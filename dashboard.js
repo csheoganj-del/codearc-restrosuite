@@ -13,99 +13,119 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cleaned active recipe specs mapped directly from "@new item recipe copy.xlsx"
   const excelRecipes = {
     // HOT COFFEE
-    "doppio": { coffee_beans: 20, hot_cups: 1 }, // 60ml double shot
-    "espresso": { coffee_beans: 10, hot_cups: 1 }, // 30ml single shot
-    "cappuccino": { coffee_beans: 10, steamed_milk: 200, hot_cups: 1 }, // 30ml shot + milk
-    "cafe latte": { coffee_beans: 10, steamed_milk: 200, hot_cups: 1 },
-    "flat white": { coffee_beans: 10, steamed_milk: 200, hot_cups: 1 },
-    "affogato": { coffee_beans: 20, vanilla_ice_cream: 110, hot_cups: 1 }, // 60ml shot + ice cream
-    "americano": { coffee_beans: 10, hot_cups: 1 }, // shot + hot water
-    "cortado": { coffee_beans: 20, steamed_milk: 120, hot_cups: 1 }, // 60ml shot + milk
-    "caramel macchiato": { coffee_beans: 10, steamed_milk: 200, caramel_syrup: 30, hot_cups: 1 },
-    "cafe mocha": { coffee_beans: 10, steamed_milk: 200, chocolate_sauce: 40, hot_cups: 1 },
-    "doppio hot chocolate": { cocoa_powder: 30, steamed_milk: 150, chocolate_sauce: 20, hot_cups: 1 },
-    "classic hot chocolate": { cocoa_powder: 30, steamed_milk: 150, hot_cups: 1 },
+    "doppio": { coffee_beans: 20, hot_cups: 1 }, // 60 ml double shot
+    "espresso": { coffee_beans: 10, hot_cups: 1 }, // 30 ml single shot
+    "cappuccino": { coffee_beans: 10, steamed_milk: 150, hot_cups: 1 }, // 30 ml shot + 150 ml milk
+    "cafe latte": { coffee_beans: 10, steamed_milk: 180, hot_cups: 1 }, // 30 ml shot + 180 ml milk
+    "flat white": { coffee_beans: 10, steamed_milk: 200, hot_cups: 1 }, // 30 ml shot + 200 ml milk
+    "affogato": { coffee_beans: 20, vanilla_ice_cream: 110, hot_cups: 1 }, // 60 ml shot + 2 scoop (110g) ice cream
+    "americano": { coffee_beans: 10, hot_cups: 1 }, // 30 ml shot + 150 ml water
+    "cortado": { coffee_beans: 20, steamed_milk: 60, hot_cups: 1 }, // 60 ml shot + 60 ml milk
+    "cortardo": { coffee_beans: 20, steamed_milk: 60, hot_cups: 1 },
+    "caramel macchiato": { coffee_beans: 10, steamed_milk: 100, caramel_syrup: 20, hot_cups: 1 }, // 30 ml shot + 100 ml milk foam + 20 ml caramel
+    "caramel machhiato": { coffee_beans: 10, steamed_milk: 100, caramel_syrup: 20, hot_cups: 1 },
+    "cafe mocha": { coffee_beans: 10, steamed_milk: 120, chocolate_sauce: 30, hot_cups: 1 }, // 30 ml shot + 120 ml milk + 30 ml chocolate
 
-    // COLD COFFEE
-    "iced latte": { coffee_beans: 20, steamed_milk: 150, cold_cups: 1 }, // 60ml shot + milk + ice
-    "iced americano": { coffee_beans: 10, cold_cups: 1 },
-    "irish coffee": { coffee_beans: 20, whipped_cream: 30, cold_cups: 1 },
-    "mocha frappe": { coffee_beans: 20, vanilla_ice_cream: 110, chocolate_sauce: 40, steamed_milk: 90, cold_cups: 1 },
-    "doppio signature frappe": { coffee_beans: 20, vanilla_ice_cream: 110, chocolate_sauce: 60, steamed_milk: 90, whipped_cream: 20, cold_cups: 1 },
-    "iced caramel macchiato": { coffee_beans: 20, steamed_milk: 150, caramel_syrup: 30, cold_cups: 1 },
-    "hazelnut frappe": { coffee_beans: 20, vanilla_ice_cream: 110, hazelnut_syrup: 30, steamed_milk: 90, cold_cups: 1 },
-    "espresso ginger ale": { coffee_beans: 10, ginger_ale: 150, cold_cups: 1 },
-    "classic frappe": { coffee_beans: 20, vanilla_ice_cream: 110, steamed_milk: 90, cold_cups: 1 },
+    // ICED COFFEE
+    "iced americano": { coffee_beans: 10, cold_cups: 1 }, // 30 ml shot + 60 ml water + ice
+    "iced latte": { coffee_beans: 20, steamed_milk: 90, cold_cups: 1 }, // 60 ml shot + 90 ml milk + ice
+    "espresso ginger ale": { coffee_beans: 10, ginger_ale: 330, cold_cups: 1 }, // 30 ml shot + 1 can ginger ale + ice
+    "cranberry espresso": { coffee_beans: 10, cranberry_juice: 150, cold_cups: 1 }, // 30 ml shot + 150 ml cranberry + ice
+    "americano sunset": { coffee_beans: 10, orange_juice: 150, cold_cups: 1 }, // 30 ml shot + 150 ml orange juice + ice
+    "tonic water espresso": { coffee_beans: 10, tonic_water: 330, cold_cups: 1 }, // 30 ml shot + 1 can tonic + ice
+    "vietnamese": { coffee_beans: 20, condensed_milk: 60, steamed_milk: 90, cold_cups: 1 }, // 60 ml shot + 60 ml condensed + 90 ml milk
 
     // MATCHA
-    "iced matcha latte": { matcha_powder: 3, steamed_milk: 150, cold_cups: 1 },
-    "matcha latte": { matcha_powder: 3, steamed_milk: 150, hot_cups: 1 },
-    "iced strawberry matcha": { matcha_powder: 3, steamed_milk: 120, strawberry_crush: 60, cold_cups: 1 },
-    "iced vanilla matcha": { matcha_powder: 3, steamed_milk: 120, vanilla_syrup: 30, cold_cups: 1 },
-    "mango matcha": { matcha_powder: 3, steamed_milk: 120, mango_crush: 60, cold_cups: 1 },
+    "hot matcha latte": { matcha_powder: 3, steamed_milk: 50, hot_cups: 1 }, // 3g matcha + 50 ml milk + 30 ml hot water
+    "ice matcha latte": { matcha_powder: 3, steamed_milk: 150, cold_cups: 1 }, // 3g matcha + 150 ml milk + ice + 30 ml water
+    "flavoured iced matcha": { matcha_powder: 3, steamed_milk: 120, vanilla_syrup: 30, cold_cups: 1 }, // 3g matcha + 30 ml flavoring + 120 ml milk + ice
+    "mango matcha": { matcha_powder: 3, steamed_milk: 120, mango_crush: 60, cold_cups: 1 }, // 3g matcha + 120 ml milk + 60 ml mango + ice
+    "strawberry matcha": { matcha_powder: 3, steamed_milk: 120, strawberry_crush: 60, cold_cups: 1 }, // 3g matcha + 120 ml milk + 60 ml strawberry + ice
 
-    // FRIES & SHARE PLATES
+    // FRAPPE
+    "class frappe": { coffee_beans: 20, vanilla_ice_cream: 110, steamed_milk: 90, cold_cups: 1 }, // 60 ml shot + 110g ice cream + 90 ml milk
+    "hazelnut frappe": { coffee_beans: 20, vanilla_ice_cream: 110, hazelnut_syrup: 30, steamed_milk: 90, cold_cups: 1 },
+    "irish frappe": { coffee_beans: 20, vanilla_ice_cream: 110, irish_syrup: 30, steamed_milk: 90, cold_cups: 1 },
+    "mocha frappe": { coffee_beans: 20, vanilla_ice_cream: 110, chocolate_sauce: 60, steamed_milk: 90, cold_cups: 1 },
+    "nutella frappe": { coffee_beans: 20, vanilla_ice_cream: 110, nutella: 40, steamed_milk: 90, whipped_cream: 20, cold_cups: 1 },
+    "biscoff frappe": { coffee_beans: 20, vanilla_ice_cream: 110, biscoff_spread: 30, steamed_milk: 90, biscuit: 4, whipped_cream: 20, cold_cups: 1 },
+    "caramel frappe": { coffee_beans: 20, vanilla_ice_cream: 110, caramel_syrup: 30, steamed_milk: 90, cold_cups: 1 },
+    "doppio signature frappe": { coffee_beans: 20, vanilla_ice_cream: 110, chocolate_sauce: 60, steamed_milk: 90, whipped_cream: 20, cold_cups: 1 },
+
+    // THICK SHAKES
+    "nutella thick shake": { vanilla_ice_cream: 135, nutella: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "nutella thickshake": { vanilla_ice_cream: 135, nutella: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "oreo cookies thick shake": { vanilla_ice_cream: 135, oreo: 5, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
+    "oreo cookies thickshake": { vanilla_ice_cream: 135, oreo: 5, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
+    "biscoff thick shake": { vanilla_ice_cream: 135, biscoff_spread: 60, whipped_cream: 20, steamed_milk: 120, biscuit: 4, cold_cups: 1 },
+    "biscoff thickshake": { vanilla_ice_cream: 135, biscoff_spread: 60, whipped_cream: 20, steamed_milk: 120, biscuit: 4, cold_cups: 1 },
+    "strawberry thick shake": { vanilla_ice_cream: 135, strawberry_crush: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "strawberry thickshake": { vanilla_ice_cream: 135, strawberry_crush: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "mango smoothie": { vanilla_ice_cream: 135, mango_crush: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "choco chips": { vanilla_ice_cream: 135, choco_chip: 60, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
+    "brownie thick shake": { vanilla_ice_cream: 135, brownie: 60, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
+    "brownie thickshake": { vanilla_ice_cream: 135, brownie: 60, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
+
+    // MOCKTAIL
+    "mojito": { mint_syrup: 30, soda: 100, sprite: 100, lemon_juice: 15, cold_cups: 1 }, // 30 ml mojito + 100 ml soda + 100 ml sprite + 15 ml lemon
+    "grean apple soda": { green_apple_syrup: 30, soda: 200, lemon_juice: 15, cold_cups: 1 }, // 30 ml syrup + 200 ml soda + 15 ml lemon
+    "green apple soda": { green_apple_syrup: 30, soda: 200, lemon_juice: 15, cold_cups: 1 },
+    "blue lagoon": { blue_curacao: 30, soda: 100, sprite: 100, lemon_juice: 15, cold_cups: 1 }, // 30 ml curacao + 100 ml soda + 100 ml sprite + 15 ml lemon
+    "spicy guava mojito": { guava_juice: 60, soda: 100, mint_syrup: 20, lemon_juice: 15, tobasco: 1, sprite: 100, chilly_powder: 1, cold_cups: 1 }, // 60 ml guava + 20 ml syrup + 100 ml soda + 15 ml lemon + 1ml Tabasco + 100 ml sprite + 1g chili powder
+    "lemon iced tea": { tea_bags: 2, sugar_syrup: 30, icea_tea_syrup: 60, lemon_juice: 15, cold_cups: 1 }, // 2 tea bags + 30 ml sugar + 60 ml tea syrup + 15 ml lemon + 60 ml hot water
+    "litchi and lime granita": { litchi_crush: 60, soda: 100, lemon_juice: 15, cold_cups: 1 }, // 60 ml litchi + 100 ml soda + 15 ml lemon
+    "strawberry granita": { strawberry_crush: 60, soda: 100, lemon_juice: 15, cold_cups: 1 }, // 60 ml strawberry + 100 ml soda + 15 ml lemon
+    "spicy mango martini": { mango_crush: 60, soda: 100, sprite: 100, lemon_juice: 15, tobasco: 1, mint_syrup: 20, chilly_powder: 1, cold_cups: 1 }, // 60 ml mango + 100 ml soda + 100 ml sprite + 15 ml lemon + 1ml Tabasco + 20 ml syrup + 1g chili powder
+
+    // DOPPIO HOT CHOCOLATE
+    "hot chocolate": { cocoa_powder: 30, chocolate_sauce: 20, steamed_milk: 150, hot_cups: 1 }, // 30g powder + 20ml sauce + 150ml milk
+    "nutella": { cocoa_powder: 30, nutella: 30, steamed_milk: 150, hot_cups: 1 }, // 30g powder + 30g Nutella + 150ml milk
+    "brownie": { cocoa_powder: 30, brownie: 30, steamed_milk: 150, hot_cups: 1 }, // 30g powder + 30g Brownie + 150ml milk
+    "flavoured": { cocoa_powder: 30, caramel_syrup: 30, steamed_milk: 150, hot_cups: 1 }, // 30g powder + 30ml flavour + 150ml milk
+
+    // COLD BREW
+    "ginger ale": { ginger_ale: 330, cold_brew: 60, cold_cups: 1 }, // 1 can (330ml) ginger ale + 60ml cold brew
+    "orange bumble": { orange_crush: 30, cold_brew: 60, soda: 330, cold_cups: 1 }, // 30ml orange + 60ml cold brew + 1 can (330ml) soda
+    "tonic water": { tonic_water: 330, cold_brew: 60, cold_cups: 1 }, // 1 can tonic (330ml) + 60ml cold brew
+    "cranberry": { cranberry_juice: 30, cold_brew: 60, soda: 330, cold_cups: 1 }, // 30ml cranberry + 60ml cold brew + 1 can soda
+    "passion fruit": { passion_fruit_syrup: 30, cold_brew: 60, lemon_juice: 15, soda: 330, cold_cups: 1 }, // 30ml syrup + 60ml cold brew + 15ml lemon + 1 can soda
+    "peach": { peach_syrup: 30, cold_brew: 60, soda: 330, cold_cups: 1 }, // 30ml peach + 60ml cold brew + 1 can soda
+    "basil": { basil_syrup: 30, cold_brew: 60, ginger_ale: 330, cold_cups: 1 }, // 30ml basil + 60ml cold brew + 1 can ginger ale
+    "mint": { mint_syrup: 20, cold_brew: 60, lemon_juice: 15, mint_leaves: 8, soda: 100, sprite: 100, cold_cups: 1 }, // 20ml syrup + 60ml cold brew + 15ml lemon + 8 mint leaves + 100ml soda + 100ml sprite
+
+    // FRIES & OTHER FOOD ITEMS FALLBACK
     "fries salted": { snack_packs: 1 },
-    "fries peri peri": { snack_packs: 1, peri_peri_seasoning: 5 },
-    "fries loaded": { snack_packs: 1, cheese_sauce: 40 },
+    "fries peri peri": { snack_packs: 1 },
+    "fries loaded": { snack_packs: 1 },
     "potato wedges classic": { snack_packs: 1 },
-    "potato wedges loaded": { snack_packs: 1, cheese_sauce: 40 },
+    "potato wedges loaded": { snack_packs: 1 },
     "hot chicken wings": { snack_packs: 1 },
     "chicken pops": { snack_packs: 1 },
     "chicken nuggets": { snack_packs: 1 },
     "chicken finger": { snack_packs: 1 },
-
-    // MOCKTAILS
-    "mojito": { mint_syrup: 30, soda: 200, lemon_juice: 15, cold_cups: 1 },
-    "green apple soda": { green_apple_syrup: 30, soda: 200, lemon_juice: 15, cold_cups: 1 },
-    "blue lagoon": { blue_curacao: 30, soda: 200, lemon_juice: 15, cold_cups: 1 },
-    "spicy guava mojito": { guava_juice: 60, mint_syrup: 20, soda: 200, lemon_juice: 15, cold_cups: 1 },
-    "lemon iced tea": { tea_bags: 1, sugar_syrup: 30, lemon_juice: 15, cold_cups: 1 },
-    "litchi and lime granita": { litchi_crush: 60, soda: 100, lemon_juice: 15, cold_cups: 1 },
-    "strawberry granita": { strawberry_crush: 60, soda: 100, lemon_juice: 15, cold_cups: 1 },
-    "spicy mango martini": { mango_crush: 60, soda: 200, lemon_juice: 15, cold_cups: 1 },
-
-    // SANDWICHES
     "bombay grilled sandwich": { snack_packs: 1 },
-    "cheese corn grilled sandwich": { snack_packs: 1, cheese_sauce: 20 },
-    "cheese chilli sandwich": { snack_packs: 1, cheese_sauce: 20 },
-
-    // THICK SHAKES
-    "nutella thickshake": { vanilla_ice_cream: 135, nutella: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
-    "oreo cookies thickshake": { vanilla_ice_cream: 135, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
-    "salted caramel thickshake": { vanilla_ice_cream: 135, caramel_syrup: 30, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
-    "strawberry thickshake": { vanilla_ice_cream: 135, strawberry_crush: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
-    "mango smoothie": { vanilla_ice_cream: 135, mango_crush: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
-    "kids mnm shake": { vanilla_ice_cream: 135, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
-
-    // CLASSIC TOAST
-    "cheese garlic": { snack_packs: 1, cheese_sauce: 20 },
-    "chilli cheese garlic": { snack_packs: 1, cheese_sauce: 20 },
-    "cheese corn toast": { snack_packs: 1, cheese_sauce: 20 },
-    "cheese mushroom toast": { snack_packs: 1, cheese_sauce: 20 },
-
-    // EGGS
-    "classic cheese omelette": { snack_packs: 1, cheese_sauce: 15 },
+    "cheese corn grilled sandwich": { snack_packs: 1 },
+    "cheese chilli sandwich": { snack_packs: 1 },
+    "cheese garlic": { snack_packs: 1 },
+    "chilli cheese garlic": { snack_packs: 1 },
+    "cheese corn toast": { snack_packs: 1 },
+    "cheese mushroom toast": { snack_packs: 1 },
+    "classic cheese omelette": { snack_packs: 1 },
     "garden omelette": { snack_packs: 1 },
     "masala omelette": { snack_packs: 1 },
     "butter garlic egg": { snack_packs: 1 },
-
-    // APPETIZERS
-    "classic nachos": { snack_packs: 1, cheese_sauce: 30 },
-    "loaded nachos": { snack_packs: 1, cheese_sauce: 30 },
-
-    // COMBOS
-    "swiggy combo1": { coffee_beans: 20, steamed_milk: 200, snack_packs: 1, hot_cups: 1 },
-    "swiggy combo2": { coffee_beans: 20, steamed_milk: 200, snack_packs: 2, hot_cups: 2 },
-    "swiggy combo3": { coffee_beans: 40, steamed_milk: 400, snack_packs: 1, hot_cups: 2 },
-    "swiggy combo4": { coffee_beans: 20, soda: 200, snack_packs: 2, cold_cups: 1 },
-    "swiggy combo5": { coffee_beans: 20, hot_cups: 1, snack_packs: 1 },
-
-    // PASTA
-    "alfredo pennei pasta": { snack_packs: 1, cheese_sauce: 50 }
+    "classic nachos": { snack_packs: 1 },
+    "loaded nachos": { snack_packs: 1 },
+    "alfredo pennei pasta": { snack_packs: 1 },
+    
+    "swiggy combo1": { coffee_beans: 10, steamed_milk: 180, snack_packs: 1, hot_cups: 1 },
+    "swiggy combo2": { coffee_beans: 20, steamed_milk: 360, snack_packs: 2, hot_cups: 2 },
+    "swiggy combo3": { coffee_beans: 20, steamed_milk: 360, snack_packs: 1, hot_cups: 2 },
+    "swiggy combo4": { coffee_beans: 10, soda: 200, snack_packs: 2, cold_cups: 1 },
+    "swiggy combo5": { coffee_beans: 10, hot_cups: 1, snack_packs: 1 }
   };
 
-  // Expanded inventory database structure (3.0 kg of raw ingredients / 300 units standard)
+  // Expanded Nagpur inventory database structure (3.0 kg of raw ingredients / 300 units standard)
   const defaultInventory = {
     coffee_beans: 3000,       // grams (3 kg)
     steamed_milk: 3000,       // ml (3 L)
@@ -122,6 +142,30 @@ document.addEventListener('DOMContentLoaded', () => {
     soda: 3000,               // ml
     lemon_juice: 1000,        // ml
     nutella: 1000,            // grams
+    vanilla_syrup: 1000,      // ml
+    irish_syrup: 1000,        // ml
+    biscoff_spread: 1000,     // grams
+    biscuit: 300,             // pieces
+    oreo: 300,                // pieces
+    choco_chip: 1000,         // grams
+    brownie: 1000,            // grams
+    ginger_ale: 3300,         // ml (10 cans)
+    tonic_water: 3300,        // ml (10 cans)
+    cranberry_juice: 2000,    // ml
+    orange_juice: 2000,       // ml
+    condensed_milk: 1000,     // ml
+    cold_brew: 2000,          // ml
+    passion_fruit_syrup: 1000,// ml
+    peach_syrup: 1000,        // ml
+    basil_syrup: 1000,        // ml
+    mint_syrup: 1000,         // ml
+    sprite: 3000,             // ml
+    blue_curacao: 1000,       // ml
+    tea_bags: 100,            // pieces
+    litchi_crush: 1000,       // ml
+    tobasco: 100,             // ml
+    chilly_powder: 200,       // grams
+    mint_leaves: 100,         // pieces
     hot_cups: 300,            // units
     cold_cups: 300,           // units
     snack_packs: 300          // units
@@ -211,11 +255,12 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   let menu = JSON.parse(localStorage.getItem('doppio_menu')) || defaultMenu;
-  let inventory = JSON.parse(localStorage.getItem('doppio_inventory')) || defaultInventory;
+  let savedInventory = JSON.parse(localStorage.getItem('doppio_inventory')) || {};
+  let inventory = { ...defaultInventory, ...savedInventory };
   let bills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
   
   if (!localStorage.getItem('doppio_menu')) localStorage.setItem('doppio_menu', JSON.stringify(menu));
-  if (!localStorage.getItem('doppio_inventory')) localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+  localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
 
   let cart = [];
   let selectedPaymentMethod = 'UPI';
@@ -737,9 +782,37 @@ document.addEventListener('DOMContentLoaded', () => {
       { key: 'whipped_cream', label: 'Whipped Cream', max: 1000, unit: 'ml' },
       { key: 'caramel_syrup', label: 'Caramel Syrup', max: 1000, unit: 'ml' },
       { key: 'chocolate_sauce', label: 'Chocolate Sauce', max: 1000, unit: 'ml' },
-      { key: 'soda', label: 'Mocktail Soda Base', max: 3000, unit: 'ml' },
-      { key: 'lemon_juice', label: 'Lemon juice juice', max: 1000, unit: 'ml' },
+      { key: 'hazelnut_syrup', label: 'Hazelnut Syrup', max: 1000, unit: 'ml' },
+      { key: 'strawberry_crush', label: 'Strawberry Crush', max: 1000, unit: 'ml' },
+      { key: 'mango_crush', label: 'Mango Crush', max: 1000, unit: 'ml' },
+      { key: 'guava_juice', label: 'Guava Juice', max: 2000, unit: 'ml' },
+      { key: 'soda', label: 'Soda Base', max: 3000, unit: 'ml' },
+      { key: 'lemon_juice', label: 'Lemon Juice', max: 1000, unit: 'ml' },
       { key: 'nutella', label: 'Premium Nutella', max: 1000, unit: 'g' },
+      { key: 'vanilla_syrup', label: 'Vanilla Syrup', max: 1000, unit: 'ml' },
+      { key: 'irish_syrup', label: 'Irish Syrup', max: 1000, unit: 'ml' },
+      { key: 'biscoff_spread', label: 'Biscoff Spread', max: 1000, unit: 'g' },
+      { key: 'biscuit', label: 'Biscoff Biscuit', max: 300, unit: 'pcs' },
+      { key: 'oreo', label: 'Oreo Biscuit', max: 300, unit: 'pcs' },
+      { key: 'choco_chip', label: 'Choco Chips', max: 1000, unit: 'g' },
+      { key: 'brownie', label: 'Chocolate Brownie', max: 1000, unit: 'g' },
+      { key: 'ginger_ale', label: 'Ginger Ale', max: 3300, unit: 'ml' },
+      { key: 'tonic_water', label: 'Tonic Water', max: 3300, unit: 'ml' },
+      { key: 'cranberry_juice', label: 'Cranberry Juice', max: 2000, unit: 'ml' },
+      { key: 'orange_juice', label: 'Orange Juice', max: 2000, unit: 'ml' },
+      { key: 'condensed_milk', label: 'Condensed Milk', max: 1000, unit: 'ml' },
+      { key: 'cold_brew', label: 'Cold Brew Base', max: 2000, unit: 'ml' },
+      { key: 'passion_fruit_syrup', label: 'Passion Fruit Syrup', max: 1000, unit: 'ml' },
+      { key: 'peach_syrup', label: 'Peach Syrup', max: 1000, unit: 'ml' },
+      { key: 'basil_syrup', label: 'Basil Syrup', max: 1000, unit: 'ml' },
+      { key: 'mint_syrup', label: 'Mint Syrup', max: 1000, unit: 'ml' },
+      { key: 'sprite', label: 'Sprite Soda', max: 3000, unit: 'ml' },
+      { key: 'blue_curacao', label: 'Blue Curacao Syrup', max: 1000, unit: 'ml' },
+      { key: 'tea_bags', label: 'Tea Bags', max: 100, unit: 'pcs' },
+      { key: 'litchi_crush', label: 'Litchi Crush', max: 1000, unit: 'ml' },
+      { key: 'tobasco', label: 'Tabasco Sauce', max: 100, unit: 'ml' },
+      { key: 'chilly_powder', label: 'Chili Powder', max: 200, unit: 'g' },
+      { key: 'mint_leaves', label: 'Fresh Mint Leaves', max: 100, unit: 'pcs' },
       { key: 'hot_cups', label: 'Hot Takeaway Cups', max: 300, unit: 'pcs' },
       { key: 'cold_cups', label: 'Cold Takeaway Cups', max: 300, unit: 'pcs' },
       { key: 'snack_packs', label: 'Takeaway Food Boxes', max: 300, unit: 'pcs' }
@@ -748,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
     items.forEach(item => {
       const current = inventory[item.key] || 0;
       const percent = Math.min(100, Math.round((current / item.max) * 100));
-      const isLow = current < (item.key.includes('cup') || item.key.includes('box') || item.key.includes('pack') ? 25 : 300);
+      const isLow = current < (item.key.includes('cups') || item.key.includes('packs') || item.key === 'biscuit' || item.key === 'oreo' || item.key === 'tea_bags' || item.key === 'mint_leaves' ? 25 : (item.key.includes('powder') || item.key === 'chilly_powder' || item.key === 'tobasco' ? 50 : 300));
 
       const card = document.createElement('div');
       card.className = 'inventory-card';
@@ -770,9 +843,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function formatStockValue(val, key) {
-    if (key.includes('cups') || key.includes('packs')) return `${val} units`;
-    if (val >= 1000) return `${(val/1000).toFixed(2)} kg`;
-    return `${val} ${key.includes('milk') || key.includes('syrup') || key.includes('sauce') || key.includes('cream') || key.includes('juice') || key.includes('soda') ? 'ml' : 'g'}`;
+    const isUnit = key.includes('cups') || key.includes('packs') || key === 'biscuit' || key === 'oreo' || key === 'tea_bags' || key === 'mint_leaves';
+    if (isUnit) return `${val} units`;
+    
+    const isLiquid = key.includes('milk') || key.includes('syrup') || key.includes('sauce') || key.includes('cream') || key.includes('juice') || key.includes('soda') || key === 'ginger_ale' || key === 'tonic_water' || key === 'cold_brew' || key === 'sprite' || key === 'blue_curacao' || key.includes('crush') || key === 'tobasco' || key === 'lemon_juice';
+    
+    if (val >= 1000) {
+      return isLiquid ? `${(val/1000).toFixed(2)} L` : `${(val/1000).toFixed(2)} kg`;
+    }
+    return `${val} ${isLiquid ? 'ml' : 'g'}`;
   }
 
   if (restockBtn) {
@@ -781,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
       renderInventory();
       checkLowStockAlerts();
-      alert('Inventory successfully restocked to full Excel standard capacity (3.0 kg / 300 units)!');
+      alert('Nagpur Inventory successfully restocked to full Excel standard capacity (30+ ingredients)!');
     });
   }
 
@@ -794,6 +873,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (inventory.coffee_beans < 400) warnings.push(`Warning: Coffee Beans are very low (${(inventory.coffee_beans/1000).toFixed(2)} kg remaining). Please restock.`);
     if (inventory.steamed_milk < 600) warnings.push(`Warning: Steamed Milk is very low (${(inventory.steamed_milk/1000).toFixed(2)} L remaining). Please restock.`);
     if (inventory.matcha_powder < 50) warnings.push(`Warning: Matcha Powder is very low (${inventory.matcha_powder}g remaining).`);
+    if (inventory.vanilla_ice_cream < 400) warnings.push(`Warning: Vanilla Ice Cream is low (${(inventory.vanilla_ice_cream/1000).toFixed(2)} kg remaining).`);
+    if (inventory.cold_brew < 300) warnings.push(`Warning: Cold Brew Base is low (${inventory.cold_brew} ml remaining).`);
     if (inventory.hot_cups < 25) warnings.push(`Warning: Takeaway Hot Cups are critically low (${inventory.hot_cups} left).`);
     if (inventory.cold_cups < 25) warnings.push(`Warning: Takeaway Cold Cups are critically low (${inventory.cold_cups} left).`);
 
