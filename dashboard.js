@@ -289,14 +289,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function initSupabase() {
-    let url = localStorage.getItem('doppio_supabase_url') || DEFAULT_SUPABASE_URL;
-    url = sanitizeSupabaseUrl(url);
-    const key = localStorage.getItem('doppio_supabase_key') || DEFAULT_SUPABASE_KEY;
+    const url = sanitizeSupabaseUrl(DEFAULT_SUPABASE_URL);
+    const key = DEFAULT_SUPABASE_KEY;
     const syncDot = document.getElementById('supabase-sync-dot');
     const syncText = document.getElementById('supabase-sync-text');
-    const statusDot = document.getElementById('status-indicator-dot');
-    const statusText = document.getElementById('status-indicator-text');
-    const disconnectBtn = document.getElementById('disconnect-supabase-btn');
 
     if (url && key && typeof supabase !== 'undefined') {
       try {
@@ -305,15 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update UI Indicators
         if (syncDot) { syncDot.className = 'sync-dot connected'; }
         if (syncText) { syncText.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Supabase Live'; }
-        if (statusDot) { statusDot.className = 'status-indicator-dot green'; }
-        if (statusText) { statusText.textContent = 'Connected (Cloud Syncing Live)'; }
-        if (disconnectBtn) { disconnectBtn.style.display = 'block'; }
-        
-        // Pre-fill inputs in modal
-        const urlInput = document.getElementById('supabase-url-input');
-        const keyInput = document.getElementById('supabase-key-input');
-        if (urlInput) urlInput.value = url;
-        if (keyInput) keyInput.value = key;
 
         // Perform Initial Sync
         syncWithSupabase();
@@ -327,9 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
       supabaseClient = null;
       if (syncDot) { syncDot.className = 'sync-dot disconnected blinking'; }
       if (syncText) { syncText.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Supabase Offline'; }
-      if (statusDot) { statusDot.className = 'status-indicator-dot red'; }
-      if (statusText) { statusText.textContent = 'Disconnected (Local Offline Mode)'; }
-      if (disconnectBtn) { disconnectBtn.style.display = 'none'; }
     }
   }
 
@@ -1646,105 +1630,4 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Supabase settings & triggers
   initSupabase();
 
-  // Supabase Settings Config modal event wiring
-  const syncTrigger = document.getElementById('supabase-sync-trigger');
-  const supabaseModal = document.getElementById('supabase-modal');
-  const closeSupabaseModalBtn = document.getElementById('close-supabase-modal');
-  const supabaseConfigForm = document.getElementById('supabase-config-form');
-  const disconnectSupabaseBtn = document.getElementById('disconnect-supabase-btn');
-
-  if (syncTrigger && supabaseModal) {
-    syncTrigger.addEventListener('click', () => {
-      const pin = prompt('Enter Admin Password/PIN to access Supabase Live Sync setup:');
-      if (pin === 'diva123' || pin === '7860') {
-        supabaseModal.classList.add('active');
-        initSupabase(); // refresh values
-      } else if (pin !== null) {
-        alert('Invalid Admin Password/PIN. Access Denied.');
-      }
-    });
-  }
-
-  if (closeSupabaseModalBtn && supabaseModal) {
-    closeSupabaseModalBtn.addEventListener('click', () => {
-      supabaseModal.classList.remove('active');
-    });
-  }
-
-  // Close when clicking overlay backdrop
-  if (supabaseModal) {
-    supabaseModal.addEventListener('click', (e) => {
-      if (e.target === supabaseModal) {
-        supabaseModal.classList.remove('active');
-      }
-    });
-  }
-
-  if (supabaseConfigForm) {
-    supabaseConfigForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      let url = document.getElementById('supabase-url-input').value.trim();
-      url = sanitizeSupabaseUrl(url);
-      const key = document.getElementById('supabase-key-input').value.trim();
-      const saveBtn = document.getElementById('save-supabase-btn');
-
-      if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting...';
-      }
-
-      // Test connection
-      try {
-        const testClient = supabase.createClient(url, key);
-        const { error } = await testClient.from('doppio_menu').select('name').limit(1);
-        
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        // Success! Save keys
-        localStorage.setItem('doppio_supabase_url', url);
-        localStorage.setItem('doppio_supabase_key', key);
-        
-        // Re-initialize client
-        initSupabase();
-        alert('Connected successfully! Database and real-time synchronization is now live.');
-        supabaseModal.classList.remove('active');
-      } catch (err) {
-        alert('Connection failed: ' + err.message + '\nPlease check your SQL scripts are run, RLS is allowed, or Anon keys are correct.');
-      } finally {
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.innerHTML = '<i class="fa-solid fa-plug"></i> Save & Connect';
-        }
-      }
-    });
-  }
-
-  if (disconnectSupabaseBtn) {
-    disconnectSupabaseBtn.addEventListener('click', () => {
-      if (confirm('Disconnect from Supabase live cloud database? POS will revert to offline-only localStorage mode.')) {
-        localStorage.removeItem('doppio_supabase_url');
-        localStorage.removeItem('doppio_supabase_key');
-        
-        // Reset local variables back to browser values
-        menu = JSON.parse(localStorage.getItem('doppio_menu')) || defaultMenu;
-        const savedInvLocal = JSON.parse(localStorage.getItem('doppio_inventory')) || {};
-        inventory = { ...defaultInventory, ...savedInvLocal };
-        bills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
-
-        initSupabase();
-        
-        renderPOSCategories();
-        renderPOSItems();
-        if (document.getElementById('inventory-grid')) renderInventory();
-        if (document.getElementById('bills-table-body')) renderBills();
-        checkLowStockAlerts();
-        generateOrderNumber();
-        
-        if (supabaseModal) supabaseModal.classList.remove('active');
-        alert('Disconnected from cloud. Switched to secure offline operation.');
-      }
-    });
-  }
 });

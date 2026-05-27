@@ -51,9 +51,9 @@
         </div>
         <div class="header-right">
           <!-- Database Sync Status Indicator -->
-          <div class="sync-pill" title="Configure Live Supabase Cloud Sync" id="supabase-sync-trigger" style="cursor: pointer;">
+          <div class="sync-pill" id="supabase-sync-trigger">
             <span class="sync-dot blinking" id="supabase-sync-dot"></span>
-            <span class="sync-text" id="supabase-sync-text"><i class="fa-solid fa-cloud-arrow-up"></i> Supabase Offline</span>
+            <span class="sync-text" id="supabase-sync-text"><i class="fa-solid fa-cloud-arrow-up"></i> Supabase Connecting...</span>
           </div>
           <div class="dateTime" id="dateTime">May 27, 2026 12:00 PM</div>
         </div>
@@ -313,40 +313,6 @@
       </div>
     </main>
   </div>
-
-  <!-- Supabase Settings Connection Modal -->
-  <div class="modal-backdrop" id="supabase-modal">
-    <div class="glass-modal">
-      <div class="modal-header">
-        <h2><i class="fa-solid fa-cloud-arrow-up"></i> Supabase Live Sync Setup</h2>
-        <button class="close-modal-btn" id="close-supabase-modal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="settings-intro" style="color: var(--text-muted); font-size: 11px; line-height: 1.4; margin-bottom: 15px;">Connect your takeaway POS live to your Supabase cloud backend database for real-time order and inventory sync.</p>
-        <form id="supabase-config-form">
-          <div class="form-group" style="margin-bottom: 15px;">
-            <label for="supabase-url-input" style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 6px; color: var(--text-dark);">Supabase Project URL</label>
-            <input type="url" id="supabase-url-input" placeholder="https://your-project.supabase.co" required style="width: 100%; padding: 10px; border: 1px solid rgba(44, 27, 24, 0.15); border-radius: 6px; background: rgba(255, 255, 255, 0.5); font-size: 12px; color: var(--text-dark);">
-          </div>
-          <div class="form-group" style="margin-bottom: 15px;">
-            <label for="supabase-key-input" style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 6px; color: var(--text-dark);">Supabase Anon Public API Key</label>
-            <input type="password" id="supabase-key-input" placeholder="eyJhbGciOi..." required style="width: 100%; padding: 10px; border: 1px solid rgba(44, 27, 24, 0.15); border-radius: 6px; background: rgba(255, 255, 255, 0.5); font-size: 12px; color: var(--text-dark);">
-          </div>
-          
-          <div class="connection-status-indicator" id="supabase-connection-indicator" style="display: flex; align-items: center; gap: 8px; margin: 15px 0; padding: 10px; border-radius: 6px; background: rgba(44, 27, 24, 0.05); font-size: 11px;">
-            <span class="status-indicator-dot red" id="status-indicator-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #FF5A5F;"></span>
-            <span class="status-indicator-text" id="status-indicator-text" style="font-weight: 600; color: var(--text-muted);">Disconnected (Local Offline Mode)</span>
-          </div>
-
-          <div class="form-actions" style="display: flex; gap: 10px; justify-content: flex-end;">
-            <button type="button" class="btn btn-secondary" id="disconnect-supabase-btn" style="color: #FF5A5F; border-color: #FF5A5F; display: none; padding: 8px 12px; font-size: 11px; border-radius: 6px; font-weight: 600;"><i class="fa-solid fa-plug-circle-xmark"></i> Disconnect</button>
-            <button type="submit" class="btn btn-primary" id="save-supabase-btn" style="padding: 8px 16px; font-size: 11px; border-radius: 6px; font-weight: 600;"><i class="fa-solid fa-plug"></i> Save & Connect</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="dashboard.js"></script>
 </body>
