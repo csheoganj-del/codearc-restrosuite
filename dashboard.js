@@ -335,10 +335,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function syncWithSupabase() {
     if (!supabaseClient) return;
+    const statusText = document.getElementById('status-indicator-text');
 
     try {
       // 1. Sync Menu Items
       const { data: dbMenu, error: menuErr } = await supabaseClient.from('doppio_menu').select('*').order('id', { ascending: true });
+      if (menuErr) {
+        console.error("Supabase Menu Error:", menuErr);
+        if (statusText) statusText.textContent = `Sync Error: ${menuErr.message}`;
+        alert(`Supabase Sync Error: ${menuErr.message}. Check your Supabase URL/Key or RLS policies.`);
+      }
       if (!menuErr && dbMenu) {
         if (dbMenu.length > 0) {
           menu = dbMenu;
