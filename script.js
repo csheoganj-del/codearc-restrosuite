@@ -547,14 +547,15 @@ window.addEventListener('DOMContentLoaded', () => {
       // If we haven't counted this session yet, hit the "up" counter endpoint (increments by 1)
       // Otherwise, query the static counter value so we don't spam fake counts on refreshes
       const endpoint = !hasCounted 
-        ? 'https://api.counterapi.dev/v1/doppiocafe/global/up' 
-        : 'https://api.counterapi.dev/v1/doppiocafe/global';
+        ? 'https://api.counterapi.dev/v1/doppiocafe/global/up/' 
+        : 'https://api.counterapi.dev/v1/doppiocafe/global/';
 
       fetch(endpoint)
         .then(response => response.json())
         .then(data => {
-          if (data && data.value) {
-            const cloudValue = data.value;
+          const countVal = data.count || data.value;
+          if (typeof countVal !== 'undefined') {
+            const cloudValue = parseInt(countVal, 10);
             const finalCount = 10480 + cloudValue;
             visitCountEl.textContent = formatCount(finalCount);
             localStorage.setItem('doppio_visitor_count', finalCount);
