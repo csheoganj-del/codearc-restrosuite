@@ -378,7 +378,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // 3. Sync Bills
-      const { data: dbBills, error: billsErr } = await supabaseClient.from('doppio_bills').select('*').order('created_at', { ascending: true });
+      let dbBills = null;
+      let billsErr = null;
+      try {
+        const res = await supabaseClient.from('doppio_bills').select('*').order('created_at', { ascending: true });
+        dbBills = res.data;
+        billsErr = res.error;
+      } catch (e) {
+        billsErr = e;
+      }
+
+      // Fallback: If ordering by created_at failed (e.g., column doesn't exist yet on old table), select without ordering
+      if (billsErr && (billsErr.code === '42703' || (billsErr.message && billsErr.message.includes('created_at')))) {
+        console.warn("created_at column missing on doppio_bills in Supabase, falling back to unordered select.");
+        const fallbackRes = await supabaseClient.from('doppio_bills').select('*');
+        dbBills = fallbackRes.data;
+        billsErr = fallbackRes.error;
+      }
+
       if (!billsErr && dbBills) {
         if (dbBills.length > 0) {
           bills = dbBills.map(b => ({
@@ -401,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
               orderId: bill.orderId,
               customerName: bill.customerName,
               dateTime: bill.dateTime,
-              items: bill.items,
+              items: typeof bill.items === 'string' ? bill.items : JSON.stringify(bill.items),
               subtotal: bill.subtotal,
               gst: bill.gst,
               total: bill.total,
@@ -444,8 +461,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!supabaseClient) return;
     try {
       // Sync Bills — detect any change: added, deleted, or edited
-      const { data: dbBills, error: billsErr } = await supabaseClient
-        .from('doppio_bills').select('*').order('created_at', { ascending: true });
+      let dbBills = null;
+      let billsErr = null;
+      try {
+        const res = await supabaseClient.from('doppio_bills').select('*').order('created_at', { ascending: true });
+        dbBills = res.data;
+        billsErr = res.error;
+      } catch (e) {
+        billsErr = e;
+      }
+
+      // Fallback: If ordering by created_at failed (e.g., column doesn't exist yet on old table), select without ordering
+      if (billsErr && (billsErr.code === '42703' || (billsErr.message && billsErr.message.includes('created_at')))) {
+        const fallbackRes = await supabaseClient.from('doppio_bills').select('*');
+        dbBills = fallbackRes.data;
+        billsErr = fallbackRes.error;
+      }
+
       if (!billsErr && dbBills) {
         const remoteLastId = dbBills.length > 0 ? dbBills[dbBills.length - 1].orderId : null;
         const localLastId = bills.length > 0 ? bills[bills.length - 1].orderId : null;
@@ -909,12 +941,17 @@ document.addEventListener('DOMContentLoaded', () => {
           orderId: newBill.orderId,
           customerName: newBill.customerName,
           dateTime: newBill.dateTime,
-          items: newBill.items,
+          items: typeof newBill.items === 'string' ? newBill.items : JSON.stringify(newBill.items),
           subtotal: newBill.subtotal,
           gst: newBill.gst,
           total: newBill.total,
           paymentMethod: newBill.paymentMethod
-        }).then(({ error }) => { if (error) console.error("Error syncing bill to cloud:", error); });
+        }).then(({ error }) => {
+          if (error) {
+            console.error("Error syncing bill to cloud:", error);
+            alert(`Cloud Sync Warning: Failed to sync this transaction to Supabase. Error: ${error.message || error.details || 'Unknown'}\n\nPlease check your Supabase schema or RLS policies!`);
+          }
+        });
       }
 
       // Print
@@ -1104,7 +1141,12 @@ document.addEventListener('DOMContentLoaded', () => {
             supabaseClient.from('doppio_bills')
               .update({ customerName: newName.trim() })
               .eq('orderId', orderId)
-              .then(({ error }) => { if (error) console.error("Error editing bill in cloud:", error); });
+              .then(({ error }) => {
+                if (error) {
+                  console.error("Error editing bill in cloud:", error);
+                  alert(`Cloud Sync Warning: Failed to sync edited customer name to Supabase. Error: ${error.message}`);
+                }
+              });
           }
         }
       } else if (btn.classList.contains('delete')) {
@@ -1134,7 +1176,12 @@ document.addEventListener('DOMContentLoaded', () => {
             supabaseClient.from('doppio_bills')
               .delete()
               .eq('orderId', orderId)
-              .then(({ error }) => { if (error) console.error("Error deleting bill from cloud:", error); });
+              .then(({ error }) => {
+                if (error) {
+                  console.error("Error deleting bill from cloud:", error);
+                  alert(`Cloud Sync Warning: Failed to sync deleted bill to Supabase. Error: ${error.message}`);
+                }
+              });
           }
 
           renderBills();
