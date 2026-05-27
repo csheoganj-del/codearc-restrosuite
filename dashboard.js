@@ -684,8 +684,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function generateOrderNumber() {
     const input = document.getElementById('order-num');
     if (input) {
-      const num = 'DO-' + (1000 + bills.length + 1);
-      input.value = num;
+      // If no bills exist, always start from DO-1001
+      const nextNum = bills.length === 0 ? 1001 : (1000 + bills.length + 1);
+      input.value = 'DO-' + nextNum;
     }
   }
   generateOrderNumber();
@@ -999,9 +1000,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.innerHTML = `
       <div class="receipt-header">
-        <div class="receipt-title">DOPPIO CAFE</div>
-        <div class="receipt-subtitle">London Street, Nagpur</div>
-        <div class="receipt-subtitle">Ph: +91 91300 03177</div>
+        <div class="receipt-title">${businessProfile ? businessProfile.name.toUpperCase() : 'DOPPIO CAFE'}</div>
+        <div class="receipt-subtitle">${businessProfile ? businessProfile.address : 'London Street, Nagpur'}</div>
+        <div class="receipt-subtitle">Ph: ${businessProfile ? businessProfile.phone : '+91 91300 03177'}</div>
       </div>
       <div class="receipt-divider"></div>
       <div class="receipt-meta-row">
@@ -1068,14 +1069,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const billsCount = document.getElementById('bills-count');
 
   let billsSearchQuery = '';
+  let billsFilterFrom = null;
+  let billsFilterTo = null;
 
   function renderBills() {
     if (!billsTableBody) return;
     billsTableBody.innerHTML = '';
 
     const filteredBills = bills.filter(bill => {
-      return bill.customerName.toLowerCase().includes(billsSearchQuery.toLowerCase()) || 
-             bill.orderId.toLowerCase().includes(billsSearchQuery.toLowerCase());
+      const q = billsSearchQuery ? billsSearchQuery.toLowerCase() : '';
+      const matchesSearch = !q || bill.customerName.toLowerCase().includes(q) || bill.orderId.toLowerCase().includes(q);
+      let matchesDate = true;
+      if (billsFilterFrom || billsFilterTo) {
+        let bd;
+        try {
+          const parts = bill.dateTime.match(/(\d+)\/(\d+)\/(\d+),?\s*(\d+):(\d+):?(\d+)?\s*(am|pm)?/i);
+          if (parts) {
+            let h = parseInt(parts[4]);
+            if (parts[7] && parts[7].toLowerCase() === 'pm' && h !== 12) h += 12;
+            if (parts[7] && parts[7].toLowerCase() === 'am' && h === 12) h = 0;
+            bd = new Date(parseInt(parts[3]), parseInt(parts[2])-1, parseInt(parts[1]), h, parseInt(parts[5]));
+          } else { bd = new Date(bill.dateTime); }
+        } catch(e) { bd = new Date(bill.dateTime); }
+        if (billsFilterFrom && bd < billsFilterFrom) matchesDate = false;
+        if (billsFilterTo && bd > billsFilterTo) matchesDate = false;
+      }
+      return matchesSearch && matchesDate;
     });
 
     if (billsCount) billsCount.textContent = `Showing ${filteredBills.length} Bills`;
@@ -1085,7 +1104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <tr>
           <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 40px;">
             <i class="fa-solid fa-receipt" style="font-size: 30px; color: var(--accent-caramel); margin-bottom: 10px; display: block;"></i>
-            No matching Nagpur cashier bills found.
+            No matching bills found.
           </td>
         </tr>
       `;
@@ -1093,14 +1112,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const sortedBills = [...filteredBills].reverse();
-
     sortedBills.forEach(bill => {
       const tr = document.createElement('tr');
       let itemsListStr = bill.items.map(item => `${item.name} (${item.qty})`).join(', ');
       if (itemsListStr.length > 30) itemsListStr = itemsListStr.substring(0, 27) + '...';
-
       const methodClass = bill.paymentMethod.toLowerCase();
-
       tr.innerHTML = `
         <td style="font-weight: 700;">${bill.orderId}</td>
         <td>${bill.customerName}</td>
@@ -1120,6 +1136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (billsTableBody) {
     billsTableBody.addEventListener('click', (e) => {
+
       const btn = e.target.closest('.table-action-btn');
       if (!btn) return;
 
@@ -1130,64 +1147,80 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btn.classList.contains('print')) {
         triggerThermalReceiptPrint(bills[targetBillIndex]);
       } else if (btn.classList.contains('edit')) {
-        const newName = prompt('Edit Takeaway Customer Name:', bills[targetBillIndex].customerName);
-        if (newName !== null && newName.trim() !== '') {
-          bills[targetBillIndex].customerName = newName.trim();
-          localStorage.setItem('doppio_bills', JSON.stringify(bills));
-          renderBills();
-
-          // Supabase mirror edit
-          if (supabaseClient) {
-            supabaseClient.from('doppio_bills')
-              .update({ customerName: newName.trim() })
-              .eq('orderId', orderId)
-              .then(({ error }) => {
-                if (error) {
-                  console.error("Error editing bill in cloud:", error);
-                  alert(`Cloud Sync Warning: Failed to sync edited customer name to Supabase. Error: ${error.message}`);
-                }
-              });
+        showAdminPinModal(() => {
+          const newName = prompt('Edit Takeaway Customer Name:', bills[targetBillIndex].customerName);
+          if (newName !== null && newName.trim() !== '') {
+            bills[targetBillIndex].customerName = newName.trim();
+            localStorage.setItem('doppio_bills', JSON.stringify(bills));
+            renderBills();
+            if (supabaseClient) {
+              supabaseClient.from('doppio_bills')
+                .update({ customerName: newName.trim() })
+                .eq('orderId', orderId)
+                .then(({ error }) => {
+                  if (error) {
+                    console.error("Error editing bill in cloud:", error);
+                    alert(`Cloud Sync Warning: Failed to sync edited customer name to Supabase. Error: ${error.message}`);
+                  }
+                });
+            }
           }
-        }
+        });
       } else if (btn.classList.contains('delete')) {
-        if (confirm(`Are you sure you want to delete bill ${orderId}? This will restore ingredients.`)) {
+        showAdminPinModal(() => {
           const bill = bills[targetBillIndex];
+          // Restore inventory
           bill.items.forEach(cartItem => {
             const specs = getDeductionSpecs(cartItem);
             Object.keys(specs).forEach(ing => {
-              inventory[ing] += (specs[ing] * cartItem.qty);
-
-              // Supabase mirror revert inventory
+              inventory[ing] = (inventory[ing] || 0) + (specs[ing] * cartItem.qty);
               if (supabaseClient) {
                 supabaseClient.from('doppio_inventory')
                   .update({ current: inventory[ing] })
                   .eq('key', ing)
-                  .then(({ error }) => { if (error) console.error("Error reverting stock in cloud:", error); });
+                  .then(({ error }) => { if (error) console.error('Inventory revert error:', error); });
               }
             });
           });
           localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-          
           bills.splice(targetBillIndex, 1);
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
-
-          // Supabase mirror delete bill
           if (supabaseClient) {
-            supabaseClient.from('doppio_bills')
-              .delete()
-              .eq('orderId', orderId)
-              .then(({ error }) => {
-                if (error) {
-                  console.error("Error deleting bill from cloud:", error);
-                  alert(`Cloud Sync Warning: Failed to sync deleted bill to Supabase. Error: ${error.message}`);
-                }
-              });
+            supabaseClient.from('doppio_bills').delete().eq('orderId', orderId)
+              .then(({ error }) => { if (error) alert(`Cloud Sync Warning: ${error.message}`); });
           }
-
+          generateOrderNumber();
           renderBills();
+          if (document.getElementById('inventory-grid')) renderInventory();
           checkLowStockAlerts();
-        }
+          if (document.getElementById('report-total-revenue')) renderReports();
+        });
       }
+    });
+  }
+
+  // Date filter for Bills tab
+  const billsFilterBtn = document.getElementById('bills-filter-btn');
+  const billsResetBtn = document.getElementById('bills-reset-btn');
+  if (billsFilterBtn) {
+    billsFilterBtn.addEventListener('click', () => {
+      const from = document.getElementById('bills-date-from').value;
+      const to = document.getElementById('bills-date-to').value;
+      billsFilterFrom = from ? new Date(from) : null;
+      billsFilterTo = to ? new Date(to + 'T23:59:59') : null;
+      billsSearchQuery = '';
+      const si = document.getElementById('bills-search-input');
+      if (si) si.value = '';
+      renderBills();
+    });
+  }
+  if (billsResetBtn) {
+    billsResetBtn.addEventListener('click', () => {
+      billsFilterFrom = null;
+      billsFilterTo = null;
+      document.getElementById('bills-date-from').value = '';
+      document.getElementById('bills-date-to').value = '';
+      renderBills();
     });
   }
 
@@ -1291,22 +1324,122 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (restockBtn) {
     restockBtn.addEventListener('click', () => {
-      inventory = { ...defaultInventory };
-      localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-      renderInventory();
-      checkLowStockAlerts();
+      showAdminPinModal(() => {
+        inventory = { ...defaultInventory };
+        localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+        renderInventory();
+        checkLowStockAlerts();
+        if (supabaseClient) {
+          Object.keys(inventory).forEach(ing => {
+            supabaseClient.from('doppio_inventory')
+              .update({ current: inventory[ing] })
+              .eq('key', ing)
+              .then(({ error }) => { if (error) console.error('Restock cloud error:', error); });
+          });
+        }
+        alert('Inventory restocked to full capacity!');
+      });
+    });
+  }
 
-      // Supabase mirror restock
-      if (supabaseClient) {
-        Object.keys(inventory).forEach(ing => {
-          supabaseClient.from('doppio_inventory')
-            .update({ current: inventory[ing] })
-            .eq('key', ing)
-            .then(({ error }) => { if (error) console.error("Error restocking ingredient in cloud:", error); });
-        });
-      }
+  // Inventory Export — CSV
+  const exportInvExcelBtn = document.getElementById('export-inventory-excel-btn');
+  if (exportInvExcelBtn) {
+    exportInvExcelBtn.addEventListener('click', () => {
+      const invItems = [
+        { key: 'coffee_beans', label: 'Coffee Beans', max: 3000, unit: 'g' },
+        { key: 'steamed_milk', label: 'Steamed Milk', max: 3000, unit: 'ml' },
+        { key: 'matcha_powder', label: 'Matcha Powder', max: 500, unit: 'g' },
+        { key: 'cocoa_powder', label: 'Cocoa Powder', max: 1000, unit: 'g' },
+        { key: 'vanilla_ice_cream', label: 'Vanilla Ice Cream', max: 3000, unit: 'g' },
+        { key: 'whipped_cream', label: 'Whipped Cream', max: 1000, unit: 'ml' },
+        { key: 'caramel_syrup', label: 'Caramel Syrup', max: 1000, unit: 'ml' },
+        { key: 'chocolate_sauce', label: 'Chocolate Sauce', max: 1000, unit: 'ml' },
+        { key: 'hazelnut_syrup', label: 'Hazelnut Syrup', max: 1000, unit: 'ml' },
+        { key: 'strawberry_crush', label: 'Strawberry Crush', max: 1000, unit: 'ml' },
+        { key: 'mango_crush', label: 'Mango Crush', max: 1000, unit: 'ml' },
+        { key: 'guava_juice', label: 'Guava Juice', max: 2000, unit: 'ml' },
+        { key: 'soda', label: 'Soda Base', max: 3000, unit: 'ml' },
+        { key: 'lemon_juice', label: 'Lemon Juice', max: 1000, unit: 'ml' },
+        { key: 'nutella', label: 'Premium Nutella', max: 1000, unit: 'g' },
+        { key: 'vanilla_syrup', label: 'Vanilla Syrup', max: 1000, unit: 'ml' },
+        { key: 'irish_syrup', label: 'Irish Syrup', max: 1000, unit: 'ml' },
+        { key: 'biscoff_spread', label: 'Biscoff Spread', max: 1000, unit: 'g' },
+        { key: 'biscuit', label: 'Biscoff Biscuit', max: 300, unit: 'pcs' },
+        { key: 'oreo', label: 'Oreo Biscuit', max: 300, unit: 'pcs' },
+        { key: 'choco_chip', label: 'Choco Chips', max: 1000, unit: 'g' },
+        { key: 'brownie', label: 'Chocolate Brownie', max: 1000, unit: 'g' },
+        { key: 'ginger_ale', label: 'Ginger Ale', max: 3300, unit: 'ml' },
+        { key: 'tonic_water', label: 'Tonic Water', max: 3300, unit: 'ml' },
+        { key: 'cranberry_juice', label: 'Cranberry Juice', max: 2000, unit: 'ml' },
+        { key: 'orange_juice', label: 'Orange Juice', max: 2000, unit: 'ml' },
+        { key: 'condensed_milk', label: 'Condensed Milk', max: 1000, unit: 'ml' },
+        { key: 'cold_brew', label: 'Cold Brew Base', max: 2000, unit: 'ml' },
+        { key: 'passion_fruit_syrup', label: 'Passion Fruit Syrup', max: 1000, unit: 'ml' },
+        { key: 'peach_syrup', label: 'Peach Syrup', max: 1000, unit: 'ml' },
+        { key: 'basil_syrup', label: 'Basil Syrup', max: 1000, unit: 'ml' },
+        { key: 'mint_syrup', label: 'Mint Syrup', max: 1000, unit: 'ml' },
+        { key: 'sprite', label: 'Sprite Soda', max: 3000, unit: 'ml' },
+        { key: 'blue_curacao', label: 'Blue Curacao Syrup', max: 1000, unit: 'ml' },
+        { key: 'tea_bags', label: 'Tea Bags', max: 100, unit: 'pcs' },
+        { key: 'litchi_crush', label: 'Litchi Crush', max: 1000, unit: 'ml' },
+        { key: 'tobasco', label: 'Tabasco Sauce', max: 100, unit: 'ml' },
+        { key: 'chilly_powder', label: 'Chili Powder', max: 200, unit: 'g' },
+        { key: 'mint_leaves', label: 'Fresh Mint Leaves', max: 100, unit: 'pcs' },
+        { key: 'hot_cups', label: 'Hot Takeaway Cups', max: 300, unit: 'pcs' },
+        { key: 'cold_cups', label: 'Cold Takeaway Cups', max: 300, unit: 'pcs' },
+        { key: 'snack_packs', label: 'Takeaway Food Boxes', max: 300, unit: 'pcs' }
+      ];
+      let csv = 'data:text/csv;charset=utf-8,';
+      csv += 'Ingredient,Current Stock,Max Capacity,Unit,% Remaining,Status\n';
+      invItems.forEach(item => {
+        const cur = inventory[item.key] || 0;
+        const pct = Math.round((cur / item.max) * 100);
+        const status = pct < 20 ? 'CRITICAL LOW' : pct < 40 ? 'Low' : 'OK';
+        csv += `"${item.label}",${cur},${item.max},${item.unit},${pct}%,${status}\n`;
+      });
+      const link = document.createElement('a');
+      link.setAttribute('href', encodeURI(csv));
+      link.setAttribute('download', `doppio_inventory_${new Date().toLocaleDateString('en-IN').replace(/\//g,'-')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
 
-      alert('Nagpur Inventory successfully restocked to full Excel standard capacity (30+ ingredients)!');
+  // Inventory Export — PDF
+  const exportInvPdfBtn = document.getElementById('export-inventory-pdf-btn');
+  if (exportInvPdfBtn) {
+    exportInvPdfBtn.addEventListener('click', () => {
+      const pw = window.open('', '_blank');
+      const invItems = [
+        { key: 'coffee_beans', label: 'Coffee Beans', max: 3000, unit: 'g' },
+        { key: 'steamed_milk', label: 'Steamed Milk', max: 3000, unit: 'ml' },
+        { key: 'matcha_powder', label: 'Matcha Powder', max: 500, unit: 'g' },
+        { key: 'cocoa_powder', label: 'Cocoa Powder', max: 1000, unit: 'g' },
+        { key: 'vanilla_ice_cream', label: 'Vanilla Ice Cream', max: 3000, unit: 'g' },
+        { key: 'whipped_cream', label: 'Whipped Cream', max: 1000, unit: 'ml' },
+        { key: 'caramel_syrup', label: 'Caramel Syrup', max: 1000, unit: 'ml' },
+        { key: 'chocolate_sauce', label: 'Chocolate Sauce', max: 1000, unit: 'ml' },
+        { key: 'hazelnut_syrup', label: 'Hazelnut Syrup', max: 1000, unit: 'ml' },
+        { key: 'strawberry_crush', label: 'Strawberry Crush', max: 1000, unit: 'ml' },
+        { key: 'mango_crush', label: 'Mango Crush', max: 1000, unit: 'ml' },
+        { key: 'guava_juice', label: 'Guava Juice', max: 2000, unit: 'ml' },
+        { key: 'soda', label: 'Soda Base', max: 3000, unit: 'ml' },
+        { key: 'nutella', label: 'Premium Nutella', max: 1000, unit: 'g' },
+        { key: 'hot_cups', label: 'Hot Cups', max: 300, unit: 'pcs' },
+        { key: 'cold_cups', label: 'Cold Cups', max: 300, unit: 'pcs' },
+        { key: 'snack_packs', label: 'Food Boxes', max: 300, unit: 'pcs' }
+      ];
+      let rows = '';
+      invItems.forEach(item => {
+        const cur = inventory[item.key] || 0;
+        const pct = Math.round((cur / item.max) * 100);
+        const color = pct < 20 ? '#FF5A5F' : pct < 40 ? '#F39C12' : '#2ecc71';
+        rows += `<tr><td style="padding:8px; border-bottom:1px solid #ddd;">${item.label}</td><td style="padding:8px; border-bottom:1px solid #ddd;">${cur} ${item.unit}</td><td style="padding:8px; border-bottom:1px solid #ddd;">${item.max} ${item.unit}</td><td style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:${color};">${pct}%</td></tr>`;
+      });
+      pw.document.write(`<html><head><title>Doppio Inventory Report</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#2C1B18;}h1{text-align:center;border-bottom:2px solid #2C1B18;padding-bottom:10px;}table{width:100%;border-collapse:collapse;margin-top:20px;}th{background:#F5EBE0;padding:10px;border-bottom:2px solid #2C1B18;text-align:left;}</style></head><body><h1>${businessProfile.name} — Inventory Stock Report</h1><p style="text-align:center;color:#7E6E6A;">Generated: ${new Date().toLocaleDateString('en-IN')} &nbsp;|&nbsp; ${businessProfile.address}</p><table><thead><tr><th>Ingredient</th><th>Current Stock</th><th>Max Capacity</th><th>% Remaining</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=function(){window.print();}<\/script></body></html>`);
+      pw.document.close();
     });
   }
 
@@ -1342,13 +1475,62 @@ document.addEventListener('DOMContentLoaded', () => {
   const ledgerList = document.getElementById('report-ledger-list');
   const ingStatsList = document.getElementById('ingredient-stats-list');
 
+  // Date filter for Reports tab
+  let reportsFilterFrom = null;
+  let reportsFilterTo = null;
+  const reportsFilterBtn = document.getElementById('reports-filter-btn');
+  const reportsResetBtn = document.getElementById('reports-reset-btn');
+  function parseBillDate(dateStr) {
+    try {
+      const parts = dateStr.match(/(\d+)\/(\d+)\/(\d+),?\s*(\d+):(\d+):?(\d+)?\s*(am|pm)?/i);
+      if (parts) {
+        let h = parseInt(parts[4]);
+        if (parts[7] && parts[7].toLowerCase() === 'pm' && h !== 12) h += 12;
+        if (parts[7] && parts[7].toLowerCase() === 'am' && h === 12) h = 0;
+        return new Date(parseInt(parts[3]), parseInt(parts[2])-1, parseInt(parts[1]), h, parseInt(parts[5]));
+      }
+    } catch(e) {}
+    return new Date(dateStr);
+  }
+  if (reportsFilterBtn) {
+    reportsFilterBtn.addEventListener('click', () => {
+      const from = document.getElementById('reports-date-from').value;
+      const to = document.getElementById('reports-date-to').value;
+      reportsFilterFrom = from ? new Date(from) : null;
+      reportsFilterTo = to ? new Date(to + 'T23:59:59') : null;
+      renderReports();
+    });
+  }
+  if (reportsResetBtn) {
+    reportsResetBtn.addEventListener('click', () => {
+      reportsFilterFrom = null;
+      reportsFilterTo = null;
+      document.getElementById('reports-date-from').value = '';
+      document.getElementById('reports-date-to').value = '';
+      const lbl = document.getElementById('reports-filtered-label');
+      if (lbl) lbl.textContent = '';
+      renderReports();
+    });
+  }
+
   function renderReports() {
-    const totalRev = bills.reduce((sum, b) => sum + b.total, 0);
+    let filteredBills = bills;
+    if (reportsFilterFrom || reportsFilterTo) {
+      filteredBills = bills.filter(b => {
+        const bd = parseBillDate(b.dateTime);
+        if (reportsFilterFrom && bd < reportsFilterFrom) return false;
+        if (reportsFilterTo && bd > reportsFilterTo) return false;
+        return true;
+      });
+      const lbl = document.getElementById('reports-filtered-label');
+      if (lbl) lbl.textContent = `Showing ${filteredBills.length} of ${bills.length} bills`;
+    }
+    const totalRev = filteredBills.reduce((sum, b) => sum + b.total, 0);
     if (reportRevenue) reportRevenue.textContent = `₹${totalRev}`;
-    if (reportOrders) reportOrders.textContent = bills.length;
+    if (reportOrders) reportOrders.textContent = filteredBills.length;
 
     const itemCounts = {};
-    bills.forEach(b => {
+    filteredBills.forEach(b => {
       b.items.forEach(item => {
         itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
       });
@@ -1366,10 +1548,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (ledgerList) {
       ledgerList.innerHTML = '';
-      if (bills.length === 0) {
+      if (filteredBills.length === 0) {
         ledgerList.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px;">No sales logged.</p>';
       } else {
-        const sorted = [...bills].reverse();
+        const sorted = [...filteredBills].reverse();
         sorted.forEach(bill => {
           const item = document.createElement('div');
           item.className = 'ledger-item';
@@ -1414,15 +1596,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const excelBtn = document.getElementById('export-excel-btn');
   if (excelBtn) {
     excelBtn.addEventListener('click', () => {
-      if (bills.length === 0) {
-        alert('No bills logged to export!');
+      const exportBills = (reportsFilterFrom || reportsFilterTo)
+        ? bills.filter(b => { const bd = parseBillDate(b.dateTime); return (!reportsFilterFrom || bd >= reportsFilterFrom) && (!reportsFilterTo || bd <= reportsFilterTo); })
+        : bills;
+      if (exportBills.length === 0) {
+        alert('No bills to export for the selected range!');
         return;
       }
 
       let csvContent = 'data:text/csv;charset=utf-8,';
       csvContent += 'Order ID,Customer Name,Date and Time,Items Ordered,Payment Method,Subtotal (INR),GST (INR),Total Bill (INR)\n';
 
-      bills.forEach(bill => {
+      exportBills.forEach(bill => {
         const itemsStr = bill.items.map(i => `${i.name} (x${i.qty})`).join('; ');
         const row = `"${bill.orderId}","${bill.customerName}","${bill.dateTime}","${itemsStr}","${bill.paymentMethod}",${bill.subtotal},${bill.gst},${bill.total}`;
         csvContent += row + '\n';
@@ -1431,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `doppio_nagpur_sales_report_${new Date().toLocaleDateString()}.csv`);
+      link.setAttribute('download', `doppio_nagpur_sales_report_${new Date().toLocaleDateString('en-IN').replace(/\//g,'-')}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1441,10 +1626,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const pdfBtn = document.getElementById('export-pdf-btn');
   if (pdfBtn) {
     pdfBtn.addEventListener('click', () => {
+      const exportBills = (reportsFilterFrom || reportsFilterTo)
+        ? bills.filter(b => { const bd = parseBillDate(b.dateTime); return (!reportsFilterFrom || bd >= reportsFilterFrom) && (!reportsFilterTo || bd <= reportsFilterTo); })
+        : bills;
       const printWindow = window.open('', '_blank');
-      const totalRev = bills.reduce((sum, b) => sum + b.total, 0);
+      const totalRev = exportBills.reduce((sum, b) => sum + b.total, 0);
       let billsRows = '';
-      bills.forEach(b => {
+      exportBills.forEach(b => {
         billsRows += `
           <tr>
             <td style="padding:8px; border-bottom:1px solid #ddd;">${b.orderId}</td>
@@ -1473,12 +1661,13 @@ document.addEventListener('DOMContentLoaded', () => {
           </style>
         </head>
         <body>
-          <h1>DOPPIO CAFE NAGPUR</h1>
-          <h3 style="text-align: center; margin-top: -10px; color: #7E6E6A;">Takeaway POS Sales & Ledger Audit Report</h3>
+          <h1>${businessProfile.name}</h1>
+          <h3 style="text-align: center; margin-top: -10px; color: #7E6E6A;">Takeaway POS Sales &amp; Ledger Audit Report</h3>
+          <p style="text-align:center; color:#7E6E6A; font-size:13px;">${businessProfile.address} &nbsp;|&nbsp; ${businessProfile.phone}</p>
           
           <div class="meta-panel">
             <span>Report Date: ${new Date().toLocaleDateString('en-IN')}</span>
-            <span>Generated By: cashier (bonie)</span>
+            <span>Generated By: Staff Dashboard</span>
           </div>
 
           <div class="metrics-panel">
@@ -1487,8 +1676,8 @@ document.addEventListener('DOMContentLoaded', () => {
               <h2>₹${totalRev}</h2>
             </div>
             <div class="metric-box">
-              <h3>Total Orders Logged</h3>
-              <h2>${bills.length}</h2>
+              <h3>Total Orders</h3>
+              <h2>${exportBills.length}</h2>
             </div>
           </div>
 
@@ -1571,24 +1760,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (formPanelTitle) formPanelTitle.textContent = 'Edit Menu Item';
         document.getElementById('save-item-btn').textContent = 'Update Item';
       } else if (btn.classList.contains('delete')) {
-        if (confirm(`Are you sure you want to delete ${menu[index].name} from the menu?`)) {
+        showAdminPinModal(() => {
           const itemToDelete = menu[index];
-          
           menu.splice(index, 1);
           localStorage.setItem('doppio_menu', JSON.stringify(menu));
-
-          // Supabase mirror delete
           if (supabaseClient) {
-            supabaseClient.from('doppio_menu')
-              .delete()
-              .eq('name', itemToDelete.name)
-              .then(({ error }) => { if (error) console.error("Error deleting menu item in cloud:", error); });
+            supabaseClient.from('doppio_menu').delete().eq('name', itemToDelete.name)
+              .then(({ error }) => { if (error) console.error('Menu delete cloud error:', error); });
           }
-
           renderMenuEditor();
           renderPOSCategories();
           renderPOSItems();
-        }
+        });
       }
     });
   }
@@ -1668,7 +1851,118 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 9. INITIAL BOOTSTRAP TRIGGERS
+  // 9. BUSINESS PROFILE
+  // ==========================================
+  let businessProfile = JSON.parse(localStorage.getItem('doppio_business_profile')) || {
+    name: 'Doppio Cafe',
+    address: 'London Street, Nagpur',
+    phone: '+91 91300 03177'
+  };
+
+  async function loadBusinessProfile() {
+    if (!supabaseClient) return;
+    try {
+      const { data, error } = await supabaseClient.from('doppio_business_profile').select('*').eq('id', 1).single();
+      if (!error && data) {
+        businessProfile = {
+          name: data.business_name || businessProfile.name,
+          address: data.address || businessProfile.address,
+          phone: data.phone || businessProfile.phone
+        };
+        localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+      }
+    } catch(e) { console.warn('Profile load error:', e); }
+  }
+
+  const openProfileBtn = document.getElementById('open-profile-btn');
+  const profileModal = document.getElementById('profile-modal');
+  const closeProfileModal = document.getElementById('close-profile-modal');
+  const cancelProfileBtn = document.getElementById('cancel-profile-btn');
+  const businessProfileForm = document.getElementById('business-profile-form');
+
+  function openProfileModal() {
+    if (!profileModal) return;
+    document.getElementById('profile-name-input').value = businessProfile.name;
+    document.getElementById('profile-address-input').value = businessProfile.address;
+    document.getElementById('profile-phone-input').value = businessProfile.phone;
+    profileModal.classList.add('active');
+  }
+
+  if (openProfileBtn) openProfileBtn.addEventListener('click', openProfileModal);
+  if (closeProfileModal) closeProfileModal.addEventListener('click', () => profileModal.classList.remove('active'));
+  if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', () => profileModal.classList.remove('active'));
+  if (profileModal) profileModal.addEventListener('click', (e) => { if (e.target === profileModal) profileModal.classList.remove('active'); });
+
+  if (businessProfileForm) {
+    businessProfileForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('profile-name-input').value.trim();
+      const address = document.getElementById('profile-address-input').value.trim();
+      const phone = document.getElementById('profile-phone-input').value.trim();
+      businessProfile = { name, address, phone };
+      localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+      const saveBtn = document.getElementById('save-profile-btn');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+      if (supabaseClient) {
+        const { error } = await supabaseClient.from('doppio_business_profile')
+          .upsert({ id: 1, business_name: name, address, phone }, { onConflict: 'id' });
+        if (error) {
+          alert(`Profile save warning: ${error.message}`);
+        }
+      }
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Profile'; }
+      profileModal.classList.remove('active');
+      alert('Business profile saved! It will now appear on all printed receipts.');
+    });
+  }
+
+  // ==========================================
+  // 10. ADMIN PIN MODAL SYSTEM
+  // ==========================================
+  let pinResolveCallback = null;
+  const adminPinModal = document.getElementById('admin-pin-modal');
+  const adminPinInput = document.getElementById('admin-pin-input');
+  const adminPinError = document.getElementById('admin-pin-error');
+  const confirmPinBtn = document.getElementById('confirm-pin-btn');
+  const cancelPinBtn = document.getElementById('cancel-pin-btn');
+  const closePinModal = document.getElementById('close-pin-modal');
+
+  function showAdminPinModal(onSuccess) {
+    if (!adminPinModal) { onSuccess(); return; }
+    pinResolveCallback = onSuccess;
+    adminPinInput.value = '';
+    adminPinError.style.display = 'none';
+    adminPinModal.classList.add('active');
+    setTimeout(() => adminPinInput.focus(), 100);
+  }
+
+  function closeAdminPinModal() {
+    if (adminPinModal) adminPinModal.classList.remove('active');
+    pinResolveCallback = null;
+    if (adminPinInput) adminPinInput.value = '';
+    if (adminPinError) adminPinError.style.display = 'none';
+  }
+
+  function checkAdminPin() {
+    if (!adminPinInput) return;
+    if (adminPinInput.value === '1006') {
+      closeAdminPinModal();
+      if (pinResolveCallback) pinResolveCallback();
+    } else {
+      adminPinError.style.display = 'block';
+      adminPinInput.value = '';
+      adminPinInput.focus();
+    }
+  }
+
+  if (confirmPinBtn) confirmPinBtn.addEventListener('click', checkAdminPin);
+  if (cancelPinBtn) cancelPinBtn.addEventListener('click', closeAdminPinModal);
+  if (closePinModal) closePinModal.addEventListener('click', closeAdminPinModal);
+  if (adminPinModal) adminPinModal.addEventListener('click', (e) => { if (e.target === adminPinModal) closeAdminPinModal(); });
+  if (adminPinInput) adminPinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAdminPin(); });
+
+  // ==========================================
+  // 11. INITIAL BOOTSTRAP TRIGGERS
   // ==========================================
   renderPOSCategories();
   renderPOSItems();
@@ -1676,5 +1970,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize Supabase settings & triggers
   initSupabase();
+
+  // After Supabase is up, load the business profile from cloud
+  setTimeout(loadBusinessProfile, 1500);
 
 });
