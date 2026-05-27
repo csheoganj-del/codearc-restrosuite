@@ -2085,6 +2085,9 @@ document.addEventListener('DOMContentLoaded', () => {
       closeAdminPinModal();
       if (pinResolveCallback) pinResolveCallback();
     } else {
+      if (typeof SoundEffects !== 'undefined' && SoundEffects.playAlert) {
+        SoundEffects.playAlert();
+      }
       adminPinError.style.display = 'block';
       adminPinInput.value = '';
       adminPinInput.focus();
@@ -2501,17 +2504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('doppio_offline_crm', JSON.stringify(queue));
   }
 
-  // Hook PIN Verification to Synthesizer Alerts
-  const originalCheckAdminPin = checkAdminPin;
-  checkAdminPin = function() {
-    if (!adminPinInput) return;
-    if (adminPinInput.value === '1006') {
-      originalCheckAdminPin();
-    } else {
-      SoundEffects.playAlert();
-      originalCheckAdminPin();
-    }
-  };
+  // Admin PIN checked directly with integrated SoundEffects alert
 
   // ==========================================
   // 11. INITIAL BOOTSTRAP TRIGGERS
