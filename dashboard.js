@@ -1,15 +1,133 @@
 /**
- * Doppio Cafe - High Fidelity Cashier Takeaway POS & Inventory Dashboard Control System
- * Manages states, ingredient reductions, thermal printing, analytics, and CRUD configurations.
+ * Doppio Cafe - Nagpur Premium Cashier Takeaway POS & Inventory Dashboard Control System
+ * Powered by Excel Recipe Database Specifications for Nagpur branch.
+ * Manages active states, exact ingredient reductions, thermal printing, analytics, and CRUD configurations.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
 
   // ==========================================
-  // 1. INITIAL DATABASES & LOCAL STORAGE STATE
+  // 1. DYNAMIC EXCEL-BASED RECIPE DATABASE & INITIAL STATE
   // ==========================================
   
-  // Default Menu Database if not initialized in localStorage
+  // Cleaned active recipe specs mapped directly from "@new item recipe copy.xlsx"
+  const excelRecipes = {
+    // HOT COFFEE
+    "doppio": { coffee_beans: 20, hot_cups: 1 }, // 60ml double shot
+    "espresso": { coffee_beans: 10, hot_cups: 1 }, // 30ml single shot
+    "cappuccino": { coffee_beans: 10, steamed_milk: 200, hot_cups: 1 }, // 30ml shot + milk
+    "cafe latte": { coffee_beans: 10, steamed_milk: 200, hot_cups: 1 },
+    "flat white": { coffee_beans: 10, steamed_milk: 200, hot_cups: 1 },
+    "affogato": { coffee_beans: 20, vanilla_ice_cream: 110, hot_cups: 1 }, // 60ml shot + ice cream
+    "americano": { coffee_beans: 10, hot_cups: 1 }, // shot + hot water
+    "cortado": { coffee_beans: 20, steamed_milk: 120, hot_cups: 1 }, // 60ml shot + milk
+    "caramel macchiato": { coffee_beans: 10, steamed_milk: 200, caramel_syrup: 30, hot_cups: 1 },
+    "cafe mocha": { coffee_beans: 10, steamed_milk: 200, chocolate_sauce: 40, hot_cups: 1 },
+    "doppio hot chocolate": { cocoa_powder: 30, steamed_milk: 150, chocolate_sauce: 20, hot_cups: 1 },
+    "classic hot chocolate": { cocoa_powder: 30, steamed_milk: 150, hot_cups: 1 },
+
+    // COLD COFFEE
+    "iced latte": { coffee_beans: 20, steamed_milk: 150, cold_cups: 1 }, // 60ml shot + milk + ice
+    "iced americano": { coffee_beans: 10, cold_cups: 1 },
+    "irish coffee": { coffee_beans: 20, whipped_cream: 30, cold_cups: 1 },
+    "mocha frappe": { coffee_beans: 20, vanilla_ice_cream: 110, chocolate_sauce: 40, steamed_milk: 90, cold_cups: 1 },
+    "doppio signature frappe": { coffee_beans: 20, vanilla_ice_cream: 110, chocolate_sauce: 60, steamed_milk: 90, whipped_cream: 20, cold_cups: 1 },
+    "iced caramel macchiato": { coffee_beans: 20, steamed_milk: 150, caramel_syrup: 30, cold_cups: 1 },
+    "hazelnut frappe": { coffee_beans: 20, vanilla_ice_cream: 110, hazelnut_syrup: 30, steamed_milk: 90, cold_cups: 1 },
+    "espresso ginger ale": { coffee_beans: 10, ginger_ale: 150, cold_cups: 1 },
+    "classic frappe": { coffee_beans: 20, vanilla_ice_cream: 110, steamed_milk: 90, cold_cups: 1 },
+
+    // MATCHA
+    "iced matcha latte": { matcha_powder: 3, steamed_milk: 150, cold_cups: 1 },
+    "matcha latte": { matcha_powder: 3, steamed_milk: 150, hot_cups: 1 },
+    "iced strawberry matcha": { matcha_powder: 3, steamed_milk: 120, strawberry_crush: 60, cold_cups: 1 },
+    "iced vanilla matcha": { matcha_powder: 3, steamed_milk: 120, vanilla_syrup: 30, cold_cups: 1 },
+    "mango matcha": { matcha_powder: 3, steamed_milk: 120, mango_crush: 60, cold_cups: 1 },
+
+    // FRIES & SHARE PLATES
+    "fries salted": { snack_packs: 1 },
+    "fries peri peri": { snack_packs: 1, peri_peri_seasoning: 5 },
+    "fries loaded": { snack_packs: 1, cheese_sauce: 40 },
+    "potato wedges classic": { snack_packs: 1 },
+    "potato wedges loaded": { snack_packs: 1, cheese_sauce: 40 },
+    "hot chicken wings": { snack_packs: 1 },
+    "chicken pops": { snack_packs: 1 },
+    "chicken nuggets": { snack_packs: 1 },
+    "chicken finger": { snack_packs: 1 },
+
+    // MOCKTAILS
+    "mojito": { mint_syrup: 30, soda: 200, lemon_juice: 15, cold_cups: 1 },
+    "green apple soda": { green_apple_syrup: 30, soda: 200, lemon_juice: 15, cold_cups: 1 },
+    "blue lagoon": { blue_curacao: 30, soda: 200, lemon_juice: 15, cold_cups: 1 },
+    "spicy guava mojito": { guava_juice: 60, mint_syrup: 20, soda: 200, lemon_juice: 15, cold_cups: 1 },
+    "lemon iced tea": { tea_bags: 1, sugar_syrup: 30, lemon_juice: 15, cold_cups: 1 },
+    "litchi and lime granita": { litchi_crush: 60, soda: 100, lemon_juice: 15, cold_cups: 1 },
+    "strawberry granita": { strawberry_crush: 60, soda: 100, lemon_juice: 15, cold_cups: 1 },
+    "spicy mango martini": { mango_crush: 60, soda: 200, lemon_juice: 15, cold_cups: 1 },
+
+    // SANDWICHES
+    "bombay grilled sandwich": { snack_packs: 1 },
+    "cheese corn grilled sandwich": { snack_packs: 1, cheese_sauce: 20 },
+    "cheese chilli sandwich": { snack_packs: 1, cheese_sauce: 20 },
+
+    // THICK SHAKES
+    "nutella thickshake": { vanilla_ice_cream: 135, nutella: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "oreo cookies thickshake": { vanilla_ice_cream: 135, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
+    "salted caramel thickshake": { vanilla_ice_cream: 135, caramel_syrup: 30, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "strawberry thickshake": { vanilla_ice_cream: 135, strawberry_crush: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "mango smoothie": { vanilla_ice_cream: 135, mango_crush: 60, whipped_cream: 20, steamed_milk: 120, cold_cups: 1 },
+    "kids mnm shake": { vanilla_ice_cream: 135, whipped_cream: 20, steamed_milk: 120, chocolate_sauce: 20, cold_cups: 1 },
+
+    // CLASSIC TOAST
+    "cheese garlic": { snack_packs: 1, cheese_sauce: 20 },
+    "chilli cheese garlic": { snack_packs: 1, cheese_sauce: 20 },
+    "cheese corn toast": { snack_packs: 1, cheese_sauce: 20 },
+    "cheese mushroom toast": { snack_packs: 1, cheese_sauce: 20 },
+
+    // EGGS
+    "classic cheese omelette": { snack_packs: 1, cheese_sauce: 15 },
+    "garden omelette": { snack_packs: 1 },
+    "masala omelette": { snack_packs: 1 },
+    "butter garlic egg": { snack_packs: 1 },
+
+    // APPETIZERS
+    "classic nachos": { snack_packs: 1, cheese_sauce: 30 },
+    "loaded nachos": { snack_packs: 1, cheese_sauce: 30 },
+
+    // COMBOS
+    "swiggy combo1": { coffee_beans: 20, steamed_milk: 200, snack_packs: 1, hot_cups: 1 },
+    "swiggy combo2": { coffee_beans: 20, steamed_milk: 200, snack_packs: 2, hot_cups: 2 },
+    "swiggy combo3": { coffee_beans: 40, steamed_milk: 400, snack_packs: 1, hot_cups: 2 },
+    "swiggy combo4": { coffee_beans: 20, soda: 200, snack_packs: 2, cold_cups: 1 },
+    "swiggy combo5": { coffee_beans: 20, hot_cups: 1, snack_packs: 1 },
+
+    // PASTA
+    "alfredo pennei pasta": { snack_packs: 1, cheese_sauce: 50 }
+  };
+
+  // Expanded inventory database structure (3.0 kg of raw ingredients / 300 units standard)
+  const defaultInventory = {
+    coffee_beans: 3000,       // grams (3 kg)
+    steamed_milk: 3000,       // ml (3 L)
+    matcha_powder: 500,       // grams
+    cocoa_powder: 1000,       // grams
+    vanilla_ice_cream: 3000,  // grams
+    whipped_cream: 1000,      // ml
+    caramel_syrup: 1000,      // ml
+    chocolate_sauce: 1000,    // ml
+    hazelnut_syrup: 1000,     // ml
+    strawberry_crush: 1000,   // ml
+    mango_crush: 1000,        // ml
+    guava_juice: 2000,        // ml
+    soda: 3000,               // ml
+    lemon_juice: 1000,        // ml
+    nutella: 1000,            // grams
+    hot_cups: 300,            // units
+    cold_cups: 300,           // units
+    snack_packs: 300          // units
+  };
+
+  // Get or Set Menu
   const defaultMenu = [
     { name: 'Iced Latte', description: 'Creamy chilled latte served over ice.', price: 249, category: 'COLD COFFEE', icon: '🥛' },
     { name: 'Iced Americano', description: 'Strong refreshing black iced coffee.', price: 229, category: 'COLD COFFEE', icon: '🧊' },
@@ -92,35 +210,19 @@ document.addEventListener('DOMContentLoaded', () => {
     { name: 'Alfredo Pennei Pasta', description: 'Creamy rich Alfredo white sauce penne pasta.', price: 499, category: 'PASTA', icon: '🍝' }
   ];
 
-  // Default Inventory values
-  const defaultInventory = {
-    coffee_beans: 3000,   // grams (3.0 kg)
-    steamed_milk: 3000,   // ml (3.0 Liters)
-    matcha_powder: 3000,  // grams (3.0 kg)
-    cocoa_powder: 3000,   // grams (3.0 kg)
-    paper_cups: 300,      // units
-    sugar_syrup: 3000,    // ml
-    snack_packs: 300      // units (fries/toast/eggs packaging)
-  };
-
-  // Get or Set localStorage states
   let menu = JSON.parse(localStorage.getItem('doppio_menu')) || defaultMenu;
   let inventory = JSON.parse(localStorage.getItem('doppio_inventory')) || defaultInventory;
   let bills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
   
-  // Set default initial state if empty
   if (!localStorage.getItem('doppio_menu')) localStorage.setItem('doppio_menu', JSON.stringify(menu));
   if (!localStorage.getItem('doppio_inventory')) localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
 
-  // Cart State
   let cart = [];
   let selectedPaymentMethod = 'UPI';
 
   // ==========================================
   // 2. CORE LAYOUT & NAVIGATION
   // ==========================================
-  
-  // Real-time Clock
   function updateDateTime() {
     const el = document.getElementById('dateTime');
     if (el) {
@@ -131,7 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateDateTime();
   setInterval(updateDateTime, 30000);
 
-  // Tab Switcher
   const sidebarLinks = document.querySelectorAll('.sidebar-link');
   const tabContents = document.querySelectorAll('.tab-content');
   const tabTitle = document.getElementById('tab-title');
@@ -140,18 +241,14 @@ document.addEventListener('DOMContentLoaded', () => {
   sidebarLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      
       const tabId = link.getAttribute('data-tab');
       
-      // Update sidebar active state
       sidebarLinks.forEach(l => l.classList.remove('active'));
       link.classList.add('active');
 
-      // Update workspace view
       tabContents.forEach(content => content.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
 
-      // Update titles
       tabTitle.textContent = link.textContent.trim();
       if (tabId === 'pos-tab') tabSubtitle.textContent = 'Default Tab: Selection Grid';
       else if (tabId === 'bills-tab') tabSubtitle.textContent = 'Print, Edit, or Delete Receipts';
@@ -159,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (tabId === 'reports-tab') tabSubtitle.textContent = 'Nagpur Branch Sales & Analytics';
       else if (tabId === 'editor-tab') tabSubtitle.textContent = 'Manage Drink & Food Items';
       
-      // Hook triggers
       if (tabId === 'inventory-tab') renderInventory();
       if (tabId === 'reports-tab') renderReports();
       if (tabId === 'bills-tab') renderBills();
@@ -167,7 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Generate Takeaway Order Number
   function generateOrderNumber() {
     const input = document.getElementById('order-num');
     if (input) {
@@ -187,7 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let activePOSCategory = 'ALL';
   let posSearchQuery = '';
 
-  // Get categories from menu database
   function renderPOSCategories() {
     if (!posCategories) return;
     const categories = ['ALL', ...new Set(menu.map(item => item.category))];
@@ -197,7 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const btn = document.createElement('button');
       btn.className = `pos-cat-btn ${cat === activePOSCategory ? 'active' : ''}`;
       btn.setAttribute('data-category', cat);
-      // Clean name
       let label = cat.toLowerCase().replace('&', 'and');
       label = label.charAt(0).toUpperCase() + label.slice(1);
       btn.textContent = label;
@@ -205,13 +298,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Render items grid
   function renderPOSItems() {
     if (!posItemsGrid) return;
     posItemsGrid.innerHTML = '';
 
     const filteredItems = menu.filter(item => {
-      const matchesCategory = activePOSCategory === 'ALL' || item.category === activeCategoryMapper(activePOSCategory);
+      const matchesCategory = activePOSCategory === 'ALL' || item.category === activePOSCategory;
       const matchesSearch = item.name.toLowerCase().includes(posSearchQuery.toLowerCase()) || 
                             item.description.toLowerCase().includes(posSearchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
@@ -233,11 +325,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function activeCategoryMapper(cat) {
-    return cat; // Category strings match exactly
-  }
-
-  // Handle Search & Filter clicks
   if (posSearch) {
     posSearch.addEventListener('input', (e) => {
       posSearchQuery = e.target.value;
@@ -256,7 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Cart operations
   function addToCart(menuItem) {
     const existing = cart.find(item => item.name === menuItem.name);
     if (existing) {
@@ -330,7 +416,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cartTotal.textContent = `₹${total}`;
   }
 
-  // Handle Cart Clicks (Plus / Minus)
   if (cartList) {
     cartList.addEventListener('click', (e) => {
       const btn = e.target.closest('.cart-qty-btn');
@@ -341,7 +426,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Clear Cart
   const clearCartBtn = document.getElementById('clear-cart');
   if (clearCartBtn) {
     clearCartBtn.addEventListener('click', () => {
@@ -352,7 +436,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Payment Selection
   const payBtns = document.querySelectorAll('.pay-method-btn');
   payBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -362,12 +445,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Complete Checkout & print
   const checkoutBtn = document.getElementById('checkout-btn');
   if (checkoutBtn) {
     checkoutBtn.addEventListener('click', () => {
       if (cart.length === 0) {
-        alert('Cart is empty! Add drinks or food before checking out.');
+        alert('Cart is empty! Add items before checking out.');
         return;
       }
 
@@ -375,11 +457,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const custName = (custNameInput && custNameInput.value.trim()) || 'Takeaway Customer';
       const orderNum = document.getElementById('order-num').value;
 
-      // 1. INVENTORY DEDUCTION MATH
+      // 1. DEDUCTION CALCULATOR
       let sufficientStock = true;
       let missingItem = '';
 
-      // Check stock sufficiency first
       const proposedDeductions = {};
       cart.forEach(cartItem => {
         const specs = getDeductionSpecs(cartItem);
@@ -388,7 +469,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
 
+      // Stock check
       Object.keys(proposedDeductions).forEach(ing => {
+        if (inventory[ing] === undefined) inventory[ing] = 1000; // auto-recovery fallback
         if (inventory[ing] < proposedDeductions[ing]) {
           sufficientStock = false;
           missingItem = ing.replace('_', ' ');
@@ -396,11 +479,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (!sufficientStock) {
-        alert(`Insufficient stock! We do not have enough ${missingItem} in inventory to complete this order.`);
+        alert(`Insufficient stock! Nagpur inventory is low on: ${missingItem}. Please restock.`);
         return;
       }
 
-      // Deduct from live inventory
+      // Perform deduction
       Object.keys(proposedDeductions).forEach(ing => {
         inventory[ing] -= proposedDeductions[ing];
       });
@@ -411,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const gst = Math.round(subtotal * 0.18);
       const total = subtotal + gst;
 
-      // 2. CREATE TRANSACTION BILL
+      // Create bill
       const newBill = {
         orderId: orderNum,
         customerName: custName,
@@ -426,10 +509,10 @@ document.addEventListener('DOMContentLoaded', () => {
       bills.push(newBill);
       localStorage.setItem('doppio_bills', JSON.stringify(bills));
 
-      // 3. COMPILE AND TRIGGER THERMAL RECEIPT PRINTING
+      // Print
       triggerThermalReceiptPrint(newBill);
 
-      // Reset cart and fields
+      // Reset
       cart = [];
       if (custNameInput) custNameInput.value = '';
       generateOrderNumber();
@@ -438,46 +521,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Recipe specs for ingredient deduction
-  function getDeductionSpecs(item) {
-    const specs = { paper_cups: 0, coffee_beans: 0, steamed_milk: 0, matcha_powder: 0, cocoa_powder: 0, sugar_syrup: 0, snack_packs: 0 };
+  // Live Excel Recipe deduction parser
+  function getDeductionSpecs(cartItem) {
+    const nameLower = cartItem.name.toLowerCase();
+    const recipe = excelRecipes[nameLower] || excelRecipes[nameLower.replace('thick shake', 'thickshake')];
     
-    const cat = item.category;
-    
-    if (cat === 'COLD COFFEE' || cat === 'HOT COFFEE') {
-      specs.paper_cups = 1;
-      specs.coffee_beans = 20; // 20g beans
-      specs.sugar_syrup = 10;  // 10ml syrup
-      if (item.name.toLowerCase().includes('latte') || 
-          item.name.toLowerCase().includes('cappuccino') || 
-          item.name.toLowerCase().includes('flat white') ||
-          item.name.toLowerCase().includes('macchiato') ||
-          item.name.toLowerCase().includes('frappe') ||
-          item.name.toLowerCase().includes('mocha')) {
-        specs.steamed_milk = 200; // 200ml milk
-      }
-    } else if (cat === 'MATCHA') {
-      specs.paper_cups = 1;
-      specs.matcha_powder = 5; // 5g matcha
-      specs.sugar_syrup = 15;
-      if (item.name.toLowerCase().includes('latte') || item.name.toLowerCase().includes('matcha')) {
-        specs.steamed_milk = 200;
-      }
-    } else if (cat === 'THICK SHAKES') {
-      specs.paper_cups = 1;
-      specs.steamed_milk = 150; // uses milk
-      specs.sugar_syrup = 20;
-      if (item.name.toLowerCase().includes('nutella') || item.name.toLowerCase().includes('oreo')) {
-        specs.cocoa_powder = 25; // flavor powder
-      }
-    } else if (cat === 'MOCKTAILS') {
-      specs.paper_cups = 1;
-      specs.sugar_syrup = 30; // syrup bases
-    } else if (cat === 'FRIES & SHARE PLATES' || cat === 'SANDWICHES' || cat === 'CLASSIC TOAST' || cat === 'EGGS' || cat === 'APPETIZERS' || cat === 'PASTA' || cat === 'COMBOS') {
-      specs.snack_packs = 1; // packing unit
+    if (recipe) {
+      return recipe;
     }
-
-    return specs;
+    
+    // Default safe fallback if item is added via Menu Editor but doesn't exist in recipes.json
+    return { snack_packs: 1 };
   }
 
   // ==========================================
@@ -558,7 +612,6 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    // Trigger Print
     window.print();
   }
 
@@ -587,19 +640,17 @@ document.addEventListener('DOMContentLoaded', () => {
         <tr>
           <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 40px;">
             <i class="fa-solid fa-receipt" style="font-size: 30px; color: var(--accent-caramel); margin-bottom: 10px; display: block;"></i>
-            No matching cashier bills found.
+            No matching Nagpur cashier bills found.
           </td>
         </tr>
       `;
       return;
     }
 
-    // Sort showing newest bills first
     const sortedBills = [...filteredBills].reverse();
 
     sortedBills.forEach(bill => {
       const tr = document.createElement('tr');
-      
       let itemsListStr = bill.items.map(item => `${item.name} (${item.qty})`).join(', ');
       if (itemsListStr.length > 30) itemsListStr = itemsListStr.substring(0, 27) + '...';
 
@@ -622,7 +673,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Hook Bills Action Buttons (Print, Edit, Delete)
   if (billsTableBody) {
     billsTableBody.addEventListener('click', (e) => {
       const btn = e.target.closest('.table-action-btn');
@@ -642,8 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
           renderBills();
         }
       } else if (btn.classList.contains('delete')) {
-        if (confirm(`Are you sure you want to delete bill ${orderId}? This cannot be undone.`)) {
-          // Optional: Restore inventory specs
+        if (confirm(`Are you sure you want to delete bill ${orderId}? This will restore ingredients.`)) {
           const bill = bills[targetBillIndex];
           bill.items.forEach(cartItem => {
             const specs = getDeductionSpecs(cartItem);
@@ -682,17 +731,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const items = [
       { key: 'coffee_beans', label: 'Coffee Beans', max: 3000, unit: 'g' },
       { key: 'steamed_milk', label: 'Steamed Milk', max: 3000, unit: 'ml' },
-      { key: 'matcha_powder', label: 'Matcha Powder', max: 3000, unit: 'g' },
-      { key: 'cocoa_powder', label: 'Cocoa Powder', max: 3000, unit: 'g' },
-      { key: 'paper_cups', label: 'Takeaway Paper Cups', max: 300, unit: 'pcs' },
-      { key: 'sugar_syrup', label: 'Sugar & Syrups', max: 3000, unit: 'ml' },
-      { key: 'snack_packs', label: 'Food Snack Packs', max: 300, unit: 'pcs' }
+      { key: 'matcha_powder', label: 'Matcha Powder', max: 500, unit: 'g' },
+      { key: 'cocoa_powder', label: 'Cocoa Powder', max: 1000, unit: 'g' },
+      { key: 'vanilla_ice_cream', label: 'Vanilla Ice Cream', max: 3000, unit: 'g' },
+      { key: 'whipped_cream', label: 'Whipped Cream', max: 1000, unit: 'ml' },
+      { key: 'caramel_syrup', label: 'Caramel Syrup', max: 1000, unit: 'ml' },
+      { key: 'chocolate_sauce', label: 'Chocolate Sauce', max: 1000, unit: 'ml' },
+      { key: 'soda', label: 'Mocktail Soda Base', max: 3000, unit: 'ml' },
+      { key: 'lemon_juice', label: 'Lemon juice juice', max: 1000, unit: 'ml' },
+      { key: 'nutella', label: 'Premium Nutella', max: 1000, unit: 'g' },
+      { key: 'hot_cups', label: 'Hot Takeaway Cups', max: 300, unit: 'pcs' },
+      { key: 'cold_cups', label: 'Cold Takeaway Cups', max: 300, unit: 'pcs' },
+      { key: 'snack_packs', label: 'Takeaway Food Boxes', max: 300, unit: 'pcs' }
     ];
 
     items.forEach(item => {
-      const current = inventory[item.key];
+      const current = inventory[item.key] || 0;
       const percent = Math.min(100, Math.round((current / item.max) * 100));
-      const isLow = current < (item.key.includes('cup') || item.key.includes('snack') ? 25 : 400);
+      const isLow = current < (item.key.includes('cup') || item.key.includes('box') || item.key.includes('pack') ? 25 : 300);
 
       const card = document.createElement('div');
       card.className = 'inventory-card';
@@ -714,9 +770,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function formatStockValue(val, key) {
-    if (key === 'paper_cups' || key === 'snack_packs') return `${val} units`;
+    if (key.includes('cups') || key.includes('packs')) return `${val} units`;
     if (val >= 1000) return `${(val/1000).toFixed(2)} kg`;
-    return `${val} ${key.includes('milk') || key.includes('syrup') ? 'ml' : 'g'}`;
+    return `${val} ${key.includes('milk') || key.includes('syrup') || key.includes('sauce') || key.includes('cream') || key.includes('juice') || key.includes('soda') ? 'ml' : 'g'}`;
   }
 
   if (restockBtn) {
@@ -725,21 +781,21 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
       renderInventory();
       checkLowStockAlerts();
-      alert('Inventory successfully restocked to full standard capacity (3.0 kg / 300 units)!');
+      alert('Inventory successfully restocked to full Excel standard capacity (3.0 kg / 300 units)!');
     });
   }
 
-  // Real-time alerts banner
   const alertsContainer = document.getElementById('low-stock-alerts');
   function checkLowStockAlerts() {
     if (!alertsContainer) return;
     alertsContainer.innerHTML = '';
 
     const warnings = [];
-    if (inventory.coffee_beans < 400) warnings.push(`Warning: Coffee Beans are very low (${(inventory.coffee_beans/1000).toFixed(2)} kg remaining). Please restock immediately.`);
-    if (inventory.steamed_milk < 600) warnings.push(`Warning: Steamed Milk is very low (${(inventory.steamed_milk/1000).toFixed(2)} L remaining). Please restock immediately.`);
-    if (inventory.matcha_powder < 100) warnings.push(`Warning: Matcha Powder is very low (${inventory.matcha_powder}g remaining).`);
-    if (inventory.paper_cups < 20) warnings.push(`Warning: Takeaway Paper Cups are critically low (${inventory.paper_cups} left).`);
+    if (inventory.coffee_beans < 400) warnings.push(`Warning: Coffee Beans are very low (${(inventory.coffee_beans/1000).toFixed(2)} kg remaining). Please restock.`);
+    if (inventory.steamed_milk < 600) warnings.push(`Warning: Steamed Milk is very low (${(inventory.steamed_milk/1000).toFixed(2)} L remaining). Please restock.`);
+    if (inventory.matcha_powder < 50) warnings.push(`Warning: Matcha Powder is very low (${inventory.matcha_powder}g remaining).`);
+    if (inventory.hot_cups < 25) warnings.push(`Warning: Takeaway Hot Cups are critically low (${inventory.hot_cups} left).`);
+    if (inventory.cold_cups < 25) warnings.push(`Warning: Takeaway Cold Cups are critically low (${inventory.cold_cups} left).`);
 
     warnings.forEach(warn => {
       const alertDiv = document.createElement('div');
@@ -760,12 +816,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const ingStatsList = document.getElementById('ingredient-stats-list');
 
   function renderReports() {
-    // 1. Calculate Summary Cards
     const totalRev = bills.reduce((sum, b) => sum + b.total, 0);
     if (reportRevenue) reportRevenue.textContent = `₹${totalRev}`;
     if (reportOrders) reportOrders.textContent = bills.length;
 
-    // Calculate Top Item
     const itemCounts = {};
     bills.forEach(b => {
       b.items.forEach(item => {
@@ -783,7 +837,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (reportTopItem) reportTopItem.textContent = topItem !== '-' ? `${topItem} (${maxQty} sold)` : '-';
 
-    // 2. Render Order Logs Summary
     if (ledgerList) {
       ledgerList.innerHTML = '';
       if (bills.length === 0) {
@@ -805,24 +858,18 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 3. Render Ingredient resource consumption report
     if (ingStatsList) {
       ingStatsList.innerHTML = '';
-      
-      const usedBeans = 3000 - inventory.coffee_beans;
-      const usedMilk = 3000 - inventory.steamed_milk;
-      const usedMatcha = 3000 - inventory.matcha_powder;
-      const usedCocoa = 3000 - inventory.cocoa_powder;
-      const usedCups = 300 - inventory.paper_cups;
-      const usedSnackPacks = 300 - inventory.snack_packs;
-
       const items = [
-        { label: 'Coffee Beans Consumed', value: usedBeans, max: 3000, unit: 'g' },
-        { label: 'Steamed Milk Consumed', value: usedMilk, max: 3000, unit: 'ml' },
-        { label: 'Matcha Powder Consumed', value: usedMatcha, max: 3000, unit: 'g' },
-        { label: 'Cocoa Powder Consumed', value: usedCocoa, max: 3000, unit: 'g' },
-        { label: 'Paper Cups Utilized', value: usedCups, max: 300, unit: 'pcs' },
-        { label: 'Takeaway Food Packs Utilized', value: usedSnackPacks, max: 300, unit: 'pcs' }
+        { label: 'Coffee Beans Consumed', value: 3000 - inventory.coffee_beans, max: 3000, unit: 'g' },
+        { label: 'Steamed Milk Consumed', value: 3000 - inventory.steamed_milk, max: 3000, unit: 'ml' },
+        { label: 'Matcha Powder Consumed', value: 500 - inventory.matcha_powder, max: 500, unit: 'g' },
+        { label: 'Cocoa Powder Consumed', value: 1000 - inventory.cocoa_powder, max: 1000, unit: 'g' },
+        { label: 'Vanilla Ice Cream Consumed', value: 3000 - inventory.vanilla_ice_cream, max: 3000, unit: 'g' },
+        { label: 'Nutella Consumed', value: 1000 - inventory.nutella, max: 1000, unit: 'g' },
+        { label: 'Mocktail Soda Utilized', value: 3000 - inventory.soda, max: 3000, unit: 'ml' },
+        { label: 'Paper Hot Cups Utilized', value: 300 - inventory.hot_cups, max: 300, unit: 'pcs' },
+        { label: 'Paper Cold Cups Utilized', value: 300 - inventory.cold_cups, max: 300, unit: 'pcs' }
       ];
 
       items.forEach(item => {
@@ -837,7 +884,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // EXCEL / CSV DATABASE EXPORTER
   const excelBtn = document.getElementById('export-excel-btn');
   if (excelBtn) {
     excelBtn.addEventListener('click', () => {
@@ -846,7 +892,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Compose CSV string
       let csvContent = 'data:text/csv;charset=utf-8,';
       csvContent += 'Order ID,Customer Name,Date and Time,Items Ordered,Payment Method,Subtotal (INR),GST (INR),Total Bill (INR)\n';
 
@@ -866,12 +911,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // PDF EXPORTER
   const pdfBtn = document.getElementById('export-pdf-btn');
   if (pdfBtn) {
     pdfBtn.addEventListener('click', () => {
       const printWindow = window.open('', '_blank');
-      
       const totalRev = bills.reduce((sum, b) => sum + b.total, 0);
       let billsRows = '';
       bills.forEach(b => {
@@ -938,7 +981,6 @@ document.addEventListener('DOMContentLoaded', () => {
               ${billsRows || '<tr><td colspan="6" style="text-align:center; padding:20px;">No sales logged in Nagpur branch database.</td></tr>'}
             </tbody>
           </table>
-          
           <script>
             window.onload = function() { window.print(); }
           </script>
@@ -983,7 +1025,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Hook edit and delete buttons inside Grid
   if (editorGrid) {
     editorGrid.addEventListener('click', (e) => {
       const btn = e.target.closest('.editor-action-btn');
@@ -992,7 +1033,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const index = parseInt(btn.getAttribute('data-index'), 10);
       
       if (btn.classList.contains('edit')) {
-        // Load item into Editor Form
         const item = menu[index];
         document.getElementById('edit-item-index').value = index;
         document.getElementById('item-name-input').value = item.name;
@@ -1015,7 +1055,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Reset Editor Form
   function resetEditorForm() {
     if (editorForm) editorForm.reset();
     document.getElementById('edit-item-index').value = '';
@@ -1034,7 +1073,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Form Submit (Save / Update Item)
   if (editorForm) {
     editorForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -1049,10 +1087,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const newItem = { name, category, price, description, icon };
 
       if (indexStr === '') {
-        // Add new item
         menu.push(newItem);
       } else {
-        // Update item
         const index = parseInt(indexStr, 10);
         menu[index] = newItem;
       }
