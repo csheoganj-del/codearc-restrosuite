@@ -661,6 +661,9 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const tabId = link.getAttribute('data-tab');
       
+      // Play soft tap sound
+      SoundEffects.playClick();
+      
       sidebarLinks.forEach(l => l.classList.remove('active'));
       link.classList.add('active');
 
@@ -673,11 +676,13 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (tabId === 'inventory-tab') tabSubtitle.textContent = 'Live Ingredient & Resource Levels';
       else if (tabId === 'reports-tab') tabSubtitle.textContent = 'Nagpur Branch Sales & Analytics';
       else if (tabId === 'editor-tab') tabSubtitle.textContent = 'Manage Drink & Food Items';
+      else if (tabId === 'crm-tab') tabSubtitle.textContent = 'Customer Relationship & Loyalty Ledger';
       
       if (tabId === 'inventory-tab') renderInventory();
       if (tabId === 'reports-tab') renderReports();
       if (tabId === 'bills-tab') renderBills();
       if (tabId === 'editor-tab') renderMenuEditor();
+      if (tabId === 'crm-tab') renderCRMTab();
     });
   });
 
@@ -729,11 +734,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     filteredItems.forEach(item => {
+      const cartItem = cart.find(i => i.name === item.name);
+      const qtyInCart = cartItem ? cartItem.qty : 0;
+      
       const card = document.createElement('div');
-      card.className = 'pos-item-card';
+      card.className = `pos-item-card ${qtyInCart > 0 ? 'selected-in-cart' : ''}`;
       card.addEventListener('click', () => addToCart(item));
 
+      const qtyBadge = qtyInCart > 0 
+        ? `<span class="pos-item-qty-badge">${qtyInCart}</span>` 
+        : '';
+
       card.innerHTML = `
+        ${qtyBadge}
         <div>
           <div class="pos-item-icon">${item.icon}</div>
           <div class="pos-item-title">${item.name}</div>
@@ -763,6 +776,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function addToCart(menuItem) {
+    // Play POP synthesizer sound
+    SoundEffects.playPop();
+    
     const existing = cart.find(item => item.name === menuItem.name);
     if (existing) {
       existing.qty += 1;
@@ -775,6 +791,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateCartQty(name, delta) {
     const item = cart.find(i => i.name === name);
     if (!item) return;
+    
+    if (delta > 0) {
+      SoundEffects.playPop();
+    } else {
+      SoundEffects.playRemove();
+    }
+    
     item.qty += delta;
     if (item.qty <= 0) {
       cart = cart.filter(i => i.name !== name);
@@ -827,12 +850,45 @@ document.addEventListener('DOMContentLoaded', () => {
       cartList.appendChild(row);
     });
 
-    const gst = Math.round(subtotal * 0.18);
-    const total = subtotal + gst;
+    // GST & Loyalty Calculations
+    const isGstEnabled = businessProfile.gstEnabled !== false;
+    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+    
+    // Check if loyalty customer exists & repeat customer (visits >= 1)
+    let loyaltyDiscount = 0;
+    const phoneInput = document.getElementById('cust-phone');
+    const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+    const nameInput = document.getElementById('cust-name');
+    const nameVal = nameInput ? nameInput.value.trim() : '';
+    
+    let matchedCustomer = null;
+    if (phoneVal || nameVal) {
+      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (nameVal && c.name.toLowerCase() === nameVal.toLowerCase()));
+    }
+    
+    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
+    }
+    
+    const taxableAmount = subtotal - loyaltyDiscount;
+    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
+    const total = taxableAmount + gst;
 
     cartSubtotal.textContent = `₹${subtotal}`;
-    cartGst.textContent = `₹${gst}`;
+    
+    // Dynamically display loyalty discount in GST calculation row or as a summary alert
+    if (loyaltyDiscount > 0) {
+      cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
+    } else {
+      cartGst.textContent = `₹${gst}`;
+    }
+    
     cartTotal.textContent = `₹${total}`;
+    
+    // Synchronize selected badge items on Touch Cards
+    renderPOSItems();
   }
 
   if (cartList) {
@@ -848,9 +904,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearCartBtn = document.getElementById('clear-cart');
   if (clearCartBtn) {
     clearCartBtn.addEventListener('click', () => {
+      SoundEffects.playRemove();
       cart = [];
       const nameInput = document.getElementById('cust-name');
       if (nameInput) nameInput.value = '';
+      const phoneInput = document.getElementById('cust-phone');
+      if (phoneInput) phoneInput.value = '';
+      if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
       renderCart();
     });
   }
@@ -916,18 +976,40 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
 
-      // Calculate totals
+      // 2. GST & Loyalty Calculations
+      const isGstEnabled = businessProfile.gstEnabled !== false;
+      const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+      const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+      const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+      
       let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      const gst = Math.round(subtotal * 0.18);
-      const total = subtotal + gst;
+      
+      const phoneInput = document.getElementById('cust-phone');
+      const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+      
+      let loyaltyDiscount = 0;
+      let matchedCustomer = null;
+      if (phoneVal || custName) {
+        matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
+      }
+      
+      if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+        loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
+      }
+      
+      const taxableAmount = subtotal - loyaltyDiscount;
+      const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
+      const total = taxableAmount + gst;
 
       // Create bill
       const newBill = {
         orderId: orderNum,
         customerName: custName,
+        customerPhone: phoneVal || null,
         dateTime: new Date().toLocaleString('en-IN'),
         items: [...cart],
         subtotal: subtotal,
+        discount: loyaltyDiscount,
         gst: gst,
         total: total,
         paymentMethod: selectedPaymentMethod
@@ -935,9 +1017,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
       bills.push(newBill);
       localStorage.setItem('doppio_bills', JSON.stringify(bills));
+      
+      // CRM Loyalty Registration/Update
+      if (phoneVal || (custName && custName !== 'Takeaway Customer')) {
+        updateCRMMember(custName, phoneVal, total);
+      }
+      
+      // Play SUCCESS sound
+      SoundEffects.playSuccess();
 
-      // Supabase mirror insert
-      if (supabaseClient) {
+      // Supabase mirror insert or offline queue
+      if (supabaseClient && navigator.onLine) {
         supabaseClient.from('doppio_bills').insert({
           orderId: newBill.orderId,
           customerName: newBill.customerName,
@@ -950,9 +1040,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }).then(({ error }) => {
           if (error) {
             console.error("Error syncing bill to cloud:", error);
-            alert(`Cloud Sync Warning: Failed to sync this transaction to Supabase. Error: ${error.message || error.details || 'Unknown'}\n\nPlease check your Supabase schema or RLS policies!`);
+            saveOfflineBill(newBill);
           }
         });
+      } else {
+        saveOfflineBill(newBill);
       }
 
       // Print
@@ -961,6 +1053,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Reset
       cart = [];
       if (custNameInput) custNameInput.value = '';
+      if (phoneInput) phoneInput.value = '';
+      if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
       generateOrderNumber();
       renderCart();
       checkLowStockAlerts();
@@ -1856,7 +1950,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let businessProfile = JSON.parse(localStorage.getItem('doppio_business_profile')) || {
     name: 'Doppio Cafe',
     address: 'London Street, Nagpur',
-    phone: '+91 91300 03177'
+    phone: '+91 91300 03177',
+    gstEnabled: true,
+    gstRate: 18.00,
+    loyaltyEnabled: false,
+    loyaltyRate: 10.00
   };
 
   async function loadBusinessProfile() {
@@ -1867,7 +1965,11 @@ document.addEventListener('DOMContentLoaded', () => {
         businessProfile = {
           name: data.business_name || businessProfile.name,
           address: data.address || businessProfile.address,
-          phone: data.phone || businessProfile.phone
+          phone: data.phone || businessProfile.phone,
+          gstEnabled: data.gst_enabled !== undefined ? data.gst_enabled : businessProfile.gstEnabled,
+          gstRate: data.gst_rate !== undefined ? parseFloat(data.gst_rate) : businessProfile.gstRate,
+          loyaltyEnabled: data.loyalty_discount_enabled !== undefined ? data.loyalty_discount_enabled : businessProfile.loyaltyEnabled,
+          loyaltyRate: data.loyalty_discount_rate !== undefined ? parseFloat(data.loyalty_discount_rate) : businessProfile.loyaltyRate
         };
         localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
       }
@@ -1885,6 +1987,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('profile-name-input').value = businessProfile.name;
     document.getElementById('profile-address-input').value = businessProfile.address;
     document.getElementById('profile-phone-input').value = businessProfile.phone;
+    
+    // Set GST and Loyalty values
+    const gstCheck = document.getElementById('profile-gst-enabled');
+    const gstRateInput = document.getElementById('profile-gst-rate');
+    const loyaltyCheck = document.getElementById('profile-loyalty-enabled');
+    const loyaltyRateInput = document.getElementById('profile-loyalty-rate');
+    
+    if (gstCheck) gstCheck.checked = businessProfile.gstEnabled !== false;
+    if (gstRateInput) gstRateInput.value = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+    if (loyaltyCheck) loyaltyCheck.checked = businessProfile.loyaltyEnabled === true;
+    if (loyaltyRateInput) loyaltyRateInput.value = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+    
     profileModal.classList.add('active');
   }
 
@@ -1896,16 +2010,37 @@ document.addEventListener('DOMContentLoaded', () => {
   if (businessProfileForm) {
     businessProfileForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      
+      // Play Click sound
+      SoundEffects.playClick();
+      
       const name = document.getElementById('profile-name-input').value.trim();
       const address = document.getElementById('profile-address-input').value.trim();
       const phone = document.getElementById('profile-phone-input').value.trim();
-      businessProfile = { name, address, phone };
+      const gstEnabled = document.getElementById('profile-gst-enabled').checked;
+      const gstRate = parseFloat(document.getElementById('profile-gst-rate').value) || 0;
+      const loyaltyEnabled = document.getElementById('profile-loyalty-enabled').checked;
+      const loyaltyRate = parseFloat(document.getElementById('profile-loyalty-rate').value) || 0;
+      
+      businessProfile = { name, address, phone, gstEnabled, gstRate, loyaltyEnabled, loyaltyRate };
       localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+      
       const saveBtn = document.getElementById('save-profile-btn');
       if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+      
       if (supabaseClient) {
         const { error } = await supabaseClient.from('doppio_business_profile')
-          .upsert({ id: 1, business_name: name, address, phone }, { onConflict: 'id' });
+          .upsert({ 
+            id: 1, 
+            business_name: name, 
+            address, 
+            phone,
+            gst_enabled: gstEnabled,
+            gst_rate: gstRate,
+            loyalty_discount_enabled: loyaltyEnabled,
+            loyalty_discount_rate: loyaltyRate
+          }, { onConflict: 'id' });
+          
         if (error) {
           alert(`Profile save warning: ${error.message}`);
         }
@@ -1913,6 +2048,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Profile'; }
       profileModal.classList.remove('active');
       alert('Business profile saved! It will now appear on all printed receipts.');
+      renderCart(); // recalculate POS totals with new GST settings
     });
   }
 
@@ -1962,8 +2098,426 @@ document.addEventListener('DOMContentLoaded', () => {
   if (adminPinInput) adminPinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAdminPin(); });
 
   // ==========================================
+  // WEB AUDIO SYNTHESIZER SOUND EFFECTS
+  // ==========================================
+  const SoundEffects = {
+    audioCtx: null,
+    
+    init() {
+      if (!this.audioCtx) {
+        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    },
+    
+    playPop() {
+      this.init();
+      const ctx = this.audioCtx;
+      if (!ctx) return;
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.1);
+      
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    },
+    
+    playClick() {
+      this.init();
+      const ctx = this.audioCtx;
+      if (!ctx) return;
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(550, ctx.currentTime);
+      osc.frequency.setValueAtTime(220, ctx.currentTime + 0.03);
+      
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    },
+    
+    playSuccess() {
+      this.init();
+      const ctx = this.audioCtx;
+      if (!ctx) return;
+      
+      const playTone = (freq, delay, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+        gain.gain.setValueAtTime(0.06, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + duration);
+      };
+      
+      playTone(523.25, 0, 0.4); // C5
+      playTone(659.25, 0.08, 0.4); // E5
+      playTone(783.99, 0.16, 0.4); // G5
+      playTone(987.77, 0.24, 0.5); // B5
+    },
+
+    playRemove() {
+      this.init();
+      const ctx = this.audioCtx;
+      if (!ctx) return;
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(250, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.15);
+      
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    },
+    
+    playAlert() {
+      this.init();
+      const ctx = this.audioCtx;
+      if (!ctx) return;
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(140, ctx.currentTime);
+      osc.frequency.setValueAtTime(130, ctx.currentTime + 0.08);
+      
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    }
+  };
+
+  // ==========================================
+  // OFFLINE AUTOMATIC SYNCHRONIZATION QUEUE
+  // ==========================================
+  const networkBadge = document.getElementById('network-status-badge');
+  
+  function updateNetworkStatus() {
+    if (!networkBadge) return;
+    const isOnline = navigator.onLine;
+    const dot = networkBadge.querySelector('.status-dot');
+    const text = networkBadge.querySelector('.status-text');
+    
+    if (isOnline) {
+      if (dot) dot.className = 'status-dot green';
+      if (text) text.textContent = 'Online Mode';
+      syncOfflineQueues();
+    } else {
+      if (dot) dot.className = 'status-dot orange';
+      if (text) text.textContent = 'Offline (Saved)';
+    }
+  }
+
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+
+  function saveOfflineBill(bill) {
+    const queue = JSON.parse(localStorage.getItem('doppio_offline_bills') || '[]');
+    queue.push(bill);
+    localStorage.setItem('doppio_offline_bills', JSON.stringify(queue));
+    console.log("Saved transaction offline locally:", bill);
+  }
+
+  async function syncOfflineQueues() {
+    if (!navigator.onLine || !supabaseClient) return;
+    
+    // A. Sync Offline Bills
+    const offlineBills = JSON.parse(localStorage.getItem('doppio_offline_bills') || '[]');
+    if (offlineBills.length > 0) {
+      console.log(`Syncing ${offlineBills.length} offline bills to Supabase...`);
+      for (const bill of offlineBills) {
+        try {
+          await supabaseClient.from('doppio_bills').insert({
+            orderId: bill.orderId,
+            customerName: bill.customerName,
+            dateTime: bill.dateTime,
+            items: typeof bill.items === 'string' ? bill.items : JSON.stringify(bill.items),
+            subtotal: bill.subtotal,
+            gst: bill.gst,
+            total: bill.total,
+            paymentMethod: bill.paymentMethod
+          });
+        } catch (e) {
+          console.error("Failed to sync offline bill:", e);
+        }
+      }
+      localStorage.removeItem('doppio_offline_bills');
+    }
+    
+    // B. Sync Offline CRM Members
+    const offlineCRM = JSON.parse(localStorage.getItem('doppio_offline_crm') || '[]');
+    if (offlineCRM.length > 0) {
+      console.log(`Syncing ${offlineCRM.length} offline CRM loyalty profiles...`);
+      for (const member of offlineCRM) {
+        try {
+          await supabaseClient.from('doppio_crm').upsert({
+            name: member.name,
+            phone: member.phone,
+            visits: member.visits,
+            total_spend: member.total_spend,
+            last_visit: member.last_visit
+          }, { onConflict: 'phone' });
+        } catch (e) {
+          console.error("Failed to sync offline CRM loyalty profile:", e);
+        }
+      }
+      localStorage.removeItem('doppio_offline_crm');
+    }
+    
+    // Reload CRM data after sync completes
+    loadCRMData();
+  }
+
+  // ==========================================
+  // CRM & LOYALTY PROGRAM SYSTEM
+  // ==========================================
+  let crmData = [];
+  const crmSearchInput = document.getElementById('crm-search-input');
+  const crmTableBody = document.getElementById('crm-table-body');
+  const custNameInput = document.getElementById('cust-name');
+  const custPhoneInput = document.getElementById('cust-phone');
+  const loyaltyStatusBox = document.getElementById('loyalty-status-box');
+
+  function getLoyaltyTier(spend) {
+    if (spend >= 5000) return 'Platinum';
+    if (spend >= 2500) return 'Gold';
+    if (spend >= 1000) return 'Silver';
+    return 'Bronze';
+  }
+
+  async function loadCRMData() {
+    const localCRM = localStorage.getItem('doppio_crm_local');
+    if (localCRM) {
+      crmData = JSON.parse(localCRM);
+      renderCRMTab();
+    }
+    
+    if (supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('doppio_crm')
+          .select('*')
+          .order('total_spend', { ascending: false });
+          
+        if (data && !error) {
+          crmData = data;
+          localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
+          renderCRMTab();
+        }
+      } catch (e) {
+        console.warn("Error loading CRM from cloud:", e);
+      }
+    }
+  }
+
+  function renderCRMTab() {
+    if (!crmTableBody) return;
+    crmTableBody.innerHTML = '';
+    
+    const searchVal = (crmSearchInput ? crmSearchInput.value : '').trim().toLowerCase();
+    
+    const filtered = crmData.filter(c => {
+      const nameMatch = c.name && c.name.toLowerCase().includes(searchVal);
+      const phoneMatch = c.phone && c.phone.includes(searchVal);
+      return nameMatch || phoneMatch;
+    });
+    
+    // Update summary metrics cards
+    const totalMembersEl = document.getElementById('crm-total-members');
+    const topSpenderEl = document.getElementById('crm-top-spender');
+    
+    if (totalMembersEl) totalMembersEl.textContent = crmData.length;
+    if (topSpenderEl && crmData.length > 0) {
+      // Find top spender
+      const top = [...crmData].sort((a,b) => b.total_spend - a.total_spend)[0];
+      topSpenderEl.textContent = `${top.name || 'Anonymous'} (₹${Math.round(top.total_spend)})`;
+    } else if (topSpenderEl) {
+      topSpenderEl.textContent = '-';
+    }
+
+    if (filtered.length === 0) {
+      crmTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align:center; padding: 30px; color: var(--text-muted);">
+            <i class="fa-solid fa-users" style="font-size: 28px; color: var(--accent-caramel); display:block; margin-bottom: 8px;"></i>
+            No loyalty members match your search query.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    filtered.forEach(c => {
+      const tier = getLoyaltyTier(c.total_spend);
+      const lastVisitStr = c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-IN') : '-';
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:600; color:var(--primary-brand);">${c.name || 'Anonymous'}</td>
+        <td>${c.phone || '-'}</td>
+        <td>${c.visits}</td>
+        <td style="font-weight:600;">₹${c.total_spend}</td>
+        <td><span class="badge tier-${tier.toLowerCase()}" style="font-weight:700; text-transform:uppercase; font-size:11px;">${tier}</span></td>
+        <td>${lastVisitStr}</td>
+      `;
+      crmTableBody.appendChild(tr);
+    });
+  }
+
+  if (crmSearchInput) {
+    crmSearchInput.addEventListener('input', renderCRMTab);
+  }
+
+  function checkLoyaltyMember() {
+    if (!custNameInput || !custPhoneInput || !loyaltyStatusBox) return;
+    const name = custNameInput.value.trim().toLowerCase();
+    const phone = custPhoneInput.value.trim();
+    
+    if (!name && !phone) {
+      loyaltyStatusBox.style.display = 'none';
+      renderCart();
+      return;
+    }
+    
+    const match = crmData.find(c => {
+      if (phone && c.phone === phone) return true;
+      if (name && c.name.toLowerCase() === name) return true;
+      return false;
+    });
+    
+    if (match) {
+      const tier = getLoyaltyTier(match.total_spend);
+      const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+      const rate = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+      
+      loyaltyStatusBox.innerHTML = `
+        <div style="font-weight: 700; color: var(--accent-caramel); margin-bottom: 2px;">
+          <i class="fa-solid fa-crown"></i> Loyalty Member Found!
+        </div>
+        <strong>${match.name}</strong> (${match.phone || 'No Phone'})<br>
+        Visits: <strong>${match.visits}</strong> &nbsp;|&nbsp; Total Spent: <strong>₹${match.total_spend}</strong><br>
+        Tier: <span style="font-weight:700; text-transform:uppercase;">${tier}</span>
+        ${isLoyaltyEnabled && match.visits >= 1 ? `<br><span style="color:#2ecc71; font-weight:700;">★ Repeat customer: ${rate}% discount applied!</span>` : ''}
+      `;
+      loyaltyStatusBox.style.display = 'block';
+    } else {
+      loyaltyStatusBox.style.display = 'none';
+    }
+    renderCart();
+  }
+
+  if (custNameInput) custNameInput.addEventListener('input', checkLoyaltyMember);
+  if (custPhoneInput) custPhoneInput.addEventListener('input', checkLoyaltyMember);
+
+  async function updateCRMMember(name, phone, spendAmount) {
+    let member = null;
+    if (phone) {
+      member = crmData.find(c => c.phone === phone);
+    } else {
+      member = crmData.find(c => c.name.toLowerCase() === name.toLowerCase());
+    }
+    
+    const nowISO = new Date().toISOString();
+    
+    if (member) {
+      member.name = name || member.name; // update name if newly provided
+      member.visits += 1;
+      member.total_spend = parseFloat((parseFloat(member.total_spend) + spendAmount).toFixed(2));
+      member.last_visit = nowISO;
+    } else {
+      member = {
+        name: name || 'Loyalty Member',
+        phone: phone || null,
+        visits: 1,
+        total_spend: parseFloat(spendAmount.toFixed(2)),
+        last_visit: nowISO
+      };
+      crmData.push(member);
+    }
+    
+    localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
+    renderCRMTab();
+    
+    if (supabaseClient && navigator.onLine) {
+      try {
+        await supabaseClient.from('doppio_crm').upsert({
+          name: member.name,
+          phone: member.phone,
+          visits: member.visits,
+          total_spend: member.total_spend,
+          last_visit: member.last_visit
+        }, { onConflict: 'phone' });
+      } catch (e) {
+        saveOfflineCRMUpdate(member);
+      }
+    } else {
+      saveOfflineCRMUpdate(member);
+    }
+  }
+
+  function saveOfflineCRMUpdate(member) {
+    const queue = JSON.parse(localStorage.getItem('doppio_offline_crm') || '[]');
+    const existingIdx = queue.findIndex(q => q.phone === member.phone);
+    if (existingIdx !== -1) {
+      queue[existingIdx] = member;
+    } else {
+      queue.push(member);
+    }
+    localStorage.setItem('doppio_offline_crm', JSON.stringify(queue));
+  }
+
+  // Hook PIN Verification to Synthesizer Alerts
+  const originalCheckAdminPin = checkAdminPin;
+  checkAdminPin = function() {
+    if (!adminPinInput) return;
+    if (adminPinInput.value === '1006') {
+      originalCheckAdminPin();
+    } else {
+      SoundEffects.playAlert();
+      originalCheckAdminPin();
+    }
+  };
+
+  // ==========================================
   // 11. INITIAL BOOTSTRAP TRIGGERS
   // ==========================================
+  loadCRMData();
+  updateNetworkStatus();
   renderPOSCategories();
   renderPOSItems();
   renderCart();

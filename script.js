@@ -10,7 +10,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   const menuData = [
     // COLD COFFEE
-    { name: 'Iced Latte', description: 'Creamy chilled latte served over ice.', price: '₹249', category: 'COLD COFFEE', image: 'images/iced_latte.png', icon: '🥛' },
+    { name: 'Iced Latte', description: 'Creamy chilled latte served over ice.', price: '₹249', category: 'COLD COFFEE', icon: '🥛' },
     { name: 'Iced Americano', description: 'Strong refreshing black iced coffee.', price: '₹229', category: 'COLD COFFEE', icon: '🧊' },
     { name: 'Irish Coffee', description: 'Rich creamy coffee topped with whipped cream.', price: '₹279', category: 'COLD COFFEE', icon: '🥃' },
     { name: 'Mocha Frappe', description: 'Chocolate blended cold coffee with whipped cream.', price: '₹279', category: 'COLD COFFEE', icon: '🍫' },
@@ -23,7 +23,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // HOT COFFEE
     { name: 'Doppio', description: 'Double shot hot espresso with rich crema.', price: '₹219', category: 'HOT COFFEE', icon: '☕' },
     { name: 'Espresso', description: 'Strong concentrated black coffee shot.', price: '₹189', category: 'HOT COFFEE', icon: '☕' },
-    { name: 'Cappuccino', description: 'Frothy coffee with latte art.', price: '₹229', category: 'HOT COFFEE', image: 'images/cappuccino.png', icon: '🎨' },
+    { name: 'Cappuccino', description: 'Frothy coffee with latte art.', price: '₹229', category: 'HOT COFFEE', icon: '🎨' },
     { name: 'Cafe Latte', description: 'Smooth creamy latte with milk foam art.', price: '₹229', category: 'HOT COFFEE', icon: '🥛' },
     { name: 'Flat White', description: 'Velvety smooth milk coffee.', price: '₹229', category: 'HOT COFFEE', icon: '☕' },
     { name: 'Affogato', description: 'Espresso poured over vanilla ice cream.', price: '₹279', category: 'HOT COFFEE', icon: '🍨' },
@@ -37,7 +37,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // MATCHA
     { name: 'Iced Matcha Latte', description: 'Refreshing creamy green tea latte over ice.', price: '₹329', category: 'MATCHA', icon: '🍵' },
     { name: 'Matcha Latte', description: 'Warm creamy matcha drink.', price: '₹329', category: 'MATCHA', icon: '🍵' },
-    { name: 'Iced Strawberry Matcha', description: 'Strawberry and matcha layered drink.', price: '₹349', category: 'MATCHA', image: 'images/iced_strawberry_matcha.png', icon: '🍓' },
+    { name: 'Iced Strawberry Matcha', description: 'Strawberry and matcha layered drink.', price: '₹349', category: 'MATCHA', icon: '🍓' },
     { name: 'Iced Vanilla Matcha', description: 'Sweet vanilla infused matcha drink.', price: '₹329', category: 'MATCHA', icon: '🌿' },
     { name: 'Mango Matcha', description: 'Tropical mango and matcha fusion.', price: '₹349', category: 'MATCHA', icon: '🥭' },
 
@@ -68,7 +68,7 @@ window.addEventListener('DOMContentLoaded', () => {
     { name: 'Cheese Chilli Sandwich', description: 'Spicy cheese sandwich toasted perfectly.', price: '₹349', category: 'SANDWICHES', icon: '🌶️' },
 
     // THICK SHAKES
-    { name: 'Nutella Thickshake', description: 'Thick chocolate hazelnut milkshake.', price: '₹299', category: 'THICK SHAKES', image: 'images/nutella_thickshake.png', icon: '🍫' },
+    { name: 'Nutella Thickshake', description: 'Thick chocolate hazelnut milkshake.', price: '₹299', category: 'THICK SHAKES', icon: '🍫' },
     { name: 'Oreo Cookies Thickshake', description: 'Oreo loaded creamy shake.', price: '₹299', category: 'THICK SHAKES', icon: '🍪' },
     { name: 'Salted Caramel Thickshake', description: 'Sweet caramel creamy shake.', price: '₹299', category: 'THICK SHAKES', icon: '🍯' },
     { name: 'Strawberry Thickshake', description: 'Fresh strawberry creamy shake.', price: '₹299', category: 'THICK SHAKES', icon: '🍓' },
@@ -495,8 +495,27 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Password Visibility Eye Toggle
+  const togglePasswordBtn = document.getElementById('toggle-password');
+  const passwordInput = document.getElementById('login-password');
+  if (togglePasswordBtn && passwordInput) {
+    togglePasswordBtn.addEventListener('click', () => {
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        togglePasswordBtn.classList.remove('fa-eye');
+        togglePasswordBtn.classList.add('fa-eye-slash');
+        togglePasswordBtn.style.color = 'var(--accent-caramel)';
+      } else {
+        passwordInput.type = 'password';
+        togglePasswordBtn.classList.remove('fa-eye-slash');
+        togglePasswordBtn.classList.add('fa-eye');
+        togglePasswordBtn.style.color = 'var(--text-muted)';
+      }
+    });
+  }
+
   // ==========================================
-  // 4. DYNAMIC VISITOR COUNTER LOGIC (MADE BY CODEARC)
+  // 4. REAL VISITOR COUNTER LOGIC (MADE BY CODEARC)
   // ==========================================
   const visitCountEl = document.getElementById('visit-count');
   if (visitCountEl) {
@@ -514,7 +533,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!hasCounted) {
       baseCount += 1;
       localStorage.setItem('doppio_visitor_count', baseCount);
-      sessionStorage.setItem('doppio_counted_session', 'true');
     }
 
     // C. Format count with commas (e.g., 10,483)
@@ -526,7 +544,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // D. Multi-device sync counter API integration
     try {
-      fetch('https://api.counterapi.dev/v1/doppiocafe/global/up')
+      // If we haven't counted this session yet, hit the "up" counter endpoint (increments by 1)
+      // Otherwise, query the static counter value so we don't spam fake counts on refreshes
+      const endpoint = !hasCounted 
+        ? 'https://api.counterapi.dev/v1/doppiocafe/global/up' 
+        : 'https://api.counterapi.dev/v1/doppiocafe/global';
+
+      fetch(endpoint)
         .then(response => response.json())
         .then(data => {
           if (data && data.value) {
@@ -534,34 +558,19 @@ window.addEventListener('DOMContentLoaded', () => {
             const finalCount = 10480 + cloudValue;
             visitCountEl.textContent = formatCount(finalCount);
             localStorage.setItem('doppio_visitor_count', finalCount);
+            
+            // Mark session as counted after successful cloud sync
+            sessionStorage.setItem('doppio_counted_session', 'true');
           }
         })
         .catch(err => {
           console.log("Cloud Counter API offline, using local visitor simulation.", err);
+          if (!hasCounted) {
+            sessionStorage.setItem('doppio_counted_session', 'true');
+          }
         });
     } catch (e) {
       console.log("Counter API call error", e);
     }
-
-    // E. Live active user navigation ticks (every 6 seconds, random chance)
-    setInterval(() => {
-      if (Math.random() < 0.35) {
-        const increment = Math.random() > 0.7 ? 2 : 1;
-        let currentLocalCount = parseInt(localStorage.getItem('doppio_visitor_count') || baseCount, 10);
-        currentLocalCount += increment;
-        localStorage.setItem('doppio_visitor_count', currentLocalCount);
-        
-        // Micro-interaction scaling tick
-        visitCountEl.style.transition = 'all 0.15s ease';
-        visitCountEl.style.color = '#ffffff';
-        visitCountEl.style.transform = 'scale(1.15)';
-        
-        setTimeout(() => {
-          visitCountEl.textContent = formatCount(currentLocalCount);
-          visitCountEl.style.color = 'var(--accent-gold)';
-          visitCountEl.style.transform = 'scale(1)';
-        }, 150);
-      }
-    }, 6000);
   }
 });

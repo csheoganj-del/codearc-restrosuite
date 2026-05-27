@@ -36,6 +36,7 @@
         <a href="#" class="sidebar-link" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i> Inventory Control</a>
         <a href="#" class="sidebar-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Sales Reports</a>
         <a href="#" class="sidebar-link" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i> Menu Editor</a>
+        <a href="#" class="sidebar-link" data-tab="crm-tab"><i class="fa-solid fa-users-rectangle"></i> CRM & Loyalty</a>
       </nav>
 
       <button class="profile-sidebar-btn" id="open-profile-btn"><i class="fa-solid fa-store"></i> Business Profile</button>
@@ -51,7 +52,11 @@
           <h1 id="tab-title">Takeaway POS</h1>
           <span id="tab-subtitle">Default Tab: Selection Grid</span>
         </div>
-        <div class="header-right">
+        <div class="header-right" style="display: flex; align-items: center; gap: 16px;">
+          <div class="status-indicator-badge" id="network-status-badge">
+            <span class="status-dot green"></span>
+            <span class="status-text">Online Mode</span>
+          </div>
           <div class="dateTime" id="dateTime">May 27, 2026 12:00 PM</div>
         </div>
       </header>
@@ -89,15 +94,24 @@
               </div>
 
               <!-- Takeaway Customer Fields -->
-              <div class="takeaway-fields">
-                <div class="form-group">
-                  <label for="cust-name">Customer Name</label>
-                  <input type="text" id="cust-name" placeholder="Enter name (e.g. Amit)">
+              <div class="takeaway-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="cust-name" style="font-size: 11px;">Customer Name</label>
+                  <input type="text" id="cust-name" placeholder="Name" style="padding: 8px 10px; font-size: 13px;">
                 </div>
-                <div class="form-group">
-                  <label for="order-num">Takeaway Order #</label>
-                  <input type="text" id="order-num" placeholder="Auto-generated" readonly>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="cust-phone" style="font-size: 11px;">Customer Phone</label>
+                  <input type="text" id="cust-phone" placeholder="Phone" style="padding: 8px 10px; font-size: 13px;">
                 </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label for="order-num" style="font-size: 11px;">Takeaway Order #</label>
+                <input type="text" id="order-num" placeholder="Auto-generated" readonly style="padding: 8px 10px; font-size: 13px;">
+              </div>
+
+              <!-- Loyalty Status Box -->
+              <div class="loyalty-status-box" id="loyalty-status-box" style="display: none; padding: 10px 12px; background: rgba(200, 138, 88, 0.08); border: 1px solid rgba(200, 138, 88, 0.3); border-radius: 8px; font-size: 12px; margin-bottom: 12px; color: var(--primary-brand); line-height: 1.4; text-align: left;">
+                <!-- Filled dynamically -->
               </div>
 
               <!-- Cart list -->
@@ -328,6 +342,48 @@
           </div>
         </div>
 
+        <!-- TAB 6: CRM & LOYALTY -->
+        <div class="tab-content" id="crm-tab">
+          <div class="crm-header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+            <h2>CRM Customer Loyalty Program</h2>
+            <div class="crm-stats" style="display: flex; gap: 16px;">
+              <div class="crm-stat-card" style="background: var(--bg-card); padding: 12px 24px; border-radius: 12px; box-shadow: var(--shadow-sm); border: 1px solid rgba(44,27,24,0.05); text-align: center; min-width: 140px;">
+                <span class="stat-num" id="crm-total-members" style="display: block; font-size: 24px; font-weight: 700; color: var(--accent-caramel);">0</span>
+                <span class="stat-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Total Members</span>
+              </div>
+              <div class="crm-stat-card" style="background: var(--bg-card); padding: 12px 24px; border-radius: 12px; box-shadow: var(--shadow-sm); border: 1px solid rgba(44,27,24,0.05); text-align: center; min-width: 180px;">
+                <span class="stat-num" id="crm-top-spender" style="display: block; font-size: 20px; font-weight: 700; color: var(--primary-brand); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">-</span>
+                <span class="stat-label" style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Top Spender</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="crm-controls" style="margin-bottom: 16px;">
+            <div class="crm-search" style="position: relative; max-width: 400px;">
+              <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--accent-caramel);"></i>
+              <input type="text" id="crm-search-input" placeholder="Search by customer name or phone number..." style="width: 100%; padding: 10px 14px 10px 38px; border-radius: 8px; border: 1px solid rgba(44,27,24,0.15); background: var(--bg-card); font-size: 13px; outline: none; transition: var(--transition);">
+            </div>
+          </div>
+
+          <div class="crm-table-container" style="background: var(--bg-card); border-radius: var(--border-radius); box-shadow: var(--shadow-sm); overflow: hidden; border: 1px solid rgba(44,27,24,0.05);">
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Customer Name</th>
+                  <th>Phone Number</th>
+                  <th>Visit Count</th>
+                  <th>Total Spent</th>
+                  <th>Loyalty Tier</th>
+                  <th>Last Visit</th>
+                </tr>
+              </thead>
+              <tbody id="crm-table-body">
+                <!-- Loyalty rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </main>
   </div>
@@ -377,6 +433,32 @@
             <label style="display:block; font-size:11px; font-weight:600; margin-bottom:5px; color:var(--text-dark);">Phone Number</label>
             <input type="text" id="profile-phone-input" placeholder="e.g. +91 91300 03177" required
               style="width:100%; padding:10px; border:1px solid rgba(44,27,24,0.15); border-radius:6px; background:rgba(255,255,255,0.5); font-size:13px; color:var(--text-dark);">
+          </div>
+
+          <!-- GST settings row -->
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-bottom: 14px; padding: 10px; background: rgba(44,27,24,0.03); border-radius: 8px; border: 1px solid rgba(44,27,24,0.06);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="profile-gst-enabled" style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent-caramel);">
+              <label for="profile-gst-enabled" style="font-size:12px; font-weight:600; color:var(--text-dark); cursor: pointer; margin: 0; user-select: none;">Apply GST (Bill)</label>
+            </div>
+            <div>
+              <label style="display:block; font-size:10px; font-weight:600; margin-bottom:3px; color:var(--text-dark);">GST Rate (%)</label>
+              <input type="number" id="profile-gst-rate" value="18" min="0" max="100" step="0.5"
+                style="width:100%; padding:6px; border:1px solid rgba(44,27,24,0.15); border-radius:4px; background:rgba(255,255,255,0.7); font-size:12px; color:var(--text-dark);">
+            </div>
+          </div>
+
+          <!-- Loyalty Discount Settings -->
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-bottom: 14px; padding: 10px; background: rgba(44,27,24,0.03); border-radius: 8px; border: 1px solid rgba(44,27,24,0.06);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="profile-loyalty-enabled" style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent-caramel);">
+              <label for="profile-loyalty-enabled" style="font-size:12px; font-weight:600; color:var(--text-dark); cursor: pointer; margin: 0; user-select: none;">Loyalty Discount</label>
+            </div>
+            <div>
+              <label style="display:block; font-size:10px; font-weight:600; margin-bottom:3px; color:var(--text-dark);">Discount (%)</label>
+              <input type="number" id="profile-loyalty-rate" value="10" min="0" max="100" step="0.5"
+                style="width:100%; padding:6px; border:1px solid rgba(44,27,24,0.15); border-radius:4px; background:rgba(255,255,255,0.7); font-size:12px; color:var(--text-dark);">
+            </div>
           </div>
           <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
             <button type="button" class="btn btn-secondary" id="cancel-profile-btn">Cancel</button>

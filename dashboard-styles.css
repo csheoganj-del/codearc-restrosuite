@@ -9,6 +9,7 @@
   --bg-cream-light: #FDF8F4;
   --bg-tan-warm: #F5EBE0;
   --bg-card: #FFFFFF;
+  --white: #FFFFFF;
   --text-dark: #2C1B18;
   --text-light: #FDF8F4;
   --text-muted: #7E6E6A;
@@ -1695,3 +1696,135 @@ body {
   border-color: var(--accent-caramel) !important;
   box-shadow: 0 0 0 3px rgba(200, 138, 88, 0.18);
 }
+
+/* ==========================================
+ * ADVANCED UI ELEMENTS (SOUNDS, OFFLINE & SELECTIONS)
+ * ========================================== */
+.status-indicator-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(44, 27, 24, 0.05);
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(44, 27, 24, 0.1);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.green {
+  background-color: #2ecc71;
+  box-shadow: 0 0 8px #2ecc71;
+}
+
+.status-dot.orange {
+  background-color: #f39c12;
+  box-shadow: 0 0 8px #f39c12;
+  animation: offline-pulse-glow 1.5s infinite alternate;
+}
+
+@keyframes offline-pulse-glow {
+  0% { opacity: 0.4; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1.1); }
+}
+
+.pos-item-card {
+  position: relative;
+}
+
+.pos-item-card.selected-in-cart {
+  border: 2px solid var(--accent-caramel) !important;
+  background: rgba(200, 138, 88, 0.05) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.pos-item-qty-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--accent-caramel);
+  color: #FFFFFF !important;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(200, 138, 88, 0.4);
+  z-index: 5;
+  animation: badge-pop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+
+/* ==========================================
+ * PREMIUM BTN REFACTORING (NO MORE BASIC HTML BUTTONS)
+ * ========================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border-radius: 30px;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--font-body);
+  text-decoration: none;
+  transition: var(--transition);
+  cursor: pointer;
+  gap: 8px;
+  border: none;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary {
+  background-color: var(--accent-caramel);
+  color: #FFFFFF !important;
+  border: 1px solid var(--accent-caramel);
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-caramel-hover);
+  border-color: var(--accent-caramel-hover);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--primary-brand) !important;
+  border: 1px solid rgba(44, 27, 24, 0.2);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(44, 27, 24, 0.05);
+}
+
+/* Modal cancel/confirm buttons layout gap */
+.modal-body .btn {
+  min-width: 100px;
+}
+
