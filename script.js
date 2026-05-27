@@ -494,4 +494,74 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // ==========================================
+  // 4. DYNAMIC VISITOR COUNTER LOGIC (MADE BY CODEARC)
+  // ==========================================
+  const visitCountEl = document.getElementById('visit-count');
+  if (visitCountEl) {
+    // A. Fetch or initialize local base visitor count
+    let baseCount = localStorage.getItem('doppio_visitor_count');
+    if (!baseCount) {
+      baseCount = 10482; // Start with a realistic, premium traffic base
+      localStorage.setItem('doppio_visitor_count', baseCount);
+    } else {
+      baseCount = parseInt(baseCount, 10);
+    }
+
+    // B. Session validation to increment once per session
+    let hasCounted = sessionStorage.getItem('doppio_counted_session');
+    if (!hasCounted) {
+      baseCount += 1;
+      localStorage.setItem('doppio_visitor_count', baseCount);
+      sessionStorage.setItem('doppio_counted_session', 'true');
+    }
+
+    // C. Format count with commas (e.g., 10,483)
+    function formatCount(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    visitCountEl.textContent = formatCount(baseCount);
+
+    // D. Multi-device sync counter API integration
+    try {
+      fetch('https://api.counterapi.dev/v1/doppiocafe/global/up')
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.value) {
+            const cloudValue = data.value;
+            const finalCount = 10480 + cloudValue;
+            visitCountEl.textContent = formatCount(finalCount);
+            localStorage.setItem('doppio_visitor_count', finalCount);
+          }
+        })
+        .catch(err => {
+          console.log("Cloud Counter API offline, using local visitor simulation.", err);
+        });
+    } catch (e) {
+      console.log("Counter API call error", e);
+    }
+
+    // E. Live active user navigation ticks (every 6 seconds, random chance)
+    setInterval(() => {
+      if (Math.random() < 0.35) {
+        const increment = Math.random() > 0.7 ? 2 : 1;
+        let currentLocalCount = parseInt(localStorage.getItem('doppio_visitor_count') || baseCount, 10);
+        currentLocalCount += increment;
+        localStorage.setItem('doppio_visitor_count', currentLocalCount);
+        
+        // Micro-interaction scaling tick
+        visitCountEl.style.transition = 'all 0.15s ease';
+        visitCountEl.style.color = '#ffffff';
+        visitCountEl.style.transform = 'scale(1.15)';
+        
+        setTimeout(() => {
+          visitCountEl.textContent = formatCount(currentLocalCount);
+          visitCountEl.style.color = 'var(--accent-gold)';
+          visitCountEl.style.transform = 'scale(1)';
+        }, 150);
+      }
+    }, 6000);
+  }
 });
