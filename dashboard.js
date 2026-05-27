@@ -314,7 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
     gstEnabled: true,
     gstRate: 18,
     loyaltyEnabled: true,
-    loyaltyRate: 10
+    loyaltyRate: 10,
+    passcodeLockEnabled: false
   };
 
   let cart = [];
@@ -355,7 +356,17 @@ document.addEventListener('DOMContentLoaded', () => {
       // Sync Menu
       const { data: dbMenu } = await supabaseClient.from('doppio_menu').select('*').order('id', { ascending: true });
       if (dbMenu && dbMenu.length > 0) {
-        menu = dbMenu;
+        // Merge dbMenu with defaultMenu defensively to ensure food items and all categories exist
+        const dbNames = new Set(dbMenu.map(item => item.name.toLowerCase().trim()));
+        let mergedMenu = [...dbMenu];
+        
+        defaultMenu.forEach(item => {
+          if (!dbNames.has(item.name.toLowerCase().trim())) {
+            mergedMenu.push(item);
+          }
+        });
+        
+        menu = mergedMenu;
         localStorage.setItem('doppio_menu', JSON.stringify(menu));
         renderPOSCategories();
         renderPOSItems();
@@ -1036,9 +1047,46 @@ document.addEventListener('DOMContentLoaded', () => {
   let activePresetDate = 'all';
   let billsSearchQuery = '';
 
+  function parseBillDate(bill) {
+    if (!bill.dateTime) return new Date();
+    const d = new Date(bill.dateTime);
+    if (!isNaN(d.getTime())) {
+      d.setHours(0,0,0,0);
+      return d;
+    }
+    const parts = bill.dateTime.split(',')[0].split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const parsedDate = new Date(year, month, day);
+      if (!isNaN(parsedDate.getTime())) {
+        parsedDate.setHours(0,0,0,0);
+        return parsedDate;
+      }
+    }
+    const fallback = new Date();
+    fallback.setHours(0,0,0,0);
+    return fallback;
+  }
+
   function renderBills() {
     if (!billsTableBody) return;
     billsTableBody.innerHTML = '';
+
+    const fromVal = document.getElementById('bills-date-from') ? document.getElementById('bills-date-from').value : '';
+    const toVal = document.getElementById('bills-date-to') ? document.getElementById('bills-date-to').value : '';
+
+    let dateFrom = null;
+    if (fromVal) {
+      dateFrom = new Date(fromVal);
+      dateFrom.setHours(0,0,0,0);
+    }
+    let dateTo = null;
+    if (toVal) {
+      dateTo = new Date(toVal);
+      dateTo.setHours(0,0,0,0);
+    }
 
     const filteredBills = bills.filter(bill => {
       // Search matches
@@ -1059,9 +1107,30 @@ document.addEventListener('DOMContentLoaded', () => {
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayStr = yesterday.toLocaleDateString('en-IN');
           matchesPreset = bill.dateTime.includes(yesterdayStr);
+        } else if (activePresetDate === 'week') {
+          const billDate = parseBillDate(bill);
+          const diffTime = Math.abs(new Date() - billDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          matchesPreset = diffDays <= 7;
+        } else if (activePresetDate === 'month') {
+          const billDate = parseBillDate(bill);
+          const diffTime = Math.abs(new Date() - billDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          matchesPreset = diffDays <= 30;
         }
       }
-      return matchesSearch && matchesPreset;
+
+      // Custom range matches
+      let matchesCustomRange = true;
+      const billDate = parseBillDate(bill);
+      if (dateFrom && billDate < dateFrom) {
+        matchesCustomRange = false;
+      }
+      if (dateTo && billDate > dateTo) {
+        matchesCustomRange = false;
+      }
+
+      return matchesSearch && matchesPreset && matchesCustomRange;
     });
 
     // Update Top Billing stats indicators
@@ -1376,8 +1445,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('inv-total-empty').textContent = `${emptyCount} Out of stock`;
   }
 
-  let thresholds = JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {};
-
   function getLabelFromKey(key) {
     const map = {
       espresso_shot: 'Espresso Shot (ml)', milk: 'Milk (ml)', ice: 'Ice (g)',
@@ -1447,14 +1514,48 @@ document.addEventListener('DOMContentLoaded', () => {
   const ingStatsList = document.getElementById('ingredient-stats-list');
 
   function renderReports() {
+    // Get filter dates
+    const fromVal = document.getElementById('reports-date-from') ? document.getElementById('reports-date-from').value : '';
+    const toVal = document.getElementById('reports-date-to') ? document.getElementById('reports-date-to').value : '';
+
+    let dateFrom = null;
+    if (fromVal) {
+      dateFrom = new Date(fromVal);
+      dateFrom.setHours(0,0,0,0);
+    }
+    let dateTo = null;
+    if (toVal) {
+      dateTo = new Date(toVal);
+      dateTo.setHours(0,0,0,0);
+    }
+
+    const filteredBills = bills.filter(bill => {
+      const billDate = parseBillDate(bill);
+      if (dateFrom && billDate < dateFrom) return false;
+      if (dateTo && billDate > dateTo) return false;
+      return true;
+    });
+
+    // Update filter feedback label
+    const feedbackLabel = document.getElementById('reports-filtered-label');
+    if (feedbackLabel) {
+      if (fromVal || toVal) {
+        feedbackLabel.textContent = `Filtered: ${filteredBills.length} of ${bills.length} bills`;
+        feedbackLabel.style.color = 'var(--accent-caramel)';
+      } else {
+        feedbackLabel.textContent = `All-Time Report`;
+        feedbackLabel.style.color = 'var(--text-muted)';
+      }
+    }
+
     // Total numbers calculations
-    const totalRevenueSum = bills.reduce((sum, b) => sum + b.total, 0);
+    const totalRevenueSum = filteredBills.reduce((sum, b) => sum + b.total, 0);
     if (reportRevenue) reportRevenue.textContent = `₹${totalRevenueSum}`;
-    if (reportOrders) reportOrders.textContent = bills.length;
+    if (reportOrders) reportOrders.textContent = filteredBills.length;
 
     // Best seller counts mapping
     const itemCounts = {};
-    bills.forEach(b => {
+    filteredBills.forEach(b => {
       b.items.forEach(item => {
         itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
       });
@@ -1477,11 +1578,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const width = 460;
       const height = 180;
       
-      // Calculate revenue points specifically for last 5 orders
-      const last5Bills = [...bills].slice(-5);
-      let dataPoints = last5Bills.map(b => b.total);
+      // Calculate revenue points specifically for last 5 orders of the filtered set
+      const chartBills = [...filteredBills].slice(-5);
+      let dataPoints = chartBills.map(b => b.total);
       if (dataPoints.length < 5) {
-        dataPoints = [120, 240, 180, 310, 250]; // standard placeholder points for dashboard visual aesthetic
+        dataPoints = [...dataPoints, 120, 240, 180, 310, 250].slice(0, 5);
       }
 
       const maxVal = Math.max(...dataPoints, 400);
@@ -1552,10 +1653,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dynamic ledger records
     if (ledgerList) {
       ledgerList.innerHTML = '';
-      if (bills.length === 0) {
+      if (filteredBills.length === 0) {
         ledgerList.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No sales logged.</p>';
       } else {
-        const sorted = [...bills].slice(-4).reverse();
+        const sorted = [...filteredBills].slice(-4).reverse();
         sorted.forEach(bill => {
           const item = document.createElement('div');
           item.style.display = 'flex';
@@ -1573,6 +1674,380 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     }
+  }
+
+  // ==========================================
+  // WIRE DATE FILTER ACTION BUTTONS
+  // ==========================================
+  const billsFilterBtn = document.getElementById('bills-filter-btn');
+  const billsResetBtn = document.getElementById('bills-reset-btn');
+  const billsDateFrom = document.getElementById('bills-date-from');
+  const billsDateTo = document.getElementById('bills-date-to');
+
+  if (billsFilterBtn) {
+    billsFilterBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      renderBills();
+    });
+  }
+
+  if (billsResetBtn) {
+    billsResetBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (billsDateFrom) billsDateFrom.value = '';
+      if (billsDateTo) billsDateTo.value = '';
+      activePresetDate = 'all';
+      if (billsPresetContainer) {
+        billsPresetContainer.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+        const allChip = billsPresetContainer.querySelector('[data-preset="all"]');
+        if (allChip) allChip.classList.add('active');
+      }
+      renderBills();
+    });
+  }
+
+  const reportsFilterBtn = document.getElementById('reports-filter-btn');
+  const reportsResetBtn = document.getElementById('reports-reset-btn');
+  const reportsDateFrom = document.getElementById('reports-date-from');
+  const reportsDateTo = document.getElementById('reports-date-to');
+
+  if (reportsFilterBtn) {
+    reportsFilterBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      renderReports();
+    });
+  }
+
+  if (reportsResetBtn) {
+    reportsResetBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (reportsDateFrom) reportsDateFrom.value = '';
+      if (reportsDateTo) reportsDateTo.value = '';
+      renderReports();
+    });
+  }
+
+  // ==========================================
+  // EXPORT ACTION BUTTONS IMPLEMENTATION
+  // ==========================================
+
+  // 1. Inventory Export CSV
+  const expInvExcelBtn = document.getElementById('export-inventory-excel-btn');
+  if (expInvExcelBtn) {
+    expInvExcelBtn.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Ingredient Key,Ingredient Label,Current Stock,Max Capacity,Stock Percentage,Status\n";
+      
+      Object.keys(inventory).forEach(key => {
+        const maxVal = defaultInventory[key] || 1000;
+        const currentVal = inventory[key];
+        const percent = Math.round((currentVal / maxVal) * 100);
+        const label = getLabelFromKey(key).replace(/,/g, '');
+        const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
+        let status = "Healthy";
+        if (percent < itemThreshold) {
+          status = currentVal <= 0 ? "Out of Stock" : "Low Stock";
+        }
+        csvContent += `${key},${label},${currentVal},${maxVal},${percent}%,${status}\n`;
+      });
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `doppio_inventory_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
+
+  // 2. Inventory Export PDF
+  const expInvPdfBtn = document.getElementById('export-inventory-pdf-btn');
+  if (expInvPdfBtn) {
+    expInvPdfBtn.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+      const printWindow = window.open('', '_blank');
+      
+      let rowsHTML = '';
+      Object.keys(inventory).forEach(key => {
+        const maxVal = defaultInventory[key] || 1000;
+        const currentVal = inventory[key];
+        const percent = Math.round((currentVal / maxVal) * 100);
+        const label = getLabelFromKey(key);
+        const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
+        let status = "Healthy";
+        let statusStyle = "color: #2e7d32; font-weight: bold;";
+        if (percent < itemThreshold) {
+          status = currentVal <= 0 ? "Out of Stock" : "Low Stock";
+          statusStyle = "color: #c62828; font-weight: bold;";
+        } else if (percent < 50) {
+          status = "Medium";
+          statusStyle = "color: #ef6c00; font-weight: bold;";
+        }
+        
+        rowsHTML += `
+          <tr>
+            <td>${label}</td>
+            <td align="right">${currentVal}</td>
+            <td align="right">${maxVal}</td>
+            <td align="right" style="font-weight:bold;">${percent}%</td>
+            <td style="${statusStyle}">${status}</td>
+          </tr>
+        `;
+      });
+      
+      printWindow.document.write(`
+        <html>
+        <head>
+          <title>Doppio Cafe - Stock & Inventory Report</title>
+          <style>
+            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C98A4A; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
+            .logo span { color: #C98A4A; }
+            .title { font-size: 18px; margin: 0; color: #2B1813; }
+            .meta { font-size: 12px; color: #666; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; }
+            th { background-color: #f7f3ed; color: #2B1813; font-weight: 600; }
+            tr:nth-child(even) { background-color: #faf8f5; }
+            .footer { margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 15px; font-size: 11px; text-align: center; color: #777; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="logo">DOPPIO <span>Café</span></div>
+              <p class="meta">Nagpur Commercial POS & Inventory Control</p>
+            </div>
+            <div style="text-align: right;">
+              <h2 class="title">Stock Level Inventory Report</h2>
+              <p class="meta">Generated: \${new Date().toLocaleString('en-IN')}</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Ingredient Name</th>
+                <th style="text-align: right;">Current Stock</th>
+                <th style="text-align: right;">Max Capacity</th>
+                <th style="text-align: right;">Stock level</th>
+                <th>Status Alert</th>
+              </tr>
+            </thead>
+            <tbody>
+              \${rowsHTML}
+            </tbody>
+          </table>
+          <div class="footer">
+            Doppio Cafe Nagpur. Confidential Commercial Stock Ledger Report. Authorized access only.
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    });
+  }
+
+  // 3. Sales Export CSV
+  const expSalesExcelBtn = document.getElementById('export-excel-btn');
+  if (expSalesExcelBtn) {
+    expSalesExcelBtn.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+      
+      const fromVal = document.getElementById('reports-date-from') ? document.getElementById('reports-date-from').value : '';
+      const toVal = document.getElementById('reports-date-to') ? document.getElementById('reports-date-to').value : '';
+
+      let dateFrom = null;
+      if (fromVal) {
+        dateFrom = new Date(fromVal);
+        dateFrom.setHours(0,0,0,0);
+      }
+      let dateTo = null;
+      if (toVal) {
+        dateTo = new Date(toVal);
+        dateTo.setHours(0,0,0,0);
+      }
+
+      const filteredBills = bills.filter(bill => {
+        const billDate = parseBillDate(bill);
+        if (dateFrom && billDate < dateFrom) return false;
+        if (dateTo && billDate > dateTo) return false;
+        return true;
+      });
+
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Order ID,Customer Name,Phone,Date & Time,Order Type,Payment Method,Subtotal,Discount,GST,Total,Items Ordered\n";
+      
+      filteredBills.forEach(b => {
+        const guestName = b.customerName.replace(/,/g, '');
+        const phone = b.customerPhone || 'N/A';
+        const dateStr = b.dateTime.replace(/,/g, '');
+        const itemsList = b.items.map(i => `\${i.name} (x\${i.qty})`).join('; ').replace(/,/g, '');
+        csvContent += `\${b.orderId},\${guestName},\${phone},\${dateStr},\${b.orderType},\${b.paymentMethod},₹\${b.subtotal},₹\${b.discount},₹\${b.gst},₹\${b.total},\${itemsList}\n`;
+      });
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `doppio_sales_report_\${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
+
+  // 4. Sales Export PDF
+  const expSalesPdfBtn = document.getElementById('export-pdf-btn');
+  if (expSalesPdfBtn) {
+    expSalesPdfBtn.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+      const printWindow = window.open('', '_blank');
+      
+      const fromVal = document.getElementById('reports-date-from') ? document.getElementById('reports-date-from').value : '';
+      const toVal = document.getElementById('reports-date-to') ? document.getElementById('reports-date-to').value : '';
+
+      let dateFrom = null;
+      if (fromVal) {
+        dateFrom = new Date(fromVal);
+        dateFrom.setHours(0,0,0,0);
+      }
+      let dateTo = null;
+      if (toVal) {
+        dateTo = new Date(toVal);
+        dateTo.setHours(0,0,0,0);
+      }
+
+      const filteredBills = bills.filter(bill => {
+        const billDate = parseBillDate(bill);
+        if (dateFrom && billDate < dateFrom) return false;
+        if (dateTo && billDate > dateTo) return false;
+        return true;
+      });
+
+      const totalRevenue = filteredBills.reduce((sum, b) => sum + b.total, 0);
+      const totalGST = filteredBills.reduce((sum, b) => sum + b.gst, 0);
+      const totalDiscount = filteredBills.reduce((sum, b) => sum + b.discount, 0);
+      const totalSubtotal = filteredBills.reduce((sum, b) => sum + b.subtotal, 0);
+      
+      let rowsHTML = '';
+      filteredBills.forEach(b => {
+        const itemsList = b.items.map(i => `\${i.name} (x\${i.qty})`).join(', ');
+        rowsHTML += `
+          <tr>
+            <td>\${b.orderId}</td>
+            <td><strong>\${b.customerName}</strong><br><span style="font-size:10px; color:#666;">\${b.customerPhone || 'Walk-in'}</span></td>
+            <td>\${b.dateTime}</td>
+            <td>\${b.orderType}</td>
+            <td>\${b.paymentMethod}</td>
+            <td align="right">₹\${b.subtotal}</td>
+            <td align="right">₹\${b.discount}</td>
+            <td align="right">₹\${b.total}</td>
+          </tr>
+          <tr>
+            <td colspan="8" style="background-color:#fff; padding: 4px 10px; font-size:11px; color:#555; border-top:none;">
+              <strong>Items:</strong> \${itemsList}
+            </td>
+          </tr>
+        `;
+      });
+
+      const rangeStr = fromVal || toVal 
+        ? `Period: \${fromVal ? fromVal : 'Beginning'} to \${toVal ? toVal : 'Present'}`
+        : 'Period: All-Time Sales Report';
+      
+      printWindow.document.write(`
+        <html>
+        <head>
+          <title>Doppio Cafe - Sales & Revenue Audit Report</title>
+          <style>
+            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C98A4A; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
+            .logo span { color: #C98A4A; }
+            .title { font-size: 18px; margin: 0; color: #2B1813; }
+            .meta { font-size: 12px; color: #666; }
+            
+            .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+            .kpi-card { background: #fdfbf7; border: 1px solid rgba(201, 138, 74, 0.2); border-radius: 8px; padding: 12px; text-align: center; }
+            .kpi-card h3 { margin: 0; font-size: 12px; color: #666; text-transform: uppercase; }
+            .kpi-card p { margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #2B1813; }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 12px; }
+            th { background-color: #f7f3ed; color: #2B1813; font-weight: 600; }
+            
+            .footer { margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 15px; font-size: 11px; text-align: center; color: #777; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="logo">DOPPIO <span>Café</span></div>
+              <p class="meta">Nagpur Commercial Analytics Studio</p>
+            </div>
+            <div style="text-align: right;">
+              <h2 class="title">Sales & Revenue Audit Report</h2>
+              <p class="meta" style="font-weight:bold; color: #C98A4A;">\${rangeStr}</p>
+              <p class="meta">Generated: \${new Date().toLocaleString('en-IN')}</p>
+            </div>
+          </div>
+          <div class="kpis">
+            <div class="kpi-card">
+              <h3>Total Orders</h3>
+              <p>\${filteredBills.length}</p>
+            </div>
+            <div class="kpi-card">
+              <h3>Gross Subtotal</h3>
+              <p>₹\${totalSubtotal}</p>
+            </div>
+            <div class="kpi-card">
+              <h3>GST Tax Collected</h3>
+              <p>₹\${totalGST}</p>
+            </div>
+            <div class="kpi-card" style="background:#f7f0e8; border-color:#C98A4A;">
+              <h3>Net Sales Revenue</h3>
+              <p style="color:#C98A4A; font-size: 20px;">₹\${totalRevenue}</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Date & Time</th>
+                <th>Type</th>
+                <th>Payment</th>
+                <th style="text-align: right;">Subtotal</th>
+                <th style="text-align: right;">Discount</th>
+                <th style="text-align: right;">Total Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              \${filteredBills.length === 0 ? '<tr><td colspan="8" align="center">No transactions recorded for this period.</td></tr>' : rowsHTML}
+            </tbody>
+          </table>
+          <div class="footer">
+            Doppio Cafe Nagpur - Authorized Financial Ledger Document
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    });
   }
 
   // ==========================================
@@ -1930,6 +2405,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('profile-gst-rate').value = businessProfile.gstRate || 18;
     document.getElementById('profile-loyalty-enabled').checked = businessProfile.loyaltyEnabled;
     document.getElementById('profile-loyalty-rate').value = businessProfile.loyaltyRate || 10;
+    document.getElementById('profile-lock-enabled').checked = businessProfile.passcodeLockEnabled || false;
     
     profileModal.classList.add('active');
     updateReceiptSimulator();
@@ -2001,8 +2477,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const gstRate = parseFloat(document.getElementById('profile-gst-rate').value) || 0;
       const loyaltyEnabled = document.getElementById('profile-loyalty-enabled').checked;
       const loyaltyRate = parseFloat(document.getElementById('profile-loyalty-rate').value) || 0;
+      const passcodeLockEnabled = document.getElementById('profile-lock-enabled').checked;
 
-      businessProfile = { name, address, phone, gstEnabled, gstRate, loyaltyEnabled, loyaltyRate };
+      businessProfile = { name, address, phone, gstEnabled, gstRate, loyaltyEnabled, loyaltyRate, passcodeLockEnabled };
       localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
 
       // Reload cloud tables upserts
@@ -2015,7 +2492,8 @@ document.addEventListener('DOMContentLoaded', () => {
           gst_enabled: gstEnabled,
           gst_rate: gstRate,
           loyalty_discount_enabled: loyaltyEnabled,
-          loyalty_discount_rate: loyaltyRate
+          loyalty_discount_rate: loyaltyRate,
+          passcode_lock_enabled: passcodeLockEnabled
         }, { onConflict: 'id' }).then();
       }
 
@@ -2226,9 +2704,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let enteredLockPin = '';
 
   // Check if user just logged in from index.html Staff Portal to bypass reload lock
+  const passcodeEnabled = businessProfile.passcodeLockEnabled === true;
   const justLoggedIn = sessionStorage.getItem('just_logged_in') === 'true';
-  if (justLoggedIn) {
-    sessionStorage.removeItem('just_logged_in');
+
+  if (!passcodeEnabled || justLoggedIn) {
+    if (justLoggedIn) sessionStorage.removeItem('just_logged_in');
     if (pageLockOverlay) {
       pageLockOverlay.style.display = 'none';
       pageLockOverlay.remove(); // Fades out and removes immediately
