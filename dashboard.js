@@ -4500,4 +4500,29 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
   });
 
+  // ==========================================
+  // MOBILE DRAWER & MODAL BODY SCROLL LOCK SYSTEM
+  // ==========================================
+  // Automatically toggles 'no-scroll' class on body when any drawer/modal is active
+  const modalScrollLockObserver = new MutationObserver(() => {
+    const isAnyOverlayActive = 
+      document.querySelector('.modal-backdrop.active') || 
+      document.querySelector('.more-nav-sheet.active') || 
+      document.querySelector('.pos-cart-sidebar.active') ||
+      document.querySelector('.menu-editor-form-panel.active');
+    
+    if (isAnyOverlayActive) {
+      document.body.classList.add('no-scroll');
+    } else {
+      document.body.classList.remove('no-scroll');
+    }
+  });
+
+  // Watch class changes across the document tree
+  modalScrollLockObserver.observe(document.body, {
+    attributes: true,
+    subtree: true,
+    attributeFilter: ['class']
+  });
+
 });
