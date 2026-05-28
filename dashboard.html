@@ -57,7 +57,22 @@
   <!-- Mobile Top Header Bar -->
   <div class="mobile-top-header">
     <div style="font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--primary-brand); letter-spacing: 1px;">DOPPIO <span style="font-size:12px; color:var(--accent-caramel); text-transform:uppercase; letter-spacing:2px;">Café</span></div>
-    <div class="avatar" style="width:32px; height:32px; font-size:12px; display:flex; align-items:center; justify-content:center; background:var(--accent-caramel); color:white; border-radius:50%; font-weight:700;">B</div>
+    
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <!-- Mobile Network Status Dot -->
+      <div id="mobile-network-status-badge" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(46, 204, 113, 0.08); border: 1px solid rgba(46, 204, 113, 0.2); cursor: pointer;" title="Supabase Live">
+        <span class="status-dot green" style="width: 8px; height: 8px; display: block; border-radius: 50%;"></span>
+      </div>
+
+      <!-- Mobile Notifications Bell -->
+      <div class="bell-icon-wrapper" id="mobile-notifications-bell" style="width: 32px; height: 32px; background: var(--bg-cream-light);" title="System Alerts">
+        <i class="fa-solid fa-bell" style="font-size: 13px;"></i>
+        <span class="bell-badge" id="mobile-bell-badge" style="display: none; top: -1px; right: -1px; width: 6px; height: 6px;"></span>
+      </div>
+
+      <!-- Mobile User Profile Avatar -->
+      <div class="avatar" id="mobile-profile-btn" style="width:32px; height:32px; font-size:12px; display:flex; align-items:center; justify-content:center; background:var(--accent-caramel); color:white; border-radius:50%; font-weight:700; cursor:pointer;">B</div>
+    </div>
   </div>
 
   <!-- Mobile Bottom Navigation Bar -->
@@ -66,7 +81,7 @@
     <a href="#" class="mobile-nav-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i> Bills</a>
     <a href="#" class="mobile-nav-link" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i> Stock</a>
     <a href="#" class="mobile-nav-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
-    <a href="#" class="mobile-nav-link" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i> Editor</a>
+    <a href="#" class="mobile-nav-link" id="mobile-more-btn"><i class="fa-solid fa-ellipsis"></i> More</a>
   </div>
 
   <div class="dashboard-wrapper">
@@ -92,6 +107,7 @@
         <a href="#" class="sidebar-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Sales Reports</a>
         <a href="#" class="sidebar-link" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i> Menu Editor</a>
         <a href="#" class="sidebar-link" data-tab="crm-tab"><i class="fa-solid fa-users-rectangle"></i> CRM & Loyalty</a>
+        <a href="#" class="sidebar-link" data-tab="tax-tab" id="sidebar-tax-link"><i class="fa-solid fa-calculator"></i> Tax Management</a>
       </nav>
 
       <button class="profile-sidebar-btn" id="open-profile-btn"><i class="fa-solid fa-store"></i> Business Profile</button>
@@ -251,6 +267,15 @@
                   </div>
                 </div>
 
+                <div class="cart-draft-actions" style="display: flex; gap: 8px; margin-top: 14px; margin-bottom: 8px; width: 100%;">
+                  <button class="btn btn-secondary" id="hold-order-btn" style="flex: 1; padding: 10px; font-size: 12.5px; font-weight: 700; border-color: var(--accent-caramel); color: var(--primary-brand); background: #fff; cursor: pointer; transition: all 0.15s ease;">
+                    <i class="fa-solid fa-pause"></i> Hold Order
+                  </button>
+                  <button class="btn btn-secondary" id="view-drafts-btn" style="flex: 1; padding: 10px; font-size: 12.5px; font-weight: 700; background-color: rgba(201, 138, 74, 0.08); border-color: var(--accent-caramel); color: var(--primary-brand); position: relative; cursor: pointer; transition: all 0.15s ease;">
+                    <i class="fa-solid fa-list-check"></i> Open Drafts <span class="badge" id="drafts-count-badge" style="position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; border-radius: 50%; font-size: 9px; width: 16px; height: 16px; line-height: 16px; text-align: center; display: none; font-weight: 700;">0</span>
+                  </button>
+                </div>
+
                 <button class="checkout-btn" id="checkout-btn"><i class="fa-solid fa-cash-register"></i> Complete Checkout & Print</button>
               </div>
             </div>
@@ -336,6 +361,11 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- Mobile-only stacked card invoices layout -->
+            <div class="bills-mobile-cards-container" id="bills-mobile-cards" style="display: none;">
+              <!-- Injected dynamically on mobile -->
+            </div>
           </div>
         </div>
 
@@ -374,8 +404,28 @@
             <div class="inventory-header-actions">
               <h2>Ingredient & Stock Levels</h2>
               <div class="inventory-action-btns">
-                <button class="export-btn excel btn btn-secondary" id="export-inventory-excel-btn"><i class="fa-solid fa-file-excel"></i> Export CSV</button>
-                <button class="export-btn pdf btn btn-secondary" id="export-inventory-pdf-btn"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+                <div class="dropdown-export">
+                  <button class="btn btn-secondary dropdown-toggle" id="inventory-export-dropdown-toggle">
+                    <i class="fa-solid fa-download"></i> Export Data <i class="fa-solid fa-chevron-down" style="font-size: 10px; margin-left: 5px;"></i>
+                  </button>
+                  <div class="dropdown-export-menu" id="inventory-export-dropdown-menu">
+                    <div class="dropdown-section-title">All Ingredients</div>
+                    <button class="dropdown-item" id="export-inventory-excel-btn">
+                      <i class="fa-solid fa-file-excel" style="color: #27ae60;"></i> Export CSV (All)
+                    </button>
+                    <button class="dropdown-item" id="export-inventory-pdf-btn">
+                      <i class="fa-solid fa-file-pdf" style="color: #e74c3c;"></i> Export PDF (All)
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-section-title">Low Stock Warnings</div>
+                    <button class="dropdown-item warning-item" id="export-low-inventory-excel-btn">
+                      <i class="fa-solid fa-file-excel" style="color: #d35400;"></i> Export Low Stock CSV
+                    </button>
+                    <button class="dropdown-item warning-item" id="export-low-inventory-pdf-btn">
+                      <i class="fa-solid fa-file-pdf" style="color: #c0392b;"></i> Export Low Stock PDF
+                    </button>
+                  </div>
+                </div>
                 <button class="btn btn-primary" id="restock-inventory-btn"><i class="fa-solid fa-rotate-left"></i> Reset to Full Stock</button>
               </div>
             </div>
@@ -434,6 +484,26 @@
                   <p>Top Beverage Selection</p>
                 </div>
               </div>
+              <div class="sales-card" style="min-width: 260px;">
+                <div class="sales-card-icon" style="background: rgba(142, 110, 106, 0.08); color: #8e6e6a;"><i class="fa-solid fa-credit-card"></i></div>
+                <div class="sales-card-details" style="width: 100%;">
+                  <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 2px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px;">
+                      <span style="font-weight: 600; color: var(--text-dark);">UPI / Online:</span>
+                      <span style="font-weight: 700; color: #27ae60;" id="report-pay-upi">₹0.00</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px;">
+                      <span style="font-weight: 600; color: var(--text-dark);">Card Sales:</span>
+                      <span style="font-weight: 700; color: #2980b9;" id="report-pay-card">₹0.00</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px;">
+                      <span style="font-weight: 600; color: var(--text-dark);">Cash Sales:</span>
+                      <span style="font-weight: 700; color: #d35400;" id="report-pay-cash">₹0.00</span>
+                    </div>
+                  </div>
+                  <p style="margin-top: 4px; font-size: 9px; letter-spacing: 0.5px;">Payment Segregation</p>
+                </div>
+              </div>
             </div>
 
             <div class="reports-columns">
@@ -484,7 +554,10 @@
             <div class="menu-editor-layout">
               <!-- Left Side: Custom Input Visual Form -->
               <div class="menu-editor-form-panel" id="editor-form-panel">
-                <h3 id="form-panel-title">Add New Menu Item</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; width: 100%;">
+                  <h3 id="form-panel-title" style="margin: 0;">Add New Menu Item</h3>
+                  <button type="button" class="close-editor-btn" id="close-editor-btn" style="background:rgba(43,24,19,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
+                </div>
                 <form id="menu-item-editor-form">
                   <input type="hidden" id="edit-item-index" value="">
                   
@@ -618,6 +691,121 @@
                 </thead>
                 <tbody id="crm-table-body">
                   <!-- Injected dynamically in JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 7: TAX MANAGEMENT -->
+        <div class="tab-content" id="tax-tab">
+          <div class="bills-tab-wrapper">
+            <!-- Tax Analytics Cards -->
+            <div class="bills-analytics-header">
+              <div class="bills-stat-card">
+                <div class="bills-stat-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                <div class="bills-stat-info">
+                  <span class="bills-stat-title">Net Taxable Supplies</span>
+                  <span class="bills-stat-val" id="tax-net-sales-card">₹0.00</span>
+                  <span class="bills-stat-trend" style="color: var(--text-muted);">Excl. Taxes & Discounts</span>
+                </div>
+              </div>
+              <div class="bills-stat-card">
+                <div class="bills-stat-icon green" style="background-color:rgba(46,204,113,0.08); color:var(--success-color);"><i class="fa-solid fa-percent"></i></div>
+                <div class="bills-stat-info">
+                  <span class="bills-stat-title">CGST Collected (9%)</span>
+                  <span class="bills-stat-val" id="tax-cgst-card">₹0.00</span>
+                  <span class="bills-stat-trend">Central GST (Half share)</span>
+                </div>
+              </div>
+              <div class="bills-stat-card">
+                <div class="bills-stat-icon blue" style="background-color:rgba(52,152,219,0.08); color:var(--info-color);"><i class="fa-solid fa-percent"></i></div>
+                <div class="bills-stat-info">
+                  <span class="bills-stat-title">SGST Collected (9%)</span>
+                  <span class="bills-stat-val" id="tax-sgst-card">₹0.00</span>
+                  <span class="bills-stat-trend">State GST (Half share)</span>
+                </div>
+              </div>
+              <div class="bills-stat-card">
+                <div class="bills-stat-icon" style="background-color:rgba(201,138,74,0.08); color:var(--accent-caramel);"><i class="fa-solid fa-sack-dollar"></i></div>
+                <div class="bills-stat-info">
+                  <span class="bills-stat-title">Total Tax Collected</span>
+                  <span class="bills-stat-val" id="tax-total-collected-card">₹0.00</span>
+                  <span class="bills-stat-trend" style="color: var(--success-color);" id="tax-average-rate-card">Avg Rate: 18%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- GSTR Filing Highlights -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 10px;">
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                <h4 style="font-size: 13px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-file-invoice" style="color: var(--accent-caramel);"></i> GSTR-1 Outward Supplies Summary
+                </h4>
+                <div style="width: 100%; font-size: 12px; display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+                  <div style="display:flex; justify-content:space-between;"><span>B2C (Consumer) Supplies:</span><strong id="gstr1-b2c-val">₹0.00</strong></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Total Invoices Logged:</span><strong id="gstr1-count-val">0 Invoices</strong></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Integrated IGST Share:</span><strong>₹0.00 (Local Sale)</strong></div>
+                </div>
+              </div>
+              
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                <h4 style="font-size: 13px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-receipt" style="color: var(--success-color);"></i> GSTR-3B Tax Liability Summary
+                </h4>
+                <div style="width: 100%; font-size: 12px; display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+                  <div style="display:flex; justify-content:space-between;"><span>Outward Taxable Value:</span><strong id="gstr3b-taxable-val">₹0.00</strong></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Total Tax Liability:</span><strong style="color: var(--danger-color);" id="gstr3b-liability-val">₹0.00</strong></div>
+                  <div style="display:flex; justify-content:space-between;"><span>ITC Claims Available:</span><strong>₹0.00 (N/A)</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Toolbar Actions & Filters -->
+            <div class="bills-controls">
+              <div class="bills-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="tax-search-input" placeholder="Search invoices by ID, name, payment...">
+              </div>
+              
+              <div class="inventory-action-btns" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="export-btn btn btn-secondary" id="export-tax-json-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-file-code"></i> Export Supabase JSON</button>
+                <button class="export-btn btn btn-secondary" id="export-tax-csv-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-file-csv"></i> Export Supabase CSV</button>
+                <button class="export-btn btn btn-secondary" id="export-tax-sql-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-database"></i> Export SQL Script</button>
+                <button class="btn btn-primary" id="import-tax-trigger-btn"><i class="fa-solid fa-file-import"></i> Import Backups</button>
+                <button class="btn btn-secondary" id="show-sql-schema-btn" style="color: var(--text-dark); border-color: rgba(43,24,19,0.15);"><i class="fa-solid fa-circle-info"></i> Supabase SQL Schema</button>
+              </div>
+            </div>
+
+            <!-- Date Filter Inputs Row -->
+            <div class="date-filter-bar" style="margin-bottom: 0;">
+              <label><i class="fa-solid fa-calendar-days"></i> Period From:</label>
+              <input type="date" id="tax-date-from">
+              <label>To:</label>
+              <input type="date" id="tax-date-to">
+              <button class="btn btn-primary filter-btn" id="tax-filter-btn"><i class="fa-solid fa-filter"></i> Apply Period</button>
+              <button class="btn btn-secondary filter-btn" id="tax-reset-btn"><i class="fa-solid fa-rotate-left"></i> Reset Period</button>
+              <div class="results-count" id="tax-ledger-count" style="margin-left: auto;">Showing 0 Invoices</div>
+            </div>
+
+            <!-- Tax Invoice Ledger Table -->
+            <div class="bills-table-container">
+              <table class="dashboard-table">
+                <thead>
+                  <tr>
+                    <th>Invoice #</th>
+                    <th>Customer Name</th>
+                    <th>Date & Time</th>
+                    <th>Taxable Subtotal</th>
+                    <th>CGST (9%)</th>
+                    <th>SGST (9%)</th>
+                    <th>Total Tax</th>
+                    <th>Total Bill</th>
+                    <th>Payment</th>
+                  </tr>
+                </thead>
+                <tbody id="tax-table-body">
+                  <!-- Tax rows injected dynamically in JS -->
                 </tbody>
               </table>
             </div>
@@ -785,6 +973,24 @@
                 <input type="number" id="profile-loyalty-rate" value="10" min="0" max="100" step="0.5">
               </div>
 
+              <!-- CRM toggle switch -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+                <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Enable CRM & Loyalty Module</span>
+                <label class="switch">
+                  <input type="checkbox" id="profile-crm-enabled">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <!-- Tax Management toggle switch -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+                <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Enable Tax Management Dashboard</span>
+                <label class="switch">
+                  <input type="checkbox" id="profile-tax-enabled">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
               <!-- Passcode lock toggle switch -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px; margin-top: 14px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Passcode Reload Lock (1006)</span>
@@ -823,7 +1029,7 @@
             </tr>
           </table>
 
-          <div style="border-top:1px dashed #777; padding-top:4px; text-align:right; font-size:9px;">
+          <div style="border-top:1px dashed #777; padding-top:4px; text-align:right; font-size:9px;" id="receipt-preview-summary">
             Subtotal: ₹259.00<br>
             <span id="receipt-preview-tax-line">GST (18%): ₹46.62</span><br>
             <span style="font-weight:700;">Total: ₹305.62</span>
@@ -833,6 +1039,131 @@
       </div>
     </div>
   </div>
+
+  <!-- SUPABASE SQL SCHEMA MODAL -->
+  <div class="modal-backdrop" id="sql-schema-modal">
+    <div class="glass-modal" style="max-width: 680px; width: 90%;">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-database"></i> Supabase SQL Schema Integration</h2>
+        <button class="close-modal-btn" id="close-schema-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 14px;">
+          Copy and run this SQL script in your <strong>Supabase SQL Editor</strong> to create the <code>doppio_bills</code> and <code>doppio_draft_orders</code> tables with optimal indexes.
+        </p>
+        
+        <div style="position: relative;">
+          <pre style="background: #1e1e1e; color: #f8f8f2; padding: 16px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; font-size: 11px; overflow-x: auto; max-height: 280px; border: 1px solid rgba(255,255,255,0.1);" id="sql-schema-code">
+-- Table Definition for doppio_bills (Sales/Invoices) in Supabase
+CREATE TABLE IF NOT EXISTS public.doppio_bills (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    "orderId" text UNIQUE NOT NULL,
+    "customerName" text DEFAULT 'Walk-in Guest'::text,
+    "dateTime" text,
+    items text, -- JSON stringified items
+    subtotal numeric DEFAULT 0,
+    gst numeric DEFAULT 0,
+    total numeric DEFAULT 0,
+    "paymentMethod" text DEFAULT 'UPI'::text
+);
+
+-- Table Definition for doppio_draft_orders (Active Held Carts) in Supabase
+CREATE TABLE IF NOT EXISTS public.doppio_draft_orders (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    "draftId" text UNIQUE NOT NULL,
+    "draftName" text NOT NULL,
+    "customerName" text,
+    "customerPhone" text,
+    "paymentMethod" text DEFAULT 'UPI'::text,
+    items text NOT NULL, -- JSON stringified items
+    subtotal numeric DEFAULT 0,
+    gst numeric DEFAULT 0,
+    total numeric DEFAULT 0,
+    "createdAt" timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable row level security (optional)
+ALTER TABLE public.doppio_bills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.doppio_draft_orders ENABLE ROW LEVEL SECURITY;
+
+-- Create policies to allow anonymous inserts and reads (matching standard POS API keys)
+CREATE POLICY "Allow anonymous inserts bills" ON public.doppio_bills FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public reads bills" ON public.doppio_bills FOR SELECT USING (true);
+
+CREATE POLICY "Allow anonymous all drafts" ON public.doppio_draft_orders FOR ALL USING (true);
+
+-- Create indexes for super-fast lookups
+CREATE INDEX IF NOT EXISTS idx_doppio_bills_order_id ON public.doppio_bills("orderId");
+CREATE INDEX IF NOT EXISTS idx_doppio_bills_date ON public.doppio_bills("dateTime");
+CREATE INDEX IF NOT EXISTS idx_doppio_drafts_id ON public.doppio_draft_orders("draftId");
+          </pre>
+          <button class="btn btn-primary" id="copy-sql-schema-btn" style="position: absolute; right: 10px; top: 10px; font-size: 10px; padding: 6px 12px;">
+            <i class="fa-solid fa-copy"></i> Copy SQL
+          </button>
+        </div>
+        
+        <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+          <button class="btn btn-secondary" id="close-schema-btn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAFT ORDERS PERSISTENCE MODAL -->
+  <div class="modal-backdrop" id="drafts-modal">
+    <div class="glass-modal" style="max-width: 500px; width: 90%;">
+      <div class="modal-header">
+        <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-list-check"></i> Held / Draft Orders</h2>
+        <button class="close-modal-btn" id="close-drafts-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div id="drafts-empty-state" style="text-align: center; padding: 30px 10px; color: var(--text-muted);">
+          <i class="fa-solid fa-pause" style="font-size: 40px; color: var(--accent-caramel); opacity: 0.5; margin-bottom: 12px; display: block;"></i>
+          <p style="font-weight: 700; margin: 0; color: var(--primary-brand);">No active draft orders found.</p>
+          <p style="font-size: 12px; margin: 6px 0 0 0; color: var(--text-muted);">Orders placed on hold will show up here across all devices.</p>
+        </div>
+        <div id="drafts-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto;">
+          <!-- Active drafts injected dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 15px 20px; background: var(--bg-cream-light); border-top: 1px solid rgba(43,24,19,0.05); display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-secondary" id="close-drafts-btn-footer">Close Window</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE "MORE" NAVIGATION DRAWER -->
+  <div class="more-nav-sheet" id="more-nav-sheet">
+    <div class="more-sheet-header">
+      <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; font-weight: 700; margin: 0;"><i class="fa-solid fa-bars"></i> Nagpur POS Menu</h3>
+      <button type="button" class="close-modal-btn" id="close-more-sheet-btn" style="background:transparent; border:none; font-size:24px; cursor:pointer;">&times;</button>
+    </div>
+    <div class="more-sheet-links">
+      <a href="#" class="more-sheet-link" data-tab="editor-tab">
+        <i class="fa-solid fa-pen-to-square"></i>
+        <span>Menu Editor</span>
+      </a>
+      <a href="#" class="more-sheet-link" data-tab="crm-tab">
+        <i class="fa-solid fa-users-rectangle"></i>
+        <span>CRM Loyalty</span>
+      </a>
+      <a href="#" class="more-sheet-link" data-tab="tax-tab">
+        <i class="fa-solid fa-calculator"></i>
+        <span>Tax Portal</span>
+      </a>
+      <a href="#" class="more-sheet-link" id="mobile-profile-sheet-btn">
+        <i class="fa-solid fa-store"></i>
+        <span>Settings</span>
+      </a>
+      <a href="index.html" class="more-sheet-link logout-link-mobile">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Logout Portal</span>
+      </a>
+    </div>
+  </div>
+
+  <input type="file" id="import-tax-file-input" accept=".json,.csv" style="display: none;">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="dashboard.js"></script>
