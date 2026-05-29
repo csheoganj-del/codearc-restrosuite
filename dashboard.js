@@ -1557,6 +1557,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       txt += formatRow32(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
+      txt += `  (₹${item.price} each)\n`;
       
       if (item.toppings && item.toppings.length > 0) {
         txt += `  + ${item.toppings.join(', ')}\n`;
@@ -1587,7 +1588,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set inside printable area with a clean pre block
     el.innerHTML = `
-      <pre style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: 600; line-height: 1.45; margin: 0; white-space: pre-wrap; word-break: break-all; color: #000; background: #fff; text-shadow: none;">${txt}</pre>
+      <pre style="font-family: 'Courier New', Courier, monospace; font-size: 10px; font-weight: 600; line-height: 1.35; margin: 0; white-space: pre; color: #000; background: #fff; text-shadow: none;">${txt}</pre>
     `;
 
     if (window.AndroidInterface) {
@@ -1678,6 +1679,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       msg += formatRow32(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
+      msg += `  (₹${item.price} each)\n`;
       
       if (item.toppings && item.toppings.length > 0) {
         msg += `  + ${item.toppings.join(', ')}\n`;
