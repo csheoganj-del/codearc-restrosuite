@@ -884,6 +884,51 @@ document.addEventListener('DOMContentLoaded', () => {
   const cartGst = document.getElementById('cart-gst');
   const cartTotal = document.getElementById('cart-total');
 
+  function updateCartTotalsOnly() {
+    const nameInput = document.getElementById('cust-name');
+    const phoneInput = document.getElementById('cust-phone');
+    if (!nameInput || !phoneInput) return;
+
+    localStorage.setItem('doppio_cart_cust_name', nameInput.value);
+    localStorage.setItem('doppio_cart_cust_phone', phoneInput.value);
+
+    let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+    const isGstEnabled = businessProfile.gstEnabled !== false;
+    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+
+    let loyaltyDiscount = 0;
+    const phoneVal = phoneInput.value.trim();
+    const nameVal = nameInput.value.trim();
+
+    let matchedCustomer = null;
+    if (phoneVal || nameVal) {
+      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (nameVal && c.name.toLowerCase() === nameVal.toLowerCase()));
+    }
+
+    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
+    }
+
+    const taxableAmount = subtotal - loyaltyDiscount;
+    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
+    const total = taxableAmount + gst;
+
+    if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
+    
+    if (cartGst) {
+      if (loyaltyDiscount > 0) {
+        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
+      } else {
+        cartGst.textContent = `₹${gst}`;
+      }
+    }
+
+    if (cartTotal) cartTotal.textContent = `₹${total}`;
+  }
+
   function renderCart() {
     if (!cartList) return;
     
@@ -2783,17 +2828,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const custPhoneInput = document.getElementById('cust-phone');
   const loyaltyStatusBox = document.getElementById('loyalty-status-box');
 
-  if (custNameInput) {
-    custNameInput.addEventListener('input', () => {
-      renderCart();
-    });
-  }
-  if (custPhoneInput) {
-    custPhoneInput.addEventListener('input', () => {
-      renderCart();
-    });
-  }
-
   function getLoyaltyTier(spend) {
     if (spend >= 5000) return 'Platinum';
     if (spend >= 2500) return 'Gold';
@@ -2852,9 +2886,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = custNameInput.value.trim().toLowerCase();
     const phone = custPhoneInput.value.trim();
     
+    localStorage.setItem('doppio_cart_cust_name', custNameInput.value);
+    localStorage.setItem('doppio_cart_cust_phone', custPhoneInput.value);
+
     if (!name && !phone) {
       loyaltyStatusBox.style.display = 'none';
-      renderCart();
+      updateCartTotalsOnly();
       return;
     }
     
@@ -2877,7 +2914,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       loyaltyStatusBox.style.display = 'none';
     }
-    renderCart();
+    updateCartTotalsOnly();
   }
 
   if (custNameInput) custNameInput.addEventListener('input', checkLoyaltyMember);
