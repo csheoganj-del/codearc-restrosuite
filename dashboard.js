@@ -323,6 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (businessProfile.crmEnabled === undefined) businessProfile.crmEnabled = true;
   if (businessProfile.taxEnabled === undefined) businessProfile.taxEnabled = true;
   if (businessProfile.soundEnabled === undefined) businessProfile.soundEnabled = false;
+  if (businessProfile.whatsappEnabled === undefined) businessProfile.whatsappEnabled = true;
 
   // Force default sound off for existing storage/users
   if (localStorage.getItem('doppio_sound_default_off_v2') !== 'true') {
@@ -1331,10 +1332,16 @@ document.addEventListener('DOMContentLoaded', () => {
       triggerThermalReceiptPrint(finalBillObject);
     }
 
-    // Offer to send bill via WhatsApp automatically if a customer number was entered
-    if (phoneVal && finalBillObject) {
+    // Offer to send bill via WhatsApp automatically if toggle is enabled
+    if (businessProfile.whatsappEnabled !== false && finalBillObject) {
       setTimeout(() => {
-        if (confirm(`Would you like to send this bill receipt via WhatsApp to ${phoneVal}?`)) {
+        let wantToShare = false;
+        if (phoneVal) {
+          wantToShare = confirm(`Would you like to send this bill receipt via WhatsApp to ${phoneVal}?`);
+        } else {
+          wantToShare = confirm(`Would you like to send this bill receipt via WhatsApp?`);
+        }
+        if (wantToShare) {
           shareBillOnWhatsApp(finalBillObject);
         }
       }, 1000);
@@ -3806,6 +3813,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     
     document.getElementById('profile-sound-enabled').checked = businessProfile.soundEnabled !== false;
     
+    const whatsappEl = document.getElementById('profile-whatsapp-enabled');
+    if (whatsappEl) whatsappEl.checked = businessProfile.whatsappEnabled !== false;
+    
     // Module Feature Toggles
     document.getElementById('profile-crm-enabled').checked = businessProfile.crmEnabled !== false;
     document.getElementById('profile-tax-enabled').checked = businessProfile.taxEnabled !== false;
@@ -3907,6 +3917,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const taxEnabled = document.getElementById('profile-tax-enabled').checked;
       const soundEnabled = document.getElementById('profile-sound-enabled').checked;
       
+      const whatsappEl = document.getElementById('profile-whatsapp-enabled');
+      const whatsappEnabled = whatsappEl ? whatsappEl.checked : true;
+      
       const lockEl = document.getElementById('profile-lock-enabled');
       const passcodeLockEnabled = lockEl ? lockEl.checked : false;
 
@@ -3916,7 +3929,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         loyaltyEnabled, loyaltyRate, 
         passcodeLockEnabled, 
         crmEnabled, taxEnabled,
-        soundEnabled
+        soundEnabled,
+        whatsappEnabled
       };
       localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
 
