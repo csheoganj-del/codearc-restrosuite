@@ -200,7 +200,10 @@
             <div class="pos-cart-side pos-cart-sidebar" id="pos-cart-sidebar">
               <div class="cart-header">
                 <div class="cart-header-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                  <h2>Takeaway Cart</h2>
+                  <div style="display:flex; flex-direction:column; gap:2px;">
+                    <h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--primary-brand);">Takeaway Cart</h2>
+                    <span style="font-size: 11px; font-weight: 700; color: var(--accent-caramel); text-align: left;" id="cart-order-badge">Order: DO-1001</span>
+                  </div>
                   <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none; background:rgba(43,24,19,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
                 </div>
                 <button class="clear-cart-btn" id="clear-cart"><i class="fa-solid fa-trash-can"></i> Clear</button>
@@ -213,15 +216,21 @@
                 <button class="order-type-btn" data-type="Delivery" id="order-delivery-btn"><i class="fa-solid fa-truck"></i> Delivery</button>
               </div>
 
-              <!-- Takeaway Customer Fields -->
-              <div class="takeaway-fields">
-                <div class="form-group">
-                  <label for="cust-name">Customer Name</label>
-                  <input type="text" id="cust-name" placeholder="Enter guest name...">
+              <!-- Guest Info Toggle Banner -->
+              <div class="guest-toggle-btn" id="guest-toggle-btn" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-cream-light); border:1px solid rgba(43,24,19,0.06); padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:12px; font-weight:700; color:var(--primary-brand); cursor:pointer; transition:all 0.2s ease;">
+                <span><i class="fa-solid fa-user-tag" style="color:var(--accent-caramel); margin-right:5px;"></i> Customer Details</span>
+                <span id="guest-toggle-indicator" style="font-size:10px; color:var(--text-muted); font-weight: 500;"><i class="fa-solid fa-chevron-down"></i> Add Info</span>
+              </div>
+
+              <!-- Takeaway Customer Fields (Collapsible) -->
+              <div class="takeaway-fields" style="background: rgba(43,24,19,0.02); border: 1px dashed rgba(43,24,19,0.08); padding: 10px; border-radius: 8px; margin-bottom: 10px; display: none;">
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <label for="cust-name" style="font-size: 10px; text-transform: uppercase; font-weight: 800; color: var(--text-muted); margin-bottom: 4px; display: block;">Customer Name</label>
+                  <input type="text" id="cust-name" placeholder="Enter guest name..." style="padding: 6px 10px; font-size: 12px; border-radius: 6px;">
                 </div>
-                <div class="form-group">
-                  <label for="cust-phone">Phone Number (Loyalty Link)</label>
-                  <input type="text" id="cust-phone" placeholder="Enter 10 digit number...">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="cust-phone" style="font-size: 10px; text-transform: uppercase; font-weight: 800; color: var(--text-muted); margin-bottom: 4px; display: block;">Phone Number (Loyalty)</label>
+                  <input type="text" id="cust-phone" placeholder="Enter 10 digit number..." style="padding: 6px 10px; font-size: 12px; border-radius: 6px;">
                 </div>
               </div>
 
@@ -230,9 +239,9 @@
                 <!-- Filled dynamically -->
               </div>
 
-              <div class="form-group" style="margin-bottom: 12px;">
+              <div class="form-group" style="display: none;">
                 <label for="order-num">Takeaway Order #</label>
-                <input type="text" id="order-num" placeholder="Auto-generated" readonly style="background: var(--bg-cream-light); font-weight: 700;">
+                <input type="hidden" id="order-num">
               </div>
 
               <!-- Cart list -->

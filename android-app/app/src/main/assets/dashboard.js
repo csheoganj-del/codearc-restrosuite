@@ -591,6 +591,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (input) {
       const nextNum = bills.length === 0 ? 1001 : (1000 + bills.length + 1);
       input.value = 'DO-' + nextNum;
+      
+      const badge = document.getElementById('cart-order-badge');
+      if (badge) {
+        badge.textContent = 'Order: DO-' + nextNum;
+      }
     }
   }
 
@@ -1219,6 +1224,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (custNameInput) custNameInput.value = '';
       if (phoneInput) phoneInput.value = '';
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
+      if (takeawayFields) {
+        takeawayFields.style.display = 'none';
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+        if (guestToggleBtn) {
+          guestToggleBtn.style.background = 'var(--bg-cream-light)';
+          guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
+        }
+      }
       
       generateOrderNumber();
       renderCart();
@@ -2919,6 +2932,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (custNameInput) custNameInput.addEventListener('input', checkLoyaltyMember);
   if (custPhoneInput) custPhoneInput.addEventListener('input', checkLoyaltyMember);
+
+  // Collapsible Customer Details Toggle Banner for Takeaway Cart
+  const guestToggleBtn = document.getElementById('guest-toggle-btn');
+  const takeawayFields = document.querySelector('.takeaway-fields');
+  const guestToggleIndicator = document.getElementById('guest-toggle-indicator');
+  
+  if (guestToggleBtn && takeawayFields) {
+    guestToggleBtn.addEventListener('click', () => {
+      if (takeawayFields.style.display === 'none') {
+        takeawayFields.style.display = 'block';
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
+        guestToggleBtn.style.background = 'rgba(201, 138, 74, 0.05)';
+        guestToggleBtn.style.borderColor = 'rgba(201, 138, 74, 0.2)';
+      } else {
+        takeawayFields.style.display = 'none';
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+        guestToggleBtn.style.background = 'var(--bg-cream-light)';
+        guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
+      }
+    });
+  }
 
   function updateCRMMember(name, phone, spendAmount) {
     let member = crmData.find(c => (phone && c.phone === phone) || c.name.toLowerCase() === name.toLowerCase());
