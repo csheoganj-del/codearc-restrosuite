@@ -244,6 +244,12 @@
                 <input type="hidden" id="order-num">
               </div>
 
+              <!-- Editing Bill Banner -->
+              <div id="editing-bill-banner" style="display: none; align-items: center; justify-content: space-between; background: rgba(201, 138, 74, 0.08); border: 1px solid rgba(201, 138, 74, 0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12px; font-weight: 700; color: var(--primary-brand); animation: fadeInDown 0.3s ease-out;">
+                <span style="display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-pen-to-square" style="color:var(--accent-caramel);"></i> Editing Bill <strong id="editing-bill-id-display">DO-1005</strong></span>
+                <button type="button" id="cancel-edit-bill-btn" style="background: var(--danger-color, #e74c3c); color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: opacity 0.2s ease;">Cancel</button>
+              </div>
+
               <!-- Cart list -->
               <div class="cart-items-list" id="cart-items-list">
                 <div class="empty-cart-state">
@@ -285,7 +291,14 @@
                   </button>
                 </div>
 
-                <button class="checkout-btn" id="checkout-btn"><i class="fa-solid fa-cash-register"></i> Complete Checkout & Print</button>
+                <div class="checkout-actions-wrapper" style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
+                  <button type="button" class="checkout-btn btn-save-only" id="checkout-save-btn" style="flex: 1; border-radius: 30px; font-weight: 700; border: none; color: white; cursor: pointer; padding: 12px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px;">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Bill
+                  </button>
+                  <button type="button" class="checkout-btn btn-print-and-save" id="checkout-print-btn" style="flex: 1; border-radius: 30px; font-weight: 700; border: none; color: white; cursor: pointer; padding: 12px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px;">
+                    <i class="fa-solid fa-print"></i> Print & Save
+                  </button>
+                </div>
               </div>
             </div>
           </div>

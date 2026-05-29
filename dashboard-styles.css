@@ -1140,6 +1140,16 @@ body {
   transform: translateY(-1px);
 }
 
+.checkout-btn.btn-save-only {
+  background: var(--success-color);
+  box-shadow: 0 4px 15px rgba(46, 204, 113, 0.2);
+}
+
+.checkout-btn.btn-save-only:hover {
+  background: #27ae60;
+  box-shadow: 0 8px 25px rgba(46, 204, 113, 0.35);
+}
+
 /* ==========================================
    TAB 2: BILLS MANAGEMENT TAB STYLE
    ========================================== */

@@ -335,6 +335,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedPaymentMethod = localStorage.getItem('doppio_cart_pay_method') || 'UPI';
   let activeOrderType = 'Takeaway';
   let draftOrders = JSON.parse(localStorage.getItem('doppio_draft_orders')) || [];
+  let editingBillId = localStorage.getItem('doppio_editing_bill_id') || null;
+  if (editingBillId === 'null') editingBillId = null;
 
   // State variables for customization modals
   let selectedSizeOpt = 'Small';
@@ -588,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (tabId === 'pos-tab') tabSubtitle.textContent = 'Default Tab: Selection Grid';
       else if (tabId === 'bills-tab') {
-        tabSubtitle.textContent = 'Print, Refund, or Duplicate Receipts';
+        tabSubtitle.textContent = 'Print, Refund, or Edit Invoices';
         renderBills();
       }
       else if (tabId === 'inventory-tab') {
@@ -1114,7 +1116,19 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('cust-name').value = '';
       document.getElementById('cust-phone').value = '';
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-      renderCart();
+      if (editingBillId) {
+        cancelEditingBill();
+      } else {
+        renderCart();
+      }
+    });
+  }
+
+  const cancelEditBillBtn = document.getElementById('cancel-edit-bill-btn');
+  if (cancelEditBillBtn) {
+    cancelEditBillBtn.addEventListener('click', () => {
+      SoundEffects.playRemove();
+      cancelEditingBill();
     });
   }
 
@@ -1130,79 +1144,138 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Complete checkout & Sync
-  const checkoutBtn = document.getElementById('checkout-btn');
-  if (checkoutBtn) {
-    checkoutBtn.addEventListener('click', () => {
-      if (cart.length === 0) {
-        alert('Cart is empty! Add items before checking out.');
-        return;
-      }
+  function performCheckout(shouldPrint) {
+    if (cart.length === 0) {
+      alert('Cart is empty! Add items before checking out.');
+      return;
+    }
 
-      const custNameInput = document.getElementById('cust-name');
-      const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
-      const orderNum = document.getElementById('order-num').value;
+    const custNameInput = document.getElementById('cust-name');
+    const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
+    const orderNum = document.getElementById('order-num').value;
+    const billIdToSave = editingBillId || orderNum;
 
-      // 1. Stock Deduction Verification
-      let sufficientStock = true;
-      let missingItem = '';
-
-      const proposedDeductions = {};
-      cart.forEach(cartItem => {
-        const specs = getDeductionSpecs(cartItem);
-        Object.keys(specs).forEach(ing => {
-          proposedDeductions[ing] = (proposedDeductions[ing] || 0) + (specs[ing] * cartItem.qty);
+    // 1. Inventory Deduction Management
+    let oldDeductions = {};
+    if (editingBillId) {
+      const originalBill = bills.find(b => b.orderId === editingBillId);
+      if (originalBill) {
+        originalBill.items.forEach(item => {
+          const specs = getDeductionSpecs(item);
+          Object.keys(specs).forEach(ing => {
+            oldDeductions[ing] = (oldDeductions[ing] || 0) + (specs[ing] * item.qty);
+          });
         });
-      });
+        
+        // Temporarily restore original deductions back to inventory level
+        Object.keys(oldDeductions).forEach(ing => {
+          if (inventory[ing] === undefined) inventory[ing] = 1000;
+          inventory[ing] += oldDeductions[ing];
+        });
+      }
+    }
 
-      Object.keys(proposedDeductions).forEach(ing => {
-        if (inventory[ing] === undefined) inventory[ing] = 1000;
-        if (inventory[ing] < proposedDeductions[ing]) {
-          sufficientStock = false;
-          missingItem = ing.replace('_', ' ');
+    // Stock Deduction Verification
+    let sufficientStock = true;
+    let missingItem = '';
+
+    const proposedDeductions = {};
+    cart.forEach(cartItem => {
+      const specs = getDeductionSpecs(cartItem);
+      Object.keys(specs).forEach(ing => {
+        proposedDeductions[ing] = (proposedDeductions[ing] || 0) + (specs[ing] * cartItem.qty);
+      });
+    });
+
+    Object.keys(proposedDeductions).forEach(ing => {
+      if (inventory[ing] === undefined) inventory[ing] = 1000;
+      if (inventory[ing] < proposedDeductions[ing]) {
+        sufficientStock = false;
+        missingItem = ing.replace('_', ' ');
+      }
+    });
+
+    if (!sufficientStock) {
+      // Revert the temporary restoration if verify fails
+      if (editingBillId) {
+        Object.keys(oldDeductions).forEach(ing => {
+          inventory[ing] -= oldDeductions[ing];
+        });
+      }
+      alert(`Insufficient stock! Low on: ${missingItem}. Please restock.`);
+      return;
+    }
+
+    // Deduct stock levels permanently
+    Object.keys(proposedDeductions).forEach(ing => {
+      inventory[ing] -= proposedDeductions[ing];
+      if (supabaseClient) {
+        supabaseClient.from('doppio_inventory')
+          .update({ current: inventory[ing] })
+          .eq('key', ing).then();
+      }
+    });
+    localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+
+    // GST and loyalties final ledger sync
+    const isGstEnabled = businessProfile.gstEnabled !== false;
+    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+    
+    let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const phoneInput = document.getElementById('cust-phone');
+    const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+    
+    let loyaltyDiscount = 0;
+    let matchedCustomer = null;
+    if (phoneVal || custName) {
+      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
+    }
+    
+    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
+    }
+    
+    const taxableAmount = subtotal - loyaltyDiscount;
+    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
+    const total = taxableAmount + gst;
+
+    let finalBillObject = null;
+
+    if (editingBillId) {
+      const billIndex = bills.findIndex(b => b.orderId === editingBillId);
+      if (billIndex !== -1) {
+        const originalDateTime = bills[billIndex].dateTime;
+        bills[billIndex] = {
+          orderId: editingBillId,
+          customerName: custName,
+          customerPhone: phoneVal || null,
+          dateTime: originalDateTime,
+          items: [...cart],
+          subtotal: subtotal,
+          discount: loyaltyDiscount,
+          gst: gst,
+          total: total,
+          paymentMethod: selectedPaymentMethod,
+          orderType: activeOrderType
+        };
+        finalBillObject = bills[billIndex];
+
+        // Cloud syncing via update
+        if (supabaseClient && navigator.onLine) {
+          supabaseClient.from('doppio_bills').update({
+            customerName: custName,
+            customerPhone: phoneVal || null,
+            items: JSON.stringify(cart),
+            subtotal: subtotal,
+            gst: gst,
+            total: total,
+            paymentMethod: selectedPaymentMethod
+          }).eq('orderId', editingBillId).then();
         }
-      });
-
-      if (!sufficientStock) {
-        alert(`Insufficient stock! Low on: ${missingItem}. Please restock.`);
-        return;
       }
-
-      // Deduct stock levels
-      Object.keys(proposedDeductions).forEach(ing => {
-        inventory[ing] -= proposedDeductions[ing];
-        if (supabaseClient) {
-          supabaseClient.from('doppio_inventory')
-            .update({ current: inventory[ing] })
-            .eq('key', ing).then();
-        }
-      });
-      localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-
-      // GST and loyalties final ledger sync
-      const isGstEnabled = businessProfile.gstEnabled !== false;
-      const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-      const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-      const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-      
-      let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      const phoneInput = document.getElementById('cust-phone');
-      const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-      
-      let loyaltyDiscount = 0;
-      let matchedCustomer = null;
-      if (phoneVal || custName) {
-        matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
-      }
-      
-      if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-        loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-      }
-      
-      const taxableAmount = subtotal - loyaltyDiscount;
-      const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-      const total = taxableAmount + gst;
-
-      // Compile new bill invoice
+    } else {
       const newBill = {
         orderId: orderNum,
         customerName: custName,
@@ -1216,24 +1289,10 @@ document.addEventListener('DOMContentLoaded', () => {
         paymentMethod: selectedPaymentMethod,
         orderType: activeOrderType
       };
-
       bills.push(newBill);
-      localStorage.setItem('doppio_bills', JSON.stringify(bills));
-      
-      // CRM dynamic ledger upgrades
-      if (phoneVal || (custName && custName !== 'Walk-in Guest')) {
-        updateCRMMember(custName, phoneVal, total);
-      }
-      
-      SoundEffects.playSuccess();
+      finalBillObject = newBill;
 
-      // Android vocal announcement
-      if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
-        const engText = "Doppio Cafe Nagpur. Payment of Rupees " + total + " received!";
-        window.AndroidInterface.speak(engText);
-      }
-
-      // Cloud syncing
+      // Cloud syncing via insert
       if (supabaseClient && navigator.onLine) {
         supabaseClient.from('doppio_bills').insert({
           orderId: newBill.orderId,
@@ -1248,36 +1307,78 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         saveOfflineBill(newBill);
       }
+    }
 
-      // Print thermal invoice triggers
-      triggerThermalReceiptPrint(newBill);
+    localStorage.setItem('doppio_bills', JSON.stringify(bills));
+    
+    // CRM dynamic ledger upgrades
+    if (phoneVal || (custName && custName !== 'Walk-in Guest')) {
+      updateCRMMember(custName, phoneVal, total);
+    }
+    
+    SoundEffects.playSuccess();
 
-      // Offer to send bill via WhatsApp automatically if a customer number was entered
-      if (phoneVal) {
-        setTimeout(() => {
-          if (confirm(`Would you like to send this bill receipt via WhatsApp to ${phoneVal}?`)) {
-            shareBillOnWhatsApp(newBill);
-          }
-        }, 1000);
-      }
+    // Android vocal announcement
+    if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
+      const engText = editingBillId 
+        ? "Doppio Cafe Nagpur. Bill " + billIdToSave + " updated!" 
+        : "Doppio Cafe Nagpur. Payment of Rupees " + total + " received!";
+      window.AndroidInterface.speak(engText);
+    }
 
-      // Clean Cart Drawer
-      cart = [];
-      if (custNameInput) custNameInput.value = '';
-      if (phoneInput) phoneInput.value = '';
-      if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-      if (takeawayFields) {
-        takeawayFields.style.display = 'none';
-        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
-        if (guestToggleBtn) {
-          guestToggleBtn.style.background = 'var(--bg-cream-light)';
-          guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
+    // Print thermal invoice triggers if requested
+    if (shouldPrint && finalBillObject) {
+      triggerThermalReceiptPrint(finalBillObject);
+    }
+
+    // Offer to send bill via WhatsApp automatically if a customer number was entered
+    if (phoneVal && finalBillObject) {
+      setTimeout(() => {
+        if (confirm(`Would you like to send this bill receipt via WhatsApp to ${phoneVal}?`)) {
+          shareBillOnWhatsApp(finalBillObject);
         }
+      }, 1000);
+    }
+
+    // Reset editing state
+    editingBillId = null;
+    localStorage.removeItem('doppio_editing_bill_id');
+    const banner = document.getElementById('editing-bill-banner');
+    if (banner) banner.style.display = 'none';
+
+    // Clean Cart Drawer
+    cart = [];
+    if (custNameInput) custNameInput.value = '';
+    if (phoneInput) phoneInput.value = '';
+    if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
+    if (takeawayFields) {
+      takeawayFields.style.display = 'none';
+      if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+      if (guestToggleBtn) {
+        guestToggleBtn.style.background = 'var(--bg-cream-light)';
+        guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
       }
-      
-      generateOrderNumber();
-      renderCart();
-      updateHeaderSummaryStats();
+    }
+    
+    generateOrderNumber();
+    renderCart();
+    updateHeaderSummaryStats();
+    renderBills();
+    renderInventory();
+  }
+
+  const checkoutSaveBtn = document.getElementById('checkout-save-btn');
+  const checkoutPrintBtn = document.getElementById('checkout-print-btn');
+
+  if (checkoutSaveBtn) {
+    checkoutSaveBtn.addEventListener('click', () => {
+      performCheckout(false);
+    });
+  }
+
+  if (checkoutPrintBtn) {
+    checkoutPrintBtn.addEventListener('click', () => {
+      performCheckout(true);
     });
   }
 
@@ -1319,6 +1420,84 @@ document.addEventListener('DOMContentLoaded', () => {
     const fallback = new Date();
     fallback.setHours(0,0,0,0);
     return fallback;
+  }
+
+  function startEditingBill(orderId) {
+    const bill = bills.find(b => b.orderId === orderId);
+    if (!bill) return;
+
+    SoundEffects.playPop();
+    editingBillId = orderId;
+    localStorage.setItem('doppio_editing_bill_id', orderId);
+    
+    // Deep copy cart items
+    cart = JSON.parse(JSON.stringify(bill.items));
+    
+    const cn = document.getElementById('cust-name');
+    const cp = document.getElementById('cust-phone');
+    if (cn) cn.value = bill.customerName;
+    if (cp) cp.value = bill.customerPhone || '';
+    
+    // Update order type active selection
+    if (bill.orderType) {
+      activeOrderType = bill.orderType;
+      const typeBtns = document.querySelectorAll('.order-type-btn');
+      typeBtns.forEach(b => {
+        if (b.getAttribute('data-type') === activeOrderType) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+    }
+
+    // Update payment method active selection
+    if (bill.paymentMethod) {
+      selectedPaymentMethod = bill.paymentMethod;
+      const payBtns = document.querySelectorAll('.pay-method-btn');
+      payBtns.forEach(b => {
+        if (b.getAttribute('data-method') === selectedPaymentMethod) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+    }
+
+    // Show editing banner
+    const banner = document.getElementById('editing-bill-banner');
+    const displayId = document.getElementById('editing-bill-id-display');
+    if (banner && displayId) {
+      displayId.textContent = orderId;
+      banner.style.display = 'flex';
+    }
+
+    const badge = document.getElementById('cart-order-badge');
+    if (badge) {
+      badge.textContent = 'Editing: ' + orderId;
+    }
+
+    renderCart();
+  }
+
+  function cancelEditingBill() {
+    editingBillId = null;
+    localStorage.removeItem('doppio_editing_bill_id');
+    
+    // Clear cart and fields
+    cart = [];
+    const cn = document.getElementById('cust-name');
+    const cp = document.getElementById('cust-phone');
+    if (cn) cn.value = '';
+    if (cp) cp.value = '';
+    
+    // Hide banner
+    const banner = document.getElementById('editing-bill-banner');
+    if (banner) banner.style.display = 'none';
+    
+    // Re-generate order number & badge
+    generateOrderNumber();
+    renderCart();
   }
 
   function renderBills() {
@@ -1453,7 +1632,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>
           <button class="table-action-btn print" data-id="${bill.orderId}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
           <button class="table-action-btn whatsapp" data-id="${bill.orderId}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
-          <button class="table-action-btn duplicate" data-id="${bill.orderId}" title="Duplicate Order"><i class="fa-solid fa-clone"></i></button>
+          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" title="Edit Bill"><i class="fa-solid fa-pen-to-square"></i></button>
           <button class="table-action-btn delete" data-id="${bill.orderId}" title="Refund/Delete"><i class="fa-solid fa-trash-can"></i></button>
         </td>
       `;
@@ -1495,13 +1674,8 @@ document.addEventListener('DOMContentLoaded', () => {
         triggerThermalReceiptPrint(bills[idx]);
       } else if (btn.classList.contains('whatsapp')) {
         shareBillOnWhatsApp(bills[idx]);
-      } else if (btn.classList.contains('duplicate')) {
-        // Load items back into active POS cart for cashier speed!
-        SoundEffects.playPop();
-        cart = [...bills[idx].items];
-        document.getElementById('cust-name').value = bills[idx].customerName;
-        document.getElementById('cust-phone').value = bills[idx].customerPhone || '';
-        renderCart();
+      } else if (btn.classList.contains('edit-bill')) {
+        startEditingBill(orderId);
         document.querySelector('[data-tab="pos-tab"]').click();
       } else if (btn.classList.contains('delete')) {
         // Requires secure cashier validation PIN triggers
@@ -4318,8 +4492,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           <button class="table-action-btn whatsapp" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(37,211,102,0.25); background:rgba(37,211,102,0.06); color:#25D366; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-brands fa-whatsapp"></i> Share
           </button>
-          <button class="table-action-btn duplicate" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(201,138,74,0.3); background:rgba(201,138,74,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
-            <i class="fa-solid fa-clone"></i> Reorder
+          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(201,138,74,0.3); background:rgba(201,138,74,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+            <i class="fa-solid fa-pen-to-square"></i> Edit
           </button>
           <button class="table-action-btn delete" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(231,76,60,0.2); background:rgba(231,76,60,0.06); color:var(--danger-color); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-solid fa-trash-can"></i> Delete
@@ -4344,14 +4518,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         triggerThermalReceiptPrint(bills[idx]);
       } else if (btn.classList.contains('whatsapp')) {
         shareBillOnWhatsApp(bills[idx]);
-      } else if (btn.classList.contains('duplicate')) {
-        SoundEffects.playPop();
-        cart = [...bills[idx].items];
-        const cn = document.getElementById('cust-name');
-        const cp = document.getElementById('cust-phone');
-        if (cn) cn.value = bills[idx].customerName;
-        if (cp) cp.value = bills[idx].customerPhone || '';
-        renderCart();
+      } else if (btn.classList.contains('edit-bill')) {
+        startEditingBill(orderId);
         activateMobileTab('pos-tab');
       } else if (btn.classList.contains('delete')) {
         showAdminPinModal(() => {
