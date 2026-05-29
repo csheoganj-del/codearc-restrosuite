@@ -486,6 +486,48 @@ document.addEventListener('DOMContentLoaded', () => {
         renderInventory();
         checkLowStockAlerts();
       }
+
+      // Sync Bills History Live across all devices!
+      const { data: dbBills } = await supabaseClient.from('doppio_bills').select('*');
+      if (dbBills && dbBills.length > 0) {
+        const parsedDbBills = dbBills.map(b => {
+          let items = b.items;
+          if (typeof items === 'string') {
+            try {
+              items = JSON.parse(items);
+            } catch(err) {
+              items = [];
+            }
+          }
+          return {
+            orderId: b.orderId,
+            customerName: b.customerName,
+            dateTime: b.dateTime,
+            items: items,
+            subtotal: parseFloat(b.subtotal || 0),
+            gst: parseFloat(b.gst || 0),
+            total: parseFloat(b.total || 0),
+            paymentMethod: b.paymentMethod
+          };
+        });
+
+        // Merge dynamically by orderId keeping unsynced local bills
+        const localBills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
+        const localMap = new Map(localBills.map(b => [b.orderId, b]));
+
+        parsedDbBills.forEach(dbBill => {
+          localMap.set(dbBill.orderId, dbBill);
+        });
+
+        const mergedBills = Array.from(localMap.values());
+        // Sort mergedBills by order ID descending to display newest orders first
+        mergedBills.sort((a, b) => b.orderId.localeCompare(a.orderId));
+
+        bills = mergedBills;
+        localStorage.setItem('doppio_bills', JSON.stringify(bills));
+        renderBills();
+        updateHeaderSummaryStats();
+      }
     } catch(e) {
       console.warn("Supabase initial sync fallback", e);
     }
