@@ -1547,7 +1547,7 @@ document.addEventListener('DOMContentLoaded', () => {
     txt += `Guest: ${bill.customerName || 'Walk-in Guest'}\n\n`;
     
     txt += borderSingle + '\n';
-    txt += 'Item                Qty   Amt\n';
+    txt += formatRow32('Item', 'Qty', 'Amt') + '\n';
     txt += borderSingle + '\n';
     
     bill.items.forEach(item => {
@@ -1669,7 +1669,7 @@ document.addEventListener('DOMContentLoaded', () => {
     msg += `Guest: ${(bill.customerName || 'Walk-in Guest').slice(0, 25)}\n\n`;
     
     msg += borderSingle + '\n';
-    msg += 'Item                Qty   Amt\n';
+    msg += formatRow32('Item', 'Qty', 'Amt') + '\n';
     msg += borderSingle + '\n';
     
     bill.items.forEach(item => {
