@@ -315,10 +315,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  let savedInventory = JSON.parse(localStorage.getItem('doppio_inventory')) || {};
+  let savedInventory = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory')) || {}; } catch(e) { return {}; } })();
   let inventory = { ...defaultInventory, ...savedInventory };
-  let bills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
-  let businessProfile = JSON.parse(localStorage.getItem('doppio_business_profile')) || {
+  let bills = (() => { try { return JSON.parse(localStorage.getItem('doppio_bills')) || []; } catch(e) { console.warn('Corrupted bills data reset'); localStorage.removeItem('doppio_bills'); return []; } })();
+  let businessProfile = (() => { try { return JSON.parse(localStorage.getItem('doppio_business_profile')) || null; } catch(e) { return null; } })() || {
     name: 'Doppio Cafe Nagpur',
     address: 'London Street, Nagpur',
     phone: '+91 91300 03177',
@@ -347,10 +347,10 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('doppio_sound_default_off_v2', 'true');
   }
 
-  let cart = JSON.parse(localStorage.getItem('doppio_cart')) || [];
+  let cart = (() => { try { return JSON.parse(localStorage.getItem('doppio_cart')) || []; } catch(e) { localStorage.removeItem('doppio_cart'); return []; } })();
   let selectedPaymentMethod = localStorage.getItem('doppio_cart_pay_method') || 'UPI';
   let activeOrderType = 'Takeaway';
-  let draftOrders = JSON.parse(localStorage.getItem('doppio_draft_orders')) || [];
+  let draftOrders = (() => { try { return JSON.parse(localStorage.getItem('doppio_draft_orders')) || []; } catch(e) { return []; } })();
   let editingBillId = localStorage.getItem('doppio_editing_bill_id') || null;
   if (editingBillId === 'null') editingBillId = null;
 
@@ -600,7 +600,8 @@ document.addEventListener('DOMContentLoaded', () => {
       link.classList.add('active');
 
       tabContents.forEach(content => content.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
+      const targetTab = document.getElementById(tabId);
+      if (targetTab) targetTab.classList.add('active');
 
       tabTitle.textContent = link.textContent.trim();
       
@@ -639,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Calculate values specifically for today
     const today = new Date().toLocaleDateString('en-IN');
-    const todayBills = bills.filter(b => b.dateTime.includes(today));
+    const todayBills = bills.filter(b => b && b.dateTime && b.dateTime.includes(today));
     const todayTotal = todayBills.reduce((sum, b) => sum + b.total, 0);
 
     if (headerSales) headerSales.textContent = `₹${todayTotal}`;
@@ -719,8 +720,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filteredItems = menu.filter(item => {
       const matchesCategory = activePOSCategory === 'ALL' || item.category === activePOSCategory;
-      const matchesSearch = item.name.toLowerCase().includes(posSearchQuery.toLowerCase()) || 
-                            item.description.toLowerCase().includes(posSearchQuery.toLowerCase());
+      const matchesSearch = (item.name && item.name.toLowerCase().includes(posSearchQuery.toLowerCase())) || 
+                            (item.description && item.description.toLowerCase().includes(posSearchQuery.toLowerCase()));
       return matchesCategory && matchesSearch;
     });
 
@@ -728,15 +729,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const sortSelect = document.getElementById('pos-sort-select');
     const sortVal = sortSelect ? sortSelect.value : 'popular';
     filteredItems.sort((a, b) => {
+      const nameA = a.name || '';
+      const nameB = b.name || '';
       if (sortVal === 'name') {
-        return a.name.localeCompare(b.name);
+        return nameA.localeCompare(nameB);
       } else {
-        const popA = posPopularityMap[a.name.toLowerCase().trim()] || 0;
-        const popB = posPopularityMap[b.name.toLowerCase().trim()] || 0;
+        const popA = posPopularityMap[nameA.toLowerCase().trim()] || 0;
+        const popB = posPopularityMap[nameB.toLowerCase().trim()] || 0;
         if (popB !== popA) {
           return popB - popA;
         }
-        return a.name.localeCompare(b.name);
+        return nameA.localeCompare(nameB);
       }
     });
 
@@ -1033,9 +1036,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>Cart is currently empty.<br>Tap items to add & customize.</p>
         </div>
       `;
-      cartSubtotal.textContent = '₹0.00';
-      cartGst.textContent = '₹0.00';
-      cartTotal.textContent = '₹0.00';
+      if (cartSubtotal) cartSubtotal.textContent = '₹0.00';
+      if (cartGst) cartGst.textContent = '₹0.00';
+      if (cartTotal) cartTotal.textContent = '₹0.00';
       return;
     }
 
@@ -1046,10 +1049,11 @@ document.addEventListener('DOMContentLoaded', () => {
       subtotal += rowTotal;
 
       // Compile customization label string
-      let configParts = [`Size: ${item.size}`];
-      if (item.sugar !== 'Regular') configParts.push(`Sweet: ${item.sugar}`);
-      if (item.ice !== 'Regular') configParts.push(`Ice: ${item.ice}`);
-      if (item.toppings.length > 0) configParts.push(`+ ${item.toppings.join(', ')}`);
+      let configParts = [`Size: ${item.size || 'Regular'}`];
+      if (item.sugar && item.sugar !== 'Regular') configParts.push(`Sweet: ${item.sugar}`);
+      if (item.ice && item.ice !== 'Regular') configParts.push(`Ice: ${item.ice}`);
+      const toppings = Array.isArray(item.toppings) ? item.toppings : [];
+      if (toppings.length > 0) configParts.push(`+ ${toppings.join(', ')}`);
       if (item.notes) configParts.push(`"${item.notes}"`);
 
       const configLabel = configParts.join(' | ');
@@ -1095,15 +1099,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
     const total = taxableAmount + gst;
 
-    cartSubtotal.textContent = `₹${subtotal}`;
+    if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
     
-    if (loyaltyDiscount > 0) {
-      cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
-    } else {
-      cartGst.textContent = `₹${gst}`;
+    if (cartGst) {
+      if (loyaltyDiscount > 0) {
+        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
+      } else {
+        cartGst.textContent = `₹${gst}`;
+      }
     }
 
-    cartTotal.textContent = `₹${total}`;
+    if (cartTotal) cartTotal.textContent = `₹${total}`;
     if (typeof calculateSplitBalance === 'function') calculateSplitBalance();
     
     // Save to localStorage for persistence across reloads/logouts/tabs
@@ -1571,8 +1577,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Search matches
       const q = billsSearchQuery.toLowerCase();
       const matchesSearch = !q || 
-                            bill.customerName.toLowerCase().includes(q) || 
-                            bill.orderId.toLowerCase().includes(q) || 
+                            (bill.customerName && bill.customerName.toLowerCase().includes(q)) || 
+                            (bill.orderId && bill.orderId.toLowerCase().includes(q)) || 
                             (bill.customerPhone && bill.customerPhone.includes(q));
 
       // Presets filter matches
@@ -1580,12 +1586,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activePresetDate !== 'all') {
         const today = new Date().toLocaleDateString('en-IN');
         if (activePresetDate === 'today') {
-          matchesPreset = bill.dateTime.includes(today);
+          matchesPreset = bill.dateTime && bill.dateTime.includes(today);
         } else if (activePresetDate === 'yesterday') {
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayStr = yesterday.toLocaleDateString('en-IN');
-          matchesPreset = bill.dateTime.includes(yesterdayStr);
+          matchesPreset = bill.dateTime && bill.dateTime.includes(yesterdayStr);
         } else if (activePresetDate === 'week') {
           const billDate = parseBillDate(bill);
           const diffTime = Math.abs(new Date() - billDate);
@@ -1613,19 +1619,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Update Top Billing stats indicators
-    const dailySalesTotal = filteredBills.reduce((sum, b) => sum + b.total, 0);
-    document.getElementById('bills-revenue-card').textContent = `₹${dailySalesTotal}`;
-    document.getElementById('bills-total-card').textContent = `${filteredBills.length} Invoices`;
+    const dailySalesTotal = filteredBills.reduce((sum, b) => sum + (b.total || 0), 0);
+    const revCard = document.getElementById('bills-revenue-card');
+    const totCard = document.getElementById('bills-total-card');
+    const aovCardEl = document.getElementById('bills-aov-card');
+    const upiPct = document.getElementById('bills-upi-percent');
+    const cashPct = document.getElementById('bills-cash-percent');
+    if (revCard) revCard.textContent = `₹${dailySalesTotal}`;
+    if (totCard) totCard.textContent = `${filteredBills.length} Invoices`;
     
     // Average Order Value calculations
     const aov = filteredBills.length === 0 ? 0 : Math.round(dailySalesTotal / filteredBills.length);
-    document.getElementById('bills-aov-card').textContent = `₹${aov}`;
+    if (aovCardEl) aovCardEl.textContent = `₹${aov}`;
 
     // Split percentages calculations
     const upiCount = filteredBills.filter(b => b.paymentMethod === 'UPI').length;
     const upiPercent = filteredBills.length === 0 ? 0 : Math.round((upiCount / filteredBills.length) * 100);
-    document.getElementById('bills-upi-percent').textContent = `${upiPercent}%`;
-    document.getElementById('bills-cash-percent').textContent = `${100 - upiPercent}%`;
+    if (upiPct) upiPct.textContent = `${upiPercent}%`;
+    if (cashPct) cashPct.textContent = `${100 - upiPercent}%`;
 
     if (billsCount) billsCount.textContent = `Showing ${filteredBills.length} Bills`;
 
@@ -1654,30 +1665,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const sortedBills = [...filteredBills].reverse();
     sortedBills.forEach(bill => {
+      if (!bill) return;
       const tr = document.createElement('tr');
       
       // Items string format details
-      let itemsListStr = bill.items.map(item => `${item.name} (${item.qty})`).join(', ');
+      const billItems = Array.isArray(bill.items) ? bill.items : [];
+      let itemsListStr = billItems.map(item => `${item.name || '?'} (${item.qty || 1})`).join(', ');
       if (itemsListStr.length > 36) itemsListStr = itemsListStr.substring(0, 33) + '...';
       
       // Avatar Initials details
-      const initials = bill.customerName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      const custName = bill.customerName || 'Walk-in';
+      const initials = custName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      const payMethod = bill.paymentMethod || 'UPI';
 
       tr.innerHTML = `
-        <td style="font-weight:700;">${bill.orderId}</td>
+        <td style="font-weight:700;">${bill.orderId || '-'}</td>
         <td>
           <div class="customer-avatar-cell">
             <div class="cust-avatar">${initials}</div>
             <div style="display:flex; flex-direction:column;">
-              <span style="font-weight:600;">${bill.customerName}</span>
+              <span style="font-weight:600;">${custName}</span>
               <span style="font-size:10px; color:var(--text-muted);">${bill.customerPhone || 'Walk-in Guest'}</span>
             </div>
           </div>
         </td>
-        <td>${bill.dateTime}</td>
-        <td title="${bill.items.map(i => `${i.name} (x${i.qty})`).join(', ')}">${itemsListStr}</td>
-        <td><span class="payment-badge ${bill.paymentMethod.toLowerCase()}">${bill.paymentMethod}</span></td>
-        <td style="font-weight:700; color:var(--accent-caramel);">₹${bill.total}</td>
+        <td>${bill.dateTime || '-'}</td>
+        <td title="${billItems.map(i => `${i.name || '?'} (x${i.qty || 1})`).join(', ')}">${itemsListStr || '-'}</td>
+        <td><span class="payment-badge ${payMethod.toLowerCase()}">${payMethod}</span></td>
+        <td style="font-weight:700; color:var(--accent-caramel);">₹${bill.total || 0}</td>
         <td>
           <button class="table-action-btn print" data-id="${bill.orderId}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
           <button class="table-action-btn whatsapp" data-id="${bill.orderId}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
@@ -2232,8 +2247,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Best seller counts mapping
     const itemCounts = {};
     filteredBills.forEach(b => {
+      if (!b.items || !Array.isArray(b.items)) return;
       b.items.forEach(item => {
-        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
+        if (!item || !item.name) return;
+        itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.qty || 1);
       });
     });
 
@@ -2341,8 +2358,8 @@ document.addEventListener('DOMContentLoaded', () => {
           item.style.borderBottom = '1px solid rgba(43,24,19,0.03)';
           item.innerHTML = `
             <div style="display:flex; flex-direction:column;">
-              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${bill.customerName} (${bill.orderId})</span>
-              <span style="font-size:10px; color:var(--text-muted);">${bill.dateTime}</span>
+              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${bill.customerName || 'Walk-in'} (${bill.orderId || '-'})</span>
+              <span style="font-size:10px; color:var(--text-muted);">${bill.dateTime || '-'}</span>
             </div>
             <span style="font-size:13px; font-weight:700; color:var(--accent-caramel);">₹${bill.total}</span>
           `;
