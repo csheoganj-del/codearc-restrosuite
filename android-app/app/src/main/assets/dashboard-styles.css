@@ -99,8 +99,36 @@ body {
   padding: 32px 24px;
   border-right: 1px solid rgba(231, 215, 201, 0.08);
   flex-shrink: 0;
-  z-index: 10;
-  box-shadow: 4px 0 30px rgba(43, 24, 19, 0.15);
+  z-index: 150;
+  box-shadow: 4px 0 30px rgba(43, 24, 19, 0.25);
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  transform: translateX(-95%); /* Collapse by default, keeping a thin 5% edge */
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+.sidebar:hover, .sidebar.reveal {
+  transform: translateX(0) !important;
+  overflow-y: auto;
+}
+
+/* Custom premium scrollbar for sidebar */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(201, 138, 74, 0.3);
+  border-radius: 3px;
+}
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 138, 74, 0.6);
 }
 
 .sidebar-brand {
@@ -297,6 +325,9 @@ body {
   flex-direction: column;
   overflow: hidden;
   background-color: var(--bg-cream-light);
+  margin-left: 14px !important;
+  width: calc(100vw - 14px) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================
@@ -1148,6 +1179,98 @@ body {
 .checkout-btn.btn-save-only:hover {
   background: #27ae60;
   box-shadow: 0 8px 25px rgba(46, 204, 113, 0.35);
+}
+
+/* ==========================================
+   PREMIUM CLUTTER-FREE CHECKOUT CUSTOM STYLES
+   ========================================== */
+.payment-segmented-control {
+  display: flex !important;
+  background: rgba(43,24,19,0.04) !important;
+  padding: 3px !important;
+  border-radius: 30px !important;
+  border: 1px solid rgba(43,24,19,0.04) !important;
+  gap: 4px !important;
+  width: 100% !important;
+  margin-top: 4px;
+}
+
+.payment-segmented-control .pay-method-btn {
+  flex: 1 !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 8px 12px !important;
+  border-radius: 20px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  color: var(--text-muted) !important;
+  box-shadow: none !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.payment-segmented-control .pay-method-btn i {
+  font-size: 12px !important;
+}
+
+.payment-segmented-control .pay-method-btn:hover {
+  background-color: rgba(43, 24, 19, 0.03) !important;
+  color: var(--primary-brand) !important;
+}
+
+.payment-segmented-control .pay-method-btn.active {
+  background-color: var(--white) !important;
+  color: var(--accent-caramel) !important;
+  box-shadow: 0 2px 8px rgba(43, 24, 19, 0.08) !important;
+  border: 1px solid rgba(201, 138, 74, 0.15) !important;
+}
+
+#toggle-summary-details-btn:hover {
+  transform: scale(1.15);
+  color: var(--primary-brand);
+}
+
+#cart-more-actions-btn:hover {
+  background-color: rgba(43, 24, 19, 0.06) !important;
+  border-color: rgba(43, 24, 19, 0.2) !important;
+  transform: translateY(-1px);
+}
+
+.cart-more-actions-menu {
+  display: none;
+  flex-direction: column;
+  box-shadow: 0 12px 36px rgba(43, 24, 19, 0.15) !important;
+  border: 1px solid rgba(43, 24, 19, 0.08) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  z-index: 100 !important;
+}
+
+.dropdown-action-item {
+  font-family: var(--font-body);
+  transition: all 0.15s ease;
+}
+
+.dropdown-action-item:hover {
+  background-color: rgba(201, 138, 74, 0.06) !important;
+  color: var(--accent-caramel) !important;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ==========================================
@@ -3013,5 +3136,699 @@ body.no-scroll {
   height: 100vh !important;
   height: 100dvh !important;
 }
+
+/* ==========================================
+   PREMIUM DARK ROAST NIGHT THEME (DARK MODE)
+   ========================================== */
+body.dark-theme {
+  --primary-brand: #F7F3EF;
+  --primary-brand-rgb: 247, 243, 239;
+  --bg-cream-light: #16100E;
+  --bg-tan-warm: #2B1813;
+  --bg-card: #201512;
+  --white: #201512;
+  --text-dark: #F7F3EF;
+  --text-light: #2B1813;
+  --text-muted: #A38F8A;
+
+  /* Gradients overrides */
+  --coffee-gradient: linear-gradient(135deg, #100B09 0%, #201512 100%);
+  --cream-gradient: linear-gradient(135deg, #201512 0%, #16100E 100%);
+  --gold-glow-gradient: linear-gradient(90deg, rgba(201, 138, 74, 0.25) 0%, rgba(201, 138, 74, 0.05) 100%);
+
+  /* Shadow overrides */
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -1px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.65), 0 15px 20px -20px rgba(0, 0, 0, 0.55);
+}
+
+/* Specific Dark Theme Overrides for hardcoded elements */
+body.dark-theme input,
+body.dark-theme select,
+body.dark-theme textarea {
+  background-color: #2D1C18 !important;
+  border-color: rgba(247, 243, 239, 0.12) !important;
+  color: #F7F3EF !important;
+}
+
+body.dark-theme input::placeholder {
+  color: rgba(247, 243, 239, 0.4) !important;
+}
+
+body.dark-theme .glass-modal,
+body.dark-theme .more-nav-sheet {
+  background: rgba(32, 21, 18, 0.85) !important;
+  border-color: rgba(247, 243, 239, 0.1) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+}
+
+body.dark-theme .sidebar-brand {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.dark-theme .bell-icon-wrapper,
+body.dark-theme .theme-toggle-btn,
+body.dark-theme .dateTime {
+  background: #2B1813 !important;
+  border-color: rgba(247, 243, 239, 0.06) !important;
+}
+
+body.dark-theme .dashboard-header {
+  border-bottom-color: rgba(247, 243, 239, 0.06) !important;
+}
+
+body.dark-theme .pos-cat-btn,
+body.dark-theme .order-type-btn {
+  background-color: #201512 !important;
+  border-color: rgba(247, 243, 239, 0.06) !important;
+  color: #F7F3EF !important;
+}
+
+body.dark-theme .pos-cat-btn.active,
+body.dark-theme .order-type-btn.active {
+  background: var(--caramel-gradient) !important;
+  border-color: var(--accent-caramel) !important;
+  color: #FFF !important;
+}
+
+body.dark-theme .cart-qty-btn,
+body.dark-theme .quick-add-btn {
+  background: #2D1C18 !important;
+  border-color: rgba(247, 243, 239, 0.08) !important;
+}
+
+body.dark-theme .takeaway-fields {
+  background: rgba(247, 243, 239, 0.02) !important;
+  border-color: rgba(247, 243, 239, 0.08) !important;
+}
+
+body.dark-theme .btn-secondary {
+  background-color: transparent !important;
+  border-color: var(--accent-caramel) !important;
+  color: var(--accent-caramel) !important;
+}
+
+body.dark-theme .btn-secondary:hover {
+  background-color: rgba(201, 138, 74, 0.1) !important;
+}
+
+body.dark-theme .dashboard-table th {
+  background: #2B1813 !important;
+  color: var(--accent-caramel) !important;
+}
+
+body.dark-theme .dashboard-table td {
+  border-bottom-color: rgba(247, 243, 239, 0.04) !important;
+}
+
+body.dark-theme .dropdown-export-menu {
+  background-color: #201512 !important;
+  border-color: rgba(247, 243, 239, 0.1) !important;
+}
+
+body.dark-theme .dropdown-item {
+  color: #F7F3EF !important;
+}
+
+body.dark-theme .dropdown-item:hover {
+  background-color: rgba(201, 138, 74, 0.15) !important;
+}
+
+body.dark-theme .tier-card {
+  border-color: rgba(247, 243, 239, 0.06) !important;
+}
+
+/* Maintain crisp original paper look for thermal receipts and simulator even in dark mode */
+body.dark-theme .live-receipt-simulator,
+body.dark-theme #receipt-preview-container,
+body.dark-theme .thermal-print-area {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}
+
+body.dark-theme #receipt-preview-container * {
+  color: #000000 !important;
+}
+
+/* ==========================================
+   MICRO-INTERACTIONS & CARTS BUMP
+   ========================================== */
+@keyframes cartBounce {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.08); }
+  65% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+.cart-bounce-active {
+  animation: cartBounce 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+/* Keyboard Spatial Navigation Glow Indicators */
+.pos-item-card:focus {
+  outline: none !important;
+  border-color: var(--accent-caramel) !important;
+  box-shadow: 0 0 0 3px rgba(201, 138, 74, 0.4), var(--shadow-lg) !important;
+  transform: translateY(-4px) !important;
+}
+
+.pos-item-card:focus::before {
+  background: var(--caramel-gradient) !important;
+}
+
+/* ==========================================
+   HIGH VISIBILITY OFFLINE INDICATOR BANNER
+   ========================================== */
+.offline-banner-strip {
+  background: linear-gradient(135deg, #d35400 0%, #e67e22 100%);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 13.5px;
+  text-align: center;
+  padding: 10px 24px;
+  border-bottom: 2px solid #b33900;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 100;
+  animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.offline-banner-strip i {
+  font-size: 16px;
+  animation: pulseWarning 1s infinite alternate;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes pulseWarning {
+  from { opacity: 0.6; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1.1); }
+}
+/* ==========================================
+   SIDEBAR COLLAPSED HOVER TRIGGER GRID
+   ========================================== */
+.sidebar-hover-trigger {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 100vh;
+  z-index: 140;
+  background: transparent;
+}
+
+/* ==========================================
+   POS SEARCH ROW & AUTO SORT DROPDOWN
+   ========================================== */
+.pos-search-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.pos-search-row .pos-search-bar {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.pos-sort-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--white);
+  border: 1px solid rgba(43, 24, 19, 0.08);
+  border-radius: 30px;
+  padding: 0 20px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.pos-sort-wrapper:focus-within {
+  border-color: var(--accent-caramel);
+  box-shadow: 0 4px 20px rgba(201, 138, 74, 0.1);
+}
+
+.pos-sort-wrapper i {
+  color: var(--accent-caramel);
+  margin-right: 10px;
+  font-size: 13px;
+}
+
+.pos-sort-wrapper select {
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--primary-brand);
+  outline: none;
+  cursor: pointer;
+  padding: 14px 0;
+  padding-right: 5px;
+}
+
+/* Dark Mode Overrides for Sort selector */
+body.dark-theme .pos-sort-wrapper {
+  background: #2D1C18 !important;
+  border-color: rgba(247, 243, 239, 0.12) !important;
+}
+
+body.dark-theme .pos-sort-wrapper select {
+  color: #F7F3EF !important;
+}
+
+/* ==========================================
+   POS SPLIT PAYMENT SYSTEM COSMETICS
+   ========================================== */
+#split-pay-container {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(43, 24, 19, 0.02);
+  border: 1px dashed rgba(43, 24, 19, 0.12);
+  padding: 12px;
+  border-radius: var(--border-radius-sm);
+  margin-top: 10px;
+  transition: var(--transition);
+  animation: fadeInDown 0.3s ease-out;
+}
+
+#split-pay-container .split-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+#split-pay-container .split-row span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-brand);
+  width: 75px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#split-pay-container .split-row span i {
+  color: var(--accent-caramel);
+  font-size: 13px;
+}
+
+#split-pay-container .split-row input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid rgba(43, 24, 19, 0.15);
+  border-radius: 8px;
+  background: var(--white);
+  outline: none;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: var(--transition);
+  color: var(--text-dark);
+}
+
+#split-pay-container .split-row input:focus {
+  border-color: var(--accent-caramel);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05), 0 0 0 2px rgba(201, 138, 74, 0.15);
+}
+
+/* Dark Mode Overrides for Split Panel */
+body.dark-theme #split-pay-container {
+  background: rgba(247, 243, 239, 0.02) !important;
+  border-color: rgba(247, 243, 239, 0.08) !important;
+}
+
+body.dark-theme #split-pay-container .split-row span {
+  color: #F7F3EF !important;
+}
+
+body.dark-theme #split-pay-container .split-row input {
+  background-color: #2D1C18 !important;
+  border-color: rgba(247, 243, 239, 0.12) !important;
+  color: #F7F3EF !important;
+}
+
+/* ==========================================
+   SHIFT CONTROL SYSTEM COSMETICS & ANIMS
+   ========================================== */
+#shift-lock-overlay {
+  animation: fadeIn 0.4s ease-out;
+}
+
+#shift-start-prompt-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201, 138, 74, 0.35);
+}
+
+.shift-alert-strip {
+  background-color: rgba(241, 196, 15, 0.08);
+  border-left: 4px solid var(--warning-color);
+  color: #d35400;
+  padding: 10px 16px;
+  border-radius: var(--border-radius-sm);
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(201, 138, 74, 0.4);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(201, 138, 74, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(201, 138, 74, 0);
+  }
+}
+
+body.dark-theme #shift-lock-overlay {
+  background: rgba(45, 28, 24, 0.96) !important;
+}
+
+body.dark-theme #shift-details-modal .glass-modal {
+  background: rgba(45, 28, 24, 0.95) !important;
+  border-color: rgba(247, 243, 239, 0.1) !important;
+  color: #FFF !important;
+}
+
+/* ==========================================================
+   LIVE QR SELF-ORDERING AND VISUAL TABLES MAP STYLES
+   ========================================================== */
+
+/* Active Table Grid */
+.tables-map-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .tables-map-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+.table-card {
+  background: var(--bg-cream-light);
+  border: 1.5px solid rgba(43, 24, 19, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  transition: var(--transition);
+  text-align: center;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+
+.table-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-caramel);
+}
+
+.table-card-num {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--primary-brand);
+  margin-bottom: 2px;
+}
+
+/* Table Occupancy Status Badges */
+.table-status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 1. Empty / Clean */
+.table-card.state-empty {
+  border-color: rgba(46, 204, 113, 0.15);
+}
+.table-card.state-empty .table-status-pill {
+  background: rgba(46, 204, 113, 0.08);
+  color: #27ae60;
+}
+
+/* 2. Active Ordering / Carting */
+.table-card.state-ordering {
+  border-color: rgba(241, 196, 15, 0.35);
+  animation: tablePulseGold 2s infinite alternate;
+}
+.table-card.state-ordering .table-status-pill {
+  background: rgba(241, 196, 15, 0.08);
+  color: #f1c40f;
+}
+
+/* 3. Pending Cashier Approval (Checkout) */
+.table-card.state-pending {
+  border-color: rgba(231, 76, 60, 0.35);
+  animation: tablePulseRed 1.5s infinite alternate;
+}
+.table-card.state-pending .table-status-pill {
+  background: rgba(231, 76, 60, 0.08);
+  color: #e74c3c;
+}
+
+/* 4. Served / Active dining */
+.table-card.state-served {
+  border-color: rgba(52, 152, 219, 0.25);
+}
+.table-card.state-served .table-status-pill {
+  background: rgba(52, 152, 219, 0.08);
+  color: #3498db;
+}
+
+@keyframes tablePulseGold {
+  from { box-shadow: 0 4px 10px rgba(241, 196, 15, 0.05); }
+  to { box-shadow: 0 4px 18px rgba(241, 196, 15, 0.22); border-color: rgba(241, 196, 15, 0.6); }
+}
+
+@keyframes tablePulseRed {
+  from { box-shadow: 0 4px 10px rgba(231, 76, 60, 0.05); }
+  to { box-shadow: 0 4px 18px rgba(231, 76, 60, 0.25); border-color: rgba(231, 76, 60, 0.7); }
+}
+
+.table-card-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  border-top: 1px dashed rgba(43, 24, 19, 0.06);
+  padding-top: 12px;
+}
+
+.table-card-btn {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid rgba(43, 24, 19, 0.1);
+  color: var(--primary-brand);
+  border-radius: 8px;
+  padding: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.table-card-btn:hover {
+  background: var(--accent-caramel);
+  color: var(--white);
+  border-color: var(--accent-caramel);
+}
+
+/* Incoming Q Order Cards */
+.qr-order-queue-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid rgba(43, 24, 19, 0.06);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  animation: slideInLeftOrder 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideInLeftOrder {
+  from { transform: translateX(30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.qr-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed rgba(43, 24, 19, 0.08);
+  padding-bottom: 10px;
+}
+
+.qr-card-table-lbl {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--primary-brand);
+}
+
+.qr-card-paymethod-badge {
+  background: rgba(39, 174, 96, 0.08);
+  border: 1px solid rgba(39, 174, 96, 0.2);
+  color: #27ae60;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.qr-card-paymethod-badge.counter {
+  background: rgba(230, 126, 34, 0.08);
+  border: 1px solid rgba(230, 126, 34, 0.2);
+  color: #e67e22;
+}
+
+.qr-card-cust-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.qr-card-items-box {
+  background: var(--bg-cream-light);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgba(43, 24, 19, 0.04);
+}
+
+.qr-card-item-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.qr-card-total-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 14.5px;
+  border-top: 1px dashed rgba(43, 24, 19, 0.08);
+  padding-top: 8px;
+}
+
+.qr-card-total-val {
+  color: var(--accent-caramel);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.qr-card-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.qr-action-btn {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 10px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.qr-action-btn.approve {
+  background: var(--caramel-gradient);
+  color: var(--white);
+}
+
+.qr-action-btn.approve:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(200, 138, 88, 0.25);
+}
+
+.qr-action-btn.reject {
+  background: rgba(231, 76, 60, 0.06);
+  border: 1px solid rgba(231, 76, 60, 0.15);
+  color: var(--danger-color);
+}
+
+.qr-action-btn.reject:hover {
+  background: var(--danger-color);
+  color: var(--white);
+  border-color: var(--danger-color);
+}
+
+/* Glow notification badges sidebar menu */
+.live-qr-badge {
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+/* Dark theme specific visual map tweaks */
+body.dark-theme .table-card {
+  background-color: #201512 !important;
+  border-color: rgba(247, 243, 239, 0.08) !important;
+}
+body.dark-theme .table-card-btn {
+  background-color: #2D1C18 !important;
+  border-color: rgba(247, 243, 239, 0.08) !important;
+  color: #F7F3EF !important;
+}
+body.dark-theme .table-card-btn:hover {
+  background-color: var(--accent-caramel) !important;
+  color: white !important;
+}
+body.dark-theme .qr-card-items-box {
+  background-color: #1A0F0D !important;
+  border-color: rgba(247, 243, 239, 0.04) !important;
+}
+body.dark-theme .printable-qr-station-frame {
+  background-color: #FFF !important; /* Keep QR printable background white for scanner high-contrast */
+}
+body.dark-theme .printable-qr-station-frame * {
+  color: #2C1B18 !important;
+}
+
 
 

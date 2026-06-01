@@ -6,6 +6,8 @@
   <title>Doppio Cafe Nagpur | Premium Cashier POS Control System</title>
   <link rel="stylesheet" href="dashboard-styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS Spreadsheet Excel Parser Library (Premium Onboarding) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -60,8 +62,13 @@
     
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- Mobile Network Status Dot -->
-      <div id="mobile-network-status-badge" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(46, 204, 113, 0.08); border: 1px solid rgba(46, 204, 113, 0.2); cursor: pointer;" title="Supabase Live">
+      <div id="mobile-network-status-badge" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(46, 204, 113, 0.08); border: 1px solid rgba(46, 204, 113, 0.2); cursor: pointer;" title="Live">
         <span class="status-dot green" style="width: 8px; height: 8px; display: block; border-radius: 50%;"></span>
+      </div>
+
+      <!-- Mobile Theme Toggle -->
+      <div id="mobile-theme-toggle-btn" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-cream-light); border: 1px solid rgba(43, 24, 19, 0.05); cursor: pointer;" title="Toggle Night Mode">
+        <i class="fa-solid fa-moon" style="font-size: 13px; color: var(--primary-brand);"></i>
       </div>
 
       <!-- Mobile Notifications Bell -->
@@ -78,9 +85,12 @@
   <!-- Mobile Bottom Navigation Bar -->
   <div class="mobile-bottom-nav">
     <a href="#" class="mobile-nav-link active" data-tab="pos-tab"><i class="fa-solid fa-mug-hot"></i> POS</a>
+    <a href="#" class="mobile-nav-link" data-tab="qr-orders-tab" id="mobile-qr-link">
+      <i class="fa-solid fa-qrcode"></i> Live QR
+      <span class="live-qr-badge" id="mobile-live-qr-badge" style="display:none; background:#e74c3c; color:white; font-size:9px; font-weight:800; padding:1px 5px; border-radius:10px; margin-left:3px; animation: pulse 1.5s infinite;">0</span>
+    </a>
     <a href="#" class="mobile-nav-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i> Bills</a>
     <a href="#" class="mobile-nav-link" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i> Stock</a>
-    <a href="#" class="mobile-nav-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
     <a href="#" class="mobile-nav-link" id="mobile-more-btn"><i class="fa-solid fa-ellipsis"></i> More</a>
   </div>
 
@@ -102,6 +112,10 @@
 
       <nav class="sidebar-menu">
         <a href="#" class="sidebar-link active" data-tab="pos-tab"><i class="fa-solid fa-mug-hot"></i> Takeaway POS</a>
+        <a href="#" class="sidebar-link" data-tab="qr-orders-tab" id="sidebar-qr-link">
+          <i class="fa-solid fa-qrcode"></i> Live Table Orders
+          <span class="live-qr-badge" id="live-qr-badge" style="display:none; background:#e74c3c; color:white; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px; margin-left:6px; animation: pulse 1.5s infinite;">0</span>
+        </a>
         <a href="#" class="sidebar-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i> Bills Management</a>
         <a href="#" class="sidebar-link" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i> Inventory Control</a>
         <a href="#" class="sidebar-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Sales Reports</a>
@@ -139,11 +153,11 @@
               <span class="header-metric-lbl">Total Bills</span>
             </div>
           </div>
-          <div class="header-metric-pill" title="Shift Period Duration">
-            <i class="fa-solid fa-clock"></i>
+          <div class="header-metric-pill" id="header-shift-pill" title="Shift & Drawer Management" style="cursor: pointer;">
+            <i class="fa-solid fa-clock" id="header-shift-icon"></i>
             <div class="header-metric-details">
-              <span class="header-metric-val">09:00 - 22:30</span>
-              <span class="header-metric-lbl">Shift Active</span>
+              <span class="header-metric-val" id="header-shift-status">09:00 - 22:30</span>
+              <span class="header-metric-lbl" id="header-shift-label">Shift Active</span>
             </div>
           </div>
         </div>
@@ -157,11 +171,22 @@
 
           <div class="status-indicator-badge" id="network-status-badge">
             <span class="status-dot green"></span>
-            <span class="status-text" id="supabase-sync-text">Supabase Live</span>
+            <span class="status-text" id="supabase-sync-text">Live</span>
           </div>
+          <!-- Theme Toggle Desktop -->
+          <div class="theme-toggle-btn" id="theme-toggle-btn" title="Toggle Night Mode" style="cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-cream-light); border: 1px solid rgba(43, 24, 19, 0.05); transition: var(--transition);">
+            <i class="fa-solid fa-moon" style="font-size: 14px; color: var(--primary-brand);"></i>
+          </div>
+
           <div class="dateTime" id="dateTime">May 27, 2026 12:00 PM</div>
         </div>
       </header>
+
+      <!-- High-visibility Offline Warning Banner -->
+      <div id="offline-banner" class="offline-banner-strip" style="display: none;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Nagpur Terminal Offline Mode Active. Sales backed up locally. Cloud sync paused.</span>
+      </div>
 
       <!-- Alert Banners container for Low Inventory Notifications -->
       <div class="alert-container" id="low-stock-alerts">
@@ -172,15 +197,33 @@
       <div class="workspace-area">
 
         <!-- TAB 1: TAKEAWAY POS (DEFAULT TAB) -->
-        <div class="tab-content active" id="pos-tab">
+        <div class="tab-content active" id="pos-tab" style="position: relative;">
+          <!-- Shift Closed POS Lock Overlay -->
+          <div id="shift-lock-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); z-index: 50; align-items: center; justify-content: center; border-radius: var(--border-radius-lg); flex-direction: column; gap: 16px; text-align: center; padding: 20px;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(201, 138, 74, 0.08); border: 2px dashed var(--accent-caramel); display: flex; align-items: center; justify-content: center;">
+              <i class="fa-solid fa-cash-register" style="font-size: 32px; color: var(--accent-caramel);"></i>
+            </div>
+            <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 20px; font-weight: 700;">Terminal Shift Session Closed</h2>
+            <p style="font-size: 13px; color: var(--text-muted); max-width: 320px; margin: 0; line-height: 1.4;">An active drawer shift session is required to process bills, record sales, and access drawer cash.</p>
+            <button type="button" class="btn btn-primary" id="shift-start-prompt-btn" style="padding: 10px 24px; font-weight: 700; border-radius: 20px;"><i class="fa-solid fa-play"></i> Open New Shift</button>
+          </div>
           <div class="pos-layout">
             <!-- Menu Column -->
             <div class="pos-menu-side">
-              <div class="pos-search-bar">
-                <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                <input type="text" id="pos-search" placeholder="Quick search drink/food item (Press '/' to focus)...">
-                <span class="shortcut-indicator">/</span>
-                <i class="fa-solid fa-microphone voice-search-icon" id="voice-search-btn" title="Voice search coming soon"></i>
+              <div class="pos-search-row">
+                <div class="pos-search-bar">
+                  <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                  <input type="text" id="pos-search" placeholder="Quick search drink/food item (Press '/' to focus)...">
+                  <span class="shortcut-indicator">/</span>
+                </div>
+                
+                <div class="pos-sort-wrapper">
+                  <i class="fa-solid fa-arrow-down-wide-short"></i>
+                  <select id="pos-sort-select" title="Sort Items Grid">
+                    <option value="popular">Popular First</option>
+                    <option value="name">Alphabetical (A-Z)</option>
+                  </select>
+                </div>
               </div>
               <div class="pos-categories" id="pos-categories">
                 <!-- Categories rendered dynamically -->
@@ -200,13 +243,15 @@
             <div class="pos-cart-side pos-cart-sidebar" id="pos-cart-sidebar">
               <div class="cart-header">
                 <div class="cart-header-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                  <div style="display:flex; flex-direction:column; gap:2px;">
+                  <div style="display:flex; align-items:baseline; gap:8px;">
                     <h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--primary-brand);">Takeaway Cart</h2>
-                    <span style="font-size: 11px; font-weight: 700; color: var(--accent-caramel); text-align: left;" id="cart-order-badge">Order: DO-1001</span>
+                    <span style="font-size: 10px; font-weight: 700; color: var(--accent-caramel); background: rgba(201, 138, 74, 0.08); border: 1px solid rgba(201, 138, 74, 0.15); padding: 2px 6px; border-radius: 12px;" id="cart-order-badge">Order: DO-1001</span>
                   </div>
-                  <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none; background:rgba(43,24,19,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="clear-cart-btn" id="clear-cart" style="background:transparent; border:none; color:var(--danger-color); cursor:pointer; font-size:12px; transition:var(--transition); padding:6px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(231,76,60,0.06);" title="Clear Cart"><i class="fa-solid fa-trash-can"></i></button>
+                    <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none; background:rgba(43,24,19,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
+                  </div>
                 </div>
-                <button class="clear-cart-btn" id="clear-cart"><i class="fa-solid fa-trash-can"></i> Clear</button>
               </div>
 
               <!-- Order Type Toggle Pills -->
@@ -217,7 +262,7 @@
               </div>
 
               <!-- Guest Info Toggle Banner -->
-              <div class="guest-toggle-btn" id="guest-toggle-btn" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-cream-light); border:1px solid rgba(43,24,19,0.06); padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:12px; font-weight:700; color:var(--primary-brand); cursor:pointer; transition:all 0.2s ease;">
+              <div class="guest-toggle-btn" id="guest-toggle-btn" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-cream-light); border:1px solid rgba(43,24,19,0.05); padding:6px 12px; border-radius:8px; margin-bottom:10px; font-size:11px; font-weight:700; color:var(--primary-brand); cursor:pointer; transition:all 0.2s ease;">
                 <span><i class="fa-solid fa-user-tag" style="color:var(--accent-caramel); margin-right:5px;"></i> Customer Details</span>
                 <span id="guest-toggle-indicator" style="font-size:10px; color:var(--text-muted); font-weight: 500;"><i class="fa-solid fa-chevron-down"></i> Add Info</span>
               </div>
@@ -260,47 +305,164 @@
 
               <!-- Checkout Summary -->
               <div class="cart-summary">
-                <div class="summary-row">
-                  <span>Subtotal</span>
-                  <span id="cart-subtotal">₹0.00</span>
-                </div>
-                <div class="summary-row">
-                  <span>Taxes & Discounts</span>
-                  <span id="cart-gst">₹0.00</span>
-                </div>
-                <div class="summary-row total-row">
-                  <span>Total Amount</span>
-                  <span id="cart-total">₹0.00</span>
+                <div class="summary-row total-row" style="margin-bottom: 8px; border-top: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-weight: 800; font-size: 15px; color: var(--primary-brand);">Total Amount</span>
+                    <button type="button" id="toggle-summary-details-btn" style="background: none; border: none; padding: 2px; color: var(--accent-caramel); cursor: pointer; font-size: 12px; transition: transform 0.2s;" title="View Breakdown">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                  </div>
+                  <span id="cart-total" style="font-weight: 800; font-size: 18px; color: var(--primary-brand);">₹0.00</span>
                 </div>
 
-                <div class="payment-selection">
-                  <label>Payment Method</label>
-                  <div class="payment-methods">
-                    <button class="pay-method-btn active" data-method="UPI"><i class="fa-solid fa-mobile-screen-button"></i> UPI</button>
-                    <button class="pay-method-btn" data-method="Cash"><i class="fa-solid fa-money-bill-1"></i> Cash</button>
-                    <button class="pay-method-btn" data-method="Card"><i class="fa-solid fa-credit-card"></i> Card</button>
+                <div id="cart-summary-details" style="display: none; background: rgba(43,24,19,0.02); border: 1px dashed rgba(43,24,19,0.08); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; animation: fadeInDown 0.2s ease;">
+                  <div class="summary-row" style="margin-bottom: 4px; font-size: 11px;">
+                    <span>Subtotal</span>
+                    <span id="cart-subtotal">₹0.00</span>
+                  </div>
+                  <div class="summary-row" style="margin-bottom: 0; font-size: 11px;">
+                    <span>Taxes & Discounts</span>
+                    <span id="cart-gst">₹0.00</span>
                   </div>
                 </div>
 
-                <div class="cart-draft-actions" style="display: flex; gap: 8px; margin-top: 14px; margin-bottom: 8px; width: 100%;">
-                  <button class="btn btn-secondary" id="hold-order-btn" style="flex: 1; padding: 10px; font-size: 12.5px; font-weight: 700; border-color: var(--accent-caramel); color: var(--primary-brand); background: #fff; cursor: pointer; transition: all 0.15s ease;">
-                    <i class="fa-solid fa-pause"></i> Hold Order
-                  </button>
-                  <button class="btn btn-secondary" id="view-drafts-btn" style="flex: 1; padding: 10px; font-size: 12.5px; font-weight: 700; background-color: rgba(201, 138, 74, 0.08); border-color: var(--accent-caramel); color: var(--primary-brand); position: relative; cursor: pointer; transition: all 0.15s ease;">
-                    <i class="fa-solid fa-list-check"></i> Open Drafts <span class="badge" id="drafts-count-badge" style="position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; border-radius: 50%; font-size: 9px; width: 16px; height: 16px; line-height: 16px; text-align: center; display: none; font-weight: 700;">0</span>
-                  </button>
+                <div class="payment-selection" style="margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="margin: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Payment Method</label>
+                    <button type="button" id="toggle-split-pay-btn" style="background: transparent; border: 1px solid var(--accent-caramel); color: var(--accent-caramel); border-radius: 20px; padding: 1px 8px; font-size: 9.5px; font-weight: 700; cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 3px;">
+                      <i class="fa-solid fa-arrows-split-up-and-left"></i> Split Pay
+                    </button>
+                  </div>
+                  
+                  <!-- Single Payment Segmented Control -->
+                  <div class="payment-segmented-control" id="single-pay-container">
+                    <button type="button" class="pay-method-btn active" data-method="UPI"><i class="fa-solid fa-mobile-screen-button"></i> UPI</button>
+                    <button type="button" class="pay-method-btn" data-method="Cash"><i class="fa-solid fa-money-bill-1"></i> Cash</button>
+                    <button type="button" class="pay-method-btn" data-method="Card"><i class="fa-solid fa-credit-card"></i> Card</button>
+                  </div>
+
+                  <!-- Split Payment Input Fields -->
+                  <div id="split-pay-container">
+                    <div class="split-row">
+                      <span><i class="fa-solid fa-mobile-screen-button"></i> UPI:</span>
+                      <input type="number" id="split-pay-upi" value="0" min="0" placeholder="0">
+                    </div>
+                    <div class="split-row">
+                      <span><i class="fa-solid fa-money-bill-1"></i> Cash:</span>
+                      <input type="number" id="split-pay-cash" value="0" min="0" placeholder="0">
+                    </div>
+                    <div class="split-row">
+                      <span><i class="fa-solid fa-credit-card"></i> Card:</span>
+                      <input type="number" id="split-pay-card" value="0" min="0" placeholder="0">
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; border-top: 1px dashed rgba(43,24,19,0.12); padding-top: 8px; font-size: 11px; font-weight: 700;">
+                      <span id="split-pay-status-label" style="color: var(--text-muted);">Remaining:</span>
+                      <span id="split-pay-remaining-val" style="color: var(--danger-color);">₹0.00</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="checkout-actions-wrapper" style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
-                  <button type="button" class="checkout-btn btn-save-only" id="checkout-save-btn" style="flex: 1; border-radius: 30px; font-weight: 700; border: none; color: white; cursor: pointer; padding: 12px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px;">
-                    <i class="fa-solid fa-floppy-disk"></i> Save Bill
-                  </button>
-                  <button type="button" class="checkout-btn btn-print-and-save" id="checkout-print-btn" style="flex: 1; border-radius: 30px; font-weight: 700; border: none; color: white; cursor: pointer; padding: 12px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px;">
+                <div class="checkout-actions-wrapper" style="display: flex; gap: 8px; margin-top: 10px; width: 100%; position: relative;">
+                  <!-- Consolidated Checkout Button -->
+                  <button type="button" class="checkout-btn btn-print-and-save" id="checkout-print-btn" style="flex: 4; border-radius: 30px; font-weight: 700; border: none; color: white; cursor: pointer; padding: 12px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13.5px; background: var(--caramel-gradient);">
                     <i class="fa-solid fa-print"></i> Print & Save
                   </button>
+                  
+                  <!-- Dropup Toggle button -->
+                  <button type="button" id="cart-more-actions-btn" style="flex: 1; border-radius: 30px; border: 1px solid rgba(43,24,19,0.12); background: var(--bg-cream-light); color: var(--primary-brand); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;" title="More Actions">
+                    <i class="fa-solid fa-ellipsis"></i>
+                  </button>
+                  
+                  <!-- Dropup menu container -->
+                  <div id="cart-more-actions-menu" class="cart-more-actions-menu" style="display: none; position: absolute; bottom: 52px; right: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(43, 24, 19, 0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 180px; z-index: 10; padding: 6px; flex-direction: column; gap: 4px; animation: fadeInUp 0.25s ease;">
+                    <button type="button" id="checkout-save-btn" class="dropdown-action-item" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--primary-brand); border-radius: 8px; cursor: pointer; text-align: left; transition: background 0.15s ease;">
+                      <i class="fa-solid fa-floppy-disk" style="color: #2ecc71; width: 16px;"></i> Save Bill (No Print)
+                    </button>
+                    <div style="height: 1px; background: rgba(43,24,19,0.06); margin: 2px 6px;"></div>
+                    <button type="button" id="hold-order-btn" class="dropdown-action-item" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--primary-brand); border-radius: 8px; cursor: pointer; text-align: left; transition: background 0.15s ease;">
+                      <i class="fa-solid fa-pause" style="color: var(--accent-caramel); width: 16px;"></i> Hold Order
+                    </button>
+                    <button type="button" id="view-drafts-btn" class="dropdown-action-item" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px; border: none; background: transparent; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--primary-brand); border-radius: 8px; cursor: pointer; text-align: left; transition: background 0.15s ease;">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-list-check" style="color: #2980b9; width: 16px;"></i> Open Drafts
+                      </span>
+                      <span class="badge" id="drafts-count-badge" style="background: #e74c3c; color: white; border-radius: 50%; font-size: 9px; width: 16px; height: 16px; line-height: 16px; text-align: center; display: none; font-weight: 700;">0</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- TAB 1.5: LIVE QR ORDERS & TABLES (SELF SERVICE INTEGRATION) -->
+        <div class="tab-content" id="qr-orders-tab">
+          <div class="qr-tab-wrapper" style="display: flex; flex-direction: column; gap: 24px;">
+            
+            <!-- Live QR Status Header Summary Cards -->
+            <div class="bills-analytics-header" style="margin-bottom: 0px;">
+              <div class="bills-stat-card">
+                <div class="bills-stat-icon"><i class="fa-solid fa-table-cells"></i></div>
+                <div class="bills-stat-info">
+                  <span class="bills-stat-title">Active Tables Status</span>
+                  <span class="bills-stat-val" id="active-tables-summary">0 / 6 Occupied</span>
+                  <span class="bills-stat-trend">Dine-in self-service active</span>
+                </div>
+              </div>
+              <div class="bills-stat-card">
+                <div class="bills-stat-icon green" style="background-color: rgba(46, 204, 113, 0.08); color: #27ae60;"><i class="fa-solid fa-receipt"></i></div>
+                <div class="bills-stat-info">
+                  <span class="bills-stat-title">Incoming QR Orders</span>
+                  <span class="bills-stat-val" id="pending-qr-orders-count">0 Orders</span>
+                  <span class="bills-stat-trend">Awaiting cashier approval</span>
+                </div>
+              </div>
+              <div class="bills-stat-card">
+                <div class="bills-stat-icon blue" style="background-color: rgba(41, 128, 185, 0.08); color: #2980b9;"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                <div class="bills-stat-info">
+                  <span class="bills-stat-title">Today's QR Revenue</span>
+                  <span class="bills-stat-val" id="qr-revenue-today">₹0.00</span>
+                  <span class="bills-stat-trend">Aggregated UPI table sales</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Two Column Live Dashboard Workspace -->
+            <div class="reports-columns" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; width: 100%;">
+              
+              <!-- Left Column: Visual Tables Map Grid -->
+              <div class="report-panel" style="padding: 24px; border-radius: 18px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 12px;">
+                  <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin: 0; font-weight: 700;"><i class="fa-solid fa-table-cells"></i> Active Tables Map</h3>
+                  <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Dine-in Stations</span>
+                </div>
+                
+                <!-- Live Tables Grid -->
+                <div class="tables-map-grid" id="tables-map-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                  <!-- Injected dynamically in JS (6 tables) -->
+                </div>
+              </div>
+
+              <!-- Right Column: Live Pending Orders Queue Feed -->
+              <div class="report-panel" style="padding: 24px; border-radius: 18px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 12px;">
+                  <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin: 0; font-weight: 700;"><i class="fa-solid fa-bell-concierge"></i> Incoming QR Orders Feed</h3>
+                  <span class="badge" id="glowing-qr-feed-badge" style="display: none; background: #e74c3c; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 800; animation: pulse 1.2s infinite;">LIVE FEED</span>
+                </div>
+                
+                <!-- Queue Cards List -->
+                <div class="qr-orders-queue-list" id="qr-orders-queue" style="display: flex; flex-direction: column; gap: 16px; max-height: 480px; overflow-y: auto;">
+                  <div class="premium-empty-state" style="padding: 60px 20px; text-align: center;">
+                    <i class="fa-solid fa-bell" style="font-size: 40px; color: var(--accent-gold); margin-bottom: 16px;"></i>
+                    <h3 style="margin-bottom: 8px; color: var(--primary-brand);">No incoming orders</h3>
+                    <p style="font-size: 12px; color: var(--text-muted);">Orders submitted by customers scanning table QR codes will instantly trigger sound alerts and appear here in real-time.</p>
+                  </div>
+                </div>
+              </div>
+              
+            </div>
+            
           </div>
         </div>
 
@@ -417,8 +579,56 @@
                 <div class="bills-stat-info">
                   <span class="bills-stat-title">Out of Stock Items</span>
                   <span class="bills-stat-val" id="inv-total-empty">0 Items</span>
-                  <span class="bills-stat-trend">Restock recommendation active</span>
+            </div>
+
+            <!-- PREMIUM AI & EXCEL ONBOARDING HUB -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; margin-top: 16px;">
+              <!-- Drag and Drop Excel Onboarding Wizard -->
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(201, 138, 74, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
+                <h4 style="font-size: 13.5px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading);">
+                  <i class="fa-solid fa-file-excel" style="color: #27ae60; font-size: 16px;"></i> Excel Setup Wizard (Instant Menu Import)
+                </h4>
+                <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                  Upload your menu items, pricing categories, and ingredient recipes spreadsheet. Reduces restaurant configuration time to under 3 seconds!
+                </p>
+                <div id="excel-drag-dropzone" style="width: 100%; border: 2px dashed rgba(201, 138, 74, 0.35); border-radius: 10px; background: rgba(201, 138, 74, 0.02); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; text-align: center; cursor: pointer; transition: var(--transition); box-sizing: border-box; margin-top: 6px;">
+                  <i class="fa-solid fa-cloud-arrow-up" style="font-size: 32px; color: var(--accent-caramel); margin-bottom: 8px;"></i>
+                  <span style="font-size: 12px; font-weight: 700; color: var(--primary-brand);" id="excel-drop-text">Drag & Drop Excel here or Click to Browse</span>
+                  <span style="font-size: 9.5px; color: var(--text-muted); margin-top: 4px;">Compatible with .xlsx, .xls, .csv recipe formats</span>
+                  <input type="file" id="excel-file-input" style="display: none;" accept=".xlsx, .xls, .csv">
                 </div>
+              </div>
+
+              <!-- AI Cost-Control & Forecasting Card -->
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(201, 138, 74, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
+                <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                  <h4 style="font-size: 13.5px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading);">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-caramel); font-size: 15px;"></i> AI Smart Inventory Forecast
+                  </h4>
+                  <span class="status-indicator-badge" style="padding: 2px 8px; font-size: 9px; font-weight: 700; background: rgba(39, 174, 96, 0.08); border-color: rgba(39,174,96,0.18); color: var(--success-color); border-style: solid; border-width: 1px; border-radius: 12px;">
+                    LIVE BURN SPEED
+                  </span>
+                </div>
+                <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                  Analyzes sales velocity dynamically to calculate ingredient depletion rates and prevent costly over-stocking.
+                </p>
+                <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; margin-top: 6px; box-sizing: border-box;">
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(43,24,19,0.07); padding-bottom: 6px;">
+                    <span style="color: var(--text-dark); font-weight: 500;">Highest Velocity Material:</span>
+                    <strong id="ai-top-material" style="color: var(--primary-brand);">Milk (🥛)</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(43,24,19,0.07); padding-bottom: 6px;">
+                    <span style="color: var(--text-dark); font-weight: 500;">Daily Burn Speed:</span>
+                    <strong id="ai-burn-rate" style="color: var(--primary-brand);">0.00 units / day</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(43,24,19,0.07); padding-bottom: 6px;">
+                    <span style="color: var(--text-dark); font-weight: 500;">Estimated Days Remaining:</span>
+                    <strong id="ai-critical-days" style="color: var(--danger-color); font-weight: 800;">Waiting for sales...</strong>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary" id="ai-auto-reorder-btn" style="width: 100%; font-size: 11px; padding: 8px; font-weight: 700; background: var(--accent-caramel); border-color: var(--accent-caramel); display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 6px; color: white; cursor: pointer; border: none; margin-top: auto;">
+                  <i class="fa-solid fa-truck-ramp-box"></i> Auto-Generate Replenishment Order
+                </button>
               </div>
             </div>
 
@@ -911,6 +1121,41 @@
     </div>
   </div>
 
+  <!-- RECEIPT PREVIEW MODAL -->
+  <div class="modal-backdrop" id="receipt-preview-modal">
+    <div class="glass-modal" style="max-width: 400px; width: 90%;">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-file-invoice"></i> Receipt Preview</h2>
+        <button class="close-modal-btn" id="close-receipt-preview-btn">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div id="receipt-preview-container" style="background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; font-size: 12px; line-height: 1.4; max-height: 400px; overflow-y: auto;">
+          <!-- Monospace simulated receipt text injected dynamically -->
+        </div>
+        
+        <!-- FREE Direct WhatsApp digital receipt dispatcher (Zero-cost CRM) -->
+        <div id="whatsapp-receipt-section" style="margin-bottom: 18px; border-top: 1px dashed rgba(43,24,19,0.15); padding-top: 15px;">
+          <label style="font-size: 11.5px; font-weight: 700; color: var(--primary-brand); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px;">
+            <i class="fa-brands fa-whatsapp" style="color: #25D366; font-size: 14px; margin-right: 4px;"></i> Send Free WhatsApp Receipt
+          </label>
+          <div style="display: flex; gap: 8px;">
+            <input type="tel" id="whatsapp-receipt-phone" placeholder="Customer 10-digit WhatsApp number" 
+              style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.15); font-size: 12px; background: white; color: var(--text-dark); outline: none; font-weight: 600;">
+            <button type="button" class="btn btn-secondary" id="send-whatsapp-receipt-btn" 
+              style="padding: 8px 14px; border-color: #25D366; color: #128C7E; font-weight: 700; display: flex; align-items: center; gap: 6px; background: rgba(37, 211, 102, 0.06); font-size: 12px; cursor: pointer; border-radius: 8px; transition: var(--transition);">
+              <i class="fa-solid fa-paper-plane"></i> Send
+            </button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn btn-secondary" id="cancel-receipt-preview-btn">Close</button>
+          <button class="btn btn-primary" id="confirm-receipt-checkout-btn" style="background: #27ae60; border-color: #27ae60; font-weight:700;"><i class="fa-solid fa-check"></i> Confirm Payment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ADMIN PIN MODAL -->
   <div class="modal-backdrop" id="admin-pin-modal">
     <div class="glass-modal" style="max-width: 380px;">
@@ -946,6 +1191,8 @@
           <div class="settings-tab-buttons">
             <button class="settings-tab-btn active" data-settings-tab="info-sec">Business Info</button>
             <button class="settings-tab-btn" data-settings-tab="billing-sec">Taxes & Loyalty</button>
+            <button class="settings-tab-btn" data-settings-tab="shift-sec">Shift Control</button>
+            <button class="settings-tab-btn" data-settings-tab="p2p-sync-sec"><i class="fa-solid fa-network-wired" style="font-size:10px; margin-right:4px;"></i> P2P Network Sync</button>
           </div>
 
           <form id="business-profile-form">
@@ -1034,6 +1281,81 @@
               </div>
             </div>
 
+            <!-- Tab 3: Shift Management Config -->
+            <div class="settings-tab-content" id="shift-sec" style="display:none;">
+              <!-- Shift Management toggle switch -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+                <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-cash-register" style="color:var(--accent-caramel); margin-right:6px;"></i> Enable Shift & Drawer Control</span>
+                <label class="switch">
+                  <input type="checkbox" id="profile-shift-enabled">
+                  <span class="slider"></span>
+                </label>
+              </div>
+              
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label>Default Start Float (₹)</label>
+                <input type="number" id="profile-shift-default-float" value="2000" min="0" step="100">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label>Max Drawer Cash (Safe Drop Alert) (₹)</label>
+                <input type="number" id="profile-shift-max-drawer" value="5000" min="0" step="500">
+              </div>
+
+              <!-- Force shift toggle switch -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+                <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Lock POS Cart when Shift is Closed</span>
+                <label class="switch">
+                  <input type="checkbox" id="profile-shift-pos-lock" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Tab 4: P2P Local Wireless Synchronization (Competes with Petpooja cloud sync) -->
+            <div class="settings-tab-content" id="p2p-sync-sec" style="display:none;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+                <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-tower-broadcast" style="color:var(--accent-caramel); margin-right:6px;"></i> Enable Local P2P Wi-Fi Sync</span>
+                <label class="switch">
+                  <input type="checkbox" id="profile-p2p-enabled" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+              
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label>Terminal Operation Mode</label>
+                <select id="profile-p2p-mode" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(43,24,19,0.15); background:white; color:var(--primary-brand); font-weight:700; font-size:12px; height: 34px;">
+                  <option value="Master">Master POS Terminal (Server / Hub)</option>
+                  <option value="KDS">Kitchen Display System (KDS Client)</option>
+                  <option value="Captain">Waiter Table-side Terminal (Client)</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label>Local Hub Server IP Address (Wi-Fi)</label>
+                <input type="text" id="profile-p2p-ip" value="192.168.1.100" placeholder="e.g. 192.168.1.15">
+              </div>
+
+              <!-- P2P Live Monitor Terminal Simulator -->
+              <div style="border:1px solid rgba(201,138,74,0.22); border-radius:8px; padding:12px; background:rgba(201,138,74,0.03); margin-top:15px; box-sizing: border-box;">
+                <h4 style="margin:0 0 8px 0; font-size:12px; color:var(--primary-brand); display:flex; align-items:center; gap:6px;">
+                  <span id="p2p-sync-status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#2ecc71; animation: pulse 1.5s infinite;"></span>
+                  Local Sync Network: <span id="p2p-sync-status-text" style="font-weight: 700; color: #2ecc71;">ONLINE (OK)</span>
+                </h4>
+                <p style="font-size:11px; margin:4px 0; color:var(--text-muted); font-weight: 600;">Connected Active Peer Nodes: <span id="p2p-connected-count" style="color:var(--accent-caramel);">3 Terminals</span></p>
+                
+                <div style="max-height:85px; overflow-y:auto; border:1px solid rgba(43,24,19,0.1); border-radius:6px; padding:8px; font-family:monospace; font-size:10px; background:white; color:#333; margin-top:8px; line-height: 1.4; box-sizing: border-box;" id="p2p-log-box">
+                  [13:01:24] Local WebSocket P2P Hub started on port 8080<br>
+                  [13:02:11] Terminal [KITCHEN-KDS-1] connected successfully<br>
+                  [13:03:05] Terminal [WAITER-CAPTAIN-1] connected successfully
+                </div>
+                
+                <button type="button" class="btn btn-secondary" id="p2p-test-btn" style="margin-top:10px; font-size:11px; padding:8px 12px; border-color:var(--accent-caramel); color:var(--primary-brand); font-weight:700; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; background: white; cursor: pointer; border-radius: 6px;">
+                  <i class="fa-solid fa-paper-plane"></i> Ping Connected Terminals
+                </button>
+              </div>
+            </div>
+
             <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
               <button type="button" class="btn btn-secondary" id="cancel-profile-btn">Cancel</button>
               <button type="submit" class="btn btn-primary" id="save-profile-btn"><i class="fa-solid fa-floppy-disk"></i> Save & Backup</button>
@@ -1116,20 +1438,64 @@ CREATE TABLE IF NOT EXISTS public.doppio_draft_orders (
     "createdAt" timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Enable row level security (optional)
+-- Enable Row Level Security (Mandatory for Commercial POS Data Privacy)
 ALTER TABLE public.doppio_bills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.doppio_draft_orders ENABLE ROW LEVEL SECURITY;
 
--- Create policies to allow anonymous inserts and reads (matching standard POS API keys)
-CREATE POLICY "Allow anonymous inserts bills" ON public.doppio_bills FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public reads bills" ON public.doppio_bills FOR SELECT USING (true);
+-- Create secure policies (Only authenticated staff accounts can read/edit invoices and active held carts)
+CREATE POLICY "Allow authenticated staff to read bills" ON public.doppio_bills FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow authenticated staff to insert bills" ON public.doppio_bills FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Allow authenticated staff to delete bills" ON public.doppio_bills FOR DELETE TO authenticated USING (true);
 
-CREATE POLICY "Allow anonymous all drafts" ON public.doppio_draft_orders FOR ALL USING (true);
+CREATE POLICY "Allow authenticated staff to manage drafts" ON public.doppio_draft_orders FOR ALL TO authenticated USING (true);
 
 -- Create indexes for super-fast lookups
 CREATE INDEX IF NOT EXISTS idx_doppio_bills_order_id ON public.doppio_bills("orderId");
 CREATE INDEX IF NOT EXISTS idx_doppio_bills_date ON public.doppio_bills("dateTime");
 CREATE INDEX IF NOT EXISTS idx_doppio_drafts_id ON public.doppio_draft_orders("draftId");
+
+-- Table Definition for doppio_shifts (Cashier Sessions) in Supabase
+CREATE TABLE IF NOT EXISTS public.doppio_shifts (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    "shiftId" text UNIQUE NOT NULL,
+    "cashierName" text NOT NULL,
+    "openedAt" timestamp with time zone NOT NULL,
+    "closedAt" timestamp with time zone,
+    "openingFloat" numeric DEFAULT 0 NOT NULL,
+    "expectedCash" numeric DEFAULT 0,
+    "actualCash" numeric DEFAULT 0,
+    variance numeric DEFAULT 0,
+    "totalSalesCash" numeric DEFAULT 0,
+    "totalSalesUpi" numeric DEFAULT 0,
+    "totalSalesCard" numeric DEFAULT 0,
+    "totalPayouts" numeric DEFAULT 0,
+    "totalSafeDrops" numeric DEFAULT 0,
+    status text DEFAULT 'OPEN'::text NOT NULL,
+    notes text
+);
+
+-- Table Definition for doppio_shift_events (Drawer Payouts & Drops) in Supabase
+CREATE TABLE IF NOT EXISTS public.doppio_shift_events (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    "eventId" text UNIQUE NOT NULL,
+    "shiftId" text NOT NULL,
+    "eventType" text NOT NULL,
+    amount numeric NOT NULL,
+    reason text NOT NULL
+);
+
+-- Enable Row Level Security for Shifts and Adjustment Events
+ALTER TABLE public.doppio_shifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.doppio_shift_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated staff to manage shifts" ON public.doppio_shifts FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow authenticated staff to manage shift events" ON public.doppio_shift_events FOR ALL TO authenticated USING (true);
+
+-- Create indexes for shifts session auditing
+CREATE INDEX IF NOT EXISTS idx_doppio_shifts_id ON public.doppio_shifts("shiftId");
+CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_events("shiftId");
           </pre>
           <button class="btn btn-primary" id="copy-sql-schema-btn" style="position: absolute; right: 10px; top: 10px; font-size: 10px; padding: 6px 12px;">
             <i class="fa-solid fa-copy"></i> Copy SQL
@@ -1193,6 +1559,216 @@ CREATE INDEX IF NOT EXISTS idx_doppio_drafts_id ON public.doppio_draft_orders("d
         <i class="fa-solid fa-right-from-bracket"></i>
         <span>Logout Portal</span>
       </a>
+    </div>
+  </div>
+
+  <!-- SHIFT INITIALIZATION MODAL -->
+  <div class="modal-backdrop" id="shift-open-modal">
+    <div class="glass-modal" style="max-width: 420px; width: 90%;">
+      <div class="modal-header">
+        <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-play"></i> Initialize Active Shift</h2>
+        <button class="close-modal-btn" id="close-shift-open-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <form id="shift-open-form">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label style="font-weight:700;">Select Cashier / Staff</label>
+            <select id="shift-cashier-select" required style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+              <option value="bonie">bonie (Cashier)</option>
+              <option value="manager">Manager / Admin</option>
+              <option value="staff_1">Staff Terminal A</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-weight:700;">Starting Drawer Cash Float (₹)</label>
+            <input type="number" id="shift-opening-float-input" required min="0" step="50" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+            <p style="font-size:10px; color:var(--text-muted); margin-top:4px;">Coins & change banknotes currently inside the cash drawer.</p>
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-secondary" id="cancel-shift-open-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" style="background:var(--caramel-gradient); border:none;"><i class="fa-solid fa-unlock"></i> Open Terminal Drawer</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFT CLOSURE & RECONCILIATION MODAL -->
+  <div class="modal-backdrop" id="shift-close-modal">
+    <div class="glass-modal" style="max-width: 480px; width: 90%;">
+      <div class="modal-header">
+        <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-flag-checkered"></i> Shift Closure Reconciliation</h2>
+        <button class="close-modal-btn" id="close-shift-close-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <!-- Live summary stats -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; background: rgba(43,24,19,0.03); padding: 12px; border-radius: 8px;">
+          <div>
+            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Opening Float</span>
+            <div style="font-size:16px; font-weight:700; color:var(--primary-brand);" id="close-summary-float">₹0</div>
+          </div>
+          <div>
+            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cash Sales (POS)</span>
+            <div style="font-size:16px; font-weight:700; color:#27ae60;" id="close-summary-sales">₹0</div>
+          </div>
+          <div style="margin-top: 8px;">
+            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Payouts</span>
+            <div style="font-size:16px; font-weight:700; color:#e74c3c;" id="close-summary-payouts">₹0</div>
+          </div>
+          <div style="margin-top: 8px;">
+            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Safe Drops</span>
+            <div style="font-size:16px; font-weight:700; color:#2980b9;" id="close-summary-drops">₹0</div>
+          </div>
+        </div>
+
+        <div style="background: rgba(201,138,74,0.06); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(201,138,74,0.15);">
+          <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; margin-bottom:2px;">Expected Drawer Balance</span>
+          <div style="font-size:22px; font-weight:800; color:var(--primary-brand);" id="close-summary-expected">₹0</div>
+        </div>
+
+        <form id="shift-close-form">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label style="font-weight:700;">Actual Counted Cash inside Drawer (₹)</label>
+            <input type="number" id="shift-actual-cash-input" required min="0" step="any" placeholder="Enter physical counted cash amount..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%; font-size:16px; font-weight:700; color:var(--primary-brand);">
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px; margin-bottom:14px; display:none;" id="variance-alert-row">
+            <span style="font-size:12px; font-weight:700; color:var(--primary-brand);">Calculated Drawer Variance:</span>
+            <span style="font-size:16px; font-weight:800;" id="close-summary-variance">₹0.00</span>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-weight:700;">Shift Notes / Discrepancy Reason</label>
+            <textarea id="shift-notes-input" placeholder="Optional comments on drawer status, shortage reason, handover detail..." rows="2" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%; font-family:var(--font-body); font-size:12px;"></textarea>
+          </div>
+          
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-secondary" id="cancel-shift-close-btn">Cancel</button>
+            <button type="submit" class="btn btn-danger" style="background:#e74c3c; border:none;"><i class="fa-solid fa-flag-checkered"></i> Reconcile & End Shift</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVE SHIFT DETAILS & ACTIONS MODAL -->
+  <div class="modal-backdrop" id="shift-details-modal">
+    <div class="glass-modal" style="max-width: 440px; width: 90%;">
+      <div class="modal-header">
+        <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-cash-register"></i> Terminal Shift Session</h2>
+        <button class="close-modal-btn" id="close-shift-details-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:16px; border-bottom:1px solid rgba(43,24,19,0.06); padding-bottom:12px; font-size:12px;">
+          <div>Active Cashier: <strong id="details-cashier-name">-</strong></div>
+          <div>Opened At: <strong id="details-opened-at">-</strong></div>
+          <div>Start Cash Float: <strong id="details-opening-float">-</strong></div>
+        </div>
+
+        <div style="background: var(--bg-cream-light); padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align:center;">
+          <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block;">Current Drawer Cash (Expected)</span>
+          <div style="font-size:26px; font-weight:800; color:var(--primary-brand);" id="details-drawer-cash">₹0</div>
+          <span style="font-size:10px; color:var(--text-muted);" id="details-max-limit-info">Limit: ₹5,000</span>
+        </div>
+
+        <!-- Quick actions buttons grid -->
+        <h3 style="font-size: 11px; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:8px;">Manual Drawer Adjustments</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+          <button type="button" class="btn btn-secondary" id="btn-shift-payout" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(201,138,74,0.2); background:white;">
+            <i class="fa-solid fa-circle-minus" style="color:#e74c3c; font-size:16px;"></i>
+            <strong>Vendor Payout</strong>
+          </button>
+          <button type="button" class="btn btn-secondary" id="btn-shift-drop" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(201,138,74,0.2); background:white;">
+            <i class="fa-solid fa-safe" style="color:#2980b9; font-size:16px;"></i>
+            <strong>Drop to Safe</strong>
+          </button>
+        </div>
+
+        <div style="border-top:1px solid rgba(43,24,19,0.06); padding-top:16px; display:flex; justify-content:space-between; gap:10px;">
+          <button type="button" class="btn btn-secondary" id="btn-shift-audit-log" style="font-size:12px; padding:8px 12px;"><i class="fa-solid fa-list"></i> View Ledger</button>
+          <button type="button" class="btn btn-danger" id="btn-end-active-shift" style="background:#e74c3c; color:white; border:none; padding:8px 16px; font-weight:700;"><i class="fa-solid fa-flag-checkered"></i> End Shift Session</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER ADJUSTMENT ENTRY MODAL (PAYOUT / DROP) -->
+  <div class="modal-backdrop" id="shift-action-modal">
+    <div class="glass-modal" style="max-width: 400px; width: 90%;">
+      <div class="modal-header">
+        <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; display: flex; align-items: center; gap: 8px;" id="action-modal-title"><i class="fa-solid fa-circle-minus"></i> Drawer Payout</h2>
+        <button class="close-modal-btn" id="close-shift-action-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <form id="shift-action-form">
+          <input type="hidden" id="action-event-type" value="PAYOUT">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label style="font-weight:700;">Amount (₹)</label>
+            <input type="number" id="action-amount-input" required min="1" step="any" placeholder="Enter cash amount..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-weight:700;">Reason / Reference Notes</label>
+            <input type="text" id="action-reason-input" required placeholder="e.g. Bought milk carton, manager cash transfer..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-secondary" id="cancel-shift-action-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-shift-action-submit"><i class="fa-solid fa-check"></i> Log Cash Adjustment</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFT AUDIT / Z-REPORT MODAL -->
+  <div class="modal-backdrop" id="shift-audit-modal">
+    <div class="glass-modal" style="max-width: 400px; width: 90%;">
+      <div class="modal-header">
+        <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-file-invoice-dollar"></i> Z-Report Thermal Audit</h2>
+        <button class="close-modal-btn" id="close-shift-audit-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div class="live-receipt-simulator" id="shift-zreport-content" style="max-height: 380px; overflow-y: auto; background:white; color:black; font-family:'Courier New', monospace; font-size:11px; padding:15px; border:1px solid #ddd; line-height:1.4;">
+          <!-- Loaded dynamically -->
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" id="close-shift-audit-btn" style="flex:1;">Close</button>
+          <button type="button" class="btn type-primary" id="print-shift-audit-btn" style="flex:1; background:var(--caramel-gradient); border:none; color:white; font-weight:700;"><i class="fa-solid fa-print"></i> Print Z-Report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE QR GENERATION VIEWER MODAL -->
+  <div class="modal-backdrop" id="qr-viewer-modal" style="z-index: 200000; display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="glass-modal" style="max-width: 420px; width: 90%; text-align: center; display: flex; flex-direction: column; align-items: center; padding: 30px; gap: 16px; position: relative;">
+      <button class="close-modal-btn" id="qr-viewer-close" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+      
+      <div class="logo login-logo" style="margin: 0 auto; display: table;">
+        <span class="logo-doppio">DOPPIO</span>
+        <span class="logo-cafe">Café</span>
+      </div>
+      
+      <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 20px; font-weight: 700; margin: 0;" id="qr-viewer-title">Table 01 QR Ordering Template</h3>
+      <p style="font-size: 11px; color: var(--text-muted); margin: 0; max-width: 320px; line-height: 1.4;">Scan takes the customer to the online ordering system with this table pre-locked.</p>
+      
+      <!-- Printable QR frame container -->
+      <div class="printable-qr-station-frame" id="printable-qr-frame" style="background: white; border: 4px solid var(--primary-brand); border-radius: 20px; padding: 24px 20px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; box-shadow: var(--shadow-sm); box-sizing: border-box;">
+        <span style="font-family: var(--font-heading); font-size: 24px; font-weight: 800; color: var(--primary-brand); letter-spacing: 1px;" id="qr-print-table-num">TABLE 01</span>
+        
+        <!-- Scannable code -->
+        <div style="background: white; padding: 12px; border-radius: 12px; border: 1.5px dashed var(--accent-caramel); width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; position: relative; box-sizing: border-box;">
+          <img id="qr-viewer-img" src="" alt="Table QR Link" style="width: 100%; height: 100%; object-fit: contain;">
+        </div>
+        
+        <div style="font-family: 'Courier New', monospace; font-size: 9px; color: var(--primary-brand); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.3; overflow-wrap: break-word; width: 100%;" id="qr-viewer-link-lbl">http://localhost:8000/index.html?table=1</div>
+        
+        <div style="font-size: 11px; font-weight: 700; color: var(--accent-caramel); background: rgba(200, 138, 88, 0.06); padding: 4px 12px; border-radius: 12px;">SCAN TO DINE & PAY</div>
+      </div>
+      
+      <div style="display: flex; gap: 12px; width: 100%; margin-top: 10px;">
+        <button type="button" class="btn btn-primary" id="btn-print-table-qr" style="flex: 1; padding: 10px; font-size: 13px;"><i class="fa-solid fa-print"></i> Print Template</button>
+        <button type="button" class="btn btn-secondary" id="btn-simulate-qr-scan" style="flex: 1; padding: 10px; font-size: 13px; color: var(--primary-brand); border-color: rgba(43,24,19,0.15);"><i class="fa-solid fa-laptop-code"></i> Simulate Scan</button>
+      </div>
     </div>
   </div>
 

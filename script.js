@@ -154,7 +154,7 @@ window.addEventListener('DOMContentLoaded', () => {
           <p class="menu-item-desc">${item.description}</p>
           <div class="menu-item-footer">
             <span class="menu-item-category">${item.category}</span>
-            <button class="menu-item-order-btn" title="Add to Order">
+            <button class="menu-item-order-btn" data-name="${item.name}" title="Add to Order">
               <i class="fa-solid fa-plus"></i>
             </button>
           </div>
@@ -481,13 +481,24 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  async function sha256(string) {
+    const utf8 = new TextEncoder().encode(string);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
   if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
+    loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value.trim();
 
-      if ((username === 'bonie' && password === 'diva123') || (username === 'staff' && password === 'staff123')) {
+      const userVal = username.toLowerCase();
+      const hashPwd = await sha256(password);
+
+      if ((userVal === 'bonie' && hashPwd === '94fc8a8d6e4987e5698d49128da76928b31e8059839cad4b933f53f4b2635eda') || 
+          (userVal === 'staff' && hashPwd === '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6')) {
         sessionStorage.setItem('just_logged_in', 'true');
         sessionStorage.setItem('logged_in_user', username);
         window.location.href = 'dashboard.html';
@@ -572,6 +583,506 @@ window.addEventListener('DOMContentLoaded', () => {
             sessionStorage.setItem('doppio_counted_session', 'true');
           }
         });
+    } catch (e) {
+      console.log("Counter API call error", e);
+    }
+  }
+
+  // ==========================================================
+  // 5. CUSTOMER QR SELF-ORDER ENGINE & BROADCAST SYNC
+  // ==========================================================
+  let custCart = [];
+  const broadcastChannel = new BroadcastChannel('doppio_qr_orders');
+
+  // DOM Elements for Customer Cart Drawer
+  const floatCartBtn = document.getElementById('customer-floating-cart');
+  const cartBadgeCount = document.getElementById('cart-badge-count');
+  const cartBtnTotal = document.getElementById('cart-btn-total');
+  const cartDrawer = document.getElementById('customer-cart-drawer');
+  const drawerBackdrop = document.getElementById('drawer-backdrop');
+  const closeDrawerBtn = document.getElementById('close-drawer-btn');
+  const customerCartItems = document.getElementById('customer-cart-items');
+  const custSubtotal = document.getElementById('cust-subtotal');
+  const custGstEl = document.getElementById('cust-gst');
+  const custTotal = document.getElementById('cust-total');
+  const checkoutSubmitBtn = document.getElementById('checkout-submit-btn');
+
+  // Inputs
+  const custOrderName = document.getElementById('cust-order-name');
+  const custOrderPhone = document.getElementById('cust-order-phone');
+  const custOrderTable = document.getElementById('cust-order-table');
+  const drawerTableBadge = document.getElementById('drawer-table-badge');
+  const tableSelectGroup = document.getElementById('table-select-group');
+
+  // Payment Simulation Modal Elements
+  const upiModal = document.getElementById('upi-payment-modal');
+  const closeUpiModal = document.getElementById('upi-modal-close');
+  const upiAmountVal = document.getElementById('upi-amount-val');
+  const upiQrImage = document.getElementById('upi-qr-image');
+  const simPaySuccessBtn = document.getElementById('sim-pay-success');
+  const simPayCounterBtn = document.getElementById('sim-pay-counter');
+
+  // Success Screen Elements
+  const successScreen = document.getElementById('order-success-screen');
+  const receiptTable = document.getElementById('receipt-table');
+  const receiptId = document.getElementById('receipt-id');
+  const receiptItemsList = document.getElementById('receipt-items-list');
+  const receiptTotalPaid = document.getElementById('receipt-total-paid');
+  const successDoneBtn = document.getElementById('success-done-btn');
+  const successSubtitleText = document.getElementById('success-subtitle-text');
+
+  // Load locked table number from URL search parameters (e.g. ?table=3)
+  const urlParams = new URLSearchParams(window.location.search);
+  const tableParam = urlParams.get('table');
+  let lockedTableNum = null;
+
+  if (tableParam) {
+    lockedTableNum = tableParam.trim();
+    if (custOrderTable) {
+      custOrderTable.value = lockedTableNum;
+    }
+    if (drawerTableBadge) {
+      drawerTableBadge.textContent = 'Table ' + (parseInt(lockedTableNum) < 10 ? '0' + lockedTableNum : lockedTableNum);
+      drawerTableBadge.style.display = 'inline-block';
+    }
+    if (tableSelectGroup) {
+      tableSelectGroup.style.display = 'none';
+    }
+  }
+
+  // Pre-populate customer name and phone from localStorage
+  if (custOrderName) custOrderName.value = localStorage.getItem('cust_self_name') || '';
+  if (custOrderPhone) custOrderPhone.value = localStorage.getItem('cust_self_phone') || '';
+
+  // Event Listeners for Cart Drawer Toggle
+  if (floatCartBtn) {
+    floatCartBtn.addEventListener('click', () => toggleCartDrawer(true));
+  }
+  if (closeDrawerBtn) {
+    closeDrawerBtn.addEventListener('click', () => toggleCartDrawer(false));
+  }
+  if (drawerBackdrop) {
+    drawerBackdrop.addEventListener('click', () => toggleCartDrawer(false));
+  }
+
+  function toggleCartDrawer(open) {
+    playSynthesizerBeep(open ? 440 : 330, 0.1); // A4 for open, E4 for close
+    if (open) {
+      cartDrawer.classList.add('open');
+      renderCustomerCart();
+    } else {
+      cartDrawer.classList.remove('open');
+    }
+  }
+
+  // Add Item delegation on dynamic Menu Cards
+  if (menuGrid) {
+    menuGrid.addEventListener('click', (e) => {
+      const addBtn = e.target.closest('.menu-item-order-btn');
+      if (!addBtn) return;
+      
+      const itemName = addBtn.getAttribute('data-name');
+      const itemData = menuData.find(item => item.name === itemName);
+      if (itemData) {
+        addToCustomerCart(itemData);
+      }
+    });
+  }
+
+  function addToCustomerCart(item) {
+    const numericPrice = parseInt(item.price.replace(/[^\d]/g, '')) || 0;
+    const existing = custCart.find(i => i.name === item.name);
+    
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      custCart.push({
+        name: item.name,
+        price: numericPrice,
+        qty: 1,
+        icon: item.icon || '☕',
+        category: item.category,
+        size: 'Regular',
+        sugar: 'Regular',
+        ice: 'Regular',
+        toppings: [],
+        notes: ''
+      });
+    }
+
+    playSynthesizerBeep(659.25, 0.12); // E5 for adding items
+    
+    // Update badge count and trigger float bar slide-in
+    updateCustomerFloatingBadge();
+    
+    // Animate the float button briefly
+    if (floatCartBtn) {
+      floatCartBtn.style.transform = 'scale(1.15)';
+      setTimeout(() => {
+        floatCartBtn.style.transform = 'none';
+      }, 200);
+    }
+  }
+
+  function updateCustomerFloatingBadge() {
+    const totalQty = custCart.reduce((sum, item) => sum + item.qty, 0);
+    const subtotal = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+    if (totalQty > 0) {
+      if (cartBadgeCount) cartBadgeCount.textContent = totalQty;
+      if (cartBtnTotal) cartBtnTotal.textContent = `₹${subtotal}`;
+      if (floatCartBtn) floatCartBtn.classList.add('active');
+    } else {
+      if (floatCartBtn) floatCartBtn.classList.remove('active');
+    }
+  }
+
+  function updateCustomerCartQty(name, delta) {
+    const item = custCart.find(i => i.name === name);
+    if (!item) return;
+
+    item.qty += delta;
+    if (item.qty <= 0) {
+      custCart = custCart.filter(i => i.name !== name);
+      playSynthesizerBeep(261.63, 0.15); // C4 for removal
+    } else {
+      playSynthesizerBeep(delta > 0 ? 523.25 : 392.00, 0.08); // C5 or G4
+    }
+
+    renderCustomerCart();
+    updateCustomerFloatingBadge();
+  }
+
+  function renderCustomerCart() {
+    if (!customerCartItems) return;
+    customerCartItems.innerHTML = '';
+
+    if (custCart.length === 0) {
+      customerCartItems.innerHTML = `
+        <div class="empty-cust-cart">
+          <i class="fa-solid fa-basket-shopping"></i>
+          <p>Your basket is empty.<br>Select premium items to begin ordering!</p>
+        </div>
+      `;
+      if (custSubtotal) custSubtotal.textContent = '₹0';
+      if (custGstEl) custGstEl.textContent = '₹0';
+      if (custTotal) custTotal.textContent = '₹0';
+      return;
+    }
+
+    custCart.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'cust-cart-row';
+      row.innerHTML = `
+        <div class="cust-cart-item-info">
+          <span class="cust-cart-item-name">${item.icon} ${item.name}</span>
+          <span class="cust-cart-item-price">₹${item.price} each</span>
+        </div>
+        <div class="cust-cart-controls">
+          <button class="cust-qty-btn decrease" data-name="${item.name}"><i class="fa-solid fa-minus"></i></button>
+          <span class="cust-cart-qty">${item.qty}</span>
+          <button class="cust-qty-btn increase" data-name="${item.name}"><i class="fa-solid fa-plus"></i></button>
+        </div>
+        <span class="cust-cart-total-item">₹${item.price * item.qty}</span>
+      `;
+      customerCartItems.appendChild(row);
+    });
+
+    // Subtotal & GST inclusive calculations
+    const subtotal = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const gstIncluded = Math.round(subtotal * 0.1525); // ~18% included GST
+    const total = subtotal;
+
+    if (custSubtotal) custSubtotal.textContent = `₹${subtotal - gstIncluded}`;
+    if (custGstEl) custGstEl.textContent = `₹${gstIncluded}`;
+    if (custTotal) custTotal.textContent = `₹${total}`;
+
+    // Add event listeners to quantity buttons
+    customerCartItems.querySelectorAll('.cust-qty-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const name = btn.getAttribute('data-name');
+        const isIncrease = btn.classList.contains('increase');
+        updateCustomerCartQty(name, isIncrease ? 1 : -1);
+      });
+    });
+  }
+
+  // Audio Synthesizer Chime
+  function playSynthesizerBeep(frequency, duration) {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+      console.log("Audio synthesized block pending user page interaction.", e);
+    }
+  }
+
+  // Checkout submission to UPI QR simulation
+  if (checkoutSubmitBtn) {
+    checkoutSubmitBtn.addEventListener('click', () => {
+      if (custCart.length === 0) {
+        alert('Your cart is empty!');
+        return;
+      }
+
+      const nameVal = custOrderName.value.trim();
+      const phoneVal = custOrderPhone.value.trim();
+      const tableVal = custOrderTable.value;
+
+      if (!nameVal) {
+        alert('Please fill out your name to place the order.');
+        custOrderName.focus();
+        return;
+      }
+
+      if (!tableVal) {
+        alert('Please select your Table Number or Takeaway.');
+        custOrderTable.focus();
+        return;
+      }
+
+      // Store in localStorage
+      localStorage.setItem('cust_self_name', nameVal);
+      localStorage.setItem('cust_self_phone', phoneVal);
+
+      // Lock totals
+      const totalAmount = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+      // UPI deep link generation
+      // pay.doppiocafe@oksbi is the merchant VPA
+      const upiUrl = `upi://pay?pa=pay.doppiocafe@oksbi&pn=Doppio%20Cafe%20Nagpur&am=${totalAmount}&cu=INR&tn=Table_${tableVal}_Order`;
+      
+      // Dynamic High-Fidelity QR Code Generator URL via open QRServer API
+      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+      
+      if (upiAmountVal) upiAmountVal.textContent = `₹${totalAmount}`;
+      if (upiQrImage) upiQrImage.src = qrApiUrl;
+
+      // Close Cart Drawer and Open UPI Modal
+      toggleCartDrawer(false);
+      
+      if (upiModal) {
+        playSynthesizerBeep(523.25, 0.1); // C5
+        upiModal.classList.add('open');
+      }
+    });
+  }
+
+  if (closeUpiModal) {
+    closeUpiModal.addEventListener('click', () => {
+      if (upiModal) upiModal.classList.remove('open');
+    });
+  }
+
+  // Simulation actions: Instant UPI Success
+  if (simPaySuccessBtn) {
+    simPaySuccessBtn.addEventListener('click', () => {
+      dispatchCustomerOrder('UPI');
+    });
+  }
+
+  // Simulation actions: Pay Cash at Counter
+  if (simPayCounterBtn) {
+    simPayCounterBtn.addEventListener('click', () => {
+      dispatchCustomerOrder('Cash (Counter)');
+    });
+  }
+
+  function dispatchCustomerOrder(payMethod) {
+    const nameVal = custOrderName.value.trim();
+    const phoneVal = custOrderPhone.value.trim();
+    const tableVal = custOrderTable.value;
+    const subtotal = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const gst = Math.round(subtotal * 0.1525);
+
+    const randomIdSuffix = Math.floor(1000 + Math.random() * 9000);
+    const generatedOrderId = `DO-QR-${randomIdSuffix}`;
+    const timestamp = new Date().toLocaleString('en-IN');
+
+    // Create the finalized Order Object matching standard sales records
+    const orderObject = {
+      orderId: generatedOrderId,
+      customerName: nameVal,
+      customerPhone: phoneVal || 'Dine-in Customer',
+      dateTime: timestamp,
+      items: JSON.parse(JSON.stringify(custCart)),
+      subtotal: subtotal,
+      discount: 0,
+      gst: gst,
+      total: subtotal,
+      paymentMethod: payMethod,
+      orderType: tableVal === 'Takeaway' ? 'Takeaway' : 'Dine-in',
+      tableNumber: tableVal,
+      status: 'Pending Review'
+    };
+
+    // 1. Sync via BroadcastChannel for instant local tab sync
+    try {
+      broadcastChannel.postMessage({
+        type: 'NEW_QR_ORDER',
+        order: orderObject
+      });
+      console.log('Order successfully broadcasted:', orderObject);
+    } catch (e) {
+      console.error('BroadcastChannel failed, using storage fallback', e);
+    }
+
+    // 2. Storage backup fallback
+    const pendingQueue = JSON.parse(localStorage.getItem('doppio_pending_qr_orders')) || [];
+    pendingQueue.push(orderObject);
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQueue));
+
+    // Close UPI gateway
+    if (upiModal) upiModal.classList.remove('open');
+
+    // Open Success Receipt Screen
+    if (successScreen) {
+      successScreen.classList.add('open');
+      
+      // Prefill receipt elements
+      if (receiptTable) {
+        receiptTable.textContent = tableVal === 'Takeaway' ? 'Takeaway Order' : `Table ${parseInt(tableVal) < 10 ? '0' + tableVal : tableVal}`;
+      }
+      if (receiptId) receiptId.textContent = `Order ID: ${generatedOrderId}`;
+      if (receiptTotalPaid) receiptTotalPaid.textContent = `₹${subtotal}`;
+      
+      if (successSubtitleText) {
+        successSubtitleText.textContent = payMethod === 'UPI' 
+          ? 'UPI Payment Verified & Received!' 
+          : 'Pending payment logged. Pay cash at counter!';
+      }
+
+      if (receiptItemsList) {
+        receiptItemsList.innerHTML = '';
+        custCart.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'receipt-item-row';
+          row.innerHTML = `
+            <span>${item.name} x${item.qty}</span>
+            <span>₹${item.price * item.qty}</span>
+          `;
+          receiptItemsList.appendChild(row);
+        });
+      }
+
+      // Synthesize Success chimes: major arpeggio
+      setTimeout(() => playSynthesizerBeep(523.25, 0.15), 0);   // C5
+      setTimeout(() => playSynthesizerBeep(659.25, 0.15), 100); // E5
+      setTimeout(() => playSynthesizerBeep(783.99, 0.15), 200); // G5
+      setTimeout(() => playSynthesizerBeep(1046.50, 0.3), 300); // C6
+
+      // Confetti physics particle explosion!
+      setTimeout(launchSuccessConfetti, 250);
+    }
+  }
+
+  // Confetti Physics loop
+  function launchSuccessConfetti() {
+    const canvas = document.getElementById('success-confetti-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    const colors = ['#C88A58', '#E5BA73', '#2C1B18', '#FAF4EE', '#2ecc71', '#3498db', '#e74c3c'];
+    const particles = [];
+
+    // Create 130 random velocity particles bursting upwards from center
+    for (let i = 0; i < 130; i++) {
+      particles.push({
+        x: width / 2,
+        y: height / 2 - 40,
+        vx: (Math.random() - 0.5) * 16,
+        vy: (Math.random() - 0.85) * 16 - 6,
+        r: Math.random() * 6 + 5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * 360,
+        rotationSpeed: (Math.random() - 0.5) * 12,
+        opacity: 1
+      });
+    }
+
+    function runLoop() {
+      ctx.clearRect(0, 0, width, height);
+      let isAlive = false;
+
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.28; // gravity force
+        p.vx *= 0.98; // wind resistance
+        p.rotation += p.rotationSpeed;
+        p.opacity -= 0.007;
+
+        if (p.opacity > 0) {
+          isAlive = true;
+          ctx.save();
+          ctx.globalAlpha = p.opacity;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation * Math.PI / 180);
+          ctx.fillStyle = p.color;
+
+          // Draw squares/circles
+          if (p.r % 2 === 0) {
+            ctx.fillRect(-p.r, -p.r, p.r * 2, p.r * 1.5);
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+      });
+
+      if (isAlive) {
+        requestAnimationFrame(runLoop);
+      }
+    }
+
+    runLoop();
+  }
+
+  // Done button on success screen restarts menu
+  if (successDoneBtn) {
+    successDoneBtn.addEventListener('click', () => {
+      if (successScreen) successScreen.classList.remove('open');
+      
+      // Clear Cart completely
+      custCart = [];
+      updateCustomerFloatingBadge();
+      
+      // Scroll smoothly to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // Listen for Live Table Reject status changes from the cashier dashboard
+  const tableRejectChannel = new BroadcastChannel('doppio_qr_order_status');
+  tableRejectChannel.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'QR_ORDER_REJECTED') {
+      const order = e.data.order;
+      // Alert the customer if they are viewing the page
+      if (localStorage.getItem('cust_self_name') === order.customerName) {
+        alert(`Attention: Your order (${order.orderId}) has been rejected or cancelled by the cashier. Please verify details at the counter.`);
+      }
+    }
+  });
+
+  // End self-ordering code block
+
     } catch (e) {
       console.log("Counter API call error", e);
     }

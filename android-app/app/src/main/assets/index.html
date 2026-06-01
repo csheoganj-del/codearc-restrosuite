@@ -320,6 +320,163 @@
     </div>
   </div>
 
+  <!-- Customer Floating Cart Button -->
+  <div class="customer-floating-cart" id="customer-floating-cart">
+    <div class="cart-btn-content">
+      <div class="cart-icon-wrapper">
+        <i class="fa-solid fa-basket-shopping"></i>
+        <span class="cart-badge-count" id="cart-badge-count">0</span>
+      </div>
+      <div class="cart-btn-text">
+        <span class="cart-label">My Cart</span>
+        <span class="cart-btn-total" id="cart-btn-total">₹0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer Cart Drawer -->
+  <div class="customer-cart-drawer" id="customer-cart-drawer">
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <div class="drawer-content">
+      <div class="drawer-header">
+        <div class="drawer-title-area">
+          <h3>Your Order</h3>
+          <span class="table-badge" id="drawer-table-badge" style="display: none;">Table 01</span>
+        </div>
+        <button class="close-drawer-btn" id="close-drawer-btn">&times;</button>
+      </div>
+      
+      <div class="drawer-body">
+        <!-- Dynamic Cart Items List -->
+        <div class="cart-items-container" id="customer-cart-items">
+          <!-- Loaded Dynamically -->
+        </div>
+        
+        <!-- Customer Details Form -->
+        <div class="customer-info-section">
+          <h4>Order Details</h4>
+          <div class="input-group">
+            <i class="fa-solid fa-user"></i>
+            <input type="text" id="cust-order-name" placeholder="Your Name (Required)" required>
+          </div>
+          <div class="input-group">
+            <i class="fa-solid fa-phone"></i>
+            <input type="tel" id="cust-order-phone" placeholder="Mobile Number (Optional)" maxlength="10">
+          </div>
+          <div class="input-group" id="table-select-group">
+            <i class="fa-solid fa-chair"></i>
+            <select id="cust-order-table">
+              <option value="">Select Table / Option</option>
+              <option value="Takeaway">Takeaway (At Counter)</option>
+              <option value="1">Table 01 (Ground Floor)</option>
+              <option value="2">Table 02 (Ground Floor)</option>
+              <option value="3">Table 03 (Ground Floor)</option>
+              <option value="4">Table 04 (First Floor)</option>
+              <option value="5">Table 05 (First Floor)</option>
+              <option value="6">Table 06 (Balcony Seating)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <div class="drawer-footer">
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="cust-subtotal">₹0</span>
+        </div>
+        <div class="summary-row">
+          <span>GST (18% included)</span>
+          <span id="cust-gst">₹0</span>
+        </div>
+        <div class="summary-row total-row">
+          <span>Grand Total</span>
+          <span id="cust-total" style="color: var(--accent-caramel); font-weight: 800; font-size: 20px;">₹0</span>
+        </div>
+        
+        <button class="checkout-submit-btn" id="checkout-submit-btn">
+          Place & Pay Order <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPI Payment Gateway Simulation Modal -->
+  <div class="upi-payment-modal" id="upi-payment-modal">
+    <div class="upi-modal-backdrop"></div>
+    <div class="upi-modal-card">
+      <div class="upi-modal-close" id="upi-modal-close"><i class="fa-solid fa-xmark"></i></div>
+      
+      <div class="upi-merchant-header">
+        <div class="merchant-badge"><i class="fa-solid fa-shield-halved"></i> Secured UPI Gateway</div>
+        <div class="logo login-logo" style="margin: 12px auto; display: table;">
+          <span class="logo-doppio">DOPPIO</span>
+          <span class="logo-cafe">Café</span>
+        </div>
+        <div class="merchant-name">Doppio Cafe Nagpur <i class="fa-solid fa-circle-check" style="color: #c98a4a;"></i></div>
+        <div class="merchant-vpa">pay.doppiocafe@oksbi</div>
+      </div>
+      
+      <div class="upi-amount-box">
+        <span class="amount-label">PAYING TO MERCHANT</span>
+        <span class="amount-val" id="upi-amount-val">₹0</span>
+      </div>
+      
+      <!-- Dynamic Scannable UPI QR Code -->
+      <div class="upi-qr-section">
+        <div class="qr-frame-wrapper">
+          <div class="qr-scanner-line"></div>
+          <img id="upi-qr-image" src="" alt="UPI QR Code for Payment">
+        </div>
+        <p class="qr-instructions">Scan with any UPI App (GPay, PhonePe, Paytm, BHIM) to pay instantly.</p>
+      </div>
+      
+      <div class="payment-sim-actions">
+        <button class="sim-btn sim-btn-success" id="sim-pay-success">
+          <i class="fa-solid fa-circle-check"></i> Simulate Payment Success
+        </button>
+        <button class="sim-btn sim-btn-cash" id="sim-pay-counter">
+          <i class="fa-solid fa-wallet"></i> Pay Cash at Counter
+        </button>
+      </div>
+      
+      <div class="payment-waiting-status">
+        <span class="spinner"></span>
+        <span>Awaiting network verification...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Success/Payment Complete Confetti & Modal -->
+  <div class="order-success-screen" id="order-success-screen">
+    <canvas id="success-confetti-canvas" style="position: fixed; top:0; left:0; width:100vw; height:100vh; z-index:99999; pointer-events:none;"></canvas>
+    <div class="success-card">
+      <div class="checkmark-circle">
+        <i class="fa-solid fa-check checkmark-icon"></i>
+      </div>
+      <h2 class="success-title">Order Placed!</h2>
+      <p class="success-subtitle" id="success-subtitle-text">Your order has been beamed to the kitchen.</p>
+      
+      <div class="receipt-box">
+        <div class="receipt-header">
+          <span id="receipt-table" style="font-weight: 800; color: var(--accent-caramel);">Table 3</span>
+          <span id="receipt-id">Order ID: DO-QR-9824</span>
+        </div>
+        <div class="receipt-divider">-----------------------------</div>
+        <div class="receipt-items" id="receipt-items-list">
+          <!-- Dynamic items -->
+        </div>
+        <div class="receipt-divider">-----------------------------</div>
+        <div class="receipt-footer">
+          <span>Total Amount Paid</span>
+          <span id="receipt-total-paid" style="font-weight: 800; color: var(--accent-caramel);">₹548</span>
+        </div>
+      </div>
+      
+      <p class="success-desc">The chef has received your order! We are preparing your fresh brew and hot food. Sit back and relax!</p>
+      <button class="btn btn-dark" id="success-done-btn" style="width: 100%;">Awesome!</button>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 </body>
 </html>
