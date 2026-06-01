@@ -1083,8 +1083,4 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // End self-ordering code block
 
-    } catch (e) {
-      console.log("Counter API call error", e);
-    }
-  }
 });
