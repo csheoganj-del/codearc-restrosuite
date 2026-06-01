@@ -6,8 +6,29 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+  // Premium Low-overhead Global Exception Logger for Nagpur Branch POS Diagnostics
+  window.onerror = function (msg, url, lineNo, columnNo, error) {
+    console.error(`[Doppio Cafe POS Crash Alert] Error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
+    const errIndicator = document.createElement('div');
+    errIndicator.style.position = 'fixed';
+    errIndicator.style.bottom = '10px';
+    errIndicator.style.right = '10px';
+    errIndicator.style.background = 'rgba(231, 76, 60, 0.95)';
+    errIndicator.style.color = '#fff';
+    errIndicator.style.padding = '8px 12px';
+    errIndicator.style.borderRadius = '5px';
+    errIndicator.style.fontSize = '10px';
+    errIndicator.style.zIndex = '999999';
+    errIndicator.style.fontFamily = 'monospace';
+    errIndicator.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    errIndicator.innerHTML = `⚠️ Terminal Script Exception (Line ${lineNo}): ${msg.slice(0, 50)}...`;
+    document.body.appendChild(errIndicator);
+    setTimeout(() => { if (errIndicator.parentNode) errIndicator.parentNode.removeChild(errIndicator); }, 8000);
+    return false;
+  };
+
   // Sales popularity database map
-  let posPopularityMap = JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {};
+  let posPopularityMap = (() => { try { return JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {}; } catch(e) { return {}; } })();
   let isSplitPaymentActive = false;
 
   async function sha256(string) {
@@ -290,18 +311,18 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   // Load custom recipes and thresholds
-  let customRecipes = JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {};
-  let thresholds = JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {};
+  let customRecipes = (() => { try { return JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {}; } catch(e) { return {}; } })();
+  let thresholds = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {}; } catch(e) { return {}; } })();
 
   // Nagpur Menu Recovery & Defensive Restoration logic
-  let storedMenu = JSON.parse(localStorage.getItem('doppio_menu'));
+  let storedMenu = (() => { try { return JSON.parse(localStorage.getItem('doppio_menu')); } catch(e) { return null; } })();
   let menu = [];
-  if (!storedMenu || storedMenu.length < 15) {
+  if (!storedMenu || !Array.isArray(storedMenu) || storedMenu.length < 15) {
     menu = defaultMenu;
     localStorage.setItem('doppio_menu', JSON.stringify(menu));
   } else {
     // Merge missing default Nagpur items (e.g. food, sandwiches, mocktails) back automatically
-    const storedNames = new Set(storedMenu.map(item => item.name.toLowerCase().trim()));
+    const storedNames = new Set(storedMenu.filter(item => item && item.name).map(item => item.name.toLowerCase().trim()));
     menu = [...storedMenu];
     let needsUpdate = false;
     defaultMenu.forEach(item => {
@@ -315,10 +336,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  let savedInventory = JSON.parse(localStorage.getItem('doppio_inventory')) || {};
+  let savedInventory = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory')) || {}; } catch(e) { return {}; } })();
   let inventory = { ...defaultInventory, ...savedInventory };
-  let bills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
-  let businessProfile = JSON.parse(localStorage.getItem('doppio_business_profile')) || {
+  let bills = (() => { try { return JSON.parse(localStorage.getItem('doppio_bills')) || []; } catch(e) { console.warn('Corrupted bills data reset'); localStorage.removeItem('doppio_bills'); return []; } })();
+  let businessProfile = (() => { try { return JSON.parse(localStorage.getItem('doppio_business_profile')) || null; } catch(e) { return null; } })() || {
     name: 'Doppio Cafe Nagpur',
     address: 'London Street, Nagpur',
     phone: '+91 91300 03177',
@@ -340,6 +361,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (businessProfile.shiftMaxDrawer === undefined) businessProfile.shiftMaxDrawer = 5000;
   if (businessProfile.shiftPosLock === undefined) businessProfile.shiftPosLock = true;
 
+  // ==========================================
+  // SHIFT MANAGEMENT STATE ENGINE (Declared at top of scope to prevent Temporal Dead Zone crashes during bootstrap)
+  // ==========================================
+  let activeShift = (() => { try { return JSON.parse(localStorage.getItem('doppio_current_shift')) || null; } catch(e) { return null; } })();
+  let shiftHistory = (() => { try { return JSON.parse(localStorage.getItem('doppio_shifts_local')) || []; } catch(e) { return []; } })();
+  let shiftEvents = (() => { try { return JSON.parse(localStorage.getItem('doppio_shift_events_local')) || []; } catch(e) { return []; } })();
+
   // Force default sound off for existing storage/users
   if (localStorage.getItem('doppio_sound_default_off_v2') !== 'true') {
     businessProfile.soundEnabled = false;
@@ -347,10 +375,10 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('doppio_sound_default_off_v2', 'true');
   }
 
-  let cart = JSON.parse(localStorage.getItem('doppio_cart')) || [];
+  let cart = (() => { try { return JSON.parse(localStorage.getItem('doppio_cart')) || []; } catch(e) { localStorage.removeItem('doppio_cart'); return []; } })();
   let selectedPaymentMethod = localStorage.getItem('doppio_cart_pay_method') || 'UPI';
   let activeOrderType = 'Takeaway';
-  let draftOrders = JSON.parse(localStorage.getItem('doppio_draft_orders')) || [];
+  let draftOrders = (() => { try { return JSON.parse(localStorage.getItem('doppio_draft_orders')) || []; } catch(e) { return []; } })();
   let editingBillId = localStorage.getItem('doppio_editing_bill_id') || null;
   if (editingBillId === 'null') editingBillId = null;
 
@@ -433,7 +461,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function saveOfflineBill(bill) {
-    const queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+    let queue = [];
+    try {
+      queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+    } catch(e) {
+      queue = [];
+    }
     if (!queue.some(b => b.orderId === bill.orderId)) {
       queue.push(bill);
       localStorage.setItem('doppio_offline_bills_queue', JSON.stringify(queue));
@@ -442,7 +475,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function syncOfflineBills() {
     if (!supabaseClient || !navigator.onLine) return;
-    const queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+    let queue = [];
+    try {
+      queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+    } catch(e) {
+      queue = [];
+    }
     if (queue.length === 0) return;
     
     const billsToSync = [...queue];
@@ -460,7 +498,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         if (!error) {
-          const currentQueue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+          let currentQueue = [];
+          try {
+            currentQueue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+          } catch(e) {
+            currentQueue = [];
+          }
           const updatedQueue = currentQueue.filter(b => b.orderId !== bill.orderId);
           localStorage.setItem('doppio_offline_bills_queue', JSON.stringify(updatedQueue));
         }
@@ -600,7 +643,8 @@ document.addEventListener('DOMContentLoaded', () => {
       link.classList.add('active');
 
       tabContents.forEach(content => content.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
+      const targetTab = document.getElementById(tabId);
+      if (targetTab) targetTab.classList.add('active');
 
       tabTitle.textContent = link.textContent.trim();
       
@@ -639,8 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Calculate values specifically for today
     const today = new Date().toLocaleDateString('en-IN');
-    const todayBills = bills.filter(b => b.dateTime.includes(today));
-    const todayTotal = todayBills.reduce((sum, b) => sum + b.total, 0);
+    const todayBills = bills.filter(b => b && b.dateTime && b.dateTime.includes(today));
+    const todayTotal = todayBills.reduce((sum, b) => sum + ((b && b.total) || 0), 0);
 
     if (headerSales) headerSales.textContent = `₹${todayTotal}`;
     if (headerBills) headerBills.textContent = `${todayBills.length} Bills`;
@@ -719,8 +763,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filteredItems = menu.filter(item => {
       const matchesCategory = activePOSCategory === 'ALL' || item.category === activePOSCategory;
-      const matchesSearch = item.name.toLowerCase().includes(posSearchQuery.toLowerCase()) || 
-                            item.description.toLowerCase().includes(posSearchQuery.toLowerCase());
+      const matchesSearch = (item.name && item.name.toLowerCase().includes(posSearchQuery.toLowerCase())) || 
+                            (item.description && item.description.toLowerCase().includes(posSearchQuery.toLowerCase()));
       return matchesCategory && matchesSearch;
     });
 
@@ -728,15 +772,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const sortSelect = document.getElementById('pos-sort-select');
     const sortVal = sortSelect ? sortSelect.value : 'popular';
     filteredItems.sort((a, b) => {
+      const nameA = a.name || '';
+      const nameB = b.name || '';
       if (sortVal === 'name') {
-        return a.name.localeCompare(b.name);
+        return nameA.localeCompare(nameB);
       } else {
-        const popA = posPopularityMap[a.name.toLowerCase().trim()] || 0;
-        const popB = posPopularityMap[b.name.toLowerCase().trim()] || 0;
+        const popA = posPopularityMap[nameA.toLowerCase().trim()] || 0;
+        const popB = posPopularityMap[nameB.toLowerCase().trim()] || 0;
         if (popB !== popA) {
           return popB - popA;
         }
-        return a.name.localeCompare(b.name);
+        return nameA.localeCompare(nameB);
       }
     });
 
@@ -1033,9 +1079,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>Cart is currently empty.<br>Tap items to add & customize.</p>
         </div>
       `;
-      cartSubtotal.textContent = '₹0.00';
-      cartGst.textContent = '₹0.00';
-      cartTotal.textContent = '₹0.00';
+      if (cartSubtotal) cartSubtotal.textContent = '₹0.00';
+      if (cartGst) cartGst.textContent = '₹0.00';
+      if (cartTotal) cartTotal.textContent = '₹0.00';
       return;
     }
 
@@ -1046,10 +1092,11 @@ document.addEventListener('DOMContentLoaded', () => {
       subtotal += rowTotal;
 
       // Compile customization label string
-      let configParts = [`Size: ${item.size}`];
-      if (item.sugar !== 'Regular') configParts.push(`Sweet: ${item.sugar}`);
-      if (item.ice !== 'Regular') configParts.push(`Ice: ${item.ice}`);
-      if (item.toppings.length > 0) configParts.push(`+ ${item.toppings.join(', ')}`);
+      let configParts = [`Size: ${item.size || 'Regular'}`];
+      if (item.sugar && item.sugar !== 'Regular') configParts.push(`Sweet: ${item.sugar}`);
+      if (item.ice && item.ice !== 'Regular') configParts.push(`Ice: ${item.ice}`);
+      const toppings = Array.isArray(item.toppings) ? item.toppings : [];
+      if (toppings.length > 0) configParts.push(`+ ${toppings.join(', ')}`);
       if (item.notes) configParts.push(`"${item.notes}"`);
 
       const configLabel = configParts.join(' | ');
@@ -1095,15 +1142,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
     const total = taxableAmount + gst;
 
-    cartSubtotal.textContent = `₹${subtotal}`;
+    if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
     
-    if (loyaltyDiscount > 0) {
-      cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
-    } else {
-      cartGst.textContent = `₹${gst}`;
+    if (cartGst) {
+      if (loyaltyDiscount > 0) {
+        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
+      } else {
+        cartGst.textContent = `₹${gst}`;
+      }
     }
 
-    cartTotal.textContent = `₹${total}`;
+    if (cartTotal) cartTotal.textContent = `₹${total}`;
     if (typeof calculateSplitBalance === 'function') calculateSplitBalance();
     
     // Save to localStorage for persistence across reloads/logouts/tabs
@@ -1448,27 +1497,47 @@ document.addEventListener('DOMContentLoaded', () => {
   let activePresetDate = 'all';
   let billsSearchQuery = '';
 
-  function parseBillDate(bill) {
-    if (!bill.dateTime) return new Date();
-    const d = new Date(bill.dateTime);
-    if (!isNaN(d.getTime())) {
-      d.setHours(0,0,0,0);
-      return d;
+  function parseBillDate(val) {
+    if (!val) return new Date(0);
+    let dateStr = val;
+    if (typeof val === 'object' && val !== null) {
+      dateStr = val.dateTime;
     }
-    const parts = bill.dateTime.split(',')[0].split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2], 10);
-      const parsedDate = new Date(year, month, day);
-      if (!isNaN(parsedDate.getTime())) {
-        parsedDate.setHours(0,0,0,0);
-        return parsedDate;
+    if (!dateStr || typeof dateStr !== 'string') return new Date(0);
+    
+    let parsed = Date.parse(dateStr);
+    if (!isNaN(parsed)) return new Date(parsed);
+    
+    // Robust Indian locale parser: 'DD/MM/YYYY, hh:mm:ss AM/PM'
+    try {
+      const clean = dateStr.replace(/[^0-9/:\sAMP]/gi, '').trim();
+      const parts = clean.split(',');
+      const dateParts = parts[0].trim().split('/');
+      if (dateParts.length === 3) {
+        let day = parseInt(dateParts[0], 10);
+        let month = parseInt(dateParts[1], 10) - 1;
+        let year = parseInt(dateParts[2], 10);
+        
+        let hour = 0, minute = 0, second = 0;
+        if (parts[1]) {
+          const timeParts = parts[1].trim().split(' ');
+          const hms = timeParts[0].split(':');
+          hour = parseInt(hms[0], 10);
+          minute = parseInt(hms[1], 10) || 0;
+          second = parseInt(hms[2], 10) || 0;
+          
+          if (timeParts[1] && timeParts[1].toUpperCase() === 'PM' && hour < 12) {
+            hour += 12;
+          } else if (timeParts[1] && timeParts[1].toUpperCase() === 'AM' && hour === 12) {
+            hour = 0;
+          }
+        }
+        return new Date(year, month, day, hour, minute, second);
       }
+    } catch (e) {
+      console.error("parseBillDate failed on:", dateStr, e);
     }
-    const fallback = new Date();
-    fallback.setHours(0,0,0,0);
-    return fallback;
+    return new Date(dateStr);
   }
 
   function startEditingBill(orderId) {
@@ -1571,8 +1640,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Search matches
       const q = billsSearchQuery.toLowerCase();
       const matchesSearch = !q || 
-                            bill.customerName.toLowerCase().includes(q) || 
-                            bill.orderId.toLowerCase().includes(q) || 
+                            (bill.customerName && bill.customerName.toLowerCase().includes(q)) || 
+                            (bill.orderId && bill.orderId.toLowerCase().includes(q)) || 
                             (bill.customerPhone && bill.customerPhone.includes(q));
 
       // Presets filter matches
@@ -1580,12 +1649,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activePresetDate !== 'all') {
         const today = new Date().toLocaleDateString('en-IN');
         if (activePresetDate === 'today') {
-          matchesPreset = bill.dateTime.includes(today);
+          matchesPreset = bill.dateTime && bill.dateTime.includes(today);
         } else if (activePresetDate === 'yesterday') {
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayStr = yesterday.toLocaleDateString('en-IN');
-          matchesPreset = bill.dateTime.includes(yesterdayStr);
+          matchesPreset = bill.dateTime && bill.dateTime.includes(yesterdayStr);
         } else if (activePresetDate === 'week') {
           const billDate = parseBillDate(bill);
           const diffTime = Math.abs(new Date() - billDate);
@@ -1613,19 +1682,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Update Top Billing stats indicators
-    const dailySalesTotal = filteredBills.reduce((sum, b) => sum + b.total, 0);
-    document.getElementById('bills-revenue-card').textContent = `₹${dailySalesTotal}`;
-    document.getElementById('bills-total-card').textContent = `${filteredBills.length} Invoices`;
+    const dailySalesTotal = filteredBills.reduce((sum, b) => sum + (b.total || 0), 0);
+    const revCard = document.getElementById('bills-revenue-card');
+    const totCard = document.getElementById('bills-total-card');
+    const aovCardEl = document.getElementById('bills-aov-card');
+    const upiPct = document.getElementById('bills-upi-percent');
+    const cashPct = document.getElementById('bills-cash-percent');
+    if (revCard) revCard.textContent = `₹${dailySalesTotal}`;
+    if (totCard) totCard.textContent = `${filteredBills.length} Invoices`;
     
     // Average Order Value calculations
     const aov = filteredBills.length === 0 ? 0 : Math.round(dailySalesTotal / filteredBills.length);
-    document.getElementById('bills-aov-card').textContent = `₹${aov}`;
+    if (aovCardEl) aovCardEl.textContent = `₹${aov}`;
 
     // Split percentages calculations
     const upiCount = filteredBills.filter(b => b.paymentMethod === 'UPI').length;
     const upiPercent = filteredBills.length === 0 ? 0 : Math.round((upiCount / filteredBills.length) * 100);
-    document.getElementById('bills-upi-percent').textContent = `${upiPercent}%`;
-    document.getElementById('bills-cash-percent').textContent = `${100 - upiPercent}%`;
+    if (upiPct) upiPct.textContent = `${upiPercent}%`;
+    if (cashPct) cashPct.textContent = `${100 - upiPercent}%`;
 
     if (billsCount) billsCount.textContent = `Showing ${filteredBills.length} Bills`;
 
@@ -1654,30 +1728,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const sortedBills = [...filteredBills].reverse();
     sortedBills.forEach(bill => {
+      if (!bill) return;
       const tr = document.createElement('tr');
       
       // Items string format details
-      let itemsListStr = bill.items.map(item => `${item.name} (${item.qty})`).join(', ');
+      const billItems = Array.isArray(bill.items) ? bill.items : [];
+      let itemsListStr = billItems.map(item => `${item.name || '?'} (${item.qty || 1})`).join(', ');
       if (itemsListStr.length > 36) itemsListStr = itemsListStr.substring(0, 33) + '...';
       
       // Avatar Initials details
-      const initials = bill.customerName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      const custName = bill.customerName || 'Walk-in';
+      const initials = custName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      const payMethod = bill.paymentMethod || 'UPI';
 
       tr.innerHTML = `
-        <td style="font-weight:700;">${bill.orderId}</td>
+        <td style="font-weight:700;">${bill.orderId || '-'}</td>
         <td>
           <div class="customer-avatar-cell">
             <div class="cust-avatar">${initials}</div>
             <div style="display:flex; flex-direction:column;">
-              <span style="font-weight:600;">${bill.customerName}</span>
+              <span style="font-weight:600;">${custName}</span>
               <span style="font-size:10px; color:var(--text-muted);">${bill.customerPhone || 'Walk-in Guest'}</span>
             </div>
           </div>
         </td>
-        <td>${bill.dateTime}</td>
-        <td title="${bill.items.map(i => `${i.name} (x${i.qty})`).join(', ')}">${itemsListStr}</td>
-        <td><span class="payment-badge ${bill.paymentMethod.toLowerCase()}">${bill.paymentMethod}</span></td>
-        <td style="font-weight:700; color:var(--accent-caramel);">₹${bill.total}</td>
+        <td>${bill.dateTime || '-'}</td>
+        <td title="${billItems.map(i => `${i.name || '?'} (x${i.qty || 1})`).join(', ')}">${itemsListStr || '-'}</td>
+        <td><span class="payment-badge ${payMethod.toLowerCase()}">${payMethod}</span></td>
+        <td style="font-weight:700; color:var(--accent-caramel);">₹${bill.total || 0}</td>
         <td>
           <button class="table-action-btn print" data-id="${bill.orderId}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
           <button class="table-action-btn whatsapp" data-id="${bill.orderId}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
@@ -2192,7 +2270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Total numbers calculations
-    const totalRevenueSum = filteredBills.reduce((sum, b) => sum + b.total, 0);
+    const totalRevenueSum = filteredBills.reduce((sum, b) => sum + ((b && b.total) || 0), 0);
     if (reportRevenue) reportRevenue.textContent = `₹${totalRevenueSum}`;
     if (reportOrders) reportOrders.textContent = filteredBills.length;
 
@@ -2202,6 +2280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sumCash = 0;
 
     filteredBills.forEach(b => {
+      if (!b) return;
       const pm = b.paymentMethod || 'UPI';
       if (pm.startsWith('Split:')) {
         // Parse "Split: UPI=300, Cash=200, Card=0"
@@ -2215,9 +2294,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       } else {
         const methodUpper = pm.toUpperCase();
-        if (methodUpper === 'UPI') sumUPI += b.total;
-        else if (methodUpper === 'CARD') sumCard += b.total;
-        else if (methodUpper === 'CASH') sumCash += b.total;
+        const amt = parseFloat(b.total) || 0;
+        if (methodUpper === 'UPI') sumUPI += amt;
+        else if (methodUpper === 'CARD') sumCard += amt;
+        else if (methodUpper === 'CASH') sumCash += amt;
       }
     });
 
@@ -2232,8 +2312,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Best seller counts mapping
     const itemCounts = {};
     filteredBills.forEach(b => {
+      if (!b.items || !Array.isArray(b.items)) return;
       b.items.forEach(item => {
-        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
+        if (!item || !item.name) return;
+        itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.qty || 1);
       });
     });
 
@@ -2256,7 +2338,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Calculate revenue points specifically for last 5 orders of the filtered set
       const chartBills = [...filteredBills].slice(-5);
-      let dataPoints = chartBills.map(b => b.total);
+      let dataPoints = chartBills.map(b => (b && b.total) || 0);
       if (dataPoints.length < 5) {
         dataPoints = [...dataPoints, 120, 240, 180, 310, 250].slice(0, 5);
       }
@@ -2302,10 +2384,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ingStatsList) {
       ingStatsList.innerHTML = '';
       const items = [
-        { label: 'Steamed Milk Used', value: 3000 - inventory.steamed_milk, max: 3000, unit: 'ml' },
-        { label: 'Coffee Beans Used', value: 3000 - inventory.coffee_beans, max: 3000, unit: 'g' },
-        { label: 'Matcha Powder Used', value: 500 - inventory.matcha_powder, max: 500, unit: 'g' },
-        { label: 'Whipped Cream Used', value: 1000 - inventory.whipped_cream, max: 1000, unit: 'ml' }
+        { label: 'Steamed Milk Used', value: 10000 - (parseFloat(inventory.milk) || 0), max: 10000, unit: 'ml' },
+        { label: 'Espresso Shots Used', value: 6000 - (parseFloat(inventory.espresso_shot) || 0), max: 6000, unit: 'ml' },
+        { label: 'Matcha Powder Used', value: 500 - (parseFloat(inventory.matcha_powder) || 0), max: 500, unit: 'g' },
+        { label: 'Cream Used', value: 2000 - (parseFloat(inventory.cream) || 0), max: 2000, unit: 'g' }
       ];
 
       items.forEach(item => {
@@ -2341,8 +2423,8 @@ document.addEventListener('DOMContentLoaded', () => {
           item.style.borderBottom = '1px solid rgba(43,24,19,0.03)';
           item.innerHTML = `
             <div style="display:flex; flex-direction:column;">
-              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${bill.customerName} (${bill.orderId})</span>
-              <span style="font-size:10px; color:var(--text-muted);">${bill.dateTime}</span>
+              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${bill.customerName || 'Walk-in'} (${bill.orderId || '-'})</span>
+              <span style="font-size:10px; color:var(--text-muted);">${bill.dateTime || '-'}</span>
             </div>
             <span style="font-size:13px; font-weight:700; color:var(--accent-caramel);">₹${bill.total}</span>
           `;
@@ -3190,7 +3272,13 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadCRMData() {
     const localCRM = localStorage.getItem('doppio_crm_local');
     if (localCRM) {
-      crmData = JSON.parse(localCRM);
+      try {
+        crmData = JSON.parse(localCRM);
+        if (!Array.isArray(crmData)) crmData = [];
+      } catch(err) {
+        console.warn("Corrupted CRM data", err);
+        crmData = [];
+      }
       renderCRMTab();
     }
   }
@@ -3349,48 +3437,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeSchemaBtn = document.getElementById('close-schema-btn');
   const copySqlSchemaBtn = document.getElementById('copy-sql-schema-btn');
 
-  function parseBillDate(dateStr) {
-    if (!dateStr) return new Date();
-    // Defensive check: if dateStr is an object (i.e. a bill), extract the dateTime string
-    if (typeof dateStr === 'object') {
-      if (dateStr.dateTime) dateStr = dateStr.dateTime;
-      else return new Date();
-    }
-    
-    let parsed = Date.parse(dateStr);
-    if (!isNaN(parsed)) return new Date(parsed);
-    
-    // Robust Indian locale parser: 'DD/MM/YYYY, hh:mm:ss AM/PM'
-    try {
-      const clean = dateStr.replace(/[^0-9/:\sAMP]/gi, '').trim();
-      const parts = clean.split(',');
-      const dateParts = parts[0].trim().split('/');
-      if (dateParts.length === 3) {
-        let day = parseInt(dateParts[0], 10);
-        let month = parseInt(dateParts[1], 10) - 1;
-        let year = parseInt(dateParts[2], 10);
-        
-        let hour = 0, minute = 0, second = 0;
-        if (parts[1]) {
-          const timeParts = parts[1].trim().split(' ');
-          const hms = timeParts[0].split(':');
-          hour = parseInt(hms[0], 10);
-          minute = parseInt(hms[1], 10) || 0;
-          second = parseInt(hms[2], 10) || 0;
-          
-          if (timeParts[1] && timeParts[1].toUpperCase() === 'PM' && hour < 12) {
-            hour += 12;
-          } else if (timeParts[1] && timeParts[1].toUpperCase() === 'AM' && hour === 12) {
-            hour = 0;
-          }
-        }
-        return new Date(year, month, day, hour, minute, second);
-      }
-    } catch (e) {
-      console.error("parseBillDate failed on:", dateStr, e);
-    }
-    return new Date(dateStr);
-  }
 
   function getActivePeriodBills() {
     const searchVal = (taxSearchInput ? taxSearchInput.value : '').trim().toLowerCase();
@@ -3404,6 +3450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (toDate) toDate.setHours(23,59,59,999);
     
     return bills.filter(b => {
+      if (!b) return false;
       const matchesSearch = !searchVal || 
                             (b.orderId && b.orderId.toLowerCase().includes(searchVal)) ||
                             (b.customerName && b.customerName.toLowerCase().includes(searchVal)) ||
@@ -3427,7 +3474,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const filteredBills = getActivePeriodBills();
     
     // Sort reverse chronological
-    filteredBills.sort((a, b) => parseBillDate(b.dateTime) - parseBillDate(a.dateTime));
+    filteredBills.sort((a, b) => {
+      const db = b ? parseBillDate(b.dateTime) : new Date(0);
+      const da = a ? parseBillDate(a.dateTime) : new Date(0);
+      return db - da;
+    });
     
     let netSales = 0;
     let totalTax = 0;
@@ -3509,9 +3560,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Export SQL Script generator
   function generateSQLScript(data) {
-    let sql = `-- DOPPIO CAFE SUPABASE INTEGRATION SCRIPT
+    let sql = `-- DOPPIO CAFE CLOUD POSTGRES INTEGRATION SCRIPT
 -- Generated on ${new Date().toLocaleString('en-IN')}
--- Compatible with Supabase Postgres SQL Editor
+-- Compatible with Cloud Postgres SQL Editors
 
 CREATE TABLE IF NOT EXISTS public.doppio_bills (
     id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
@@ -3633,7 +3684,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `doppio_supabase_bills_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `doppio_cloud_bills_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
     });
   }
@@ -3659,7 +3710,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `doppio_supabase_bills_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `doppio_cloud_bills_${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
     });
   }
@@ -3674,7 +3725,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `doppio_supabase_bills_sync_${new Date().toISOString().slice(0, 10)}.sql`;
+      a.download = `doppio_cloud_bills_sync_${new Date().toISOString().slice(0, 10)}.sql`;
       a.click();
     });
   }
@@ -4728,7 +4779,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     // 1. Load local draft orders fallback
     const localDrafts = localStorage.getItem('doppio_draft_orders');
     if (localDrafts) {
-      draftOrders = JSON.parse(localDrafts);
+      try {
+        draftOrders = JSON.parse(localDrafts);
+        if (!Array.isArray(draftOrders)) draftOrders = [];
+      } catch(err) {
+        console.warn("Corrupted draft orders", err);
+        draftOrders = [];
+      }
     }
 
     // 2. Load from Supabase in real-time
@@ -5757,12 +5814,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     });
   }
 
-  // ==========================================
-  // SHIFT MANAGEMENT STATE ENGINE
-  // ==========================================
-  let activeShift = JSON.parse(localStorage.getItem('doppio_current_shift')) || null;
-  let shiftHistory = JSON.parse(localStorage.getItem('doppio_shifts_local')) || [];
-  let shiftEvents = JSON.parse(localStorage.getItem('doppio_shift_events_local')) || [];
+
 
   // Expose activeShift internationally for checkout tagging
   window.getActiveShiftId = function() {
@@ -5819,9 +5871,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const float = parseFloat(activeShift.openingFloat) || 0;
     
     // Cash Sales
-    const shiftBills = bills.filter(b => b.shiftId === activeShift.shiftId);
+    const shiftBills = bills.filter(b => b && b.shiftId === activeShift.shiftId);
     let cashSalesTotal = 0;
     shiftBills.forEach(b => {
+      if (!b) return;
       if (b.paymentMethod === 'Cash') {
         cashSalesTotal += parseFloat(b.total) || 0;
       } else if (b.paymentMethod && b.paymentMethod.includes('Split:')) {
@@ -5834,10 +5887,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     });
 
     // Payouts & Drops
-    const sessionEvents = shiftEvents.filter(e => e.shiftId === activeShift.shiftId);
+    const sessionEvents = shiftEvents.filter(e => e && e.shiftId === activeShift.shiftId);
     let payoutsTotal = 0;
     let dropsTotal = 0;
     sessionEvents.forEach(e => {
+      if (!e) return;
       if (e.eventType === 'PAYOUT') payoutsTotal += parseFloat(e.amount) || 0;
       if (e.eventType === 'SAFE_DROP') dropsTotal += parseFloat(e.amount) || 0;
     });
@@ -6356,14 +6410,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   // ==========================================================
   // 19. LIVE QR ORDERING & TABLES CASHIER SYNC MODULE
   // ==========================================================
-  let pendingQrOrders = JSON.parse(localStorage.getItem('doppio_pending_qr_orders')) || [];
+  let pendingQrOrders = (() => { try { return JSON.parse(localStorage.getItem('doppio_pending_qr_orders')) || []; } catch(e) { return []; } })();
   let qrRevenueToday = parseFloat(localStorage.getItem('doppio_qr_revenue_today')) || 0;
   let completedQrOrdersCount = parseInt(localStorage.getItem('doppio_completed_qr_orders_count')) || 0;
   
   // Tables state: EMPTY, ORDERING, PENDING, SERVED
-  let tablesState = JSON.parse(localStorage.getItem('doppio_tables_state')) || {
+  let tablesState = (() => { try { return JSON.parse(localStorage.getItem('doppio_tables_state')) || {
     1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY"
-  };
+  }; } catch(e) { return { 1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" }; } })();
 
   // Broadcast Channels
   const qrOrdersChannel = new BroadcastChannel('doppio_qr_orders');

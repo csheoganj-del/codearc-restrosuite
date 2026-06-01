@@ -1003,11 +1003,11 @@
               </div>
               
               <div class="inventory-action-btns" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button class="export-btn btn btn-secondary" id="export-tax-json-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-file-code"></i> Export Supabase JSON</button>
-                <button class="export-btn btn btn-secondary" id="export-tax-csv-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-file-csv"></i> Export Supabase CSV</button>
+                <button class="export-btn btn btn-secondary" id="export-tax-json-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-file-code"></i> Export Cloud JSON</button>
+                <button class="export-btn btn btn-secondary" id="export-tax-csv-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-file-csv"></i> Export Cloud CSV</button>
                 <button class="export-btn btn btn-secondary" id="export-tax-sql-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-database"></i> Export SQL Script</button>
                 <button class="btn btn-primary" id="import-tax-trigger-btn"><i class="fa-solid fa-file-import"></i> Import Backups</button>
-                <button class="btn btn-secondary" id="show-sql-schema-btn" style="color: var(--text-dark); border-color: rgba(43,24,19,0.15);"><i class="fa-solid fa-circle-info"></i> Supabase SQL Schema</button>
+                <button class="btn btn-secondary" id="show-sql-schema-btn" style="color: var(--text-dark); border-color: rgba(43,24,19,0.15);"><i class="fa-solid fa-circle-info"></i> Cloud SQL Schema</button>
               </div>
             </div>
 
@@ -1397,16 +1397,16 @@
     </div>
   </div>
 
-  <!-- SUPABASE SQL SCHEMA MODAL -->
+  <!-- CLOUD SQL SCHEMA MODAL -->
   <div class="modal-backdrop" id="sql-schema-modal">
     <div class="glass-modal" style="max-width: 680px; width: 90%;">
       <div class="modal-header">
-        <h2><i class="fa-solid fa-database"></i> Supabase SQL Schema Integration</h2>
+        <h2><i class="fa-solid fa-database"></i> Cloud SQL Schema Integration</h2>
         <button class="close-modal-btn" id="close-schema-modal">&times;</button>
       </div>
       <div class="modal-body" style="padding: 20px;">
         <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 14px;">
-          Copy and run this SQL script in your <strong>Supabase SQL Editor</strong> to create the <code>doppio_bills</code> and <code>doppio_draft_orders</code> tables with optimal indexes.
+          Copy and run this SQL script in your <strong>Cloud Database SQL Editor</strong> to create the <code>doppio_bills</code> and <code>doppio_draft_orders</code> tables with optimal indexes.
         </p>
         
         <div style="position: relative;">
