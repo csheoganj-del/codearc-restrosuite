@@ -518,6 +518,37 @@ document.addEventListener('DOMContentLoaded', () => {
   async function syncWithSupabase() {
     if (!supabaseClient) return;
     try {
+      // Sync Business Profile Toggles and Settings Live!
+      try {
+        const { data: dbProfileList } = await supabaseClient.from('doppio_business_profile').select('*').eq('id', 1);
+        if (dbProfileList && dbProfileList.length > 0) {
+          const dbProfile = dbProfileList[0];
+          businessProfile = {
+            name: dbProfile.business_name || businessProfile.name,
+            address: dbProfile.address || businessProfile.address,
+            phone: dbProfile.phone || businessProfile.phone,
+            gstEnabled: dbProfile.gst_enabled !== undefined ? dbProfile.gst_enabled : businessProfile.gstEnabled,
+            gstRate: dbProfile.gst_rate !== undefined ? parseFloat(dbProfile.gst_rate) : businessProfile.gstRate,
+            loyaltyEnabled: dbProfile.loyalty_discount_enabled !== undefined ? dbProfile.loyalty_discount_enabled : businessProfile.loyaltyEnabled,
+            loyaltyRate: dbProfile.loyalty_discount_rate !== undefined ? parseFloat(dbProfile.loyalty_discount_rate) : businessProfile.loyaltyRate,
+            passcodeLockEnabled: dbProfile.passcode_lock_enabled !== undefined ? dbProfile.passcode_lock_enabled : businessProfile.passcodeLockEnabled,
+            crmEnabled: dbProfile.crm_enabled !== undefined ? dbProfile.crm_enabled : businessProfile.crmEnabled,
+            taxEnabled: dbProfile.tax_enabled !== undefined ? dbProfile.tax_enabled : businessProfile.taxEnabled,
+            soundEnabled: dbProfile.sound_enabled !== undefined ? dbProfile.sound_enabled : businessProfile.soundEnabled,
+            whatsappEnabled: dbProfile.whatsapp_enabled !== undefined ? dbProfile.whatsapp_enabled : businessProfile.whatsappEnabled,
+            shiftEnabled: dbProfile.shift_enabled !== undefined ? dbProfile.shift_enabled : businessProfile.shiftEnabled,
+            shiftDefaultFloat: dbProfile.shift_default_float !== undefined ? parseFloat(dbProfile.shift_default_float) : businessProfile.shiftDefaultFloat,
+            shiftMaxDrawer: dbProfile.shift_max_drawer !== undefined ? parseFloat(dbProfile.shift_max_drawer) : businessProfile.shiftMaxDrawer,
+            shiftPosLock: dbProfile.shift_pos_lock !== undefined ? dbProfile.shift_pos_lock : businessProfile.shiftPosLock
+          };
+          localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+          applyFeatureToggles();
+          renderCart();
+        }
+      } catch (err) {
+        console.warn("Supabase business profile sync failed (probably table/columns missing):", err);
+      }
+
       // Sync Menu
       const { data: dbMenu } = await supabaseClient.from('doppio_menu').select('*').order('id', { ascending: true });
       if (dbMenu && dbMenu.length > 0) {
@@ -4083,9 +4114,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
       applyFeatureToggles();
 
-      // Reload cloud tables upserts
+      // Reload cloud tables upserts defensively
       if (supabaseClient) {
-        supabaseClient.from('doppio_business_profile').upsert({
+        const fullPayload = {
           id: 1,
           business_name: name,
           address,
@@ -4097,11 +4128,44 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           passcode_lock_enabled: passcodeLockEnabled,
           crm_enabled: crmEnabled,
           tax_enabled: taxEnabled,
+          sound_enabled: soundEnabled,
+          whatsapp_enabled: whatsappEnabled,
           shift_enabled: shiftEnabled,
           shift_default_float: shiftDefaultFloat,
           shift_max_drawer: shiftMaxDrawer,
           shift_pos_lock: shiftPosLock
-        }, { onConflict: 'id' }).then();
+        };
+
+        const basicPayload = {
+          id: 1,
+          business_name: name,
+          address,
+          phone,
+          gst_enabled: gstEnabled,
+          gst_rate: gstRate,
+          loyalty_discount_enabled: loyaltyEnabled,
+          loyalty_discount_rate: loyaltyRate
+        };
+
+        supabaseClient.from('doppio_business_profile').upsert(fullPayload, { onConflict: 'id' })
+          .then(({ error }) => {
+            if (error) {
+              console.warn("Full settings sync failed (likely missing database columns), trying basic sync fallback:", error);
+              supabaseClient.from('doppio_business_profile').upsert(basicPayload, { onConflict: 'id' })
+                .then(({ error: basicError }) => {
+                  if (basicError) {
+                    console.error("Supabase basic settings sync failed:", basicError);
+                  } else {
+                    console.log("Supabase basic settings synced successfully!");
+                  }
+                });
+            } else {
+              console.log("Supabase full settings synced successfully!");
+            }
+          })
+          .catch(err => {
+            console.error("Supabase settings sync caught error:", err);
+          });
       }
 
       profileModal.classList.remove('active');
@@ -7418,6 +7482,6 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   // End Live QR Ordering system module
 
   // Trigger evaluation on start
-  evaluateShiftStatusUI();
+  applyFeatureToggles();
 
 });
