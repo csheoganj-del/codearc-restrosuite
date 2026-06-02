@@ -356,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (businessProfile.taxEnabled === undefined) businessProfile.taxEnabled = true;
   if (businessProfile.soundEnabled === undefined) businessProfile.soundEnabled = false;
   if (businessProfile.whatsappEnabled === undefined) businessProfile.whatsappEnabled = true;
-  if (businessProfile.shiftEnabled === undefined) businessProfile.shiftEnabled = true;
+  if (businessProfile.shiftEnabled === undefined) businessProfile.shiftEnabled = false;
   if (businessProfile.shiftDefaultFloat === undefined) businessProfile.shiftDefaultFloat = 2000;
   if (businessProfile.shiftMaxDrawer === undefined) businessProfile.shiftMaxDrawer = 5000;
   if (businessProfile.shiftPosLock === undefined) businessProfile.shiftPosLock = true;
@@ -373,6 +373,13 @@ document.addEventListener('DOMContentLoaded', () => {
     businessProfile.soundEnabled = false;
     localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
     localStorage.setItem('doppio_sound_default_off_v2', 'true');
+  }
+
+  // Force default shift off for existing storage/users so they aren't forced to open shifts
+  if (localStorage.getItem('doppio_shift_default_off_v4') !== 'true') {
+    businessProfile.shiftEnabled = false;
+    localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+    localStorage.setItem('doppio_shift_default_off_v4', 'true');
   }
 
   let cart = (() => { try { return JSON.parse(localStorage.getItem('doppio_cart')) || []; } catch(e) { localStorage.removeItem('doppio_cart'); return []; } })();
