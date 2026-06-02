@@ -407,7 +407,25 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
         updateNetworkStatus(true);
-        syncWithSupabase();
+        
+        // Disable shiftEnabled in Supabase cloud db once for migration v4
+        if (localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
+          supabaseClient.from('doppio_business_profile').update({ shift_enabled: false }).eq('id', 1)
+            .then(({ error }) => {
+              if (!error) {
+                localStorage.setItem('doppio_shift_supabase_synced_v4', 'true');
+                console.log("Successfully disabled shift_enabled in cloud db for migration v4");
+              }
+              // Proceed with sync after update attempt completes
+              syncWithSupabase();
+            })
+            .catch(() => {
+              syncWithSupabase();
+            });
+        } else {
+          syncWithSupabase();
+        }
+        
         syncOfflineBills();
         setupSupabaseRealtime();
       } catch (err) {
