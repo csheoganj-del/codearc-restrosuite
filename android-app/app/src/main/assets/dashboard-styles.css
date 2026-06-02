@@ -2814,23 +2814,56 @@ input:checked + .slider:before {
     width: 100% !important;
     height: 85vh !important;
     background: white !important;
-    z-index: 1050 !important;
+    z-index: 2050 !important; /* Sit on top of bottom sheet nav */
     border-radius: 20px 20px 0 0 !important;
     box-shadow: 0 -10px 30px rgba(0,0,0,0.15) !important;
     transform: translateY(100%);
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
     display: flex !important;
     flex-direction: column !important;
     padding: 20px !important;
     overflow-y: auto !important;
+    visibility: hidden !important; /* Hide completely from page flow when inactive */
+    pointer-events: none !important;
   }
 
   .menu-editor-form-panel.active {
+    visibility: visible !important;
+    pointer-events: auto !important;
     transform: translateY(0) !important;
   }
   
   .settings-split-body {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Hide live receipt preview in settings modal on mobile to fit the form cleanly and show Save button */
+  .live-receipt-simulator {
+    display: none !important;
+  }
+  
+  /* Make CRM loyalty tiers a beautiful swipable horizontal carousel on mobile */
+  .loyalty-tiers-strip {
+    display: flex !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 12px !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 20px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .tier-card {
+    flex: 0 0 160px !important;
+    padding: 12px 14px !important;
+  }
+
+  /* Prevent table squishing on mobile by forcing scrollbar when overflowing */
+  .dashboard-table {
+    min-width: 750px !important;
+    width: max-content !important;
   }
   
   .crm-header-actions {
@@ -2866,10 +2899,12 @@ input:checked + .slider:before {
   }
 
   .glass-modal {
-    max-height: 90vh !important;
+    max-height: 85dvh !important;
     width: 95% !important;
     margin: 10px !important;
     border-radius: 16px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   .modal-body {
