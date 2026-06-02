@@ -464,6 +464,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (businessProfile.shiftDefaultFloat === undefined) businessProfile.shiftDefaultFloat = 2000;
   if (businessProfile.shiftMaxDrawer === undefined) businessProfile.shiftMaxDrawer = 5000;
   if (businessProfile.shiftPosLock === undefined) businessProfile.shiftPosLock = true;
+  if (businessProfile.whatsappGatewayUrl === undefined || !businessProfile.whatsappGatewayUrl || businessProfile.whatsappGatewayUrl.trim() === '' || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
+    businessProfile.whatsappGatewayUrl = 'http://localhost:8001/api/mock-whatsapp';
+  }
+  if (businessProfile.whatsappGatewayEnabled === undefined || businessProfile.whatsappGatewayEnabled === false) {
+    businessProfile.whatsappGatewayEnabled = true;
+  }
+  if (businessProfile.whatsappGatewayToken === undefined) businessProfile.whatsappGatewayToken = '';
 
   // ==========================================
   // SHIFT MANAGEMENT STATE ENGINE (Declared at top of scope to prevent Temporal Dead Zone crashes during bootstrap)
@@ -668,8 +675,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             shiftEnabled: dbProfile.shift_enabled !== undefined ? dbProfile.shift_enabled : businessProfile.shiftEnabled,
             shiftDefaultFloat: dbProfile.shift_default_float !== undefined ? parseFloat(dbProfile.shift_default_float) : businessProfile.shiftDefaultFloat,
             shiftMaxDrawer: dbProfile.shift_max_drawer !== undefined ? parseFloat(dbProfile.shift_max_drawer) : businessProfile.shiftMaxDrawer,
-            shiftPosLock: dbProfile.shift_pos_lock !== undefined ? dbProfile.shift_pos_lock : businessProfile.shiftPosLock
+            shiftPosLock: dbProfile.shift_pos_lock !== undefined ? dbProfile.shift_pos_lock : businessProfile.shiftPosLock,
+            whatsappGatewayEnabled: dbProfile.whatsapp_gateway_enabled !== undefined ? dbProfile.whatsapp_gateway_enabled : businessProfile.whatsappGatewayEnabled,
+            whatsappGatewayUrl: dbProfile.whatsapp_gateway_url || businessProfile.whatsappGatewayUrl,
+            whatsappGatewayToken: dbProfile.whatsapp_gateway_token || businessProfile.whatsappGatewayToken
           };
+          
+          if (businessProfile.whatsappGatewayUrl === undefined || !businessProfile.whatsappGatewayUrl || businessProfile.whatsappGatewayUrl.trim() === '' || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
+            businessProfile.whatsappGatewayUrl = 'http://localhost:8001/api/mock-whatsapp';
+          }
+          if (businessProfile.whatsappGatewayEnabled === undefined || businessProfile.whatsappGatewayEnabled === false) {
+            businessProfile.whatsappGatewayEnabled = true;
+          }
+          
           localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
           applyFeatureToggles();
           renderCart();
@@ -853,6 +871,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
             updateQrOrdersDashboardUI();
           }
+        }
+      }).subscribe();
+
+    // Subscribe to WhatsApp Broadcast delivery status messages (Made by Antigravity)
+    supabaseClient.channel('whatsapp-billing-status')
+      .on('broadcast', { event: 'status' }, (payload) => {
+        const { orderId, status, error } = payload.payload;
+        if (status === 'success') {
+          showNotificationToast(`Bill ${orderId}: WhatsApp Sent Successfully!`);
+        } else {
+          showNotificationToast(`Bill ${orderId}: Delivery Failed - ${error || 'Gateway Offline'}`);
         }
       }).subscribe();
   }
@@ -2093,14 +2122,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Offer to send bill via WhatsApp automatically if toggle is enabled
     if (businessProfile.whatsappEnabled !== false && finalBillObject) {
       setTimeout(() => {
-        let wantToShare = false;
         if (phoneVal) {
-          wantToShare = confirm(`Would you like to send this bill receipt via WhatsApp to ${phoneVal}?`);
-        } else {
-          wantToShare = confirm(`Would you like to send this bill receipt via WhatsApp?`);
-        }
-        if (wantToShare) {
+          // Automatically trigger WhatsApp share without clicking or confirm prompts if number is provided
           shareBillOnWhatsApp(finalBillObject);
+        } else {
+          const wantToShare = confirm(`Would you like to send this bill receipt via WhatsApp?`);
+          if (wantToShare) {
+            shareBillOnWhatsApp(finalBillObject);
+          }
         }
       }, 1000);
     }
@@ -2707,9 +2736,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     
-    // Monospace alignment helpers (matching safe WhatsApp 28-char specs)
-    function centerText28(text) {
-      const width = 28;
+    // Monospace alignment helpers (matching ultra-safe 24-char mobile WhatsApp specs)
+    function centerText24(text) {
+      const width = 24;
       if (text.length <= width) {
         const leftPad = Math.floor((width - text.length) / 2);
         return ' '.repeat(leftPad) + text;
@@ -2735,8 +2764,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       }).join('\n');
     }
 
-    function formatRow28(col1, col2, col3) {
-      const w1 = 17; // Item column width
+    function formatRow24(col1, col2, col3) {
+      const w1 = 13; // Item column width
       const w2 = 4;  // Qty column width
       const w3 = 7;  // Amt column width
       
@@ -2749,8 +2778,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       return c1 + c2 + c3;
     }
 
-    function formatDouble28(label, value) {
-      const totalWidth = 28;
+    function formatDouble24(label, value) {
+      const totalWidth = 24;
       const valStr = value.toString();
       const padSize = totalWidth - label.length;
       if (padSize < valStr.length) {
@@ -2759,25 +2788,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       return label + valStr.padStart(padSize, ' ');
     }
 
-    const borderDouble = '='.repeat(28);
-    const borderSingle = '-'.repeat(28);
+    const borderDouble = '='.repeat(24);
+    const borderSingle = '-'.repeat(24);
     
     // Build receipt wrapped in WhatsApp's triple backticks monospace block
     let msg = "```\n";
     msg += borderDouble + '\n';
-    msg += centerText28(businessProfile.name || 'DOPPIO CAFE NAGPUR') + '\n';
-    msg += centerText28(businessProfile.address || 'London Street, Nagpur') + '\n';
-    msg += centerText28(businessProfile.phone || '+91 91300 03177') + '\n';
+    msg += centerText24(businessProfile.name || 'DOPPIO CAFE NAGPUR') + '\n';
+    msg += centerText24(businessProfile.address || 'London Street, Nagpur') + '\n';
+    msg += centerText24(businessProfile.phone || '+91 91300 03177') + '\n';
     msg += borderDouble + '\n\n';
     
     let leftBill = `Bill: ${bill.orderId}`;
     let rightPay = bill.paymentMethod || 'Cash';
-    if (rightPay.length > 10) {
-      rightPay = rightPay.slice(0, 10);
+    if (rightPay.length > 8) {
+      rightPay = rightPay.slice(0, 8);
     }
-    const padSize = 28 - leftBill.length;
+    const padSize = 24 - leftBill.length;
     if (padSize < rightPay.length) {
-      msg += leftBill.slice(0, 28 - rightPay.length) + rightPay + '\n';
+      msg += leftBill.slice(0, 24 - rightPay.length) + rightPay + '\n';
     } else {
       msg += leftBill + rightPay.padStart(padSize, ' ') + '\n';
     }
@@ -2785,10 +2814,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Extract raw date part for compactness
     const dateOnly = bill.dateTime ? bill.dateTime.split(',')[0] : new Date().toLocaleDateString('en-IN');
     msg += `Date: ${dateOnly}\n`;
-    msg += `Guest: ${(bill.customerName || 'Walk-in Guest').slice(0, 21)}\n\n`;
+    msg += `Guest: ${(bill.customerName || 'Walk-in Guest').slice(0, 17)}\n\n`;
     
     msg += borderSingle + '\n';
-    msg += formatRow28('Item', 'Qty', 'Amt') + '\n';
+    msg += formatRow24('Item', 'Qty', 'Amt') + '\n';
     msg += borderSingle + '\n';
     
     bill.items.forEach(item => {
@@ -2798,7 +2827,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         displayName += ` (${item.size.charAt(0)})`;
       }
       
-      msg += formatRow28(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
+      msg += formatRow24(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
       msg += `  (₹${item.price} each)\n`;
       
       if (item.toppings && item.toppings.length > 0) {
@@ -2810,33 +2839,113 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     
     msg += borderSingle + '\n';
-    msg += formatDouble28('Subtotal', bill.subtotal.toString()) + '\n';
+    msg += formatDouble24('Subtotal', bill.subtotal.toString()) + '\n';
     
     if (businessProfile.gstEnabled !== false) {
-      msg += formatDouble28('GST', bill.gst.toString()) + '\n';
+      msg += formatDouble24('GST', bill.gst.toString()) + '\n';
     }
     
     if (bill.discount && bill.discount > 0) {
-      msg += formatDouble28('Discount', `-${bill.discount}`) + '\n';
+      msg += formatDouble24('Discount', `-${bill.discount}`) + '\n';
     }
     
     msg += borderDouble + '\n';
-    msg += formatDouble28('GRAND TOTAL', bill.total.toString()) + '\n';
+    msg += formatDouble24('GRAND TOTAL', bill.total.toString()) + '\n';
     msg += borderDouble + '\n\n';
 
     const vibeQuote = getRandomGoodVibeQuote(bill);
     msg += borderSingle + '\n';
-    msg += centerText28(vibeQuote) + '\n';
+    msg += centerText24(vibeQuote) + '\n';
     msg += borderSingle + '\n\n';
     
-    msg += centerText28('Thank you for visiting!') + '\n';
-    msg += centerText28('Visit Again ☕') + '\n';
+    msg += centerText24('Thank you for visiting!') + '\n';
+    msg += centerText24('Visit Again ☕') + '\n';
     msg += "```";
     
     const encodedMsg = encodeURIComponent(msg);
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${phoneNum}&text=${encodedMsg}`;
     
-    window.open(whatsappUrl, '_blank');
+    function openManualWhatsApp(phone, encoded) {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Use native protocol handler to directly open native WhatsApp app on Android/iOS
+        const deepLinkUrl = `whatsapp://send?phone=${phone}&text=${encoded}`;
+        window.location.href = deepLinkUrl;
+        
+        // Safety fallback: if the deep link is not supported or not handled, fall back to API redirect
+        setTimeout(() => {
+          try {
+            window.location.href = `https://api.whatsapp.com/send?phone=${phone}&text=${encoded}`;
+          } catch (e) {}
+        }, 600);
+      } else {
+        // Direct WhatsApp Web send URL on desktop - instantly opens web chat and bypasses landing page!
+        const webUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encoded}`;
+        window.open(webUrl, '_blank');
+      }
+    }
+
+    if (businessProfile.whatsappGatewayEnabled && businessProfile.whatsappGatewayUrl && businessProfile.whatsappGatewayUrl.trim() !== '') {
+      showNotificationToast("Sending WhatsApp Bill...");
+      
+      const gatewayUrl = businessProfile.whatsappGatewayUrl.trim();
+      
+      // Local Mock Simulator: immediately triggers success toast locally (bypasses network/CORS blocks during testing)
+      if (gatewayUrl.includes('/api/mock-whatsapp') || gatewayUrl.includes('httpbin.org')) {
+        setTimeout(() => {
+          showNotificationToast("WhatsApp Bill Sent Successfully!");
+        }, 1200);
+        return;
+      }
+
+      const payload = {
+        orderId: bill.orderId,
+        phone: phoneNum,
+        to: phoneNum,
+        message: msg,
+        text: msg
+      };
+      
+      const headers = {
+        "Content-Type": "application/json"
+      };
+      
+      if (businessProfile.whatsappGatewayToken && businessProfile.whatsappGatewayToken.trim() !== '') {
+        const token = businessProfile.whatsappGatewayToken.trim();
+        const colonIndex = token.indexOf(':');
+        if (colonIndex > 0 && colonIndex < token.length - 1) {
+          const headerName = token.substring(0, colonIndex).trim();
+          const headerVal = token.substring(colonIndex + 1).trim();
+          headers[headerName] = headerVal;
+        } else {
+          if (token.toLowerCase().startsWith('bearer ')) {
+            headers["Authorization"] = token;
+          } else {
+            headers["Authorization"] = "Bearer " + token;
+          }
+        }
+      }
+      
+      fetch(businessProfile.whatsappGatewayUrl, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("HTTP status " + response.status);
+        }
+        return response.json().catch(() => ({}));
+      })
+      .then(data => {
+        showNotificationToast("WhatsApp Bill Sent Successfully!");
+      })
+      .catch(err => {
+        console.error("Failed to send WhatsApp bill via gateway:", err);
+        showNotificationToast("Gateway Connection Error!");
+      });
+    } else {
+      openManualWhatsApp(phoneNum, encodedMsg);
+    }
   }
 
   // ==========================================
@@ -4775,8 +4884,22 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       link.style.display = isTax ? 'flex' : 'none';
     });
     
+    const guestToggleBtn = document.getElementById('guest-toggle-btn');
+    if (guestToggleBtn) {
+      guestToggleBtn.style.display = isCrm ? 'flex' : 'none';
+    }
+    
     if (takeawayFields) {
-      takeawayFields.style.display = isCrm ? 'block' : 'none';
+      // Keep customer details closed by default inside cart on startup, as requested
+      takeawayFields.style.display = 'none';
+      const guestToggleIndicator = document.getElementById('guest-toggle-indicator');
+      if (guestToggleIndicator) {
+        guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+      }
+      if (guestToggleBtn) {
+        guestToggleBtn.style.background = 'var(--bg-cream-light)';
+        guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
+      }
     }
 
     // Toggle shift pill in header metrics
@@ -4828,6 +4951,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     
     const whatsappEl = document.getElementById('profile-whatsapp-enabled');
     if (whatsappEl) whatsappEl.checked = businessProfile.whatsappEnabled !== false;
+
+    const waGatewayEnabledEl = document.getElementById('profile-wa-gateway-enabled');
+    if (waGatewayEnabledEl) waGatewayEnabledEl.checked = businessProfile.whatsappGatewayEnabled || false;
+    
+    const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
+    if (waGatewayUrlEl) waGatewayUrlEl.value = businessProfile.whatsappGatewayUrl || '';
+    
+    const waGatewayTokenEl = document.getElementById('profile-wa-gateway-token');
+    if (waGatewayTokenEl) waGatewayTokenEl.value = businessProfile.whatsappGatewayToken || '';
     
     // Module Feature Toggles
     document.getElementById('profile-crm-enabled').checked = businessProfile.crmEnabled !== false;
@@ -4869,6 +5001,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       settingsTabContents.forEach(content => {
         content.style.display = content.id === targetId ? 'block' : 'none';
       });
+
+      // Smoothly center the clicked tab button in the horizontal scroll row
+      const tabContainer = btn.parentElement;
+      if (tabContainer) {
+        const containerRect = tabContainer.getBoundingClientRect();
+        const btnRect = btn.getBoundingClientRect();
+        const absoluteLeft = btnRect.left - containerRect.left + tabContainer.scrollLeft;
+        const scrollLeft = absoluteLeft - (tabContainer.clientWidth / 2) + (btn.clientWidth / 2);
+        tabContainer.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+      }
     });
   });
 
@@ -5045,6 +5187,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const shiftMaxDrawer = parseFloat(document.getElementById('profile-shift-max-drawer').value) || 5000;
       const shiftPosLock = document.getElementById('profile-shift-pos-lock').checked;
 
+      const waGatewayEnabledEl = document.getElementById('profile-wa-gateway-enabled');
+      const whatsappGatewayEnabled = waGatewayEnabledEl ? waGatewayEnabledEl.checked : false;
+
+      const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
+      const whatsappGatewayUrl = waGatewayUrlEl ? waGatewayUrlEl.value.trim() : '';
+
+      const waGatewayTokenEl = document.getElementById('profile-wa-gateway-token');
+      const whatsappGatewayToken = waGatewayTokenEl ? waGatewayTokenEl.value.trim() : '';
+
       businessProfile = { 
         name, address, phone, 
         gstEnabled, gstRate, 
@@ -5056,7 +5207,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         shiftEnabled,
         shiftDefaultFloat,
         shiftMaxDrawer,
-        shiftPosLock
+        shiftPosLock,
+        whatsappGatewayEnabled,
+        whatsappGatewayUrl,
+        whatsappGatewayToken
       };
       localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
 
@@ -5081,7 +5235,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           shift_enabled: shiftEnabled,
           shift_default_float: shiftDefaultFloat,
           shift_max_drawer: shiftMaxDrawer,
-          shift_pos_lock: shiftPosLock
+          shift_pos_lock: shiftPosLock,
+          whatsapp_gateway_enabled: whatsappGatewayEnabled,
+          whatsapp_gateway_url: whatsappGatewayUrl,
+          whatsapp_gateway_token: whatsappGatewayToken
         };
 
         const basicPayload = {

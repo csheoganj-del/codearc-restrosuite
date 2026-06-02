@@ -2109,6 +2109,7 @@ body {
   cursor: pointer;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
+  flex-shrink: 0 !important;
 }
 
 .settings-tab-btn.active {
@@ -2835,11 +2836,54 @@ input:checked + .slider:before {
   
   .settings-split-body {
     grid-template-columns: 1fr !important;
+    padding: 0 !important;
+    flex-grow: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+
+  .settings-form-container {
+    flex-grow: 1 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  #business-profile-form {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-grow: 1 !important;
   }
 
   /* Hide live receipt preview in settings modal on mobile to fit the form cleanly and show Save button */
   .live-receipt-simulator {
     display: none !important;
+  }
+
+  .settings-tab-buttons {
+    position: relative !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Sticky footer settings buttons container on mobile */
+  .settings-form-actions {
+    position: sticky !important;
+    bottom: -16px !important; /* aligns with .settings-form-container bottom padding */
+    background: var(--white) !important;
+    padding: 12px 16px !important;
+    margin-left: -16px !important;
+    margin-right: -16px !important;
+    border-top: 1px dashed rgba(var(--primary-brand-rgb), 0.12) !important;
+    margin-top: auto !important; /* Pushes the sticky footer to the bottom of the form if content is short */
+    z-index: 100 !important;
+    display: flex !important;
+    gap: 10px !important;
+    justify-content: flex-end !important;
+    border-radius: 0 0 16px 16px !important; /* Match the modal bottom rounded corners */
   }
   
   /* Make CRM loyalty tiers a beautiful swipable horizontal carousel on mobile */
@@ -2883,8 +2927,10 @@ input:checked + .slider:before {
   }
 
   .reports-columns {
-    grid-template-columns: 1fr !important;
-    gap: 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 16px !important;
   }
 
   .crm-table-container, .tax-table-container, .bills-table-container {
@@ -2903,12 +2949,21 @@ input:checked + .slider:before {
     width: 95% !important;
     margin: 10px !important;
     border-radius: 16px !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .modal-header {
+    flex-shrink: 0 !important;
   }
 
   .modal-body {
     padding: 16px !important;
+    flex-grow: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
   /* "More" Navigation Bottom Sheet */
@@ -3578,8 +3633,49 @@ body.dark-theme #shift-details-modal .glass-modal {
 }
 
 @media (max-width: 768px) {
+  .report-panel {
+    padding: 16px 12px !important; /* Reduced padding from 24px to prevent horizontal viewport clipping */
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .report-panel > div:first-child {
+    flex-wrap: wrap !important; /* Prevents title and subtitle from overlapping or squishing */
+    gap: 6px !important;
+  }
+
   .tables-map-grid {
     grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important; /* Reduced gap from 16px to fit narrow screens */
+    width: 100% !important;
+  }
+
+  .table-card {
+    padding: 12px 8px !important; /* Reduced padding from 20px */
+    gap: 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .table-card-num {
+    font-size: 16px !important; /* Slightly smaller table numbers to fit beautifully */
+  }
+
+  .table-status-pill {
+    font-size: 9px !important; /* Legible but compact */
+    padding: 3px 6px !important;
+  }
+
+  .table-card-actions {
+    flex-direction: column !important; /* Stack QR Link and Scan buttons vertically to prevent squishing */
+    gap: 6px !important;
+    margin-top: 6px !important;
+    padding-top: 8px !important;
+  }
+
+  .table-card-btn {
+    width: 100% !important;
+    padding: 8px 4px !important;
+    font-size: 10px !important;
   }
 }
 
@@ -3840,6 +3936,274 @@ body.dark-theme #shift-details-modal .glass-modal {
   box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
 }
 
+.online-badge {
+  box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
+}
+
+/* AI Smart Upsell Container */
+.ai-upsell-container {
+  background: rgba(201, 138, 74, 0.05);
+  border: 1px dashed var(--accent-caramel);
+  border-radius: var(--border-radius-md);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: fadeInUp 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-upsell-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--accent-caramel);
+}
+
+.ai-upsell-badge {
+  background: var(--accent-caramel);
+  color: var(--white);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-upsell-text {
+  font-size: 11px;
+  color: var(--primary-brand);
+  font-weight: 600;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.ai-upsell-btn {
+  background: var(--white);
+  border: 1px solid rgba(201, 138, 74, 0.25);
+  color: var(--accent-caramel);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.ai-upsell-btn:hover {
+  background: var(--accent-caramel);
+  color: var(--white);
+}
+
+/* Kitchen Display System (KDS) Cards */
+.kds-card {
+  background: var(--white);
+  border-radius: var(--border-radius-md);
+  border: 1px solid rgba(43, 24, 19, 0.05);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  transition: var(--transition);
+  animation: fadeInUp 0.3s ease;
+  min-height: 240px;
+}
+
+.kds-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.kds-card.type-dine-in { border-top: 5px solid var(--accent-caramel); }
+.kds-card.type-takeaway { border-top: 5px solid var(--primary-brand); }
+.kds-card.type-swiggy { border-top: 5px solid #fc8019; }
+.kds-card.type-zomato { border-top: 5px solid #e23744; }
+
+.kds-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(43, 24, 19, 0.05);
+  padding-bottom: 8px;
+}
+
+.kds-card-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-brand);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kds-card-timer {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--danger-color);
+  background: rgba(231, 76, 60, 0.06);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.kds-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.kds-item-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--primary-brand);
+}
+
+.kds-item-row input[type="checkbox"] {
+  margin-top: 3px;
+  cursor: pointer;
+  accent-color: var(--accent-caramel);
+  width: 14px;
+  height: 14px;
+}
+
+.kds-item-row.checked span {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.kds-item-qty {
+  font-weight: 800;
+  color: var(--accent-caramel);
+  background: rgba(201, 138, 74, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.kds-item-desc {
+  font-size: 9px;
+  color: var(--danger-color);
+  font-style: italic;
+  margin-top: 2px;
+  display: block;
+}
+
+.kds-card-footer {
+  margin-top: auto;
+  border-top: 1px solid rgba(43, 24, 19, 0.05);
+  padding-top: 12px;
+}
+
+.kds-bump-btn {
+  width: 100%;
+  border: none;
+  background: var(--caramel-gradient);
+  color: var(--white);
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.kds-bump-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(201,138,74,0.25);
+}
+
+/* Token Management Styles */
+.token-monitor-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  height: calc(100vh - 180px);
+}
+
+.token-column {
+  background: var(--white);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid rgba(43, 24, 19, 0.05);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.token-column-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(43, 24, 19, 0.05);
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.token-column-header.preparing {
+  background: rgba(201, 138, 74, 0.04);
+  color: var(--primary-brand);
+}
+
+.token-column-header.ready {
+  background: rgba(46, 204, 113, 0.04);
+  color: var(--success-color);
+}
+
+.token-list {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
+}
+
+.token-badge {
+  background: var(--bg-cream-light);
+  border: 1px solid rgba(43, 24, 19, 0.06);
+  color: var(--primary-brand);
+  font-size: 16px;
+  font-weight: 800;
+  padding: 12px 6px;
+  border-radius: 12px;
+  text-align: center;
+  animation: pulse-slow 2s infinite;
+}
+
+.token-badge.ready {
+  background: rgba(46, 204, 113, 0.08);
+  border-color: rgba(46, 204, 113, 0.2);
+  color: var(--success-color);
+  animation: readyPulse 1.5s infinite alternate;
+  font-size: 18px;
+}
+
+@keyframes readyPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(46, 204, 113, 0); }
+  100% { transform: scale(1.05); box-shadow: 0 0 12px rgba(46, 204, 113, 0.25); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* Dark theme specific visual map tweaks */
 body.dark-theme .table-card {
   background-color: #201512 !important;
@@ -3863,6 +4227,61 @@ body.dark-theme .printable-qr-station-frame {
 }
 body.dark-theme .printable-qr-station-frame * {
   color: #2C1B18 !important;
+}
+
+body.dark-theme .ai-upsell-container {
+  background: rgba(247, 243, 239, 0.02) !important;
+  border-color: rgba(201, 138, 74, 0.4) !important;
+}
+body.dark-theme .ai-upsell-text {
+  color: #F7F3EF !important;
+}
+body.dark-theme .ai-upsell-btn {
+  background: #201512 !important;
+  border-color: rgba(201, 138, 74, 0.2) !important;
+  color: var(--accent-caramel) !important;
+}
+body.dark-theme .ai-upsell-btn:hover {
+  background: var(--accent-caramel) !important;
+  color: white !important;
+}
+
+body.dark-theme .kds-card {
+  background-color: #201512 !important;
+  border-color: rgba(247, 243, 239, 0.06) !important;
+}
+body.dark-theme .kds-card-title {
+  color: #F7F3EF !important;
+}
+body.dark-theme .kds-item-row {
+  color: #F7F3EF !important;
+}
+body.dark-theme .kds-card-header,
+body.dark-theme .kds-card-footer {
+  border-color: rgba(247, 243, 239, 0.06) !important;
+}
+
+body.dark-theme .token-column {
+  background-color: #201512 !important;
+  border-color: rgba(247, 243, 239, 0.06) !important;
+}
+body.dark-theme .token-column-header.preparing {
+  background-color: rgba(201, 138, 74, 0.05) !important;
+  color: #F7F3EF !important;
+}
+body.dark-theme .token-column-header.ready {
+  background-color: rgba(46, 204, 113, 0.05) !important;
+  color: var(--success-color) !important;
+}
+body.dark-theme .token-badge {
+  background-color: #1A0F0D !important;
+  border-color: rgba(247, 243, 239, 0.04) !important;
+  color: #F7F3EF !important;
+}
+body.dark-theme .token-badge.ready {
+  background-color: rgba(46, 204, 113, 0.1) !important;
+  border-color: rgba(46, 204, 113, 0.2) !important;
+  color: var(--success-color) !important;
 }
 
 

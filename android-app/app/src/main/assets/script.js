@@ -4,6 +4,20 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
+
+  // Initialize Supabase Client (Made by Antigravity)
+  let supabaseClient = null;
+  const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
+  const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+
+  if (typeof supabase !== 'undefined') {
+    try {
+      supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+      console.log("Supabase initialized successfully on Customer side");
+    } catch (err) {
+      console.error("Supabase fail to initialize on Customer side:", err);
+    }
+  }
   
   // ==========================================
   // 1. DYNAMIC INTERACTIVE MENU DATABASE
@@ -101,6 +115,33 @@ window.addEventListener('DOMContentLoaded', () => {
     // PASTA
     { name: 'Alfredo Pennei Pasta', description: 'Creamy rich Alfredo white sauce penne pasta.', price: '₹499', category: 'PASTA', icon: '🍝' }
   ];
+
+  // Fetch menuData dynamically from Supabase if available (Made by Antigravity)
+  if (supabaseClient) {
+    supabaseClient.from('doppio_menu').select('*')
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          console.log("Dynamically loaded menu from Supabase:", data);
+          const dbMenuMapped = data.map(item => ({
+            name: item.name,
+            description: item.description || '',
+            price: `₹${item.price}`,
+            category: item.category,
+            icon: item.icon || '☕',
+            bestseller: item.bestseller || false
+          }));
+          
+          // Replace static array contents with cloud values
+          menuData.length = 0;
+          dbMenuMapped.forEach(i => menuData.push(i));
+          
+          // Re-render menu
+          renderMenu();
+        } else {
+          console.log("Supabase menu fetch empty or error. Using local fallback.");
+        }
+      });
+  }
 
   // Render Menu Function
   const menuGrid = document.getElementById('menu-grid');
@@ -636,23 +677,113 @@ window.addEventListener('DOMContentLoaded', () => {
   const tableParam = urlParams.get('table');
   let lockedTableNum = null;
 
-  if (tableParam) {
-    lockedTableNum = tableParam.trim();
-    if (custOrderTable) {
-      custOrderTable.value = lockedTableNum;
-    }
-    if (drawerTableBadge) {
-      drawerTableBadge.textContent = 'Table ' + (parseInt(lockedTableNum) < 10 ? '0' + lockedTableNum : lockedTableNum);
-      drawerTableBadge.style.display = 'inline-block';
-    }
+  const isCaptainMode = urlParams.get('captain') === 'true' || urlParams.get('waiter') === 'true';
+
+  if (isCaptainMode) {
+    // Inject floating captain bar programmatically
+    const bar = document.createElement('div');
+    bar.id = 'captain-header-bar';
+    bar.style.position = 'fixed';
+    bar.style.top = '0';
+    bar.style.left = '0';
+    bar.style.right = '0';
+    bar.style.height = '60px';
+    bar.style.background = 'rgba(43, 24, 19, 0.95)';
+    bar.style.backdropFilter = 'blur(10px)';
+    bar.style.borderBottom = '2px solid var(--accent-caramel)';
+    bar.style.zIndex = '9999';
+    bar.style.display = 'flex';
+    bar.style.alignItems = 'center';
+    bar.style.justifyContent = 'space-between';
+    bar.style.padding = '0 16px';
+    bar.style.boxShadow = '0 2px 10px rgba(43,24,19,0.25)';
+    bar.style.fontFamily = 'Outfit, sans-serif';
+    bar.style.color = '#fff';
+    bar.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px;">
+        <i class="fa-solid fa-user-tie" style="color:var(--accent-caramel); font-size:18px;"></i>
+        <div style="display:flex; flex-direction:column;">
+          <span style="font-weight:800; color:var(--accent-caramel); font-size:13px; line-height:1.2;">CAPTAIN STATION</span>
+          <span style="font-size:9px; color:rgba(255,255,255,0.7);">Take table orders directly</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:11px; font-weight:700; color:rgba(255,255,255,0.8);">Active Table:</span>
+        <select id="captain-table-select" style="background:#fff; border:1.5px solid var(--accent-caramel); padding:5px 8px; border-radius:8px; font-size:12px; font-weight:800; color:var(--primary-brand); outline:none;">
+          <option value="Takeaway">Takeaway</option>
+          <option value="1">Table 01</option>
+          <option value="2">Table 02</option>
+          <option value="3">Table 03</option>
+          <option value="4">Table 04</option>
+          <option value="5">Table 05</option>
+          <option value="6">Table 06</option>
+          <option value="7">Table 07</option>
+          <option value="8">Table 08</option>
+          <option value="9">Table 09</option>
+          <option value="10">Table 10</option>
+        </select>
+      </div>
+    `;
+    document.body.appendChild(bar);
+    document.body.style.paddingTop = '60px';
+
+    // Hide normal table selector
     if (tableSelectGroup) {
       tableSelectGroup.style.display = 'none';
     }
-  }
 
-  // Pre-populate customer name and phone from localStorage
-  if (custOrderName) custOrderName.value = localStorage.getItem('cust_self_name') || '';
-  if (custOrderPhone) custOrderPhone.value = localStorage.getItem('cust_self_phone') || '';
+    // Bind captain selector to order fields
+    setTimeout(() => {
+      const capSelect = document.getElementById('captain-table-select');
+      if (capSelect) {
+        capSelect.addEventListener('change', (e) => {
+          if (custOrderTable) {
+            custOrderTable.value = e.target.value;
+          }
+          if (drawerTableBadge) {
+            if (e.target.value === 'Takeaway') {
+              drawerTableBadge.textContent = 'Takeaway';
+            } else {
+              drawerTableBadge.textContent = 'Table ' + (parseInt(e.target.value) < 10 ? '0' + e.target.value : e.target.value);
+            }
+            drawerTableBadge.style.display = 'inline-block';
+          }
+        });
+        // If there's a table in url, select it
+        if (tableParam) {
+          capSelect.value = tableParam.trim();
+        }
+        capSelect.dispatchEvent(new Event('change'));
+      }
+    }, 100);
+
+    // Lock cashier inputs
+    if (custOrderName) {
+      custOrderName.value = "Waiter Captain";
+      custOrderName.readOnly = true;
+    }
+    if (custOrderPhone) {
+      custOrderPhone.value = "9999999999";
+      custOrderPhone.readOnly = true;
+    }
+  } else {
+    if (tableParam) {
+      lockedTableNum = tableParam.trim();
+      if (custOrderTable) {
+        custOrderTable.value = lockedTableNum;
+      }
+      if (drawerTableBadge) {
+        drawerTableBadge.textContent = 'Table ' + (parseInt(lockedTableNum) < 10 ? '0' + lockedTableNum : lockedTableNum);
+        drawerTableBadge.style.display = 'inline-block';
+      }
+      if (tableSelectGroup) {
+        tableSelectGroup.style.display = 'none';
+      }
+    }
+    // Pre-populate customer name and phone from localStorage
+    if (custOrderName) custOrderName.value = localStorage.getItem('cust_self_name') || '';
+    if (custOrderPhone) custOrderPhone.value = localStorage.getItem('cust_self_phone') || '';
+  }
 
   // Event Listeners for Cart Drawer Toggle
   if (floatCartBtn) {
@@ -873,6 +1004,11 @@ window.addEventListener('DOMContentLoaded', () => {
       // Close Cart Drawer and Open UPI Modal
       toggleCartDrawer(false);
       
+      if (isCaptainMode) {
+        dispatchCustomerOrder('Captain App');
+        return;
+      }
+      
       if (upiModal) {
         playSynthesizerBeep(523.25, 0.1); // C5
         upiModal.classList.add('open');
@@ -925,10 +1061,32 @@ window.addEventListener('DOMContentLoaded', () => {
       paymentMethod: payMethod,
       orderType: tableVal === 'Takeaway' ? 'Takeaway' : 'Dine-in',
       tableNumber: tableVal,
-      status: 'Pending Review'
+      status: payMethod === 'Captain App' ? 'Accepted' : 'Pending Review'
     };
 
-    // 1. Sync via BroadcastChannel for instant local tab sync
+    // 1. Sync via Supabase Database (Real-time Cloud Sync) (Made by Antigravity)
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders').insert({
+        orderId: generatedOrderId,
+        customerName: nameVal,
+        customerPhone: phoneVal || 'Dine-in Customer',
+        dateTime: timestamp,
+        items: JSON.stringify(custCart),
+        subtotal: subtotal,
+        discount: 0,
+        gst: gst,
+        total: subtotal,
+        paymentMethod: payMethod,
+        orderType: tableVal === 'Takeaway' ? 'Takeaway' : 'Dine-in',
+        tableNumber: tableVal,
+        status: payMethod === 'Captain App' ? 'Accepted' : 'Pending Review'
+      }).then(({ error }) => {
+        if (error) console.error("Error inserting pending QR order to Supabase:", error);
+        else console.log("Pending QR order successfully uploaded to Supabase!");
+      });
+    }
+
+    // 2. Sync via BroadcastChannel for instant local tab sync
     try {
       broadcastChannel.postMessage({
         type: 'NEW_QR_ORDER',
@@ -939,13 +1097,36 @@ window.addEventListener('DOMContentLoaded', () => {
       console.error('BroadcastChannel failed, using storage fallback', e);
     }
 
-    // 2. Storage backup fallback
+    // 3. Storage backup fallback
     const pendingQueue = JSON.parse(localStorage.getItem('doppio_pending_qr_orders')) || [];
     pendingQueue.push(orderObject);
     localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQueue));
 
     // Close UPI gateway
     if (upiModal) upiModal.classList.remove('open');
+
+    if (isCaptainMode) {
+      // Synthesize Success chimes: major arpeggio
+      setTimeout(() => playSynthesizerBeep(523.25, 0.15), 0);   // C5
+      setTimeout(() => playSynthesizerBeep(659.25, 0.15), 100); // E5
+      setTimeout(() => playSynthesizerBeep(783.99, 0.15), 200); // G5
+      setTimeout(() => playSynthesizerBeep(1046.50, 0.3), 300); // C6
+      
+      // Confetti physics particle explosion!
+      setTimeout(launchSuccessConfetti, 250);
+      
+      alert(`Success! Captain Order ${generatedOrderId} sent directly to Kitchen.`);
+      
+      // Clear Cart
+      custCart = [];
+      localStorage.removeItem('cust_cart');
+      renderCustomerCart();
+      updateCustomerFloatingBadge();
+      
+      // Close Cart Drawer
+      toggleCartDrawer(false);
+      return;
+    }
 
     // Open Success Receipt Screen
     if (successScreen) {

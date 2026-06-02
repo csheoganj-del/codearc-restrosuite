@@ -8,3 +8,7 @@ app/build/
 *.aar
 local.properties
 .DS_Store
+
+node_modules/
+.wwebjs_auth/
+.wwebjs_cache/

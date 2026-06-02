@@ -1,5 +1,5 @@
 # Native PowerShell HTTP Server for Doppio Cafe POS
-$port = 8000
+$port = 8001
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$port/")
 
@@ -14,6 +14,44 @@ try {
         $response = $context.Response
         
         $urlPath = $request.Url.LocalPath
+        
+        # Handle CORS OPTIONS preflight
+        if ($request.HttpMethod -eq "OPTIONS") {
+            $response.Headers.Add("Access-Control-Allow-Origin", "*")
+            $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            $response.Headers.Add("Access-Control-Allow-Methods", "POST, OPTIONS, GET")
+            $response.StatusCode = 200
+            $response.Close()
+            continue
+        }
+
+        # Mock WhatsApp Gateway API Receiver
+        if ($urlPath -eq "/api/mock-whatsapp") {
+            $reader = New-Object System.IO.StreamReader($request.InputStream)
+            $body = $reader.ReadToEnd()
+            $reader.Close()
+            
+            Write-Host "`n==========================================" -ForegroundColor Green
+            Write-Host "   MOCK AUTOMATED WHATSAPP GATEWAY" -ForegroundColor Green
+            Write-Host "==========================================" -ForegroundColor Green
+            Write-Host "Received background WhatsApp dispatch!" -ForegroundColor Cyan
+            Write-Host "Payload content:" -ForegroundColor Gray
+            Write-Host $body -ForegroundColor White
+            Write-Host "==========================================`n" -ForegroundColor Green
+            
+            $response.ContentType = "application/json"
+            $response.Headers.Add("Access-Control-Allow-Origin", "*")
+            $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            $response.Headers.Add("Access-Control-Allow-Methods", "POST, OPTIONS")
+            $response.StatusCode = 200
+            
+            $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Mock delivery successful"}')
+            $response.ContentLength64 = $resBytes.Length
+            $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            $response.Close()
+            continue
+        }
+
         if ($urlPath -eq "/") { $urlPath = "/login.html" }
         
         # Resolve real file path on disk

@@ -2109,6 +2109,7 @@ body {
   cursor: pointer;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
+  flex-shrink: 0 !important;
 }
 
 .settings-tab-btn.active {
@@ -2835,11 +2836,54 @@ input:checked + .slider:before {
   
   .settings-split-body {
     grid-template-columns: 1fr !important;
+    padding: 0 !important;
+    flex-grow: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+
+  .settings-form-container {
+    flex-grow: 1 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  #business-profile-form {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-grow: 1 !important;
   }
 
   /* Hide live receipt preview in settings modal on mobile to fit the form cleanly and show Save button */
   .live-receipt-simulator {
     display: none !important;
+  }
+
+  .settings-tab-buttons {
+    position: relative !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Sticky footer settings buttons container on mobile */
+  .settings-form-actions {
+    position: sticky !important;
+    bottom: -16px !important; /* aligns with .settings-form-container bottom padding */
+    background: var(--white) !important;
+    padding: 12px 16px !important;
+    margin-left: -16px !important;
+    margin-right: -16px !important;
+    border-top: 1px dashed rgba(var(--primary-brand-rgb), 0.12) !important;
+    margin-top: auto !important; /* Pushes the sticky footer to the bottom of the form if content is short */
+    z-index: 100 !important;
+    display: flex !important;
+    gap: 10px !important;
+    justify-content: flex-end !important;
+    border-radius: 0 0 16px 16px !important; /* Match the modal bottom rounded corners */
   }
   
   /* Make CRM loyalty tiers a beautiful swipable horizontal carousel on mobile */
@@ -2883,8 +2927,10 @@ input:checked + .slider:before {
   }
 
   .reports-columns {
-    grid-template-columns: 1fr !important;
-    gap: 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 16px !important;
   }
 
   .crm-table-container, .tax-table-container, .bills-table-container {
@@ -2903,12 +2949,21 @@ input:checked + .slider:before {
     width: 95% !important;
     margin: 10px !important;
     border-radius: 16px !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .modal-header {
+    flex-shrink: 0 !important;
   }
 
   .modal-body {
     padding: 16px !important;
+    flex-grow: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
   /* "More" Navigation Bottom Sheet */
@@ -3578,8 +3633,49 @@ body.dark-theme #shift-details-modal .glass-modal {
 }
 
 @media (max-width: 768px) {
+  .report-panel {
+    padding: 16px 12px !important; /* Reduced padding from 24px to prevent horizontal viewport clipping */
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .report-panel > div:first-child {
+    flex-wrap: wrap !important; /* Prevents title and subtitle from overlapping or squishing */
+    gap: 6px !important;
+  }
+
   .tables-map-grid {
     grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important; /* Reduced gap from 16px to fit narrow screens */
+    width: 100% !important;
+  }
+
+  .table-card {
+    padding: 12px 8px !important; /* Reduced padding from 20px */
+    gap: 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .table-card-num {
+    font-size: 16px !important; /* Slightly smaller table numbers to fit beautifully */
+  }
+
+  .table-status-pill {
+    font-size: 9px !important; /* Legible but compact */
+    padding: 3px 6px !important;
+  }
+
+  .table-card-actions {
+    flex-direction: column !important; /* Stack QR Link and Scan buttons vertically to prevent squishing */
+    gap: 6px !important;
+    margin-top: 6px !important;
+    padding-top: 8px !important;
+  }
+
+  .table-card-btn {
+    width: 100% !important;
+    padding: 8px 4px !important;
+    font-size: 10px !important;
   }
 }
 
