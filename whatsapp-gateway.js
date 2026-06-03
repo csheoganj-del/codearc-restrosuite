@@ -26,10 +26,19 @@ let connectionStatus = 'connecting'; // 'connecting', 'qr', 'ready', 'disconnect
 let qrCodeDataUrl = null;
 let linkedNumber = null;
 
+const os = require('os');
+const path = require('path');
+
+// Determine data path dynamically to support both Windows local execution and Linux cloud containers
+let authDataPath = path.join(__dirname, '.wwebjs_auth');
+if (os.platform() === 'win32') {
+    authDataPath = 'C:\\Users\\KALPESH DEORA\\.gemini\\antigravity\\doppio-auth';
+}
+
 // Initialize WhatsApp client with local session caching
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: 'C:\\Users\\KALPESH DEORA\\.gemini\\antigravity\\doppio-auth'
+        dataPath: authDataPath
     }),
     puppeteer: {
         handleSIGINT: false,
