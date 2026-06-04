@@ -710,7 +710,7 @@ async function handleNewRegistrationNotification(record) {
         }
         const chatId = `${targetPhone}@c.us`;
         const typeStr = (outlet_type || 'cafe').toUpperCase();
-        const msgText = `🎉 *Registration Received - CodeArc RestoSuite*\n\nHello,\n\nThank you for registering your outlet *${name}* (${typeStr}) with CodeArc RestoSuite!\n\nYour registration details:\n• *Outlet ID (Slug):* ${slug}\n• *Admin Username:* ${username}\n• *Owner Email:* ${email || 'N/A'}\n• *WhatsApp Number:* ${phone}\n\n*Status:* ⏳ Pending Approval\n\nOur team at CodeArc is reviewing your request. You will receive another notification as soon as your account is approved and active.\n\nIf you have any questions, feel free to reply or contact us at:\n• 📧 Email: hello@codearc.co.in\n• 📞 Call: +353 85 225 8004\n• 🌐 Web: corearc.co.in\n\nBest regards,\nCodeArc Operations Team`;
+        const msgText = `🎉 *Registration Received - CodeArc RestoSuite*\n\nHello,\n\nThank you for registering your outlet *${name}* (${typeStr}) with CodeArc RestoSuite!\n\nYour registration details:\n• *Outlet ID (Slug):* ${slug}\n• *Admin Username:* ${username}\n• *Owner Email:* ${email || 'N/A'}\n• *WhatsApp Number:* ${phone}\n\n*Status:* ⏳ Pending Approval\n\nOur team at CodeArc is reviewing your request. You will receive another notification as soon as your account is approved and active.\n\nIf you have any questions, feel free to reply or contact us at:\n• 📧 Email: hello@codearc.co.in\n• 📞 Call: +91 99837 21179\n• 🌐 Web: codearc.co.in\n\nBest regards,\nCodeArc Operations Team`;
         
         try {
             await client.sendMessage(chatId, msgText);
@@ -747,8 +747,8 @@ async function handleNewRegistrationNotification(record) {
           <p style="font-size: 12px; color: #666; margin-bottom: 5px;">Need support? Contact us at:</p>
           <ul style="font-size: 12px; color: #666; padding-left: 20px; margin-top: 0;">
             <li>📧 Email: <a href="mailto:hello@codearc.co.in" style="color: #C98A4A; text-decoration: none;">hello@codearc.co.in</a></li>
-            <li>📞 Call: +353 85 225 8004</li>
-            <li>🌐 Web: <a href="https://corearc.co.in" target="_blank" style="color: #C98A4A; text-decoration: none;">corearc.co.in</a></li>
+            <li>📞 Call: +91 99837 21179</li>
+            <li>🌐 Web: <a href="https://codearc.co.in" target="_blank" style="color: #C98A4A; text-decoration: none;">codearc.co.in</a></li>
           </ul>
           
           <p style="font-size: 11px; color: #999; margin-top: 20px; text-align: center;">This is an automated system notification from CodeArc RestoSuite.</p>
@@ -782,7 +782,7 @@ async function handleApprovalNotification(record) {
             targetPhone = "91" + targetPhone;
         }
         const chatId = `${targetPhone}@c.us`;
-        const msgText = `🎉 *Account Approved & Active - CodeArc RestoSuite*\n\nHello,\n\nGreat news! Your registration request for *${name}* has been reviewed and APPROVED by CodeArc RestoSuite.\n\nYour account is now fully active!\n\n🔑 *Login Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Admin Username:* ${username}\n\n*Portal Link:* https://corearc.co.in/portal (or your server login page)\n\nYou can now log in, configure your settings, menu, inventory, and staff to get started immediately!\n\nIf you need any support, feel free to contact us:\n• 📧 Email: hello@codearc.co.in\n• 📞 Call: +353 85 225 8004\n\nWelcome to RestoSuite!\n\nBest regards,\nCodeArc Operations Team`;
+        const msgText = `🎉 *Account Approved & Active - CodeArc RestoSuite*\n\nHello,\n\nGreat news! Your registration request for *${name}* has been reviewed and APPROVED by CodeArc RestoSuite.\n\nYour account is now fully active!\n\n🔑 *Login Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Admin Username:* ${username}\n\n*Portal Link:* https://codearc.co.in/portal (or your server login page)\n\nYou can now log in, configure your settings, menu, inventory, and staff to get started immediately!\n\nIf you need any support, feel free to contact us:\n• 📧 Email: hello@codearc.co.in\n• 📞 Call: +91 99837 21179\n\nWelcome to RestoSuite!\n\nBest regards,\nCodeArc Operations Team`;
         
         try {
             await client.sendMessage(chatId, msgText);
@@ -812,7 +812,7 @@ async function handleApprovalNotification(record) {
 
           <p>You can access your store dashboard portal here:</p>
           <div style="text-align: center; margin: 25px 0;">
-            <a href="https://corearc.co.in/portal" style="background: #22c55e; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">Access Login Portal</a>
+            <a href="https://codearc.co.in/portal" style="background: #22c55e; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">Access Login Portal</a>
           </div>
 
           <p>Please log in, review your settings, tax tables, custom menu configuration, and employee ledger to begin operations.</p>
@@ -821,7 +821,7 @@ async function handleApprovalNotification(record) {
           <p style="font-size: 12px; color: #666; margin-bottom: 5px;">If you have any questions or require launch support, contact us:</p>
           <ul style="font-size: 12px; color: #666; padding-left: 20px; margin-top: 0;">
             <li>📧 Email: <a href="mailto:hello@codearc.co.in" style="color: #22c55e; text-decoration: none;">hello@codearc.co.in</a></li>
-            <li>📞 Call: +353 85 225 8004</li>
+            <li>📞 Call: +91 99837 21179</li>
           </ul>
           
           <p style="font-size: 11px; color: #999; margin-top: 20px; text-align: center;">Welcome to the CodeArc RestoSuite platform!</p>
