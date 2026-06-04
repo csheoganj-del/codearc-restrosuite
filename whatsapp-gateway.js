@@ -265,22 +265,7 @@ async function saveSessionToSupabase() {
             output.on('close', resolve);
             archive.on('error', reject);
             archive.pipe(output);
-            
-            // Exclude browser cache directories to keep zip size small (typically <5MB instead of 50MB+)
-            archive.glob('**/*', {
-                cwd: authDataPath,
-                ignore: [
-                    '**/Cache/**',
-                    '**/Code Cache/**',
-                    '**/GPUCache/**',
-                    '**/.wwebjs_cache/**',
-                    '**/Service Worker/CacheStorage/**',
-                    '**/Service Worker/ScriptCache/**',
-                    '**/CacheStorage/**',
-                    '**/ScriptCache/**',
-                    '**/Network/Trust Token Key Commitments/**'
-                ]
-            });
+            archive.directory(authDataPath, false);
             
             archive.finalize();
         });
