@@ -10,42 +10,43 @@
   
   <style>
     :root {
-      /* Refined Dark Hospitality Palette */
-      --bg-dark: #080707;             /* Near-black charcoal background */
-      --bg-surface: #0f0e0e;          /* Soft dark graphite card/surface */
-      --bg-surface-elevated: #161515; /* Elevated surface for headers/popups */
-      --bg-surface-hover: #1e1d1d;    /* Hover color for items */
-      
-      --primary-brand: #d28e58;       /* Muted warm amber/copper accent */
-      --primary-hover: #c48047;       /* Muted copper hover state */
-      --primary-glow: rgba(210, 142, 88, 0.08);
-      
-      --text-main: #f4eae7;           /* Off-white primary text */
-      --text-secondary: #a19693;      /* Muted warm gray hierarchy */
-      --text-muted: #645a57;          /* Low-contrast separator text */
-      
-      --success: #34c759;             /* Premium iOS green (connected/active) */
-      --success-glow: rgba(52, 199, 89, 0.1);
-      --warning: #ff9500;             /* Premium amber warning */
-      --error: #ff3b30;               /* Premium alert red */
-      
-      --border-color: rgba(255, 255, 255, 0.04);
-      --border-accent: rgba(210, 142, 88, 0.08);
-      --border-accent-strong: rgba(210, 142, 88, 0.2);
-      
+      /* Premium Dark Hospitality Color System */
+      --bg-dark: #0A0806;              /* Primary background: near-black charred wood */
+      --bg-surface: #120F0D;           /* Secondary surface: elevated warm graphite */
+      --bg-surface-elevated: #1A1512;  /* Card surface: toasted oak */
+      --bg-surface-hover: #221D18;     /* Hover state: warm roast */
+
+      --primary-brand: #C87A53;        /* Primary accent: warm terracotta orange */
+      --primary-hover: #D98C64;        /* Hover accent: spiced cinnamon honey */
+      --primary-glow: rgba(200, 122, 83, 0.06); /* Very subtle warm glow */
+
+      --text-main: #F5EFEB;            /* Primary text: warm latte cream */
+      --text-secondary: #BCAE9F;       /* Secondary text: toasted sesame / oat gray */
+      --text-muted: #85766A;           /* Muted text: roasted coffee grinds */
+
+      --success: #22c55e;              /* Operational green */
+      --success-subtle: rgba(34, 197, 94, 0.08);
+      --warning: #f59e0b;              /* Operational amber warning */
+      --error: #ef4444;                /* Alert red */
+
+      --border-color: rgba(245, 239, 235, 0.06); /* Primary border: soft warm rgba */
+      --border-subtle: rgba(245, 239, 235, 0.03); /* Near-invisible separator */
+      --border-accent: rgba(200, 122, 83, 0.14);  /* Soft accent border */
+      --border-accent-strong: rgba(200, 122, 83, 0.24); /* Visible accent border */
+
       --font-heading: 'Outfit', 'Inter', sans-serif;
       --font-body: 'Inter', sans-serif;
-      
+
       --radius-sm: 6px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --radius-xl: 24px;
-      
-      --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      
-      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.6);
-      --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.8);
-      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.95);
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+
+      --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+      --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6), 0 1px 4px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.6);
     }
 
     * {
@@ -84,9 +85,9 @@
 
     /* Translucent Header */
     header {
-      background: rgba(8, 7, 7, 0.75);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      background: rgba(10, 8, 6, 0.82);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid var(--border-color);
       position: fixed;
       top: 0;
@@ -162,8 +163,8 @@
       bottom: -6px;
       left: 0;
       width: 100%;
-      height: 1.5px;
-      background: var(--primary-brand);
+      height: 1px;
+      background: rgba(255, 255, 255, 0.25);
     }
 
     .nav-actions {
@@ -185,21 +186,21 @@
     }
 
     .nav-actions .btn-portal {
-      background: transparent;
-      color: var(--primary-brand);
-      border: 1px solid var(--border-accent-strong);
+      background: var(--bg-surface-elevated);
+      color: var(--text-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       padding: 8px 18px;
       border-radius: var(--radius-sm);
       font-size: 13.5px;
-      font-weight: 600;
+      font-weight: 500;
       text-decoration: none;
       transition: var(--transition);
     }
 
     .nav-actions .btn-portal:hover {
-      background: var(--primary-brand);
-      color: var(--bg-dark);
-      border-color: var(--primary-brand);
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.16);
     }
 
     /* Hero Section */
@@ -223,15 +224,15 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(210, 142, 88, 0.05);
-      border: 1px solid var(--border-accent-strong);
-      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 5px 13px;
       border-radius: 50px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--primary-brand);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
       margin-bottom: 24px;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
     }
 
@@ -239,14 +240,14 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background-color: var(--primary-brand);
-      animation: pulse-amber 2s infinite;
+      background-color: var(--success);
+      animation: pulse-green 2.5s infinite;
     }
 
-    @keyframes pulse-amber {
-      0% { transform: scale(0.9); opacity: 0.6; }
-      50% { transform: scale(1.2); opacity: 1; }
-      100% { transform: scale(0.9); opacity: 0.6; }
+    @keyframes pulse-green {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      70% { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
 
     .hero-title {
@@ -260,7 +261,10 @@
     }
 
     .hero-title span {
-      color: var(--primary-brand);
+      background: linear-gradient(135deg, #F5EFEB 20%, #BCAE9F 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
       display: inline-block;
     }
 
@@ -295,25 +299,30 @@
 
     .btn-primary {
       background: var(--primary-brand);
-      color: var(--bg-dark);
+      color: #FFFFFF;
       border: 1px solid var(--primary-brand);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12);
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }
 
     .btn-primary:hover {
       background: var(--primary-hover);
       border-color: var(--primary-hover);
       transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(200, 122, 83, 0.2), 0 1px 3px rgba(0,0,0,0.4);
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.02);
-      color: #FFF;
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
       border: 1px solid var(--border-color);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
 
     .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.12);
+      background: var(--bg-surface-hover);
+      border-color: #3F3F46;
       transform: translateY(-1px);
     }
 
@@ -332,7 +341,7 @@
     }
 
     .hero-meta i {
-      color: var(--primary-brand);
+      color: var(--text-muted);
       font-size: 11px;
     }
 
@@ -346,7 +355,7 @@
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg);
+      box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.02) inset;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -440,14 +449,14 @@
     }
 
     .sidebar-icon.active {
-      background: rgba(210, 142, 88, 0.08);
+      background: rgba(200, 122, 83, 0.10);
       color: var(--primary-brand);
-      border: 1px solid var(--border-accent-strong);
+      border: 1px solid var(--border-accent);
     }
 
     .sidebar-icon:hover:not(.active) {
-      color: var(--text-main);
-      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.03);
     }
 
     .dashboard-content {
@@ -456,7 +465,7 @@
       flex-direction: column;
       gap: 16px;
       overflow-y: auto;
-      background: #0b0a0a;
+      background: #0F0D0B;
     }
 
     /* Live Analytics Grid */
@@ -530,7 +539,7 @@
 
     .widget-badge {
       font-size: 9px;
-      background: rgba(52, 199, 89, 0.08);
+      background: var(--success-subtle);
       color: var(--success);
       padding: 2px 6px;
       border-radius: 4px;
@@ -581,15 +590,15 @@
       font-family: var(--font-heading);
       font-size: 15px;
       font-weight: 700;
-      color: var(--primary-brand);
+      color: var(--text-main);
     }
 
     .pos-pay-btn {
-      background: var(--bg-surface-elevated);
-      border: 1px solid var(--border-accent-strong);
-      color: var(--primary-brand);
+      background: var(--primary-brand);
+      border: 1px solid var(--primary-brand);
+      color: #FFFFFF;
       font-size: 10.5px;
-      font-weight: 700;
+      font-weight: 600;
       padding: 8px;
       border-radius: 6px;
       text-align: center;
@@ -602,8 +611,8 @@
     }
 
     .pos-pay-btn:hover {
-      background: var(--primary-brand);
-      color: var(--bg-dark);
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
     }
 
     /* Kitchen KDS Ticket */
@@ -614,8 +623,8 @@
     }
 
     .kds-ticket-card {
-      background: #141313;
-      border: 1px solid rgba(255, 255, 255, 0.03);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 10px;
     }
@@ -655,8 +664,9 @@
     }
 
     .kds-items span {
-      color: var(--primary-brand);
-      font-weight: 700;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
     }
 
     /* Inventory Status Alerts */
@@ -694,7 +704,7 @@
     .inv-stock-level {
       color: var(--warning);
       font-weight: 600;
-      background: rgba(255, 149, 0, 0.06);
+      background: rgba(245, 158, 11, 0.08);
       padding: 2px 6px;
       border-radius: 4px;
     }
@@ -704,8 +714,8 @@
       position: absolute;
       bottom: -24px;
       right: 32px;
-      background: #0b141a;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: #0E1419;
+      border: 1px solid var(--border-color);
       border-radius: 12px;
       width: 250px;
       box-shadow: var(--shadow-lg);
@@ -736,17 +746,17 @@
     }
 
     .whatsapp-bubble {
-      background: #054d44;
+      background: #0A3D35;
       border-radius: 8px;
       padding: 8px 10px;
       font-size: 10px;
-      color: #e9edef;
+      color: #D4E8E3;
       line-height: 1.4;
       position: relative;
     }
 
     .whatsapp-bubble strong {
-      color: #fff;
+      color: #F0FAF7;
     }
 
     .whatsapp-time {
@@ -763,57 +773,53 @@
       color: #53bdeb;
     }
 
-    /* Outlets tag strip */
+    /* Social Proof Metrics Strip */
     .outlets-section {
       border-top: 1px solid var(--border-color);
       border-bottom: 1px solid var(--border-color);
-      background: rgba(255, 255, 255, 0.005);
-      padding: 40px 32px;
+      background: transparent;
+      padding: 48px 32px;
     }
 
     .outlets-inner {
       max-width: 1280px;
       margin: 0 auto;
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
+      gap: 0;
       flex-wrap: wrap;
-      gap: 32px;
     }
 
-    .outlets-intro {
-      font-size: 12.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: var(--text-muted);
-    }
-
-    .outlets-list {
+    .proof-metric {
       display: flex;
-      gap: 48px;
+      flex-direction: column;
       align-items: center;
+      gap: 4px;
+      padding: 0 56px;
     }
 
-    .outlet-pill {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .proof-number {
       font-family: var(--font-heading);
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      transition: var(--transition);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.5px;
     }
 
-    .outlet-pill:hover {
-      color: var(--primary-brand);
-      transform: translateY(-1px);
+    .proof-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
     }
 
-    .outlet-pill i {
-      color: var(--primary-brand);
-      font-size: 14px;
+    .proof-divider {
+      width: 1px;
+      height: 36px;
+      background: var(--border-color);
+      flex-shrink: 0;
     }
 
     /* Features Section - Bento Grid Layout */
@@ -832,11 +838,11 @@
     }
 
     .section-label {
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 11px;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: var(--primary-brand);
+      letter-spacing: 1.8px;
+      color: var(--text-muted);
       margin-bottom: 16px;
     }
 
@@ -876,7 +882,7 @@
     }
 
     .bento-card:hover {
-      border-color: var(--border-accent-strong);
+      border-color: #3F3F46;
       box-shadow: var(--shadow-md);
       transform: translateY(-2px);
     }
@@ -906,8 +912,8 @@
     }
 
     .bento-preview {
-      background: #090909;
-      border: 1px solid rgba(255, 255, 255, 0.03);
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       width: 100%;
       height: 180px;
@@ -927,7 +933,7 @@
       height: 100%;
       padding: 12px;
       gap: 12px;
-      background: #0e0d0d;
+      background: var(--bg-dark);
     }
 
     .bento-pos-items {
@@ -937,8 +943,8 @@
     }
 
     .bento-pos-tile {
-      background: var(--bg-surface);
-      border: 1px solid rgba(255, 255, 255, 0.03);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 8px 4px;
       text-align: center;
@@ -954,6 +960,7 @@
     .bento-pos-tile i {
       color: var(--primary-brand);
       font-size: 12px;
+      opacity: 0.85;
     }
 
     .bento-pos-cart {
@@ -990,8 +997,8 @@
 
     /* KDS Ticket Preview inside Bento Grid */
     .bento-kds-ticket {
-      background: #141313;
-      border: 1px solid rgba(255, 255, 255, 0.03);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       width: 85%;
       padding: 14px;
@@ -1019,8 +1026,8 @@
     }
 
     .bento-stock-bar {
-      height: 5px;
-      background: rgba(255, 255, 255, 0.03);
+      height: 4px;
+      background: rgba(255, 255, 255, 0.05);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -1038,7 +1045,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
-      background: #0e0d0d;
+      background: var(--bg-dark);
     }
 
     .bento-analytics-left {
@@ -1060,22 +1067,23 @@
 
     .chart-bar {
       flex: 1;
-      background: rgba(210, 142, 88, 0.15);
-      border: 1px solid rgba(210, 142, 88, 0.2);
+      background: rgba(200, 122, 83, 0.12);
+      border: 1px solid rgba(200, 122, 83, 0.16);
+      border-bottom: none;
       border-radius: 2px 2px 0 0;
       position: relative;
       transition: var(--transition);
     }
 
     .chart-bar:hover {
-      background: var(--primary-brand);
+      background: rgba(200, 122, 83, 0.3);
     }
 
     /* Loyalty Tier Preview */
     .bento-loyalty-card {
-      background: linear-gradient(135deg, #1b1919 0%, #111010 100%);
-      border: 1px solid var(--border-accent-strong);
-      border-radius: 12px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
       width: 85%;
       padding: 16px;
       position: relative;
@@ -1083,11 +1091,12 @@
 
     .bento-loyalty-tier {
       font-size: 9px;
-      font-weight: 700;
-      color: var(--primary-brand);
+      font-weight: 600;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 1px;
-      background: rgba(210, 142, 88, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
       padding: 3px 8px;
       border-radius: 4px;
       display: inline-block;
@@ -1102,12 +1111,12 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #0c151b;
+      background: #0D1419;
     }
 
     /* Pricing Section */
     .pricing-section {
-      background: rgba(255, 255, 255, 0.003);
+      background: var(--bg-dark);
       border-top: 1px solid var(--border-color);
       padding: 120px 32px;
     }
@@ -1126,7 +1135,7 @@
     }
 
     .price-card {
-      background: var(--bg-surface);
+      background: var(--bg-surface-elevated);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
       padding: 48px 36px;
@@ -1138,26 +1147,27 @@
     }
 
     .price-card:hover {
-      border-color: rgba(255, 255, 255, 0.1);
+      border-color: #3F3F46;
       transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
     }
 
     .price-card.popular {
       border-color: var(--border-accent-strong);
-      background: linear-gradient(180deg, rgba(210, 142, 88, 0.02) 0%, rgba(0, 0, 0, 0) 100%), var(--bg-surface);
+      background: var(--bg-surface-elevated);
     }
 
     .price-card.popular .popular-badge {
       position: absolute;
       top: 20px;
       right: 24px;
-      background: rgba(210, 142, 88, 0.08);
-      border: 1px solid var(--border-accent-strong);
+      background: rgba(200, 122, 83, 0.10);
+      border: 1px solid var(--border-accent);
       color: var(--primary-brand);
       padding: 4px 10px;
       border-radius: 4px;
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -1219,11 +1229,13 @@
     }
 
     .price-features li i.fa-circle-check {
-      color: var(--primary-brand);
+      color: var(--success);
+      opacity: 0.8;
     }
 
     .price-features li i.fa-circle-xmark {
       color: var(--text-muted);
+      opacity: 0.5;
     }
 
     .price-card .btn {
@@ -1232,7 +1244,7 @@
 
     /* Minimal Enterprise Footer */
     footer {
-      background: #060505;
+      background: #0A0806;
       padding: 100px 32px 48px;
       border-top: 1px solid var(--border-color);
     }
@@ -1269,9 +1281,9 @@
       width: 36px;
       height: 36px;
       border-radius: 6px;
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--bg-surface-elevated);
       border: 1px solid var(--border-color);
-      color: var(--text-secondary);
+      color: var(--text-muted);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1280,9 +1292,9 @@
     }
 
     .social-btn:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.1);
-      color: var(--text-main);
+      background: var(--bg-surface-hover);
+      border-color: #3F3F46;
+      color: var(--text-secondary);
     }
 
     .footer-right {
@@ -1315,7 +1327,7 @@
     }
 
     .footer-contact-row i {
-      color: var(--primary-brand);
+      color: var(--text-muted);
       font-size: 14px;
       margin-top: 3px;
     }
@@ -1610,12 +1622,29 @@
   <!-- Outlet Strip Section -->
   <section class="outlets-section">
     <div class="outlets-inner">
-      <div class="outlets-intro">Engineered For High-Performance Dining</div>
-      <div class="outlets-list">
-        <div class="outlet-pill"><i class="fa-solid fa-utensils"></i> Fine Dining & Restaurants</div>
-        <div class="outlet-pill"><i class="fa-solid fa-mug-hot"></i> Coffee Roasters & Cafes</div>
-        <div class="outlet-pill"><i class="fa-solid fa-bowl-food"></i> Multi-Outlet Dhabas</div>
-        <div class="outlet-pill"><i class="fa-solid fa-truck"></i> High-Volume Food Trucks</div>
+      <div class="proof-metric">
+        <div class="proof-number">500+</div>
+        <div class="proof-label">Active Outlets</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">₹12Cr+</div>
+        <div class="proof-label">Processed Monthly</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">4</div>
+        <div class="proof-label">Outlet Formats</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">&lt; 10 min</div>
+        <div class="proof-label">Setup Time</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">99.9%</div>
+        <div class="proof-label">Uptime SLA</div>
       </div>
     </div>
   </section>
@@ -1643,7 +1672,7 @@
                 <span>Espresso</span>
                 <strong>₹120</strong>
               </div>
-              <div class="bento-pos-tile" style="border-color: var(--border-accent-strong); background: rgba(210,142,88,0.05);">
+              <div class="bento-pos-tile" style="border-color: var(--border-accent-strong); background: rgba(200, 122, 83, 0.06);">
                 <i class="fa-solid fa-mug-saucer"></i>
                 <span>Cortado</span>
                 <strong>₹140</strong>
@@ -1694,7 +1723,7 @@
         <div class="bento-preview">
           <div class="bento-kds-ticket">
             <div class="kds-card-header" style="margin-bottom: 8px;">
-              <span style="font-weight:700; color: #FFF; font-size: 11px;">Kitchen Queue #1210</span>
+              <span style="font-weight:600; color: var(--text-main); font-size: 11px;">Kitchen Queue #1210</span>
               <span style="color: var(--success); font-size: 11px;"><i class="fa-regular fa-clock"></i> 02:44m</span>
             </div>
             <div style="font-size: 10.5px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 4px;">
@@ -1769,7 +1798,7 @@
         <div class="bento-preview">
           <div class="bento-loyalty-card">
             <div class="bento-loyalty-tier">Platinum VIP member</div>
-            <div style="font-size: 12px; font-weight: 700; color: #FFF; margin-bottom: 4px;">Rahul Mehta</div>
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Rahul Mehta</div>
             <div style="font-size: 10px; color: var(--text-secondary);">18 Visits • Avg Ticket ₹1,420</div>
           </div>
         </div>

@@ -11,28 +11,28 @@
   <style>
     :root {
       /* Premium Dark Hospitality Color System */
-      --bg-dark: #0B0B0C;              /* Primary background: near-black */
-      --bg-surface: #121214;           /* Secondary surface: elevated graphite */
-      --bg-surface-elevated: #17171A;  /* Card surface: subtle lift */
-      --bg-surface-hover: #1E1E22;     /* Hover state for interactive elements */
+      --bg-dark: #0A0806;              /* Primary background: near-black charred wood */
+      --bg-surface: #120F0D;           /* Secondary surface: elevated warm graphite */
+      --bg-surface-elevated: #1A1512;  /* Card surface: toasted oak */
+      --bg-surface-hover: #221D18;     /* Hover state: warm roast */
 
-      --primary-brand: #C78A4A;        /* Primary accent: refined warm amber */
-      --primary-hover: #D89B5B;        /* Hover accent: slightly brighter */
-      --primary-glow: rgba(199, 138, 74, 0.06); /* Very subtle warm glow */
+      --primary-brand: #C87A53;        /* Primary accent: warm terracotta orange */
+      --primary-hover: #D98C64;        /* Hover accent: spiced cinnamon honey */
+      --primary-glow: rgba(200, 122, 83, 0.06); /* Very subtle warm glow */
 
-      --text-main: #F5F5F5;            /* Primary text: clean off-white */
-      --text-secondary: #A1A1AA;       /* Secondary text: zinc-400 */
-      --text-muted: #71717A;           /* Muted text: zinc-500 */
+      --text-main: #F5EFEB;            /* Primary text: warm latte cream */
+      --text-secondary: #BCAE9F;       /* Secondary text: toasted sesame / oat gray */
+      --text-muted: #85766A;           /* Muted text: roasted coffee grinds */
 
       --success: #22c55e;              /* Operational green */
       --success-subtle: rgba(34, 197, 94, 0.08);
       --warning: #f59e0b;              /* Operational amber warning */
       --error: #ef4444;                /* Alert red */
 
-      --border-color: rgba(255, 255, 255, 0.07); /* Primary border: soft rgba */
-      --border-subtle: rgba(255, 255, 255, 0.03); /* Near-invisible separator */
-      --border-accent: rgba(199, 138, 74, 0.14);  /* Soft accent border */
-      --border-accent-strong: rgba(199, 138, 74, 0.24); /* Visible accent border */
+      --border-color: rgba(245, 239, 235, 0.06); /* Primary border: soft warm rgba */
+      --border-subtle: rgba(245, 239, 235, 0.03); /* Near-invisible separator */
+      --border-accent: rgba(200, 122, 83, 0.14);  /* Soft accent border */
+      --border-accent-strong: rgba(200, 122, 83, 0.24); /* Visible accent border */
 
       --font-heading: 'Outfit', 'Inter', sans-serif;
       --font-body: 'Inter', sans-serif;
@@ -85,7 +85,7 @@
 
     /* Translucent Header */
     header {
-      background: rgba(11, 11, 12, 0.82);
+      background: rgba(10, 8, 6, 0.82);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid var(--border-color);
@@ -261,7 +261,7 @@
     }
 
     .hero-title span {
-      background: linear-gradient(135deg, #FFFFFF 20%, #A1A1AA 100%);
+      background: linear-gradient(135deg, #F5EFEB 20%, #BCAE9F 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -310,7 +310,7 @@
       background: var(--primary-hover);
       border-color: var(--primary-hover);
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(199, 138, 74, 0.2), 0 1px 3px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 12px rgba(200, 122, 83, 0.2), 0 1px 3px rgba(0,0,0,0.4);
     }
 
     .btn-secondary {
@@ -449,7 +449,7 @@
     }
 
     .sidebar-icon.active {
-      background: rgba(199, 138, 74, 0.10);
+      background: rgba(200, 122, 83, 0.10);
       color: var(--primary-brand);
       border: 1px solid var(--border-accent);
     }
@@ -465,7 +465,7 @@
       flex-direction: column;
       gap: 16px;
       overflow-y: auto;
-      background: #0E0E10;
+      background: #0F0D0B;
     }
 
     /* Live Analytics Grid */
@@ -1067,8 +1067,8 @@
 
     .chart-bar {
       flex: 1;
-      background: rgba(199, 138, 74, 0.12);
-      border: 1px solid rgba(199, 138, 74, 0.16);
+      background: rgba(200, 122, 83, 0.12);
+      border: 1px solid rgba(200, 122, 83, 0.16);
       border-bottom: none;
       border-radius: 2px 2px 0 0;
       position: relative;
@@ -1076,7 +1076,7 @@
     }
 
     .chart-bar:hover {
-      background: rgba(199, 138, 74, 0.3);
+      background: rgba(200, 122, 83, 0.3);
     }
 
     /* Loyalty Tier Preview */
@@ -1161,7 +1161,7 @@
       position: absolute;
       top: 20px;
       right: 24px;
-      background: rgba(199, 138, 74, 0.10);
+      background: rgba(200, 122, 83, 0.10);
       border: 1px solid var(--border-accent);
       color: var(--primary-brand);
       padding: 4px 10px;
@@ -1244,7 +1244,7 @@
 
     /* Minimal Enterprise Footer */
     footer {
-      background: #0B0B0C;
+      background: #0A0806;
       padding: 100px 32px 48px;
       border-top: 1px solid var(--border-color);
     }
@@ -1672,7 +1672,7 @@
                 <span>Espresso</span>
                 <strong>₹120</strong>
               </div>
-              <div class="bento-pos-tile" style="border-color: var(--border-accent-strong); background: rgba(199, 138, 74, 0.06);">
+              <div class="bento-pos-tile" style="border-color: var(--border-accent-strong); background: rgba(200, 122, 83, 0.06);">
                 <i class="fa-solid fa-mug-saucer"></i>
                 <span>Cortado</span>
                 <strong>₹140</strong>
