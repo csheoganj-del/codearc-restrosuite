@@ -393,8 +393,9 @@ const client = new Client({
         dataPath: authDataPath
     }),
     webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+        type: 'local',
+        path: path.join(__dirname, '.wwebjs_cache'),
+        strict: false
     },
     puppeteer: {
         handleSIGINT: false,
