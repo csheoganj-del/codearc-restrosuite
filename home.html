@@ -10,30 +10,30 @@
   
   <style>
     :root {
-      /* Premium Matte Dark Hospitality Color System */
-      --bg-dark: #0D0D0E;              /* Deep matte background */
-      --bg-surface: #141416;           /* Soft graphite surface */
-      --bg-surface-elevated: #1B1B1F;  /* Soft dark card surface */
-      --bg-surface-hover: #222228;     /* Subtle elevated hover surface */
+      /* Premium Light Swiggy & Zomato Inspired Color System */
+      --bg-dark: #FFFFFF;              /* Pure white background */
+      --bg-surface: #F8F9FA;           /* Soft light gray surface */
+      --bg-surface-elevated: #FFFFFF;  /* Card surface: clean white */
+      --bg-surface-hover: #F1F3F5;     /* Subtle gray hover surface */
 
-      --primary-brand: #F59E42;        /* Primary accent: Matte Marigold Peach */
-      --primary-hover: #D88A3D;        /* Secondary accent: Warm Bronze/Ochre */
-      --accent-red: #E65C5C;           /* Minimal Warm Highlight: Soft Crimson */
-      --primary-glow: rgba(245, 158, 66, 0.04); /* Ultra subtle warm matte glow */
+      --primary-brand: #FC8019;        /* Primary accent: Swiggy Tangerine Orange */
+      --primary-hover: #FD9139;        /* Hover accent: Swiggy Bright Orange */
+      --accent-red: #E23744;           /* Secondary accent: Zomato Crimson Red */
+      --primary-glow: rgba(252, 128, 25, 0.05); /* Soft Swiggy Orange glow */
 
-      --text-main: #F5F5F5;            /* Primary text */
-      --text-secondary: #B4B4BC;       /* Secondary text */
-      --text-muted: #7B7B84;           /* Muted text */
+      --text-main: #1C1C1C;            /* Primary text: Deep Charcoal */
+      --text-secondary: #5E636A;       /* Secondary text: Slate Gray */
+      --text-muted: #8F959E;           /* Muted text: Soft Gray */
 
-      --success: #22c55e;              /* Operational success green */
+      --success: #22c55e;              /* Success green */
       --success-subtle: rgba(34, 197, 94, 0.08);
       --warning: #f59e0b;
       --error: #ef4444;
 
-      --border-color: #2B2B31;         /* Subtle low-contrast border */
-      --border-subtle: rgba(255, 255, 255, 0.03); /* Soft interior separator */
-      --border-accent: rgba(245, 158, 66, 0.12);  /* Soft accent border */
-      --border-accent-strong: rgba(245, 158, 66, 0.22); /* Matte accent border */
+      --border-color: #E2E8F0;         /* Subtle light border */
+      --border-subtle: #EDF2F7;        /* Soft separator */
+      --border-accent: rgba(252, 128, 25, 0.15);  /* Accent border */
+      --border-accent-strong: rgba(252, 128, 25, 0.28); /* Strong accent border */
 
       --font-heading: 'Outfit', 'Inter', sans-serif;
       --font-body: 'Inter', sans-serif;
@@ -45,9 +45,9 @@
 
       --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 
-      --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
-      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6), 0 1px 4px rgba(0, 0, 0, 0.5);
-      --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.6);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
     }
 
     * {
@@ -86,7 +86,7 @@
 
     /* Translucent Header */
     header {
-      background: rgba(13, 13, 14, 0.82);
+      background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid var(--border-color);
@@ -111,7 +111,7 @@
       font-family: var(--font-heading);
       font-size: 20px;
       font-weight: 700;
-      color: #FFF;
+      color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -187,9 +187,9 @@
     }
 
     .nav-actions .btn-portal {
-      background: var(--bg-surface-elevated);
-      color: var(--text-secondary);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
       padding: 8px 18px;
       border-radius: var(--radius-sm);
       font-size: 13.5px;
@@ -200,8 +200,8 @@
 
     .nav-actions .btn-portal:hover {
       background: var(--bg-surface-hover);
-      color: var(--text-main);
-      border-color: rgba(255, 255, 255, 0.16);
+      color: var(--primary-brand);
+      border-color: var(--primary-brand);
     }
 
     /* Hero Section */
@@ -225,8 +225,8 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
       padding: 5px 13px;
       border-radius: 50px;
       font-size: 11px;
@@ -258,11 +258,11 @@
       line-height: 1.1;
       letter-spacing: -1.5px;
       margin-bottom: 24px;
-      color: #FFF;
+      color: var(--text-main);
     }
 
     .hero-title span {
-      background: linear-gradient(135deg, #FFFFFF 20%, #F59E42 100%);
+      background: linear-gradient(135deg, #1C1C1C 20%, #FC8019 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -323,7 +323,7 @@
 
     .btn-secondary:hover {
       background: var(--bg-surface-hover);
-      border-color: #3F3F46;
+      border-color: var(--primary-brand);
       transform: translateY(-1px);
     }
 
@@ -715,11 +715,11 @@
       position: absolute;
       bottom: -24px;
       right: 32px;
-      background: #0E1419;
+      background: #FFFFFF;
       border: 1px solid var(--border-color);
       border-radius: 12px;
       width: 250px;
-      box-shadow: var(--shadow-lg);
+      box-shadow: var(--shadow-md);
       padding: 12px;
       z-index: 10;
       transform: translateY(-10px);
@@ -730,7 +730,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid #EEEEEE;
       padding-bottom: 6px;
       margin-bottom: 8px;
     }
@@ -743,26 +743,26 @@
     .whatsapp-header span {
       font-size: 10.5px;
       font-weight: 700;
-      color: var(--text-main);
+      color: #1C1C1C;
     }
 
     .whatsapp-bubble {
-      background: #0A3D35;
+      background: #E7FFDB;
       border-radius: 8px;
       padding: 8px 10px;
       font-size: 10px;
-      color: #D4E8E3;
+      color: #1C1C1C;
       line-height: 1.4;
       position: relative;
     }
 
     .whatsapp-bubble strong {
-      color: #F0FAF7;
+      color: #000000;
     }
 
     .whatsapp-time {
       font-size: 8px;
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(0, 0, 0, 0.45);
       float: right;
       margin-top: 4px;
       display: flex;
@@ -883,7 +883,7 @@
     }
 
     .bento-card:hover {
-      border-color: #3F3F46;
+      border-color: var(--primary-brand);
       box-shadow: var(--shadow-md);
       transform: translateY(-2px);
     }
@@ -1156,7 +1156,7 @@
     }
 
     .price-card:hover {
-      border-color: #3F3F46;
+      border-color: var(--primary-brand);
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
     }
@@ -1302,8 +1302,8 @@
 
     .social-btn:hover {
       background: var(--bg-surface-hover);
-      border-color: #3F3F46;
-      color: var(--text-secondary);
+      border-color: var(--primary-brand);
+      color: var(--primary-brand);
     }
 
     .footer-right {
@@ -1316,7 +1316,7 @@
       font-family: var(--font-heading);
       font-size: 14px;
       font-weight: 700;
-      color: #FFF;
+      color: var(--text-main);
       text-transform: uppercase;
       letter-spacing: 1px;
     }
@@ -1818,9 +1818,9 @@
           <p class="bento-desc">Create profiles automatically during checkouts. Segment clients into premium tiers like Zomato Gold or Swiggy One VIP program links.</p>
         </div>
         <div class="bento-preview">
-          <div class="bento-loyalty-card" style="background: linear-gradient(135deg, #1A1512 0%, #14110E 100%); border: 1px solid var(--border-accent-strong); box-shadow: 0 4px 12px rgba(245, 158, 66, 0.05);">
-            <div class="bento-loyalty-tier" style="background: rgba(245, 158, 66, 0.12); color: var(--primary-brand); border-color: var(--border-accent);">RestoSuite Gold Elite</div>
-            <div style="font-size: 13px; font-weight: 700; color: var(--primary-brand); margin-bottom: 4px;">Rahul Mehta <span style="font-size:9.5px; color: #22c55e; margin-left: 6px;"><i class="fa-solid fa-star"></i> 4.9 Rating</span></div>
+          <div class="bento-loyalty-card" style="background: linear-gradient(135deg, #FFFDF9 0%, #FAF5EB 100%); border: 1px solid #D4AF37; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.08);">
+            <div class="bento-loyalty-tier" style="background: rgba(212, 175, 55, 0.15); color: #B48A1D; border-color: rgba(212, 175, 55, 0.25);">Zomato Gold VIP</div>
+            <div style="font-size: 13px; font-weight: 700; color: #8C6615; margin-bottom: 4px;">Rahul Mehta <span style="font-size:9.5px; color: #22c55e; margin-left: 6px;"><i class="fa-solid fa-star"></i> 4.9 Rating</span></div>
             <div style="font-size: 10px; color: var(--text-secondary);">24 Orders • Avg Check ₹1,190.00</div>
           </div>
         </div>
