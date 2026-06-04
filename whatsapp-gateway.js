@@ -5,15 +5,37 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const ws = require('ws');
+const archiver = require('archiver');
+const unzipper = require('unzipper');
 
-// Initialize Supabase Client for Realtime Broadcast integration
+// ============================================================
+// SUPABASE CLIENTS
+// ============================================================
 const SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+
+// Service-role key for Supabase Storage access (set as env variable in HuggingFace Secrets)
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+
+// Anon client for Realtime
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-    realtime: {
-        transport: ws
-    }
+    realtime: { transport: ws }
 });
+
+// Service client for Storage (session backup) + health log
+const supabaseService = SUPABASE_SERVICE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    : null;
+
+// Storage bucket name for WhatsApp session backup
+const SESSION_BUCKET = 'whatsapp-session';
+const SESSION_FILE_NAME = 'session.zip';
+
+// ============================================================
+// ADMIN ALERT CONFIGURATION
+// ============================================================
+const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'csheoganj@gmail.com';
+const ADMIN_ALERT_WHATSAPP = process.env.ADMIN_ALERT_WHATSAPP || '919983721179'; // +91 99837 21179
 
 // Configure Nodemailer for Free Gmail SMTP sending (Made by Antigravity)
 const fs = require('fs');
@@ -62,6 +84,251 @@ app.use(express.json());
 let connectionStatus = 'connecting'; // 'connecting', 'qr', 'ready', 'disconnected', 'auth_failure'
 let qrCodeDataUrl = null;
 let linkedNumber = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+let sessionSavedAt = null;
+let sessionRestoredAt = null;
+let lastAlertSent = null;
+let totalMessagesSent = 0;
+let recentHealthEvents = []; // last 10 events for dashboard
+
+// ============================================================
+// HEALTH LOGGING — writes to gateway_health_log in Supabase
+// ============================================================
+async function logHealthEvent(event, status, details = {}) {
+    const entry = { event, status, details, time: new Date().toISOString() };
+    // Keep last 10 events in memory for dashboard
+    recentHealthEvents.unshift(entry);
+    if (recentHealthEvents.length > 10) recentHealthEvents.pop();
+
+    if (!supabaseService) {
+        console.log(`[Health Log] (no service key) ${event} - ${status}`);
+        return;
+    }
+    try {
+        await supabaseService.from('gateway_health_log').insert({ event, status, details });
+    } catch (err) {
+        console.error('[Health Log Error]', err.message);
+    }
+}
+
+// ============================================================
+// ADMIN ALERT — sends email to admin when gateway is in trouble
+// ============================================================
+async function sendAdminAlert(type, extraDetails = {}) {
+    if (!transporter) {
+        console.warn('[Admin Alert] Email transporter not configured. Alert not sent.');
+        return;
+    }
+
+    // Throttle alerts — don't spam more than once per 10 minutes for same type
+    const now = Date.now();
+    if (lastAlertSent && lastAlertSent.type === type && (now - lastAlertSent.time) < 10 * 60 * 1000) {
+        console.log(`[Admin Alert] Throttled — ${type} alert already sent recently.`);
+        return;
+    }
+    lastAlertSent = { type, time: now };
+
+    const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
+    let subject = '';
+    let bodyHtml = '';
+    const dashboardUrl = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+
+    if (type === 'disconnected') {
+        subject = '⚠️ ALERT: RestoSuite WhatsApp Gateway Disconnected';
+        bodyHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #ef4444;border-radius:8px;color:#333;">
+          <div style="background:#fef2f2;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
+            <h1 style="color:#dc2626;font-size:22px;margin:0;">⚠️ WhatsApp Gateway OFFLINE</h1>
+            <p style="color:#64748b;font-size:13px;margin:6px 0 0;">Immediate Attention Required</p>
+          </div>
+          <p>The <strong>RestoSuite WhatsApp notification gateway</strong> has gone <strong style="color:#dc2626;">OFFLINE</strong>.</p>
+          <div style="background:#f8fafc;padding:14px;border-radius:6px;margin:16px 0;border-left:4px solid #ef4444;">
+            <table style="font-size:13px;width:100%;">
+              <tr><td style="font-weight:bold;width:160px;padding:3px 0;">Status:</td><td style="color:#dc2626;font-weight:bold;">DISCONNECTED ❌</td></tr>
+              <tr><td style="font-weight:bold;padding:3px 0;">Time:</td><td>${timeStr}</td></tr>
+              <tr><td style="font-weight:bold;padding:3px 0;">Reconnect Attempts:</td><td>${extraDetails.attempts || 0}/${MAX_RECONNECT_ATTEMPTS}</td></tr>
+              <tr><td style="font-weight:bold;padding:3px 0;">Reason:</td><td>${extraDetails.reason || 'Unknown'}</td></tr>
+            </table>
+          </div>
+          <div style="background:#fff7ed;padding:14px;border-radius:6px;border-left:4px solid #f97316;margin:16px 0;">
+            <strong style="color:#c2410c;">⚡ Impact:</strong>
+            <ul style="font-size:13px;margin:8px 0;padding-left:20px;">
+              <li>New registrations will <strong>NOT</strong> receive WhatsApp confirmation</li>
+              <li>Billing receipts via WhatsApp are <strong>PAUSED</strong></li>
+              <li style="color:#16a34a;">✅ Email notifications are still working normally</li>
+            </ul>
+          </div>
+          <div style="background:#eff6ff;padding:14px;border-radius:6px;border-left:4px solid #3b82f6;margin:16px 0;">
+            <strong style="color:#1d4ed8;">🔧 Action Required:</strong>
+            <ol style="font-size:13px;margin:8px 0;padding-left:20px;">
+              <li>Open the gateway dashboard: <a href="${dashboardUrl}" style="color:#1d4ed8;">${dashboardUrl}</a></li>
+              <li>If a QR code is showing, scan it with CodeArc's WhatsApp</li>
+              <li>Or restart the HuggingFace Space to trigger auto-reconnect</li>
+            </ol>
+          </div>
+          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+        </div>`;
+    } else if (type === 'online') {
+        subject = '✅ RESOLVED: RestoSuite WhatsApp Gateway is Back Online';
+        bodyHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #22c55e;border-radius:8px;color:#333;">
+          <div style="background:#f0fdf4;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
+            <h1 style="color:#16a34a;font-size:22px;margin:0;">✅ WhatsApp Gateway ONLINE</h1>
+            <p style="color:#64748b;font-size:13px;margin:6px 0 0;">All notifications are working normally</p>
+          </div>
+          <p>The RestoSuite WhatsApp gateway has <strong style="color:#16a34a;">successfully reconnected</strong> and is fully operational.</p>
+          <div style="background:#f8fafc;padding:14px;border-radius:6px;margin:16px 0;border-left:4px solid #22c55e;">
+            <table style="font-size:13px;width:100%;">
+              <tr><td style="font-weight:bold;width:160px;padding:3px 0;">Status:</td><td style="color:#16a34a;font-weight:bold;">READY ✅</td></tr>
+              <tr><td style="font-weight:bold;padding:3px 0;">Time:</td><td>${timeStr}</td></tr>
+              <tr><td style="font-weight:bold;padding:3px 0;">Connected Number:</td><td>+${extraDetails.number || linkedNumber || 'Unknown'}</td></tr>
+              <tr><td style="font-weight:bold;padding:3px 0;">Session Saved:</td><td>${extraDetails.sessionSaved ? '✅ Backed up to Supabase Storage' : '⚠️ Save in progress'}</td></tr>
+            </table>
+          </div>
+          <p style="color:#16a34a;font-weight:bold;">WhatsApp confirmations and receipts are now being sent normally. No action needed.</p>
+          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+        </div>`;
+    } else if (type === 'qr_needed') {
+        subject = '📱 ACTION REQUIRED: WhatsApp QR Scan Needed — RestoSuite Gateway';
+        bodyHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #f59e0b;border-radius:8px;color:#333;">
+          <div style="background:#fffbeb;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
+            <h1 style="color:#d97706;font-size:22px;margin:0;">📱 QR Code Scan Required</h1>
+            <p style="color:#64748b;font-size:13px;margin:6px 0 0;">WhatsApp session expired — rescan needed</p>
+          </div>
+          <p>The WhatsApp gateway could not restore the previous session. A new QR code scan is required to re-link WhatsApp.</p>
+          <div style="background:#fffbeb;padding:14px;border-radius:6px;border-left:4px solid #f59e0b;margin:16px 0;">
+            <strong style="color:#92400e;">🔧 Steps to fix:</strong>
+            <ol style="font-size:13px;margin:8px 0;padding-left:20px;">
+              <li>Go to: <a href="${dashboardUrl}" style="color:#d97706;">${dashboardUrl}</a></li>
+              <li>A QR code should be visible on the page</li>
+              <li>Open <strong>WhatsApp</strong> on CodeArc's linked phone</li>
+              <li>Go to <strong>Settings → Linked Devices → Link a Device</strong></li>
+              <li>Scan the QR code</li>
+              <li>Done! Session will be auto-saved to cloud ✅</li>
+            </ol>
+          </div>
+          <div style="text-align:center;margin:20px 0;">
+            <a href="${dashboardUrl}" style="background:#f59e0b;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:14px;">Open Gateway Dashboard →</a>
+          </div>
+          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+        </div>`;
+    } else if (type === 'startup') {
+        subject = '🚀 INFO: RestoSuite WhatsApp Gateway Started';
+        bodyHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;color:#333;">
+          <h2 style="color:#0f172a;">🚀 Gateway Server Started</h2>
+          <p>The RestoSuite WhatsApp gateway server has started/restarted at <strong>${timeStr}</strong>.</p>
+          <p>Session restore: <strong>${extraDetails.sessionRestored ? '✅ Success — WhatsApp reconnecting automatically' : '⚠️ No saved session — QR scan will be needed'}</strong></p>
+          <p style="font-size:11px;color:#999;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+        </div>`;
+    }
+
+    if (!subject) return;
+
+    try {
+        await transporter.sendMail({
+            from: `"CodeArc Gateway Monitor" <${emailConfig.user}>`,
+            to: ADMIN_ALERT_EMAIL,
+            subject,
+            html: bodyHtml
+        });
+        console.log(`[Admin Alert] Email sent: ${subject}`);
+        await logHealthEvent('alert_sent', 'ok', { type, to: ADMIN_ALERT_EMAIL });
+    } catch (err) {
+        console.error(`[Admin Alert Error] Failed to send alert email:`, err.message);
+    }
+}
+
+// ============================================================
+// SESSION PERSISTENCE — Save/Restore WhatsApp session via Supabase Storage
+// ============================================================
+async function saveSessionToSupabase() {
+    if (!supabaseService) {
+        console.warn('[Session Save] SUPABASE_SERVICE_KEY not set. Session backup skipped.');
+        return;
+    }
+    if (!fs.existsSync(authDataPath)) {
+        console.warn('[Session Save] Auth data path does not exist. Nothing to save.');
+        return;
+    }
+    const zipPath = path.join(os.tmpdir(), 'wa_session_backup.zip');
+    try {
+        // Zip the auth folder
+        await new Promise((resolve, reject) => {
+            const output = fs.createWriteStream(zipPath);
+            const archive = archiver('zip', { zlib: { level: 6 } });
+            output.on('close', resolve);
+            archive.on('error', reject);
+            archive.pipe(output);
+            archive.directory(authDataPath, false);
+            archive.finalize();
+        });
+
+        const zipBuffer = fs.readFileSync(zipPath);
+        const { error } = await supabaseService.storage
+            .from(SESSION_BUCKET)
+            .upload(SESSION_FILE_NAME, zipBuffer, {
+                contentType: 'application/zip',
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        sessionSavedAt = new Date().toISOString();
+        console.log(`[Session Save] ✅ WhatsApp session backed up to Supabase Storage at ${sessionSavedAt}`);
+        await logHealthEvent('session_saved', 'ok', { path: SESSION_FILE_NAME, size: zipBuffer.length });
+    } catch (err) {
+        console.error('[Session Save Error]', err.message);
+        await logHealthEvent('session_save_failed', 'error', { error: err.message });
+    } finally {
+        try { fs.unlinkSync(zipPath); } catch (_) {}
+    }
+}
+
+async function restoreSessionFromSupabase() {
+    if (!supabaseService) {
+        console.warn('[Session Restore] SUPABASE_SERVICE_KEY not set. Skipping restore.');
+        return false;
+    }
+    const zipPath = path.join(os.tmpdir(), 'wa_session_restore.zip');
+    try {
+        const { data, error } = await supabaseService.storage
+            .from(SESSION_BUCKET)
+            .download(SESSION_FILE_NAME);
+
+        if (error || !data) {
+            console.log('[Session Restore] No saved session found in Supabase Storage.');
+            await logHealthEvent('session_restore_skipped', 'ok', { reason: 'no_backup_found' });
+            return false;
+        }
+
+        const arrayBuffer = await data.arrayBuffer();
+        fs.writeFileSync(zipPath, Buffer.from(arrayBuffer));
+
+        // Clear existing auth folder before extracting
+        if (fs.existsSync(authDataPath)) {
+            fs.rmSync(authDataPath, { recursive: true, force: true });
+        }
+        fs.mkdirSync(authDataPath, { recursive: true });
+
+        await fs.createReadStream(zipPath)
+            .pipe(unzipper.Extract({ path: authDataPath }))
+            .promise();
+
+        sessionRestoredAt = new Date().toISOString();
+        console.log(`[Session Restore] ✅ WhatsApp session restored from Supabase Storage at ${sessionRestoredAt}`);
+        await logHealthEvent('session_restored', 'ok', { path: SESSION_FILE_NAME });
+        return true;
+    } catch (err) {
+        console.error('[Session Restore Error]', err.message);
+        await logHealthEvent('session_restore_failed', 'error', { error: err.message });
+        return false;
+    } finally {
+        try { fs.unlinkSync(zipPath); } catch (_) {}
+    }
+}
 
 // Read secret token from environment variable (configured as a secret in HuggingFace Space)
 const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || '';
@@ -138,34 +405,85 @@ client.on('qr', async (qr) => {
         console.log('==================================================================\n');
         qrcode.generate(qr, { small: true });
         console.log('\nInstructions: Open WhatsApp > Settings > Linked Devices > Link a Device.');
-        console.log('Alternative: Open POS Admin settings to scan directly from the browser.');
+        console.log('Alternative: Open gateway dashboard to scan directly from the browser.');
     } catch (err) {
         console.error('Failed to generate base64 QR Code URL:', err);
     }
+    await logHealthEvent('qr_generated', 'warning', { reconnectAttempts });
+    // Alert admin that QR scan is needed (only once — not on every QR refresh)
+    if (reconnectAttempts === 0) {
+        await sendAdminAlert('qr_needed', { reason: 'session_expired_or_new_start' });
+    }
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
+    const prevStatus = connectionStatus;
     connectionStatus = 'ready';
     qrCodeDataUrl = null;
+    reconnectAttempts = 0;
     linkedNumber = client.info?.wid?.user || 'Unknown Device';
     console.log('\n======================================================');
     console.log(`   SUCCESS: Free WhatsApp Gateway is Ready & Linked!  `);
     console.log(`   Connected Account: +${linkedNumber}`);
     console.log('======================================================\n');
+
+    // Save session to Supabase Storage so it survives restarts
+    await saveSessionToSupabase();
+    await logHealthEvent('connected', 'ok', { number: linkedNumber });
+
+    // Send "back online" alert only if we were previously disconnected
+    if (prevStatus === 'disconnected' || prevStatus === 'auth_failure') {
+        await sendAdminAlert('online', { number: linkedNumber, sessionSaved: true });
+    }
+
+    // Periodic session backup every 30 minutes to keep it fresh
+    setInterval(async () => {
+        if (connectionStatus === 'ready') {
+            console.log('[Session Backup] Running periodic session backup...');
+            await saveSessionToSupabase();
+        }
+    }, 30 * 60 * 1000);
 });
 
-client.on('auth_failure', (msg) => {
+client.on('auth_failure', async (msg) => {
     connectionStatus = 'auth_failure';
     qrCodeDataUrl = null;
     linkedNumber = null;
     console.error('Authentication failure:', msg);
+    await logHealthEvent('auth_failure', 'error', { message: String(msg) });
+    await sendAdminAlert('qr_needed', { reason: 'auth_failure', message: String(msg) });
 });
 
-client.on('disconnected', (reason) => {
+client.on('disconnected', async (reason) => {
+    const prevLinked = linkedNumber;
     connectionStatus = 'disconnected';
     qrCodeDataUrl = null;
     linkedNumber = null;
     console.log('WhatsApp client was disconnected:', reason);
+    await logHealthEvent('disconnected', 'warning', { reason });
+
+    // Auto-reconnect logic
+    async function attemptReconnect() {
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            console.error(`[Reconnect] All ${MAX_RECONNECT_ATTEMPTS} reconnect attempts exhausted. Sending admin alert.`);
+            await sendAdminAlert('disconnected', { reason, attempts: reconnectAttempts });
+            await logHealthEvent('reconnect_failed', 'error', { attempts: reconnectAttempts, reason });
+            return;
+        }
+        reconnectAttempts++;
+        const delayMs = 10000 * reconnectAttempts; // 10s, 20s, 30s, 40s, 50s
+        console.log(`[Reconnect] Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000}s...`);
+        await logHealthEvent('reconnecting', 'warning', { attempt: reconnectAttempts, delayMs });
+        setTimeout(async () => {
+            try {
+                await client.initialize();
+            } catch (err) {
+                console.error(`[Reconnect] Attempt ${reconnectAttempts} failed:`, err.message);
+                await attemptReconnect();
+            }
+        }, delayMs);
+    }
+    attemptReconnect();
 });
 
 // GET Endpoint to serve visual Gateway Dashboard for CodeArc Administrators (Made by Antigravity)
@@ -504,13 +822,18 @@ app.get('/', (req, res) => {
 // GET Endpoint to read current gateway connection state
 app.get('/status', (req, res) => {
     const isAuthorized = verifyToken(req);
-    
+
     if (isAuthorized) {
         res.json({
             status: connectionStatus,
             authenticated: connectionStatus === 'ready',
             number: linkedNumber,
-            qr: qrCodeDataUrl
+            qr: qrCodeDataUrl,
+            sessionSavedAt,
+            sessionRestoredAt,
+            reconnectAttempts,
+            totalMessagesSent,
+            recentHealthEvents
         });
     } else {
         // Return masked status to prevent data leaks or QR hijacking
@@ -519,7 +842,9 @@ app.get('/status', (req, res) => {
             authenticated: connectionStatus === 'ready',
             number: linkedNumber ? maskPhone(linkedNumber) : null,
             qr: null, // Hide QR code from public view
-            secured: true
+            secured: true,
+            sessionSavedAt,
+            reconnectAttempts
         });
     }
 });
@@ -1196,11 +1521,28 @@ function formatReceiptText(record, profile = businessProfile) {
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log('\n======================================================');
-    console.log(` Free Local WhatsApp Gateway running at:`);
+    console.log(` RestoSuite WhatsApp Gateway running at:`);
     console.log(` http://localhost:${PORT}`);
     console.log('======================================================');
-    console.log('Initializing WhatsApp driver... Please wait for QR code.');
+
+    await logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() });
+
+    // Attempt to restore WhatsApp session from Supabase Storage
+    console.log('[Startup] Attempting to restore WhatsApp session from Supabase Storage...');
+    const sessionRestored = await restoreSessionFromSupabase();
+
+    if (sessionRestored) {
+        console.log('[Startup] ✅ Session restored. Connecting to WhatsApp without QR scan...');
+    } else {
+        console.log('[Startup] ⚠️  No saved session. A QR code will be generated.');
+    }
+
+    // Send startup alert email (informational only)
+    await sendAdminAlert('startup', { sessionRestored });
+
+    console.log('[Startup] Initializing WhatsApp driver...');
     client.initialize().catch(err => console.error('Failed to initialize client:', err));
 });
+
