@@ -767,7 +767,7 @@ app.get('/', (req, res) => {
                     \${badgeHtml}
                     <i class="fa-solid fa-circle-check success-icon"></i>
                     <p class="details-text">CodeArc WhatsApp is fully linked and active.</p>
-                    <p class="details-text">Active Number: <span class="number-highlight">+\\${number || 'Unknown'}</span></p>
+                    <p class="details-text">Active Number: <span class="number-highlight">+\${number || 'Unknown'}</span></p>
 \`;
             } else if (status === 'qr') {
                 if (qr) {
