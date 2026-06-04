@@ -98,16 +98,11 @@
 
     .login-container {
       width: 100%;
-      max-width: 580px;
+      max-width: 440px;
       animation: fadeInUp 0.6s ease;
       margin: 20px 0;
       position: relative;
       z-index: 2;
-    }
-
-    #login-form {
-      max-width: 400px;
-      margin: 0 auto;
     }
 
     .login-card {
@@ -352,27 +347,6 @@
       cursor: pointer;
     }
 
-    /* Registration 2-Column Grid Layout */
-    #register-form {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px 16px;
-      text-align: left;
-    }
-
-    #register-form .form-group {
-      margin-bottom: 0; /* Let grid gap handle vertical spacing */
-    }
-
-    #register-form .form-group.full-width {
-      grid-column: span 2;
-    }
-
-    #register-form .submit-btn {
-      grid-column: span 2;
-      margin-top: 10px;
-    }
-
     /* Mobile Responsiveness Override */
     @media (max-width: 480px) {
       body {
@@ -384,49 +358,39 @@
         max-width: 100%;
       }
       .login-card {
-        padding: 20px 14px 16px; /* Super compact card padding on mobile */
+        padding: 24px 16px 20px;
         border-radius: 16px;
       }
       .brand-logo {
-        margin-bottom: 12px;
+        margin-bottom: 16px;
       }
       .logo-container {
         padding: 6px 12px;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
       }
       .login-title {
-        font-size: 18px;
+        font-size: 20px;
       }
       .login-subtitle {
-        font-size: 11px;
-        margin-bottom: 10px;
+        font-size: 12px;
+        margin-bottom: 12px;
       }
       .tab-header {
-        margin-bottom: 12px;
+        margin-bottom: 16px;
       }
       .tab-btn {
         padding: 8px 4px;
         font-size: 12px;
       }
-      #register-form {
-        grid-template-columns: 1fr;
-        gap: 8px 0;
-      }
-      #register-form .form-group.full-width {
-        grid-column: span 1;
-      }
-      #register-form .submit-btn {
-        grid-column: span 1;
-      }
       .form-group {
-        margin-bottom: 8px; /* Compact margins on mobile */
+        margin-bottom: 12px;
       }
       .form-group label {
         font-size: 9px;
-        margin-bottom: 3px;
+        margin-bottom: 4px;
       }
       .form-input {
-        padding: 9px 12px 9px 36px;
+        padding: 10px 14px 10px 38px;
         font-size: 16px; /* Prevents auto-zoom on iOS */
       }
       .form-input.no-icon {
@@ -507,79 +471,56 @@
 
       <!-- REGISTRATION FORM -->
       <form id="register-form" style="display: none;">
-        
-        <!-- Step 1: Outlet Details -->
-        <div class="reg-step" id="reg-step-1">
-          <div class="form-group">
-            <label for="reg-name">Outlet / Business Name</label>
-            <input type="text" id="reg-name" class="form-input" placeholder="e.g. Royal Restaurant & Dhaba" required>
-            <i class="fa-solid fa-store input-icon"></i>
-          </div>
-
-          <div class="form-group">
-            <label for="reg-slug">Outlet ID / Unique Slug</label>
-            <input type="text" id="reg-slug" class="form-input" placeholder="e.g. royal-dhaba (letters & hyphens)" required>
-            <i class="fa-solid fa-link input-icon"></i>
-          </div>
-
-          <div class="form-group">
-            <label for="reg-type">Outlet Type</label>
-            <select id="reg-type" class="form-input no-icon" required>
-              <option value="restaurant">Restaurant</option>
-              <option value="cafe">Cafe / Bakery</option>
-              <option value="dhaba">Dhaba / Local Diner</option>
-              <option value="cart">Food Cart / Truck</option>
-              <option value="other">Other Food Outlet</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="reg-email">Owner Email</label>
-            <input type="email" id="reg-email" class="form-input" placeholder="owner@email.com" required>
-            <i class="fa-solid fa-envelope input-icon"></i>
-          </div>
-
-          <button type="button" class="submit-btn" id="btn-next-step" style="margin-top: 15px;">
-            Next Step <i class="fa-solid fa-arrow-right"></i>
-          </button>
+        <div class="form-group">
+          <label for="reg-name">Outlet / Business Name</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="e.g. Royal Restaurant & Dhaba" required>
+          <i class="fa-solid fa-store input-icon"></i>
         </div>
 
-        <!-- Step 2: Admin Configuration -->
-        <div class="reg-step" id="reg-step-2" style="display: none;">
-          <div class="form-group">
-            <label for="reg-whatsapp">WhatsApp Mobile Number</label>
-            <input type="tel" id="reg-whatsapp" class="form-input" placeholder="e.g. 919876543210 (with country code)" required>
-            <i class="fa-brands fa-whatsapp input-icon" style="color: #25d366;"></i>
-          </div>
-
-          <div class="form-group">
-            <label for="reg-user">Admin Username</label>
-            <input type="text" id="reg-user" class="form-input" placeholder="e.g. admin" required>
-            <i class="fa-solid fa-user-gear input-icon"></i>
-          </div>
-
-          <div class="form-group">
-            <label for="reg-pass">Admin Password</label>
-            <input type="password" id="reg-pass" class="form-input" placeholder="Choose Password" required>
-            <i class="fa-solid fa-key input-icon"></i>
-          </div>
-
-          <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <button type="button" class="submit-btn" id="btn-prev-step" style="background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border-color); box-shadow: none; flex: 1; margin-top: 0;">
-              <i class="fa-solid fa-arrow-left"></i> Back
-            </button>
-            <button type="submit" class="submit-btn" style="background-color: #22c55e !important; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25); flex: 2; margin-top: 0;">
-              Register <i class="fa-solid fa-paper-plane"></i>
-            </button>
-          </div>
+        <div class="form-group">
+          <label for="reg-slug">Outlet ID / Unique Slug</label>
+          <input type="text" id="reg-slug" class="form-input" placeholder="e.g. royal-dhaba (letters & hyphens)" required>
+          <i class="fa-solid fa-link input-icon"></i>
         </div>
 
-        <!-- Stepper Indicator -->
-        <div class="stepper-indicator" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 20px;">
-          <span class="step-dot active" id="dot-1" style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary-brand); transition: var(--transition);"></span>
-          <span class="step-dot" id="dot-2" style="width: 8px; height: 8px; border-radius: 50%; background: var(--border-color); transition: var(--transition);"></span>
+        <div class="form-group">
+          <label for="reg-type">Outlet Type</label>
+          <select id="reg-type" class="form-input no-icon" required>
+            <option value="restaurant">Restaurant</option>
+            <option value="cafe">Cafe / Bakery</option>
+            <option value="dhaba">Dhaba / Local Diner</option>
+            <option value="cart">Food Cart / Truck</option>
+            <option value="other">Other Food Outlet</option>
+          </select>
         </div>
 
+        <div class="form-group">
+          <label for="reg-email">Owner Email</label>
+          <input type="email" id="reg-email" class="form-input" placeholder="owner@email.com" required>
+          <i class="fa-solid fa-envelope input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-whatsapp">WhatsApp Mobile Number</label>
+          <input type="tel" id="reg-whatsapp" class="form-input" placeholder="e.g. 919876543210 (with country code)" required>
+          <i class="fa-brands fa-whatsapp input-icon" style="color: #25d366;"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-user">Admin Username</label>
+          <input type="text" id="reg-user" class="form-input" placeholder="e.g. admin" required>
+          <i class="fa-solid fa-user-gear input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-pass">Admin Password</label>
+          <input type="password" id="reg-pass" class="form-input" placeholder="Choose Password" required>
+          <i class="fa-solid fa-key input-icon"></i>
+        </div>
+
+        <button type="submit" class="submit-btn" style="background-color: #22c55e !important; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);">
+          Request Registration <i class="fa-solid fa-paper-plane"></i>
+        </button>
       </form>
 
     </div>
@@ -1026,7 +967,6 @@
         document.getElementById('portal-subtitle').textContent = "Access your restaurant or food outlet terminal";
         errorBox.style.display = 'none';
         successBox.style.display = 'none';
-        if (registerForm) registerForm.reset();
       });
 
       function activateRegisterTab() {
@@ -1038,7 +978,6 @@
         document.getElementById('portal-subtitle').textContent = "Submit a request to CodeArc for a new SaaS instance";
         errorBox.style.display = 'none';
         successBox.style.display = 'none';
-        if (registerForm) registerForm.reset();
       }
 
       tabRegisterBtn.addEventListener('click', activateRegisterTab);
@@ -1256,7 +1195,7 @@
             // and asynchronously by the backend gateway server listening to Supabase Realtime changes on saas_tenants.
             // This eliminates token exposure in the public client-side frontend code.
 
-            if (registerForm) registerForm.reset();
+            registerForm.reset();
             // Scroll to top of card to show success message
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }
