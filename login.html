@@ -35,6 +35,11 @@
       --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
     }
 
+    html, body {
+      overflow-x: hidden;
+      width: 100%;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -174,6 +179,9 @@
       font-size: 13px;
       cursor: pointer;
       transition: var(--transition);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
     }
 
     .tab-btn.active {
@@ -371,7 +379,7 @@
         margin-bottom: 16px;
       }
       .tab-btn {
-        padding: 8px;
+        padding: 8px 4px;
         font-size: 12px;
       }
       .form-group {
@@ -384,6 +392,9 @@
       .form-input {
         padding: 10px 14px 10px 38px;
         font-size: 16px; /* Prevents auto-zoom on iOS */
+      }
+      .form-input.no-icon {
+        padding-left: 14px;
       }
       .form-group i.input-icon {
         left: 14px;
