@@ -262,7 +262,23 @@ async function saveSessionToSupabase() {
             output.on('close', resolve);
             archive.on('error', reject);
             archive.pipe(output);
-            archive.directory(authDataPath, false);
+            
+            // Exclude browser cache directories to keep zip size small (typically <5MB instead of 50MB+)
+            archive.glob('**/*', {
+                cwd: authDataPath,
+                ignore: [
+                    '**/Cache/**',
+                    '**/Code Cache/**',
+                    '**/GPUCache/**',
+                    '**/.wwebjs_cache/**',
+                    '**/Service Worker/CacheStorage/**',
+                    '**/Service Worker/ScriptCache/**',
+                    '**/CacheStorage/**',
+                    '**/ScriptCache/**',
+                    '**/Network/Trust Token Key Commitments/**'
+                ]
+            });
+            
             archive.finalize();
         });
 
@@ -1031,6 +1047,7 @@ app.post('/supabase-webhook', async (req, res) => {
 // Helper to send registration notification (WhatsApp + Email) (Made by Antigravity)
 async function handleNewRegistrationNotification(record) {
     const { name, slug, outlet_type, email, phone, username } = record;
+    await logHealthEvent('registration_received', 'ok', { name, slug, email, phone });
     
     // 1. Send WhatsApp Confirmation
     if (phone && connectionStatus === 'ready') {
@@ -1045,9 +1062,15 @@ async function handleNewRegistrationNotification(record) {
         try {
             await client.sendMessage(chatId, msgText);
             console.log(`[Realtime WhatsApp] Registration confirmation sent to +${maskPhone(targetPhone)}`);
+            await logHealthEvent('registration_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
             console.error(`[Realtime WhatsApp Error] Failed to send registration confirmation to +${targetPhone}:`, err.message);
+            await logHealthEvent('registration_whatsapp_failed', 'error', { phone: targetPhone, error: err.message });
         }
+    } else {
+        await logHealthEvent('registration_whatsapp_skipped', 'warning', {
+            reason: !phone ? 'no_phone' : `gateway_status_${connectionStatus}`
+        });
     }
 
     // 2. Send Email Confirmation
@@ -1095,15 +1118,22 @@ async function handleNewRegistrationNotification(record) {
         try {
             await transporter.sendMail(mailOptions);
             console.log(`[Realtime Email] Registration confirmation email sent to ${email}`);
+            await logHealthEvent('registration_email_sent', 'ok', { email, name });
         } catch (err) {
             console.error(`[Realtime Email Error] Failed to send registration confirmation email to ${email}:`, err.message);
+            await logHealthEvent('registration_email_failed', 'error', { email, error: err.message });
         }
+    } else {
+        await logHealthEvent('registration_email_skipped', 'warning', {
+            reason: !email ? 'no_email' : 'transporter_not_configured'
+        });
     }
 }
 
 // Helper to send approval notification (WhatsApp + Email) (Made by Antigravity)
 async function handleApprovalNotification(record) {
     const { name, slug, email, phone, username } = record;
+    await logHealthEvent('approval_received', 'ok', { name, slug, email, phone });
 
     // 1. Send WhatsApp Approval Alert
     if (phone && connectionStatus === 'ready') {
@@ -1117,9 +1147,15 @@ async function handleApprovalNotification(record) {
         try {
             await client.sendMessage(chatId, msgText);
             console.log(`[Realtime WhatsApp] Account approval alert sent to +${maskPhone(targetPhone)}`);
+            await logHealthEvent('approval_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
             console.error(`[Realtime WhatsApp Error] Failed to send account approval alert to +${targetPhone}:`, err.message);
+            await logHealthEvent('approval_whatsapp_failed', 'error', { phone: targetPhone, error: err.message });
         }
+    } else {
+        await logHealthEvent('approval_whatsapp_skipped', 'warning', {
+            reason: !phone ? 'no_phone' : `gateway_status_${connectionStatus}`
+        });
     }
 
     // 2. Send Email Approval Alert
@@ -1168,16 +1204,102 @@ async function handleApprovalNotification(record) {
         try {
             await transporter.sendMail(mailOptions);
             console.log(`[Realtime Email] Account approval email sent to ${email}`);
+            await logHealthEvent('approval_email_sent', 'ok', { email, name });
         } catch (err) {
             console.error(`[Realtime Email Error] Failed to send account approval email to ${email}:`, err.message);
+            await logHealthEvent('approval_email_failed', 'error', { email, error: err.message });
         }
+    } else {
+        await logHealthEvent('approval_email_skipped', 'warning', {
+            reason: !email ? 'no_email' : 'transporter_not_configured'
+        });
+    }
+}
+
+// ======================================================
+// POLLING FALLBACK FOR RELIABLE NOTIFICATIONS (Made by Antigravity)
+// ======================================================
+async function runNotificationPollingFallback() {
+    if (!supabaseService) {
+        console.warn('[Polling Fallback] SUPABASE_SERVICE_KEY not set. Polling skipped.');
+        return;
+    }
+
+    try {
+        // 1. Get all registrations from saas_tenants in the last 24 hours
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: tenants, error: tenantErr } = await supabaseService
+            .from('saas_tenants')
+            .select('*')
+            .gt('created_at', oneDayAgo);
+
+        if (tenantErr) throw tenantErr;
+        if (!tenants || tenants.length === 0) return;
+
+        // 2. Get all notified slugs from gateway_health_log
+        const { data: logs, error: logErr } = await supabaseService
+            .from('gateway_health_log')
+            .select('details')
+            .eq('event', 'registration_received')
+            .gt('created_at', oneDayAgo);
+
+        if (logErr) throw logErr;
+
+        const notifiedSlugs = new Set();
+        if (logs) {
+            logs.forEach(log => {
+                if (log.details && log.details.slug) {
+                    notifiedSlugs.add(log.details.slug);
+                }
+            });
+        }
+
+        // 3. Find any registrations that haven't been notified
+        for (const tenant of tenants) {
+            if (!notifiedSlugs.has(tenant.slug)) {
+                console.log(`[Polling Fallback] Found un-notified registration: ${tenant.name} (${tenant.slug}). Notifying...`);
+                await handleNewRegistrationNotification(tenant);
+            }
+        }
+        
+        // 4. Do the same for approved status transition
+        const approvedTenants = tenants.filter(t => t.status === 'approved');
+        if (approvedTenants.length > 0) {
+            const { data: approvalLogs, error: approvalLogErr } = await supabaseService
+                .from('gateway_health_log')
+                .select('details')
+                .eq('event', 'approval_received')
+                .gt('created_at', oneDayAgo);
+                
+            if (approvalLogErr) throw approvalLogErr;
+            
+            const notifiedApprovalSlugs = new Set();
+            if (approvalLogs) {
+                approvalLogs.forEach(log => {
+                    if (log.details && log.details.slug) {
+                        notifiedApprovalSlugs.add(log.details.slug);
+                    }
+                });
+            }
+            
+            for (const tenant of approvedTenants) {
+                if (!notifiedApprovalSlugs.has(tenant.slug)) {
+                    console.log(`[Polling Fallback] Found un-notified approval: ${tenant.name} (${tenant.slug}). Notifying...`);
+                    await handleApprovalNotification(tenant);
+                }
+            }
+        }
+
+    } catch (err) {
+        console.error('[Polling Fallback Error]', err.message);
     }
 }
 
 // ======================================================
 // NATIVE SUPABASE REALTIME DB LISTENERS
 // ======================================================
-const realtimeChannel = supabase
+const dbClientForRealtime = supabaseService || supabase;
+const realtimeChannel = dbClientForRealtime
     .channel('doppio-realtime-listener')
     .on(
         'postgres_changes',
@@ -1527,6 +1649,20 @@ app.listen(PORT, async () => {
     console.log(` http://localhost:${PORT}`);
     console.log('======================================================');
 
+    // Ensure storage bucket file size limit is set correctly (150MB) to allow session backup
+    if (supabaseService) {
+        try {
+            console.log('[Startup] Ensuring storage bucket limits are set correctly...');
+            await supabaseService.storage.updateBucket(SESSION_BUCKET, {
+                public: false,
+                fileSizeLimit: 157286400 // 150MB
+            });
+            console.log('[Startup] Storage bucket configured.');
+        } catch (err) {
+            console.error('[Startup Storage Config Warning]', err.message);
+        }
+    }
+
     await logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() });
 
     // Attempt to restore WhatsApp session from Supabase Storage
@@ -1544,5 +1680,12 @@ app.listen(PORT, async () => {
 
     console.log('[Startup] Initializing WhatsApp driver...');
     client.initialize().catch(err => console.error('Failed to initialize client:', err));
+
+    // Start database notification polling fallback (every 60 seconds)
+    if (supabaseService) {
+        console.log('[Startup] Starting database notification polling fallback...');
+        setTimeout(runNotificationPollingFallback, 5000); // Initial run in 5s
+        setInterval(runNotificationPollingFallback, 60000); // Run every 60s
+    }
 });
 
