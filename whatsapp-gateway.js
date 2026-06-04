@@ -67,7 +67,10 @@ if (emailConfig.user && emailConfig.pass) {
         auth: {
             user: emailConfig.user,
             pass: emailConfig.pass
-        }
+        },
+        connectionTimeout: 5000, // 5 seconds connection timeout
+        greetingTimeout: 5000,   // 5 seconds greeting timeout
+        socketTimeout: 5000      // 5 seconds socket inactivity timeout
     });
     console.log(`[SMTP] Nodemailer configured to send as: ${emailConfig.user}`);
 } else {
@@ -1115,14 +1118,15 @@ async function handleNewRegistrationNotification(record) {
             html: emailHtml
         };
 
-        try {
-            await transporter.sendMail(mailOptions);
-            console.log(`[Realtime Email] Registration confirmation email sent to ${email}`);
-            await logHealthEvent('registration_email_sent', 'ok', { email, name });
-        } catch (err) {
-            console.error(`[Realtime Email Error] Failed to send registration confirmation email to ${email}:`, err.message);
-            await logHealthEvent('registration_email_failed', 'error', { email, error: err.message });
-        }
+        transporter.sendMail(mailOptions)
+            .then(() => {
+                console.log(`[Realtime Email] Registration confirmation email sent to ${email}`);
+                logHealthEvent('registration_email_sent', 'ok', { email, name });
+            })
+            .catch(err => {
+                console.error(`[Realtime Email Error] Failed to send registration confirmation email to ${email}:`, err.message);
+                logHealthEvent('registration_email_failed', 'error', { email, error: err.message });
+            });
     } else {
         await logHealthEvent('registration_email_skipped', 'warning', {
             reason: !email ? 'no_email' : 'transporter_not_configured'
@@ -1201,14 +1205,15 @@ async function handleApprovalNotification(record) {
             html: emailHtml
         };
 
-        try {
-            await transporter.sendMail(mailOptions);
-            console.log(`[Realtime Email] Account approval email sent to ${email}`);
-            await logHealthEvent('approval_email_sent', 'ok', { email, name });
-        } catch (err) {
-            console.error(`[Realtime Email Error] Failed to send account approval email to ${email}:`, err.message);
-            await logHealthEvent('approval_email_failed', 'error', { email, error: err.message });
-        }
+        transporter.sendMail(mailOptions)
+            .then(() => {
+                console.log(`[Realtime Email] Account approval email sent to ${email}`);
+                logHealthEvent('approval_email_sent', 'ok', { email, name });
+            })
+            .catch(err => {
+                console.error(`[Realtime Email Error] Failed to send account approval email to ${email}:`, err.message);
+                logHealthEvent('approval_email_failed', 'error', { email, error: err.message });
+            });
     } else {
         await logHealthEvent('approval_email_skipped', 'warning', {
             reason: !email ? 'no_email' : 'transporter_not_configured'
