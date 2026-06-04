@@ -325,6 +325,59 @@
     .shake-anim {
       animation: shake 0.4s ease;
     }
+
+    /* Mobile Responsiveness Override */
+    @media (max-width: 480px) {
+      .login-container {
+        margin: 10px 0;
+      }
+      .login-card {
+        padding: 32px 20px 24px;
+        border-radius: 16px;
+      }
+      .brand-logo {
+        margin-bottom: 20px;
+      }
+      .logo-container {
+        padding: 6px 14px;
+        margin-bottom: 12px;
+      }
+      .login-title {
+        font-size: 20px;
+      }
+      .login-subtitle {
+        font-size: 12px;
+        margin-bottom: 16px;
+      }
+      .tab-header {
+        margin-bottom: 20px;
+      }
+      .tab-btn {
+        padding: 8px;
+        font-size: 12px;
+      }
+      .form-input {
+        padding: 10px 14px 10px 38px;
+        font-size: 13.5px;
+      }
+      .form-group i.input-icon {
+        left: 14px;
+        bottom: 11px;
+        font-size: 12px;
+      }
+      .toggle-pwd {
+        right: 14px;
+        bottom: 11px;
+        font-size: 12px;
+      }
+      .submit-btn {
+        padding: 12px;
+        font-size: 13.5px;
+      }
+      .bg-icon-left, .bg-icon-right {
+        display: none; /* Hide decorative floating icons on small screen sizes to prevent visual clutter */
+      }
+    }
   </style>
 </head>
 <body>
@@ -431,7 +484,7 @@
           <i class="fa-solid fa-key input-icon"></i>
         </div>
 
-        <button type="submit" class="submit-btn" style="background: var(--success-green); box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);">
+        <button type="submit" class="submit-btn" style="background: var(--success); box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);">
           Request Registration <i class="fa-solid fa-paper-plane"></i>
         </button>
       </form>
