@@ -478,9 +478,10 @@
         </div>
 
         <div class="form-group">
-          <label for="reg-slug">Outlet ID / Unique Slug</label>
+          <label for="reg-slug">Outlet ID / Unique Slug <span style="text-transform: none; font-weight: normal; color: var(--text-muted); font-size: 10.5px; margin-left: 4px;">(Must be unique & non-repetitive)</span></label>
           <input type="text" id="reg-slug" class="form-input" placeholder="e.g. royal-dhaba (letters & hyphens)" required>
           <i class="fa-solid fa-link input-icon"></i>
+          <div id="slug-status" style="font-size: 11px; margin-top: 5px; font-weight: 600; display: none; text-align: left; transition: var(--transition);"></div>
         </div>
 
         <div class="form-group">
@@ -982,20 +983,104 @@
 
       tabRegisterBtn.addEventListener('click', activateRegisterTab);
 
+      // Real-time Slug Suggestion & Database Check
+      const regNameInput = document.getElementById('reg-name');
+      const regSlugInput = document.getElementById('reg-slug');
+      const slugStatus = document.getElementById('slug-status');
+      let isSlugEditedManually = false;
+      let checkTimeout = null;
+
+      // Track manual edits to the slug field
+      if (regSlugInput) {
+        regSlugInput.addEventListener('input', () => {
+          isSlugEditedManually = true;
+          triggerAvailabilityCheck(regSlugInput.value);
+        });
+      }
+
+      // Convert business name to suggested slug in real-time
+      if (regNameInput && regSlugInput) {
+        regNameInput.addEventListener('input', (e) => {
+          if (!isSlugEditedManually) {
+            let suggestedSlug = e.target.value
+              .toLowerCase()
+              .replace(/[\s_]+/g, '-')          // spaces/underscores to hyphens
+              .replace(/[^a-z0-9-]/g, '')        // remove special chars
+              .replace(/-+/g, '-')              // consolidate consecutive hyphens
+              .replace(/^-+|-+$/g, '');         // trim leading/trailing hyphens
+            
+            regSlugInput.value = suggestedSlug;
+            triggerAvailabilityCheck(suggestedSlug);
+          }
+        });
+      }
+
+      // Helper to debounce database calls (waits 400ms after typing stops)
+      function triggerAvailabilityCheck(slug) {
+        if (checkTimeout) clearTimeout(checkTimeout);
+        
+        if (!slug) {
+          if (slugStatus) {
+            slugStatus.style.display = 'none';
+          }
+          return;
+        }
+
+        if (slugStatus) {
+          slugStatus.style.display = 'block';
+          slugStatus.style.color = 'var(--text-muted)';
+          slugStatus.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Checking availability...';
+        }
+
+        checkTimeout = setTimeout(() => {
+          runAvailabilityQuery(slug);
+        }, 400);
+      }
+
+      // Query Supabase for slug existence
+      async function runAvailabilityQuery(slug) {
+        if (!slugStatus) return;
+        
+        if (!supabaseClient) {
+          slugStatus.style.color = '#ef4444';
+          slugStatus.textContent = "Supabase connection is offline.";
+          return;
+        }
+
+        try {
+          const { data, error } = await supabaseClient
+            .from('saas_tenants')
+            .select('slug')
+            .eq('slug', slug);
+
+          if (error) throw error;
+
+          // Double check if the current input still matches the queried slug (to avoid race conditions)
+          if (regSlugInput && regSlugInput.value !== slug) return;
+
+          if (data && data.length > 0) {
+            slugStatus.style.color = '#ef4444'; // Error Red
+            slugStatus.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Already registered (Not Available)';
+          } else {
+            slugStatus.style.color = 'var(--success)'; // Success Green
+            slugStatus.innerHTML = '<i class="fa-solid fa-circle-check"></i> Unique ID Available';
+          }
+        } catch (err) {
+          console.error("Availability check failed:", err);
+          slugStatus.style.color = '#ef4444';
+          slugStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Error checking availability';
+        }
+      }
+
       // Auto-sanitize Slug Inputs (converting spaces/special chars to hyphens, lowercase, etc.)
       const sanitizeSlugInput = (inputEl) => {
         if (!inputEl) return;
         inputEl.addEventListener('input', (e) => {
           let val = e.target.value;
-          // Replace spaces and underscores with hyphens
           val = val.replace(/[\s_]+/g, '-');
-          // Make lowercase
           val = val.toLowerCase();
-          // Remove anything that is not lowercase letter, number, or hyphen
           val = val.replace(/[^a-z0-9-]/g, '');
-          // Remove multiple consecutive hyphens
           val = val.replace(/-+/g, '-');
-          // Update input value
           e.target.value = val;
         });
       };
