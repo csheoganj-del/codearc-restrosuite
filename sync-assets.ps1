@@ -15,6 +15,8 @@ $FilesToCopy = @(
     "index.html",
     "dashboard.html",
     "login.html",
+    "home.html",
+    "supabase_migration.sql",
     "styles.css",
     "dashboard-styles.css",
     "script.js",

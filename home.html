@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeArc RestoSuite | Premium Restaurant & Food Outlet SaaS System</title>
+  <meta name="description" content="State-of-the-art multi-tenant management software for cafes, restaurants, dhabas, and food carts. Developed by CodeArc.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #090605;
+      --bg-surface: #140f0d;
+      --primary-brand: #C98A4A;
+      --primary-hover: #b5763b;
+      --text-main: #f3eae8;
+      --text-muted: #9e8e8a;
+      --success: #4CAF7C;
+      --accent-latte: #ebdcd5;
+      --border-color: rgba(201, 138, 74, 0.15);
+      --font-heading: 'Outfit', 'Inter', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --shadow-lg: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Ambient glow elements */
+    .glow-1 {
+      position: absolute;
+      top: -200px;
+      right: -200px;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(201, 138, 74, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .glow-2 {
+      position: absolute;
+      top: 600px;
+      left: -300px;
+      width: 800px;
+      height: 800px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(201, 138, 74, 0.04) 0%, rgba(0, 0, 0, 0) 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* Header & Navigation */
+    header {
+      background: rgba(9, 6, 5, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 1000;
+      transition: var(--transition);
+    }
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-family: var(--font-heading);
+      font-size: 24px;
+      font-weight: 800;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .logo span {
+      color: var(--primary-brand);
+    }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14.5px;
+      font-weight: 500;
+      transition: var(--transition);
+    }
+    .nav-links a:hover {
+      color: #FFF;
+    }
+    .cta-btn {
+      background: var(--primary-brand);
+      color: #FFF !important;
+      padding: 10px 22px;
+      border-radius: 50px;
+      font-weight: 600 !important;
+      border: 1px solid transparent;
+      box-shadow: 0 4px 14px rgba(201, 138, 74, 0.3);
+    }
+    .cta-btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(201, 138, 74, 0.4);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 160px 24px 80px;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.12fr 1fr;
+      align-items: center;
+      gap: 60px;
+    }
+    .hero-content {
+      text-align: left;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(201, 138, 74, 0.1);
+      border: 1px solid rgba(201, 138, 74, 0.3);
+      padding: 6px 16px;
+      border-radius: 50px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--primary-brand);
+      margin-bottom: 24px;
+    }
+    .hero-title {
+      font-family: var(--font-heading);
+      font-size: 48px;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      color: #FFF;
+    }
+    .hero-title span {
+      background: linear-gradient(135deg, var(--primary-brand) 0%, #ecd6c4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-desc {
+      font-size: 16.5px;
+      color: var(--text-muted);
+      margin-bottom: 36px;
+      max-width: 520px;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+    }
+    .btn {
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: var(--transition);
+    }
+    .btn-primary {
+      background: var(--primary-brand);
+      color: #FFF;
+      border: none;
+      box-shadow: 0 4px 14px rgba(201, 138, 74, 0.3);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: #FFF;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Hero Mockup Widget */
+    .hero-mockup {
+      position: relative;
+    }
+    .mockup-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: var(--shadow-lg);
+      transform: perspective(1000px) rotateY(-5deg) rotateX(5deg);
+      transition: var(--transition);
+    }
+    .mockup-card:hover {
+      transform: perspective(1000px) rotateY(0deg) rotateX(0deg);
+    }
+    .mockup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 12px;
+    }
+    .dot-indicators {
+      display: flex;
+      gap: 6px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot.red { background: #ff5f56; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #27c93f; }
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .mockup-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .mockup-item i {
+      font-size: 24px;
+      color: var(--primary-brand);
+      margin-bottom: 8px;
+    }
+    .mockup-item div {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Outlets Section */
+    .outlets {
+      padding: 60px 24px;
+      background: rgba(201, 138, 74, 0.02);
+      border-y: 1px solid rgba(201, 138, 74, 0.05);
+      text-align: center;
+    }
+    .outlets-container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .outlets-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      margin-bottom: 30px;
+    }
+    .outlets-grid {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 30px;
+    }
+    .outlet-tag {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      opacity: 0.8;
+      transition: var(--transition);
+    }
+    .outlet-tag:hover {
+      opacity: 1;
+      color: var(--primary-brand);
+      transform: scale(1.05);
+    }
+    .outlet-tag i {
+      color: var(--primary-brand);
+    }
+
+    /* Features Section */
+    .features {
+      padding: 100px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: 36px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 32px;
+      transition: var(--transition);
+    }
+    .feature-card:hover {
+      transform: translateY(-8px);
+      border-color: rgba(201, 138, 74, 0.4);
+      box-shadow: 0 10px 25px -5px rgba(201, 138, 74, 0.1);
+    }
+    .feature-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      background: rgba(201, 138, 74, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary-brand);
+      font-size: 22px;
+      margin-bottom: 24px;
+    }
+    .feature-card h3 {
+      font-family: var(--font-heading);
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #FFF;
+    }
+    .feature-card p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Pricing Plan Section */
+    .pricing {
+      padding: 80px 24px;
+      background: rgba(255, 255, 255, 0.01);
+    }
+    .pricing-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .price-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 40px 32px;
+      text-align: center;
+      transition: var(--transition);
+      position: relative;
+    }
+    .price-card.popular {
+      border-color: var(--primary-brand);
+      transform: scale(1.05);
+      box-shadow: 0 15px 35px -10px rgba(201, 138, 74, 0.2);
+    }
+    .popular-tag {
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--primary-brand);
+      color: #FFF;
+      padding: 4px 16px;
+      border-radius: 50px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .price-name {
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .price-value {
+      font-family: var(--font-heading);
+      font-size: 42px;
+      font-weight: 800;
+      color: #FFF;
+      margin-bottom: 24px;
+    }
+    .price-value span {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .price-features {
+      list-style: none;
+      text-align: left;
+      margin-bottom: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .price-features li {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .price-features li i {
+      color: var(--success);
+    }
+    .price-btn {
+      width: 100%;
+      justify-content: center;
+      padding: 12px;
+      border-radius: 10px;
+    }
+
+    /* Contact & Footer Section */
+    footer {
+      background: #060403;
+      padding: 80px 24px 40px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .footer-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 80px;
+      margin-bottom: 60px;
+    }
+    .footer-brand h3 {
+      font-family: var(--font-heading);
+      font-size: 26px;
+      font-weight: 800;
+      color: #FFF;
+      margin-bottom: 16px;
+    }
+    .footer-brand h3 span {
+      color: var(--primary-brand);
+    }
+    .footer-brand p {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 400px;
+      margin-bottom: 30px;
+    }
+    .social-links {
+      display: flex;
+      gap: 16px;
+    }
+    .social-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      text-decoration: none;
+      transition: var(--transition);
+    }
+    .social-icon:hover {
+      background: var(--primary-brand);
+      color: #FFF;
+      border-color: transparent;
+      transform: translateY(-3px);
+    }
+    .footer-contact h3 {
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 700;
+      color: #FFF;
+      margin-bottom: 24px;
+    }
+    .contact-details {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .contact-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .contact-item i {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(201, 138, 74, 0.08);
+      color: var(--primary-brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .contact-item a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: var(--transition);
+    }
+    .contact-item a:hover {
+      color: #FFF;
+    }
+    .footer-bottom {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+    .footer-bottom a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: var(--transition);
+    }
+    .footer-bottom a:hover {
+      color: #FFF;
+    }
+
+    @media (max-width: 900px) {
+      .hero {
+        grid-template-columns: 1fr;
+        text-align: center;
+        padding-top: 120px;
+      }
+      .hero-content {
+        text-align: center;
+      }
+      .hero-desc {
+        margin: 0 auto 36px;
+      }
+      .hero-actions {
+        justify-content: center;
+      }
+      .features-grid, .pricing-grid, .footer-container {
+        grid-template-columns: 1fr;
+      }
+      .price-card.popular {
+        transform: scale(1);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-container">
+      <a href="#" class="logo">CodeArc <span>RestoSuite</span></a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact</a></li>
+        <li><a href="login.html" class="cta-btn" id="nav-login-btn"><i class="fa-solid fa-right-to-bracket"></i> Client Portal</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="badge">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> White-Labeled Food Outlet SaaS
+      </div>
+      <h1 class="hero-title">
+        The Ultimate Operating System for <span>Any Food Outlet</span>
+      </h1>
+      <p class="hero-desc">
+        One subscription to run your entire POS, real-time KDS, customer self-QR ordering, analytics ledger, automated payroll, and WhatsApp receipts. Made general for restaurants, cafes, dhabas, and food carts.
+      </p>
+      <div class="hero-actions">
+        <a href="login.html?tab=register" class="btn btn-primary" id="hero-signup-btn"><i class="fa-solid fa-rocket"></i> Register Your Outlet</a>
+        <a href="#features" class="btn btn-secondary">Explore Features</a>
+      </div>
+    </div>
+    
+    <div class="hero-mockup">
+      <div class="mockup-card">
+        <div class="mockup-header">
+          <div class="dot-indicators">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; color: var(--text-muted);">SaaS Control Panel</span>
+        </div>
+        <div class="mockup-grid">
+          <div class="mockup-item">
+            <i class="fa-solid fa-cash-register"></i>
+            <div>Takeaway POS</div>
+          </div>
+          <div class="mockup-item">
+            <i class="fa-solid fa-table-list"></i>
+            <div>Table Map</div>
+          </div>
+          <div class="mockup-item">
+            <i class="fa-solid fa-kitchen-set"></i>
+            <div>Kitchen KDS</div>
+          </div>
+          <div class="mockup-item">
+            <i class="fa-solid fa-qrcode"></i>
+            <div>QR Ordering</div>
+          </div>
+          <div class="mockup-item">
+            <i class="fa-solid fa-chart-line"></i>
+            <div>Sales Reports</div>
+          </div>
+          <div class="mockup-item">
+            <i class="fa-solid fa-warehouse"></i>
+            <div>Inventory Control</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Outlets Tag Strip -->
+  <section class="outlets">
+    <div class="outlets-container">
+      <div class="outlets-title">Engineered For All Food-Serving Formats</div>
+      <div class="outlets-grid">
+        <div class="outlet-tag"><i class="fa-solid fa-utensils"></i> Restaurants</div>
+        <div class="outlet-tag"><i class="fa-solid fa-mug-hot"></i> Premium Cafes</div>
+        <div class="outlet-tag"><i class="fa-solid fa-bowl-food"></i> Local Dhabas</div>
+        <div class="outlet-tag"><i class="fa-solid fa-truck-field"></i> Food Trucks & Carts</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features" id="features">
+    <div class="section-header">
+      <h2 class="section-title">Built-In Enterprise Utilities</h2>
+      <p class="section-desc">Everything you need to automate billing, kitchen orders, inventory, and staff ledgers in one seamless application.</p>
+    </div>
+    
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fa-solid fa-cash-register"></i></div>
+        <h3>Ultra-Fast POS Screen</h3>
+        <p>Responsive POS grid system featuring custom item categories, active cart sessions, split-pay features, and quick print configurations.</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fa-solid fa-kitchen-set"></i></div>
+        <h3>Live Kitchen KDS Screen</h3>
+        <p>Live order tickets streaming instantly into the preparation room. Active timers flag tickets to keep average preparation time below 12 minutes.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fa-solid fa-warehouse"></i></div>
+        <h3>Live Inventory Control</h3>
+        <p>Dynamic ingredient matching and stock tracking. Automatic low-stock warnings flag alerts on the POS layout to prevent ordering unavailable items.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fa-solid fa-chart-pie"></i></div>
+        <h3>Nagpur Analytics Studio</h3>
+        <p>Rich dashboards illustrating sales, revenue trend lines, payment type segregation (UPI vs Cash), and pro-rated monthly cost audits.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fa-solid fa-users"></i></div>
+        <h3>Loyalty & CRM Ledger</h3>
+        <p>Automatic customer profile creation on checkout. Customer tier segmentation (Bronze, Silver, Gold, Platinum) with custom discount rates.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fa-solid fa-receipt"></i></div>
+        <h3>WhatsApp Broadcast Billing</h3>
+        <p>Automate receipt delivery by broadcasting bills directly to customer WhatsApp profiles. Go paperless and increase repeat bookings.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Plans -->
+  <section class="pricing" id="pricing">
+    <div class="pricing-container">
+      <div class="section-header">
+        <h2 class="section-title">Transparent SaaS Pricing</h2>
+        <p class="section-desc">Select the perfect toolkit to run your kitchen. Upgrade, downgrade, or cancel anytime.</p>
+      </div>
+      
+      <div class="pricing-grid">
+        <div class="price-card">
+          <div class="price-name">Basic Cart</div>
+          <div class="price-value">₹999 <span>/ month</span></div>
+          <ul class="price-features">
+            <li><i class="fa-solid fa-circle-check"></i> Standard Billing POS</li>
+            <li><i class="fa-solid fa-circle-check"></i> Up to 100 Bills / Day</li>
+            <li><i class="fa-solid fa-circle-check"></i> Digital Menu Manager</li>
+            <li><i class="fa-solid fa-circle-xmark" style="color:var(--text-muted)"></i> Live KDS Monitor</li>
+            <li><i class="fa-solid fa-circle-xmark" style="color:var(--text-muted)"></i> WhatsApp Gateway</li>
+          </ul>
+          <a href="login.html?tab=register" class="btn btn-secondary price-btn">Get Started</a>
+        </div>
+        
+        <div class="price-card popular">
+          <div class="popular-tag">Most Popular</div>
+          <div class="price-name">Standard Suite</div>
+          <div class="price-value">₹2,499 <span>/ month</span></div>
+          <ul class="price-features">
+            <li><i class="fa-solid fa-circle-check"></i> Enterprise Billing POS</li>
+            <li><i class="fa-solid fa-circle-check"></i> Unlimited Bills & Sales</li>
+            <li><i class="fa-solid fa-circle-check"></i> Live Kitchen KDS Board</li>
+            <li><i class="fa-solid fa-circle-check"></i> Automated CRM & Loyalty</li>
+            <li><i class="fa-solid fa-circle-check"></i> WhatsApp Gateway Integration</li>
+          </ul>
+          <a href="login.html?tab=register" class="btn btn-primary price-btn">Get Started</a>
+        </div>
+
+        <div class="price-card">
+          <div class="price-name">Enterprise Hub</div>
+          <div class="price-value">₹4,999 <span>/ month</span></div>
+          <ul class="price-features">
+            <li><i class="fa-solid fa-circle-check"></i> Everything in Standard Suite</li>
+            <li><i class="fa-solid fa-circle-check"></i> Multi-Outlet Roster Ledger</li>
+            <li><i class="fa-solid fa-circle-check"></i> Live WhatsApp Gateway Sync</li>
+            <li><i class="fa-solid fa-circle-check"></i> Dedicated Account Support</li>
+            <li><i class="fa-solid fa-circle-check"></i> AI Sales Intelligence Panel</li>
+          </ul>
+          <a href="login.html?tab=register" class="btn btn-secondary price-btn">Get Started</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer & Contacts -->
+  <footer id="contact">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <h3>CodeArc <span>RestoSuite</span></h3>
+        <p>Premium restaurant, cafe, dhaba, and food cart operating system. Automate your operations, reduce table delays, and grow your sales seamlessly.</p>
+        <div class="social-links">
+          <a href="https://wa.me/353852258004" target="_blank" class="social-icon" title="WhatsApp Chat"><i class="fa-brands fa-whatsapp"></i></a>
+          <a href="https://instagram.com" target="_blank" class="social-icon" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="https://corearc.co.in" target="_blank" class="social-icon" title="Website"><i class="fa-solid fa-globe"></i></a>
+        </div>
+      </div>
+      
+      <div class="footer-contact">
+        <h3>Corporate Connections</h3>
+        <div class="contact-details">
+          <div class="contact-item">
+            <i class="fa-solid fa-phone"></i>
+            <div>
+              <strong>Direct Mobile:</strong><br>
+              <a href="tel:+353852258004">+353 85 225 8004</a>
+            </div>
+          </div>
+          <div class="contact-item">
+            <i class="fa-solid fa-envelope"></i>
+            <div>
+              <strong>Email Support:</strong><br>
+              <a href="mailto:hello@codearc.co.in">hello@codearc.co.in</a>
+            </div>
+          </div>
+          <div class="contact-item">
+            <i class="fa-solid fa-globe"></i>
+            <div>
+              <strong>Developer Agency Website:</strong><br>
+              <a href="https://corearc.co.in" target="_blank">corearc.co.in</a> / <a href="https://codearc.co.in" target="_blank">codearc.co.in</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer-bottom">
+      <div>&copy; 2026 CodeArc. All rights reserved. Designed & Engineered for premium dining platforms.</div>
+      <div>
+        <a href="login.html">Client Portal</a> &bull; 
+        <a href="https://corearc.co.in" target="_blank">CodeArc Agency</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

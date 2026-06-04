@@ -13,6 +13,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'login.html';
     return;
   }
+  const activeTenantId = sessionStorage.getItem('tenant_id');
+  const activeTenantSlug = sessionStorage.getItem('tenant_slug');
+  const activeTenantName = sessionStorage.getItem('tenant_name') || 'Restaurant';
+  const allowedTabsRaw = sessionStorage.getItem('allowed_tabs');
+  const allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
 
   // ==========================================
   // TRIPLE-VAULT RESILIENCE VAULT (IndexedDB)
@@ -450,10 +455,79 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let savedInventory = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory')) || {}; } catch(e) { return {}; } })();
   let inventory = { ...defaultInventory, ...savedInventory };
+
+  const getMockBills = () => [
+    {
+      orderId: 'DO-1001',
+      customerName: 'Aniket Sharma',
+      customerPhone: '9823012345',
+      dateTime: new Date(Date.now() - 3 * 3600000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Bombay Grilled Sandwich', qty: 1, price: 369 },
+        { name: 'Nutella Thickshake', qty: 1, price: 299 }
+      ],
+      subtotal: 668,
+      discount: 33.4,
+      gst: 114.23,
+      total: 749,
+      paymentMethod: 'UPI'
+    },
+    {
+      orderId: 'DO-1002',
+      customerName: 'Priya Deshmukh',
+      customerPhone: '9130098765',
+      dateTime: new Date(Date.now() - 2 * 3600000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Alfredo Pennei Pasta', qty: 1, price: 499 },
+        { name: 'Spicy Mango Martini', qty: 2, price: 329 }
+      ],
+      subtotal: 1157,
+      discount: 115.7,
+      gst: 187.43,
+      total: 1229,
+      paymentMethod: 'Card'
+    },
+    {
+      orderId: 'DO-1003',
+      customerName: 'Rahul Verma',
+      customerPhone: '8888776655',
+      dateTime: new Date(Date.now() - 1 * 3600000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Cheese Garlic', qty: 1, price: 249 },
+        { name: 'Classic Hot Chocolate', qty: 1, price: 349 }
+      ],
+      subtotal: 598,
+      discount: 0,
+      gst: 107.64,
+      total: 706,
+      paymentMethod: 'Cash'
+    },
+    {
+      orderId: 'DO-1004',
+      customerName: 'Kunal Sen',
+      customerPhone: '9552147890',
+      dateTime: new Date(Date.now() - 30 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Oreo Cookies Thickshake', qty: 1, price: 299 },
+        { name: 'Swiggy Combo3', qty: 1, price: 530 }
+      ],
+      subtotal: 829,
+      discount: 124.35,
+      gst: 126.84,
+      total: 831,
+      paymentMethod: 'UPI'
+    }
+  ];
+
   let bills = (() => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_bills'));
-      return Array.isArray(parsed) ? parsed.filter(b => b && typeof b === 'object' && b.orderId) : [];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter(b => b && typeof b === 'object' && b.orderId);
+      }
+      const mock = getMockBills();
+      localStorage.setItem('doppio_bills', JSON.stringify(mock));
+      return mock;
     } catch(e) {
       console.warn('Corrupted bills data reset');
       localStorage.removeItem('doppio_bills');
@@ -591,7 +665,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let employees = (() => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_employees'));
-      return Array.isArray(parsed) ? parsed.filter(e => e && typeof e === 'object' && e.id) : defaultEmployees;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter(e => e && typeof e === 'object' && e.id);
+      }
+      return defaultEmployees;
     } catch(e) {
       return defaultEmployees;
     }
@@ -604,7 +681,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let leaveRequests = (() => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_leave_requests')) || JSON.parse(localStorage.getItem('doppio_leaves'));
-      return Array.isArray(parsed) ? parsed.filter(r => r && typeof r === 'object' && r.id) : defaultLeaves;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter(r => r && typeof r === 'object' && r.id);
+      }
+      return defaultLeaves;
     } catch(e) {
       return defaultLeaves;
     }
@@ -622,7 +702,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let attendanceLogs = (() => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_attendance'));
-      return Array.isArray(parsed) ? parsed.filter(l => l && typeof l === 'object' && l.id) : defaultAttendance;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter(l => l && typeof l === 'object' && l.id);
+      }
+      return defaultAttendance;
     } catch(e) {
       return defaultAttendance;
     }
@@ -662,7 +745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Disable shiftEnabled in Supabase cloud db once for migration v4
         if (localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
-          supabaseClient.from('doppio_business_profile').update({ shift_enabled: false }).eq('id', 1)
+          supabaseClient.from('doppio_business_profile').update({ shift_enabled: false }).eq('tenant_id', activeTenantId)
             .then(({ error }) => {
               if (!error) {
                 localStorage.setItem('doppio_shift_supabase_synced_v4', 'true');
@@ -808,6 +891,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     for (const bill of billsToSync) {
       try {
         const { error } = await supabaseClient.from('doppio_bills').insert({
+          tenant_id: activeTenantId,
           orderId: bill.orderId,
           customerName: bill.customerName,
           customerPhone: bill.customerPhone,
@@ -839,10 +923,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function syncWithSupabase() {
     if (!supabaseClient) return;
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') {
+      applyFeatureToggles();
+      return;
+    }
     try {
       // Sync Business Profile Toggles and Settings Live!
       try {
-        const { data: dbProfileList } = await supabaseClient.from('doppio_business_profile').select('*').eq('id', 1);
+        let { data: dbProfileList } = await supabaseClient.from('doppio_business_profile').select('*').eq('tenant_id', activeTenantId);
+        if (!dbProfileList || dbProfileList.length === 0) {
+          // Auto-create default profile for new client
+          const { data: newProfile } = await supabaseClient.from('doppio_business_profile').insert({
+            tenant_id: activeTenantId,
+            business_name: activeTenantName,
+            address: 'India',
+            phone: '+353 85 225 8004',
+            gst_enabled: true,
+            gst_rate: 18,
+            loyalty_discount_enabled: true,
+            loyalty_discount_rate: 10,
+            crm_enabled: true,
+            tax_enabled: true,
+            sound_enabled: false,
+            whatsapp_enabled: true,
+            shift_enabled: false
+          }).select('*');
+          if (newProfile && newProfile.length > 0) dbProfileList = newProfile;
+        }
         if (dbProfileList && dbProfileList.length > 0) {
           const dbProfile = dbProfileList[0];
           businessProfile = {
@@ -885,7 +992,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // Sync Menu
-      const { data: dbMenu } = await supabaseClient.from('doppio_menu').select('*').order('id', { ascending: true });
+      let { data: dbMenu } = await supabaseClient.from('doppio_menu').select('*').eq('tenant_id', activeTenantId).order('id', { ascending: true });
+      if (!dbMenu || dbMenu.length === 0) {
+        // Auto-seed default menu items for the new tenant
+        const seedItems = defaultMenu.map(item => ({
+          tenant_id: activeTenantId,
+          name: item.name,
+          category: item.category,
+          price: item.price,
+          description: item.description || '',
+          icon: item.icon || '☕'
+        }));
+        await supabaseClient.from('doppio_menu').insert(seedItems);
+        const { data: freshMenu } = await supabaseClient.from('doppio_menu').select('*').eq('tenant_id', activeTenantId).order('id', { ascending: true });
+        dbMenu = freshMenu || [];
+      }
       if (dbMenu && dbMenu.length > 0) {
         // Merge dbMenu with defaultMenu defensively to ensure food items and all categories exist
         const dbNames = new Set(dbMenu.map(item => item.name.toLowerCase().trim()));
@@ -904,7 +1025,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // Sync Inventory
-      const { data: dbInv } = await supabaseClient.from('doppio_inventory').select('*');
+      let { data: dbInv } = await supabaseClient.from('doppio_inventory').select('*').eq('tenant_id', activeTenantId);
+      if (!dbInv || dbInv.length === 0) {
+        // Auto-seed inventory keys
+        const seedInv = Object.keys(defaultInventory).map(key => ({
+          tenant_id: activeTenantId,
+          key: key,
+          current: defaultInventory[key],
+          min_required: 10
+        }));
+        await supabaseClient.from('doppio_inventory').insert(seedInv);
+        const { data: freshInv } = await supabaseClient.from('doppio_inventory').select('*').eq('tenant_id', activeTenantId);
+        dbInv = freshInv || [];
+      }
       if (dbInv && dbInv.length > 0) {
         dbInv.forEach(row => {
           inventory[row.key] = row.current;
@@ -915,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // Sync Bills History Live across all devices!
-      const { data: dbBills } = await supabaseClient.from('doppio_bills').select('*');
+      const { data: dbBills } = await supabaseClient.from('doppio_bills').select('*').eq('tenant_id', activeTenantId);
       if (dbBills && dbBills.length > 0) {
         const parsedDbBills = dbBills.map(b => {
           let items = b.items;
@@ -958,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Pending QR Orders & Dine-In Carts (Made by Antigravity)
       try {
-        const { data: dbPending } = await supabaseClient.from('doppio_pending_orders').select('*');
+        const { data: dbPending } = await supabaseClient.from('doppio_pending_orders').select('*').eq('tenant_id', activeTenantId);
         if (dbPending && dbPending.length > 0) {
           const parsedPending = dbPending.map(o => {
             let items = o.items;
@@ -1020,7 +1153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Shift History from cloud (restores Z-reports and closed shift data across devices)
       try {
-        const { data: dbShifts } = await supabaseClient.from('doppio_shifts').select('*').order('openedAt', { ascending: false }).limit(50);
+        const { data: dbShifts } = await supabaseClient.from('doppio_shifts').select('*').eq('tenant_id', activeTenantId).order('openedAt', { ascending: false }).limit(50);
         if (dbShifts && dbShifts.length > 0) {
           const localMap = new Map(shiftHistory.filter(s => s && s.shiftId).map(s => [s.shiftId, s]));
           dbShifts.forEach(dbS => {
@@ -1051,7 +1184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Shift Events (cash payouts, safe drops) from cloud
       try {
-        const { data: dbShiftEvents } = await supabaseClient.from('doppio_shift_events').select('*').order('createdAt', { ascending: false }).limit(200);
+        const { data: dbShiftEvents } = await supabaseClient.from('doppio_shift_events').select('*').eq('tenant_id', activeTenantId).order('createdAt', { ascending: false }).limit(200);
         if (dbShiftEvents && dbShiftEvents.length > 0) {
           const localMap = new Map(shiftEvents.filter(e => e && e.eventId).map(e => [e.eventId, e]));
           dbShiftEvents.forEach(dbE => {
@@ -1074,7 +1207,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Sync Employees
 
       try {
-        const { data: dbEmployees } = await supabaseClient.from('doppio_employees').select('*');
+        let { data: dbEmployees } = await supabaseClient.from('doppio_employees').select('*').eq('tenant_id', activeTenantId);
+        if (!dbEmployees || dbEmployees.length === 0) {
+          const seedEmp = defaultEmployees.map(emp => ({
+            tenant_id: activeTenantId,
+            name: emp.name,
+            role: emp.role,
+            contact: emp.contact,
+            baseSalary: emp.baseSalary,
+            shift: emp.shift,
+            leaves: emp.leaves
+          }));
+          await supabaseClient.from('doppio_employees').insert(seedEmp);
+          const { data: freshEmp } = await supabaseClient.from('doppio_employees').select('*').eq('tenant_id', activeTenantId);
+          dbEmployees = freshEmp || [];
+        }
         if (dbEmployees && dbEmployees.length > 0) {
           const localEmployees = JSON.parse(localStorage.getItem('doppio_employees')) || [];
           const localMap = new Map(localEmployees.filter(e => e && e.id).map(e => [e.id, e]));
@@ -1099,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Leave Requests
       try {
-        const { data: dbLeaves } = await supabaseClient.from('doppio_leave_requests').select('*');
+        const { data: dbLeaves } = await supabaseClient.from('doppio_leave_requests').select('*').eq('tenant_id', activeTenantId);
         if (dbLeaves && dbLeaves.length > 0) {
           const localLeaves = JSON.parse(localStorage.getItem('doppio_leave_requests')) || [];
           const localMap = new Map(localLeaves.filter(r => r && r.id).map(r => [r.id, r]));
@@ -1126,7 +1273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Attendance Logs
       try {
-        const { data: dbAttendance } = await supabaseClient.from('doppio_attendance').select('*');
+        const { data: dbAttendance } = await supabaseClient.from('doppio_attendance').select('*').eq('tenant_id', activeTenantId);
         if (dbAttendance && dbAttendance.length > 0) {
           const localAttendance = JSON.parse(localStorage.getItem('doppio_attendance')) || [];
           const localMap = new Map(localAttendance.filter(log => log && log.id).map(log => [log.id, log]));
@@ -1154,7 +1301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync CRM Loyalty Members
       try {
-        const { data: dbCRM } = await supabaseClient.from('doppio_crm').select('*');
+        const { data: dbCRM } = await supabaseClient.from('doppio_crm').select('*').eq('tenant_id', activeTenantId);
         if (dbCRM && dbCRM.length > 0) {
           const localMap = new Map(crmData.filter(c => c && c.phone).map(c => [c.phone, c]));
           dbCRM.forEach(dbC => {
@@ -1195,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Inventory Batches
       try {
-        const { data: dbBatches } = await supabaseClient.from('doppio_inventory_batches').select('*');
+        const { data: dbBatches } = await supabaseClient.from('doppio_inventory_batches').select('*').eq('tenant_id', activeTenantId);
         if (dbBatches && dbBatches.length > 0) {
           // Rebuild inventoryBatches map from cloud
           const cloudMap = {};
@@ -1219,7 +1366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Notifications
       try {
-        const { data: dbNotifs } = await supabaseClient.from('doppio_notifications').select('*').order('created_at', { ascending: false }).limit(50);
+        const { data: dbNotifs } = await supabaseClient.from('doppio_notifications').select('*').eq('tenant_id', activeTenantId).order('created_at', { ascending: false }).limit(50);
         if (dbNotifs && dbNotifs.length > 0) {
           const localMap = new Map(notifications.filter(n => n && n.id).map(n => [n.id, n]));
           dbNotifs.forEach(dbN => {
@@ -1245,7 +1392,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Custom Item Recipes
       try {
-        const { data: dbRecipes } = await supabaseClient.from('doppio_custom_recipes').select('*');
+        const { data: dbRecipes } = await supabaseClient.from('doppio_custom_recipes').select('*').eq('tenant_id', activeTenantId);
         if (dbRecipes && dbRecipes.length > 0) {
           dbRecipes.forEach(row => {
             const itemName = (row.item_name || '').toLowerCase().trim();
@@ -1266,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync Inventory Thresholds
       try {
-        const { data: dbThresholds } = await supabaseClient.from('doppio_inventory_thresholds').select('*');
+        const { data: dbThresholds } = await supabaseClient.from('doppio_inventory_thresholds').select('*').eq('tenant_id', activeTenantId);
         if (dbThresholds && dbThresholds.length > 0) {
           dbThresholds.forEach(row => {
             if (row.ingredient_key) {
@@ -1282,7 +1429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Sync POS Item Popularity (used for grid sort order)
       try {
-        const { data: dbPopularity } = await supabaseClient.from('doppio_pos_popularity').select('*');
+        const { data: dbPopularity } = await supabaseClient.from('doppio_pos_popularity').select('*').eq('tenant_id', activeTenantId);
         if (dbPopularity && dbPopularity.length > 0) {
           dbPopularity.forEach(row => {
             const itemName = (row.item_name || '').toLowerCase().trim();
@@ -1308,13 +1455,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) return;
     
     // Subscribe to standard bills changes
-    supabaseClient.channel('doppio-bills-realtime')
+    supabaseClient.channel('doppio-bills-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills', filter: 'tenant_id=eq.' + activeTenantId }, payload => {})
       .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills' }, () => {
         syncWithSupabase();
       }).subscribe();
 
     // Subscribe to live QR self-ordering queue & table sessions (Made by Antigravity)
-    supabaseClient.channel('doppio-pending-orders-realtime')
+    supabaseClient.channel('doppio-pending-orders-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: 'tenant_id=eq.' + activeTenantId }, payload => {})
       .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders' }, (payload) => {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const newOrder = payload.new;
@@ -1430,6 +1577,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           showNotificationToast(`Bill ${orderId}: Delivery Failed - ${error || 'Gateway Offline'}`);
         }
       }).subscribe();
+
+    // Subscribe to SaaS Tenants real-time updates for Super-Admin console (Made by Antigravity)
+    const loggedInRole = sessionStorage.getItem('logged_in_role');
+    if (loggedInRole === 'superadmin') {
+      supabaseClient.channel('saas-tenants-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'saas_tenants' }, (payload) => {
+          console.log("Realtime SaaS Tenants Change detected:", payload);
+          renderSuperAdminTab();
+        }).subscribe();
+    }
   }
 
   // ==========================================
@@ -1523,6 +1680,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         tabSubtitle.textContent = 'Live Takeaway & Delivery Pickup Screen';
         if (typeof renderTokensTab === 'function') renderTokensTab();
       }
+      else if (tabId === 'super-admin-tab') {
+        tabSubtitle.textContent = 'Manage client subscriptions, features, and system access';
+        renderSuperAdminTab();
+      }
     });
   });
 
@@ -1565,9 +1726,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Focus search indicator keyboard listener
   document.addEventListener('keydown', (e) => {
+    // / → focus search bar (clear value to start fresh)
     if (e.key === '/' && document.activeElement !== posSearch) {
       e.preventDefault();
-      if (posSearch) { posSearch.focus(); posSearch.value = ''; }
+      if (posSearch) { posSearch.focus(); posSearch.select(); }
+      return;
+    }
+
+    // Esc → clear search and unfocus (return to neutral state)
+    if (e.key === 'Escape' && document.activeElement === posSearch) {
+      e.preventDefault();
+      if (posSearch) {
+        posSearch.value = '';
+        posSearchQuery = '';
+        renderPOSItems();
+        posSearch.blur();
+      }
+      return;
+    }
+
+    // Enter from search → add first visible item to cart instantly
+    if (e.key === 'Enter' && document.activeElement === posSearch) {
+      e.preventDefault();
+      const firstCard = document.querySelector('#pos-items-grid .pos-item-card');
+      if (firstCard) {
+        const titleEl = firstCard.querySelector('.pos-item-title');
+        if (titleEl) {
+          const itemName = titleEl.textContent.trim();
+          const item = menu.find(i => i.name === itemName);
+          if (item) {
+            addDefaultToCart(item);
+            // Clear search after adding
+            posSearch.value = '';
+            posSearchQuery = '';
+            renderPOSItems();
+          }
+        }
+      }
+      return;
     }
   });
 
@@ -1649,9 +1845,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <span class="pos-item-price">₹${item.price}</span>
       `;
 
-      // Click card to add directly to cart
+      // Click card to add directly to cart (pass DOM ref for flash animation)
       card.addEventListener('click', () => {
-        addDefaultToCart(item);
+        addDefaultToCart(item, card);
       });
 
       posItemsGrid.appendChild(card);
@@ -1786,7 +1982,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Quick default add mapping
-  function addDefaultToCart(menuItem) {
+  function addDefaultToCart(menuItem, sourceCardEl) {
     SoundEffects.playPop();
     const compositeKey = `${menuItem.name}_Small_Sugar:Regular_Ice:Regular_Addons:_Notes:`;
     const existing = cart.find(item => item.key === compositeKey);
@@ -1808,6 +2004,39 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
     renderCart();
+
+    // --- Add-to-cart visual feedback ---
+    // 1. Flash the source card if a DOM element was passed
+    if (sourceCardEl) {
+      sourceCardEl.classList.remove('card-added');
+      // Force reflow so animation restarts even on repeated taps
+      void sourceCardEl.offsetWidth;
+      sourceCardEl.classList.add('card-added');
+      sourceCardEl.addEventListener('animationend', () => {
+        sourceCardEl.classList.remove('card-added');
+      }, { once: true });
+    } else {
+      // Find the card by item name if no element reference
+      const cards = document.querySelectorAll('#pos-items-grid .pos-item-card');
+      cards.forEach(card => {
+        const t = card.querySelector('.pos-item-title');
+        if (t && t.textContent.trim() === menuItem.name) {
+          card.classList.remove('card-added');
+          void card.offsetWidth;
+          card.classList.add('card-added');
+          card.addEventListener('animationend', () => card.classList.remove('card-added'), { once: true });
+        }
+      });
+    }
+
+    // 2. Pop the cart order badge
+    const cartBadge = document.getElementById('cart-order-badge');
+    if (cartBadge) {
+      cartBadge.classList.remove('cart-header-pop');
+      void cartBadge.offsetWidth;
+      cartBadge.classList.add('cart-header-pop');
+      cartBadge.addEventListener('animationend', () => cartBadge.classList.remove('cart-header-pop'), { once: true });
+    }
   }
 
   function addCustomItemToCart(item) {
@@ -1923,11 +2152,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     cartList.innerHTML = '';
 
+    const sidebarEl = document.getElementById('pos-cart-sidebar');
+
     if (cart.length === 0) {
+      if (sidebarEl) sidebarEl.classList.remove('has-items');
       cartList.innerHTML = `
         <div class="empty-cart-state">
-          <i class="fa-solid fa-basket-shopping"></i>
-          <p>Cart is currently empty.<br>Tap items to add & customize.</p>
+          <div class="empty-cart-icon-wrapper">
+            <i class="fa-solid fa-basket-shopping"></i>
+          </div>
+          <div class="empty-cart-title">Cart is empty</div>
+          <div class="empty-cart-desc">Tap menu items to add them to this order.</div>
         </div>
       `;
       if (cartSubtotal) cartSubtotal.textContent = '₹0.00';
@@ -1965,6 +2200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    if (sidebarEl) sidebarEl.classList.add('has-items');
     let subtotal = 0;
 
     cart.forEach(item => {
@@ -2224,6 +2460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (supabaseClient && navigator.onLine) {
       supabaseClient.from('doppio_bills').insert({
+        tenant_id: activeTenantId,
         orderId: approvedBill.orderId,
         customerName: approvedBill.customerName,
         customerPhone: approvedBill.customerPhone,
@@ -2328,6 +2565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (supabaseClient) {
       try {
         await supabaseClient.from('doppio_pending_orders').insert({
+          tenant_id: activeTenantId,
           orderId: mockOrder.orderId,
           customerName: mockOrder.customerName,
           customerPhone: mockOrder.customerPhone,
@@ -2419,14 +2657,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Payment triggers selectors
   const payBtns = document.querySelectorAll('.pay-method-btn');
+  const paySegmentedCtrl = document.getElementById('single-pay-container');
+
+  // Helper: update the sliding pill position
+  function updatePayPillIndex() {
+    if (!paySegmentedCtrl) return;
+    const allBtns = Array.from(payBtns);
+    const activeIdx = allBtns.findIndex(b => b.classList.contains('active'));
+    paySegmentedCtrl.style.setProperty('--active-index', activeIdx >= 0 ? activeIdx : 0);
+  }
+
   payBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       payBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       selectedPaymentMethod = btn.getAttribute('data-method');
       SoundEffects.playClick();
+      updatePayPillIndex(); // slide the pill
     });
   });
+
+  // Initialize pill position on page load (UPI is default = index 0)
+  updatePayPillIndex();
 
   // Complete checkout & Sync
   function performCheckout(shouldPrint) {
@@ -2581,6 +2833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Cloud syncing via insert
       if (supabaseClient && navigator.onLine) {
         supabaseClient.from('doppio_bills').insert({
+          tenant_id: activeTenantId,
           orderId: newBill.orderId,
           customerName: newBill.customerName,
           customerPhone: newBill.customerPhone,
@@ -3703,6 +3956,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       inventoryGrid.appendChild(card);
     });
+
+    // Render premium empty state if no inventory items match the current filter
+    if (inventoryGrid.children.length === 0) {
+      inventoryGrid.innerHTML = `
+        <div class="premium-empty-state" style="grid-column: 1 / -1; width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          <h3>No Ingredients Found</h3>
+          <p>No ingredients matched the selected filter criteria.</p>
+        </div>
+      `;
+    }
 
     // Update Top metrics cards
     document.getElementById('inv-total-low').textContent = `${lowCount} Warnings`;
@@ -4929,7 +5193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // On mobile, slide the form panel up as a drawer
         const formPanel = document.getElementById('editor-form-panel');
-        if (formPanel && window.innerWidth <= 768) {
+        if (formPanel && window.innerWidth <= 600) {
           formPanel.classList.add('active');
         }
       });
@@ -5108,7 +5372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // On mobile, close the editor drawer after save
       const savedFormPanel = document.getElementById('editor-form-panel');
-      if (savedFormPanel && window.innerWidth <= 768) savedFormPanel.classList.remove('active');
+      if (savedFormPanel && window.innerWidth <= 600) savedFormPanel.classList.remove('active');
 
       renderMenuEditor();
       renderPOSCategories();
@@ -5125,7 +5389,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
       // On mobile, close the drawer
       const fp = document.getElementById('editor-form-panel');
-      if (fp && window.innerWidth <= 768) fp.classList.remove('active');
+      if (fp && window.innerWidth <= 600) fp.classList.remove('active');
     });
   }
 
@@ -5140,7 +5404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
       // On mobile, slide the form panel up as a drawer
       const formPanel = document.getElementById('editor-form-panel');
-      if (formPanel && window.innerWidth <= 768) {
+      if (formPanel && window.innerWidth <= 600) {
         formPanel.classList.add('active');
       }
     });
@@ -5173,8 +5437,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn("Corrupted CRM data", err);
         crmData = [];
       }
-      renderCRMTab();
+    } else {
+      crmData = [
+        { name: 'Aniket Sharma', phone: '9823012345', visits: 6, total_spend: 2840, last_visit: new Date().toISOString() },
+        { name: 'Priya Deshmukh', phone: '9130098765', visits: 12, total_spend: 6420, last_visit: new Date().toISOString() },
+        { name: 'Rahul Verma', phone: '8888776655', visits: 2, total_spend: 1150, last_visit: new Date().toISOString() },
+        { name: 'Kunal Sen', phone: '9552147890', visits: 24, total_spend: 12850, last_visit: new Date().toISOString() },
+        { name: 'Aditi Rao', phone: '9372154687', visits: 1, total_spend: 350, last_visit: new Date().toISOString() }
+      ];
+      localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
     }
+    renderCRMTab();
   }
 
   function renderCRMTab() {
@@ -5196,21 +5469,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('crm-top-spender').textContent = `${top.name} (₹${Math.round(top.total_spend)})`;
     }
 
-    filtered.forEach(c => {
-      const tier = getLoyaltyTier(c.total_spend);
-      const lastVisitStr = c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-IN') : '-';
-      
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="font-weight:600; color:var(--primary-brand);">${c.name}</td>
-        <td>${c.phone || '-'}</td>
-        <td>${c.visits}</td>
-        <td style="font-weight:600;">₹${c.total_spend}</td>
-        <td><span class="status-badge paid" style="font-weight:700;">${tier}</span></td>
-        <td>${lastVisitStr}</td>
+    if (filtered.length === 0) {
+      crmTableBody.innerHTML = `
+        <tr>
+          <td colspan="6">
+            <div class="premium-empty-state" style="margin: 20px auto;">
+              <i class="fa-solid fa-users"></i>
+              <h3>No Loyalty Members Yet</h3>
+              <p>Customers registering their phone numbers during checkout will appear here with points, spent totals, and tiers.</p>
+            </div>
+          </td>
+        </tr>
       `;
-      crmTableBody.appendChild(tr);
-    });
+    } else {
+      filtered.forEach(c => {
+        const tier = getLoyaltyTier(c.total_spend);
+        const lastVisitStr = c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-IN') : '-';
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight:600; color:var(--primary-brand);">${c.name}</td>
+          <td>${c.phone || '-'}</td>
+          <td>${c.visits}</td>
+          <td style="font-weight:600;">₹${c.total_spend}</td>
+          <td><span class="status-badge paid" style="font-weight:700;">${tier}</span></td>
+          <td>${lastVisitStr}</td>
+        `;
+        crmTableBody.appendChild(tr);
+      });
+    }
   }
 
   if (crmSearchInput) crmSearchInput.addEventListener('input', renderCRMTab);
@@ -5464,29 +5751,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     let cgst = 0;
     let sgst = 0;
     
-    filteredBills.forEach(b => {
-      const taxable = b.subtotal - (b.discount || 0);
-      netSales += taxable;
-      
-      const tax = b.gst || 0;
-      totalTax += tax;
-      cgst += tax / 2;
-      sgst += tax / 2;
-      
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="font-weight:700; color:var(--accent-caramel);">${b.orderId}</td>
-        <td style="font-weight:600; color:var(--primary-brand);">${b.customerName || 'Walk-in Guest'}</td>
-        <td style="font-size: 11px;">${b.dateTime}</td>
-        <td>₹${taxable.toFixed(2)}</td>
-        <td style="color:#27ae60;">₹${(tax/2).toFixed(2)}</td>
-        <td style="color:#2980b9;">₹${(tax/2).toFixed(2)}</td>
-        <td style="font-weight:600; color:var(--text-dark);">₹${tax.toFixed(2)}</td>
-        <td style="font-weight:700; color:var(--primary-brand);">₹${(b.total || 0).toFixed(2)}</td>
-        <td><span class="payment-badge ${b.paymentMethod ? b.paymentMethod.toLowerCase() : 'upi'}">${b.paymentMethod || 'UPI'}</span></td>
+    if (filteredBills.length === 0) {
+      taxTableBody.innerHTML = `
+        <tr>
+          <td colspan="9">
+            <div class="premium-empty-state" style="margin: 20px auto;">
+              <i class="fa-solid fa-percent"></i>
+              <h3>No Invoices For Selected Period</h3>
+              <p>No tax-compliant invoices were recorded in the selected date range. Try clearing your date filters.</p>
+            </div>
+          </td>
+        </tr>
       `;
-      taxTableBody.appendChild(tr);
-    });
+    } else {
+      filteredBills.forEach(b => {
+        const taxable = b.subtotal - (b.discount || 0);
+        netSales += taxable;
+        
+        const tax = b.gst || 0;
+        totalTax += tax;
+        cgst += tax / 2;
+        sgst += tax / 2;
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight:700; color:var(--accent-caramel);">${b.orderId}</td>
+          <td style="font-weight:600; color:var(--primary-brand);">${b.customerName || 'Walk-in Guest'}</td>
+          <td style="font-size: 11px;">${b.dateTime}</td>
+          <td>₹${taxable.toFixed(2)}</td>
+          <td style="color:#27ae60;">₹${(tax/2).toFixed(2)}</td>
+          <td style="color:#2980b9;">₹${(tax/2).toFixed(2)}</td>
+          <td style="font-weight:600; color:var(--text-dark);">₹${tax.toFixed(2)}</td>
+          <td style="font-weight:700; color:var(--primary-brand);">₹${(b.total || 0).toFixed(2)}</td>
+          <td><span class="payment-badge ${b.paymentMethod ? b.paymentMethod.toLowerCase() : 'upi'}">${b.paymentMethod || 'UPI'}</span></td>
+        `;
+        taxTableBody.appendChild(tr);
+      });
+    }
     
     // Update summary labels
     if (taxNetSalesCard) taxNetSalesCard.textContent = `₹${netSales.toFixed(2)}`;
@@ -5892,6 +6193,43 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const loggedInUser = sessionStorage.getItem('logged_in_user');
     const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
     
+    if (loggedInRole === 'superadmin') {
+      const saLink = document.getElementById('sidebar-super-admin-link');
+      if (saLink) saLink.style.display = 'flex';
+      
+      const sidebarLinks = document.querySelectorAll('.sidebar-link');
+      sidebarLinks.forEach(link => {
+        const tabId = link.getAttribute('data-tab');
+        if (tabId === 'super-admin-tab') {
+          link.style.display = 'flex';
+          link.classList.add('active');
+        } else {
+          link.style.display = 'none';
+        }
+      });
+      
+      const headerCenter = document.querySelector('.header-center-metrics');
+      if (headerCenter) headerCenter.style.display = 'none';
+      const notificationsBell = document.getElementById('notifications-bell');
+      if (notificationsBell) notificationsBell.style.display = 'none';
+      const profileBtn = document.getElementById('open-profile-btn');
+      if (profileBtn) profileBtn.style.display = 'none';
+      const shiftPill = document.getElementById('header-shift-pill');
+      if (shiftPill) shiftPill.style.display = 'none';
+      
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      const saTab = document.getElementById('super-admin-tab');
+      if (saTab) saTab.classList.add('active');
+      
+      const tabTitle = document.getElementById('tab-title');
+      if (tabTitle) tabTitle.textContent = "SaaS Super-Admin Console";
+      const tabSubtitle = document.getElementById('tab-subtitle');
+      if (tabSubtitle) tabSubtitle.textContent = "Manage client subscriptions, features, and system access";
+      
+      renderSuperAdminTab();
+      return;
+    }
+    
     if (!loggedInUser) {
       window.location.href = 'login.html';
       return;
@@ -5909,6 +6247,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const featureFlags = businessProfile.featureFlags || {};
 
     // Update dynamic user pill in sidebar
+        // Dynamically white-label the logo branding in the sidebar header
+    const brandNameEl = document.getElementById('sidebar-brand-name');
+    const brandTypeEl = document.getElementById('sidebar-brand-type');
+    if (brandNameEl && brandTypeEl) {
+      if (activeTenantName === 'SaaS Platform Owner') {
+        brandNameEl.textContent = 'RESTO';
+        brandTypeEl.textContent = 'Suite';
+      } else {
+        const words = activeTenantName.split(' ');
+        if (words.length > 1) {
+          brandNameEl.textContent = words[0].toUpperCase();
+          brandTypeEl.textContent = words.slice(1).join(' ');
+        } else {
+          brandNameEl.textContent = activeTenantName.toUpperCase();
+          brandTypeEl.textContent = '';
+        }
+      }
+    }
     const userNameEl = document.querySelector('.sidebar .user-name');
     const userRoleEl = document.querySelector('.sidebar .user-role');
     if (userNameEl) userNameEl.textContent = loggedInUser.charAt(0).toUpperCase() + loggedInUser.slice(1);
@@ -5951,7 +6307,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const isAllowedByRole = rolePermissions[loggedInRole].includes(tabId);
       const isEnabledByFlag = featureFlags[tabId] !== false; // enabled by default
       
-      if (isAllowedByRole && isEnabledByFlag) {
+      const isAllowedBySaaS = allowedTabs.includes(tabId);
+      if (isAllowedByRole && isEnabledByFlag && isAllowedBySaaS) {
         link.style.display = 'flex';
       } else {
         link.style.display = 'none';
@@ -5973,14 +6330,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       }
     });
 
-    // Hide mobile bottom nav entirely for kitchen and display terminals
+    // Only explicitly hide mobile nav/header for operational roles (kitchen, display).
+    // For normal roles (admin, cashier, waiter), let CSS media queries control visibility —
+    // they should be hidden on desktop and only appear on small screens (≤ 600px).
     const mobileBottomNav = document.querySelector('.mobile-bottom-nav');
-    if (mobileBottomNav) {
-      mobileBottomNav.style.display = isOperationalRole ? 'none' : 'flex';
+    if (mobileBottomNav && isOperationalRole) {
+      mobileBottomNav.style.display = 'none';
     }
     const mobileTopHeader = document.querySelector('.mobile-top-header');
-    if (mobileTopHeader) {
-      mobileTopHeader.style.display = isOperationalRole ? 'none' : 'flex';
+    if (mobileTopHeader && isOperationalRole) {
+      mobileTopHeader.style.display = 'none';
     }
 
     // Check customer toggle details
@@ -7349,6 +7708,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       renderTaxTab();
     } else if (tabId === 'employees-tab') {
       renderEmployeesTab();
+    } else if (tabId === 'online-tab') {
+      if (typeof renderOnlineOrdersTab === 'function') renderOnlineOrdersTab();
+    } else if (tabId === 'kds-tab') {
+      if (typeof renderKDSTab === 'function') renderKDSTab();
+    } else if (tabId === 'tokens-tab') {
+      if (typeof renderTokensTab === 'function') renderTokensTab();
+    } else if (tabId === 'super-admin-tab') {
+      renderSuperAdminTab();
+    } else if (tabId === 'qr-orders-tab') {
+      if (typeof updateQrOrdersDashboardUI === 'function') updateQrOrdersDashboardUI();
     }
   }
 
@@ -7455,10 +7824,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     // On mobile, hide the desktop table and show the card layout
     const billsTableContainer = document.querySelector('.bills-table-container');
     if (billsTableContainer) {
-      billsTableContainer.style.display = window.innerWidth <= 768 ? 'none' : '';
+      billsTableContainer.style.display = window.innerWidth <= 600 ? 'none' : '';
     }
-    mobileCardsContainer.style.display = window.innerWidth <= 768 ? 'block' : 'none';
-    if (window.innerWidth > 768) return;
+    mobileCardsContainer.style.display = window.innerWidth <= 600 ? 'block' : 'none';
+    if (window.innerWidth > 600) return;
 
     mobileCardsContainer.innerHTML = '';
 
@@ -9280,10 +9649,82 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   // ==========================================================
   // 19. LIVE QR ORDERING & TABLES CASHIER SYNC MODULE
   // ==========================================================
+  const getMockPendingQrOrders = () => [
+    {
+      orderId: 'DO-1005',
+      customerName: 'Sanjay Dutt',
+      customerPhone: '9422158763',
+      orderType: 'ZOMATO',
+      dateTime: new Date(Date.now() - 10 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Bombay Grilled Sandwich', qty: 1, price: 369 },
+        { name: 'Nutella Thickshake', qty: 1, price: 299 }
+      ],
+      subtotal: 668,
+      discount: 0,
+      gst: 120.24,
+      total: 788,
+      status: 'Pending Review'
+    },
+    {
+      orderId: 'DO-1006',
+      customerName: 'Sneha Patil',
+      customerPhone: '9890123456',
+      orderType: 'SWIGGY',
+      dateTime: new Date(Date.now() - 8 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Alfredo Pennei Pasta', qty: 1, price: 499 },
+        { name: 'Oreo Cookies Thickshake', qty: 1, price: 299 }
+      ],
+      subtotal: 798,
+      discount: 0,
+      gst: 143.64,
+      total: 942,
+      status: 'Pending Review'
+    },
+    {
+      orderId: 'DO-1007',
+      customerName: 'Table 03 Guests',
+      customerPhone: '',
+      orderType: 'Dine-In',
+      tableNumber: '3',
+      dateTime: new Date(Date.now() - 15 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Masala Omelette', qty: 2, price: 269, isDone: false },
+        { name: 'Classic Hot Chocolate', qty: 1, price: 349, isDone: false }
+      ],
+      subtotal: 887,
+      discount: 0,
+      gst: 159.66,
+      total: 1047,
+      status: 'Accepted'
+    },
+    {
+      orderId: 'DO-1008',
+      customerName: 'Amit Trivedi',
+      customerPhone: '9922115544',
+      orderType: 'Takeaway',
+      dateTime: new Date(Date.now() - 25 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Cheese Garlic', qty: 1, price: 249, isDone: true }
+      ],
+      subtotal: 249,
+      discount: 0,
+      gst: 44.82,
+      total: 294,
+      status: 'Ready'
+    }
+  ];
+
   let pendingQrOrders = (() => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_pending_qr_orders'));
-      return Array.isArray(parsed) ? parsed.filter(o => o && typeof o === 'object' && o.orderId && Array.isArray(o.items)) : [];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter(o => o && typeof o === 'object' && o.orderId && Array.isArray(o.items));
+      }
+      const mock = getMockPendingQrOrders();
+      localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(mock));
+      return mock;
     } catch(e) {
       return [];
     }
@@ -9301,9 +9742,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         }
         return parsed;
       }
-      return { 1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
+      const initial = { 1: "EMPTY", 2: "EMPTY", 3: "ORDERING", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
+      localStorage.setItem('doppio_tables_state', JSON.stringify(initial));
+      return initial;
     } catch(e) {
-      return { 1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
+      return { 1: "EMPTY", 2: "EMPTY", 3: "ORDERING", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
     }
   })();
 
@@ -9906,6 +10349,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     // 4. Cloud Sync insert
     if (supabaseClient && navigator.onLine) {
       supabaseClient.from('doppio_bills').insert({
+        tenant_id: activeTenantId,
         orderId: approvedBill.orderId,
         customerName: approvedBill.customerName,
         customerPhone: approvedBill.customerPhone,
@@ -11334,6 +11778,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             localStorage.setItem('doppio_employees', JSON.stringify(employees));
             if (supabaseClient) {
               supabaseClient.from('doppio_employees').upsert({
+                tenant_id: activeTenantId,
                 id: emp.id,
                 name: emp.name,
                 role: emp.role,
@@ -11931,4 +12376,231 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     console.error("Error in applyFeatureToggles:", err);
   }
 
+
+  // ==========================================================
+  // SAAS MULTI-TENANT SUPER-ADMIN CONTROLS (Made by CodeArc)
+  // ==========================================================
+  async function sha256(string) {
+    const utf8 = new TextEncoder().encode(string);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function renderSuperAdminTab() {
+    const listContainer = document.getElementById('saas-tenants-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center;">Loading food outlets database...</td></tr>';
+
+    const { data: tenants, error } = await supabaseClient
+      .from('saas_tenants')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      listContainer.innerHTML = `<tr><td colspan="6" style="padding:16px; text-align:center; color:#ef4444;">Error loading tenants: ${error.message}</td></tr>`;
+      return;
+    }
+
+    if (!tenants || tenants.length === 0) {
+      listContainer.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center; color:#64748b;">No food outlets registered yet.</td></tr>';
+      return;
+    }
+
+    listContainer.innerHTML = tenants.map(t => {
+      const badgeClass = t.status === 'approved' ? 'paid' : t.status === 'suspended' ? 'void' : 'hold';
+      const statusText = t.status === 'approved' ? 'Active' : t.status === 'suspended' ? 'Suspended' : 'Pending';
+      const outletLabel = (t.outlet_type || 'cafe').toUpperCase();
+      return `
+        <tr style="border-bottom:1px solid rgba(0,0,0,0.05); height:45px; color:#000;">
+          <td style="padding:10px; font-weight:700;">
+            <div style="font-size:13px; color:#0f172a;">${t.name}</div>
+            <div style="font-size:10px; color:#64748b; font-weight:400;">Outlet ID: ${t.slug}</div>
+          </td>
+          <td style="padding:10px; font-size:11px; font-weight:600; color:#b57a3e;">${outletLabel}</td>
+          <td style="padding:10px; font-size:11px; color:#334155;">
+            <div><i class="fa-solid fa-envelope" style="color:#64748b; font-size:10px;"></i> ${t.email || '-'}</div>
+            ${t.phone ? `<div style="margin-top:3px;"><i class="fa-brands fa-whatsapp" style="color:#25d366; font-size:11px;"></i> <strong>+${t.phone}</strong></div>` : ''}
+          </td>
+          <td style="padding:10px; font-size:11px; color:#334155;">
+            <div>Admin User: <strong>${t.username}</strong></div>
+          </td>
+          <td style="padding:10px;"><span class="status-badge ${badgeClass}">${statusText}</span></td>
+          <td style="padding:10px; text-align:right;">
+            <button class="btn btn-secondary manage-tenant-btn" data-id="${t.id}" style="padding:4px 10px; font-size:11px; border-radius:6px; background:#f1f5f9; border:1px solid #cbd5e1; cursor:pointer;"><i class="fa-solid fa-gear"></i> Manage</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Add click handlers for manage buttons
+    listContainer.querySelectorAll('.manage-tenant-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tenantId = btn.getAttribute('data-id');
+        console.log("SuperAdmin Click: tenantId = ", tenantId);
+        
+        // Find tenant using loose string conversion for safety
+        const tenant = tenants.find(t => String(t.id) === String(tenantId));
+        console.log("SuperAdmin Click: found tenant = ", tenant);
+        
+        if (tenant) {
+          openTenantManageModal(tenant);
+        } else {
+          console.warn("SuperAdmin: No tenant found in cached list for ID: " + tenantId);
+          alert("Error: Tenant record details not found in local cache.");
+        }
+      });
+    });
+  }
+
+  function openTenantManageModal(tenant) {
+    try {
+      console.log("openTenantManageModal called for: ", tenant);
+      const modal = document.getElementById('tenant-manage-modal');
+      if (!modal) {
+        console.error("SuperAdmin Error: modal 'tenant-manage-modal' element not found in DOM.");
+        alert("System Error: Management modal element is missing from the page layout.");
+        return;
+      }
+
+      const tenantIdEl = document.getElementById('manage-tenant-id');
+      const tenantNameEl = document.getElementById('manage-tenant-name');
+      const usernameEl = document.getElementById('manage-username');
+      const passwordEl = document.getElementById('manage-password');
+      const statusEl = document.getElementById('manage-status');
+      const phoneEl = document.getElementById('manage-phone');
+      const emailEl = document.getElementById('manage-email');
+
+      if (tenantIdEl) {
+        tenantIdEl.value = tenant.id || '';
+        tenantIdEl.setAttribute('data-slug', tenant.slug || '');
+      }
+      if (tenantNameEl) tenantNameEl.textContent = (tenant.name || 'Unknown') + ` (${(tenant.outlet_type || 'cafe').toUpperCase()})`;
+      if (usernameEl) usernameEl.value = tenant.username || '';
+      if (passwordEl) passwordEl.value = ''; 
+      if (statusEl) {
+        statusEl.value = tenant.status || 'pending';
+        statusEl.setAttribute('data-prev-status', tenant.status || 'pending');
+      }
+      if (phoneEl) phoneEl.value = tenant.phone || '';
+      if (emailEl) emailEl.value = tenant.email || '';
+
+      const allowed = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [];
+      const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
+      console.log(`Checking ${checkboxes.length} checkboxes against allowed tabs:`, allowed);
+      
+      checkboxes.forEach(cb => {
+        cb.checked = allowed.includes(cb.value);
+      });
+
+      modal.classList.add('active');
+      console.log("SuperAdmin: Modal active class added.");
+    } catch (err) {
+      console.error("Error inside openTenantManageModal:", err);
+      alert("Failed to render management controls: " + err.message);
+    }
+  }
+
+
+  // Hook up Super-Admin modal events
+  const closeTenantModal = () => {
+    const modal = document.getElementById('tenant-manage-modal');
+    if (modal) modal.classList.remove('active');
+  };
+
+
+  const closeBtn = document.getElementById('close-tenant-modal');
+  const closeBtn2 = document.getElementById('close-tenant-modal-btn');
+  if (closeBtn) closeBtn.addEventListener('click', closeTenantModal);
+  if (closeBtn2) closeBtn2.addEventListener('click', closeTenantModal);
+
+  const saveTenantBtn = document.getElementById('save-tenant-settings-btn');
+  if (saveTenantBtn) {
+    saveTenantBtn.addEventListener('click', async () => {
+      try {
+        console.log("SuperAdmin Save Settings Clicked");
+        const tenantIdEl = document.getElementById('manage-tenant-id');
+        const tenantId = tenantIdEl.value;
+        const slug = tenantIdEl.getAttribute('data-slug') || '';
+        const name = document.getElementById('manage-tenant-name').textContent.split('(')[0].trim();
+        const username = document.getElementById('manage-username').value.trim();
+        const password = document.getElementById('manage-password').value.trim();
+        const statusEl = document.getElementById('manage-status');
+        const status = statusEl.value;
+        const prevStatus = statusEl.getAttribute('data-prev-status') || 'pending';
+        const phone = document.getElementById('manage-phone').value.trim();
+        const email = document.getElementById('manage-email').value.trim();
+
+        console.log("Input values gathered:", { tenantId, username, status, prevStatus, phone, email });
+
+        const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
+        const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+
+        const updates = {
+          username,
+          status,
+          allowed_tabs,
+          phone,
+          email
+        };
+
+        if (password !== '') {
+          console.log("Hashing new password...");
+          const hashed = await sha256(password);
+          updates.password_hash = hashed;
+        }
+
+        console.log("Sending update request to Supabase for tenant ID:", tenantId, "Updates:", updates);
+        const { data, error } = await supabaseClient.from('saas_tenants').update(updates).eq('id', tenantId).select();
+        console.log("Supabase response:", { data, error });
+
+        if (error) {
+          console.error("Supabase update error:", error);
+          alert("Failed to save settings: " + error.message);
+        } else {
+          console.log("Update succeeded. Toasting and refreshing list.");
+          closeTenantModal();
+          showNotificationToast("Client configurations saved successfully!");
+
+          // Note: Approval notifications (WhatsApp & Email) are now processed securely 
+          // and asynchronously by the backend gateway server listening to Supabase Realtime changes on saas_tenants.
+          // This removes direct HTTP calls to the gateway from the client-side super-admin console.
+
+          await renderSuperAdminTab();
+        }
+      } catch (err) {
+        console.error("Error in saveTenantBtn handler:", err);
+        alert("Client-side system error saving settings: " + err.message);
+      }
+    });
+  }
+
+  const deleteTenantBtn = document.getElementById('delete-tenant-btn');
+  if (deleteTenantBtn) {
+    deleteTenantBtn.addEventListener('click', async () => {
+      try {
+        const tenantId = document.getElementById('manage-tenant-id').value;
+        const tenantName = document.getElementById('manage-tenant-name').textContent;
+        
+        if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their POS bills, inventory records, custom menus, and staff details from Supabase!`)) {
+          console.log("Requesting deletion of tenant ID:", tenantId);
+          const { error } = await supabaseClient.from('saas_tenants').delete().eq('id', tenantId);
+          if (error) {
+            console.error("Supabase deletion error:", error);
+            alert("Failed to delete account: " + error.message);
+          } else {
+            console.log("Deletion succeeded. Refreshing UI.");
+            closeTenantModal();
+            showNotificationToast("Client account successfully deleted.");
+            await renderSuperAdminTab();
+          }
+        }
+      } catch (err) {
+        console.error("Error in deleteTenantBtn handler:", err);
+        alert("Client-side system error deleting client: " + err.message);
+      }
+    });
+  }
 });

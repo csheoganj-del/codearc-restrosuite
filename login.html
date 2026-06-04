@@ -3,17 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doppio Cafe POS Terminal | Staff Login</title>
+  <title>RestoSuite Portal | CodeArc Staff Access</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <style>
     :root {
-      --primary-brand: #2b1813;
-      --primary-brand-dark: #1b0d0a;
+      --primary-brand: #0f172a;
+      --primary-brand-dark: #020617;
       --accent-caramel: #C98A4A;
       --bg-cream: #FDFBF7;
-      --text-dark: #2b1813;
-      --text-muted: #8e7a75;
-      --error-red: #e74c3c;
+      --text-dark: #0f172a;
+      --text-muted: #94a3b8;
+      --error-red: #ef4444;
+      --success-green: #22c55e;
       --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -21,7 +25,7 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Inter', 'Segoe UI', sans-serif;
     }
 
     body {
@@ -32,218 +36,246 @@
       align-items: center;
       padding: 20px;
       color: #FFF;
-      overflow: hidden;
+      overflow-y: auto;
       position: relative;
     }
 
-    /* Ambient background glowing coffee beans simulation */
+    /* Ambient elements */
     body::before {
-      content: "☕";
+      content: "🍔";
       position: absolute;
-      font-size: 200px;
-      opacity: 0.03;
-      top: -50px;
-      left: -50px;
+      font-size: 180px;
+      opacity: 0.02;
+      top: -30px;
+      left: -30px;
+      pointer-events: none;
     }
     body::after {
-      content: "🥐";
+      content: "🍕";
       position: absolute;
-      font-size: 150px;
+      font-size: 140px;
       opacity: 0.02;
-      bottom: -30px;
-      right: -30px;
+      bottom: -20px;
+      right: -20px;
+      pointer-events: none;
     }
 
     .login-container {
       width: 100%;
-      max-width: 400px;
+      max-width: 440px;
       animation: fadeInUp 0.6s ease;
+      margin: 20px 0;
     }
 
     .login-card {
-      background: rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 28px;
-      padding: 40px 30px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+      padding: 36px 28px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
       text-align: center;
     }
 
     .brand-logo {
-      margin-bottom: 25px;
+      margin-bottom: 24px;
     }
 
     .logo-container {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 8px 16px;
-      background: rgba(201, 138, 74, 0.1);
-      border: 1px solid rgba(201, 138, 74, 0.25);
+      gap: 8px;
+      padding: 8px 18px;
+      background: rgba(201, 138, 74, 0.08);
+      border: 1px solid rgba(201, 138, 74, 0.2);
       border-radius: 50px;
       margin-bottom: 12px;
     }
 
     .logo-icon {
-      font-size: 20px;
+      font-size: 18px;
       color: var(--accent-caramel);
     }
 
     .logo-text {
+      font-family: 'Outfit', sans-serif;
       font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 2px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
       color: #FFF;
     }
 
     .logo-text span {
       color: var(--accent-caramel);
-      font-weight: 400;
-      font-style: italic;
     }
 
     .login-title {
+      font-family: 'Outfit', sans-serif;
       font-size: 22px;
       font-weight: 700;
       color: #FFF;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .login-subtitle {
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.6);
-      margin-bottom: 30px;
-      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    /* Tab switcher for login vs signup */
+    .tab-header {
+      display: flex;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-caramel);
+      color: #FFF;
+      box-shadow: 0 4px 10px rgba(201, 138, 74, 0.2);
     }
 
     .form-group {
       position: relative;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       text-align: left;
     }
 
-    .form-group i.input-icon {
-      position: absolute;
-      left: 18px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 15px;
-      transition: var(--transition);
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .form-input {
       width: 100%;
-      padding: 16px 50px 16px 50px;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1.5px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px;
+      padding: 14px 18px 14px 44px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
       color: #FFF;
-      font-size: 14.5px;
+      font-size: 14px;
       outline: none;
       transition: var(--transition);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-      position: relative;
-      z-index: 1;
     }
 
-    .form-input::-ms-reveal,
-    .form-input::-ms-clear {
-      display: none;
+    .form-input.no-icon {
+      padding-left: 16px;
     }
 
     .form-input::placeholder {
-      color: rgba(255, 255, 255, 0.35);
+      color: rgba(255, 255, 255, 0.25);
     }
 
     .form-input:focus {
       border-color: var(--accent-caramel);
-      background: rgba(0, 0, 0, 0.4);
-      box-shadow: 0 0 10px rgba(201, 138, 74, 0.25);
+      background: rgba(0, 0, 0, 0.35);
+      box-shadow: 0 0 10px rgba(201, 138, 74, 0.15);
+    }
+
+    .form-group i.input-icon {
+      position: absolute;
+      left: 16px;
+      bottom: 15px;
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 14px;
+      transition: var(--transition);
     }
 
     .form-input:focus + i.input-icon {
       color: var(--accent-caramel);
     }
 
-    .form-group i.input-icon {
-      position: absolute;
-      left: 18px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 15px;
-      transition: var(--transition);
-      z-index: 10;
-    }
-
-    /* Eye toggle icon */
     .toggle-pwd {
       position: absolute;
-      right: 18px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: rgba(255, 255, 255, 0.4);
+      right: 16px;
+      bottom: 15px;
+      color: rgba(255, 255, 255, 0.3);
       cursor: pointer;
-      font-size: 15px;
+      font-size: 14px;
       transition: var(--transition);
-      z-index: 10;
     }
 
     .toggle-pwd:hover {
       color: var(--accent-caramel);
     }
 
-    .login-btn {
+    .submit-btn {
       width: 100%;
-      padding: 16px;
+      padding: 14px;
       background: var(--accent-caramel);
       border: none;
-      border-radius: 14px;
+      border-radius: 12px;
       color: #FFF;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
       cursor: pointer;
       margin-top: 10px;
       transition: var(--transition);
-      box-shadow: 0 4px 15px rgba(201, 138, 74, 0.3);
+      box-shadow: 0 4px 15px rgba(201, 138, 74, 0.2);
       display: flex;
       justify-content: center;
       align-items: center;
       gap: 10px;
     }
 
-    .login-btn:hover {
+    .submit-btn:hover {
       background: #b57a3e;
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(201, 138, 74, 0.4);
-    }
-
-    .login-btn:active {
-      transform: translateY(1px);
     }
 
     .error-box {
-      background: rgba(231, 76, 60, 0.1);
-      border: 1px solid rgba(231, 76, 60, 0.25);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
       border-radius: 12px;
       padding: 12px;
-      color: #ff7675;
+      color: #f87171;
       font-size: 12px;
       font-weight: 600;
       margin-bottom: 20px;
       display: none;
-      animation: shake 0.4s ease;
       line-height: 1.4;
     }
 
-    /* Animation classes */
+    .success-box {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: 12px;
+      padding: 12px;
+      color: #4ade80;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: none;
+      line-height: 1.4;
+    }
+
     @keyframes fadeInUp {
       from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(15px);
       }
       to {
         opacity: 1;
@@ -258,13 +290,7 @@
     }
 
     .shake-anim {
-      animation: shake 0.4s ease !important;
-    }
-
-    @keyframes lockBounce {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-8px); }
-      75% { transform: translateX(8px); }
+      animation: shake 0.4s ease;
     }
   </style>
 </head>
@@ -276,36 +302,100 @@
       <!-- Brand Logo -->
       <div class="brand-logo">
         <div class="logo-container">
-          <span class="logo-icon">☕</span>
-          <span class="logo-text">DOPPIO <span>Café</span></span>
+          <span class="logo-icon"><i class="fa-solid fa-utensils"></i></span>
+          <span class="logo-text">CodeArc <span>RestoSuite</span></span>
         </div>
-        <h2 class="login-title">POS Control Terminal</h2>
-        <p class="login-subtitle">Nagpur Cashier & Staff Access Only</p>
+        <h2 class="login-title" id="portal-title">Client Access Portal</h2>
+        <p class="login-subtitle" id="portal-subtitle">Access your restaurant or food outlet terminal</p>
       </div>
 
-      <!-- Error Box -->
-      <div class="error-box" id="error-box">
-        Access Denied: Invalid Username or Password.
+      <!-- Tab Switcher -->
+      <div class="tab-header">
+        <button class="tab-btn active" id="tab-login-btn">Login Terminal</button>
+        <button class="tab-btn" id="tab-register-btn">Register Outlet</button>
       </div>
 
-      <!-- Login Form -->
+      <!-- Alerts -->
+      <div class="error-box" id="error-box"></div>
+      <div class="success-box" id="success-box"></div>
+
+      <!-- LOGIN FORM -->
       <form id="login-form">
-        <!-- Username input -->
         <div class="form-group">
+          <label for="tenant-id">Outlet ID / Slug</label>
+          <input type="text" id="tenant-id" class="form-input" placeholder="e.g. royal-dhaba" required autocomplete="off">
+          <i class="fa-solid fa-hotel input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="username">Username</label>
           <input type="text" id="username" class="form-input" placeholder="Username" required autocomplete="username">
           <i class="fa-solid fa-user input-icon"></i>
         </div>
 
-        <!-- Password input -->
         <div class="form-group">
+          <label for="password">Password</label>
           <input type="password" id="password" class="form-input" placeholder="Password" required autocomplete="current-password">
           <i class="fa-solid fa-lock input-icon"></i>
           <i class="fa-solid fa-eye toggle-pwd" id="toggle-pwd"></i>
         </div>
 
-        <!-- Submit button -->
-        <button type="submit" class="login-btn">
+        <button type="submit" class="submit-btn">
           Log In Terminal <i class="fa-solid fa-right-to-bracket"></i>
+        </button>
+      </form>
+
+      <!-- REGISTRATION FORM -->
+      <form id="register-form" style="display: none;">
+        <div class="form-group">
+          <label for="reg-name">Outlet / Business Name</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="e.g. Royal Restaurant & Dhaba" required>
+          <i class="fa-solid fa-store input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-slug">Outlet ID / Unique Slug</label>
+          <input type="text" id="reg-slug" class="form-input" placeholder="e.g. royal-dhaba (letters & hyphens)" required>
+          <i class="fa-solid fa-link input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-type">Outlet Type</label>
+          <select id="reg-type" class="form-input no-icon" style="background: rgba(0, 0, 0, 0.25); color: #FFF;" required>
+            <option value="restaurant" style="background: #0f172a;">Restaurant</option>
+            <option value="cafe" style="background: #0f172a;">Cafe / Bakery</option>
+            <option value="dhaba" style="background: #0f172a;">Dhaba / Local Diner</option>
+            <option value="cart" style="background: #0f172a;">Food Cart / Truck</option>
+            <option value="other" style="background: #0f172a;">Other Food Outlet</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-email">Owner Email</label>
+          <input type="email" id="reg-email" class="form-input" placeholder="owner@email.com" required>
+          <i class="fa-solid fa-envelope input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-whatsapp">WhatsApp Mobile Number</label>
+          <input type="tel" id="reg-whatsapp" class="form-input" placeholder="e.g. 919876543210 (with country code)" required>
+          <i class="fa-brands fa-whatsapp input-icon" style="color: #25d366;"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-user">Admin Username</label>
+          <input type="text" id="reg-user" class="form-input" placeholder="e.g. admin" required>
+          <i class="fa-solid fa-user-gear input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-pass">Admin Password</label>
+          <input type="password" id="reg-pass" class="form-input" placeholder="Choose Password" required>
+          <i class="fa-solid fa-key input-icon"></i>
+        </div>
+
+        <button type="submit" class="submit-btn" style="background: var(--success-green); box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);">
+          Request Registration <i class="fa-solid fa-paper-plane"></i>
         </button>
       </form>
 
@@ -313,30 +403,113 @@
   </div>
 
   <script>
+    const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
+    const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+
+    let supabaseClient = null;
+    if (typeof supabase !== 'undefined') {
+      supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
-      const loginForm = document.getElementById('login-form');
-      const usernameInput = document.getElementById('username');
-      const passwordInput = document.getElementById('password');
-      const togglePwd = document.getElementById('toggle-pwd');
-      const errorBox = document.getElementById('error-box');
       const loginCard = document.getElementById('login-card');
+      const tabLoginBtn = document.getElementById('tab-login-btn');
+      const tabRegisterBtn = document.getElementById('tab-register-btn');
+      
+      const loginForm = document.getElementById('login-form');
+      const registerForm = document.getElementById('register-form');
+      
+      const errorBox = document.getElementById('error-box');
+      const successBox = document.getElementById('success-box');
+      
+      const togglePwdBtn = document.getElementById('toggle-pwd');
+      const passwordInput = document.getElementById('password');
+
+      // Check URL query parameters for direct tab activation
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('tab') === 'register') {
+        activateRegisterTab();
+      }
+
+      function showError(msg) {
+        successBox.style.display = 'none';
+        errorBox.textContent = msg;
+        errorBox.style.display = 'block';
+        loginCard.classList.remove('shake-anim');
+        void loginCard.offsetWidth; // trigger reflow
+        loginCard.classList.add('shake-anim');
+        if (window.AndroidInterface) window.AndroidInterface.vibrate(300);
+      }
+
+      function showSuccess(msg) {
+        errorBox.style.display = 'none';
+        successBox.textContent = msg;
+        successBox.style.display = 'block';
+        if (window.AndroidInterface) window.AndroidInterface.vibrate(80);
+      }
 
       // Password visibility eye toggler
-      if (togglePwd && passwordInput) {
-        togglePwd.addEventListener('click', () => {
+      if (togglePwdBtn && passwordInput) {
+        togglePwdBtn.addEventListener('click', () => {
           if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
-            togglePwd.classList.remove('fa-eye');
-            togglePwd.classList.add('fa-eye-slash');
-            togglePwd.style.color = 'var(--accent-caramel)';
+            togglePwdBtn.classList.remove('fa-eye');
+            togglePwdBtn.classList.add('fa-eye-slash');
+            togglePwdBtn.style.color = 'var(--accent-caramel)';
           } else {
             passwordInput.type = 'password';
-            togglePwd.classList.remove('fa-eye-slash');
-            togglePwd.classList.add('fa-eye');
-            togglePwd.style.color = 'rgba(255, 255, 255, 0.4)';
+            togglePwdBtn.classList.remove('fa-eye-slash');
+            togglePwdBtn.classList.add('fa-eye');
+            togglePwdBtn.style.color = 'rgba(255, 255, 255, 0.3)';
           }
         });
       }
+
+      // Switch tabs
+      tabLoginBtn.addEventListener('click', () => {
+        tabRegisterBtn.classList.remove('active');
+        tabLoginBtn.classList.add('active');
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+        document.getElementById('portal-title').textContent = "Client Access Portal";
+        document.getElementById('portal-subtitle').textContent = "Access your restaurant or food outlet terminal";
+        errorBox.style.display = 'none';
+        successBox.style.display = 'none';
+      });
+
+      function activateRegisterTab() {
+        tabLoginBtn.classList.remove('active');
+        tabRegisterBtn.classList.add('active');
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        document.getElementById('portal-title').textContent = "Register Your Outlet";
+        document.getElementById('portal-subtitle').textContent = "Submit a request to CodeArc for a new SaaS instance";
+        errorBox.style.display = 'none';
+        successBox.style.display = 'none';
+      }
+
+      tabRegisterBtn.addEventListener('click', activateRegisterTab);
+
+      // Auto-sanitize Slug Inputs (converting spaces/special chars to hyphens, lowercase, etc.)
+      const sanitizeSlugInput = (inputEl) => {
+        if (!inputEl) return;
+        inputEl.addEventListener('input', (e) => {
+          let val = e.target.value;
+          // Replace spaces and underscores with hyphens
+          val = val.replace(/[\s_]+/g, '-');
+          // Make lowercase
+          val = val.toLowerCase();
+          // Remove anything that is not lowercase letter, number, or hyphen
+          val = val.replace(/[^a-z0-9-]/g, '');
+          // Remove multiple consecutive hyphens
+          val = val.replace(/-+/g, '-');
+          // Update input value
+          e.target.value = val;
+        });
+      };
+
+      sanitizeSlugInput(document.getElementById('reg-slug'));
+      sanitizeSlugInput(document.getElementById('tenant-id'));
 
       async function sha256(string) {
         const utf8 = new TextEncoder().encode(string);
@@ -349,75 +522,193 @@
       if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
           e.preventDefault();
-          const userVal = usernameInput.value.trim();
-          const pwdVal = passwordInput.value.trim();
-
+          errorBox.style.display = 'none';
+          
+          const slugVal = document.getElementById('tenant-id').value.trim().toLowerCase();
+          const userVal = document.getElementById('username').value.trim();
+          const pwdVal = document.getElementById('password').value.trim();
+          
           const userLower = userVal.toLowerCase();
           const hashPwd = await sha256(pwdVal);
 
-          let authenticated = false;
-          let role = 'cashier'; // default fallback
+          // 1. Check Super-Admin platform login bypass
+          if (userLower === 'superadmin' && hashPwd === '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918') { // 'admin' in sha256
+            sessionStorage.setItem('just_logged_in', 'true');
+            sessionStorage.setItem('logged_in_user', 'superadmin');
+            sessionStorage.setItem('logged_in_role', 'superadmin');
+            sessionStorage.setItem('tenant_id', 'superadmin');
+            sessionStorage.setItem('tenant_slug', 'superadmin');
+            sessionStorage.setItem('tenant_name', 'SaaS Platform Owner');
+            sessionStorage.setItem('allowed_tabs', JSON.stringify(['super-admin-tab']));
+            
+            if (window.AndroidInterface) window.AndroidInterface.vibrate(80);
+            window.location.href = 'dashboard.html';
+            return;
+          }
 
-          if (userLower === 'bonie' && hashPwd === '94fc8a8d6e4987e5698d49128da76928b31e8059839cad4b933f53f4b2635eda') {
-            authenticated = true;
-            role = 'admin'; // Bonie is the manager
-          } else if (userLower === 'staff' && hashPwd === '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6') {
-            authenticated = true;
-            role = 'cashier';
-          } else if (userLower === 'admin' && hashPwd === '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918') {
+          // Ensure Supabase is working
+          if (!supabaseClient) {
+            showError("Supabase connection is offline. Cannot authenticate.");
+            return;
+          }
+
+          // 2. Fetch tenant profile by Slug
+          const { data: tenants, error: tenantErr } = await supabaseClient
+            .from('saas_tenants')
+            .select('*')
+            .eq('slug', slugVal);
+
+          if (tenantErr || !tenants || tenants.length === 0) {
+            showError("Authentication Failed: Invalid Outlet ID.");
+            return;
+          }
+
+          const tenant = tenants[0];
+          
+          // Check tenant status
+          if (tenant.status === 'pending') {
+            showError("Access Denied: Your registration request is pending CodeArc approval.");
+            return;
+          }
+          if (tenant.status === 'suspended') {
+            showError("Access Denied: Account suspended. Please contact hello@codearc.co.in");
+            return;
+          }
+
+          // 3. Authenticate User
+          let authenticated = false;
+          let role = 'cashier'; // fallback
+
+          if (userVal === tenant.username && hashPwd === tenant.password_hash) {
+            // Logged in as the primary tenant admin
             authenticated = true;
             role = 'admin';
-          } else if (userLower === 'waiter' && hashPwd === 'f81907cb3c5905d43818e6c4669862da157778b403487c95e1eb24606ffb7e41') {
-            authenticated = true;
-            role = 'waiter';
-          } else if (userLower === 'kitchen' && hashPwd === '4f51e048d0879685600beff68e8339b699c2dbd11124b6f17849e49c7161b32e') {
-            authenticated = true;
-            role = 'kitchen';
-          } else if (userLower === 'display' && hashPwd === '691ebff078c59367db6ec70092f694ef0b9fe4ff78bc70bf1390494be9090aa9') {
-            authenticated = true;
-            role = 'customer_display';
+          } else {
+            // Check default role access credentials
+            // standard role passwords hashes:
+            const standardRoles = {
+              cashier: {
+                user: 'staff',
+                hash: '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6' // 'staff'
+              },
+              admin: {
+                user: 'admin',
+                hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918' // 'admin'
+              },
+              waiter: {
+                user: 'waiter',
+                hash: 'f81907cb3c5905d43818e6c4669862da157778b403487c95e1eb24606ffb7e41' // 'waiter'
+              },
+              kitchen: {
+                user: 'kitchen',
+                hash: '4f51e048d0879685600beff68e8339b699c2dbd11124b6f17849e49c7161b32e' // 'kitchen'
+              },
+              customer_display: {
+                user: 'display',
+                hash: '691ebff078c59367db6ec70092f694ef0b9fe4ff78bc70bf1390494be9090aa9' // 'display'
+              }
+            };
+
+            for (const rKey of Object.keys(standardRoles)) {
+              if (userLower === standardRoles[rKey].user && hashPwd === standardRoles[rKey].hash) {
+                authenticated = true;
+                role = rKey;
+                break;
+              }
+            }
           }
 
           if (authenticated) {
-            // Store credentials matching Web portal logic
             sessionStorage.setItem('just_logged_in', 'true');
             sessionStorage.setItem('logged_in_user', userVal);
             sessionStorage.setItem('logged_in_role', role);
+            sessionStorage.setItem('tenant_id', tenant.id);
+            sessionStorage.setItem('tenant_slug', tenant.slug);
+            sessionStorage.setItem('tenant_name', tenant.name);
+            sessionStorage.setItem('allowed_tabs', JSON.stringify(tenant.allowed_tabs || []));
             
-            // Native vibration on success
-            if (window.AndroidInterface) {
-              window.AndroidInterface.vibrate(80);
-            }
-            
-            // Redirect straight to dashboard
+            if (window.AndroidInterface) window.AndroidInterface.vibrate(80);
             window.location.href = 'dashboard.html';
           } else {
-            // Visual shake & show error box
-            errorBox.style.display = 'block';
-            
-            // Hard Native vibration on failure
-            if (window.AndroidInterface) {
-              window.AndroidInterface.vibrate(300);
-            }
-
-            // CSS shake animation
-            loginCard.classList.remove('shake-anim');
-            void loginCard.offsetWidth; // trigger reflow
-            loginCard.classList.add('shake-anim');
-
-            // Reset password field
-            passwordInput.value = '';
-            passwordInput.focus();
+            showError("Access Denied: Invalid Username or Password for this Outlet.");
           }
         });
       }
 
-      // Hide error box on input change
-      [usernameInput, passwordInput].forEach(input => {
-        input.addEventListener('input', () => {
+      // Handle registration submit
+      if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
           errorBox.style.display = 'none';
+          
+          const name = document.getElementById('reg-name').value.trim();
+          const slug = document.getElementById('reg-slug').value.trim().toLowerCase();
+          const type = document.getElementById('reg-type').value;
+          const email = document.getElementById('reg-email').value.trim();
+          const whatsapp = document.getElementById('reg-whatsapp').value.trim();
+          const user = document.getElementById('reg-user').value.trim();
+          const pass = document.getElementById('reg-pass').value.trim();
+
+          // Validate slug (must be URL friendly)
+          if (!/^[a-z0-9-]+$/.test(slug)) {
+            showError("Slug can only contain lowercase letters, numbers, and hyphens (e.g. royal-dhaba).");
+            return;
+          }
+
+          if (!supabaseClient) {
+            showError("Supabase connection is offline. Cannot register.");
+            return;
+          }
+
+          // Check if slug already exists
+          const { data: existing, error: checkErr } = await supabaseClient
+            .from('saas_tenants')
+            .select('slug')
+            .eq('slug', slug);
+
+          if (checkErr) {
+            showError("Failed to validate unique slug: " + checkErr.message);
+            return;
+          }
+
+          if (existing && existing.length > 0) {
+            showError(`The Outlet ID "${slug}" is already taken. Try another unique slug.`);
+            return;
+          }
+
+          // Hash password
+          const passHash = await sha256(pass);
+
+          // Insert new pending tenant
+          const { error: insErr } = await supabaseClient
+            .from('saas_tenants')
+            .insert({
+              name,
+              slug,
+              outlet_type: type,
+              email,
+              phone: whatsapp,
+              username: user,
+              password_hash: passHash,
+              status: 'pending',
+              allowed_tabs: ['pos-tab', 'qr-orders-tab', 'bills-tab', 'inventory-tab', 'reports-tab', 'editor-tab', 'crm-tab', 'tax-tab', 'online-tab', 'kds-tab', 'tokens-tab', 'employees-tab'] // default all
+            });
+
+          if (insErr) {
+            showError("Registration failed: " + insErr.message);
+          } else {
+            showSuccess("Registration submitted successfully! Please wait for CodeArc to approve your account.");
+            
+            // Note: Registration confirmation alerts (WhatsApp & Email) are now processed securely 
+            // and asynchronously by the backend gateway server listening to Supabase Realtime changes on saas_tenants.
+            // This eliminates token exposure in the public client-side frontend code.
+
+            registerForm.reset();
+            // Scroll to top of card to show success message
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         });
-      });
+      }
     });
   </script>
 </body>

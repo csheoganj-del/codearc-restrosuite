@@ -9,6 +9,27 @@ app/build/
 local.properties
 .DS_Store
 
+# Node
 node_modules/
+node_modules_old/
+node-portable/
+node.zip
+
+# WhatsApp session files (never commit these)
 .wwebjs_auth/
+.wwebjs_auth (1)/
 .wwebjs_cache/
+
+# Sensitive config (contains passwords)
+email-config.json
+
+# Sample/dev files
+sample_dashboard.css
+sample_dashboard.html
+
+# Kombai tool files
+.kombai/
+
+# Python cache
+__pycache__/
+*.pyc
