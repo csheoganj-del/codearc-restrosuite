@@ -98,11 +98,16 @@
 
     .login-container {
       width: 100%;
-      max-width: 440px;
+      max-width: 580px;
       animation: fadeInUp 0.6s ease;
       margin: 20px 0;
       position: relative;
       z-index: 2;
+    }
+
+    #login-form {
+      max-width: 400px;
+      margin: 0 auto;
     }
 
     .login-card {
@@ -347,6 +352,27 @@
       cursor: pointer;
     }
 
+    /* Registration 2-Column Grid Layout */
+    #register-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+      text-align: left;
+    }
+
+    #register-form .form-group {
+      margin-bottom: 0; /* Let grid gap handle vertical spacing */
+    }
+
+    #register-form .form-group.full-width {
+      grid-column: span 2;
+    }
+
+    #register-form .submit-btn {
+      grid-column: span 2;
+      margin-top: 10px;
+    }
+
     /* Mobile Responsiveness Override */
     @media (max-width: 480px) {
       body {
@@ -358,39 +384,49 @@
         max-width: 100%;
       }
       .login-card {
-        padding: 24px 16px 20px;
+        padding: 20px 14px 16px; /* Super compact card padding on mobile */
         border-radius: 16px;
       }
       .brand-logo {
-        margin-bottom: 16px;
+        margin-bottom: 12px;
       }
       .logo-container {
         padding: 6px 12px;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
       }
       .login-title {
-        font-size: 20px;
+        font-size: 18px;
       }
       .login-subtitle {
-        font-size: 12px;
-        margin-bottom: 12px;
+        font-size: 11px;
+        margin-bottom: 10px;
       }
       .tab-header {
-        margin-bottom: 16px;
+        margin-bottom: 12px;
       }
       .tab-btn {
         padding: 8px 4px;
         font-size: 12px;
       }
+      #register-form {
+        grid-template-columns: 1fr;
+        gap: 8px 0;
+      }
+      #register-form .form-group.full-width {
+        grid-column: span 1;
+      }
+      #register-form .submit-btn {
+        grid-column: span 1;
+      }
       .form-group {
-        margin-bottom: 12px;
+        margin-bottom: 8px; /* Compact margins on mobile */
       }
       .form-group label {
         font-size: 9px;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
       }
       .form-input {
-        padding: 10px 14px 10px 38px;
+        padding: 9px 12px 9px 36px;
         font-size: 16px; /* Prevents auto-zoom on iOS */
       }
       .form-input.no-icon {
@@ -980,83 +1016,6 @@
         });
       }
 
-      // Helper to reset registration form steps
-      function resetRegForm() {
-        if (registerForm) {
-          registerForm.reset();
-          const step1 = document.getElementById('reg-step-1');
-          const step2 = document.getElementById('reg-step-2');
-          const dot1 = document.getElementById('dot-1');
-          const dot2 = document.getElementById('dot-2');
-          if (step1) step1.style.display = 'block';
-          if (step2) step2.style.display = 'none';
-          if (dot1) {
-            dot1.classList.add('active');
-            dot1.style.background = 'var(--primary-brand)';
-          }
-          if (dot2) {
-            dot2.classList.remove('active');
-            dot2.style.background = 'var(--border-color)';
-          }
-        }
-      }
-
-      // Stepper Navigation Logic
-      const btnNextStep = document.getElementById('btn-next-step');
-      const btnPrevStep = document.getElementById('btn-prev-step');
-      
-      if (btnNextStep) {
-        btnNextStep.addEventListener('click', () => {
-          // Validate fields in step 1 only
-          const step1Inputs = document.querySelectorAll('#reg-step-1 input, #reg-step-1 select');
-          let isValid = true;
-          step1Inputs.forEach(input => {
-            if (!input.checkValidity()) {
-              input.reportValidity();
-              isValid = false;
-            }
-          });
-          
-          if (isValid) {
-            const step1 = document.getElementById('reg-step-1');
-            const step2 = document.getElementById('reg-step-2');
-            const dot1 = document.getElementById('dot-1');
-            const dot2 = document.getElementById('dot-2');
-            
-            if (step1) step1.style.display = 'none';
-            if (step2) step2.style.display = 'block';
-            if (dot1) {
-              dot1.classList.remove('active');
-              dot1.style.background = 'var(--border-color)';
-            }
-            if (dot2) {
-              dot2.classList.add('active');
-              dot2.style.background = 'var(--primary-brand)';
-            }
-          }
-        });
-      }
-
-      if (btnPrevStep) {
-        btnPrevStep.addEventListener('click', () => {
-          const step1 = document.getElementById('reg-step-1');
-          const step2 = document.getElementById('reg-step-2');
-          const dot1 = document.getElementById('dot-1');
-          const dot2 = document.getElementById('dot-2');
-          
-          if (step1) step1.style.display = 'block';
-          if (step2) step2.style.display = 'none';
-          if (dot1) {
-            dot1.classList.add('active');
-            dot1.style.background = 'var(--primary-brand)';
-          }
-          if (dot2) {
-            dot2.classList.remove('active');
-            dot2.style.background = 'var(--border-color)';
-          }
-        });
-      }
-
       // Switch tabs
       tabLoginBtn.addEventListener('click', () => {
         tabRegisterBtn.classList.remove('active');
@@ -1067,7 +1026,7 @@
         document.getElementById('portal-subtitle').textContent = "Access your restaurant or food outlet terminal";
         errorBox.style.display = 'none';
         successBox.style.display = 'none';
-        resetRegForm();
+        if (registerForm) registerForm.reset();
       });
 
       function activateRegisterTab() {
@@ -1079,7 +1038,7 @@
         document.getElementById('portal-subtitle').textContent = "Submit a request to CodeArc for a new SaaS instance";
         errorBox.style.display = 'none';
         successBox.style.display = 'none';
-        resetRegForm();
+        if (registerForm) registerForm.reset();
       }
 
       tabRegisterBtn.addEventListener('click', activateRegisterTab);
@@ -1297,7 +1256,7 @@
             // and asynchronously by the backend gateway server listening to Supabase Realtime changes on saas_tenants.
             // This eliminates token exposure in the public client-side frontend code.
 
-            resetRegForm();
+            if (registerForm) registerForm.reset();
             // Scroll to top of card to show success message
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }
