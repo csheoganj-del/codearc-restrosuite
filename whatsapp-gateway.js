@@ -660,6 +660,16 @@ app.get('/', (req, res) => {
             background-color: var(--danger);
             color: white;
         }
+        .btn-warning {
+            background-color: transparent;
+            border: 1px solid var(--warning);
+            color: var(--warning);
+            margin-top: 10px;
+        }
+        .btn-warning:hover {
+            background-color: var(--warning);
+            color: #0f172a;
+        }
         .footer {
             margin-top: 30px;
             font-size: 11px;
@@ -692,8 +702,9 @@ app.get('/', (req, res) => {
             <p>Initializing connection status...</p>
         </div>
 
-        <div id="action-container" style="display: none;">
-            <button class="btn btn-danger" id="logout-btn"><i class="fa-solid fa-link-slash"></i> Unlink WhatsApp Account</button>
+        <div id="action-container" style="display: none; flex-direction: column; gap: 8px; align-items: center; margin-top: 20px;">
+            <button class="btn btn-danger" id="logout-btn" style="width: 100%; justify-content: center;"><i class="fa-solid fa-link-slash"></i> Unlink WhatsApp Account</button>
+            <button class="btn btn-warning" id="reset-btn" style="width: 100%; justify-content: center;"><i class="fa-solid fa-arrows-rotate"></i> Force Reset Gateway</button>
         </div>
 
         <div class="footer">
@@ -705,6 +716,7 @@ app.get('/', (req, res) => {
         const statusCard = document.getElementById('status-card');
         const actionContainer = document.getElementById('action-container');
         const logoutBtn = document.getElementById('logout-btn');
+        const resetBtn = document.getElementById('reset-btn');
         let checkInterval = null;
 
         function getAuthToken() {
@@ -741,14 +753,21 @@ app.get('/', (req, res) => {
             let badgeHtml = \`<span class="status-badge \${statusClass}"><i class="fa-solid fa-circle"></i> \${statusText}</span>\`;
             let contentHtml = '';
             
+            if (secured) {
+                actionContainer.style.display = 'none';
+            } else {
+                actionContainer.style.display = 'flex';
+                logoutBtn.style.display = (status === 'ready') ? 'inline-flex' : 'none';
+                resetBtn.style.display = 'inline-flex';
+            }
+            
             if (status === 'ready') {
                 contentHtml = \`
                     \${badgeHtml}
                     <i class="fa-solid fa-circle-check success-icon"></i>
                     <p class="details-text">CodeArc WhatsApp is fully linked and active.</p>
-                    <p class="details-text">Active Number: <span class="number-highlight">+\${number || 'Unknown'}</span></p>
+                    <p class="details-text">Active Number: <span class="number-highlight">+\\${number || 'Unknown'}</span></p>
 \`;
-                actionContainer.style.display = 'block';
             } else if (status === 'qr') {
                 if (qr) {
                     contentHtml = \`
@@ -764,14 +783,13 @@ app.get('/', (req, res) => {
                         <p class="details-text">Generating QR code...</p>
 \`;
                 }
-                actionContainer.style.display = 'none';
             } else if (status === 'connecting') {
                 contentHtml = \`
                     \${badgeHtml}
                     <div class="spinner"></div>
                     <p class="details-text">Establishing connection with WhatsApp Web drivers...</p>
+                    <p class="details-text" style="font-size: 11px; margin-top: 10px; color: var(--text-secondary);">If stuck for more than 2 minutes, use <strong>Force Reset Gateway</strong> below.</p>
 \`;
-                actionContainer.style.display = 'none';
             } else {
                 contentHtml = \`
                     \${badgeHtml}
@@ -779,7 +797,6 @@ app.get('/', (req, res) => {
                     <p class="details-text">Driver Status: <span style="font-weight: 600;">\${statusText}</span></p>
                     <p class="details-text" style="font-size: 12px; max-width: 280px;">Please check the server console logs for exact failure details.</p>
 \`;
-                actionContainer.style.display = 'none';
             }
 
             statusCard.innerHTML = contentHtml;
@@ -808,6 +825,39 @@ app.get('/', (req, res) => {
                 }
             } catch (err) {
                 alert("Network error: " + err.message);
+            }
+        });
+
+        resetBtn.addEventListener('click', async () => {
+            if (!confirm("Are you sure you want to force reset the gateway? This will delete the saved session from Supabase Storage and the local cache, and restart the gateway container to generate a fresh QR code.")) return;
+            
+            const token = getAuthToken();
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
+
+            try {
+                statusCard.innerHTML = \`
+                    <div class="spinner"></div>
+                    <p>Resetting gateway & restarting server...</p>
+                \`;
+                actionContainer.style.display = 'none';
+
+                const response = await fetch('/reset', {
+                    method: 'POST',
+                    headers
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    alert("Gateway reset initiated. Please wait 1-2 minutes for the server to restart and generate a fresh QR code.");
+                } else {
+                    alert("Failed to reset: " + (data.error || "Unknown error"));
+                    updateStatus();
+                }
+            } catch (err) {
+                alert("Gateway reset command sent successfully. The server is restarting now. Please wait 1-2 minutes, then refresh this page to scan the fresh QR code!");
+                location.reload();
             }
         });
 
@@ -924,6 +974,60 @@ app.post('/logout', async (req, res) => {
         res.json({ status: 'success', message: 'Logged out successfully. Scan QR again.' });
     } catch (err) {
         console.error('Failed to log out device:', err);
+        res.status(500).json({ status: 'error', error: err.message });
+    }
+});
+
+// POST Endpoint to force reset the gateway session (deletes storage zip and restarts)
+app.post('/reset', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
+
+    try {
+        console.log('[Reset] Force reset requested. Cleaning up files...');
+        connectionStatus = 'connecting';
+        qrCodeDataUrl = null;
+        linkedNumber = null;
+
+        // 1. Delete session from Supabase Storage
+        if (supabaseService) {
+            console.log('[Reset] Deleting session.zip from Supabase Storage...');
+            const { data, error } = await supabaseService.storage
+                .from(SESSION_BUCKET)
+                .remove([SESSION_FILE_NAME]);
+            
+            if (error) {
+                console.error('[Reset Error] Failed to delete session.zip from storage:', error.message);
+            } else {
+                console.log('[Reset] session.zip deleted successfully from Supabase Storage.');
+            }
+        }
+
+        // 2. Delete local auth data directory
+        if (fs.existsSync(authDataPath)) {
+            console.log('[Reset] Deleting local auth directory:', authDataPath);
+            fs.rmSync(authDataPath, { recursive: true, force: true });
+        }
+
+        // 3. Clear wwebjs cache directory if it exists
+        const cachePath = path.join(__dirname, '.wwebjs_cache');
+        if (fs.existsSync(cachePath)) {
+            console.log('[Reset] Deleting local cache directory:', cachePath);
+            fs.rmSync(cachePath, { recursive: true, force: true });
+        }
+
+        console.log('[Reset] Reset complete. Restarting process...');
+        res.json({ status: 'success', message: 'Gateway reset initiated. Server is restarting.' });
+
+        // Exit process to trigger HuggingFace container auto-restart
+        setTimeout(() => {
+            console.log('[Reset] Exiting process now.');
+            process.exit(0);
+        }, 1500);
+
+    } catch (err) {
+        console.error('[Reset Error] Failed to perform reset:', err);
         res.status(500).json({ status: 'error', error: err.message });
     }
 });
