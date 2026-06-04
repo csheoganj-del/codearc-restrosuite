@@ -979,19 +979,31 @@ app.post('/logout', async (req, res) => {
     }
 });
 
-// POST Endpoint to force reset the gateway session (deletes storage zip and restarts)
-app.post('/reset', async (req, res) => {
+// Helper function to perform reset in-process without crashing container
+async function performReset(req, res, format = 'json') {
     if (!verifyToken(req)) {
-        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+        if (format === 'html') {
+            return res.status(401).send('Unauthorized: Invalid Gateway Token');
+        } else {
+            return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+        }
     }
 
     try {
-        console.log('[Reset] Force reset requested. Cleaning up files...');
+        console.log('[Reset] Force reset initiated...');
         connectionStatus = 'connecting';
         qrCodeDataUrl = null;
         linkedNumber = null;
 
-        // 1. Delete session from Supabase Storage
+        // 1. Destroy current client browser instance if possible
+        try {
+            console.log('[Reset] Closing active Puppeteer browser session...');
+            await client.destroy();
+        } catch (destroyErr) {
+            console.log('[Reset Warning] Failed to destroy client cleanly (safe to ignore):', destroyErr.message);
+        }
+
+        // 2. Delete session from Supabase Storage
         if (supabaseService) {
             console.log('[Reset] Deleting session.zip from Supabase Storage...');
             const { data, error } = await supabaseService.storage
@@ -1005,99 +1017,60 @@ app.post('/reset', async (req, res) => {
             }
         }
 
-        // 2. Delete local auth data directory
+        // 3. Delete local auth directory
         if (fs.existsSync(authDataPath)) {
             console.log('[Reset] Deleting local auth directory:', authDataPath);
             fs.rmSync(authDataPath, { recursive: true, force: true });
         }
 
-        // 3. Clear wwebjs cache directory if it exists
+        // 4. Clear cache directory
         const cachePath = path.join(__dirname, '.wwebjs_cache');
         if (fs.existsSync(cachePath)) {
             console.log('[Reset] Deleting local cache directory:', cachePath);
             fs.rmSync(cachePath, { recursive: true, force: true });
         }
 
-        console.log('[Reset] Reset complete. Restarting process...');
-        res.json({ status: 'success', message: 'Gateway reset initiated. Server is restarting.' });
-
-        // Exit process to trigger HuggingFace container auto-restart
-        setTimeout(() => {
-            console.log('[Reset] Exiting process now.');
-            process.exit(0);
-        }, 1500);
-
-    } catch (err) {
-        console.error('[Reset Error] Failed to perform reset:', err);
-        res.status(500).json({ status: 'error', error: err.message });
-    }
-});
-
-// GET Endpoint to force reset the gateway session (deletes storage zip and restarts)
-app.get('/reset', async (req, res) => {
-    if (!verifyToken(req)) {
-        return res.status(401).send('Unauthorized: Invalid Gateway Token');
-    }
-
-    try {
-        console.log('[Reset GET] Force reset requested. Cleaning up files...');
-        connectionStatus = 'connecting';
-        qrCodeDataUrl = null;
-        linkedNumber = null;
-
-        // 1. Delete session from Supabase Storage
-        if (supabaseService) {
-            console.log('[Reset GET] Deleting session.zip from Supabase Storage...');
-            const { data, error } = await supabaseService.storage
-                .from(SESSION_BUCKET)
-                .remove([SESSION_FILE_NAME]);
-            
-            if (error) {
-                console.error('[Reset GET Error] Failed to delete session.zip from storage:', error.message);
-            }
-        }
-
-        // 2. Delete local auth data directory
-        if (fs.existsSync(authDataPath)) {
-            console.log('[Reset GET] Deleting local auth directory:', authDataPath);
-            fs.rmSync(authDataPath, { recursive: true, force: true });
-        }
-
-        // 3. Clear cache directory
-        const cachePath = path.join(__dirname, '.wwebjs_cache');
-        if (fs.existsSync(cachePath)) {
-            fs.rmSync(cachePath, { recursive: true, force: true });
-        }
-
-        res.send(`
-            <div style="font-family: Arial, sans-serif; text-align: center; padding: 40px; background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;">
-                <div style="max-width: 500px; padding: 30px; border: 1px solid #334155; border-radius: 16px; background-color: #1e293b; border-top: 4px solid #eab308; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);">
-                    <h1 style="color: #f8fafc; font-size: 24px; margin-bottom: 15px;">⚡ Gateway Reset Initiated</h1>
-                    <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 20px;">
-                        The corrupted WhatsApp session has been successfully deleted from your Supabase storage and local container cache.
-                    </p>
-                    <p style="font-size: 15px; font-weight: 600; color: #22c55e; margin-bottom: 25px;">
-                        The gateway is now rebooting. A fresh QR code will be generated in 1-2 minutes.
-                    </p>
-                    <hr style="border: 0; border-top: 1px solid #334155; margin-bottom: 20px;">
-                    <a href="/" style="background-color: #C98A4A; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block; transition: background 0.2s;">
-                        Go to Dashboard &rarr;
-                    </a>
+        // 5. Send response to client first
+        if (format === 'html') {
+            res.send(`
+                <div style="font-family: Arial, sans-serif; text-align: center; padding: 40px; background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;">
+                    <div style="max-width: 500px; padding: 30px; border: 1px solid #334155; border-radius: 16px; background-color: #1e293b; border-top: 4px solid #eab308; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);">
+                        <h1 style="color: #f8fafc; font-size: 24px; margin-bottom: 15px;">⚡ Gateway Reset Complete</h1>
+                        <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 20px;">
+                            The corrupted WhatsApp session has been successfully deleted from your Supabase storage and local cache.
+                        </p>
+                        <p style="font-size: 15px; font-weight: 600; color: #22c55e; margin-bottom: 25px;">
+                            The gateway is re-initializing right now! A fresh QR code will display on the dashboard in a few seconds.
+                        </p>
+                        <hr style="border: 0; border-top: 1px solid #334155; margin-bottom: 20px;">
+                        <a href="/" style="background-color: #C98A4A; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+                            Go to Dashboard &rarr;
+                        </a>
+                    </div>
                 </div>
-            </div>
-        `);
+            `);
+        } else {
+            res.json({ status: 'success', message: 'Gateway reset completed. Re-initializing driver.' });
+        }
 
-        // Exit process to trigger container auto-restart
-        setTimeout(() => {
-            console.log('[Reset GET] Exiting process now.');
-            process.exit(0);
-        }, 1500);
+        // 6. Spawn new browser instance in background
+        console.log('[Reset] Re-initializing clean WhatsApp driver instance...');
+        client.initialize().catch(err => {
+            console.error('[Reset Error] Failed to re-initialize WhatsApp client:', err.message);
+        });
 
     } catch (err) {
-        console.error('[Reset GET Error] Failed to perform reset:', err);
-        res.status(500).send('Error resetting gateway: ' + err.message);
+        console.error('[Reset Fatal Error]', err);
+        if (format === 'html') {
+            res.status(500).send('Error resetting gateway: ' + err.message);
+        } else {
+            res.status(500).json({ status: 'error', error: err.message });
+        }
     }
-});
+}
+
+app.post('/reset', (req, res) => performReset(req, res, 'json'));
+app.get('/reset', (req, res) => performReset(req, res, 'html'));
 
 // HTTP API Endpoint to send receipts manually in the background
 app.post('/send', async (req, res) => {
