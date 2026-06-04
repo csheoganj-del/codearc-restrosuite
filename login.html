@@ -10,15 +10,29 @@
   
   <style>
     :root {
-      --primary-brand: #0f172a;
-      --primary-brand-dark: #020617;
-      --accent-caramel: #C98A4A;
-      --bg-cream: #FDFBF7;
-      --text-dark: #0f172a;
-      --text-muted: #94a3b8;
-      --error-red: #ef4444;
-      --success-green: #22c55e;
-      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      /* Premium Light Swiggy & Zomato Inspired Color System */
+      --bg-dark: #FFFFFF;              /* Pure white background */
+      --bg-surface: #F8F9FA;           /* Soft light gray surface */
+      --bg-surface-elevated: #FFFFFF;  /* Card surface: clean white */
+      --bg-surface-hover: #F1F3F5;     /* Subtle gray hover surface */
+
+      --primary-brand: #FC8019;        /* Primary accent: Swiggy Tangerine Orange */
+      --primary-hover: #FD9139;        /* Hover accent: Swiggy Bright Orange */
+      --accent-red: #E23744;           /* Secondary accent: Zomato Crimson Red */
+
+      --text-main: #1C1C1C;            /* Primary text: Deep Charcoal */
+      --text-secondary: #5E636A;       /* Secondary text: Slate Gray */
+      --text-muted: #8F959E;           /* Muted text: Soft Gray */
+
+      --success: #22c55e;              /* Success green */
+      --error: #ef4444;
+
+      --border-color: #E2E8F0;         /* Subtle light border */
+      --border-subtle: #EDF2F7;        /* Soft separator */
+
+      --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+      --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
     }
 
     * {
@@ -29,35 +43,52 @@
     }
 
     body {
-      background: linear-gradient(135deg, var(--primary-brand-dark) 0%, var(--primary-brand) 100%);
+      background: radial-gradient(circle at 50% 0%, rgba(252, 128, 25, 0.05) 0%, #F8F9FA 70%);
+      color: var(--text-main);
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 20px;
-      color: #FFF;
       overflow-y: auto;
       position: relative;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
-    /* Ambient elements */
+    /* Noise texture overlay for a physical premium feel */
     body::before {
-      content: "🍔";
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.015'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Ambient elements with reduced opacity for light theme */
+    .bg-icon-left {
       position: absolute;
       font-size: 180px;
-      opacity: 0.02;
+      opacity: 0.025;
       top: -30px;
       left: -30px;
       pointer-events: none;
+      user-select: none;
+      z-index: 1;
     }
-    body::after {
-      content: "🍕";
+    .bg-icon-right {
       position: absolute;
       font-size: 140px;
-      opacity: 0.02;
+      opacity: 0.025;
       bottom: -20px;
       right: -20px;
       pointer-events: none;
+      user-select: none;
+      z-index: 1;
     }
 
     .login-container {
@@ -65,73 +96,71 @@
       max-width: 440px;
       animation: fadeInUp 0.6s ease;
       margin: 20px 0;
+      position: relative;
+      z-index: 2;
     }
 
     .login-card {
-      background: rgba(255, 255, 255, 0.04);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 28px;
-      padding: 36px 28px;
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+      background: #FFFFFF;
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 40px 32px;
+      box-shadow: var(--shadow-lg);
       text-align: center;
     }
 
     .brand-logo {
-      margin-bottom: 24px;
+      margin-bottom: 28px;
     }
 
     .logo-container {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       padding: 8px 18px;
-      background: rgba(201, 138, 74, 0.08);
-      border: 1px solid rgba(201, 138, 74, 0.2);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
       border-radius: 50px;
-      margin-bottom: 12px;
-    }
-
-    .logo-icon {
-      font-size: 18px;
-      color: var(--accent-caramel);
+      margin-bottom: 16px;
+      text-decoration: none;
     }
 
     .logo-text {
       font-family: 'Outfit', sans-serif;
       font-size: 18px;
       font-weight: 800;
-      letter-spacing: 1.5px;
-      color: #FFF;
+      letter-spacing: -0.5px;
+      color: var(--text-main);
     }
 
     .logo-text span {
-      color: var(--accent-caramel);
+      color: var(--text-secondary);
+      font-weight: 400;
     }
 
     .login-title {
       font-family: 'Outfit', sans-serif;
-      font-size: 22px;
-      font-weight: 700;
-      color: #FFF;
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-main);
       margin-bottom: 6px;
+      letter-spacing: -0.5px;
     }
 
     .login-subtitle {
-      font-size: 12px;
-      color: var(--text-muted);
+      font-size: 13px;
+      color: var(--text-secondary);
       margin-bottom: 24px;
     }
 
     /* Tab switcher for login vs signup */
     .tab-header {
       display: flex;
-      background: rgba(0, 0, 0, 0.2);
+      background: var(--bg-surface);
       border-radius: 12px;
       padding: 4px;
-      margin-bottom: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 28px;
+      border: 1px solid var(--border-color);
     }
 
     .tab-btn {
@@ -140,7 +169,7 @@
       border-radius: 8px;
       background: transparent;
       border: none;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       font-weight: 600;
       font-size: 13px;
       cursor: pointer;
@@ -148,34 +177,34 @@
     }
 
     .tab-btn.active {
-      background: var(--accent-caramel);
-      color: #FFF;
-      box-shadow: 0 4px 10px rgba(201, 138, 74, 0.2);
+      background: var(--primary-brand);
+      color: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(252, 128, 25, 0.18);
     }
 
     .form-group {
       position: relative;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
       text-align: left;
     }
 
     .form-group label {
       display: block;
       font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
+      font-weight: 700;
+      color: var(--text-secondary);
       margin-bottom: 6px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
     }
 
     .form-input {
       width: 100%;
-      padding: 14px 18px 14px 44px;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1.5px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      color: #FFF;
+      padding: 12px 16px 12px 42px;
+      background: #FFFFFF;
+      border: 1.5px solid var(--border-color);
+      border-radius: 10px;
+      color: var(--text-main);
       font-size: 14px;
       outline: none;
       transition: var(--transition);
@@ -186,55 +215,56 @@
     }
 
     .form-input::placeholder {
-      color: rgba(255, 255, 255, 0.25);
+      color: var(--text-muted);
+      opacity: 0.8;
     }
 
     .form-input:focus {
-      border-color: var(--accent-caramel);
-      background: rgba(0, 0, 0, 0.35);
-      box-shadow: 0 0 10px rgba(201, 138, 74, 0.15);
+      border-color: var(--primary-brand);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(252, 128, 25, 0.08);
     }
 
     .form-group i.input-icon {
       position: absolute;
       left: 16px;
-      bottom: 15px;
-      color: rgba(255, 255, 255, 0.3);
+      bottom: 13px;
+      color: var(--text-muted);
       font-size: 14px;
       transition: var(--transition);
     }
 
     .form-input:focus + i.input-icon {
-      color: var(--accent-caramel);
+      color: var(--primary-brand);
     }
 
     .toggle-pwd {
       position: absolute;
       right: 16px;
-      bottom: 15px;
-      color: rgba(255, 255, 255, 0.3);
+      bottom: 13px;
+      color: var(--text-muted);
       cursor: pointer;
       font-size: 14px;
       transition: var(--transition);
     }
 
     .toggle-pwd:hover {
-      color: var(--accent-caramel);
+      color: var(--primary-brand);
     }
 
     .submit-btn {
       width: 100%;
       padding: 14px;
-      background: var(--accent-caramel);
+      background: var(--primary-brand);
       border: none;
-      border-radius: 12px;
-      color: #FFF;
+      border-radius: 10px;
+      color: #FFFFFF;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
       margin-top: 10px;
       transition: var(--transition);
-      box-shadow: 0 4px 15px rgba(201, 138, 74, 0.2);
+      box-shadow: 0 4px 12px rgba(252, 128, 25, 0.15);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -242,34 +272,37 @@
     }
 
     .submit-btn:hover {
-      background: #b57a3e;
+      background: var(--primary-hover);
       transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(252, 128, 25, 0.25);
     }
 
     .error-box {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-      border-radius: 12px;
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      border-radius: 10px;
       padding: 12px;
-      color: #f87171;
-      font-size: 12px;
+      color: #b91c1c;
+      font-size: 12.5px;
       font-weight: 600;
       margin-bottom: 20px;
       display: none;
       line-height: 1.4;
+      text-align: left;
     }
 
     .success-box {
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.25);
-      border-radius: 12px;
+      background: rgba(34, 197, 94, 0.06);
+      border: 1px solid rgba(34, 197, 94, 0.15);
+      border-radius: 10px;
       padding: 12px;
-      color: #4ade80;
-      font-size: 12px;
+      color: #15803d;
+      font-size: 12.5px;
       font-weight: 600;
       margin-bottom: 20px;
       display: none;
       line-height: 1.4;
+      text-align: left;
     }
 
     @keyframes fadeInUp {
@@ -296,13 +329,17 @@
 </head>
 <body>
 
+  <!-- Ambient decorative icons -->
+  <div class="bg-icon-left">🍔</div>
+  <div class="bg-icon-right">🍕</div>
+
   <div class="login-container">
     <div class="login-card" id="login-card">
       
       <!-- Brand Logo -->
       <div class="brand-logo">
         <div class="logo-container">
-          <span class="logo-icon"><i class="fa-solid fa-utensils"></i></span>
+          <div class="logo-mark" style="width: 24px; height: 24px; border-radius: 6px; background: var(--primary-brand); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #FFF; font-weight: 800;"><i class="fa-solid fa-square-poll-horizontal"></i></div>
           <span class="logo-text">CodeArc <span>RestoSuite</span></span>
         </div>
         <h2 class="login-title" id="portal-title">Client Access Portal</h2>
@@ -361,12 +398,12 @@
 
         <div class="form-group">
           <label for="reg-type">Outlet Type</label>
-          <select id="reg-type" class="form-input no-icon" style="background: rgba(0, 0, 0, 0.25); color: #FFF;" required>
-            <option value="restaurant" style="background: #0f172a;">Restaurant</option>
-            <option value="cafe" style="background: #0f172a;">Cafe / Bakery</option>
-            <option value="dhaba" style="background: #0f172a;">Dhaba / Local Diner</option>
-            <option value="cart" style="background: #0f172a;">Food Cart / Truck</option>
-            <option value="other" style="background: #0f172a;">Other Food Outlet</option>
+          <select id="reg-type" class="form-input no-icon" required>
+            <option value="restaurant">Restaurant</option>
+            <option value="cafe">Cafe / Bakery</option>
+            <option value="dhaba">Dhaba / Local Diner</option>
+            <option value="cart">Food Cart / Truck</option>
+            <option value="other">Other Food Outlet</option>
           </select>
         </div>
 
@@ -455,12 +492,12 @@
             passwordInput.type = 'text';
             togglePwdBtn.classList.remove('fa-eye');
             togglePwdBtn.classList.add('fa-eye-slash');
-            togglePwdBtn.style.color = 'var(--accent-caramel)';
+            togglePwdBtn.style.color = 'var(--primary-brand)';
           } else {
             passwordInput.type = 'password';
             togglePwdBtn.classList.remove('fa-eye-slash');
             togglePwdBtn.classList.add('fa-eye');
-            togglePwdBtn.style.color = 'rgba(255, 255, 255, 0.3)';
+            togglePwdBtn.style.color = 'var(--text-muted)';
           }
         });
       }
