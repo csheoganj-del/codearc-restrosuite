@@ -16,15 +16,15 @@
     <div class="lock-card" style="background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 30px 70px rgba(0,0,0,0.5); border-radius: 28px; width: 360px; padding: 40px 30px; text-align: center; display: flex; flex-direction: column; align-items: center; box-sizing: border-box; color: #FFF; animation: fadeInUp 0.5s ease;">
       
       <!-- Brand Logo -->
-      <div style="font-family: 'Playfair Display', serif; font-size: 34px; font-weight: 700; color: #E7D7C9; margin-bottom: 2px; letter-spacing: 2px;">DOPPIO</div>
-      <div style="font-size: 11px; color: #C98A4A; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
+      <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 30px; font-weight: 800; color: #ECE7DF; margin-bottom: 2px; letter-spacing: 1px;">DOPPIO</div>
+      <div style="font-size: 10px; color: #C88A4D; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
       
       <!-- Security Icon -->
-      <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(201, 138, 74, 0.1); border: 2px solid #C98A4A; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-        <i class="fa-solid fa-lock" style="font-size: 26px; color: #C98A4A;"></i>
+      <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(200, 138, 77, 0.1); border: 2px solid #C88A4D; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+        <i class="fa-solid fa-lock" style="font-size: 26px; color: #C88A4D;"></i>
       </div>
       
-      <p style="font-family: 'Poppins', sans-serif; font-size: 13px; color: #F7F3EF; margin-bottom: 15px; font-weight: 500;">Enter Passcode to Unlock Terminal</p>
+      <p style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: #F6F3EE; margin-bottom: 15px; font-weight: 500;">Enter Passcode to Unlock Terminal</p>
       
       <!-- Passcode Input -->
       <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-bottom: 20px;">
@@ -58,7 +58,7 @@
 
   <!-- Mobile Top Header Bar -->
   <div class="mobile-top-header">
-    <div style="font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--primary-brand); letter-spacing: 1px;">DOPPIO <span style="font-size:12px; color:var(--accent-caramel); text-transform:uppercase; letter-spacing:2px;">Café</span></div>
+    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--primary-brand); letter-spacing: 0.5px;">DOPPIO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Café</span></div>
     
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- Mobile Network Status Dot -->
@@ -133,10 +133,13 @@
         <a href="#" class="sidebar-link" data-tab="crm-tab"><i class="fa-solid fa-users-rectangle"></i> CRM & Loyalty</a>
         <a href="#" class="sidebar-link" data-tab="tax-tab" id="sidebar-tax-link"><i class="fa-solid fa-calculator"></i> Tax Management</a>
         <a href="#" class="sidebar-link" data-tab="employees-tab" id="sidebar-employees-link"><i class="fa-solid fa-users"></i> Employee Ledger</a>
+        <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none; background: rgba(201, 138, 74, 0.12); color: var(--accent-caramel); font-weight: 700;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
       </nav>
 
-      <button class="profile-sidebar-btn" id="open-profile-btn"><i class="fa-solid fa-store"></i> Business Profile</button>
-      <a href="index.html" class="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout Portal</a>
+      <div class="sidebar-footer">
+        <button class="profile-sidebar-btn" id="open-profile-btn"><i class="fa-solid fa-store"></i> Business Profile</button>
+        <a href="index.html" class="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout Portal</a>
+      </div>
     </aside>
 
     <!-- Main Workspace Content -->
@@ -219,7 +222,7 @@
       <div class="workspace-area">
 
         <!-- TAB 1: TAKEAWAY POS (DEFAULT TAB) -->
-        <div class="tab-content active" id="pos-tab" style="position: relative;">
+        <div class="tab-content active" id="pos-tab">
           <!-- Shift Closed POS Lock Overlay -->
           <div id="shift-lock-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); z-index: 50; align-items: center; justify-content: center; border-radius: var(--border-radius-lg); flex-direction: column; gap: 16px; text-align: center; padding: 20px;">
             <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(201, 138, 74, 0.08); border: 2px dashed var(--accent-caramel); display: flex; align-items: center; justify-content: center;">
@@ -341,24 +344,30 @@
               <!-- Cart list -->
               <div class="cart-items-list" id="cart-items-list">
                 <div class="empty-cart-state">
-                  <i class="fa-solid fa-basket-shopping"></i>
-                  <p>Cart is currently empty.<br>Tap items to add & customize.</p>
+                  <div class="empty-cart-icon-wrapper">
+                    <i class="fa-solid fa-basket-shopping"></i>
+                  </div>
+                  <div class="empty-cart-title">Cart is empty</div>
+                  <div class="empty-cart-desc">Tap menu items to add them to this order.</div>
+                  <div class="empty-cart-shortcuts">
+                    <kbd>/</kbd> Search &nbsp;·&nbsp; <kbd>↵</kbd> Add item
+                  </div>
                 </div>
               </div>
 
               <!-- Checkout Summary -->
               <div class="cart-summary">
-                <div class="summary-row total-row" style="margin-bottom: 8px; border-top: none; padding-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                <div class="summary-row total-row">
                   <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-weight: 800; font-size: 15px; color: var(--primary-brand);">Total Amount</span>
-                    <button type="button" id="toggle-summary-details-btn" style="background: none; border: none; padding: 2px; color: var(--accent-caramel); cursor: pointer; font-size: 12px; transition: transform 0.2s;" title="View Breakdown">
+                    <span class="total-label">Total Amount</span>
+                    <button type="button" id="toggle-summary-details-btn" title="View Breakdown">
                       <i class="fa-solid fa-circle-info"></i>
                     </button>
                   </div>
-                  <span id="cart-total" style="font-weight: 800; font-size: 18px; color: var(--primary-brand);">₹0.00</span>
+                  <span id="cart-total">₹0.00</span>
                 </div>
 
-                <div id="cart-summary-details" style="display: none; background: rgba(43,24,19,0.02); border: 1px dashed rgba(43,24,19,0.08); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; animation: fadeInDown 0.2s ease;">
+                <div id="cart-summary-details" style="display: none; animation: fadeInDown 0.2s ease;">
                   <div class="summary-row" style="margin-bottom: 4px; font-size: 11px;">
                     <span>Subtotal</span>
                     <span id="cart-subtotal">₹0.00</span>
@@ -408,17 +417,17 @@
 
                 <div class="checkout-actions-wrapper" style="display: flex; gap: 8px; margin-top: 10px; width: 100%; position: relative;">
                   <!-- Consolidated Checkout Button -->
-                  <button type="button" class="checkout-btn btn-print-and-save" id="checkout-print-btn" style="flex: 4; border-radius: 30px; font-weight: 700; border: none; color: white; cursor: pointer; padding: 12px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13.5px; background: var(--caramel-gradient);">
+                  <button type="button" class="checkout-btn btn-print-and-save" id="checkout-print-btn" style="flex: 4;">
                     <i class="fa-solid fa-print"></i> Print & Save
                   </button>
                   
                   <!-- Dropup Toggle button -->
-                  <button type="button" id="cart-more-actions-btn" style="flex: 1; border-radius: 30px; border: 1px solid rgba(43,24,19,0.12); background: var(--bg-cream-light); color: var(--primary-brand); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;" title="More Actions">
+                  <button type="button" id="cart-more-actions-btn" style="flex: 1;" title="More Actions">
                     <i class="fa-solid fa-ellipsis"></i>
                   </button>
                   
                   <!-- Dropup menu container -->
-                  <div id="cart-more-actions-menu" class="cart-more-actions-menu" style="display: none; position: absolute; bottom: 52px; right: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(43, 24, 19, 0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 180px; z-index: 10; padding: 6px; flex-direction: column; gap: 4px; animation: fadeInUp 0.25s ease;">
+                  <div id="cart-more-actions-menu" class="cart-more-actions-menu" style="display: none; position: absolute; bottom: 44px; right: 0; width: 180px;">
                     <button type="button" id="checkout-save-btn" class="dropdown-action-item" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--primary-brand); border-radius: 8px; cursor: pointer; text-align: left; transition: background 0.15s ease;">
                       <i class="fa-solid fa-floppy-disk" style="color: #2ecc71; width: 16px;"></i> Save Bill (No Print)
                     </button>
@@ -838,10 +847,11 @@
                     <!-- Transactions logs -->
                   </div>
                 </div>
+              </div>
             </div>
             
-            <!-- Detailed P&L Statement Panel -->
-            <div class="report-panel" style="margin-top: 20px; padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
+          <!-- Detailed P&L Statement Panel -->
+          <div class="report-panel" style="margin-top: 20px; padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
               <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
                 <i class="fa-solid fa-file-invoice-dollar"></i> Doppio Café Nagpur - Detailed Profit & Loss Statement
               </h3>
@@ -1556,6 +1566,43 @@
                 </div>
               </div>
               
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 13: SAAS SUPER-ADMIN CONSOLE -->
+        <div class="tab-content" id="super-admin-tab">
+          <div class="bills-tab-wrapper">
+            <div class="reports-header-actions" style="margin-bottom:12px;">
+              <div class="report-filters">
+                <span class="report-span" style="font-family:var(--font-heading); font-size:22px; font-weight:700; color:var(--primary-brand);"><i class="fa-solid fa-user-shield"></i> SaaS platform Owner Admin Portal</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">CodeArc RestoSuite Hub</div>
+            </div>
+
+            <!-- Tenants list panel -->
+            <div class="report-panel" style="padding: 24px; border-radius: 16px; background: var(--white); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex-grow: 1; min-height: 400px; display: flex; flex-direction: column;">
+              <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+                <i class="fa-solid fa-store"></i> Registered Client Food Outlets
+              </h3>
+              
+              <div style="overflow-x: auto; flex-grow: 1;">
+                <table class="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid rgba(43,24,19,0.08); color: var(--text-muted); font-weight: 700;">
+                      <th style="padding: 10px;">Outlet Name / Slug</th>
+                      <th style="padding: 10px;">Type</th>
+                      <th style="padding: 10px;">Owner Contact</th>
+                      <th style="padding: 10px;">Login Details</th>
+                      <th style="padding: 10px;">Status</th>
+                      <th style="padding: 10px; text-align: right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="saas-tenants-list">
+                    <!-- Injected dynamically in JS -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -2591,9 +2638,92 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
     </div>
   </div>
 
+
+  <!-- SAAS TENANT MANAGEMENT MODAL -->
+  <div class="modal-backdrop" id="tenant-manage-modal" style="z-index: 200000;">
+    <div class="glass-modal" style="max-width: 500px; width: 90%; background: #fff; color: #000; border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 16px; position: relative;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+        <h2 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin: 0;"><i class="fa-solid fa-sliders"></i> SaaS Client Management Control</h2>
+        <button class="close-modal-btn" id="close-tenant-modal" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <input type="hidden" id="manage-tenant-id">
+        <h3 id="manage-tenant-name" style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; margin: 0;">Royal Dhaba</h3>
+        
+        <!-- Section 1: Credentials & Contact Override -->
+        <div style="background: rgba(0,0,0,0.02); padding: 14px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 11px; text-transform: uppercase; color: var(--accent-caramel); font-weight: 700; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 4px; margin: 0;">1. Client Credentials & Contacts</h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Admin Username</label>
+              <input type="text" id="manage-username" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(0,0,0,0.15); font-size: 12px; outline: none;">
+            </div>
+            <div>
+              <label style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Reset Password</label>
+              <input type="password" id="manage-password" placeholder="Type new password" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(0,0,0,0.15); font-size: 12px; outline: none;">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">WhatsApp Contact</label>
+              <input type="tel" id="manage-phone" placeholder="e.g. 919876543210" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(0,0,0,0.15); font-size: 12px; outline: none;">
+            </div>
+            <div>
+              <label style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Owner Email</label>
+              <input type="email" id="manage-email" placeholder="owner@email.com" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(0,0,0,0.15); font-size: 12px; outline: none;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Account Status -->
+        <div style="background: rgba(0,0,0,0.02); padding: 14px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 11px; text-transform: uppercase; color: var(--accent-caramel); font-weight: 700; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 4px; margin: 0;">2. Status & Visibility</h4>
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <div style="flex: 1;">
+              <label style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Account Status</label>
+              <select id="manage-status" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.15); font-size:12px; background: white; outline: none;">
+                <option value="pending">Pending Approval</option>
+                <option value="approved">Approved / Active</option>
+                <option value="suspended">Suspended / Blocked</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Feature Allotment -->
+        <div style="background: rgba(0,0,0,0.02); padding: 14px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 11px; text-transform: uppercase; color: var(--accent-caramel); font-weight: 700; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 4px; margin: 0;">3. Feature Gatekeeping (Allot Tabs)</h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: #000;" id="manage-tabs-grid">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="pos-tab"> Takeaway POS</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="qr-orders-tab"> Live Table Orders</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="online-tab"> Online Integrations</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="kds-tab"> Kitchen KDS Screen</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="tokens-tab"> Live Token Board</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="bills-tab"> Bills Management</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="inventory-tab"> Inventory Control</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="reports-tab"> Sales Reports</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="editor-tab"> Menu Editor</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="crm-tab"> CRM & Loyalty</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="tax-tab"> Tax Management</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" value="employees-tab"> Employee Ledger</label>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid #eee; padding-top: 15px;">
+          <button type="button" class="btn btn-danger" id="delete-tenant-btn" style="padding: 10px 18px; font-size:12px; font-weight:700; background: #ef4444; border: none; color: white; border-radius: 6px; cursor: pointer;"><i class="fa-solid fa-trash"></i> Delete Account</button>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="btn btn-secondary" id="close-tenant-modal-btn" style="padding: 10px 18px; font-size:12px; border: 1px solid #ccc; border-radius: 6px; cursor: pointer; background: #fff;">Cancel</button>
+            <button type="button" class="btn btn-primary" id="save-tenant-settings-btn" style="padding: 10px 22px; font-size:12px; font-weight:700; background: #22c55e; border: none; color: white; border-radius: 6px; cursor: pointer;"><i class="fa-solid fa-floppy-disk"></i> Save Client Settings</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <input type="file" id="import-tax-file-input" accept=".json,.csv" style="display: none;">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="dashboard.js"></script>
+  <script src="dashboard.js?v=1.2"></script>
 </body>
 </html>
