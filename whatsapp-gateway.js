@@ -2331,6 +2331,44 @@ app.get('/debug-relay', (req, res) => {
     });
 });
 
+app.get('/test-relay-call', async (req, res) => {
+    const relay = process.env.EMAIL_RELAY_URL || emailConfig.relayUrl || '';
+    if (!relay) return res.json({ error: 'No relay configured' });
+    
+    const https = require('https');
+    const url = new URL(relay);
+    const postData = JSON.stringify({
+        to: 'csheoganj@gmail.com',
+        subject: 'Test Ping',
+        html: '<p>Ping</p>'
+    });
+    
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData),
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        timeout: 10000
+    };
+    
+    const request = https.request(url, options, (response) => {
+        let body = '';
+        response.on('data', chunk => body += chunk);
+        response.on('end', () => {
+            res.json({
+                statusCode: response.statusCode,
+                headers: response.headers,
+                body: body
+            });
+        });
+    });
+    request.on('error', err => res.json({ error: err.message }));
+    request.write(postData);
+    request.end();
+});
+
 // HEALTH ENDPOINT — for UptimeRobot / external monitors
 // ============================================================
 app.get('/health', (req, res) => {
