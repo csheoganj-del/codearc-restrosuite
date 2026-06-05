@@ -1,3 +1,4 @@
+require('dns').setDefaultResultOrder('ipv4first');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const QRCodeLib = require('qrcode');
