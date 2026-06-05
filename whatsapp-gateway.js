@@ -63,14 +63,17 @@ if (!emailConfig.user && fs.existsSync(configPath)) {
 let transporter = null;
 if (emailConfig.user && emailConfig.pass) {
     transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        family: 4, // Force IPv4 — Hugging Face Spaces block IPv6 outbound connections
         auth: {
             user: emailConfig.user,
             pass: emailConfig.pass
         },
-        connectionTimeout: 5000, // 5 seconds connection timeout
-        greetingTimeout: 5000,   // 5 seconds greeting timeout
-        socketTimeout: 5000      // 5 seconds socket inactivity timeout
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 10000
     });
     console.log(`[SMTP] Nodemailer configured to send as: ${emailConfig.user}`);
 } else {
