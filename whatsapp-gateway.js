@@ -1272,7 +1272,7 @@ app.post('/send', async (req, res) => {
 
     // Clean phone number format
     phone = phone.replace(/\D/g, '');
-    if (phone.length === 10) {
+    if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
         phone = "91" + phone;
     }
 
@@ -1371,7 +1371,7 @@ app.post('/supabase-webhook', async (req, res) => {
     }
 
     phone = phone.replace(/\D/g, '');
-    if (phone.length === 10) {
+    if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
         phone = "91" + phone;
     }
 
@@ -1717,7 +1717,7 @@ async function handleApprovalNotification(record) {
     // 1. Send WhatsApp Approval Alert
     if (phone && connectionStatus === 'ready') {
         let targetPhone = phone.replace(/\D/g, '');
-        if (targetPhone.length === 10) {
+        if (targetPhone.length === 10 && !targetPhone.startsWith('65') && !targetPhone.startsWith('45') && !targetPhone.startsWith('47') && !targetPhone.startsWith('96') && !targetPhone.startsWith('91')) {
             targetPhone = "91" + targetPhone;
         }
         const chatId = `${targetPhone}@c.us`;
@@ -1902,7 +1902,7 @@ const realtimeChannel = dbClientForRealtime
             }
 
             phone = phone.replace(/\D/g, '');
-            if (phone.length === 10) {
+            if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
                 phone = "91" + phone;
             }
 
