@@ -62,12 +62,16 @@ if (!emailConfig.user && fs.existsSync(configPath)) {
 }
 
 let transporter = null;
+const dns = require('dns');
 if (emailConfig.user && emailConfig.pass) {
     transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
         family: 4, // Force IPv4 — Hugging Face Spaces block IPv6 outbound connections
+        lookup: (hostname, options, callback) => {
+            return dns.lookup(hostname, { family: 4 }, callback);
+        },
         auth: {
             user: emailConfig.user,
             pass: emailConfig.pass
