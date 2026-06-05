@@ -53,7 +53,7 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
 
   // Format phone number nicely (e.g., +91 99837 21179)
   let targetPhone = phone ? phone.replace(/\D/g, '') : '';
-  if (targetPhone.length === 10 && !targetPhone.startsWith('65')) {
+  if (targetPhone.length === 10 && !targetPhone.startsWith('65') && !targetPhone.startsWith('45') && !targetPhone.startsWith('47') && !targetPhone.startsWith('96') && !targetPhone.startsWith('91')) {
     targetPhone = "91" + targetPhone;
   }
   const formattedPhone = (targetPhone.startsWith('91') && targetPhone.length === 12) 
