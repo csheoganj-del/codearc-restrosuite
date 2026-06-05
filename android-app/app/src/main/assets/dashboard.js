@@ -2145,8 +2145,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const guestToggleBtn = document.getElementById('guest-toggle-btn');
       if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
       if (guestToggleBtn) {
-        guestToggleBtn.style.background = 'rgba(255, 134, 22, 0.05)';
-        guestToggleBtn.style.borderColor = 'rgba(255, 134, 22, 0.2)';
+        guestToggleBtn.style.background = 'rgba(252, 128, 25, 0.05)';
+        guestToggleBtn.style.borderColor = 'rgba(252, 128, 25, 0.2)';
       }
     }
 
@@ -2182,7 +2182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
         if (guestToggleBtn) {
           guestToggleBtn.style.background = 'var(--bg-cream-light)';
-          guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
+          guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
         }
       }
 
@@ -2929,7 +2929,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
       if (guestToggleBtn) {
         guestToggleBtn.style.background = 'var(--bg-cream-light)';
-        guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
+        guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
       }
     }
     
@@ -3853,7 +3853,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <span><i class="fa-solid fa-boxes-stacked"></i> View Batches (${ingredientBatchesList.filter(b => b.qty > 0).length})</span>
           <i class="fa-solid fa-chevron-down"></i>
         </div>
-        <div class="batches-dropdown-content" style="display: none; padding: 8px 0; border-top: 1px dashed rgba(43,24,19,0.08); margin-top: 6px;">
+        <div class="batches-dropdown-content" style="display: none; padding: 8px 0; border-top: 1px dashed rgba(28, 28, 28,0.08); margin-top: 6px;">
           ${ingredientBatchesList.map((b, idx) => {
             if (b.qty <= 0) return '';
             const exp = new Date(b.expiryDate);
@@ -3881,7 +3881,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="inventory-card-actions" style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:12px;">
           <label style="font-size: 10px; font-weight:700; color:var(--text-muted); display:flex; align-items:center; gap:4px; margin:0;">
             Warn: 
-            <input type="number" class="threshold-input" data-key="${key}" value="${itemThreshold}" min="0" max="100" style="width: 45px; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); background: transparent; color: var(--primary-brand); text-align: center; font-size:10px; font-weight:700; outline:none;">
+            <input type="number" class="threshold-input" data-key="${key}" value="${itemThreshold}" min="0" max="100" style="width: 45px; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); background: transparent; color: var(--primary-brand); text-align: center; font-size:10px; font-weight:700; outline:none;">
             %
           </label>
           <button class="btn btn-secondary quick-refill-btn" data-key="${key}" style="padding:4px 10px; font-size:10px;"><i class="fa-solid fa-plus"></i> Refill</button>
@@ -3981,7 +3981,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         b.classList.remove('active');
         b.style.background = 'white';
         b.style.color = 'var(--primary-brand)';
-        b.style.borderColor = 'rgba(43,24,19,0.15)';
+        b.style.borderColor = 'rgba(28, 28, 28,0.15)';
       });
       btn.classList.add('active');
       btn.style.background = 'var(--accent-caramel)';
@@ -4428,9 +4428,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             </linearGradient>
           </defs>
           <!-- Grid lines -->
-          <line x1="30" y1="30" x2="${width-30}" y2="30" stroke="rgba(43,24,19,0.03)" stroke-width="1"/>
-          <line x1="30" y1="90" x2="${width-30}" y2="90" stroke="rgba(43,24,19,0.03)" stroke-width="1"/>
-          <line x1="30" y1="${height-30}" x2="${width-30}" y2="${height-30}" stroke="rgba(43,24,19,0.08)" stroke-width="1.5"/>
+          <line x1="30" y1="30" x2="${width-30}" y2="30" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
+          <line x1="30" y1="90" x2="${width-30}" y2="90" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
+          <line x1="30" y1="${height-30}" x2="${width-30}" y2="${height-30}" stroke="rgba(28, 28, 28,0.08)" stroke-width="1.5"/>
           
           <!-- Area Underlay -->
           <path d="${areaD}" fill="url(#chartAreaGrad)" />
@@ -4487,7 +4487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           item.style.display = 'flex';
           item.style.justifyContent = 'space-between';
           item.style.padding = '8px 0';
-          item.style.borderBottom = '1px solid rgba(43,24,19,0.03)';
+          item.style.borderBottom = '1px solid rgba(28, 28, 28,0.03)';
           item.innerHTML = `
             <div style="display:flex; flex-direction:column;">
               <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${bill.customerName || 'Walk-in'} (${bill.orderId || '-'})</span>
@@ -4537,7 +4537,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span><i class="fa-solid fa-store" style="color:var(--success-color);"></i> Direct Store Sales (100% Retained)</span>
               <strong>₹${directGross.toFixed(2)}</strong>
             </div>
-            <div style="width: 100%; height: 8px; background: rgba(43,24,19,0.05); border-radius: 4px; overflow: hidden;">
+            <div style="width: 100%; height: 8px; background: rgba(28, 28, 28,0.05); border-radius: 4px; overflow: hidden;">
               <div style="width: ${directPct}%; height: 100%; background: var(--success-color); border-radius: 4px; transition: width 0.5s ease;"></div>
             </div>
           </div>
@@ -4548,7 +4548,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span><i class="fa-solid fa-cloud" style="color:var(--accent-caramel);"></i> Online Aggregator Gross (Zomato/Swiggy)</span>
               <strong>₹${onlineGross.toFixed(2)}</strong>
             </div>
-            <div style="width: 100%; height: 8px; background: rgba(43,24,19,0.05); border-radius: 4px; overflow: hidden;">
+            <div style="width: 100%; height: 8px; background: rgba(28, 28, 28,0.05); border-radius: 4px; overflow: hidden;">
               <div style="width: ${onlinePct}%; height: 100%; background: var(--accent-caramel); border-radius: 4px; transition: width 0.5s ease;"></div>
             </div>
           </div>
@@ -4695,9 +4695,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           <title>Doppio Cafe - Stock & Inventory Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FF8616; padding-bottom: 15px; margin-bottom: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
             .logo { font-size: 24px; font-weight: bold; color: #1F1F1F; }
-            .logo span { color: #FF8616; }
+            .logo span { color: #FC8019; }
             .title { font-size: 18px; margin: 0; color: #1F1F1F; }
             .meta { font-size: 12px; color: #666; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -5049,14 +5049,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           <title>Doppio Cafe - Sales & Revenue Audit Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FF8616; padding-bottom: 15px; margin-bottom: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
             .logo { font-size: 24px; font-weight: bold; color: #1F1F1F; }
-            .logo span { color: #FF8616; }
+            .logo span { color: #FC8019; }
             .title { font-size: 18px; margin: 0; color: #1F1F1F; }
             .meta { font-size: 12px; color: #666; }
             
             .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
-            .kpi-card { background: #fdfbf7; border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 8px; padding: 12px; text-align: center; }
+            .kpi-card { background: #fdfbf7; border: 1px solid rgba(252, 128, 25, 0.2); border-radius: 8px; padding: 12px; text-align: center; }
             .kpi-card h3 { margin: 0; font-size: 12px; color: #666; text-transform: uppercase; }
             .kpi-card p { margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #1F1F1F; }
             
@@ -5075,7 +5075,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
             <div style="text-align: right;">
               <h2 class="title">Sales & Revenue Audit Report</h2>
-              <p class="meta" style="font-weight:bold; color: #FF8616;">` + rangeStr + `</p>
+              <p class="meta" style="font-weight:bold; color: #FC8019;">` + rangeStr + `</p>
               <p class="meta">Generated: ` + new Date().toLocaleString('en-IN') + `</p>
             </div>
           </div>
@@ -5092,9 +5092,9 @@ document.addEventListener('DOMContentLoaded', async () => {
               <h3>GST Tax Collected</h3>
               <p>₹` + totalGST + `</p>
             </div>
-            <div class="kpi-card" style="background:#f7f0e8; border-color:#FF8616;">
+            <div class="kpi-card" style="background:#f7f0e8; border-color:#FC8019;">
               <h3>Net Sales Revenue</h3>
-              <p style="color:#FF8616; font-size: 20px;">₹` + totalRevenue + `</p>
+              <p style="color:#FC8019; font-size: 20px;">₹` + totalRevenue + `</p>
             </div>
           </div>
           <div class="kpis" style="grid-template-columns: repeat(3, 1fr); margin-top: 0; margin-bottom: 20px;">
@@ -5242,10 +5242,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     row.innerHTML = `
-      <select class="recipe-ing-select" required style="flex:2; padding:6px; border-radius:6px; border:1px solid rgba(43,24,19,0.15); font-size:12px; background:white; color:var(--primary-brand);">
+      <select class="recipe-ing-select" required style="flex:2; padding:6px; border-radius:6px; border:1px solid rgba(28, 28, 28,0.15); font-size:12px; background:white; color:var(--primary-brand);">
         ${optionsHTML}
       </select>
-      <input type="number" class="recipe-ing-qty" placeholder="Qty" value="${qtyValue}" required min="0.1" step="any" style="width:70px; padding:6px; border-radius:6px; border:1px solid rgba(43,24,19,0.15); text-align:center; font-size:12px; background:white; color:var(--primary-brand); font-weight:700;">
+      <input type="number" class="recipe-ing-qty" placeholder="Qty" value="${qtyValue}" required min="0.1" step="any" style="width:70px; padding:6px; border-radius:6px; border:1px solid rgba(28, 28, 28,0.15); text-align:center; font-size:12px; background:white; color:var(--primary-brand); font-weight:700;">
       <span class="unit-lbl" style="font-size:11px; font-weight:600; color:var(--text-muted); width:30px; text-align:center;">g</span>
       <button type="button" class="remove-ing-row-btn" style="background:transparent; border:none; color:var(--danger-color); font-size:16px; cursor:pointer; padding:0 4px;"><i class="fa-solid fa-circle-minus"></i></button>
     `;
@@ -5561,7 +5561,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const item = document.createElement('div');
       item.className = 'crm-suggestion-item';
       item.style.padding = '8px 12px';
-      item.style.borderBottom = '1px solid rgba(43,24,19,0.05)';
+      item.style.borderBottom = '1px solid rgba(28, 28, 28,0.05)';
       item.style.cursor = 'pointer';
       item.style.fontSize = '11px';
       item.style.transition = 'background 0.15s ease';
@@ -5571,7 +5571,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
 
       item.addEventListener('mouseover', () => {
-        item.style.background = 'rgba(255, 134, 22, 0.06)';
+        item.style.background = 'rgba(252, 128, 25, 0.06)';
       });
       item.addEventListener('mouseout', () => {
         item.style.background = 'none';
@@ -5622,13 +5622,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (takeawayFields.style.display === 'none') {
         takeawayFields.style.display = 'block';
         if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
-        guestToggleBtn.style.background = 'rgba(255, 134, 22, 0.05)';
-        guestToggleBtn.style.borderColor = 'rgba(255, 134, 22, 0.2)';
+        guestToggleBtn.style.background = 'rgba(252, 128, 25, 0.05)';
+        guestToggleBtn.style.borderColor = 'rgba(252, 128, 25, 0.2)';
       } else {
         takeawayFields.style.display = 'none';
         if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
         guestToggleBtn.style.background = 'var(--bg-cream-light)';
-        guestToggleBtn.style.borderColor = 'rgba(43,24,19,0.06)';
+        guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
       }
     });
   }
@@ -6386,6 +6386,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         }
       }
     }
+    document.body.style.opacity = '1';
   }
 
   // ==========================================
@@ -7850,11 +7851,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       card.className = 'mobile-bill-card';
       card.style.cssText = `
         background: var(--bg-white);
-        border: 1px solid rgba(43,24,19,0.08);
+        border: 1px solid rgba(28, 28, 28,0.08);
         border-radius: 14px;
         padding: 14px 16px;
         margin-bottom: 10px;
-        box-shadow: 0 2px 8px rgba(43,24,19,0.06);
+        box-shadow: 0 2px 8px rgba(28, 28, 28,0.06);
       `;
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -7877,13 +7878,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           ${bill.items.map(i => `${i.name} ×${i.qty}`).join(', ').substring(0, 80)}${bill.items.length > 3 ? '...' : ''}
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="table-action-btn print" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(43,24,19,0.12); background:var(--bg-cream-light); color:var(--primary-brand); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+          <button class="table-action-btn print" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(28, 28, 28,0.12); background:var(--bg-cream-light); color:var(--primary-brand); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-solid fa-print"></i> Print
           </button>
           <button class="table-action-btn whatsapp" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(37,211,102,0.25); background:rgba(37,211,102,0.06); color:#25D366; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-brands fa-whatsapp"></i> Share
           </button>
-          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(255,134,22,0.3); background:rgba(255,134,22,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(252, 128, 25,0.3); background:rgba(252, 128, 25,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-solid fa-pen-to-square"></i> Edit
           </button>
           <button class="table-action-btn delete" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(231,76,60,0.2); background:rgba(231,76,60,0.06); color:var(--danger-color); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
@@ -8160,7 +8161,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     draftOrders.forEach(d => {
       const draftCard = document.createElement('div');
       draftCard.className = 'draft-card';
-      draftCard.style.cssText = 'border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 10px; padding: 12px; background: #fff; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; margin-bottom: 8px;';
+      draftCard.style.cssText = 'border: 1px solid rgba(252, 128, 25, 0.2); border-radius: 10px; padding: 12px; background: #fff; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; margin-bottom: 8px;';
       
       const itemCount = d.items.reduce((sum, i) => sum + i.qty, 0);
       const timeStr = new Date(d.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -9935,8 +9936,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const item = document.createElement('div');
       item.style.marginBottom = '6px';
       
-      const itemBg = n.isRead ? 'transparent' : 'rgba(255, 134, 22, 0.04)';
-      const itemBorder = n.isRead ? 'rgba(43,24,19,0.05)' : 'rgba(255, 134, 22, 0.15)';
+      const itemBg = n.isRead ? 'transparent' : 'rgba(252, 128, 25, 0.04)';
+      const itemBorder = n.isRead ? 'rgba(28, 28, 28,0.05)' : 'rgba(252, 128, 25, 0.15)';
       
       let iconHtml = '<i class="fa-solid fa-circle-info"></i>';
       if (n.type === 'order') iconHtml = '<i class="fa-solid fa-qrcode"></i>';
@@ -10973,14 +10974,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       excelDropzone.style.borderColor = 'var(--accent-caramel)';
     });
     excelDropzone.addEventListener('dragleave', () => {
-      excelDropzone.style.borderColor = 'rgba(255, 134, 22, 0.25)';
-      excelDropzone.style.background = 'rgba(255, 134, 22, 0.01)';
+      excelDropzone.style.borderColor = 'rgba(252, 128, 25, 0.25)';
+      excelDropzone.style.background = 'rgba(252, 128, 25, 0.01)';
     });
 
     excelDropzone.addEventListener('drop', (e) => {
       e.preventDefault();
-      excelDropzone.style.borderColor = 'rgba(255, 134, 22, 0.25)';
-      excelDropzone.style.background = 'rgba(255, 134, 22, 0.01)';
+      excelDropzone.style.borderColor = 'rgba(252, 128, 25, 0.25)';
+      excelDropzone.style.background = 'rgba(252, 128, 25, 0.01)';
       
       if (e.dataTransfer.files.length > 0) {
         excelFileInput.files = e.dataTransfer.files;
@@ -11183,7 +11184,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     
     if (cookingOrders.length === 0) {
       kdsGrid.innerHTML = `
-        <div class="premium-empty-state" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; width:100%; box-sizing: border-box; background: var(--white); border-radius: var(--border-radius-md); border: 1px solid rgba(43,24,19,0.05);">
+        <div class="premium-empty-state" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; width:100%; box-sizing: border-box; background: var(--white); border-radius: var(--border-radius-md); border: 1px solid rgba(28, 28, 28,0.05);">
           <i class="fa-solid fa-fire-burner" style="font-size: 36px; color: var(--accent-caramel); opacity: 0.5; margin-bottom: 16px;"></i>
           <h3 style="margin-bottom: 8px; color: var(--primary-brand); font-family: var(--font-heading);">Kitchen is Clear</h3>
           <p style="font-size: 11px; color: var(--text-muted); max-width: 300px; margin: 0 auto; line-height: 1.4;">All orders have been prepared and bumped. High five! 🙌</p>
@@ -11514,7 +11515,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         itemEl.style.justifyContent = 'space-between';
         itemEl.style.fontSize = '11px';
         itemEl.style.padding = '4px 0';
-        itemEl.style.borderBottom = '1px dashed rgba(43,24,19,0.05)';
+        itemEl.style.borderBottom = '1px dashed rgba(28, 28, 28,0.05)';
         itemEl.innerHTML = `
           <span>${item.name} x${item.qty}</span>
           <span style="font-weight:700;">₹${item.price * item.qty}</span>
@@ -11733,7 +11734,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           ? `<span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#2ecc71; margin-right:6px; animation: pulse 1.5s infinite;"></span>`
           : '';
         return `
-          <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 35px; color: var(--text-dark);">
+          <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 35px; color: var(--text-dark);">
             <td style="padding: 8px; font-weight:700; display:flex; align-items:center;">${statusDot}${emp.name}</td>
             <td style="padding: 8px;">${(emp.role || '').toUpperCase()}</td>
             <td style="padding: 8px;">${emp.shift || ''}</td>
@@ -11759,7 +11760,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     
     if (shiftRosterList) {
       shiftRosterList.innerHTML = validEmployees.map(emp => `
-        <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 35px; color: var(--text-dark);">
+        <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 35px; color: var(--text-dark);">
           <td style="padding: 6px; font-weight:700;">${emp.name}</td>
           <td style="padding: 6px;">${emp.shift || ''}</td>
           <td style="padding: 6px;">
@@ -11806,7 +11807,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           const item = document.createElement('div');
           item.style.marginBottom = '6px';
           item.innerHTML = `
-            <div style="background: rgba(43,24,19,0.02); border: 1px solid rgba(43,24,19,0.05); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 10.5px;">
+            <div style="background: rgba(28, 28, 28,0.02); border: 1px solid rgba(28, 28, 28,0.05); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 10.5px;">
               <div style="display:flex; justify-content:space-between; font-weight:700;">
                 <span>${req.employeeName || ''} (${req.type || ''})</span>
                 <span style="color:var(--accent-caramel);">${req.days || 0} days</span>
@@ -11883,10 +11884,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         if (log.status === 'Active') {
           statusBadge = `<span style="background-color: #2ecc71; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 9px; animation: pulse 1.5s infinite;"><i class="fa-solid fa-spinner fa-spin"></i> Clocked In</span>`;
         } else {
-          statusBadge = `<span style="background-color: rgba(43,24,19,0.06); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9px;">Completed</span>`;
+          statusBadge = `<span style="background-color: rgba(28, 28, 28,0.06); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9px;">Completed</span>`;
         }
         return `
-          <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 32px; color: var(--text-dark);">
+          <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px; color: var(--text-dark);">
             <td style="padding: 6px; font-weight:700;">${log.employeeName}</td>
             <td style="padding: 6px;">${log.date}</td>
             <td style="padding: 6px;">${log.clockInTime}</td>
@@ -12037,7 +12038,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           <span>Special Allowance</span>
           <strong>₹${allowance.toFixed(0)}</strong>
         </div>
-        <div style="display:flex; justify-content:space-between; margin-bottom: 4px; border-top:1px dashed rgba(43,24,19,0.1); padding-top:4px; font-weight:700; color:var(--text-dark);">
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px; border-top:1px dashed rgba(28, 28, 28,0.1); padding-top:4px; font-weight:700; color:var(--text-dark);">
           <span>Gross Earnings</span>
           <strong>₹${gross.toFixed(0)}</strong>
         </div>
@@ -12149,7 +12150,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           
           <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 15px;">
             <thead>
-              <tr style="background: rgba(43,24,19,0.05); font-weight:700;">
+              <tr style="background: rgba(28, 28, 28,0.05); font-weight:700;">
                 <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Earnings</th>
                 <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Amount (₹)</th>
                 <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Deductions</th>
@@ -12175,7 +12176,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
                 <td style="padding: 6px; border: 1px solid #ddd;">Income Tax (Estimated TDS)</td>
                 <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${tds.toFixed(0)}</td>
               </tr>
-              <tr style="font-weight: 700; background: rgba(43,24,19,0.02);">
+              <tr style="font-weight: 700; background: rgba(28, 28, 28,0.02);">
                 <td style="padding: 6px; border: 1px solid #ddd;">Total Earnings (Gross)</td>
                 <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${gross.toFixed(0)}</td>
                 <td style="padding: 6px; border: 1px solid #ddd;">Total Deductions</td>
@@ -12390,7 +12391,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   async function renderSuperAdminTab() {
     const listContainer = document.getElementById('saas-tenants-list');
     if (!listContainer) return;
-    listContainer.innerHTML = '<div style="padding: 32px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(43,24,19,0.05);"><i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #C67C4E;"></i> Loading client workspace registry...</div>';
+    listContainer.innerHTML = '<div style="padding: 32px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);"><i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #FC8019;"></i> Loading client workspace registry...</div>';
 
     const { data: tenants, error } = await supabaseClient
       .from('saas_tenants')
@@ -12403,7 +12404,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     }
 
     if (!tenants || tenants.length === 0) {
-      listContainer.innerHTML = '<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(43,24,19,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No registered client food outlets found.</div></div>';
+      listContainer.innerHTML = '<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No registered client food outlets found.</div></div>';
       return;
     }
 
@@ -12430,15 +12431,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           : 'background: rgba(245, 158, 11, 0.1); color: #F59E0B;';
 
       return `
-        <div class="tenant-workspace-card" style="display: flex; align-items: center; padding: 16px; background: #FFFFFF; border: 1px solid rgba(43,24,19,0.05); border-radius: 12px; gap: 16px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #2B2B2B; font-family: var(--font-body);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(43,24,19,0.05)'; this.style.borderColor='rgba(198,124,78,0.2)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'; this.style.borderColor='rgba(43,24,19,0.05)';">
+        <div class="tenant-workspace-card" style="display: flex; align-items: center; padding: 16px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.05); border-radius: 12px; gap: 16px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #2B2B2B; font-family: var(--font-body);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(28, 28, 28,0.05)'; this.style.borderColor='rgba(252, 128, 25,0.2)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'; this.style.borderColor='rgba(28, 28, 28,0.05)';">
           <!-- Selection Checkbox -->
           <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <input type="checkbox" class="tenant-select-checkbox" data-id="${t.id}" style="cursor: pointer; width: 15px; height: 15px; accent-color: #C67C4E;">
+            <input type="checkbox" class="tenant-select-checkbox" data-id="${t.id}" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
           </div>
           
           <!-- Name & Avatar -->
           <div style="flex: 2.5; min-width: 200px; display: flex; align-items: center; gap: 12px; overflow: hidden;">
-            <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(198, 124, 78, 0.1); color: #C67C4E; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; text-transform: uppercase;">
+            <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(252, 128, 25, 0.1); color: #FC8019; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; text-transform: uppercase;">
               ${(t.name || 'U').substring(0, 2)}
             </div>
             <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
@@ -12449,7 +12450,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
           <!-- Outlet Type / Category Pill -->
           <div style="flex: 1; min-width: 100px; display: flex; align-items: center;">
-            <span style="font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: rgba(198, 124, 78, 0.08); color: #C67C4E; text-transform: uppercase; letter-spacing: 0.5px;">
+            <span style="font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: rgba(252, 128, 25, 0.08); color: #FC8019; text-transform: uppercase; letter-spacing: 0.5px;">
               ${outletLabel}
             </span>
           </div>
@@ -12482,7 +12483,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
           <!-- Actions -->
           <div style="flex: 1.5; min-width: 150px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0;">
-            <button class="btn manage-tenant-btn" data-id="${t.id}" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; background: #F6F3EE; border: 1px solid rgba(43,24,19,0.08); color: #2B2B2B; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='#2B2B2B'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#F6F3EE'; this.style.color='#2B2B2B';">
+            <button class="btn manage-tenant-btn" data-id="${t.id}" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.08); color: #2B2B2B; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='#2B2B2B'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#FFFFFF'; this.style.color='#2B2B2B';">
               <i class="fa-solid fa-gear" style="font-size: 10px;"></i> Manage
             </button>
             <button class="btn delete-single-tenant-btn" data-id="${t.id}" data-name="${t.name}" style="padding: 6px; width: 28px; height: 28px; font-size: 11px; border-radius: 8px; background: rgba(239, 68, 68, 0.05); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.15); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#FFFFFF';" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#ef4444';">

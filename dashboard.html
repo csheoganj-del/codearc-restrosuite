@@ -20,11 +20,11 @@
       <div style="font-size: 10px; color: var(--accent-caramel); text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
       
       <!-- Security Icon -->
-      <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(255, 134, 22, 0.1); border: 2px solid var(--accent-caramel); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+      <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(252, 128, 25, 0.1); border: 2px solid var(--accent-caramel); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
         <i class="fa-solid fa-lock" style="font-size: 26px; color: var(--accent-caramel);"></i>
       </div>
       
-      <p style="font-family: 'Inter', sans-serif; font-size: 13px; color: #F8F6F3; margin-bottom: 15px; font-weight: 500;">Enter Passcode to Unlock Terminal</p>
+      <p style="font-family: 'Inter', sans-serif; font-size: 13px; color: #F8F9FA; margin-bottom: 15px; font-weight: 500;">Enter Passcode to Unlock Terminal</p>
       
       <!-- Passcode Input -->
       <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-bottom: 20px;">
@@ -67,7 +67,7 @@
       </div>
 
       <!-- Mobile Theme Toggle -->
-      <div id="mobile-theme-toggle-btn" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-cream-light); border: 1px solid rgba(43, 24, 19, 0.05); cursor: pointer;" title="Toggle Night Mode">
+      <div id="mobile-theme-toggle-btn" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-cream-light); border: 1px solid rgba(28, 28, 28, 0.05); cursor: pointer;" title="Toggle Night Mode">
         <i class="fa-solid fa-moon" style="font-size: 13px; color: var(--primary-brand);"></i>
       </div>
 
@@ -111,7 +111,7 @@
       </div>
 
       <nav class="sidebar-menu">
-        <a href="#" class="sidebar-link active" data-tab="pos-tab"><i class="fa-solid fa-mug-hot"></i> Takeaway POS</a>
+        <a href="#" class="sidebar-link" data-tab="pos-tab"><i class="fa-solid fa-mug-hot"></i> Takeaway POS</a>
         <a href="#" class="sidebar-link" data-tab="qr-orders-tab" id="sidebar-qr-link">
           <i class="fa-solid fa-qrcode"></i> Live Table Orders
           <span class="live-qr-badge" id="live-qr-badge" style="display:none; background:#e74c3c; color:white; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px; margin-left:6px; animation: pulse 1.5s infinite;">0</span>
@@ -133,7 +133,7 @@
         <a href="#" class="sidebar-link" data-tab="crm-tab"><i class="fa-solid fa-users-rectangle"></i> CRM & Loyalty</a>
         <a href="#" class="sidebar-link" data-tab="tax-tab" id="sidebar-tax-link"><i class="fa-solid fa-calculator"></i> Tax Management</a>
         <a href="#" class="sidebar-link" data-tab="employees-tab" id="sidebar-employees-link"><i class="fa-solid fa-users"></i> Employee Ledger</a>
-        <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none; background: rgba(255, 134, 22, 0.08); color: var(--accent-caramel); font-weight: 600;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
+        <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none; background: rgba(252, 128, 25, 0.08); color: var(--accent-caramel); font-weight: 600;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
       </nav>
 
       <div class="sidebar-footer">
@@ -183,8 +183,8 @@
             <span class="bell-badge" id="bell-badge" style="display: none; padding: 1px 4px; font-size: 8.5px; font-weight: 800; border-radius: 10px; color: white; background: var(--danger-color); position: absolute; top: -4px; right: -4px; min-width: 14px; height: 14px; text-align: center; line-height: 12px; box-sizing: border-box;">0</span>
             
             <!-- Global Dropdown Panel -->
-            <div id="notifications-dropdown-panel" style="display: none; position: absolute; top: 45px; right: 0; width: 340px; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(15px); border: 1px solid rgba(43,24,19,0.08); border-radius: var(--border-radius-md); box-shadow: var(--shadow-lg); z-index: 10000; padding: 16px; flex-direction: column; gap: 10px; box-sizing: border-box; text-align: left;">
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(43,24,19,0.1); padding-bottom: 10px; margin-bottom: 6px;">
+            <div id="notifications-dropdown-panel" style="display: none; position: absolute; top: 45px; right: 0; width: 340px; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(15px); border: 1px solid rgba(28, 28, 28,0.08); border-radius: var(--border-radius-md); box-shadow: var(--shadow-lg); z-index: 10000; padding: 16px; flex-direction: column; gap: 10px; box-sizing: border-box; text-align: left;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(28, 28, 28,0.1); padding-bottom: 10px; margin-bottom: 6px;">
                 <h4 style="font-size: 13px; font-weight: 700; color: var(--primary-brand); margin: 0; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-bell"></i> Notifications Alerts</h4>
                 <button type="button" id="clear-notifications-btn" style="background: transparent; border: none; color: var(--accent-caramel); font-size: 10px; font-weight: 700; cursor: pointer; padding: 4px;">Mark all read</button>
               </div>
@@ -199,7 +199,7 @@
             <span class="status-text" id="supabase-sync-text">Live</span>
           </div>
           <!-- Theme Toggle Desktop -->
-          <div class="theme-toggle-btn" id="theme-toggle-btn" title="Toggle Night Mode" style="cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-cream-light); border: 1px solid rgba(43, 24, 19, 0.05); transition: var(--transition);">
+          <div class="theme-toggle-btn" id="theme-toggle-btn" title="Toggle Night Mode" style="cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-cream-light); border: 1px solid rgba(28, 28, 28, 0.05); transition: var(--transition);">
             <i class="fa-solid fa-moon" style="font-size: 14px; color: var(--primary-brand);"></i>
           </div>
 
@@ -222,10 +222,10 @@
       <div class="workspace-area">
 
         <!-- TAB 1: TAKEAWAY POS (DEFAULT TAB) -->
-        <div class="tab-content active" id="pos-tab">
+        <div class="tab-content" id="pos-tab">
           <!-- Shift Closed POS Lock Overlay -->
           <div id="shift-lock-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); z-index: 50; align-items: center; justify-content: center; border-radius: var(--border-radius-lg); flex-direction: column; gap: 16px; text-align: center; padding: 20px;">
-            <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(255, 134, 22, 0.05); border: 2px dashed var(--accent-caramel); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(252, 128, 25, 0.05); border: 2px dashed var(--accent-caramel); display: flex; align-items: center; justify-content: center;">
               <i class="fa-solid fa-cash-register" style="font-size: 32px; color: var(--accent-caramel);"></i>
             </div>
             <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 20px; font-weight: 700;">Terminal Shift Session Closed</h2>
@@ -287,11 +287,11 @@
                 <div class="cart-header-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                   <div style="display:flex; align-items:baseline; gap:8px;">
                     <h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--primary-brand);">Takeaway Cart</h2>
-                    <span style="font-size: 10px; font-weight: 700; color: var(--accent-caramel); background: rgba(255, 134, 22, 0.06); border: 1px solid rgba(255, 134, 22, 0.12); padding: 2px 6px; border-radius: 12px;" id="cart-order-badge">Order: DO-1001</span>
+                    <span style="font-size: 10px; font-weight: 700; color: var(--accent-caramel); background: rgba(252, 128, 25, 0.06); border: 1px solid rgba(252, 128, 25, 0.12); padding: 2px 6px; border-radius: 12px;" id="cart-order-badge">Order: DO-1001</span>
                   </div>
                   <div style="display:flex; align-items:center; gap:8px;">
                     <button class="clear-cart-btn" id="clear-cart" style="background:transparent; border:none; color:var(--danger-color); cursor:pointer; font-size:12px; transition:var(--transition); padding:6px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(231,76,60,0.06);" title="Clear Cart"><i class="fa-solid fa-trash-can"></i></button>
-                    <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none; background:rgba(43,24,19,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
+                    <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none; background:rgba(28, 28, 28,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
                   </div>
                 </div>
               </div>
@@ -304,13 +304,13 @@
               </div>
 
               <!-- Guest Info Toggle Banner -->
-              <div class="guest-toggle-btn" id="guest-toggle-btn" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-cream-light); border:1px solid rgba(43,24,19,0.05); padding:6px 12px; border-radius:8px; margin-bottom:10px; font-size:11px; font-weight:700; color:var(--primary-brand); cursor:pointer; transition:all 0.2s ease;">
+              <div class="guest-toggle-btn" id="guest-toggle-btn" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-cream-light); border:1px solid rgba(28, 28, 28,0.05); padding:6px 12px; border-radius:8px; margin-bottom:10px; font-size:11px; font-weight:700; color:var(--primary-brand); cursor:pointer; transition:all 0.2s ease;">
                 <span><i class="fa-solid fa-user-tag" style="color:var(--accent-caramel); margin-right:5px;"></i> Customer Details</span>
                 <span id="guest-toggle-indicator" style="font-size:10px; color:var(--text-muted); font-weight: 500;"><i class="fa-solid fa-chevron-down"></i> Add Info</span>
               </div>
 
               <!-- Takeaway Customer Fields (Collapsible) -->
-              <div class="takeaway-fields" style="background: rgba(43,24,19,0.02); border: 1px dashed rgba(43,24,19,0.08); padding: 10px; border-radius: 8px; margin-bottom: 10px; display: none; position: relative;">
+              <div class="takeaway-fields" style="background: rgba(28, 28, 28,0.02); border: 1px dashed rgba(28, 28, 28,0.08); padding: 10px; border-radius: 8px; margin-bottom: 10px; display: none; position: relative;">
                 <div class="form-group" style="margin-bottom: 8px;">
                   <label for="cust-name" style="font-size: 10px; text-transform: uppercase; font-weight: 800; color: var(--text-muted); margin-bottom: 4px; display: block;">Customer Name</label>
                   <input type="text" id="cust-name" placeholder="Enter guest name..." style="padding: 6px 10px; font-size: 12px; border-radius: 6px;" autocomplete="off">
@@ -320,11 +320,11 @@
                   <input type="text" id="cust-phone" placeholder="Enter 10 digit number..." style="padding: 6px 10px; font-size: 12px; border-radius: 6px;" autocomplete="off">
                 </div>
                 <!-- Dynamic CRM Loyalty Suggestions Dropdown -->
-                <div id="crm-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid rgba(43,24,19,0.15); border-radius: 0 0 8px 8px; z-index: 10000; max-height: 180px; overflow-y: auto; box-shadow: 0 8px 16px rgba(43,24,19,0.12); margin-top: 2px;"></div>
+                <div id="crm-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid rgba(28, 28, 28,0.15); border-radius: 0 0 8px 8px; z-index: 10000; max-height: 180px; overflow-y: auto; box-shadow: 0 8px 16px rgba(28, 28, 28,0.12); margin-top: 2px;"></div>
               </div>
 
               <!-- Loyalty Status Box (Hidden Permanently as suggestions are used instead) -->
-              <div class="loyalty-status-box" id="loyalty-status-box" style="display: none !important; padding: 10px 12px; background: rgba(255, 134, 22, 0.06); border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 8px; font-size: 11px; margin-bottom: 12px; color: var(--primary-brand); line-height: 1.4;">
+              <div class="loyalty-status-box" id="loyalty-status-box" style="display: none !important; padding: 10px 12px; background: rgba(252, 128, 25, 0.06); border: 1px solid rgba(252, 128, 25, 0.2); border-radius: 8px; font-size: 11px; margin-bottom: 12px; color: var(--primary-brand); line-height: 1.4;">
                 <!-- Filled dynamically -->
               </div>
 
@@ -334,7 +334,7 @@
               </div>
 
               <!-- Editing Bill Banner -->
-              <div id="editing-bill-banner" style="display: none; align-items: center; justify-content: space-between; background: rgba(255, 134, 22, 0.06); border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12px; font-weight: 700; color: var(--primary-brand); animation: fadeInDown 0.3s ease-out;">
+              <div id="editing-bill-banner" style="display: none; align-items: center; justify-content: space-between; background: rgba(252, 128, 25, 0.06); border: 1px solid rgba(252, 128, 25, 0.2); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12px; font-weight: 700; color: var(--primary-brand); animation: fadeInDown 0.3s ease-out;">
                 <span style="display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-pen-to-square" style="color:var(--accent-caramel);"></i> Editing Bill <strong id="editing-bill-id-display">DO-1005</strong></span>
                 <button type="button" id="cancel-edit-bill-btn" style="background: var(--danger-color, #e74c3c); color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: opacity 0.2s ease;">Cancel</button>
               </div>
@@ -408,7 +408,7 @@
                       <input type="number" id="split-pay-card" value="0" min="0" placeholder="0">
                     </div>
                     
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; border-top: 1px dashed rgba(43,24,19,0.12); padding-top: 8px; font-size: 11px; font-weight: 700;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; border-top: 1px dashed rgba(28, 28, 28,0.12); padding-top: 8px; font-size: 11px; font-weight: 700;">
                       <span id="split-pay-status-label" style="color: var(--text-muted);">Remaining:</span>
                       <span id="split-pay-remaining-val" style="color: var(--danger-color);">₹0.00</span>
                     </div>
@@ -431,7 +431,7 @@
                     <button type="button" id="checkout-save-btn" class="dropdown-action-item" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--primary-brand); border-radius: 8px; cursor: pointer; text-align: left; transition: background 0.15s ease;">
                       <i class="fa-solid fa-floppy-disk" style="color: #2ecc71; width: 16px;"></i> Save Bill (No Print)
                     </button>
-                    <div style="height: 1px; background: rgba(43,24,19,0.06); margin: 2px 6px;"></div>
+                    <div style="height: 1px; background: rgba(28, 28, 28,0.06); margin: 2px 6px;"></div>
                     <button type="button" id="hold-order-btn" class="dropdown-action-item" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--primary-brand); border-radius: 8px; cursor: pointer; text-align: left; transition: background 0.15s ease;">
                       <i class="fa-solid fa-pause" style="color: var(--accent-caramel); width: 16px;"></i> Hold Order
                     </button>
@@ -485,7 +485,7 @@
               
               <!-- Left Column: Visual Tables Map Grid -->
               <div class="report-panel" style="padding: 24px; border-radius: 18px; display: flex; flex-direction: column; gap: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px;">
                   <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin: 0; font-weight: 700;"><i class="fa-solid fa-table-cells"></i> Active Tables Map</h3>
                   <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Dine-in Stations</span>
                 </div>
@@ -498,7 +498,7 @@
 
               <!-- Right Column: Live Pending Orders Queue Feed -->
               <div class="report-panel" style="padding: 24px; border-radius: 18px; display: flex; flex-direction: column; gap: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px;">
                   <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin: 0; font-weight: 700;"><i class="fa-solid fa-bell-concierge"></i> Incoming QR Orders Feed</h3>
                   <span class="badge" id="glowing-qr-feed-badge" style="display: none; background: #e74c3c; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 800; animation: pulse 1.2s infinite;">LIVE FEED</span>
                 </div>
@@ -638,14 +638,14 @@
             <!-- PREMIUM AI & EXCEL ONBOARDING HUB -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; margin-top: 16px;">
               <!-- Drag and Drop Excel Onboarding Wizard -->
-              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(255, 134, 22, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(252, 128, 25, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
                 <h4 style="font-size: 13.5px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading);">
                   <i class="fa-solid fa-file-excel" style="color: #27ae60; font-size: 16px;"></i> Excel Setup Wizard (Instant Menu Import)
                 </h4>
                 <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.4;">
                   Upload your menu items, pricing categories, and ingredient recipes spreadsheet. Reduces restaurant configuration time to under 3 seconds!
                 </p>
-                <div id="excel-drag-dropzone" style="width: 100%; border: 2px dashed rgba(255, 134, 22, 0.25); border-radius: 10px; background: rgba(255, 134, 22, 0.01); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; text-align: center; cursor: pointer; transition: var(--transition); box-sizing: border-box; margin-top: 6px;">
+                <div id="excel-drag-dropzone" style="width: 100%; border: 2px dashed rgba(252, 128, 25, 0.25); border-radius: 10px; background: rgba(252, 128, 25, 0.01); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; text-align: center; cursor: pointer; transition: var(--transition); box-sizing: border-box; margin-top: 6px;">
                   <i class="fa-solid fa-cloud-arrow-up" style="font-size: 32px; color: var(--accent-caramel); margin-bottom: 8px;"></i>
                   <span style="font-size: 12px; font-weight: 700; color: var(--primary-brand);" id="excel-drop-text">Drag & Drop Excel here or Click to Browse</span>
                   <span style="font-size: 9.5px; color: var(--text-muted); margin-top: 4px;">Compatible with .xlsx, .xls, .csv recipe formats</span>
@@ -654,7 +654,7 @@
               </div>
 
               <!-- AI Cost-Control & Forecasting Card -->
-              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(255, 134, 22, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(252, 128, 25, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
                 <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
                   <h4 style="font-size: 13.5px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading);">
                     <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-caramel); font-size: 15px;"></i> AI Smart Inventory Forecast
@@ -667,15 +667,15 @@
                   Analyzes sales velocity dynamically to calculate ingredient depletion rates and prevent costly over-stocking.
                 </p>
                 <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; margin-top: 6px; box-sizing: border-box;">
-                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(43,24,19,0.07); padding-bottom: 6px;">
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(28, 28, 28,0.07); padding-bottom: 6px;">
                     <span style="color: var(--text-dark); font-weight: 500;">Highest Velocity Material:</span>
                     <strong id="ai-top-material" style="color: var(--primary-brand);">Milk (🥛)</strong>
                   </div>
-                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(43,24,19,0.07); padding-bottom: 6px;">
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(28, 28, 28,0.07); padding-bottom: 6px;">
                     <span style="color: var(--text-dark); font-weight: 500;">Daily Burn Speed:</span>
                     <strong id="ai-burn-rate" style="color: var(--primary-brand);">0.00 units / day</strong>
                   </div>
-                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(43,24,19,0.07); padding-bottom: 6px;">
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(28, 28, 28,0.07); padding-bottom: 6px;">
                     <span style="color: var(--text-dark); font-weight: 500;">Estimated Days Remaining:</span>
                     <strong id="ai-critical-days" style="color: var(--danger-color); font-weight: 800;">Waiting for sales...</strong>
                   </div>
@@ -719,9 +719,9 @@
             <!-- Category Navigation Filters -->
             <div class="inventory-filters-tabs" style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
               <button type="button" class="inv-filter-btn active" data-filter="all" style="padding: 6px 16px; border-radius: 20px; border: 1px solid var(--accent-caramel); background: var(--accent-caramel); color: white; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">All Items</button>
-              <button type="button" class="inv-filter-btn" data-filter="low" style="padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(43,24,19,0.15); background: white; color: var(--primary-brand); font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Low Stock</button>
-              <button type="button" class="inv-filter-btn" data-filter="drinks" style="padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(43,24,19,0.15); background: white; color: var(--primary-brand); font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Drinks</button>
-              <button type="button" class="inv-filter-btn" data-filter="food" style="padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(43,24,19,0.15); background: white; color: var(--primary-brand); font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Food Ingredients</button>
+              <button type="button" class="inv-filter-btn" data-filter="low" style="padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(28, 28, 28,0.15); background: white; color: var(--primary-brand); font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Low Stock</button>
+              <button type="button" class="inv-filter-btn" data-filter="drinks" style="padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(28, 28, 28,0.15); background: white; color: var(--primary-brand); font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Drinks</button>
+              <button type="button" class="inv-filter-btn" data-filter="food" style="padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(28, 28, 28,0.15); background: white; color: var(--primary-brand); font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Food Ingredients</button>
             </div>
 
             <!-- Stock bar grid -->
@@ -852,7 +852,7 @@
             
           <!-- Detailed P&L Statement Panel -->
           <div class="report-panel" style="margin-top: 20px; padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
-              <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+              <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
                 <i class="fa-solid fa-file-invoice-dollar"></i> Doppio Café Nagpur - Detailed Profit & Loss Statement
               </h3>
               <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px;">
@@ -860,27 +860,27 @@
                 <div>
                   <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
                     <tbody>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 32px;">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px;">
                         <td style="padding: 6px; font-weight: 600;">Gross Sales Revenue</td>
                         <td style="padding: 6px; text-align: right; font-weight: 700; color: #27ae60;" id="pl-revenue">₹0.00</td>
                       </tr>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 32px;">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px;">
                         <td style="padding: 6px; font-weight: 600; padding-left: 20px; color: var(--text-muted);">- Cost of Goods Sold (COGS 35%)</td>
                         <td style="padding: 6px; text-align: right; color: #c0392b;" id="pl-cogs">-₹0.00</td>
                       </tr>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 32px; background: rgba(43,24,19,0.02);">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px; background: rgba(28, 28, 28,0.02);">
                         <td style="padding: 6px; font-weight: 700;">Gross Profit Margin</td>
                         <td style="padding: 6px; text-align: right; font-weight: 700;" id="pl-gross-profit">₹0.00</td>
                       </tr>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 32px;">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px;">
                         <td style="padding: 6px; font-weight: 600; padding-left: 20px; color: var(--text-muted);">- Staff Labor Expense (Clocked Wages + Salaried)</td>
                         <td style="padding: 6px; text-align: right; color: #c0392b;" id="pl-labor">-₹0.00</td>
                       </tr>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.05); height: 32px;">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px;">
                         <td style="padding: 6px; font-weight: 600; padding-left: 20px; color: var(--text-muted);">- Fixed Operating Expenses (Rent, Bills)</td>
                         <td style="padding: 6px; text-align: right; color: #c0392b;" id="pl-fixed">-₹0.00</td>
                       </tr>
-                      <tr style="height: 36px; background: rgba(43,24,19,0.05); font-size: 13px;">
+                      <tr style="height: 36px; background: rgba(28, 28, 28,0.05); font-size: 13px;">
                         <td style="padding: 6px; font-weight: 800; color: var(--primary-brand);">Net Operating Profit / Loss</td>
                         <td style="padding: 6px; text-align: right; font-weight: 800;" id="pl-net-profit">₹0.00</td>
                       </tr>
@@ -914,13 +914,13 @@
               <div class="menu-editor-form-panel" id="editor-form-panel">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; width: 100%;">
                   <h3 id="form-panel-title" style="margin: 0;">Add New Menu Item</h3>
-                  <button type="button" class="close-editor-btn" id="close-editor-btn" style="background:rgba(43,24,19,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
+                  <button type="button" class="close-editor-btn" id="close-editor-btn" style="background:rgba(28, 28, 28,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
                 </div>
                 <form id="menu-item-editor-form">
                   <input type="hidden" id="edit-item-index" value="">
                   
                   <!-- Section 1: Basic Details -->
-                  <h4 style="font-size: 11px; text-transform: uppercase; color: var(--accent-caramel); margin: 0 0 12px 0; border-bottom: 1px solid rgba(43,24,19,0.08); padding-bottom: 4px; font-weight: 700; font-family: var(--font-body);">1. Basic Details</h4>
+                  <h4 style="font-size: 11px; text-transform: uppercase; color: var(--accent-caramel); margin: 0 0 12px 0; border-bottom: 1px solid rgba(28, 28, 28,0.08); padding-bottom: 4px; font-weight: 700; font-family: var(--font-body);">1. Basic Details</h4>
                   
                   <div class="form-group">
                     <label for="item-name-input">Item Name</label>
@@ -958,7 +958,7 @@
                   <div class="form-group" style="display: none;">
                     <label style="font-weight: 700;">Representation Icon</label>
                     <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
-                      <select id="item-icon-select" style="padding: 8px; border-radius: 6px; border: 1px solid rgba(43,24,19,0.15); font-size: 14px; background: white; color: var(--primary-brand); cursor: pointer; flex: 1;">
+                      <select id="item-icon-select" style="padding: 8px; border-radius: 6px; border: 1px solid rgba(28, 28, 28,0.15); font-size: 14px; background: white; color: var(--primary-brand); cursor: pointer; flex: 1;">
                         <option value="☕">☕ Coffee Cup</option>
                         <option value="🥛">🥛 Milk Glass</option>
                         <option value="🧊">🧊 Ice Glass</option>
@@ -976,12 +976,12 @@
                         <option value="🍪">🍪 Cookie</option>
                         <option value="✨">✨ Special / Star</option>
                       </select>
-                      <input type="text" id="item-icon-input" placeholder="☕" required style="width: 50px; text-align: center; font-size: 18px; padding: 6px; border-radius: 6px; border: 1px solid rgba(43,24,19,0.15);" readonly>
+                      <input type="text" id="item-icon-input" placeholder="☕" required style="width: 50px; text-align: center; font-size: 18px; padding: 6px; border-radius: 6px; border: 1px solid rgba(28, 28, 28,0.15);" readonly>
                     </div>
                   </div>
 
                   <!-- Section 2: Ingredients & Recipe Binding (Optional) -->
-                  <h4 style="font-size: 11px; text-transform: uppercase; color: var(--accent-caramel); margin: 20px 0 12px 0; border-bottom: 1px solid rgba(43,24,19,0.08); padding-bottom: 4px; font-weight: 700; font-family: var(--font-body);">2. Ingredients & Recipe Binding (Optional)</h4>
+                  <h4 style="font-size: 11px; text-transform: uppercase; color: var(--accent-caramel); margin: 20px 0 12px 0; border-bottom: 1px solid rgba(28, 28, 28,0.08); padding-bottom: 4px; font-weight: 700; font-family: var(--font-body);">2. Ingredients & Recipe Binding (Optional)</h4>
 
                   <div class="form-group">
                     <div id="recipe-ingredients-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
@@ -1110,7 +1110,7 @@
                 </div>
               </div>
               <div class="bills-stat-card">
-                <div class="bills-stat-icon" style="background-color:rgba(255,134,22,0.08); color:var(--accent-caramel);"><i class="fa-solid fa-sack-dollar"></i></div>
+                <div class="bills-stat-icon" style="background-color:rgba(252, 128, 25,0.08); color:var(--accent-caramel);"><i class="fa-solid fa-sack-dollar"></i></div>
                 <div class="bills-stat-info">
                   <span class="bills-stat-title">Total Tax Collected</span>
                   <span class="bills-stat-val" id="tax-total-collected-card">₹0.00</span>
@@ -1157,7 +1157,7 @@
                 <button class="export-btn btn btn-secondary" id="export-tax-csv-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-file-csv"></i> Export Cloud CSV</button>
                 <button class="export-btn btn btn-secondary" id="export-tax-sql-btn" style="border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;"><i class="fa-solid fa-database"></i> Export SQL Script</button>
                 <button class="btn btn-primary" id="import-tax-trigger-btn"><i class="fa-solid fa-file-import"></i> Import Backups</button>
-                <button class="btn btn-secondary" id="show-sql-schema-btn" style="color: var(--text-dark); border-color: rgba(43,24,19,0.15);"><i class="fa-solid fa-circle-info"></i> Cloud SQL Schema</button>
+                <button class="btn btn-secondary" id="show-sql-schema-btn" style="color: var(--text-dark); border-color: rgba(28, 28, 28,0.15);"><i class="fa-solid fa-circle-info"></i> Cloud SQL Schema</button>
               </div>
             </div>
 
@@ -1218,7 +1218,7 @@
                 </div>
 
                 <!-- Zomato Integration -->
-                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(43,24,19,0.05);">
+                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);">
                   <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="width: 32px; height: 32px; border-radius: 8px; background: #e23744; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: 800;">Z</div>
                     <div>
@@ -1233,7 +1233,7 @@
                 </div>
 
                 <!-- Swiggy Integration -->
-                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(43,24,19,0.05);">
+                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);">
                   <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="width: 32px; height: 32px; border-radius: 8px; background: #fc8019; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: 800;">S</div>
                     <div>
@@ -1248,7 +1248,7 @@
                 </div>
 
                 <!-- Dunzo Delivery -->
-                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(43,24,19,0.05);">
+                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);">
                   <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="width: 32px; height: 32px; border-radius: 8px; background: #00b386; display: flex; align-items: center; justify-content: center; color: white; font-size: 15px;"><i class="fa-solid fa-motorcycle"></i></div>
                     <div>
@@ -1262,7 +1262,7 @@
                   </label>
                 </div>
 
-                <hr style="border: 0; border-top: 1px solid rgba(43,24,19,0.05); margin: 5px 0;">
+                <hr style="border: 0; border-top: 1px solid rgba(28, 28, 28,0.05); margin: 5px 0;">
 
                 <!-- Webhook Simulators -->
                 <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Aggregator Webhook Simulator</h4>
@@ -1292,7 +1292,7 @@
         <!-- TAB 10: KITCHEN DISPLAY SYSTEM (KDS) -->
         <div class="tab-content" id="kds-tab">
           <div class="kds-layout" style="display: flex; flex-direction: column; gap: 20px; height: 100%;">
-            <div class="kds-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--white); padding: 16px 24px; border-radius: var(--border-radius); border: 1px solid rgba(43,24,19,0.05); box-shadow: var(--shadow-sm);">
+            <div class="kds-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--white); padding: 16px 24px; border-radius: var(--border-radius); border: 1px solid rgba(28, 28, 28,0.05); box-shadow: var(--shadow-sm);">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--success-color); animation: pulse 1.5s infinite;"></div>
                 <span style="font-size: 14px; font-weight: 700; color: var(--primary-brand);">KDS Live Ticket Monitor</span>
@@ -1315,7 +1315,7 @@
         <!-- TAB 11: TOKEN MANAGEMENT SCREEN -->
         <div class="tab-content" id="tokens-tab">
           <div style="display: flex; flex-direction: column; gap: 20px; height: 100%;">
-            <div class="kds-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--white); padding: 16px 24px; border-radius: var(--border-radius); border: 1px solid rgba(43,24,19,0.05); box-shadow: var(--shadow-sm);">
+            <div class="kds-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--white); padding: 16px 24px; border-radius: var(--border-radius); border: 1px solid rgba(28, 28, 28,0.05); box-shadow: var(--shadow-sm);">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <i class="fa-solid fa-bullhorn" style="color: var(--accent-caramel);"></i>
                 <span style="font-size: 14px; font-weight: 700; color: var(--primary-brand);">Takeaway & Delivery Token Monitor</span>
@@ -1353,7 +1353,7 @@
             <!-- Header Analytics -->
             <div class="bills-analytics-header" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
               <div class="bills-stat-card">
-                <div class="bills-stat-icon" style="background-color: rgba(255, 134, 22, 0.08); color: var(--accent-caramel);"><i class="fa-solid fa-users"></i></div>
+                <div class="bills-stat-icon" style="background-color: rgba(252, 128, 25, 0.08); color: var(--accent-caramel);"><i class="fa-solid fa-users"></i></div>
                 <div class="bills-stat-info">
                   <span class="bills-stat-title">Active Employees</span>
                   <span class="bills-stat-val" id="emp-stat-total">4 Staff Members</span>
@@ -1383,13 +1383,13 @@
               
               <!-- Left Column: Employee Directory -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
-                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
                   <i class="fa-solid fa-user-tie"></i> Nagpur Staff Directory
                 </h3>
                 <div style="overflow-x: auto;">
                   <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;" id="emp-directory-table">
                     <thead>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.08); color: var(--text-muted); font-weight: 700;">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.08); color: var(--text-muted); font-weight: 700;">
                         <th style="padding: 8px;">Employee</th>
                         <th style="padding: 8px;">Role</th>
                         <th style="padding: 8px;">Shift</th>
@@ -1407,7 +1407,7 @@
 
               <!-- Right Column: Leave Applications Tracker -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
-                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 4px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 4px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
                   <i class="fa-solid fa-calendar-minus"></i> Leave Requests Tracker
                 </h3>
                 <!-- Apply Leave Form -->
@@ -1415,11 +1415,11 @@
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div>
                       <label style="font-weight: 700; display: block; margin-bottom: 2px;">Select Employee</label>
-                      <select id="leave-emp-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15);" required></select>
+                      <select id="leave-emp-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15);" required></select>
                     </div>
                     <div>
                       <label style="font-weight: 700; display: block; margin-bottom: 2px;">Leave Type</label>
-                      <select id="leave-type-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15);">
+                      <select id="leave-type-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15);">
                         <option value="Casual Leave">Casual Leave</option>
                         <option value="Sick Leave">Sick Leave</option>
                         <option value="Privilege Leave">Privilege Leave</option>
@@ -1429,22 +1429,22 @@
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div>
                       <label style="font-weight: 700; display: block; margin-bottom: 2px;">Start Date</label>
-                      <input type="date" id="leave-start-date" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15);" required>
+                      <input type="date" id="leave-start-date" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15);" required>
                     </div>
                     <div>
                       <label style="font-weight: 700; display: block; margin-bottom: 2px;">End Date</label>
-                      <input type="date" id="leave-end-date" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15);" required>
+                      <input type="date" id="leave-end-date" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15);" required>
                     </div>
                   </div>
                   <div>
                     <label style="font-weight: 700; display: block; margin-bottom: 2px;">Reason</label>
-                    <input type="text" id="leave-reason" placeholder="e.g. Family Function, Not feeling well" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15);" required>
+                    <input type="text" id="leave-reason" placeholder="e.g. Family Function, Not feeling well" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15);" required>
                   </div>
                   <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 11px; padding: 8px; font-weight: 700; background: var(--accent-caramel); border: none; color: white; cursor: pointer; border-radius: 4px;"><i class="fa-solid fa-plane-departure"></i> Submit Leave Request</button>
                 </form>
 
                 <!-- Active Leave Requests Grid list -->
-                <div style="border-top: 1px solid rgba(43,24,19,0.08); padding-top: 8px;">
+                <div style="border-top: 1px solid rgba(28, 28, 28,0.08); padding-top: 8px;">
                   <h4 style="font-size: 12px; font-weight: 700; color: var(--primary-brand); margin: 0 0 6px 0;">Pending Approvals</h4>
                   <div id="leave-approvals-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto;">
                     <!-- Leave items -->
@@ -1458,13 +1458,13 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
               <!-- Shift Scheduling Panel -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
-                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
                   <i class="fa-solid fa-clock"></i> Weekly Shift Roster (Nagpur Branch)
                 </h3>
                 <div style="overflow-x: auto;">
                   <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;" id="shift-roster-table">
                     <thead>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.08); color: var(--text-muted); font-weight: 700;">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.08); color: var(--text-muted); font-weight: 700;">
                         <th style="padding: 6px;">Staff</th>
                         <th style="padding: 6px;">Shift Assignment</th>
                         <th style="padding: 6px;">Actions</th>
@@ -1479,32 +1479,32 @@
 
               <!-- Payroll Slip Calculator -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
-                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
                   <i class="fa-solid fa-file-invoice-dollar"></i> India Payroll & TDS Calculator
                 </h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px;">
                   <div>
                     <label style="font-weight: 700; display: block; margin-bottom: 2px;">Staff Member</label>
-                    <select id="payroll-emp-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); background: white;"></select>
+                    <select id="payroll-emp-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); background: white;"></select>
                   </div>
                   <div>
                     <label style="font-weight: 700; display: block; margin-bottom: 2px;">Days Worked</label>
-                    <input type="number" id="payroll-days-worked" value="30" min="0" max="31" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); background: white;">
+                    <input type="number" id="payroll-days-worked" value="30" min="0" max="31" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); background: white;">
                   </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px;">
                   <div>
                     <label style="font-weight: 700; display: block; margin-bottom: 2px;">Base Salary (Monthly)</label>
-                    <input type="number" id="payroll-base-salary" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); color: var(--primary-brand); font-weight: 700; background: #eee;" readonly>
+                    <input type="number" id="payroll-base-salary" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); color: var(--primary-brand); font-weight: 700; background: #eee;" readonly>
                   </div>
                   <div>
                     <label style="font-weight: 700; display: block; margin-bottom: 2px;">LOP Days (Unpaid Leaves)</label>
-                    <input type="number" id="payroll-lop" value="0" min="0" max="31" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); background: white;">
+                    <input type="number" id="payroll-lop" value="0" min="0" max="31" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); background: white;">
                   </div>
                 </div>
 
                 <!-- Calculations Live Breakdown -->
-                <div style="background: rgba(43,24,19,0.02); border: 1px solid rgba(43,24,19,0.05); border-radius: 8px; padding: 12px; font-size: 11px; display: flex; flex-direction: column; gap: 6px;" id="payroll-breakdown">
+                <div style="background: rgba(28, 28, 28,0.02); border: 1px solid rgba(28, 28, 28,0.05); border-radius: 8px; padding: 12px; font-size: 11px; display: flex; flex-direction: column; gap: 6px;" id="payroll-breakdown">
                   <!-- Calculations injected by JS -->
                 </div>
                 
@@ -1517,18 +1517,18 @@
               
               <!-- Left Column: Clock In/Out Panel -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
-                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
                   <i class="fa-solid fa-user-clock"></i> Daily Shift Clocking System
                 </h3>
                 
                 <div style="display: flex; flex-direction: column; gap: 10px; font-size: 11px;">
                   <div>
                     <label style="font-weight: 700; display: block; margin-bottom: 2px;">Select Employee</label>
-                    <select id="attendance-emp-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); background: white;"></select>
+                    <select id="attendance-emp-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); background: white;"></select>
                   </div>
                   <div>
                     <label style="font-weight: 700; display: block; margin-bottom: 2px;">Select Shift</label>
-                    <select id="attendance-shift-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); background: white;">
+                    <select id="attendance-shift-select" style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); background: white;">
                       <option value="Morning Shift">Morning Shift (09:00 - 17:00)</option>
                       <option value="Evening Shift">Evening Shift (17:00 - 01:00)</option>
                     </select>
@@ -1543,13 +1543,13 @@
               
               <!-- Right Column: Attendance & Shift Wage Ledger -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
-                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 8px;">
+                <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
                   <i class="fa-solid fa-book"></i> Attendance & Shift Wage Ledger
                 </h3>
                 <div style="overflow-x: auto; max-height: 180px; overflow-y: auto;">
                   <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;" id="attendance-ledger-table">
                     <thead>
-                      <tr style="border-bottom: 1px solid rgba(43,24,19,0.08); color: var(--text-muted); font-weight: 700;">
+                      <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.08); color: var(--text-muted); font-weight: 700;">
                         <th style="padding: 6px;">Staff</th>
                         <th style="padding: 6px;">Date</th>
                         <th style="padding: 6px;">In</th>
@@ -1581,16 +1581,16 @@
             </div>
 
             <!-- Tenants list panel -->
-            <div class="report-panel" style="padding: 24px; border-radius: 16px; background: #F6F3EE; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex-grow: 1; min-height: 400px; display: flex; flex-direction: column;">
-              <h3 style="font-family: var(--font-heading); color: #2B2B2B; font-size: 18px; font-weight: 800; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                <span><i class="fa-solid fa-store" style="color: #C67C4E; margin-right: 6px;"></i> Client Workspace Registry</span>
+            <div class="report-panel" style="padding: 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex-grow: 1; min-height: 400px; display: flex; flex-direction: column;">
+              <h3 style="font-family: var(--font-heading); color: #2B2B2B; font-size: 18px; font-weight: 800; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span><i class="fa-solid fa-store" style="color: #FC8019; margin-right: 6px;"></i> Client Workspace Registry</span>
                 <button id="btn-delete-selected-tenants" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); font-size: 11px; padding: 6px 12px; cursor: pointer; display: none; align-items: center; gap: 6px; border-radius: 6px; font-family: var(--font-body);"><i class="fa-solid fa-trash"></i> Delete Selected</button>
               </h3>
               
               <!-- Column Header Bar -->
-              <div style="display: flex; align-items: center; padding: 12px 16px; background: rgba(43,24,19,0.03); border-radius: 10px; margin-bottom: 12px; font-weight: 700; font-size: 11px; color: #6B7280; gap: 16px; font-family: var(--font-body);">
+              <div style="display: flex; align-items: center; padding: 12px 16px; background: rgba(28, 28, 28,0.03); border-radius: 10px; margin-bottom: 12px; font-weight: 700; font-size: 11px; color: #6B7280; gap: 16px; font-family: var(--font-body);">
                 <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                  <input type="checkbox" id="select-all-tenants" style="cursor: pointer; width: 15px; height: 15px; accent-color: #C67C4E;">
+                  <input type="checkbox" id="select-all-tenants" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
                 </div>
                 <div style="flex: 2.5; min-width: 200px;">Outlet Workspace</div>
                 <div style="flex: 1; min-width: 100px;">Outlet Type</div>
@@ -1699,13 +1699,13 @@
         </div>
         
         <!-- FREE Direct WhatsApp digital receipt dispatcher (Zero-cost CRM) -->
-        <div id="whatsapp-receipt-section" style="margin-bottom: 18px; border-top: 1px dashed rgba(43,24,19,0.15); padding-top: 15px;">
+        <div id="whatsapp-receipt-section" style="margin-bottom: 18px; border-top: 1px dashed rgba(28, 28, 28,0.15); padding-top: 15px;">
           <label style="font-size: 11.5px; font-weight: 700; color: var(--primary-brand); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px;">
             <i class="fa-brands fa-whatsapp" style="color: #25D366; font-size: 14px; margin-right: 4px;"></i> Send Free WhatsApp Receipt
           </label>
           <div style="display: flex; gap: 8px;">
             <input type="tel" id="whatsapp-receipt-phone" placeholder="Customer 10-digit WhatsApp number" 
-              style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.15); font-size: 12px; background: white; color: var(--text-dark); outline: none; font-weight: 600;">
+              style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(28, 28, 28,0.15); font-size: 12px; background: white; color: var(--text-dark); outline: none; font-weight: 600;">
             <button type="button" class="btn btn-secondary" id="send-whatsapp-receipt-btn" 
               style="padding: 8px 14px; border-color: #25D366; color: #128C7E; font-weight: 700; display: flex; align-items: center; gap: 6px; background: rgba(37, 211, 102, 0.06); font-size: 12px; cursor: pointer; border-radius: 8px; transition: var(--transition);">
               <i class="fa-solid fa-paper-plane"></i> Send
@@ -1784,7 +1784,7 @@
 
             <!-- Tab 2: Taxes & Invoices -->
             <div class="settings-tab-content" id="tax-sec" style="display:none;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Apply GST Rate on Invoices</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-gst-enabled">
@@ -1797,7 +1797,7 @@
                 <input type="number" id="profile-gst-rate" value="18" min="0" max="100" step="0.5">
               </div>
 
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Enable Tax Management Dashboard</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-tax-enabled">
@@ -1808,7 +1808,7 @@
 
             <!-- Tab 3: CRM & Loyalty -->
             <div class="settings-tab-content" id="loyalty-sec" style="display:none;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Loyalty Reward Discounts</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-loyalty-enabled">
@@ -1821,7 +1821,7 @@
                 <input type="number" id="profile-loyalty-rate" value="10" min="0" max="100" step="0.5">
               </div>
 
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Enable CRM & Loyalty Module</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-crm-enabled">
@@ -1921,7 +1921,7 @@
 
             <!-- Tab 5: Shift Control -->
             <div class="settings-tab-content" id="shift-sec" style="display:none;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-cash-register" style="color:var(--accent-caramel); margin-right:6px;"></i> Enable Shift & Drawer Control</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-shift-enabled">
@@ -1939,7 +1939,7 @@
                 <input type="number" id="profile-shift-max-drawer" value="5000" min="0" step="500">
               </div>
 
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);">Lock POS Cart when Shift is Closed</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-shift-pos-lock" checked>
@@ -1950,7 +1950,7 @@
 
             <!-- Tab 6: P2P Network Sync -->
             <div class="settings-tab-content" id="p2p-sync-sec" style="display:none;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-tower-broadcast" style="color:var(--accent-caramel); margin-right:6px;"></i> Enable Local P2P Wi-Fi Sync</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-p2p-enabled" checked>
@@ -1960,7 +1960,7 @@
               
               <div class="form-group" style="margin-bottom: 12px;">
                 <label>Terminal Operation Mode</label>
-                <select id="profile-p2p-mode" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(43,24,19,0.15); background:white; color:var(--primary-brand); font-weight:700; font-size:12px; height: 34px;">
+                <select id="profile-p2p-mode" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(28, 28, 28,0.15); background:white; color:var(--primary-brand); font-weight:700; font-size:12px; height: 34px;">
                   <option value="Master">Master POS Terminal (Server / Hub)</option>
                   <option value="KDS">Kitchen Display System (KDS Client)</option>
                   <option value="Captain">Waiter Table-side Terminal (Client)</option>
@@ -1980,7 +1980,7 @@
             <!-- Tab 7: System Settings -->
             <div class="settings-tab-content" id="system-sec" style="display:none;">
               <!-- Sound FX & Speech toggle switch -->
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-volume-high" style="color:var(--accent-caramel); margin-right:6px;"></i> Enable POS Sound FX & Speech</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-sound-enabled" checked>
@@ -1989,7 +1989,7 @@
               </div>
 
               <!-- WhatsApp Billing toggle switch -->
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-brands fa-whatsapp" style="color:#25D366; margin-right:6px;"></i> Enable WhatsApp Billing Prompt</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-whatsapp-enabled" checked>
@@ -1998,7 +1998,7 @@
               </div>
 
               <!-- Passcode Lock toggle switch -->
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
                 <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-key" style="color:var(--accent-caramel); margin-right:6px;"></i> Enable Passcode Lock on Startup</span>
                 <label class="switch">
                   <input type="checkbox" id="profile-lock-enabled">
@@ -2023,10 +2023,10 @@
                   <button type="button" class="btn btn-secondary" id="btn-export-backup" style="flex:1; font-size:11px; padding:10px; border-color:var(--accent-caramel); color:var(--primary-brand); font-weight:700; background:white;"><i class="fa-solid fa-download"></i> Export JSON Backup</button>
                 </div>
 
-                <div style="border:1px dashed rgba(255,134,22,0.25); border-radius:8px; padding:12px; background:rgba(255,134,22,0.01); margin-top:5px; box-sizing: border-box;">
+                <div style="border:1px dashed rgba(252, 128, 25,0.25); border-radius:8px; padding:12px; background:rgba(252, 128, 25,0.01); margin-top:5px; box-sizing: border-box;">
                   <h5 style="margin:0 0 6px 0; font-size:11px; color:var(--primary-brand);"><i class="fa-solid fa-upload"></i> Restore POS from Backup File</h5>
                   <p style="font-size:9px; color:var(--text-muted); margin-bottom:8px;">Upload a previously exported .json backup file to instantly restore your entire billing history, inventory levels, shifts, and settings.</p>
-                  <input type="file" id="restore-backup-file" accept=".json" style="width:100%; font-size:10px; padding:4px; border:1px solid rgba(43,24,19,0.1); border-radius:4px; background:white;">
+                  <input type="file" id="restore-backup-file" accept=".json" style="width:100%; font-size:10px; padding:4px; border:1px solid rgba(28, 28, 28,0.1); border-radius:4px; background:white;">
                 </div>
               </div>
             </div>
@@ -2037,84 +2037,84 @@
               <p style="font-size:11px; color:var(--text-muted); margin-bottom:15px; line-height: 1.4;">Disable unused features to hide them from the dashboard navigation panel for all users.</p>
               
               <div style="display:flex; flex-direction:column; gap:10px; max-height:240px; overflow-y:auto; padding-right:6px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-mug-hot" style="width:16px;"></i> Takeaway POS Grid</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-pos-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-table-cells" style="width:16px;"></i> Live Table Orders</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-tables-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-cloud-arrow-down" style="width:16px;"></i> Online Integrations</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-online-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-tv" style="width:16px;"></i> Kitchen KDS Screen</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-kds-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-ticket" style="width:16px;"></i> Live Token Board</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-tokens-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-file-invoice-dollar" style="width:16px;"></i> Bills Management</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-bills-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-boxes-stacked" style="width:16px;"></i> Inventory Control</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-inventory-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-chart-line" style="width:16px;"></i> Sales Reports</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-reports-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-pen-to-square" style="width:16px;"></i> Menu Editor</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-editor-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-users-rectangle" style="width:16px;"></i> CRM & Loyalty Ledger</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-crm-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-calculator" style="width:16px;"></i> Tax Ledger Portal</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-tax-enabled" checked>
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:8px 12px; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:8px 12px; border-radius:8px;">
                   <span style="font-size:11.5px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-user-tie" style="width:16px;"></i> Employee & Payroll Ledger</span>
                   <label class="switch">
                     <input type="checkbox" id="feature-employees-enabled" checked>
@@ -2125,7 +2125,7 @@
             </div>
 
             <!-- Global Settings Form Actions (Always visible at the bottom) -->
-            <div class="settings-form-actions" style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; border-top: 1px solid rgba(43,24,19,0.05); padding-top: 15px;">
+            <div class="settings-form-actions" style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px; border-top: 1px solid rgba(28, 28, 28,0.05); padding-top: 15px;">
               <button type="button" class="btn btn-secondary" id="cancel-profile-btn">Cancel</button>
               <button type="submit" class="btn btn-primary" id="save-profile-btn"><i class="fa-solid fa-floppy-disk"></i> Save & Backup</button>
             </div>
@@ -2310,7 +2310,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
           <!-- Active drafts injected dynamically -->
         </div>
       </div>
-      <div class="modal-footer" style="padding: 15px 20px; background: var(--bg-cream-light); border-top: 1px solid rgba(43,24,19,0.05); display: flex; justify-content: flex-end; gap: 10px;">
+      <div class="modal-footer" style="padding: 15px 20px; background: var(--bg-cream-light); border-top: 1px solid rgba(28, 28, 28,0.05); display: flex; justify-content: flex-end; gap: 10px;">
         <button class="btn btn-secondary" id="close-drafts-btn-footer">Close Window</button>
       </div>
     </div>
@@ -2357,7 +2357,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
         <form id="shift-open-form">
           <div class="form-group" style="margin-bottom: 14px;">
             <label style="font-weight:700;">Select Cashier / Staff</label>
-            <select id="shift-cashier-select" required style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+            <select id="shift-cashier-select" required style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28, 28, 28,0.1); width: 100%;">
               <option value="bonie">bonie (Cashier)</option>
               <option value="manager">Manager / Admin</option>
               <option value="staff_1">Staff Terminal A</option>
@@ -2365,7 +2365,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label style="font-weight:700;">Starting Drawer Cash Float (₹)</label>
-            <input type="number" id="shift-opening-float-input" required min="0" step="50" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+            <input type="number" id="shift-opening-float-input" required min="0" step="50" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28, 28, 28,0.1); width: 100%;">
             <p style="font-size:10px; color:var(--text-muted); margin-top:4px;">Coins & change banknotes currently inside the cash drawer.</p>
           </div>
           <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
@@ -2386,7 +2386,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       </div>
       <div class="modal-body" style="padding: 20px;">
         <!-- Live summary stats -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; background: rgba(43,24,19,0.03); padding: 12px; border-radius: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; background: rgba(28, 28, 28,0.03); padding: 12px; border-radius: 8px;">
           <div>
             <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Opening Float</span>
             <div style="font-size:16px; font-weight:700; color:var(--primary-brand);" id="close-summary-float">₹0</div>
@@ -2405,7 +2405,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
           </div>
         </div>
 
-        <div style="background: rgba(255,134,22,0.06); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(255,134,22,0.15);">
+        <div style="background: rgba(252, 128, 25,0.06); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(252, 128, 25,0.15);">
           <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; margin-bottom:2px;">Expected Drawer Balance</span>
           <div style="font-size:22px; font-weight:800; color:var(--primary-brand);" id="close-summary-expected">₹0</div>
         </div>
@@ -2413,17 +2413,17 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
         <form id="shift-close-form">
           <div class="form-group" style="margin-bottom: 14px;">
             <label style="font-weight:700;">Actual Counted Cash inside Drawer (₹)</label>
-            <input type="number" id="shift-actual-cash-input" required min="0" step="any" placeholder="Enter physical counted cash amount..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%; font-size:16px; font-weight:700; color:var(--primary-brand);">
+            <input type="number" id="shift-actual-cash-input" required min="0" step="any" placeholder="Enter physical counted cash amount..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28, 28, 28,0.1); width: 100%; font-size:16px; font-weight:700; color:var(--primary-brand);">
           </div>
           
-          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(43,24,19,0.03); padding:10px; border-radius:8px; margin-bottom:14px; display:none;" id="variance-alert-row">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px; margin-bottom:14px; display:none;" id="variance-alert-row">
             <span style="font-size:12px; font-weight:700; color:var(--primary-brand);">Calculated Drawer Variance:</span>
             <span style="font-size:16px; font-weight:800;" id="close-summary-variance">₹0.00</span>
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
             <label style="font-weight:700;">Shift Notes / Discrepancy Reason</label>
-            <textarea id="shift-notes-input" placeholder="Optional comments on drawer status, shortage reason, handover detail..." rows="2" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%; font-family:var(--font-body); font-size:12px;"></textarea>
+            <textarea id="shift-notes-input" placeholder="Optional comments on drawer status, shortage reason, handover detail..." rows="2" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28, 28, 28,0.1); width: 100%; font-family:var(--font-body); font-size:12px;"></textarea>
           </div>
           
           <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
@@ -2443,7 +2443,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
         <button class="close-modal-btn" id="close-shift-details-modal">&times;</button>
       </div>
       <div class="modal-body" style="padding: 20px;">
-        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:16px; border-bottom:1px solid rgba(43,24,19,0.06); padding-bottom:12px; font-size:12px;">
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:16px; border-bottom:1px solid rgba(28, 28, 28,0.06); padding-bottom:12px; font-size:12px;">
           <div>Active Cashier: <strong id="details-cashier-name">-</strong></div>
           <div>Opened At: <strong id="details-opened-at">-</strong></div>
           <div>Start Cash Float: <strong id="details-opening-float">-</strong></div>
@@ -2458,17 +2458,17 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
         <!-- Quick actions buttons grid -->
         <h3 style="font-size: 11px; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:8px;">Manual Drawer Adjustments</h3>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
-          <button type="button" class="btn btn-secondary" id="btn-shift-payout" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(255,134,22,0.2); background:white;">
+          <button type="button" class="btn btn-secondary" id="btn-shift-payout" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(252, 128, 25,0.2); background:white;">
             <i class="fa-solid fa-circle-minus" style="color:#e74c3c; font-size:16px;"></i>
             <strong>Vendor Payout</strong>
           </button>
-          <button type="button" class="btn btn-secondary" id="btn-shift-drop" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(255,134,22,0.2); background:white;">
+          <button type="button" class="btn btn-secondary" id="btn-shift-drop" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(252, 128, 25,0.2); background:white;">
             <i class="fa-solid fa-safe" style="color:#2980b9; font-size:16px;"></i>
             <strong>Drop to Safe</strong>
           </button>
         </div>
 
-        <div style="border-top:1px solid rgba(43,24,19,0.06); padding-top:16px; display:flex; justify-content:space-between; gap:10px;">
+        <div style="border-top:1px solid rgba(28, 28, 28,0.06); padding-top:16px; display:flex; justify-content:space-between; gap:10px;">
           <button type="button" class="btn btn-secondary" id="btn-shift-audit-log" style="font-size:12px; padding:8px 12px;"><i class="fa-solid fa-list"></i> View Ledger</button>
           <button type="button" class="btn btn-danger" id="btn-end-active-shift" style="background:#e74c3c; color:white; border:none; padding:8px 16px; font-weight:700;"><i class="fa-solid fa-flag-checkered"></i> End Shift Session</button>
         </div>
@@ -2488,11 +2488,11 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
           <input type="hidden" id="action-event-type" value="PAYOUT">
           <div class="form-group" style="margin-bottom: 14px;">
             <label style="font-weight:700;">Amount (₹)</label>
-            <input type="number" id="action-amount-input" required min="1" step="any" placeholder="Enter cash amount..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+            <input type="number" id="action-amount-input" required min="1" step="any" placeholder="Enter cash amount..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28, 28, 28,0.1); width: 100%;">
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label style="font-weight:700;">Reason / Reference Notes</label>
-            <input type="text" id="action-reason-input" required placeholder="e.g. Bought milk carton, manager cash transfer..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(43,24,19,0.1); width: 100%;">
+            <input type="text" id="action-reason-input" required placeholder="e.g. Bought milk carton, manager cash transfer..." style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28, 28, 28,0.1); width: 100%;">
           </div>
           <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
             <button type="button" class="btn btn-secondary" id="cancel-shift-action-btn">Cancel</button>
@@ -2551,7 +2551,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       
       <div style="display: flex; gap: 12px; width: 100%; margin-top: 10px;">
         <button type="button" class="btn btn-primary" id="btn-print-table-qr" style="flex: 1; padding: 10px; font-size: 13px;"><i class="fa-solid fa-print"></i> Print Template</button>
-        <button type="button" class="btn btn-secondary" id="btn-simulate-qr-scan" style="flex: 1; padding: 10px; font-size: 13px; color: var(--primary-brand); border-color: rgba(43,24,19,0.15);"><i class="fa-solid fa-laptop-code"></i> Simulate Scan</button>
+        <button type="button" class="btn btn-secondary" id="btn-simulate-qr-scan" style="flex: 1; padding: 10px; font-size: 13px; color: var(--primary-brand); border-color: rgba(28, 28, 28,0.15);"><i class="fa-solid fa-laptop-code"></i> Simulate Scan</button>
       </div>
     </div>
   </div>
@@ -2561,7 +2561,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
     <div class="glass-modal" style="max-width: 450px; width: 90%; text-align: left; display: flex; flex-direction: column; padding: 24px; gap: 16px; position: relative;">
       <button type="button" class="close-modal-btn" id="table-session-modal-close" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
       
-      <div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px dashed rgba(43,24,19,0.08); padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px;">
         <div style="font-size: 28px; color: var(--accent-caramel);">
           <i class="fa-solid fa-chair"></i>
         </div>
@@ -2572,11 +2572,11 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       </div>
       
       <!-- Table Active Items List -->
-      <div style="flex: 1; min-height: 120px; max-height: 250px; overflow-y: auto; background: rgba(43,24,19,0.02); border: 1px solid rgba(43,24,19,0.05); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;" id="table-session-modal-items-list">
+      <div style="flex: 1; min-height: 120px; max-height: 250px; overflow-y: auto; background: rgba(28, 28, 28,0.02); border: 1px solid rgba(28, 28, 28,0.05); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;" id="table-session-modal-items-list">
         <!-- Render items or empty message -->
       </div>
       
-      <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--primary-brand); border-top: 1px dashed rgba(43,24,19,0.08); padding-top: 12px;">
+      <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--primary-brand); border-top: 1px dashed rgba(28, 28, 28,0.08); padding-top: 12px;">
         <span>Session Subtotal</span>
         <span id="table-session-modal-total">₹0.00</span>
       </div>
