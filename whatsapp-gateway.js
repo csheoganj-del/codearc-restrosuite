@@ -2312,6 +2312,25 @@ function formatReceiptText(record, profile = businessProfile) {
 }
 
 // ============================================================
+// ============================================================
+// DEBUG RELAY ENDPOINT — to check relay URL format safely
+// ============================================================
+app.get('/debug-relay', (req, res) => {
+    const relay = process.env.EMAIL_RELAY_URL || emailConfig.relayUrl || '';
+    if (!relay) {
+        return res.json({ configured: false, error: 'Relay URL is empty' });
+    }
+    res.json({
+        configured: true,
+        length: relay.length,
+        prefix: relay.substring(0, 40),
+        suffix: relay.substring(Math.max(0, relay.length - 15)),
+        containsMacros: relay.includes('/macros/s/'),
+        containsExec: relay.endsWith('/exec'),
+        containsEdit: relay.includes('/edit')
+    });
+});
+
 // HEALTH ENDPOINT — for UptimeRobot / external monitors
 // ============================================================
 app.get('/health', (req, res) => {
