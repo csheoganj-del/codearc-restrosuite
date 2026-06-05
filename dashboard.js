@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const activeTenantSlug = sessionStorage.getItem('tenant_slug');
   const activeTenantName = sessionStorage.getItem('tenant_name') || 'Restaurant';
   const allowedTabsRaw = sessionStorage.getItem('allowed_tabs');
-  const allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
+  // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
+  let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
 
   // ==========================================
   // TRIPLE-VAULT RESILIENCE VAULT (IndexedDB)
@@ -1578,14 +1579,86 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }).subscribe();
 
-    // Subscribe to SaaS Tenants real-time updates for Super-Admin console (Made by Antigravity)
+    // ─────────────────────────────────────────────────────────────────────
+    // ⚡ REAL-TIME TENANT SYNC — SaaS Tenants table listener
+    // ─────────────────────────────────────────────────────────────────────
     const loggedInRole = sessionStorage.getItem('logged_in_role');
+
+    // Super-Admin: refresh registry table whenever any tenant row changes
     if (loggedInRole === 'superadmin') {
-      supabaseClient.channel('saas-tenants-realtime')
+      supabaseClient.channel('saas-tenants-superadmin-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'saas_tenants' }, (payload) => {
-          console.log("Realtime SaaS Tenants Change detected:", payload);
+          console.log('[SaaS Realtime] Tenant registry change detected — refreshing super-admin tab:', payload);
           renderSuperAdminTab();
         }).subscribe();
+    }
+
+    // Logged-in tenant: watch OWN row for live permission/status changes by SuperAdmin
+    if (loggedInRole !== 'superadmin' && activeTenantId) {
+      supabaseClient
+        .channel('saas-tenant-self-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'saas_tenants',
+            filter: `id=eq.${activeTenantId}`
+          },
+          (payload) => {
+            const updated = payload.new;
+            console.log('[SaaS Realtime] Own tenant record updated by SuperAdmin:', updated);
+
+            // 1. Account suspended → kick to login immediately
+            if (updated.status === 'suspended') {
+              showNotificationToast('⚠️ Account suspended. Redirecting to login...');
+              setTimeout(() => {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+              }, 2200);
+              return;
+            }
+
+            // 2. Account set back to pending → kick to login
+            if (updated.status === 'pending') {
+              showNotificationToast('ℹ️ Account access changed. Please contact your provider.');
+              setTimeout(() => {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+              }, 2200);
+              return;
+            }
+
+            // 3. Hot-swap allowed_tabs in memory + sessionStorage
+            if (Array.isArray(updated.allowed_tabs)) {
+              allowedTabs.length = 0;
+              updated.allowed_tabs.forEach(t => allowedTabs.push(t));
+              sessionStorage.setItem('allowed_tabs', JSON.stringify(updated.allowed_tabs));
+              console.log('[SaaS Realtime] allowedTabs updated live:', allowedTabs);
+            }
+
+            // 4. Re-apply all sidebar/mobile-nav/feature visibility immediately
+            applyFeatureToggles();
+
+            // 5. If currently active tab was just revoked → redirect to first allowed tab
+            const activeTabEl = document.querySelector('.tab-content.active');
+            const activeTabId = activeTabEl ? activeTabEl.id : null;
+            if (activeTabId && !allowedTabs.includes(activeTabId)) {
+              const firstAllowed = allowedTabs[0];
+              if (firstAllowed) {
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+                const targetTab = document.getElementById(firstAllowed);
+                if (targetTab) targetTab.classList.add('active');
+                const targetLink = document.querySelector(`.sidebar-link[data-tab="${firstAllowed}"]`);
+                if (targetLink) targetLink.classList.add('active');
+              }
+            }
+
+            showNotificationToast('🔄 Your access permissions were updated by the admin.');
+          }
+        )
+        .subscribe();
     }
   }
 
@@ -6370,15 +6443,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       }
     });
 
-    // Filter mobile bottom nav links
+    // Filter mobile bottom nav links — must pass all 3 gates (role + feature flag + SaaS allowlist)
     const mobileNavLinks = document.querySelectorAll('.mobile-bottom-nav a');
     mobileNavLinks.forEach(link => {
       const tabId = link.getAttribute('data-tab');
       if (!tabId) return;
       const isAllowedByRole = rolePermissions[loggedInRole].includes(tabId);
       const isEnabledByFlag = featureFlags[tabId] !== false;
-      
-      if (isAllowedByRole && isEnabledByFlag) {
+      const isAllowedBySaaS = allowedTabs.includes(tabId);
+
+      if (isAllowedByRole && isEnabledByFlag && isAllowedBySaaS) {
         link.style.display = 'inline-block';
       } else {
         link.style.display = 'none';
