@@ -2145,8 +2145,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const guestToggleBtn = document.getElementById('guest-toggle-btn');
       if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
       if (guestToggleBtn) {
-        guestToggleBtn.style.background = 'rgba(201, 138, 74, 0.05)';
-        guestToggleBtn.style.borderColor = 'rgba(201, 138, 74, 0.2)';
+        guestToggleBtn.style.background = 'rgba(255, 134, 22, 0.05)';
+        guestToggleBtn.style.borderColor = 'rgba(255, 134, 22, 0.2)';
       }
     }
 
@@ -4694,15 +4694,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         <head>
           <title>Doppio Cafe - Stock & Inventory Report</title>
           <style>
-            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C98A4A; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
-            .logo span { color: #C98A4A; }
-            .title { font-size: 18px; margin: 0; color: #2B1813; }
+            body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FF8616; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo { font-size: 24px; font-weight: bold; color: #1F1F1F; }
+            .logo span { color: #FF8616; }
+            .title { font-size: 18px; margin: 0; color: #1F1F1F; }
             .meta { font-size: 12px; color: #666; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; }
-            th { background-color: #f7f3ed; color: #2B1813; font-weight: 600; }
+            th { background-color: #f7f3ed; color: #1F1F1F; font-weight: 600; }
             tr:nth-child(even) { background-color: #faf8f5; }
             .footer { margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 15px; font-size: 11px; text-align: center; color: #777; }
           </style>
@@ -4855,9 +4855,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <head>
           <title>Doppio Cafe - Low Stock Alert Report</title>
           <style>
-            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
+            body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e74c3c; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
+            .logo { font-size: 24px; font-weight: bold; color: #1F1F1F; }
             .logo span { color: #e74c3c; }
             .title { font-size: 18px; margin: 0; color: #c0392b; }
             .meta { font-size: 12px; color: #666; }
@@ -5048,21 +5048,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         <head>
           <title>Doppio Cafe - Sales & Revenue Audit Report</title>
           <style>
-            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C98A4A; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
-            .logo span { color: #C98A4A; }
-            .title { font-size: 18px; margin: 0; color: #2B1813; }
+            body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FF8616; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo { font-size: 24px; font-weight: bold; color: #1F1F1F; }
+            .logo span { color: #FF8616; }
+            .title { font-size: 18px; margin: 0; color: #1F1F1F; }
             .meta { font-size: 12px; color: #666; }
             
             .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
-            .kpi-card { background: #fdfbf7; border: 1px solid rgba(201, 138, 74, 0.2); border-radius: 8px; padding: 12px; text-align: center; }
+            .kpi-card { background: #fdfbf7; border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 8px; padding: 12px; text-align: center; }
             .kpi-card h3 { margin: 0; font-size: 12px; color: #666; text-transform: uppercase; }
-            .kpi-card p { margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #2B1813; }
+            .kpi-card p { margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #1F1F1F; }
             
             table { width: 100%; border-collapse: collapse; margin-top: 10px; }
             th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 12px; }
-            th { background-color: #f7f3ed; color: #2B1813; font-weight: 600; }
+            th { background-color: #f7f3ed; color: #1F1F1F; font-weight: 600; }
             
             .footer { margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 15px; font-size: 11px; text-align: center; color: #777; }
           </style>
@@ -5075,7 +5075,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
             <div style="text-align: right;">
               <h2 class="title">Sales & Revenue Audit Report</h2>
-              <p class="meta" style="font-weight:bold; color: #C98A4A;">` + rangeStr + `</p>
+              <p class="meta" style="font-weight:bold; color: #FF8616;">` + rangeStr + `</p>
               <p class="meta">Generated: ` + new Date().toLocaleString('en-IN') + `</p>
             </div>
           </div>
@@ -5092,9 +5092,9 @@ document.addEventListener('DOMContentLoaded', async () => {
               <h3>GST Tax Collected</h3>
               <p>₹` + totalGST + `</p>
             </div>
-            <div class="kpi-card" style="background:#f7f0e8; border-color:#C98A4A;">
+            <div class="kpi-card" style="background:#f7f0e8; border-color:#FF8616;">
               <h3>Net Sales Revenue</h3>
-              <p style="color:#C98A4A; font-size: 20px;">₹` + totalRevenue + `</p>
+              <p style="color:#FF8616; font-size: 20px;">₹` + totalRevenue + `</p>
             </div>
           </div>
           <div class="kpis" style="grid-template-columns: repeat(3, 1fr); margin-top: 0; margin-bottom: 20px;">
@@ -5571,7 +5571,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
 
       item.addEventListener('mouseover', () => {
-        item.style.background = 'rgba(201, 138, 74, 0.06)';
+        item.style.background = 'rgba(255, 134, 22, 0.06)';
       });
       item.addEventListener('mouseout', () => {
         item.style.background = 'none';
@@ -5622,8 +5622,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (takeawayFields.style.display === 'none') {
         takeawayFields.style.display = 'block';
         if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
-        guestToggleBtn.style.background = 'rgba(201, 138, 74, 0.05)';
-        guestToggleBtn.style.borderColor = 'rgba(201, 138, 74, 0.2)';
+        guestToggleBtn.style.background = 'rgba(255, 134, 22, 0.05)';
+        guestToggleBtn.style.borderColor = 'rgba(255, 134, 22, 0.2)';
       } else {
         takeawayFields.style.display = 'none';
         if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
@@ -7883,7 +7883,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           <button class="table-action-btn whatsapp" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(37,211,102,0.25); background:rgba(37,211,102,0.06); color:#25D366; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-brands fa-whatsapp"></i> Share
           </button>
-          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(201,138,74,0.3); background:rgba(201,138,74,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(255,134,22,0.3); background:rgba(255,134,22,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-solid fa-pen-to-square"></i> Edit
           </button>
           <button class="table-action-btn delete" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(231,76,60,0.2); background:rgba(231,76,60,0.06); color:var(--danger-color); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
@@ -8160,7 +8160,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     draftOrders.forEach(d => {
       const draftCard = document.createElement('div');
       draftCard.className = 'draft-card';
-      draftCard.style.cssText = 'border: 1px solid rgba(201, 138, 74, 0.2); border-radius: 10px; padding: 12px; background: #fff; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; margin-bottom: 8px;';
+      draftCard.style.cssText = 'border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 10px; padding: 12px; background: #fff; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; margin-bottom: 8px;';
       
       const itemCount = d.items.reduce((sum, i) => sum + i.qty, 0);
       const timeStr = new Date(d.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -9935,8 +9935,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const item = document.createElement('div');
       item.style.marginBottom = '6px';
       
-      const itemBg = n.isRead ? 'transparent' : 'rgba(201, 138, 74, 0.04)';
-      const itemBorder = n.isRead ? 'rgba(43,24,19,0.05)' : 'rgba(201, 138, 74, 0.15)';
+      const itemBg = n.isRead ? 'transparent' : 'rgba(255, 134, 22, 0.04)';
+      const itemBorder = n.isRead ? 'rgba(43,24,19,0.05)' : 'rgba(255, 134, 22, 0.15)';
       
       let iconHtml = '<i class="fa-solid fa-circle-info"></i>';
       if (n.type === 'order') iconHtml = '<i class="fa-solid fa-qrcode"></i>';
@@ -10973,14 +10973,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       excelDropzone.style.borderColor = 'var(--accent-caramel)';
     });
     excelDropzone.addEventListener('dragleave', () => {
-      excelDropzone.style.borderColor = 'rgba(201, 138, 74, 0.35)';
-      excelDropzone.style.background = 'rgba(201, 138, 74, 0.02)';
+      excelDropzone.style.borderColor = 'rgba(255, 134, 22, 0.25)';
+      excelDropzone.style.background = 'rgba(255, 134, 22, 0.01)';
     });
 
     excelDropzone.addEventListener('drop', (e) => {
       e.preventDefault();
-      excelDropzone.style.borderColor = 'rgba(201, 138, 74, 0.35)';
-      excelDropzone.style.background = 'rgba(201, 138, 74, 0.02)';
+      excelDropzone.style.borderColor = 'rgba(255, 134, 22, 0.25)';
+      excelDropzone.style.background = 'rgba(255, 134, 22, 0.01)';
       
       if (e.dataTransfer.files.length > 0) {
         excelFileInput.files = e.dataTransfer.files;

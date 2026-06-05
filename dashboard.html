@@ -16,20 +16,20 @@
     <div class="lock-card" style="background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 30px 70px rgba(0,0,0,0.5); border-radius: 28px; width: 360px; padding: 40px 30px; text-align: center; display: flex; flex-direction: column; align-items: center; box-sizing: border-box; color: #FFF; animation: fadeInUp 0.5s ease;">
       
       <!-- Brand Logo -->
-      <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 30px; font-weight: 800; color: #ECE7DF; margin-bottom: 2px; letter-spacing: 1px;">DOPPIO</div>
-      <div style="font-size: 10px; color: #C88A4D; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
+      <div style="font-family: 'Inter', sans-serif; font-size: 30px; font-weight: 800; color: #ECE7DF; margin-bottom: 2px; letter-spacing: 1px;">DOPPIO</div>
+      <div style="font-size: 10px; color: var(--accent-caramel); text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
       
       <!-- Security Icon -->
-      <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(200, 138, 77, 0.1); border: 2px solid #C88A4D; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-        <i class="fa-solid fa-lock" style="font-size: 26px; color: #C88A4D;"></i>
+      <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(255, 134, 22, 0.1); border: 2px solid var(--accent-caramel); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+        <i class="fa-solid fa-lock" style="font-size: 26px; color: var(--accent-caramel);"></i>
       </div>
       
-      <p style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: #F6F3EE; margin-bottom: 15px; font-weight: 500;">Enter Passcode to Unlock Terminal</p>
+      <p style="font-family: 'Inter', sans-serif; font-size: 13px; color: #F8F6F3; margin-bottom: 15px; font-weight: 500;">Enter Passcode to Unlock Terminal</p>
       
       <!-- Passcode Input -->
       <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-bottom: 20px;">
         <input type="password" id="lock-passcode-input" placeholder="••••" maxlength="4" autofocus
-          style="width: 140px; padding: 10px; text-align: center; font-size: 28px; font-weight: 800; letter-spacing: 12px; border: 2px solid #C98A4A; border-radius: 12px; background: rgba(0,0,0,0.3); color: #FFF; outline: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);">
+          style="width: 140px; padding: 10px; text-align: center; font-size: 28px; font-weight: 800; letter-spacing: 12px; border: 2px solid var(--accent-caramel); border-radius: 12px; background: rgba(0,0,0,0.3); color: #FFF; outline: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);">
         <div id="lock-passcode-error" style="color: #FF5A5F; font-size: 11px; margin-top: 8px; height: 16px; font-weight: 600;"></div>
       </div>
       
@@ -46,7 +46,7 @@
         <button class="lock-pin-btn" data-val="9">9</button>
         <button class="lock-pin-btn text-btn" data-val="clear" style="font-size: 10px; text-transform: uppercase;">Clear</button>
         <button class="lock-pin-btn" data-val="0">0</button>
-        <button class="lock-pin-btn text-btn" data-val="unlock" style="font-size: 10px; text-transform: uppercase; background: #C98A4A; color: #FFF; border-color: #C98A4A;">Enter</button>
+        <button class="lock-pin-btn text-btn" data-val="unlock" style="font-size: 10px; text-transform: uppercase; background: var(--accent-caramel); color: #FFF; border-color: var(--accent-caramel);">Enter</button>
       </div>
     </div>
   </div>
@@ -133,7 +133,7 @@
         <a href="#" class="sidebar-link" data-tab="crm-tab"><i class="fa-solid fa-users-rectangle"></i> CRM & Loyalty</a>
         <a href="#" class="sidebar-link" data-tab="tax-tab" id="sidebar-tax-link"><i class="fa-solid fa-calculator"></i> Tax Management</a>
         <a href="#" class="sidebar-link" data-tab="employees-tab" id="sidebar-employees-link"><i class="fa-solid fa-users"></i> Employee Ledger</a>
-        <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none; background: rgba(201, 138, 74, 0.12); color: var(--accent-caramel); font-weight: 700;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
+        <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none; background: rgba(255, 134, 22, 0.08); color: var(--accent-caramel); font-weight: 600;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
       </nav>
 
       <div class="sidebar-footer">
@@ -225,7 +225,7 @@
         <div class="tab-content active" id="pos-tab">
           <!-- Shift Closed POS Lock Overlay -->
           <div id="shift-lock-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); z-index: 50; align-items: center; justify-content: center; border-radius: var(--border-radius-lg); flex-direction: column; gap: 16px; text-align: center; padding: 20px;">
-            <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(201, 138, 74, 0.08); border: 2px dashed var(--accent-caramel); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(255, 134, 22, 0.05); border: 2px dashed var(--accent-caramel); display: flex; align-items: center; justify-content: center;">
               <i class="fa-solid fa-cash-register" style="font-size: 32px; color: var(--accent-caramel);"></i>
             </div>
             <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 20px; font-weight: 700;">Terminal Shift Session Closed</h2>
@@ -287,7 +287,7 @@
                 <div class="cart-header-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                   <div style="display:flex; align-items:baseline; gap:8px;">
                     <h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--primary-brand);">Takeaway Cart</h2>
-                    <span style="font-size: 10px; font-weight: 700; color: var(--accent-caramel); background: rgba(201, 138, 74, 0.08); border: 1px solid rgba(201, 138, 74, 0.15); padding: 2px 6px; border-radius: 12px;" id="cart-order-badge">Order: DO-1001</span>
+                    <span style="font-size: 10px; font-weight: 700; color: var(--accent-caramel); background: rgba(255, 134, 22, 0.06); border: 1px solid rgba(255, 134, 22, 0.12); padding: 2px 6px; border-radius: 12px;" id="cart-order-badge">Order: DO-1001</span>
                   </div>
                   <div style="display:flex; align-items:center; gap:8px;">
                     <button class="clear-cart-btn" id="clear-cart" style="background:transparent; border:none; color:var(--danger-color); cursor:pointer; font-size:12px; transition:var(--transition); padding:6px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(231,76,60,0.06);" title="Clear Cart"><i class="fa-solid fa-trash-can"></i></button>
@@ -324,7 +324,7 @@
               </div>
 
               <!-- Loyalty Status Box (Hidden Permanently as suggestions are used instead) -->
-              <div class="loyalty-status-box" id="loyalty-status-box" style="display: none !important; padding: 10px 12px; background: rgba(201, 138, 74, 0.08); border: 1px solid rgba(201, 138, 74, 0.3); border-radius: 8px; font-size: 11px; margin-bottom: 12px; color: var(--primary-brand); line-height: 1.4;">
+              <div class="loyalty-status-box" id="loyalty-status-box" style="display: none !important; padding: 10px 12px; background: rgba(255, 134, 22, 0.06); border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 8px; font-size: 11px; margin-bottom: 12px; color: var(--primary-brand); line-height: 1.4;">
                 <!-- Filled dynamically -->
               </div>
 
@@ -334,7 +334,7 @@
               </div>
 
               <!-- Editing Bill Banner -->
-              <div id="editing-bill-banner" style="display: none; align-items: center; justify-content: space-between; background: rgba(201, 138, 74, 0.08); border: 1px solid rgba(201, 138, 74, 0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12px; font-weight: 700; color: var(--primary-brand); animation: fadeInDown 0.3s ease-out;">
+              <div id="editing-bill-banner" style="display: none; align-items: center; justify-content: space-between; background: rgba(255, 134, 22, 0.06); border: 1px solid rgba(255, 134, 22, 0.2); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 12px; font-weight: 700; color: var(--primary-brand); animation: fadeInDown 0.3s ease-out;">
                 <span style="display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-pen-to-square" style="color:var(--accent-caramel);"></i> Editing Bill <strong id="editing-bill-id-display">DO-1005</strong></span>
                 <button type="button" id="cancel-edit-bill-btn" style="background: var(--danger-color, #e74c3c); color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: opacity 0.2s ease;">Cancel</button>
               </div>
@@ -638,14 +638,14 @@
             <!-- PREMIUM AI & EXCEL ONBOARDING HUB -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; margin-top: 16px;">
               <!-- Drag and Drop Excel Onboarding Wizard -->
-              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(201, 138, 74, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(255, 134, 22, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
                 <h4 style="font-size: 13.5px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading);">
                   <i class="fa-solid fa-file-excel" style="color: #27ae60; font-size: 16px;"></i> Excel Setup Wizard (Instant Menu Import)
                 </h4>
                 <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.4;">
                   Upload your menu items, pricing categories, and ingredient recipes spreadsheet. Reduces restaurant configuration time to under 3 seconds!
                 </p>
-                <div id="excel-drag-dropzone" style="width: 100%; border: 2px dashed rgba(201, 138, 74, 0.35); border-radius: 10px; background: rgba(201, 138, 74, 0.02); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; text-align: center; cursor: pointer; transition: var(--transition); box-sizing: border-box; margin-top: 6px;">
+                <div id="excel-drag-dropzone" style="width: 100%; border: 2px dashed rgba(255, 134, 22, 0.25); border-radius: 10px; background: rgba(255, 134, 22, 0.01); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; text-align: center; cursor: pointer; transition: var(--transition); box-sizing: border-box; margin-top: 6px;">
                   <i class="fa-solid fa-cloud-arrow-up" style="font-size: 32px; color: var(--accent-caramel); margin-bottom: 8px;"></i>
                   <span style="font-size: 12px; font-weight: 700; color: var(--primary-brand);" id="excel-drop-text">Drag & Drop Excel here or Click to Browse</span>
                   <span style="font-size: 9.5px; color: var(--text-muted); margin-top: 4px;">Compatible with .xlsx, .xls, .csv recipe formats</span>
@@ -654,7 +654,7 @@
               </div>
 
               <!-- AI Cost-Control & Forecasting Card -->
-              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(201, 138, 74, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
+              <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 20px; gap: 10px; min-height: 210px; background: var(--bg-card); border: 1px solid rgba(255, 134, 22, 0.15); border-radius: var(--border-radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.02); box-sizing: border-box;">
                 <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
                   <h4 style="font-size: 13.5px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading);">
                     <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-caramel); font-size: 15px;"></i> AI Smart Inventory Forecast
@@ -1110,7 +1110,7 @@
                 </div>
               </div>
               <div class="bills-stat-card">
-                <div class="bills-stat-icon" style="background-color:rgba(201,138,74,0.08); color:var(--accent-caramel);"><i class="fa-solid fa-sack-dollar"></i></div>
+                <div class="bills-stat-icon" style="background-color:rgba(255,134,22,0.08); color:var(--accent-caramel);"><i class="fa-solid fa-sack-dollar"></i></div>
                 <div class="bills-stat-info">
                   <span class="bills-stat-title">Total Tax Collected</span>
                   <span class="bills-stat-val" id="tax-total-collected-card">₹0.00</span>
@@ -1353,7 +1353,7 @@
             <!-- Header Analytics -->
             <div class="bills-analytics-header" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
               <div class="bills-stat-card">
-                <div class="bills-stat-icon" style="background-color: rgba(201, 138, 74, 0.08); color: var(--accent-caramel);"><i class="fa-solid fa-users"></i></div>
+                <div class="bills-stat-icon" style="background-color: rgba(255, 134, 22, 0.08); color: var(--accent-caramel);"><i class="fa-solid fa-users"></i></div>
                 <div class="bills-stat-info">
                   <span class="bills-stat-title">Active Employees</span>
                   <span class="bills-stat-val" id="emp-stat-total">4 Staff Members</span>
@@ -2023,7 +2023,7 @@
                   <button type="button" class="btn btn-secondary" id="btn-export-backup" style="flex:1; font-size:11px; padding:10px; border-color:var(--accent-caramel); color:var(--primary-brand); font-weight:700; background:white;"><i class="fa-solid fa-download"></i> Export JSON Backup</button>
                 </div>
 
-                <div style="border:1px dashed rgba(201,138,74,0.35); border-radius:8px; padding:12px; background:rgba(201,138,74,0.02); margin-top:5px; box-sizing: border-box;">
+                <div style="border:1px dashed rgba(255,134,22,0.25); border-radius:8px; padding:12px; background:rgba(255,134,22,0.01); margin-top:5px; box-sizing: border-box;">
                   <h5 style="margin:0 0 6px 0; font-size:11px; color:var(--primary-brand);"><i class="fa-solid fa-upload"></i> Restore POS from Backup File</h5>
                   <p style="font-size:9px; color:var(--text-muted); margin-bottom:8px;">Upload a previously exported .json backup file to instantly restore your entire billing history, inventory levels, shifts, and settings.</p>
                   <input type="file" id="restore-backup-file" accept=".json" style="width:100%; font-size:10px; padding:4px; border:1px solid rgba(43,24,19,0.1); border-radius:4px; background:white;">
@@ -2405,7 +2405,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
           </div>
         </div>
 
-        <div style="background: rgba(201,138,74,0.06); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(201,138,74,0.15);">
+        <div style="background: rgba(255,134,22,0.06); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(255,134,22,0.15);">
           <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; margin-bottom:2px;">Expected Drawer Balance</span>
           <div style="font-size:22px; font-weight:800; color:var(--primary-brand);" id="close-summary-expected">₹0</div>
         </div>
@@ -2458,11 +2458,11 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
         <!-- Quick actions buttons grid -->
         <h3 style="font-size: 11px; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:8px;">Manual Drawer Adjustments</h3>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
-          <button type="button" class="btn btn-secondary" id="btn-shift-payout" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(201,138,74,0.2); background:white;">
+          <button type="button" class="btn btn-secondary" id="btn-shift-payout" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(255,134,22,0.2); background:white;">
             <i class="fa-solid fa-circle-minus" style="color:#e74c3c; font-size:16px;"></i>
             <strong>Vendor Payout</strong>
           </button>
-          <button type="button" class="btn btn-secondary" id="btn-shift-drop" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(201,138,74,0.2); background:white;">
+          <button type="button" class="btn btn-secondary" id="btn-shift-drop" style="padding: 10px; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; border-color:rgba(255,134,22,0.2); background:white;">
             <i class="fa-solid fa-safe" style="color:#2980b9; font-size:16px;"></i>
             <strong>Drop to Safe</strong>
           </button>
