@@ -33,3 +33,8 @@ sample_dashboard.html
 # Python cache
 __pycache__/
 *.pyc
+
+# Local Supabase CLI executables and test results
+supabase.exe
+supabase-go.exe
+res.txt

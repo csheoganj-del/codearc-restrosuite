@@ -20,24 +20,30 @@ function toBase64(str: string): string {
 
 // Send email via Gmail SMTP using Deno's built-in TCP (via smtp library)
 // We use the Deno SMTP library available as a CDN import
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
-
+// Send email via Google Apps Script Web App Relay
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  const client = new SMTPClient();
-  await client.connectTLS({
-    hostname: "smtp.gmail.com",
-    port: 465,
-    username: GMAIL_USER,
-    password: GMAIL_APP_PASSWORD,
+  const relayUrl = Deno.env.get("EMAIL_RELAY_URL");
+  if (!relayUrl) {
+    throw new Error("EMAIL_RELAY_URL environment variable is not configured.");
+  }
+
+  const response = await fetch(relayUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ to, subject, html }),
   });
-  await client.send({
-    from: `${FROM_NAME} <${GMAIL_USER}>`,
-    to: to,
-    subject: subject,
-    content: "Please enable HTML to view this email.",
-    html: html,
-  });
-  await client.close();
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Relay request failed: ${response.status} - ${errText}`);
+  }
+
+  const resJson = await response.json();
+  if (resJson.status !== "success") {
+    throw new Error(`Relay returned failure status: ${JSON.stringify(resJson)}`);
+  }
 }
 
 function buildRegistrationEmailHtml(record: Record<string, string>): string {
