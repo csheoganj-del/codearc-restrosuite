@@ -762,6 +762,18 @@ app.get('/', (req, res) => {
             <button class="btn btn-warning" id="reset-btn" style="width: 100%; justify-content: center;"><i class="fa-solid fa-arrows-rotate"></i> Force Reset Gateway</button>
         </div>
 
+        <div id="pair-container" style="display:none; margin-top:16px; width:100%;">
+            <div class="pair-section">
+                <h4><i class="fa-solid fa-mobile-screen"></i> Can't scan? Use Pairing Code</h4>
+                <p class="details-text" style="font-size:12px; margin-bottom: 10px; margin-top: 0;">Enter the WhatsApp number (with country code, no + or spaces)</p>
+                <input type="tel" id="pair-phone" class="pair-input" placeholder="e.g. 919983721179" />
+                <button class="btn btn-success" id="pair-btn" style="width:100%; justify-content:center; margin-top:4px;">
+                    <i class="fa-solid fa-key"></i> Get Pairing Code
+                </button>
+                <div id="pair-result" style="display:none;"></div>
+            </div>
+        </div>
+
         <div class="footer">
             Platform Gateway &copy; 2026 CodeArc. Support: <a href="mailto:hello@codearc.co.in">hello@codearc.co.in</a>
         </div>
@@ -770,9 +782,15 @@ app.get('/', (req, res) => {
     <script>
         const statusCard = document.getElementById('status-card');
         const actionContainer = document.getElementById('action-container');
+        const pairContainer = document.getElementById('pair-container');
         const logoutBtn = document.getElementById('logout-btn');
         const resetBtn = document.getElementById('reset-btn');
+        const pairBtn = document.getElementById('pair-btn');
         let checkInterval = null;
+        let lastRenderedStatus = null;
+
+        // Attach pairing code button listener once (persistent element)
+        if (pairBtn) pairBtn.addEventListener('click', requestPairingCode);
 
         function getAuthToken() {
             return window.location.hash ? window.location.hash.substring(1) : '';
@@ -790,6 +808,13 @@ app.get('/', (req, res) => {
                 if (!response.ok) throw new Error("HTTP error " + response.status);
                 const data = await response.json();
                 
+                // Skip re-rendering if still in 'qr' state and user is typing in the pair input
+                const pairInput = document.getElementById('pair-phone');
+                const userIsTyping = pairInput && (document.activeElement === pairInput || pairInput.value.length > 0);
+                if (data.status === 'qr' && lastRenderedStatus === 'qr' && userIsTyping) {
+                    return; // Don't wipe the input while user is typing
+                }
+
                 renderState(data.status, data.qr, data.number, data.secured);
             } catch (err) {
                 console.error("Failed to query gateway status:", err);
@@ -798,10 +823,12 @@ app.get('/', (req, res) => {
                     <p>Gateway server connection offline.</p>
                 \`;
                 actionContainer.style.display = 'none';
+                if (pairContainer) pairContainer.style.display = 'none';
             }
         }
 
         function renderState(status, qr, number, secured) {
+            lastRenderedStatus = status;
             let statusText = status.toUpperCase();
             let statusClass = status;
 
@@ -814,6 +841,11 @@ app.get('/', (req, res) => {
                 actionContainer.style.display = 'flex';
                 logoutBtn.style.display = (status === 'ready') ? 'inline-flex' : 'none';
                 resetBtn.style.display = 'inline-flex';
+            }
+
+            // Show/hide pairing section only when QR is active
+            if (pairContainer) {
+                pairContainer.style.display = (status === 'qr' && qr && !secured) ? 'block' : 'none';
             }
             
             if (status === 'ready') {
@@ -830,21 +862,7 @@ app.get('/', (req, res) => {
                         <img src="\${qr}" class="qr-image" alt="WhatsApp QR Code">
                         <p class="details-text" style="margin-top: 15px; font-weight: 500;">Scan with CodeArc's Official WhatsApp to link.</p>
                         <p class="details-text" style="font-size:12px;">Settings > Linked Devices > Link a Device</p>
-                        <div class="pair-section">
-                            <h4><i class="fa-solid fa-mobile-screen"></i> Can't scan? Use Pairing Code</h4>
-                            <p class="details-text" style="font-size:12px; margin-bottom: 10px; margin-top: 0;">Enter the WhatsApp number to link (with country code, no + or spaces)</p>
-                            <input type="tel" id="pair-phone" class="pair-input" placeholder="e.g. 919983721179" />
-                            <button class="btn btn-success" id="pair-btn" style="width:100%; justify-content:center; margin-top:4px;">
-                                <i class="fa-solid fa-key"></i> Get Pairing Code
-                            </button>
-                            <div id="pair-result" style="display:none;"></div>
-                        </div>
 \`;
-                    // Attach pairing code button listener after render
-                    setTimeout(() => {
-                        const pairBtn = document.getElementById('pair-btn');
-                        if (pairBtn) pairBtn.addEventListener('click', requestPairingCode);
-                    }, 100);
                 } else {
                     contentHtml = \`
                         \${badgeHtml}
