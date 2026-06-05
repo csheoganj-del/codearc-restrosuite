@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doppio Cafe Nagpur | Premium Cashier POS Control System</title>
+  <title>RestoSuite Console | CodeArc Staff Access</title>
   <link rel="stylesheet" href="dashboard-styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- SheetJS Spreadsheet Excel Parser Library (Premium Onboarding) -->
@@ -16,8 +16,8 @@
     <div class="lock-card" style="background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 30px 70px rgba(0,0,0,0.5); border-radius: 28px; width: 360px; padding: 40px 30px; text-align: center; display: flex; flex-direction: column; align-items: center; box-sizing: border-box; color: #FFF; animation: fadeInUp 0.5s ease;">
       
       <!-- Brand Logo -->
-      <div style="font-family: 'Inter', sans-serif; font-size: 30px; font-weight: 800; color: #ECE7DF; margin-bottom: 2px; letter-spacing: 1px;">DOPPIO</div>
-      <div style="font-size: 10px; color: var(--accent-caramel); text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
+      <div id="lock-brand-name" style="font-family: 'Inter', sans-serif; font-size: 30px; font-weight: 800; color: #ECE7DF; margin-bottom: 2px; letter-spacing: 1px;">DOPPIO</div>
+      <div id="lock-brand-desc" style="font-size: 10px; color: var(--accent-caramel); text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
       
       <!-- Security Icon -->
       <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(252, 128, 25, 0.1); border: 2px solid var(--accent-caramel); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
@@ -58,7 +58,7 @@
 
   <!-- Mobile Top Header Bar -->
   <div class="mobile-top-header">
-    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--primary-brand); letter-spacing: 0.5px;">DOPPIO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Café</span></div>
+    <div id="mobile-brand-title" style="font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: var(--primary-brand); letter-spacing: 0.5px;">DOPPIO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Café</span></div>
     
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- Mobile Network Status Dot -->
@@ -98,8 +98,8 @@
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="sidebar-brand" id="header-logo">
-        <span class="brand-doppio">DOPPIO</span>
-        <span class="brand-cafe">Café</span>
+        <span class="brand-doppio" id="sidebar-brand-name">DOPPIO</span>
+        <span class="brand-cafe" id="sidebar-brand-type">Café</span>
       </div>
       
       <div class="user-pill">
@@ -133,7 +133,7 @@
         <a href="#" class="sidebar-link" data-tab="crm-tab"><i class="fa-solid fa-users-rectangle"></i> CRM & Loyalty</a>
         <a href="#" class="sidebar-link" data-tab="tax-tab" id="sidebar-tax-link"><i class="fa-solid fa-calculator"></i> Tax Management</a>
         <a href="#" class="sidebar-link" data-tab="employees-tab" id="sidebar-employees-link"><i class="fa-solid fa-users"></i> Employee Ledger</a>
-        <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none; background: rgba(252, 128, 25, 0.08); color: var(--accent-caramel); font-weight: 600;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
+        <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
       </nav>
 
       <div class="sidebar-footer">
@@ -1582,7 +1582,7 @@
 
             <!-- Tenants list panel -->
             <div class="report-panel" style="padding: 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex-grow: 1; min-height: 400px; display: flex; flex-direction: column;">
-              <h3 style="font-family: var(--font-heading); color: #2B2B2B; font-size: 18px; font-weight: 800; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-family: var(--font-heading); color: #1C1C1C; font-size: 18px; font-weight: 800; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
                 <span><i class="fa-solid fa-store" style="color: #FC8019; margin-right: 6px;"></i> Client Workspace Registry</span>
                 <button id="btn-delete-selected-tenants" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); font-size: 11px; padding: 6px 12px; cursor: pointer; display: none; align-items: center; gap: 6px; border-radius: 6px; font-family: var(--font-body);"><i class="fa-solid fa-trash"></i> Delete Selected</button>
               </h3>

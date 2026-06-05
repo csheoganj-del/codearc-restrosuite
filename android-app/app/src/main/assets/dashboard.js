@@ -6194,6 +6194,34 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
     
     if (loggedInRole === 'superadmin') {
+      // Dynamically update brand name to RESTO Suite for Super-Admin
+      const brandNameEl = document.getElementById('sidebar-brand-name');
+      const brandTypeEl = document.getElementById('sidebar-brand-type');
+      if (brandNameEl && brandTypeEl) {
+        brandNameEl.textContent = 'RESTO';
+        brandTypeEl.textContent = 'Suite';
+      }
+
+      const mobileBrandTitleEl = document.getElementById('mobile-brand-title');
+      if (mobileBrandTitleEl) {
+        mobileBrandTitleEl.innerHTML = 'RESTO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Suite</span>';
+      }
+
+      const lockBrandNameEl = document.getElementById('lock-brand-name');
+      const lockBrandDescEl = document.getElementById('lock-brand-desc');
+      if (lockBrandNameEl) {
+        lockBrandNameEl.textContent = 'RESTOSUITE';
+        if (lockBrandDescEl) lockBrandDescEl.textContent = 'CodeArc Staff Access';
+      }
+
+      // Update superadmin user details in sidebar
+      const userNameEl = document.querySelector('.sidebar .user-name');
+      const userRoleEl = document.querySelector('.sidebar .user-role');
+      const avatarEl = document.querySelector('.sidebar .avatar');
+      if (userNameEl && loggedInUser) userNameEl.textContent = loggedInUser.charAt(0).toUpperCase() + loggedInUser.slice(1);
+      if (userRoleEl) userRoleEl.textContent = 'SaaS Super-Admin';
+      if (avatarEl && loggedInUser) avatarEl.textContent = loggedInUser.charAt(0).toUpperCase();
+
       const saLink = document.getElementById('sidebar-super-admin-link');
       if (saLink) saLink.style.display = 'flex';
       
@@ -6250,6 +6278,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         // Dynamically white-label the logo branding in the sidebar header
     const brandNameEl = document.getElementById('sidebar-brand-name');
     const brandTypeEl = document.getElementById('sidebar-brand-type');
+    const mobileBrandTitleEl = document.getElementById('mobile-brand-title');
+    const lockBrandNameEl = document.getElementById('lock-brand-name');
+    const lockBrandDescEl = document.getElementById('lock-brand-desc');
+
     if (brandNameEl && brandTypeEl) {
       if (activeTenantName === 'SaaS Platform Owner') {
         brandNameEl.textContent = 'RESTO';
@@ -6263,6 +6295,29 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           brandNameEl.textContent = activeTenantName.toUpperCase();
           brandTypeEl.textContent = '';
         }
+      }
+    }
+
+    if (mobileBrandTitleEl) {
+      if (activeTenantName === 'SaaS Platform Owner') {
+        mobileBrandTitleEl.innerHTML = 'RESTO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Suite</span>';
+      } else {
+        const words = activeTenantName.split(' ');
+        if (words.length > 1) {
+          mobileBrandTitleEl.innerHTML = `${words[0].toUpperCase()} <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">${words.slice(1).join(' ')}</span>`;
+        } else {
+          mobileBrandTitleEl.innerHTML = `${activeTenantName.toUpperCase()}`;
+        }
+      }
+    }
+
+    if (lockBrandNameEl) {
+      if (activeTenantName === 'SaaS Platform Owner') {
+        lockBrandNameEl.textContent = 'RESTOSUITE';
+        if (lockBrandDescEl) lockBrandDescEl.textContent = 'CodeArc Staff Access';
+      } else {
+        lockBrandNameEl.textContent = activeTenantName.toUpperCase();
+        if (lockBrandDescEl) lockBrandDescEl.textContent = `${activeTenantName} POS`;
       }
     }
     const userNameEl = document.querySelector('.sidebar .user-name');
@@ -12430,7 +12485,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           : 'background: rgba(245, 158, 11, 0.1); color: #F59E0B;';
 
       return `
-        <div class="tenant-workspace-card" style="display: flex; align-items: center; padding: 16px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.05); border-radius: 12px; gap: 16px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #2B2B2B; font-family: var(--font-body);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(28, 28, 28,0.05)'; this.style.borderColor='rgba(252, 128, 25,0.2)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'; this.style.borderColor='rgba(28, 28, 28,0.05)';">
+        <div class="tenant-workspace-card" style="display: flex; align-items: center; padding: 16px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.05); border-radius: 12px; gap: 16px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #1C1C1C; font-family: var(--font-body);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(28, 28, 28,0.05)'; this.style.borderColor='rgba(252, 128, 25,0.2)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'; this.style.borderColor='rgba(28, 28, 28,0.05)';">
           <!-- Selection Checkbox -->
           <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
             <input type="checkbox" class="tenant-select-checkbox" data-id="${t.id}" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
@@ -12442,7 +12497,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
               ${(t.name || 'U').substring(0, 2)}
             </div>
             <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
-              <div style="font-size: 14px; font-weight: 700; color: #2B2B2B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.name}</div>
+              <div style="font-size: 14px; font-weight: 700; color: #1C1C1C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.name}</div>
               <div style="font-size: 10px; color: #6B7280; font-family: monospace;">workspace: ${t.slug}</div>
             </div>
           </div>
@@ -12482,7 +12537,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
           <!-- Actions -->
           <div style="flex: 1.5; min-width: 150px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0;">
-            <button class="btn manage-tenant-btn" data-id="${t.id}" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.08); color: #2B2B2B; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='#2B2B2B'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#FFFFFF'; this.style.color='#2B2B2B';">
+            <button class="btn manage-tenant-btn" data-id="${t.id}" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.08); color: #1C1C1C; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='#1C1C1C'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#FFFFFF'; this.style.color='#1C1C1C';">
               <i class="fa-solid fa-gear" style="font-size: 10px;"></i> Manage
             </button>
             <button class="btn delete-single-tenant-btn" data-id="${t.id}" data-name="${t.name}" style="padding: 6px; width: 28px; height: 28px; font-size: 11px; border-radius: 8px; background: rgba(239, 68, 68, 0.05); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.15); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#FFFFFF';" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#ef4444';">
