@@ -671,6 +671,60 @@ app.get('/', (req, res) => {
             background-color: var(--warning);
             color: #0f172a;
         }
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #16a34a;
+        }
+        .pair-section {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(201, 138, 74, 0.08);
+            border: 1px solid rgba(201, 138, 74, 0.25);
+            border-radius: 10px;
+            text-align: left;
+            width: 100%;
+        }
+        .pair-section h4 {
+            font-size: 12px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pair-input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid #334155;
+            color: var(--text-primary);
+            padding: 9px 12px;
+            border-radius: 7px;
+            font-size: 13px;
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
+        .pair-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .pair-code-display {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 8px;
+            color: var(--accent);
+            text-align: center;
+            padding: 14px;
+            background: rgba(201, 138, 74, 0.1);
+            border-radius: 8px;
+            border: 1px dashed rgba(201, 138, 74, 0.4);
+            margin: 10px 0;
+            font-family: monospace;
+        }
         .footer {
             margin-top: 30px;
             font-size: 11px;
@@ -776,7 +830,21 @@ app.get('/', (req, res) => {
                         <img src="\${qr}" class="qr-image" alt="WhatsApp QR Code">
                         <p class="details-text" style="margin-top: 15px; font-weight: 500;">Scan with CodeArc's Official WhatsApp to link.</p>
                         <p class="details-text" style="font-size:12px;">Settings > Linked Devices > Link a Device</p>
+                        <div class="pair-section">
+                            <h4><i class="fa-solid fa-mobile-screen"></i> Can't scan? Use Pairing Code</h4>
+                            <p class="details-text" style="font-size:12px; margin-bottom: 10px; margin-top: 0;">Enter the WhatsApp number to link (with country code, no + or spaces)</p>
+                            <input type="tel" id="pair-phone" class="pair-input" placeholder="e.g. 919983721179" />
+                            <button class="btn btn-success" id="pair-btn" style="width:100%; justify-content:center; margin-top:4px;">
+                                <i class="fa-solid fa-key"></i> Get Pairing Code
+                            </button>
+                            <div id="pair-result" style="display:none;"></div>
+                        </div>
 \`;
+                    // Attach pairing code button listener after render
+                    setTimeout(() => {
+                        const pairBtn = document.getElementById('pair-btn');
+                        if (pairBtn) pairBtn.addEventListener('click', requestPairingCode);
+                    }, 100);
                 } else {
                     contentHtml = \`
                         \${badgeHtml}
@@ -862,6 +930,57 @@ app.get('/', (req, res) => {
             }
         });
 
+        async function requestPairingCode() {
+            const phoneInput = document.getElementById('pair-phone');
+            const resultDiv = document.getElementById('pair-result');
+            const pairBtn = document.getElementById('pair-btn');
+            const phone = (phoneInput ? phoneInput.value : '').replace(/\\D/g, '').trim();
+            if (!phone || phone.length < 10) {
+                alert('Please enter a valid phone number with country code (e.g. 919983721179).');
+                return;
+            }
+            if (pairBtn) {
+                pairBtn.disabled = true;
+                pairBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Requesting...';
+            }
+            if (resultDiv) resultDiv.style.display = 'none';
+
+            const token = getAuthToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+
+            try {
+                const response = await fetch('/pair-code', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ phone })
+                });
+                const data = await response.json();
+                if (resultDiv) {
+                    resultDiv.style.display = 'block';
+                    if (data.code) {
+                        resultDiv.innerHTML = \`
+                            <p class="details-text" style="text-align:center; font-size:12px; margin-top:12px;">Open WhatsApp → Settings → Linked Devices → Link a Device → <strong>Link with phone number instead</strong></p>
+                            <div class="pair-code-display">\${data.code}</div>
+                            <p class="details-text" style="text-align:center; font-size:11px; color: var(--warning);">⚠️ Enter this code in WhatsApp within 60 seconds!</p>
+                        \`;
+                    } else {
+                        resultDiv.innerHTML = \`<p class="details-text" style="color: var(--danger); margin-top:10px;">❌ \${data.error || 'Failed to get pairing code.'}</p>\`;
+                    }
+                }
+            } catch (err) {
+                if (resultDiv) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = \`<p class="details-text" style="color: var(--danger); margin-top:10px;">❌ Network error: \${err.message}</p>\`;
+                }
+            } finally {
+                if (pairBtn) {
+                    pairBtn.disabled = false;
+                    pairBtn.innerHTML = '<i class="fa-solid fa-key"></i> Get Pairing Code';
+                }
+            }
+        }
+
         updateStatus();
         checkInterval = setInterval(updateStatus, 2500);
         window.addEventListener('hashchange', updateStatus);
@@ -869,6 +988,39 @@ app.get('/', (req, res) => {
 </body>
 </html>
     `);
+});
+
+// POST Endpoint to request a pairing code (alternative to QR scan)
+app.post('/pair-code', async (req, res) => {
+    let { phone } = req.body;
+    if (!phone) {
+        return res.status(400).json({ status: 'error', error: 'Missing phone number' });
+    }
+
+    // Clean phone number
+    phone = String(phone).replace(/\D/g, '');
+    if (phone.length < 10) {
+        return res.status(400).json({ status: 'error', error: 'Invalid phone number. Use country code format e.g. 919983721179' });
+    }
+
+    if (connectionStatus !== 'qr') {
+        return res.status(400).json({ 
+            status: 'error', 
+            error: `Gateway is in '${connectionStatus}' state. Pairing code only works when status is 'qr'. If gateway is already ready, no linking is needed.`
+        });
+    }
+
+    try {
+        console.log(`[Pair Code] Requesting pairing code for +${maskPhone(phone)}...`);
+        const code = await client.requestPairingCode(phone);
+        console.log(`[Pair Code] ✅ Pairing code generated for +${maskPhone(phone)}: ${code}`);
+        await logHealthEvent('pair_code_requested', 'ok', { phone: maskPhone(phone) });
+        res.json({ status: 'success', code, phone: maskPhone(phone) });
+    } catch (err) {
+        console.error(`[Pair Code Error] Failed to request pairing code:`, err.message);
+        await logHealthEvent('pair_code_failed', 'error', { phone: maskPhone(phone), error: err.message });
+        res.status(500).json({ status: 'error', error: err.message });
+    }
 });
 
 // GET Endpoint to debug and manually trigger polling fallback (Made by Antigravity)
