@@ -12641,30 +12641,33 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           }
 
           logsContainer.innerHTML = logs.map(log => {
-            const logDate = new Date(log.created_at);
+            const logDate = log.created_at ? new Date(log.created_at) : new Date();
             const timeStr = logDate.toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
             const dateStr = logDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
             
-            let eventTitle = log.event;
+            const eventStr = log.event || '';
+            const statusStr = log.status || '';
+            const details = log.details || {};
+            
+            let eventTitle = eventStr || 'System Event';
             let detailsHtml = '';
             let channelBadge = '';
             let statusBadgeHtml = '';
 
             // Format event status
-            if (log.status === 'ok') {
+            if (statusStr === 'ok') {
               statusBadgeHtml = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 800; background: rgba(34, 197, 94, 0.1); color: #22C55E; text-transform: uppercase;">Success</span>`;
-            } else if (log.status === 'warning') {
+            } else if (statusStr === 'warning') {
               statusBadgeHtml = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 800; background: rgba(245, 158, 11, 0.1); color: #F59E0B; text-transform: uppercase;">Warn</span>`;
             } else {
               statusBadgeHtml = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 800; background: rgba(239, 68, 68, 0.1); color: #EF4444; text-transform: uppercase;">Error</span>`;
             }
 
             // Format channel & details based on event
-            const details = log.details || {};
-            const isWhatsApp = log.event.includes('whatsapp');
-            const isEmail = log.event.includes('email');
-            const isRegistration = log.event.includes('registration');
-            const isApproval = log.event.includes('approval');
+            const isWhatsApp = eventStr.includes('whatsapp');
+            const isEmail = eventStr.includes('email');
+            const isRegistration = eventStr.includes('registration');
+            const isApproval = eventStr.includes('approval');
 
             if (isWhatsApp) {
               channelBadge = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; background: rgba(37, 211, 102, 0.1); color: #25D366; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-brands fa-whatsapp"></i> WA</span>`;
@@ -12678,13 +12681,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
               eventTitle = 'SaaS Registration';
             } else if (isApproval) {
               eventTitle = 'Workspace Approval';
-            } else if (log.event === 'connected') {
+            } else if (eventStr === 'connected') {
               eventTitle = 'Gateway Connected';
-            } else if (log.event === 'disconnected') {
+            } else if (eventStr === 'disconnected') {
               eventTitle = 'Gateway Disconnected';
-            } else if (log.event === 'session_saved') {
+            } else if (eventStr === 'session_saved') {
               eventTitle = 'Session Backed Up';
-            } else if (log.event === 'alert_sent') {
+            } else if (eventStr === 'alert_sent') {
               eventTitle = 'Admin Alert Sent';
             }
 
