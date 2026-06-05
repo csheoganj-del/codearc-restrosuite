@@ -4,7 +4,7 @@
   "description": "Free Self-Hosted WhatsApp Gateway for Doppio Cafe POS",
   "main": "whatsapp-gateway.js",
   "scripts": {
-    "start": "node whatsapp-gateway.js"
+    "start": "node --dns-result-order=ipv4first whatsapp-gateway.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
