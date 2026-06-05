@@ -46,16 +46,20 @@ const nodemailer = require('nodemailer');
 let emailConfig = {
     user: process.env.GMAIL_USER || '',
     pass: process.env.GMAIL_APP_PASSWORD || '',
-    fromName: process.env.FROM_NAME || 'CodeArc RestoSuite'
+    fromName: process.env.FROM_NAME || 'CodeArc RestoSuite',
+    relayUrl: process.env.EMAIL_RELAY_URL || ''
 };
 
 const configPath = path.join(__dirname, 'email-config.json');
-if (!emailConfig.user && fs.existsSync(configPath)) {
+if (fs.existsSync(configPath)) {
     try {
         const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        emailConfig.user = fileConfig.gmail_user || '';
-        emailConfig.pass = fileConfig.gmail_app_password || '';
-        emailConfig.fromName = fileConfig.from_name || 'CodeArc RestoSuite';
+        if (!emailConfig.user) {
+            emailConfig.user = fileConfig.gmail_user || '';
+            emailConfig.pass = fileConfig.gmail_app_password || '';
+        }
+        emailConfig.fromName = fileConfig.from_name || emailConfig.fromName;
+        emailConfig.relayUrl = fileConfig.email_relay_url || emailConfig.relayUrl;
     } catch (err) {
         console.error("Failed to parse local email-config.json:", err.message);
     }
@@ -81,8 +85,71 @@ if (emailConfig.user && emailConfig.pass) {
         socketTimeout: 10000
     });
     console.log(`[SMTP] Nodemailer configured to send as: ${emailConfig.user}`);
-} else {
-    console.log('[SMTP Warning] GMAIL_USER and GMAIL_APP_PASSWORD not set. Email notifications will be disabled.');
+} else if (!emailConfig.relayUrl) {
+    console.log('[SMTP Warning] GMAIL_USER and GMAIL_APP_PASSWORD not set. Email notifications will be disabled unless EMAIL_RELAY_URL is provided.');
+}
+
+if (emailConfig.relayUrl) {
+    console.log(`[Email Relay] Configured to send emails via HTTP Relay: ${emailConfig.relayUrl}`);
+}
+
+async function sendMailHelper(to, subject, html, text = '') {
+    if (emailConfig.relayUrl) {
+        // Send via HTTPS Relay Web App
+        const https = require('https');
+        const http = require('http');
+        const url = new URL(emailConfig.relayUrl);
+        const postData = JSON.stringify({ to, subject, html, text });
+        
+        return new Promise((resolve, reject) => {
+            const lib = emailConfig.relayUrl.startsWith('https') ? https : http;
+            const req = lib.request(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(postData)
+                },
+                timeout: 15000 // 15 seconds timeout
+            }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.status === 'success' || parsed.ok || parsed.status === 'ok') {
+                            resolve({ messageId: parsed.messageId || 'relay_ok' });
+                        } else {
+                            reject(new Error(parsed.error || 'Relay returned failure status'));
+                        }
+                    } catch (_) {
+                        if (res.statusCode >= 200 && res.statusCode < 300) {
+                            resolve({ messageId: 'relay_ok' });
+                        } else {
+                            reject(new Error(`Relay returned status ${res.statusCode}`));
+                        }
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('Relay connection timeout'));
+            });
+            req.write(postData);
+            req.end();
+        });
+    } else if (transporter) {
+        // Send via SMTP
+        return transporter.sendMail({
+            from: `"${emailConfig.fromName}" <${emailConfig.user}>`,
+            to,
+            subject,
+            text,
+            html
+        });
+    } else {
+        throw new Error('No email service configured (SMTP or Relay).');
+    }
 }
 
 const app = express();
@@ -278,12 +345,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
     if (!subject) return;
 
     try {
-        await transporter.sendMail({
-            from: `"CodeArc Gateway Monitor" <${emailConfig.user}>`,
-            to: ADMIN_ALERT_EMAIL,
-            subject,
-            html: bodyHtml
-        });
+        await sendMailHelper(ADMIN_ALERT_EMAIL, subject, bodyHtml);
         console.log(`[Admin Alert] Email sent: ${subject}`);
         await logHealthEvent('alert_sent', 'ok', { type, to: ADMIN_ALERT_EMAIL });
     } catch (err) {
@@ -1382,20 +1444,12 @@ app.post('/send-email', async (req, res) => {
         return res.status(400).json({ status: 'error', error: 'Missing to, subject, or body (text/html)' });
     }
 
-    if (!transporter) {
-        return res.status(503).json({ status: 'error', error: 'Email SMTP service is not configured on this gateway space.' });
+    if (!transporter && !emailConfig.relayUrl) {
+        return res.status(503).json({ status: 'error', error: 'Email SMTP or HTTP Relay service is not configured on this gateway space.' });
     }
 
-    const mailOptions = {
-        from: `"${emailConfig.fromName}" <${emailConfig.user}>`,
-        to: to,
-        subject: subject,
-        text: text,
-        html: html
-    };
-
     try {
-        const info = await transporter.sendMail(mailOptions);
+        const info = await sendMailHelper(to, subject, html, text);
         console.log(`[Email Sent] Message successfully delivered to: ${to} (MessageId: ${info.messageId})`);
         res.json({ status: 'success', messageId: info.messageId });
     } catch (err) {
@@ -1735,14 +1789,7 @@ async function handleNewRegistrationNotification(record) {
 </body>
 </html>`;
         
-        const mailOptions = {
-            from: `"${emailConfig.fromName}" <${emailConfig.user}>`,
-            to: email,
-            subject: emailSubject,
-            html: emailHtml
-        };
-
-        transporter.sendMail(mailOptions)
+        sendMailHelper(email, emailSubject, emailHtml)
             .then(() => {
                 console.log(`[Realtime Email] Registration confirmation email sent to ${email}`);
                 logHealthEvent('registration_email_sent', 'ok', { email, name });
@@ -1753,7 +1800,7 @@ async function handleNewRegistrationNotification(record) {
             });
     } else {
         await logHealthEvent('registration_email_skipped', 'warning', {
-            reason: !email ? 'no_email' : 'transporter_not_configured'
+            reason: !email ? 'no_email' : 'transporter_and_relay_not_configured'
         });
     }
 }
@@ -1787,8 +1834,8 @@ async function handleApprovalNotification(record) {
     }
 
     // 2. Send Email Approval Alert
-    if (email && transporter) {
-        const emailSubject = `Account Approved & Active - CodeArc RestoSuite (Outlet: ${name})`;
+    if (email && (transporter || emailConfig.relayUrl)) {
+        const emailSubject = `✅ Account Approved & Active - CodeArc RestoSuite (Outlet: ${name})`;
         const emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; color: #333;">
           <h2 style="color: #22c55e; border-bottom: 2px solid #22c55e; padding-bottom: 10px;">🎉 Account Approved & Active</h2>
@@ -1822,14 +1869,7 @@ async function handleApprovalNotification(record) {
         </div>
         `;
 
-        const mailOptions = {
-            from: `"${emailConfig.fromName}" <${emailConfig.user}>`,
-            to: email,
-            subject: emailSubject,
-            html: emailHtml
-        };
-
-        transporter.sendMail(mailOptions)
+        sendMailHelper(email, emailSubject, emailHtml)
             .then(() => {
                 console.log(`[Realtime Email] Account approval email sent to ${email}`);
                 logHealthEvent('approval_email_sent', 'ok', { email, name });
@@ -1840,7 +1880,7 @@ async function handleApprovalNotification(record) {
             });
     } else {
         await logHealthEvent('approval_email_skipped', 'warning', {
-            reason: !email ? 'no_email' : 'transporter_not_configured'
+            reason: !email ? 'no_email' : 'transporter_and_relay_not_configured'
         });
     }
 }
