@@ -20,10 +20,10 @@ function toBase64(str: string): string {
 
 // Send email via Gmail SMTP using Deno's built-in TCP (via smtp library)
 // We use the Deno SMTP library available as a CDN import
-import { SmtpClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  const client = new SmtpClient();
+  const client = new SMTPClient();
   await client.connectTLS({
     hostname: "smtp.gmail.com",
     port: 465,
