@@ -290,7 +290,6 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
 </body>
 </html>`;
 }
-}
 
 function buildApprovalEmailHtml(record: Record<string, string>): string {
   const { name, slug, username } = record;
