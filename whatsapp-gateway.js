@@ -99,6 +99,45 @@ let lastAlertSent = null;
 let totalMessagesSent = 0;
 let recentHealthEvents = []; // last 10 events for dashboard
 
+// Watchdog — detects when gateway is stuck at 'connecting' and auto-resets
+// This fixes the #1 reliability bug: restored session is invalid/expired but
+// whatsapp-web.js never fires auth_failure or qr events — it just hangs forever.
+let watchdogTimer = null;
+const WATCHDOG_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+
+function startWatchdog() {
+    clearWatchdog();
+    watchdogTimer = setTimeout(async () => {
+        if (connectionStatus === 'connecting') {
+            console.warn('[Watchdog] ⚠️  Gateway stuck at "connecting" for 3 minutes. Auto-resetting...');
+            await logHealthEvent('watchdog_reset', 'warning', {
+                reason: 'stuck_connecting_timeout',
+                reconnectAttempts
+            });
+            // Destroy current client and re-initialize cleanly
+            try { await client.destroy(); } catch (_) {}
+            // Clear bad session files so a fresh QR is generated
+            if (fs.existsSync(authDataPath)) {
+                fs.rmSync(authDataPath, { recursive: true, force: true });
+            }
+            // Delete bad session from Supabase Storage too
+            if (supabaseService) {
+                await supabaseService.storage.from(SESSION_BUCKET).remove([SESSION_FILE_NAME]).catch(() => {});
+            }
+            connectionStatus = 'connecting';
+            console.log('[Watchdog] Re-initializing WhatsApp driver after reset...');
+            client.initialize().catch(err => console.error('[Watchdog] Re-init failed:', err.message));
+        }
+    }, WATCHDOG_TIMEOUT_MS);
+}
+
+function clearWatchdog() {
+    if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+    }
+}
+
 // ============================================================
 // HEALTH LOGGING — writes to gateway_health_log in Supabase
 // ============================================================
@@ -415,6 +454,7 @@ const client = new Client({
 
 // Display QR code in terminal and save base64 data URI for POS Web UI
 client.on('qr', async (qr) => {
+    clearWatchdog(); // QR received — gateway is not stuck anymore
     connectionStatus = 'qr';
     linkedNumber = null;
     try {
@@ -436,6 +476,7 @@ client.on('qr', async (qr) => {
 });
 
 client.on('ready', async () => {
+    clearWatchdog(); // Successfully connected — cancel any pending watchdog
     const prevStatus = connectionStatus;
     connectionStatus = 'ready';
     qrCodeDataUrl = null;
@@ -465,6 +506,7 @@ client.on('ready', async () => {
 });
 
 client.on('auth_failure', async (msg) => {
+    clearWatchdog(); // Auth failed — not stuck, just failed
     connectionStatus = 'auth_failure';
     qrCodeDataUrl = null;
     linkedNumber = null;
@@ -474,6 +516,7 @@ client.on('auth_failure', async (msg) => {
 });
 
 client.on('disconnected', async (reason) => {
+    clearWatchdog(); // Disconnected — not stuck
     const prevLinked = linkedNumber;
     connectionStatus = 'disconnected';
     qrCodeDataUrl = null;
@@ -1242,6 +1285,7 @@ async function performReset(req, res, format = 'json') {
 
         // 6. Spawn new browser instance in background
         console.log('[Reset] Re-initializing clean WhatsApp driver instance...');
+        startWatchdog(); // Start watchdog after reset too
         client.initialize().catch(err => {
             console.error('[Reset Error] Failed to re-initialize WhatsApp client:', err.message);
         });
@@ -2223,6 +2267,18 @@ function formatReceiptText(record, profile = businessProfile) {
     return msg;
 }
 
+// ============================================================
+// HEALTH ENDPOINT — for UptimeRobot / external monitors
+// ============================================================
+app.get('/health', (req, res) => {
+    res.json({
+        ok: true,
+        status: connectionStatus,
+        uptime: Math.floor(process.uptime()),
+        time: new Date().toISOString()
+    });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log('\n======================================================');
@@ -2260,6 +2316,7 @@ app.listen(PORT, async () => {
     await sendAdminAlert('startup', { sessionRestored });
 
     console.log('[Startup] Initializing WhatsApp driver...');
+    startWatchdog(); // Start watchdog — auto-resets if stuck at connecting
     client.initialize().catch(err => console.error('Failed to initialize client:', err));
 
     // Start database notification polling fallback (every 60 seconds)
@@ -2268,5 +2325,37 @@ app.listen(PORT, async () => {
         setTimeout(runNotificationPollingFallback, 5000); // Initial run in 5s
         setInterval(runNotificationPollingFallback, 60000); // Run every 60s
     }
+
+    // ============================================================
+    // KEEP-ALIVE SELF-PING — prevents HuggingFace Space from sleeping
+    // Pings own /health endpoint every 4 minutes so the space stays
+    // warm 24/7 even on the free tier.
+    // ============================================================
+    const selfUrl = process.env.SPACE_HOST
+        ? `https://${process.env.SPACE_HOST}/health`
+        : `http://localhost:${PORT}/health`;
+
+    const https = require('https');
+    const http  = require('http');
+
+    function selfPing() {
+        const lib = selfUrl.startsWith('https') ? https : http;
+        const req = lib.get(selfUrl, (res) => {
+            console.log(`[Keep-Alive] Self-ping OK — status ${res.statusCode} (gateway: ${connectionStatus})`);
+        });
+        req.on('error', (err) => {
+            console.warn(`[Keep-Alive] Self-ping failed: ${err.message}`);
+        });
+        req.end();
+    }
+
+    // First ping after 30s, then every 4 minutes
+    setTimeout(() => {
+        selfPing();
+        setInterval(selfPing, 4 * 60 * 1000);
+    }, 30000);
+
+    console.log(`[Keep-Alive] Self-ping scheduler started → ${selfUrl} (every 4 min)`);
 });
+
 
