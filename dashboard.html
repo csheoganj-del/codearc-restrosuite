@@ -1572,7 +1572,7 @@
 
         <!-- TAB 13: SAAS SUPER-ADMIN CONSOLE -->
         <div class="tab-content" id="super-admin-tab" style="overflow-y: auto; height: 100%;">
-          <div class="bills-tab-wrapper" style="height: auto; min-height: 100%; padding: 24px; box-sizing: border-box;">
+          <div class="bills-tab-wrapper" style="height: auto; min-height: 100%;">
             <div class="reports-header-actions" style="margin-bottom: 28px;">
               <div class="report-filters">
                 <span class="report-span" style="font-family: var(--font-heading); font-size: 24px; font-weight: 600; color: var(--primary-brand); letter-spacing: -0.02em;"><i class="fa-solid fa-user-shield"></i> SaaS Platform Owner Admin Portal</span>
@@ -1580,134 +1580,31 @@
               <div style="font-size: 13.5px; color: var(--text-muted); font-weight: 400; margin-top: 6px; letter-spacing: -0.01em;">CodeArc RestoSuite Hub</div>
             </div>
 
-            <!-- Two-column responsive wrapper -->
-            <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; width: 100%;">
-
-              <!-- Left Column: Client Workspace Registry -->
-              <div class="report-panel" style="padding: 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex: 1.8; min-width: 580px; display: flex; flex-direction: column; box-sizing: border-box;">
-                <h3 style="font-family: var(--font-heading); color: #1C1C1C; font-size: 18px; font-weight: 800; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                  <span><i class="fa-solid fa-store" style="color: #FC8019; margin-right: 6px;"></i> Client Workspace Registry</span>
-                  <button id="btn-delete-selected-tenants" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); font-size: 11px; padding: 6px 12px; cursor: pointer; display: none; align-items: center; gap: 6px; border-radius: 6px; font-family: var(--font-body);"><i class="fa-solid fa-trash"></i> Delete Selected</button>
-                </h3>
-                
-                <!-- Scroll container for horizontal cards table -->
-                <div style="overflow-x: auto; width: 100%; border-radius: 10px; margin-bottom: 6px;">
-                  <div style="min-width: 860px; padding-bottom: 8px;">
-                    
-                    <!-- Column Header Bar -->
-                    <div style="display: flex; align-items: center; padding: 12px 16px; background: rgba(28, 28, 28,0.03); border-radius: 10px; margin-bottom: 12px; font-weight: 700; font-size: 11px; color: #6B7280; gap: 16px; font-family: var(--font-body);">
-                      <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                        <input type="checkbox" id="select-all-tenants" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
-                      </div>
-                      <div style="flex: 2.5; min-width: 200px;">Outlet Workspace</div>
-                      <div style="flex: 1; min-width: 100px;">Outlet Type</div>
-                      <div style="flex: 2; min-width: 180px;">Owner Contact</div>
-                      <div style="flex: 1.5; min-width: 120px;">System Login</div>
-                      <div style="flex: 1; min-width: 100px; text-align: center;">Status</div>
-                      <div style="flex: 1.5; min-width: 150px; text-align: right;">Actions</div>
-                    </div>
-
-                    <!-- List of workspace cards -->
-                    <div id="saas-tenants-list" style="display: flex; flex-direction: column; gap: 10px;">
-                      <!-- Injected dynamically in JS -->
-                    </div>
-
-                  </div>
+            <!-- Tenants list panel -->
+            <div class="report-panel" style="padding: 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex-grow: 1; min-height: 400px; display: flex; flex-direction: column;">
+              <h3 style="font-family: var(--font-heading); color: #1C1C1C; font-size: 18px; font-weight: 800; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span><i class="fa-solid fa-store" style="color: #FC8019; margin-right: 6px;"></i> Client Workspace Registry</span>
+                <button id="btn-delete-selected-tenants" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); font-size: 11px; padding: 6px 12px; cursor: pointer; display: none; align-items: center; gap: 6px; border-radius: 6px; font-family: var(--font-body);"><i class="fa-solid fa-trash"></i> Delete Selected</button>
+              </h3>
+              
+              <!-- Column Header Bar -->
+              <div style="display: flex; align-items: center; padding: 12px 16px; background: rgba(28, 28, 28,0.03); border-radius: 10px; margin-bottom: 12px; font-weight: 700; font-size: 11px; color: #6B7280; gap: 16px; font-family: var(--font-body);">
+                <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <input type="checkbox" id="select-all-tenants" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
                 </div>
+                <div style="flex: 2.5; min-width: 200px;">Outlet Workspace</div>
+                <div style="flex: 1; min-width: 100px;">Outlet Type</div>
+                <div style="flex: 2; min-width: 180px;">Owner Contact</div>
+                <div style="flex: 1.5; min-width: 120px;">System Login</div>
+                <div style="flex: 1; min-width: 100px; text-align: center;">Status</div>
+                <div style="flex: 1.5; min-width: 150px; text-align: right;">Actions</div>
               </div>
 
-              <!-- Right Column: Platform Infrastructure & Gateway Monitor -->
-              <div class="report-panel" style="padding: 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex: 1.2; min-width: 340px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box;">
-                <h3 style="font-family: var(--font-heading); color: #1C1C1C; font-size: 18px; font-weight: 800; margin: 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px;">
-                  <i class="fa-solid fa-server" style="color: #FC8019; margin-right: 6px;"></i> Platform Gateway Monitor
-                </h3>
-                
-                <!-- Gateway Selector Row -->
-                <div style="display: flex; gap: 8px;">
-                  <button type="button" id="sa-wa-select-cloud" style="flex: 1; padding: 8px; font-size: 11px; font-weight: 700; border-radius: 8px; border: 1px solid #FC8019; background: rgba(252, 128, 25, 0.08); color: #FC8019; cursor: pointer; transition: all 0.2s;">
-                    <i class="fa-solid fa-cloud"></i> Cloud Space
-                  </button>
-                  <button type="button" id="sa-wa-select-local" style="flex: 1; padding: 8px; font-size: 11px; font-weight: 600; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFF; color: #4B5563; cursor: pointer; transition: all 0.2s;">
-                    <i class="fa-solid fa-desktop"></i> Local Gateway
-                  </button>
-                </div>
-
-                <!-- Custom URL input -->
-                <div>
-                  <label style="font-size: 10px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.02em;">Gateway URL</label>
-                  <input type="text" id="sa-wa-url" value="https://kalpeshdeora1006-whatsapp-gateway.hf.space" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-size: 12px; font-family: monospace; outline: none; box-sizing: border-box;" onfocus="this.style.borderColor='#FC8019'">
-                </div>
-
-                <!-- Token input -->
-                <div>
-                  <label style="font-size: 10px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.02em;">Security Auth Token</label>
-                  <input type="password" id="sa-wa-token" placeholder="Enter secure gateway token" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-size: 12px; outline: none; box-sizing: border-box;" onfocus="this.style.borderColor='#FC8019'">
-                </div>
-
-                <!-- Connection status details card -->
-                <div style="background: #FAFAFA; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Gateway Status:</span>
-                    <span id="sa-wa-status-badge" style="font-size: 9px; font-weight: 800; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; background: #E2E8F0; color: #6B7280; display: inline-flex; align-items: center; gap: 5px;">
-                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #9CA3AF; display: inline-block;"></span>Checking
-                    </span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Connected Account:</span>
-                    <strong id="sa-wa-number" style="font-size: 11px; color: #1F1F1F; font-family: monospace;">-</strong>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 11px; font-weight: 600; color: #4B5563;">Receipts Sent:</span>
-                    <strong id="sa-wa-total-sent" style="font-size: 11px; color: #1F1F1F;">0 Messages</strong>
-                  </div>
-                </div>
-
-                <!-- QR code and Pairing code Container -->
-                <div id="sa-wa-qr-container" style="display: none; flex-direction: column; align-items: center; justify-content: center; background: #fff; padding: 14px; border-radius: 12px; border: 1px dashed rgba(252, 128, 25, 0.4); margin-top: 4px; min-height: 180px;">
-                  <img id="sa-wa-qr-img" src="" alt="WhatsApp QR Code" style="width: 140px; height: 140px; display: none; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 8px; padding: 4px;">
-                  <div id="sa-wa-qr-spinner" style="font-size: 11px; color: #9CA3AF; text-align: center;">
-                    <i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 8px; font-size: 18px; color: #FC8019;"></i><br>Generating QR Code...
-                  </div>
-                  
-                  <!-- Pairing Code Section inside QR Container -->
-                  <div style="width: 100%; border-top: 1px solid #E2E8F0; margin-top: 14px; padding-top: 12px; box-sizing: border-box;">
-                    <div style="font-size: 10px; font-weight: 700; color: #FC8019; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.02em;">Or Link with Phone Number</div>
-                    <div style="display: flex; gap: 6px;">
-                      <input type="tel" id="sa-wa-pair-phone" placeholder="e.g. 919983721179" style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #E2E8F0; font-size: 11px; outline: none; box-sizing: border-box;" onfocus="this.style.borderColor='#FC8019'">
-                      <button type="button" id="sa-wa-pair-btn" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 6px; border: none; background: #FC8019; color: #fff; cursor: pointer; transition: opacity 0.15s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">Get Code</button>
-                    </div>
-                    <div id="sa-wa-pair-result" style="display: none; text-align: center; margin-top: 10px; padding: 10px; background: rgba(252, 128, 25, 0.06); border: 1px dashed rgba(252, 128, 25, 0.25); border-radius: 8px;">
-                      <div style="font-size: 9px; color: #6B7280; font-weight: 600;">Pairing Code:</div>
-                      <div id="sa-wa-pair-code" style="font-size: 20px; font-weight: 800; color: #FC8019; letter-spacing: 4px; font-family: monospace; margin-top: 4px;">--------</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div id="sa-wa-actions" style="display: flex; gap: 8px; width: 100%;">
-                  <button type="button" id="sa-wa-reset-btn" style="flex: 1; padding: 8px; font-size: 11px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.05); color: #EF4444; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#EF4444'; this.style.color='#FFF'" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#EF4444'">
-                    <i class="fa-solid fa-arrows-rotate"></i> Reset Server
-                  </button>
-                  <button type="button" id="sa-wa-logout-btn" style="flex: 1; padding: 8px; font-size: 11px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.05); color: #EF4444; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#EF4444'; this.style.color='#FFF'" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#EF4444'">
-                    <i class="fa-solid fa-link-slash"></i> Unlink Device
-                  </button>
-                </div>
-
-                <!-- Live Health Logs Terminal -->
-                <div style="display: flex; flex-direction: column; flex-grow: 1; min-height: 200px; box-sizing: border-box;">
-                  <div style="font-size: 10px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.02em;">
-                    <span>System Infrastructure Logs</span>
-                    <button type="button" id="sa-wa-refresh-logs" style="border: none; background: none; font-size: 10px; color: #FC8019; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 700; font-family: var(--font-body);"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                  </div>
-                  <div id="sa-wa-logs-terminal" style="flex-grow: 1; height: 200px; background: #111827; border-radius: 10px; border: 1px solid #1F2937; padding: 12px; font-family: monospace; font-size: 10px; color: #10B981; overflow-y: auto; line-height: 1.4; white-space: pre-wrap; box-sizing: border-box;">
-                    <!-- Logs injected here -->
-                  </div>
-                </div>
-
+              <!-- List of workspace cards -->
+              <div id="saas-tenants-list" style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1;">
+                <!-- Injected dynamically in JS -->
               </div>
-
             </div>
-
           </div>
         </div>
       </div>
