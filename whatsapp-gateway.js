@@ -261,14 +261,27 @@ async function saveSessionToSupabase() {
     }
     const zipPath = path.join(os.tmpdir(), 'wa_session_backup.zip');
     try {
-        // Zip the auth folder
+        // Zip the auth folder excluding Chrome cache files to keep size under 3MB and avoid corruption
         await new Promise((resolve, reject) => {
             const output = fs.createWriteStream(zipPath);
             const archive = archiver('zip', { zlib: { level: 6 } });
             output.on('close', resolve);
             archive.on('error', reject);
             archive.pipe(output);
-            archive.directory(authDataPath, false);
+            archive.glob('**/*', {
+                cwd: authDataPath,
+                ignore: [
+                    '**/Cache/**',
+                    '**/Code Cache/**',
+                    '**/GPUCache/**',
+                    '**/Service Worker/**',
+                    '**/Crashpad/**',
+                    '**/*.pma',
+                    '**/LOCK',
+                    '**/LOG',
+                    '**/LOG.old'
+                ]
+            });
             
             archive.finalize();
         });
