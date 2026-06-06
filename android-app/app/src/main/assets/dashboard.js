@@ -8633,7 +8633,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       mTotal.textContent = `₹${subtotal + gst}`;
       
       if (mobileFloatingCart) {
-        if (totalQty > 0) {
+        if (totalQty > 0 && window.innerWidth <= 600) {
           mobileFloatingCart.style.setProperty('display', 'flex', 'important');
         } else {
           mobileFloatingCart.style.setProperty('display', 'none', 'important');

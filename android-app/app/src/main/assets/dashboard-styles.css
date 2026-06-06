@@ -122,11 +122,11 @@ body::before {
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(252, 128, 25, 0.3);
+  background: rgba(28, 28, 28, 0.15);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-caramel);
+  background: rgba(28, 28, 28, 0.3);
 }
 
 /* ==========================================
