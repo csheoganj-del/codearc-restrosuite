@@ -490,8 +490,8 @@ function verifyToken(req) {
 const os = require('os');
 
 // Determine data path dynamically to support both Windows local execution and Linux cloud containers
-let authDataPath = path.join(__dirname, '.wwebjs_auth');
-if (os.platform() === 'win32') {
+let authDataPath = process.env.AUTH_DATA_PATH || path.join(__dirname, '.wwebjs_auth');
+if (!process.env.AUTH_DATA_PATH && os.platform() === 'win32') {
     authDataPath = path.join(os.homedir(), '.gemini', 'antigravity', 'doppio-auth');
 }
 
@@ -1169,8 +1169,9 @@ app.post('/pair-code', async (req, res) => {
 
 // GET Endpoint to debug and manually trigger polling fallback (Made by Antigravity)
 app.get('/debug-poll', async (req, res) => {
+    const force = req.query.force === 'true';
     try {
-        console.log('[Debug Poll] Triggering polling fallback manually...');
+        console.log(`[Debug Poll] Triggering polling fallback manually (force: ${force})...`);
         if (!supabaseService) {
             return res.json({ status: 'error', reason: 'SUPABASE_SERVICE_KEY not set' });
         }
@@ -1209,7 +1210,7 @@ app.get('/debug-poll', async (req, res) => {
         // 3. Process
         const results = [];
         for (const tenant of tenants) {
-            const alreadyNotified = notifiedSlugs.includes(tenant.slug);
+            const alreadyNotified = force ? false : notifiedSlugs.includes(tenant.slug);
             results.push({ name: tenant.name, slug: tenant.slug, alreadyNotified });
             if (!alreadyNotified) {
                 await handleNewRegistrationNotification(tenant);
@@ -1555,7 +1556,7 @@ async function handleNewRegistrationNotification(record) {
     }
 
     // 2. Send Email Confirmation
-    if (email && transporter) {
+    if (email && (transporter || emailConfig.relayUrl)) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
         const emailSubject = `Registration Received - CodeArc RestoSuite (Outlet: ${name})`;
@@ -2329,6 +2330,24 @@ app.get('/debug-relay', (req, res) => {
         containsExec: relay.endsWith('/exec'),
         containsEdit: relay.includes('/edit')
     });
+});
+
+// GET Endpoint to read recent DB health logs bypassing RLS
+app.get('/debug-logs', async (req, res) => {
+    try {
+        if (!supabaseService) {
+            return res.json({ status: 'error', reason: 'SUPABASE_SERVICE_KEY not set' });
+        }
+        const { data, error } = await supabaseService
+            .from('gateway_health_log')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100);
+        if (error) throw error;
+        return res.json({ status: 'success', logs: data });
+    } catch (err) {
+        return res.status(500).json({ status: 'error', message: err.message });
+    }
 });
 
 app.get('/test-relay-call', async (req, res) => {
