@@ -2346,6 +2346,26 @@ app.get('/debug-logs', async (req, res) => {
     }
 });
 
+// GET Endpoint to inspect session storage bucket settings
+app.get('/debug-bucket', async (req, res) => {
+    try {
+        if (!supabaseService) {
+            return res.json({ status: 'error', reason: 'SUPABASE_SERVICE_KEY not set' });
+        }
+        const { data: bucket, error: bucketErr } = await supabaseService.storage.getBucket(SESSION_BUCKET);
+        if (bucketErr) throw bucketErr;
+        const { data: files, error: filesErr } = await supabaseService.storage.from(SESSION_BUCKET).list();
+        return res.json({
+            status: 'success',
+            bucket,
+            files: files || [],
+            filesErr: filesErr ? filesErr.message : null
+        });
+    } catch (err) {
+        return res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
 app.get('/test-relay-call', async (req, res) => {
     const relay = process.env.EMAIL_RELAY_URL || emailConfig.relayUrl || '';
     if (!relay) return res.json({ error: 'No relay configured' });
