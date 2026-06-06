@@ -1,10 +1,6 @@
 {
-  "redirects": [
-    { "source": "/", "destination": "/home", "permanent": true }
-  ],
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/home", "destination": "/home.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/dashboard", "destination": "/dashboard.html" }
   ]

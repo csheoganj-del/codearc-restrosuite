@@ -4,12 +4,336 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RestoSuite Console | CodeArc Staff Access</title>
-  <link rel="stylesheet" href="dashboard-styles.css?v=1.5">
+  <link rel="stylesheet" href="dashboard-styles.css?v=2.6">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- SheetJS Spreadsheet Excel Parser Library (Premium Onboarding) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    // Guard session immediately to prevent render flash for unauthorized users
+    (function() {
+      var user = sessionStorage.getItem('logged_in_user');
+      var role = sessionStorage.getItem('logged_in_role');
+      if (!user) {
+        window.location.replace('login.html');
+        return;
+      }
+      document.documentElement.classList.add('role-' + (role || 'cashier'));
+    })();
+  </script>
+  <style>
+    /* Anti-flash styles for SaaS Super-Admin */
+    .superadmin-only {
+      display: none !important;
+    }
+    .role-superadmin .client-only {
+      display: none !important;
+    }
+    .role-superadmin .superadmin-only {
+      display: inline !important;
+    }
+    .role-superadmin div.superadmin-only,
+    .role-superadmin a.superadmin-only {
+      display: flex !important;
+    }
+    .role-superadmin .sidebar-menu a:not(#sidebar-super-admin-link):not(#sidebar-gateway-monitor-link) {
+      display: none !important;
+    }
+    .role-superadmin #sidebar-super-admin-link,
+    .role-superadmin #sidebar-gateway-monitor-link {
+      display: flex !important;
+    }
+    .role-superadmin .header-center-metrics,
+    .role-superadmin #notifications-bell,
+    .role-superadmin #open-profile-btn,
+    .role-superadmin #header-shift-pill {
+      display: none !important;
+    }
+    /* Mobile nav: hide client tabs for superadmin */
+    .role-superadmin .mobile-bottom-nav .mobile-nav-client {
+      display: none !important;
+    }
+    /* Mobile nav: show superadmin tabs */
+    .role-superadmin .mobile-bottom-nav .mobile-nav-superadmin {
+      display: flex !important;
+    }
+    /* Mobile more sheet: hide client links for superadmin */
+    .role-superadmin .more-sheet-link.client-only {
+      display: none !important;
+    }
+    /* Mobile more sheet: show superadmin links */
+    .role-superadmin .more-sheet-link.superadmin-only {
+      display: flex !important;
+    }
+    /* Mobile top header: hide client-only controls for superadmin */
+    .role-superadmin #mobile-notifications-bell,
+    .role-superadmin #mobile-profile-btn {
+      display: none !important;
+    }
+
+    /* Tab routing and visibility */
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: flex !important;
+      flex-direction: column;
+    }
+    
+    /* Default tab display before JS loaded */
+    body:not(.js-loaded) .role-cashier #pos-tab,
+    body:not(.js-loaded) .role-admin #pos-tab,
+    body:not(.js-loaded) .role-waiter #qr-orders-tab,
+    body:not(.js-loaded) .role-kitchen #kds-tab,
+    body:not(.js-loaded) .role-customer_display #tokens-tab {
+      display: flex !important;
+      flex-direction: column;
+    }
+    body:not(.js-loaded) .role-superadmin #super-admin-tab {
+      display: flex !important;
+      flex-direction: column;
+    }
+
+    /* Onboarding Tour Style Overrides (No blur, adaptive themes, premium matching) */
+    #onboarding-card {
+      position: absolute;
+      z-index: 99999;
+      pointer-events: all;
+      width: 350px;
+      background: #FFFFFF;
+      border: 1px solid rgba(252, 128, 25, 0.25);
+      border-radius: 20px;
+      padding: 24px 24px 20px 24px;
+      box-shadow: var(--shadow-lg), 0 0 0 1px rgba(28, 28, 28, 0.04);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      font-family: 'Inter', sans-serif;
+      color: var(--text-dark);
+      box-sizing: border-box;
+    }
+
+    body.dark-theme #onboarding-card {
+      background: #201512;
+      border-color: rgba(252, 128, 25, 0.4);
+      color: #F7F3EF;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    #tour-step-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(252, 128, 25, 0.08);
+      border: 1px solid rgba(252, 128, 25, 0.15);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #FC8019;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    body.dark-theme #tour-step-badge {
+      background: rgba(252, 128, 25, 0.15);
+      border-color: rgba(252, 128, 25, 0.3);
+    }
+
+    #tour-feature-icon {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      border-radius: 12px;
+      background: rgba(252, 128, 25, 0.06);
+      border: 1px solid rgba(252, 128, 25, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    body.dark-theme #tour-feature-icon {
+      background: rgba(252, 128, 25, 0.12);
+      border-color: rgba(252, 128, 25, 0.3);
+    }
+
+    #tour-prev-btn {
+      flex: 1;
+      padding: 10px 0;
+      border-radius: 10px;
+      background: #F8F9FA;
+      border: 1px solid #E2E8F0;
+      color: #6B7280;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    body.dark-theme #tour-prev-btn {
+      background: #1C1C1C;
+      border-color: rgba(255, 255, 255, 0.08);
+      color: #F7F3EF;
+    }
+
+    #tour-prev-btn:hover {
+      background: #EEEEEE;
+      color: #1F1F1F;
+    }
+
+    body.dark-theme #tour-prev-btn:hover {
+      background: #2D2D2D;
+      color: #FFFFFF;
+    }
+
+    #tour-next-btn {
+      flex: 2;
+      padding: 10px 0;
+      border-radius: 10px;
+      background: var(--caramel-gradient);
+      border: none;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 14px rgba(252, 128, 25, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    #tour-next-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-0.5px);
+    }
+
+    #tour-skip-btn {
+      background: rgba(28, 28, 28, 0.05);
+      border: 1px solid rgba(28, 28, 28, 0.08);
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 14px;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+
+    body.dark-theme #tour-skip-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: #F7F3EF;
+    }
+
+    #tour-skip-btn:hover {
+      background: rgba(28, 28, 28, 0.1);
+      color: var(--primary-brand);
+    }
+
+    body.dark-theme #tour-skip-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #FFFFFF;
+    }
+
+    #onboarding-spotlight {
+      position: absolute;
+      border-radius: 12px;
+      border: 2px solid #FC8019;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.08), 0 0 15px rgba(252, 128, 25, 0.6);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      z-index: 99998;
+      animation: spotlightPulse 2s infinite ease-in-out;
+    }
+
+    @keyframes spotlightPulse {
+      0% {
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.08), 0 0 8px rgba(252, 128, 25, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.08), 0 0 20px rgba(252, 128, 25, 0.8);
+      }
+      100% {
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.08), 0 0 8px rgba(252, 128, 25, 0.4);
+      }
+    }
+
+    @media (max-width: 768px) {
+      #onboarding-card {
+        position: fixed !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: calc(100vw - 32px) !important;
+        max-width: 380px !important;
+        z-index: 99999 !important;
+        box-shadow: 0 -10px 30px rgba(0,0,0,0.15), var(--shadow-lg);
+      }
+    }
+  </style>
 </head>
 <body>
+
+  <!-- ============================================================
+       ONBOARDING TOUR OVERLAY — shown once for new workspaces
+       ============================================================ -->
+  <div id="onboarding-overlay" style="display:none; position:fixed; inset:0; z-index:99999; pointer-events:none;">
+    <!-- Clear transparent backdrop overlay (blocks clicks on dashboard without obscuring it) -->
+    <div id="onboarding-backdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.01); pointer-events:all; transition:opacity 0.3s ease;"></div>
+
+    <!-- Spotlight ring (follows target element) -->
+    <div id="onboarding-spotlight"></div>
+
+    <!-- Tour Tooltip Card -->
+    <div id="onboarding-card">
+      <!-- Card top: step badge + close -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+        <div id="tour-step-badge">
+          <span id="tour-step-icon" style="font-size:11px;">✨</span>
+          <span id="tour-step-label">Welcome</span>
+        </div>
+        <button id="tour-skip-btn" onclick="window.endOnboardingTour()" title="Skip tour">×</button>
+      </div>
+
+      <!-- Icon + Title -->
+      <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px;">
+        <div id="tour-feature-icon">🏪</div>
+        <div>
+          <h3 id="tour-title" style="margin:0 0 4px; font-size:17px; font-weight:800; line-height:1.2;">Welcome to RestoSuite</h3>
+          <p id="tour-subtitle" style="margin:0; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; opacity:0.8;">Your Complete Restaurant OS</p>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <p id="tour-desc" style="font-size:13px; line-height:1.65; margin:0 0 20px; min-height:56px; opacity:0.9;">
+        Let's take a quick tour of your dashboard. We'll walk through every feature so you can get started confidently. Takes about 60 seconds.
+      </p>
+
+      <!-- Progress dots -->
+      <div id="tour-dots" style="display:flex; gap:6px; align-items:center; margin-bottom:20px; flex-wrap:wrap;"></div>
+
+      <!-- Navigation buttons -->
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button id="tour-prev-btn" onclick="window.tourNavigate(-1)">← Prev</button>
+        <button id="tour-next-btn" onclick="window.tourNavigate(1)">Next →</button>
+      </div>
+
+      <!-- Skip text -->
+      <div style="text-align:center; margin-top:14px;">
+        <button onclick="window.endOnboardingTour()" style="
+          background:none; border:none; color:var(--text-muted);
+          font-size:11px; cursor:pointer; font-family:'Inter',sans-serif;
+          transition:color 0.2s;
+        " onmouseover="this.style.color='var(--accent-caramel)'" onmouseout="this.style.color='var(--text-muted)'">
+          Skip tour — I'll explore on my own
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- END ONBOARDING TOUR -->
 
   <!-- GLOBAL SCREEN LOCK OVERLAY -->
   <div id="page-lock-overlay" style="display: none;">
@@ -58,7 +382,10 @@
 
   <!-- Mobile Top Header Bar -->
   <div class="mobile-top-header">
-    <div id="mobile-brand-title" style="font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: var(--primary-brand); letter-spacing: 0.5px;">DOPPIO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Café</span></div>
+    <div id="mobile-brand-title" style="font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: var(--primary-brand); letter-spacing: 0.5px;">
+      <span class="client-only">DOPPIO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Café</span></span>
+      <span class="superadmin-only" style="display: none;">RESTO <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">Suite</span></span>
+    </div>
     
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- Mobile Network Status Dot -->
@@ -84,29 +411,45 @@
 
   <!-- Mobile Bottom Navigation Bar -->
   <div class="mobile-bottom-nav">
-    <a href="#" class="mobile-nav-link active" data-tab="pos-tab"><i class="fa-solid fa-mug-hot"></i> POS</a>
-    <a href="#" class="mobile-nav-link" data-tab="qr-orders-tab" id="mobile-qr-link">
+    <!-- CLIENT-ONLY bottom nav tabs (hidden for superadmin) -->
+    <a href="#" class="mobile-nav-link active mobile-nav-client" data-tab="pos-tab"><i class="fa-solid fa-mug-hot"></i> POS</a>
+    <a href="#" class="mobile-nav-link mobile-nav-client" data-tab="qr-orders-tab" id="mobile-qr-link">
       <i class="fa-solid fa-qrcode"></i> Live QR
       <span class="live-qr-badge" id="mobile-live-qr-badge" style="display:none; background:#e74c3c; color:white; font-size:9px; font-weight:800; padding:1px 5px; border-radius:10px; margin-left:3px; animation: pulse 1.5s infinite;">0</span>
     </a>
-    <a href="#" class="mobile-nav-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i> Bills</a>
-    <a href="#" class="mobile-nav-link" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i> Stock</a>
-    <a href="#" class="mobile-nav-link" id="mobile-more-btn"><i class="fa-solid fa-ellipsis"></i> More</a>
+    <a href="#" class="mobile-nav-link mobile-nav-client" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i> Bills</a>
+    <a href="#" class="mobile-nav-link mobile-nav-client" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i> Stock</a>
+    <a href="#" class="mobile-nav-link mobile-nav-client" id="mobile-more-btn"><i class="fa-solid fa-ellipsis"></i> More</a>
+    <!-- SUPERADMIN-ONLY bottom nav tabs (hidden for clients, shown for superadmin) -->
+    <a href="#" class="mobile-nav-link mobile-nav-superadmin" data-tab="super-admin-tab" style="display:none;"><i class="fa-solid fa-user-shield"></i> Clients</a>
+    <a href="#" class="mobile-nav-link mobile-nav-superadmin" data-tab="gateway-monitor-tab" style="display:none;"><i class="fa-solid fa-server"></i> Gateway</a>
+    <a href="#" class="mobile-nav-link mobile-nav-superadmin" id="mobile-more-btn-sa" style="display:none;"><i class="fa-solid fa-ellipsis"></i> More</a>
   </div>
 
   <div class="dashboard-wrapper">
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="sidebar-brand" id="header-logo">
-        <span class="brand-doppio" id="sidebar-brand-name">DOPPIO</span>
-        <span class="brand-cafe" id="sidebar-brand-type">Café</span>
+        <span class="brand-doppio client-only" id="sidebar-brand-name">DOPPIO</span>
+        <span class="brand-cafe client-only" id="sidebar-brand-type">Café</span>
+        <span class="brand-doppio superadmin-only" id="sidebar-brand-name-sa" style="display: none;">RESTO</span>
+        <span class="brand-cafe superadmin-only" id="sidebar-brand-type-sa" style="display: none;">Suite</span>
       </div>
       
       <div class="user-pill">
-        <div class="avatar">B</div>
+        <div class="avatar">
+          <span class="client-only">B</span>
+          <span class="superadmin-only" style="display: none;">S</span>
+        </div>
         <div class="user-details">
-          <span class="user-name">bonie</span>
-          <span class="user-role">Cashier / Staff</span>
+          <span class="user-name">
+            <span class="client-only">bonie</span>
+            <span class="superadmin-only" style="display: none;">Superadmin</span>
+          </span>
+          <span class="user-role">
+            <span class="client-only">Cashier / Staff</span>
+            <span class="superadmin-only" style="display: none;">SaaS Super-Admin</span>
+          </span>
         </div>
       </div>
 
@@ -139,6 +482,7 @@
 
       <div class="sidebar-footer">
         <button class="profile-sidebar-btn" id="open-profile-btn"><i class="fa-solid fa-store"></i> Business Profile</button>
+        <button class="profile-sidebar-btn client-only" onclick="window.startOnboardingTour && window.startOnboardingTour()" style="background:rgba(252,128,25,0.08); border:1px dashed rgba(252,128,25,0.25); color:var(--accent-caramel); margin-top:6px;" title="Replay the feature tour"><i class="fa-solid fa-compass"></i> Feature Tour</button>
         <a href="index.html" class="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout Portal</a>
       </div>
     </aside>
@@ -148,20 +492,26 @@
       <!-- Header bar -->
       <header class="dashboard-header">
         <div class="header-left">
-          <h1 id="tab-title">Takeaway POS</h1>
-          <span id="tab-subtitle">Default Tab: Selection Grid</span>
+          <h1 id="tab-title">
+            <span class="client-only">Takeaway POS</span>
+            <span class="superadmin-only" style="display: none;">SaaS Super-Admin Console</span>
+          </h1>
+          <span id="tab-subtitle">
+            <span class="client-only">Default Tab: Selection Grid</span>
+            <span class="superadmin-only" style="display: none;">Manage client subscriptions, features, and system access</span>
+          </span>
         </div>
 
         <!-- Cashier Diagnostics & Daily Sales Info -->
         <div class="header-center-metrics">
-          <div class="header-metric-pill" title="Current Daily Sales Total">
+          <div class="header-metric-pill" id="header-sales-pill" title="Current Daily Sales Total" style="cursor: pointer;">
             <i class="fa-solid fa-indian-rupee-sign"></i>
             <div class="header-metric-details">
               <span class="header-metric-val" id="header-sales-today">₹0.00</span>
               <span class="header-metric-lbl">Sales Today</span>
             </div>
           </div>
-          <div class="header-metric-pill" title="Total Bills Completed Today">
+          <div class="header-metric-pill" id="header-bills-pill" title="Total Bills Completed Today" style="cursor: pointer;">
             <i class="fa-solid fa-receipt"></i>
             <div class="header-metric-details">
               <span class="header-metric-val" id="header-bills-today">0 Bills</span>
@@ -1201,7 +1551,7 @@
         <div class="tab-content" id="online-tab">
           <div class="menu-editor-layout">
             <!-- Left panel: Settings & Integration -->
-            <div class="menu-editor-form-panel glassmorphic-panel" style="position: sticky; top: 0;">
+            <div class="online-control-panel glassmorphic-panel" style="position: sticky; top: 0;">
               <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin-bottom: 8px;"><i class="fa-solid fa-cloud-arrow-down"></i> Channel Control</h3>
               <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 20px;">Manage online aggregators, WhatsApp gateways, and auto-accept state in real-time.</p>
               
@@ -1588,17 +1938,17 @@
                 <button id="btn-delete-selected-tenants" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); font-size: 11px; padding: 6px 12px; cursor: pointer; display: none; align-items: center; gap: 6px; border-radius: 6px; font-family: var(--font-body);"><i class="fa-solid fa-trash"></i> Delete Selected</button>
               </h3>
               
-              <!-- Column Header Bar -->
-              <div style="display: flex; align-items: center; padding: 12px 16px; background: rgba(28, 28, 28,0.03); border-radius: 10px; margin-bottom: 12px; font-weight: 700; font-size: 11px; color: #6B7280; gap: 16px; font-family: var(--font-body);">
+              <!-- Column Header Bar — hidden on mobile, cards show inline labels -->
+              <div class="sa-table-header" style="display: flex; align-items: center; padding: 12px 16px; background: rgba(28, 28, 28,0.03); border-radius: 10px; margin-bottom: 12px; font-weight: 700; font-size: 11px; color: #6B7280; gap: 16px; font-family: var(--font-body);">
                 <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                   <input type="checkbox" id="select-all-tenants" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
                 </div>
-                <div style="flex: 2.5; min-width: 200px;">Outlet Workspace</div>
-                <div style="flex: 1; min-width: 100px;">Outlet Type</div>
-                <div style="flex: 2; min-width: 180px;">Owner Contact</div>
-                <div style="flex: 1.5; min-width: 120px;">System Login</div>
-                <div style="flex: 1; min-width: 100px; text-align: center;">Status</div>
-                <div style="flex: 1.5; min-width: 150px; text-align: right;">Actions</div>
+                <div style="flex: 2.5; min-width: 0;">Outlet Workspace</div>
+                <div style="flex: 1; min-width: 0;">Type</div>
+                <div style="flex: 2; min-width: 0;">Owner Contact</div>
+                <div style="flex: 1.5; min-width: 0;">Login</div>
+                <div style="flex: 1; min-width: 0; text-align: center;">Status</div>
+                <div style="flex: 1.5; min-width: 0; text-align: right;">Actions</div>
               </div>
 
               <!-- List of workspace cards -->
@@ -2086,6 +2436,15 @@
                   <span class="slider"></span>
                 </label>
               </div>
+
+              <!-- Collapse Sidebar toggle switch -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:rgba(28, 28, 28,0.03); padding:10px; border-radius:8px;">
+                <span style="font-size:12px; font-weight:600; color:var(--text-dark);"><i class="fa-solid fa-compress" style="color:var(--accent-caramel); margin-right:6px;"></i> Collapse Sidebar to Icons</span>
+                <label class="switch">
+                  <input type="checkbox" id="profile-collapse-sidebar">
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
 
             <!-- Tab 8: Data Backup -->
@@ -2404,23 +2763,54 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       <button type="button" class="close-modal-btn" id="close-more-sheet-btn" style="background:transparent; border:none; font-size:24px; cursor:pointer;">&times;</button>
     </div>
     <div class="more-sheet-links">
-      <a href="#" class="more-sheet-link" data-tab="editor-tab">
+      <!-- CLIENT-ONLY more sheet links -->
+      <a href="#" class="more-sheet-link client-only" data-tab="online-tab">
+        <i class="fa-solid fa-cloud-arrow-down"></i>
+        <span>Online Orders</span>
+      </a>
+      <a href="#" class="more-sheet-link client-only" data-tab="kds-tab">
+        <i class="fa-solid fa-tv"></i>
+        <span>Kitchen KDS</span>
+      </a>
+      <a href="#" class="more-sheet-link client-only" data-tab="tokens-tab">
+        <i class="fa-solid fa-ticket"></i>
+        <span>Token Board</span>
+      </a>
+      <a href="#" class="more-sheet-link client-only" data-tab="reports-tab">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Reports</span>
+      </a>
+      <a href="#" class="more-sheet-link client-only" data-tab="editor-tab">
         <i class="fa-solid fa-pen-to-square"></i>
         <span>Menu Editor</span>
       </a>
-      <a href="#" class="more-sheet-link" data-tab="crm-tab">
+      <a href="#" class="more-sheet-link client-only" data-tab="crm-tab">
         <i class="fa-solid fa-users-rectangle"></i>
         <span>CRM Loyalty</span>
       </a>
-      <a href="#" class="more-sheet-link" data-tab="tax-tab">
+      <a href="#" class="more-sheet-link client-only" data-tab="tax-tab">
         <i class="fa-solid fa-calculator"></i>
         <span>Tax Portal</span>
       </a>
-      <a href="#" class="more-sheet-link" id="mobile-profile-sheet-btn">
+      <a href="#" class="more-sheet-link client-only" data-tab="employees-tab">
+        <i class="fa-solid fa-users"></i>
+        <span>Employees</span>
+      </a>
+      <a href="#" class="more-sheet-link client-only" id="mobile-profile-sheet-btn">
         <i class="fa-solid fa-store"></i>
         <span>Settings</span>
       </a>
-      <a href="index.html" class="more-sheet-link logout-link-mobile">
+      <!-- SUPERADMIN-ONLY more sheet links (hidden by default, shown via CSS for role-superadmin) -->
+      <a href="#" class="more-sheet-link superadmin-only" data-tab="super-admin-tab" style="display:none;">
+        <i class="fa-solid fa-user-shield"></i>
+        <span>SaaS Console</span>
+      </a>
+      <a href="#" class="more-sheet-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none;">
+        <i class="fa-solid fa-server"></i>
+        <span>Gateway Monitor</span>
+      </a>
+      <!-- Shared logout -->
+      <a href="index.html" class="more-sheet-link logout-link-mobile" style="grid-column: span 2;">
         <i class="fa-solid fa-right-from-bracket"></i>
         <span>Logout Portal</span>
       </a>
@@ -2726,8 +3116,8 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
        SaaS CLIENT MANAGEMENT MODAL — Premium redesign
        Matches dashboard design system: Inter, #FC8019, slate borders
        ══════════════════════════════════════════════════════ -->
-  <div class="modal-backdrop" id="tenant-manage-modal" style="z-index: 200000;">
-    <div class="glass-modal" style="max-width: 600px; width: 94%; box-shadow: 0 10px 40px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.03);">
+  <div class="modal-backdrop" id="tenant-manage-modal" style="z-index: 200000; overflow-y: auto; align-items: flex-start; padding: 20px 0;">
+    <div class="glass-modal" style="max-width: 600px; width: 94%; max-height: none; overflow: visible; box-shadow: 0 10px 40px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.03);">
 
       <!-- ── Header ── -->
       <div class="modal-header" style="padding: 20px 24px 18px; border-bottom: 1px solid #F1F5F9;">
@@ -2744,7 +3134,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       </div>
 
       <!-- ── Body ── -->
-      <div class="modal-body" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="modal-body" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow: visible; flex-grow: 1;">
 
         <input type="hidden" id="manage-tenant-id">
 
@@ -2768,37 +3158,43 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
             <div style="width: 3px; height: 13px; background: #FC8019; border-radius: 2px; flex-shrink: 0;"></div>
             <span style="font-size: 11px; font-weight: 600; color: #374151; letter-spacing: 0;">Client credentials &amp; contact</span>
           </div>
-          <div style="padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #fff;">
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Admin username</label>
-              <input type="text" id="manage-username" placeholder="e.g. admin"
-                style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
-                onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
-                onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
+          <div style="padding: 14px 16px; background: #fff; display: flex; flex-direction: column; gap: 12px;">
+            <!-- Row 1: Username + Password -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Admin username</label>
+                <input type="text" id="manage-username" placeholder="e.g. admin"
+                  style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
+                  onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
+                  onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
+              </div>
+              <div>
+                <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Reset password</label>
+                <input type="password" id="manage-password" placeholder="Leave blank to keep"
+                  style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
+                  onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
+                  onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
+              </div>
             </div>
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Reset password</label>
-              <input type="password" id="manage-password" placeholder="Leave blank to keep"
-                style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
-                onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
-                onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
-            </div>
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">WhatsApp contact</label>
-              <input type="tel" id="manage-phone" placeholder="e.g. 919876543210"
-                style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
-                onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
-                onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
-            </div>
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Owner email</label>
-              <input type="email" id="manage-email" placeholder="owner@email.com"
-                style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
-                onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
-                onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
-            </div>
-          </div>
-        </div>
+            <!-- Row 2: WhatsApp + Email -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">WhatsApp contact</label>
+                <input type="tel" id="manage-phone" placeholder="e.g. 919876543210"
+                  style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
+                  onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
+                  onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
+              </div>
+              <div>
+                <label style="font-size: 10px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Owner email</label>
+                <input type="text" id="manage-email" placeholder="owner@email.com"
+                  style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #E2E8F0; font-family: 'Inter', sans-serif; font-size: 13px; color: #1F1F1F; outline: none; background: #FAFAFA; transition: border-color 0.14s, box-shadow 0.14s; box-sizing: border-box;"
+                  onfocus="this.style.borderColor='#FC8019'; this.style.boxShadow='0 0 0 3px rgba(252,128,25,0.1)'; this.style.background='#fff'"
+                  onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'; this.style.background='#FAFAFA'">
+              </div>
+            </div><!-- /Row 2 grid -->
+          </div><!-- /outer flex column -->
+        </div><!-- /card -->
 
         <!-- ── Section 2: Account Status ── -->
         <div style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;">
@@ -2938,7 +3334,15 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
           style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(239,68,68,0.2); background: rgba(239,68,68,0.05); color: #EF4444; cursor: pointer; transition: all 0.14s ease;"
           onmouseover="this.style.background='#EF4444'; this.style.color='#fff'; this.style.borderColor='#EF4444'"
           onmouseout="this.style.background='rgba(239,68,68,0.05)'; this.style.color='#EF4444'; this.style.borderColor='rgba(239,68,68,0.2)'">
-          <i class="fa-solid fa-trash" style="font-size: 10px;"></i> Delete account
+        <i class="fa-solid fa-trash" style="font-size: 10px;"></i> Delete account
+        </button>
+
+        <!-- Reset Data button -->
+        <button type="button" id="reset-tenant-data-btn"
+          style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.07); color: #B45309; cursor: pointer; transition: all 0.14s ease;"
+          onmouseover="this.style.background='#F59E0B'; this.style.color='#fff'; this.style.borderColor='#F59E0B'"
+          onmouseout="this.style.background='rgba(245,158,11,0.07)'; this.style.color='#B45309'; this.style.borderColor='rgba(245,158,11,0.3)'">
+          <i class="fa-solid fa-arrow-rotate-left" style="font-size: 10px;"></i> Reset data
         </button>
 
         <div style="display: flex; gap: 8px; align-items: center;">
@@ -2966,6 +3370,427 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
   <input type="file" id="import-tax-file-input" accept=".json,.csv" style="display: none;">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="dashboard.js?v=1.5"></script>
+  <script src="dashboard.js?v=2.4"></script>
+
+  <!-- ONBOARDING TOUR ENGINE -->
+  <script>
+  (function() {
+    'use strict';
+
+    const TOUR_KEY = 'restrosuite_tour_done';
+
+    const ALL_STEPS = [
+      {
+        target: null, // Welcome screen — no spotlight
+        label: 'Welcome',
+        icon: '✨',
+        featureIcon: '🏪',
+        title: 'Welcome to RestoSuite!',
+        subtitle: 'Your Complete Restaurant OS',
+        desc: "Let's walk you through every feature of your new dashboard. This quick tour covers all active modules. Use the arrows or keyboard ← → to navigate."
+      },
+      {
+        target: '.sidebar-link[data-tab="pos-tab"]',
+        label: 'Takeaway POS',
+        icon: '☕',
+        featureIcon: '🛒',
+        title: 'Takeaway POS',
+        subtitle: 'Fast Checkout at the Counter',
+        desc: "Your main billing screen. Browse your menu, tap items to add them to cart, choose Takeaway / Dine-In / Delivery, apply loyalty discounts, and print a thermal receipt — all in seconds."
+      },
+      {
+        target: '.sidebar-link[data-tab="qr-orders-tab"]',
+        label: 'Live QR Orders',
+        icon: '📱',
+        featureIcon: '📲',
+        title: 'Live Table Orders',
+        subtitle: 'Self-Service QR Dine-In',
+        desc: "Customers scan the QR code at their table, browse your menu on their phone, and submit orders directly to you. Orders appear here live — approve them to send to the Kitchen KDS instantly."
+      },
+      {
+        target: '.sidebar-link[data-tab="online-tab"]',
+        label: 'Online Integrations',
+        icon: '🚚',
+        featureIcon: '🌐',
+        title: 'Online Integrations',
+        subtitle: 'Swiggy / Zomato / WhatsApp',
+        desc: "Connect your Swiggy & Zomato storefronts or take WhatsApp delivery orders. Incoming orders flow into a single queue so you never miss an order from any channel."
+      },
+      {
+        target: '.sidebar-link[data-tab="kds-tab"]',
+        label: 'Kitchen KDS',
+        icon: '🖥️',
+        featureIcon: '🍳',
+        title: 'Kitchen Display Screen',
+        subtitle: 'Real-Time KDS for the Kitchen',
+        desc: "Mount a screen in the kitchen. Every new order ticket appears here in real-time with item-level status. Kitchen staff mark items ready — the system auto-clears completed tickets and alerts the counter."
+      },
+      {
+        target: '.sidebar-link[data-tab="tokens-tab"]',
+        label: 'Token Board',
+        icon: '🎫',
+        featureIcon: '🎟️',
+        title: 'Live Token Board',
+        subtitle: 'Order Readiness Display',
+        desc: "A public-facing screen for customers. Shows order numbers divided into 'Preparing' and 'Please Collect' sections to manage crowd flows professionally."
+      },
+      {
+        target: '.sidebar-link[data-tab="bills-tab"]',
+        label: 'Bills',
+        icon: '🧾',
+        featureIcon: '📊',
+        title: 'Bills Management',
+        subtitle: 'Every Invoice, Every Sale',
+        desc: "Browse the full sales history. Search by order ID, customer name, or phone. Edit, reprint, refund, or export bills. Summary cards show daily revenue, order count, and AOV at a glance."
+      },
+      {
+        target: '.sidebar-link[data-tab="inventory-tab"]',
+        label: 'Inventory',
+        icon: '📦',
+        featureIcon: '🏭',
+        title: 'Inventory Control',
+        subtitle: 'Stock & Batch Management',
+        desc: "Track every ingredient, stock level, and expiry batch. Low-stock alerts fire automatically. Add purchase batches, set minimum thresholds, and view a complete ingredient usage log."
+      },
+      {
+        target: '.sidebar-link[data-tab="reports-tab"]',
+        label: 'Reports',
+        icon: '📈',
+        featureIcon: '📉',
+        title: 'Sales Reports & Analytics',
+        subtitle: 'Business Intelligence Hub',
+        desc: "Visual charts of daily, weekly, and monthly revenue. Top-selling items, hourly heatmaps, payment method splits, and GST tax summaries — all exportable to Excel with one click."
+      },
+      {
+        target: '.sidebar-link[data-tab="editor-tab"]',
+        label: 'Menu Editor',
+        icon: '✏️',
+        featureIcon: '📝',
+        title: 'Menu Editor',
+        subtitle: 'Build Your Full Menu Here',
+        desc: "Add, edit, or delete menu items. Set name, category, price, emoji icon, and description. Changes sync to the POS and QR ordering system instantly — no reload needed."
+      },
+      {
+        target: '.sidebar-link[data-tab="crm-tab"]',
+        label: 'CRM & Loyalty',
+        icon: '💎',
+        featureIcon: '👥',
+        title: 'CRM & Loyalty Program',
+        subtitle: 'Customer Relationships',
+        desc: "Every customer who gives their phone number gets a loyalty profile. Track visit count, total spend, and loyalty points. Send WhatsApp thank-you messages and birthday offers automatically."
+      },
+      {
+        target: '.sidebar-link[data-tab="tax-tab"]',
+        label: 'Tax Management',
+        icon: '🧮',
+        featureIcon: '💸',
+        title: 'Tax Management',
+        subtitle: 'GST & Service Charge Settings',
+        desc: "Set up central GST tax slabs (CGST/SGST/IGST), discount policies, service charges, and bill rounding logic to stay compliant with state rules."
+      },
+      {
+        target: '.sidebar-link[data-tab="employees-tab"]',
+        label: 'Employees',
+        icon: '👔',
+        featureIcon: '🏢',
+        title: 'Employee Ledger',
+        subtitle: 'HR, Payroll & Attendance',
+        desc: "Add your staff, set roles and salaries. Track attendance with clock-in/out, manage leave requests, and generate salary slips. Role-based access keeps cashiers from seeing admin data."
+      }
+    ];
+
+    let steps = [];
+    let currentStep = 0;
+
+    function initSteps() {
+      steps = ALL_STEPS.filter(step => {
+        if (!step.target) return true; // Welcome step is always active
+        const el = document.querySelector(step.target);
+        if (!el) return false;
+        // Check if the sidebar link is visible (i.e. display is not none)
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none';
+      });
+    }
+
+    function buildDots() {
+      const container = document.getElementById('tour-dots');
+      if (!container) return;
+      container.innerHTML = '';
+      steps.forEach((_, i) => {
+        const dot = document.createElement('div');
+        dot.style.cssText = `
+          width:${i === currentStep ? '20px' : '7px'};
+          height:7px; border-radius:10px;
+          background:${i === currentStep ? '#FC8019' : i < currentStep ? 'rgba(252,128,25,0.35)' : 'rgba(255,255,255,0.15)'};
+          transition:all 0.35s ease; cursor:pointer; flex-shrink:0;
+        `;
+        dot.onclick = () => goToStep(i);
+        container.appendChild(dot);
+      });
+    }
+
+    function positionSpotlight(targetEl) {
+      const spotlight = document.getElementById('onboarding-spotlight');
+      if (!spotlight) return;
+      if (!targetEl) {
+        spotlight.style.cssText = 'display:none;';
+        return;
+      }
+      const rect = targetEl.getBoundingClientRect();
+      const pad = 8;
+      spotlight.style.cssText = ''; // Clear inline styles
+      spotlight.style.display = 'block';
+      spotlight.style.left = (rect.left - pad) + 'px';
+      spotlight.style.top = (rect.top - pad) + 'px';
+      spotlight.style.width = (rect.width + pad * 2) + 'px';
+      spotlight.style.height = (rect.height + pad * 2) + 'px';
+    }
+
+    function positionCard(targetEl) {
+      const card = document.getElementById('onboarding-card');
+      if (!card) return;
+      const cardW = 350;
+      const cardH = card.offsetHeight || 320;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 20;
+      const isMobile = vw <= 768;
+
+      if (isMobile) {
+        // Mobile layout: position card at top or bottom depending on target location to avoid overlap
+        card.style.left = '50%';
+        card.style.transform = 'translateX(-50%)';
+        card.style.width = 'calc(100vw - 32px)';
+        card.style.maxWidth = '380px';
+        
+        if (targetEl) {
+          const rect = targetEl.getBoundingClientRect();
+          // If the target is in the lower half of the screen, place card in the upper half
+          if (rect.top > vh / 2) {
+            card.style.top = '80px';
+            card.style.bottom = 'auto';
+          } else {
+            card.style.bottom = '80px';
+            card.style.top = 'auto';
+          }
+        } else {
+          // Centered or bottom for welcome step
+          card.style.bottom = '80px';
+          card.style.top = 'auto';
+        }
+        return;
+      }
+
+      // Reset mobile styles on desktop
+      card.style.width = '350px';
+      card.style.maxWidth = '';
+      card.style.transform = '';
+      card.style.bottom = 'auto';
+
+      if (!targetEl) {
+        // Center card for welcome step
+        card.style.left = Math.max(pad, (vw - cardW) / 2) + 'px';
+        card.style.top = Math.max(pad, (vh - cardH) / 2) + 'px';
+        return;
+      }
+
+      const rect = targetEl.getBoundingClientRect();
+      let left, top;
+
+      // Try to place to the right of the target (sidebar link)
+      if (rect.right + pad + cardW < vw) {
+        left = rect.right + pad;
+        top = Math.max(pad, Math.min(rect.top, vh - cardH - pad));
+      }
+      // Try to place below
+      else if (rect.bottom + pad + cardH < vh) {
+        left = Math.max(pad, Math.min(rect.left, vw - cardW - pad));
+        top = rect.bottom + pad;
+      }
+      // Try to place above
+      else if (rect.top - pad - cardH > 0) {
+        left = Math.max(pad, Math.min(rect.left, vw - cardW - pad));
+        top = rect.top - cardH - pad;
+      }
+      // Fallback: center right
+      else {
+        left = Math.max(pad, vw - cardW - pad);
+        top = Math.max(pad, (vh - cardH) / 2);
+      }
+
+      card.style.left = left + 'px';
+      card.style.top = top + 'px';
+    }
+
+    function goToStep(index) {
+      if (steps.length === 0) return;
+      currentStep = Math.max(0, Math.min(index, steps.length - 1));
+      const step = steps[currentStep];
+      const isLast = currentStep === steps.length - 1;
+
+      // Update card content
+      document.getElementById('tour-step-icon').textContent = step.icon;
+      document.getElementById('tour-step-label').textContent = step.label;
+      document.getElementById('tour-feature-icon').textContent = step.featureIcon;
+      document.getElementById('tour-title').textContent = step.title;
+      document.getElementById('tour-subtitle').textContent = step.subtitle;
+      document.getElementById('tour-desc').textContent = step.desc;
+
+      const nextBtn = document.getElementById('tour-next-btn');
+      const prevBtn = document.getElementById('tour-prev-btn');
+      nextBtn.textContent = isLast ? '🎉 Get Started!' : 'Next →';
+      if (isLast) {
+        nextBtn.style.background = 'linear-gradient(135deg,#27ae60,#2ecc71)';
+        nextBtn.style.boxShadow = '0 4px 14px rgba(46, 204, 113, 0.35)';
+      } else {
+        nextBtn.style.background = ''; // Use style block gradient
+        nextBtn.style.boxShadow = '';
+      }
+      prevBtn.style.opacity = currentStep === 0 ? '0.3' : '1';
+      prevBtn.style.pointerEvents = currentStep === 0 ? 'none' : 'auto';
+
+      buildDots();
+
+      // Find target tab ID
+      const tabId = step.target ? step.target.match(/data-tab="([^"]+)"/)?.[1] : null;
+
+      // Programmatically click tab to switch view
+      if (tabId) {
+        const clickTarget = document.querySelector(`.mobile-bottom-nav [data-tab="${tabId}"]`) || 
+                            document.querySelector(`.more-sheet-link[data-tab="${tabId}"]`) || 
+                            document.querySelector(`.sidebar-link[data-tab="${tabId}"]`);
+        if (clickTarget) {
+          clickTarget.click();
+        }
+      }
+
+      // Determine spotlight target element
+      let targetEl = null;
+      const isMobile = window.innerWidth <= 768;
+
+      if (isMobile && tabId) {
+        // On mobile, check if the tab exists in the bottom navigation
+        targetEl = document.querySelector(`.mobile-bottom-nav [data-tab="${tabId}"]`);
+        // If not in bottom nav, highlight the "More" button instead
+        if (!targetEl || window.getComputedStyle(targetEl).display === 'none') {
+          targetEl = document.getElementById('mobile-more-btn');
+        }
+      } else if (step.target) {
+        targetEl = document.querySelector(step.target);
+      }
+
+      // Highlight sidebar link if on desktop/tablet
+      if (!isMobile) {
+        document.querySelectorAll('.sidebar-link').forEach(el => {
+          el.style.outline = '';
+          el.style.outlineOffset = '';
+        });
+        const desktopSidebarLink = step.target ? document.querySelector(step.target) : null;
+        if (desktopSidebarLink && desktopSidebarLink.classList.contains('sidebar-link')) {
+          desktopSidebarLink.style.outline = '2px solid rgba(252,128,25,0.8)';
+          desktopSidebarLink.style.outlineOffset = '2px';
+        }
+
+        // Show/reveal sidebar on mobile/tablet during the step
+        if (targetEl && targetEl.classList.contains('sidebar-link')) {
+          const sidebar = document.querySelector('.sidebar');
+          if (sidebar) sidebar.classList.add('reveal');
+        } else {
+          const sidebar = document.querySelector('.sidebar');
+          if (sidebar) sidebar.classList.remove('reveal');
+        }
+      }
+
+      // Briefly wait for tab render / transitions before drawing spotlight & card positioning
+      setTimeout(() => {
+        positionSpotlight(targetEl);
+        positionCard(targetEl);
+      }, 80);
+    }
+
+    window.tourNavigate = function(dir) {
+      if (dir > 0 && currentStep === steps.length - 1) {
+        window.endOnboardingTour();
+        return;
+      }
+      goToStep(currentStep + dir);
+    };
+
+    window.endOnboardingTour = function() {
+      try { localStorage.setItem(TOUR_KEY, '1'); } catch(e) {}
+      const overlay = document.getElementById('onboarding-overlay');
+      if (overlay) {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.4s ease';
+        setTimeout(() => { overlay.style.display = 'none'; }, 400);
+      }
+      // Collapse sidebar
+      const sidebar = document.querySelector('.sidebar');
+      if (sidebar) {
+        sidebar.classList.remove('reveal');
+      }
+    };
+
+    function startTour() {
+      const overlay = document.getElementById('onboarding-overlay');
+      if (!overlay) return;
+      
+      initSteps();
+      if (steps.length === 0) return;
+
+      overlay.style.display = 'block';
+      overlay.style.opacity = '0';
+      overlay.style.transition = 'opacity 0.5s ease';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+      });
+      goToStep(0);
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+      const overlay = document.getElementById('onboarding-overlay');
+      if (!overlay || overlay.style.display === 'none') return;
+      if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); window.tourNavigate(1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); window.tourNavigate(-1); }
+      if (e.key === 'Escape') { e.preventDefault(); window.endOnboardingTour(); }
+    });
+
+    // Reposition on resize
+    window.addEventListener('resize', () => {
+      if (document.getElementById('onboarding-overlay')?.style.display !== 'none') {
+        const step = steps[currentStep];
+        const tabId = step && step.target ? step.target.match(/data-tab="([^"]+)"/)?.[1] : null;
+        let targetEl = null;
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile && tabId) {
+          targetEl = document.querySelector(`.mobile-bottom-nav [data-tab="${tabId}"]`) || document.getElementById('mobile-more-btn');
+        } else if (step && step.target) {
+          targetEl = document.querySelector(step.target);
+        }
+        positionSpotlight(targetEl);
+        positionCard(targetEl);
+      }
+    });
+
+    // Launch after page fully loads and user is a tenant (not superadmin)
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        const role = sessionStorage.getItem('logged_in_role');
+        if (role === 'superadmin') return;
+        try {
+          if (localStorage.getItem(TOUR_KEY)) return; // Already seen tour
+        } catch(e) {}
+        startTour();
+      }, 1200); // Wait for Supabase sync to settle first
+    });
+
+    // Also expose for manual restart (e.g., from Feature Tour button)
+    window.startOnboardingTour = startTour;
+
+  })();
+  </script>
 </body>
 </html>
