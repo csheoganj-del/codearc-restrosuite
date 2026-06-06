@@ -903,14 +903,14 @@ body::before {
   gap: 10px;
   overflow-y: auto;
   flex-grow: 1;
-  padding-bottom: 16px;
+  padding: 4px 4px 16px 4px;
 }
 
 .pos-item-card {
   background-color: var(--white);
   border-radius: 16px;
   padding: 12px 14px;
-  border: 1px solid var(--border-subtle);
+  border: 2px solid var(--border-subtle);
   box-shadow: var(--shadow-sm), 0 4px 10px rgba(28, 28, 28, 0.01);
   display: flex;
   flex-direction: column;
@@ -939,8 +939,8 @@ body::before {
 
 .pos-item-card.selected-in-cart {
   background: rgba(252, 128, 25, 0.03);
-  box-shadow: 0 0 0 2px var(--accent-caramel);
-  border-color: transparent;
+  border-color: var(--accent-caramel);
+  box-shadow: 0 0 0 1px var(--accent-caramel);
   animation: cardSelectPulse 0.28s cubic-bezier(0.16,1,0.3,1) forwards;
 }
 
