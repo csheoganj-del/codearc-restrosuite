@@ -381,7 +381,32 @@ async function saveSessionToSupabase() {
                     '**/*.pma',
                     '**/LOCK',
                     '**/LOG',
-                    '**/LOG.old'
+                    '**/LOG.old',
+                    // Ignore all extra Chrome cache/download/telemetry folders to keep session zip small
+                    '**/*cache**',
+                    '**/*Cache**',
+                    '**/blob_storage/**',
+                    '**/chrome_cart_db/**',
+                    '**/commerce_subscription_db/**',
+                    '**/discount_infos_db/**',
+                    '**/discounts_db/**',
+                    '**/parcel_tracking_db/**',
+                    '**/shared_proto_db/**',
+                    '**/Feature Engagement Tracker/**',
+                    '**/AutofillStrikeDatabase/**',
+                    '**/BudgetDatabase/**',
+                    '**/Safe Browsing/**',
+                    '**/SafeBrowsing/**',
+                    '**/CertificateRevocation/**',
+                    '**/component_crx_cache/**',
+                    '**/extensions_crx_cache/**',
+                    '**/TranslateKit/**',
+                    '**/ActorSafetyLists/**',
+                    '**/AmountExtractionHeuristicRegexes/**',
+                    '**/FileTypePolicies/**',
+                    '**/ZxcvbnData/**',
+                    '**/*.log',
+                    '**/*.txt'
                 ]
             });
             
@@ -509,6 +534,10 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu',
+            '--disable-cache',
+            '--disk-cache-size=0',
+            '--media-cache-size=0',
+            '--aggressive-cache-discard',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
     }
