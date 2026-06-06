@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RestoSuite Portal | CodeArc Staff Access</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    :root {
+      /* Premium Light Swiggy & Zomato Inspired Color System */
+      --bg-dark: #FFFFFF;              /* Pure white background */
+      --bg-surface: #F8F9FA;           /* Soft light gray surface */
+      --bg-surface-elevated: #FFFFFF;  /* Card surface: clean white */
+      --bg-surface-hover: #F1F3F5;     /* Subtle gray hover surface */
+
+      --primary-brand: #FC8019;        /* Primary accent: Swiggy Tangerine Orange */
+      --primary-hover: #FD9139;        /* Hover accent: Swiggy Bright Orange */
+      --accent-red: #E23744;           /* Secondary accent: Zomato Crimson Red */
+
+      --text-main: #1C1C1C;            /* Primary text: Deep Charcoal */
+      --text-secondary: #5E636A;       /* Secondary text: Slate Gray */
+      --text-muted: #8F959E;           /* Muted text: Soft Gray */
+
+      --success: #22c55e;              /* Success green */
+      --error: #ef4444;
+
+      --border-color: #E2E8F0;         /* Subtle light border */
+      --border-subtle: #EDF2F7;        /* Soft separator */
+
+      --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+      --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    html, body {
+      overflow-x: hidden;
+      width: 100%;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, rgba(252, 128, 25, 0.05) 0%, #F8F9FA 70%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      overflow-y: auto;
+      position: relative;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Noise texture overlay for a physical premium feel */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.015'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Ambient elements with reduced opacity for light theme */
+    .bg-icon-left {
+      position: absolute;
+      font-size: 180px;
+      opacity: 0.025;
+      top: -30px;
+      left: -30px;
+      pointer-events: none;
+      user-select: none;
+      z-index: 1;
+    }
+    .bg-icon-right {
+      position: absolute;
+      font-size: 140px;
+      opacity: 0.025;
+      bottom: -20px;
+      right: -20px;
+      pointer-events: none;
+      user-select: none;
+      z-index: 1;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+      animation: fadeInUp 0.6s ease;
+      margin: 20px 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .login-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 40px 32px;
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+    }
+
+    .brand-logo {
+      margin-bottom: 28px;
+    }
+
+    .logo-container {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 50px;
+      margin-bottom: 16px;
+      text-decoration: none;
+    }
+
+    .logo-text {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text-main);
+    }
+
+    .logo-text span {
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .login-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+    }
+
+    .login-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    /* Tab switcher for login vs signup */
+    .tab-header {
+      display: flex;
+      background: var(--bg-surface);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 28px;
+      border: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .tab-btn.active {
+      background: var(--primary-brand);
+      color: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(252, 128, 25, 0.18);
+    }
+
+    .form-group {
+      position: relative;
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px 12px 42px;
+      background: #FFFFFF;
+      border: 1.5px solid var(--border-color);
+      border-radius: 10px;
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    .form-input.no-icon {
+      padding-left: 16px;
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.8;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary-brand);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(252, 128, 25, 0.08);
+    }
+
+    .form-group i.input-icon {
+      position: absolute;
+      left: 16px;
+      bottom: 13px;
+      color: var(--text-muted);
+      font-size: 14px;
+      transition: var(--transition);
+    }
+
+    .form-input:focus + i.input-icon {
+      color: var(--primary-brand);
+    }
+
+    .toggle-pwd {
+      position: absolute;
+      right: 16px;
+      bottom: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      transition: var(--transition);
+    }
+
+    .toggle-pwd:hover {
+      color: var(--primary-brand);
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--primary-brand);
+      border: none;
+      border-radius: 10px;
+      color: #FFFFFF;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: var(--transition);
+      box-shadow: 0 4px 12px rgba(252, 128, 25, 0.15);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .submit-btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(252, 128, 25, 0.25);
+    }
+
+    .phone-input-wrapper {
+      display: flex;
+      position: relative;
+    }
+    .phone-prefix {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-surface);
+      border: 1.5px solid var(--border-color);
+      border-right: none;
+      border-radius: 10px 0 0 10px;
+      padding: 0 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      outline: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .phone-input-wrapper .form-input {
+      border-radius: 0 10px 10px 0;
+      padding-left: 12px !important;
+      flex: 1;
+    }
+    .phone-input-wrapper i.fa-whatsapp {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #25d366;
+      font-size: 16px;
+      pointer-events: none;
+    }
+    .phone-input-wrapper:focus-within .phone-prefix {
+      border-color: var(--primary-brand);
+      background: #FFFFFF;
+    }
+
+    .error-box {
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      border-radius: 10px;
+      padding: 12px;
+      color: #b91c1c;
+      font-size: 12.5px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: none;
+      line-height: 1.4;
+      text-align: left;
+    }
+
+    .success-box {
+      background: rgba(34, 197, 94, 0.06);
+      border: 1px solid rgba(34, 197, 94, 0.15);
+      border-radius: 10px;
+      padding: 12px;
+      color: #15803d;
+      font-size: 12.5px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: none;
+      line-height: 1.4;
+      text-align: left;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(15px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    .shake-anim {
+      animation: shake 0.4s ease;
+    }
+
+    /* Custom Styling for the select dropdown */
+    select.form-input {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235E636A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      background-size: 16px;
+      padding-right: 40px !important;
+      cursor: pointer;
+    }
+
+    /* Mobile Responsiveness Override */
+    @media (max-width: 480px) {
+      body {
+        align-items: flex-start; /* Avoid vertical crop on short viewports */
+        padding: 12px 8px;
+      }
+      .login-container {
+        margin: 8px auto;
+        max-width: 100%;
+      }
+      .login-card {
+        padding: 24px 16px 20px;
+        border-radius: 16px;
+      }
+      .brand-logo {
+        margin-bottom: 16px;
+      }
+      .logo-container {
+        padding: 6px 12px;
+        margin-bottom: 8px;
+      }
+      .login-title {
+        font-size: 20px;
+      }
+      .login-subtitle {
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+      .tab-header {
+        margin-bottom: 16px;
+      }
+      .tab-btn {
+        padding: 8px 4px;
+        font-size: 12px;
+      }
+      .form-group {
+        margin-bottom: 12px;
+      }
+      .form-group label {
+        font-size: 9px;
+        margin-bottom: 4px;
+      }
+      .form-input {
+        padding: 10px 14px 10px 38px;
+        font-size: 16px; /* Prevents auto-zoom on iOS */
+      }
+      .form-input.no-icon {
+        padding-left: 14px;
+      }
+      .form-group i.input-icon {
+        left: 14px;
+        bottom: 11px;
+        font-size: 12px;
+      }
+      .toggle-pwd {
+        right: 14px;
+        bottom: 11px;
+        font-size: 12px;
+      }
+      .phone-input-wrapper i.fa-whatsapp {
+        right: 14px;
+        font-size: 14px;
+      }
+      .submit-btn {
+        padding: 12px;
+        font-size: 14px;
+      }
+      .bg-icon-left, .bg-icon-right {
+        display: none; /* Hidden in favor of physics canvas */
+      }
+    }
+  </style>
+</head>
+<body>
+
+
+
+  <div class="login-container">
+    <div class="login-card" id="login-card">
+      
+      <!-- Brand Logo -->
+      <div class="brand-logo">
+        <div class="logo-container">
+          <div class="logo-mark" style="width: 24px; height: 24px; border-radius: 6px; background: var(--primary-brand); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #FFF; font-weight: 800;"><i class="fa-solid fa-square-poll-horizontal"></i></div>
+          <span class="logo-text">CodeArc <span>RestoSuite</span></span>
+        </div>
+        <h2 class="login-title" id="portal-title">Client Access Portal</h2>
+        <p class="login-subtitle" id="portal-subtitle">Access your restaurant or food outlet terminal</p>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="tab-header">
+        <button class="tab-btn active" id="tab-login-btn">Login Terminal</button>
+        <button class="tab-btn" id="tab-register-btn">Register Outlet</button>
+      </div>
+
+      <!-- Alerts -->
+      <div class="error-box" id="error-box"></div>
+      <div class="success-box" id="success-box"></div>
+
+      <!-- LOGIN FORM -->
+      <form id="login-form">
+        <div class="form-group">
+          <label for="tenant-id">Outlet ID / Slug</label>
+          <input type="text" id="tenant-id" class="form-input" placeholder="e.g. royal-dhaba" required autocomplete="off">
+          <i class="fa-solid fa-hotel input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" class="form-input" placeholder="Username" required autocomplete="username">
+          <i class="fa-solid fa-user input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" class="form-input" placeholder="Password" required autocomplete="current-password">
+          <i class="fa-solid fa-lock input-icon"></i>
+          <i class="fa-solid fa-eye toggle-pwd" id="toggle-pwd"></i>
+        </div>
+
+        <button type="submit" class="submit-btn">
+          Log In Terminal <i class="fa-solid fa-right-to-bracket"></i>
+        </button>
+      </form>
+
+      <!-- REGISTRATION FORM -->
+      <form id="register-form" style="display: none;">
+        <div class="form-group">
+          <label for="reg-name">Outlet / Business Name</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="e.g. Royal Restaurant & Dhaba" required>
+          <i class="fa-solid fa-store input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-slug">Outlet ID / Unique Slug <span style="text-transform: none; font-weight: normal; color: var(--text-muted); font-size: 10.5px; margin-left: 4px;">(Must be unique & non-repetitive)</span></label>
+          <input type="text" id="reg-slug" class="form-input" placeholder="e.g. royal-dhaba (letters & hyphens)" required>
+          <i class="fa-solid fa-link input-icon"></i>
+          <div id="slug-status" style="font-size: 11px; margin-top: 5px; font-weight: 600; display: none; text-align: left; transition: var(--transition);"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-type">Outlet Type</label>
+          <select id="reg-type" class="form-input no-icon" required>
+            <option value="restaurant">Restaurant</option>
+            <option value="cafe">Cafe / Bakery</option>
+            <option value="dhaba">Dhaba / Local Diner</option>
+            <option value="cart">Food Cart / Truck</option>
+            <option value="other">Other Food Outlet</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-email">Owner Email</label>
+          <input type="email" id="reg-email" class="form-input" placeholder="owner@email.com" required>
+          <i class="fa-solid fa-envelope input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-whatsapp">WhatsApp Mobile Number</label>
+          <div class="phone-input-wrapper">
+            <select id="reg-country-code" class="phone-prefix" required>
+              <option value="91" selected>🇮🇳 +91</option>
+              <option value="1">🇺🇸 +1</option>
+              <option value="44">🇬🇧 +44</option>
+              <option value="971">🇦🇪 +971</option>
+              <option value="966">🇸🇦 +966</option>
+              <option value="965">🇰🇼 +965</option>
+              <option value="968">🇴🇲 +968</option>
+              <option value="974">🇶🇦 +974</option>
+              <option value="973">🇧🇭 +973</option>
+              <option value="60">🇲🇾 +60</option>
+              <option value="65">🇸🇬 +65</option>
+              <option value="61">🇦🇺 +61</option>
+              <option value="27">🇿🇦 +27</option>
+              <option value="92">🇵🇰 +92</option>
+              <option value="880">🇧🇩 +880</option>
+              <option value="977">🇳🇵 +977</option>
+              <option value="94">🇱🇰 +94</option>
+              <option value="254">🇰🇪 +254</option>
+              <option value="93">🇦🇫 +93</option>
+              <option value="355">🇦🇱 +355</option>
+              <option value="213">🇩🇿 +213</option>
+              <option value="376">🇦🇩 +376</option>
+              <option value="244">🇦🇴 +244</option>
+              <option value="54">🇦🇷 +54</option>
+              <option value="374">🇦🇲 +374</option>
+              <option value="43">🇦🇹 +43</option>
+              <option value="994">🇦🇿 +994</option>
+              <option value="375">🇧🇾 +375</option>
+              <option value="32">🇧🇪 +32</option>
+              <option value="501">🇧🇿 +501</option>
+              <option value="229">🇧🇯 +229</option>
+              <option value="975">🇧🇹 +975</option>
+              <option value="591">🇧🇴 +591</option>
+              <option value="387">🇧🇦 +387</option>
+              <option value="267">🇧🇼 +267</option>
+              <option value="55">🇧🇷 +55</option>
+              <option value="673">🇧🇳 +673</option>
+              <option value="359">🇧🇬 +359</option>
+              <option value="226">🇧🇫 +226</option>
+              <option value="257">🇧🇮 +257</option>
+              <option value="855">🇰🇭 +855</option>
+              <option value="237">🇨🇲 +237</option>
+              <option value="56">🇨🇱 +56</option>
+              <option value="86">🇨🇳 +86</option>
+              <option value="57">🇨🇴 +57</option>
+              <option value="506">🇨🇷 +506</option>
+              <option value="385">🇭🇷 +385</option>
+              <option value="53">🇨🇺 +53</option>
+              <option value="357">🇨🇾 +357</option>
+              <option value="420">🇨🇿 +420</option>
+              <option value="45">🇩🇰 +45</option>
+              <option value="253">🇩🇯 +253</option>
+              <option value="593">🇪🇨 +593</option>
+              <option value="20">🇪🇬 +20</option>
+              <option value="503">🇸🇻 +503</option>
+              <option value="372">🇪🇪 +372</option>
+              <option value="251">🇪🇹 +251</option>
+              <option value="679">🇫🇯 +679</option>
+              <option value="358">🇫🇮 +358</option>
+              <option value="33">🇫🇷 +33</option>
+              <option value="995">🇬🇪 +995</option>
+              <option value="49">🇩🇪 +49</option>
+              <option value="233">🇬🇭 +233</option>
+              <option value="30">🇬🇷 +30</option>
+              <option value="502">🇬🇹 +502</option>
+              <option value="504">🇭🇳 +504</option>
+              <option value="852">🇭🇰 +852</option>
+              <option value="36">🇭🇺 +36</option>
+              <option value="354">🇮🇸 +354</option>
+              <option value="62">🇮🇩 +62</option>
+              <option value="98">🇮🇷 +98</option>
+              <option value="964">🇮🇶 +964</option>
+              <option value="353">🇮🇪 +353</option>
+              <option value="972">🇮🇱 +972</option>
+              <option value="39">🇮🇹 +39</option>
+              <option value="81">🇯🇵 +81</option>
+              <option value="962">🇯🇴 +962</option>
+              <option value="7">🇰🇿 +7</option>
+              <option value="996">🇰🇬 +996</option>
+              <option value="856">🇱🇦 +856</option>
+              <option value="371">🇱🇻 +371</option>
+              <option value="961">🇱🇧 +961</option>
+              <option value="266">🇱🇸 +266</option>
+              <option value="231">🇱🇷 +231</option>
+              <option value="218">🇱🇾 +218</option>
+              <option value="423">🇱🇮 +423</option>
+              <option value="370">🇱🇹 +370</option>
+              <option value="352">🇱🇺 +352</option>
+              <option value="853">🇲🇴 +853</option>
+              <option value="389">🇲🇰 +389</option>
+              <option value="261">🇲🇬 +261</option>
+              <option value="265">🇲🇼 +265</option>
+              <option value="960">🇲🇻 +960</option>
+              <option value="223">🇲🇱 +223</option>
+              <option value="356">🇲🇹 +356</option>
+              <option value="230">🇲🇺 +230</option>
+              <option value="52">🇲🇽 +52</option>
+              <option value="373">🇲🇩 +373</option>
+              <option value="377">🇲🇨 +377</option>
+              <option value="976">🇲🇳 +976</option>
+              <option value="382">🇲🇪 +382</option>
+              <option value="212">🇲🇦 +212</option>
+              <option value="258">🇲🇿 +258</option>
+              <option value="95">🇲🇲 +95</option>
+              <option value="264">🇳🇦 +264</option>
+              <option value="31">🇳🇱 +31</option>
+              <option value="64">🇳🇿 +64</option>
+              <option value="505">🇳🇮 +505</option>
+              <option value="227">🇳🇪 +227</option>
+              <option value="234">🇳🇬 +234</option>
+              <option value="47">🇳🇴 +47</option>
+              <option value="970">🇵🇸 +970</option>
+              <option value="507">🇵🇦 +507</option>
+              <option value="675">🇵🇬 +675</option>
+              <option value="595">🇵🇾 +595</option>
+              <option value="51">🇵🇪 +51</option>
+              <option value="63">🇵🇭 +63</option>
+              <option value="48">🇵🇱 +48</option>
+              <option value="351">🇵🇹 +351</option>
+              <option value="40">🇷🇴 +40</option>
+              <option value="250">🇷🇼 +250</option>
+              <option value="221">🇸🇳 +221</option>
+              <option value="381">🇷🇸 +381</option>
+              <option value="248">🇸🇨 +248</option>
+              <option value="232">🇸🇱 +232</option>
+              <option value="421">🇸🇰 +421</option>
+              <option value="386">🇸🇮 +386</option>
+              <option value="252">🇸🇴 +252</option>
+              <option value="82">🇰🇷 +82</option>
+              <option value="34">🇪🇸 +34</option>
+              <option value="249">🇸🇩 +249</option>
+              <option value="46">🇸🇪 +46</option>
+              <option value="41">🇨🇭 +41</option>
+              <option value="963">🇸🇾 +963</option>
+              <option value="886">🇹🇼 +886</option>
+              <option value="992">🇹🇯 +992</option>
+              <option value="255">🇹🇿 +255</option>
+              <option value="66">🇹🇭 +66</option>
+              <option value="228">🇹🇬 +228</option>
+              <option value="216">🇹🇳 +216</option>
+              <option value="90">🇹🇷 +90</option>
+              <option value="993">🇹🇲 +993</option>
+              <option value="256">🇺🇬 +256</option>
+              <option value="380">🇺🇦 +380</option>
+              <option value="598">🇺🇾 +598</option>
+              <option value="998">🇺🇿 +998</option>
+              <option value="58">🇻🇪 +58</option>
+              <option value="84">🇻🇳 +84</option>
+              <option value="967">🇾🇪 +967</option>
+              <option value="260">🇿🇲 +260</option>
+              <option value="263">🇿🇼 +263</option>
+            </select>
+            <input type="tel" id="reg-whatsapp" class="form-input" placeholder="e.g. 9876543210" required>
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-user">Admin Username</label>
+          <input type="text" id="reg-user" class="form-input" placeholder="e.g. admin" required>
+          <i class="fa-solid fa-user-gear input-icon"></i>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-pass">Admin Password</label>
+          <input type="password" id="reg-pass" class="form-input" placeholder="Choose Password" required>
+          <i class="fa-solid fa-key input-icon"></i>
+        </div>
+
+        <button type="submit" class="submit-btn" style="background-color: #22c55e !important; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);">
+          Request Registration <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
+    const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+
+    let supabaseClient = null;
+    if (typeof supabase !== 'undefined') {
+      supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginCard = document.getElementById('login-card');
+      
+      // --- INTERACTIVE STEAM, AROMA & BOKEH DYNAMIC CANVAS ---
+      (function() {
+        const canvas = document.createElement('canvas');
+        canvas.id = 'aroma-canvas';
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100vw';
+        canvas.style.height = '100vh';
+        canvas.style.zIndex = '0';
+        canvas.style.pointerEvents = 'none';
+        document.body.prepend(canvas);
+
+        const ctx = canvas.getContext('2d');
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        let mouse = { x: -1000, y: -1000, radius: 180 };
+        let time = 0;
+        let cardRect = null;
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          canvas.width = width;
+          canvas.height = height;
+        });
+
+        // Track cursor/touch coordinate
+        window.addEventListener('mousemove', (e) => {
+          mouse.x = e.clientX;
+          mouse.y = e.clientY;
+        });
+
+        window.addEventListener('mouseleave', () => {
+          mouse.x = -1000;
+          mouse.y = -1000;
+        });
+
+        window.addEventListener('touchmove', (e) => {
+          if (e.touches.length > 0) {
+            mouse.x = e.touches[0].clientX;
+            mouse.y = e.touches[0].clientY;
+          }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+          mouse.x = -1000;
+          mouse.y = -1000;
+        });
+
+        // 1. Ambient Bokeh Orbs (Slow floating warm blobs)
+        class BokehOrb {
+          constructor(color) {
+            this.color = color; // '252, 128, 25' (orange) or '226, 55, 68' (red)
+            this.reset();
+          }
+
+          reset() {
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
+            this.radius = Math.random() * 180 + 150; // Size 150px - 330px
+            this.vx = (Math.random() - 0.5) * 0.25;
+            this.vy = (Math.random() - 0.5) * 0.25;
+            this.alpha = Math.random() * 0.035 + 0.015; // Very subtle transparency
+          }
+
+          update() {
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Bounce off boundaries
+            if (this.x - this.radius < 0) this.vx = Math.abs(this.vx);
+            else if (this.x + this.radius > width) this.vx = -Math.abs(this.vx);
+
+            if (this.y - this.radius < 0) this.vy = Math.abs(this.vy);
+            else if (this.y + this.radius > height) this.vy = -Math.abs(this.vy);
+
+            // Attract to mouse very gently
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 400) {
+              this.vx += (dx / dist) * 0.003;
+              this.vy += (dy / dist) * 0.003;
+            }
+
+            // Cap speed
+            const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+            if (speed > 0.4) {
+              this.vx = (this.vx / speed) * 0.4;
+              this.vy = (this.vy / speed) * 0.4;
+            }
+          }
+
+          draw() {
+            ctx.save();
+            const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+            grad.addColorStop(0, `rgba(${this.color}, ${this.alpha})`);
+            grad.addColorStop(0.5, `rgba(${this.color}, ${this.alpha * 0.3})`);
+            grad.addColorStop(1, `rgba(${this.color}, 0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        // 2. Aroma Steam Ribbons (Soft bezier curves flowing around loginCard)
+        class SteamRibbon {
+          constructor(x, width, speed, opacity, color1, color2) {
+            this.x = x;
+            this.width = width;
+            this.speed = speed;
+            this.opacity = opacity;
+            this.color1 = color1; // 'rgba(252, 128, 25, '
+            this.color2 = color2; // 'rgba(226, 55, 68, '
+            this.offset = Math.random() * 50;
+          }
+
+          draw() {
+            const segments = 22;
+            const step = height / segments;
+            
+            ctx.save();
+            const grad = ctx.createLinearGradient(0, height, 0, 0);
+            grad.addColorStop(0, this.color1 + '0)'); // transparent at bottom
+            grad.addColorStop(0.2, this.color1 + this.opacity + ')');
+            grad.addColorStop(0.6, this.color2 + (this.opacity * 0.7) + ')');
+            grad.addColorStop(1, this.color1 + '0)'); // transparent at top
+            
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = this.width;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // Soft blur visual glow for steam
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = this.color1 + (this.opacity * 0.2) + ')';
+            
+            ctx.beginPath();
+
+            let points = [];
+            for (let i = 0; i <= segments; i++) {
+              const y = height - (i * step);
+              const angle = (time * this.speed) + (i * 0.12) + this.offset;
+              
+              // Base swaying oscillation
+              let waveX = Math.sin(angle) * 28;
+              
+              // Spread out slightly as it rises
+              waveX *= (1 + (i / segments) * 1.3);
+              
+              let currentX = this.x + waveX;
+              
+              // Flow around the loginCard
+              if (cardRect) {
+                const rect = cardRect;
+                const pad = this.width * 0.4 + 12;
+                const cardLeft = rect.left - pad;
+                const cardRight = rect.right + pad;
+                const cardTop = rect.top - pad;
+                const cardBottom = rect.bottom + pad;
+                
+                if (y > cardTop && y < cardBottom && currentX > cardLeft && currentX < cardRight) {
+                  const distToLeft = currentX - cardLeft;
+                  const distToRight = cardRight - currentX;
+                  // Push smoothly to the closer side
+                  if (distToLeft < distToRight) {
+                    currentX = cardLeft - Math.sin(i * 0.2) * 10;
+                  } else {
+                    currentX = cardRight + Math.sin(i * 0.2) * 10;
+                  }
+                }
+              }
+
+              // Repulse gently from mouse cursor
+              const mdx = currentX - mouse.x;
+              const mdy = y - mouse.y;
+              const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+              if (mdist < mouse.radius) {
+                const force = (mouse.radius - mdist) / mouse.radius;
+                currentX += (mdx / mdist) * force * 50;
+              }
+
+              points.push({ x: currentX, y: y });
+            }
+
+            // Draw smooth curve using coordinates
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 0; i < points.length - 1; i++) {
+              const xc = (points[i].x + points[i + 1].x) / 2;
+              const yc = (points[i].y + points[i + 1].y) / 2;
+              ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+            }
+            ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // 3. Glowing Aroma Sparks (tiny floating particles)
+        class AromaSpark {
+          constructor() {
+            this.reset(true);
+          }
+
+          reset(initial = false) {
+            this.x = Math.random() * width;
+            this.y = initial ? Math.random() * height : height + 10;
+            this.radius = Math.random() * 2 + 1.2;
+            this.vx = (Math.random() - 0.5) * 0.4;
+            this.vy = -(Math.random() * 0.7 + 0.5); // drift upward
+            this.alpha = Math.random() * 0.55 + 0.25;
+            this.decay = Math.random() * 0.004 + 0.0015;
+            this.color = Math.random() > 0.5 ? '252, 128, 25' : '226, 55, 68'; // Orange/Red
+            this.waveSpeed = Math.random() * 0.015 + 0.008;
+            this.waveAngle = Math.random() * Math.PI * 2;
+            this.waveAmplitude = Math.random() * 0.4 + 0.15;
+          }
+
+          update() {
+            this.waveAngle += this.waveSpeed;
+            this.x += this.vx + Math.sin(this.waveAngle) * this.waveAmplitude;
+            this.y += this.vy;
+            this.alpha -= this.decay;
+
+            // Float around card boundaries
+            if (cardRect) {
+              const rect = cardRect;
+              const pad = this.radius + 4;
+              if (this.x + pad > rect.left && this.x - pad < rect.right &&
+                  this.y + pad > rect.top && this.y - pad < rect.bottom) {
+                
+                const overlapLeft = (this.x + pad) - rect.left;
+                const overlapRight = rect.right - (this.x - pad);
+                const overlapTop = (this.y + pad) - rect.top;
+                const overlapBottom = rect.bottom - (this.y - pad);
+                
+                const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+                
+                if (minOverlap === overlapLeft) {
+                  this.x = rect.left - pad;
+                  this.vx = -Math.abs(this.vx) * 0.6;
+                } else if (minOverlap === overlapRight) {
+                  this.x = rect.right + pad;
+                  this.vx = Math.abs(this.vx) * 0.6;
+                } else if (minOverlap === overlapTop) {
+                  this.y = rect.top - pad;
+                  this.vy = -Math.abs(this.vy) * 0.6;
+                } else {
+                  this.y = rect.bottom + pad;
+                  this.vy = Math.abs(this.vy) * 0.6;
+                }
+              }
+            }
+
+            // Mouse interaction push
+            const dx = this.x - mouse.x;
+            const dy = this.y - mouse.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 160) {
+              const force = (160 - dist) / 160;
+              this.x += (dx / dist) * force * 1.6;
+              this.y += (dy / dist) * force * 1.6;
+            }
+
+            if (this.alpha <= 0 || this.y < -10) {
+              this.reset(false);
+            }
+          }
+
+          draw() {
+            ctx.save();
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = `rgba(${this.color}, ${this.alpha})`;
+            ctx.fillStyle = `rgba(${this.color}, ${this.alpha})`;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        // Initialize animation components
+        let items = [];
+        
+        // Add 3-4 soft background bokeh orbs
+        items.push(new BokehOrb('252, 128, 25')); // orange
+        items.push(new BokehOrb('226, 55, 68')); // red
+        items.push(new BokehOrb('252, 128, 25')); // orange
+        
+        // Add 4-6 steam ribbons depending on screen size
+        const ribbonCount = width < 480 ? 3 : 5;
+        const spacing = width / (ribbonCount + 1);
+        for (let i = 0; i < ribbonCount; i++) {
+          const xPos = spacing * (i + 1);
+          // Alternating color variables
+          const isOrange = i % 2 === 0;
+          const c1 = isOrange ? 'rgba(252, 128, 25, ' : 'rgba(226, 55, 68, ';
+          const c2 = isOrange ? 'rgba(226, 55, 68, ' : 'rgba(252, 128, 25, ';
+          
+          items.push(new SteamRibbon(
+            xPos, 
+            Math.random() * 40 + 50,      // Ribbon width 50px - 90px
+            Math.random() * 0.01 + 0.008,  // sway speed
+            Math.random() * 0.02 + 0.015,  // low opacity: 0.015 - 0.035
+            c1, 
+            c2
+          ));
+        }
+
+        // Add glowing sparks
+        const sparkCount = width < 480 ? 15 : 45;
+        for (let i = 0; i < sparkCount; i++) {
+          items.push(new AromaSpark());
+        }
+
+        // Kinetic splash click wave
+        window.addEventListener('pointerdown', (e) => {
+          const clickX = e.clientX;
+          const clickY = e.clientY;
+          
+          // Spawn extra sparks swirling upwards from click point
+          const splashSparks = width < 480 ? 6 : 15;
+          for (let i = 0; i < splashSparks; i++) {
+            const spark = new AromaSpark();
+            spark.x = clickX + (Math.random() - 0.5) * 30;
+            spark.y = clickY + (Math.random() - 0.5) * 30;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 2.5 + 1.0;
+            spark.vx = Math.cos(angle) * speed;
+            spark.vy = Math.sin(angle) * speed - 1.0; // rising bias
+            spark.alpha = 0.9;
+            spark.decay = Math.random() * 0.012 + 0.008; // decay faster
+            items.push(spark);
+          }
+        });
+
+        function loop() {
+          time += 1;
+          ctx.clearRect(0, 0, width, height);
+          cardRect = loginCard ? loginCard.getBoundingClientRect() : null;
+
+          // Update & Draw all items
+          items.forEach((item, index) => {
+            if (item.update) {
+              item.update();
+              // Remove dead sparks from array to keep it clean
+              if (item instanceof AromaSpark && item.alpha <= 0) {
+                // If it's a temp click spark, delete it; otherwise keep recycling
+                if (items.length > (3 + ribbonCount + sparkCount)) {
+                  items.splice(index, 1);
+                  return;
+                }
+              }
+            }
+            item.draw();
+          });
+
+          requestAnimationFrame(loop);
+        }
+        loop();
+      })();
+
+      const tabLoginBtn = document.getElementById('tab-login-btn');
+      const tabRegisterBtn = document.getElementById('tab-register-btn');
+      
+      const loginForm = document.getElementById('login-form');
+      const registerForm = document.getElementById('register-form');
+      
+      const errorBox = document.getElementById('error-box');
+      const successBox = document.getElementById('success-box');
+      
+      const togglePwdBtn = document.getElementById('toggle-pwd');
+      const passwordInput = document.getElementById('password');
+
+      // Check URL query parameters for direct tab activation
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('tab') === 'register') {
+        activateRegisterTab();
+      }
+
+      function showError(msg) {
+        successBox.style.display = 'none';
+        errorBox.textContent = msg;
+        errorBox.style.display = 'block';
+        loginCard.classList.remove('shake-anim');
+        void loginCard.offsetWidth; // trigger reflow
+        loginCard.classList.add('shake-anim');
+        if (window.AndroidInterface) window.AndroidInterface.vibrate(300);
+      }
+
+      function showSuccess(msg) {
+        errorBox.style.display = 'none';
+        successBox.textContent = msg;
+        successBox.style.display = 'block';
+        if (window.AndroidInterface) window.AndroidInterface.vibrate(80);
+      }
+
+      // Password visibility eye toggler
+      if (togglePwdBtn && passwordInput) {
+        togglePwdBtn.addEventListener('click', () => {
+          if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            togglePwdBtn.classList.remove('fa-eye');
+            togglePwdBtn.classList.add('fa-eye-slash');
+            togglePwdBtn.style.color = 'var(--primary-brand)';
+          } else {
+            passwordInput.type = 'password';
+            togglePwdBtn.classList.remove('fa-eye-slash');
+            togglePwdBtn.classList.add('fa-eye');
+            togglePwdBtn.style.color = 'var(--text-muted)';
+          }
+        });
+      }
+
+      // Switch tabs
+      tabLoginBtn.addEventListener('click', () => {
+        tabRegisterBtn.classList.remove('active');
+        tabLoginBtn.classList.add('active');
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+        document.getElementById('portal-title').textContent = "Client Access Portal";
+        document.getElementById('portal-subtitle').textContent = "Access your restaurant or food outlet terminal";
+        errorBox.style.display = 'none';
+        successBox.style.display = 'none';
+      });
+
+      function activateRegisterTab() {
+        tabLoginBtn.classList.remove('active');
+        tabRegisterBtn.classList.add('active');
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        document.getElementById('portal-title').textContent = "Register Your Outlet";
+        document.getElementById('portal-subtitle').textContent = "Submit a request to CodeArc for a new SaaS instance";
+        errorBox.style.display = 'none';
+        successBox.style.display = 'none';
+      }
+
+      tabRegisterBtn.addEventListener('click', activateRegisterTab);
+
+      // Real-time Slug Suggestion & Database Check
+      const regNameInput = document.getElementById('reg-name');
+      const regSlugInput = document.getElementById('reg-slug');
+      const slugStatus = document.getElementById('slug-status');
+      let isSlugEditedManually = false;
+      let checkTimeout = null;
+
+      // Track manual edits to the slug field
+      if (regSlugInput) {
+        regSlugInput.addEventListener('input', () => {
+          isSlugEditedManually = true;
+          triggerAvailabilityCheck(regSlugInput.value);
+        });
+      }
+
+      // Convert business name to suggested slug in real-time
+      if (regNameInput && regSlugInput) {
+        regNameInput.addEventListener('input', (e) => {
+          if (!isSlugEditedManually) {
+            let suggestedSlug = e.target.value
+              .toLowerCase()
+              .replace(/[\s_]+/g, '-')          // spaces/underscores to hyphens
+              .replace(/[^a-z0-9-]/g, '')        // remove special chars
+              .replace(/-+/g, '-')              // consolidate consecutive hyphens
+              .replace(/^-+|-+$/g, '');         // trim leading/trailing hyphens
+            
+            regSlugInput.value = suggestedSlug;
+            triggerAvailabilityCheck(suggestedSlug);
+          }
+        });
+      }
+
+      // Helper to debounce database calls (waits 400ms after typing stops)
+      function triggerAvailabilityCheck(slug) {
+        if (checkTimeout) clearTimeout(checkTimeout);
+        
+        if (!slug) {
+          if (slugStatus) {
+            slugStatus.style.display = 'none';
+          }
+          return;
+        }
+
+        if (slugStatus) {
+          slugStatus.style.display = 'block';
+          slugStatus.style.color = 'var(--text-muted)';
+          slugStatus.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Checking availability...';
+        }
+
+        checkTimeout = setTimeout(() => {
+          runAvailabilityQuery(slug);
+        }, 400);
+      }
+
+      // Query Supabase for slug existence
+      async function runAvailabilityQuery(slug) {
+        if (!slugStatus) return;
+        
+        if (!supabaseClient) {
+          slugStatus.style.color = '#ef4444';
+          slugStatus.textContent = "Supabase connection is offline.";
+          return;
+        }
+
+        try {
+          const { data, error } = await supabaseClient
+            .from('saas_tenants')
+            .select('slug')
+            .eq('slug', slug);
+
+          if (error) throw error;
+
+          // Double check if the current input still matches the queried slug (to avoid race conditions)
+          if (regSlugInput && regSlugInput.value !== slug) return;
+
+          if (data && data.length > 0) {
+            slugStatus.style.color = '#ef4444'; // Error Red
+            slugStatus.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Already registered (Not Available)';
+          } else {
+            slugStatus.style.color = 'var(--success)'; // Success Green
+            slugStatus.innerHTML = '<i class="fa-solid fa-circle-check"></i> Unique ID Available';
+          }
+        } catch (err) {
+          console.error("Availability check failed:", err);
+          slugStatus.style.color = '#ef4444';
+          slugStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Error checking availability';
+        }
+      }
+
+      // Auto-sanitize Slug Inputs (converting spaces/special chars to hyphens, lowercase, etc.)
+      const sanitizeSlugInput = (inputEl) => {
+        if (!inputEl) return;
+        inputEl.addEventListener('input', (e) => {
+          let val = e.target.value;
+          val = val.replace(/[\s_]+/g, '-');
+          val = val.toLowerCase();
+          val = val.replace(/[^a-z0-9-]/g, '');
+          val = val.replace(/-+/g, '-');
+          e.target.value = val;
+        });
+      };
+
+      sanitizeSlugInput(document.getElementById('reg-slug'));
+      sanitizeSlugInput(document.getElementById('tenant-id'));
+
+      async function sha256(string) {
+        const utf8 = new TextEncoder().encode(string);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+
+      // Handle login submit
+      if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          errorBox.style.display = 'none';
+          
+          const slugVal = document.getElementById('tenant-id').value.trim().toLowerCase();
+          const userVal = document.getElementById('username').value.trim();
+          const pwdVal = document.getElementById('password').value.trim();
+          
+          const userLower = userVal.toLowerCase();
+          const hashPwd = await sha256(pwdVal);
+
+          // 1. Check Super-Admin platform login bypass
+          if (userLower === 'superadmin' && hashPwd === '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918') { // 'admin' in sha256
+            sessionStorage.setItem('just_logged_in', 'true');
+            sessionStorage.setItem('logged_in_user', 'superadmin');
+            sessionStorage.setItem('logged_in_role', 'superadmin');
+            sessionStorage.setItem('tenant_id', 'superadmin');
+            sessionStorage.setItem('tenant_slug', 'superadmin');
+            sessionStorage.setItem('tenant_name', 'SaaS Platform Owner');
+            sessionStorage.setItem('allowed_tabs', JSON.stringify(['super-admin-tab', 'gateway-monitor-tab']));
+            
+            if (window.AndroidInterface) window.AndroidInterface.vibrate(80);
+            window.location.href = 'dashboard.html';
+            return;
+          }
+
+          // Ensure Supabase is working
+          if (!supabaseClient) {
+            showError("Supabase connection is offline. Cannot authenticate.");
+            return;
+          }
+
+          // 2. Fetch tenant profile by Slug
+          const { data: tenants, error: tenantErr } = await supabaseClient
+            .from('saas_tenants')
+            .select('*')
+            .eq('slug', slugVal);
+
+          if (tenantErr || !tenants || tenants.length === 0) {
+            showError("Authentication Failed: Invalid Outlet ID.");
+            return;
+          }
+
+          const tenant = tenants[0];
+          
+          // Check tenant status
+          if (tenant.status === 'pending') {
+            showError("Access Denied: Your registration request is pending CodeArc approval.");
+            return;
+          }
+          if (tenant.status === 'suspended') {
+            showError("Access Denied: Account suspended. Please contact hello@codearc.co.in");
+            return;
+          }
+
+          // 3. Authenticate User
+          let authenticated = false;
+          let role = 'cashier'; // fallback
+
+          if (userVal === tenant.username && hashPwd === tenant.password_hash) {
+            // Logged in as the primary tenant admin
+            authenticated = true;
+            role = 'admin';
+          } else {
+            // Check default role access credentials
+            // standard role passwords hashes:
+            const standardRoles = {
+              cashier: {
+                user: 'staff',
+                hash: '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6' // 'staff'
+              },
+              admin: {
+                user: 'admin',
+                hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918' // 'admin'
+              },
+              waiter: {
+                user: 'waiter',
+                hash: 'f81907cb3c5905d43818e6c4669862da157778b403487c95e1eb24606ffb7e41' // 'waiter'
+              },
+              kitchen: {
+                user: 'kitchen',
+                hash: '4f51e048d0879685600beff68e8339b699c2dbd11124b6f17849e49c7161b32e' // 'kitchen'
+              },
+              customer_display: {
+                user: 'display',
+                hash: '691ebff078c59367db6ec70092f694ef0b9fe4ff78bc70bf1390494be9090aa9' // 'display'
+              }
+            };
+
+            for (const rKey of Object.keys(standardRoles)) {
+              if (userLower === standardRoles[rKey].user && hashPwd === standardRoles[rKey].hash) {
+                authenticated = true;
+                role = rKey;
+                break;
+              }
+            }
+          }
+
+          if (authenticated) {
+            sessionStorage.setItem('just_logged_in', 'true');
+            sessionStorage.setItem('logged_in_user', userVal);
+            sessionStorage.setItem('logged_in_role', role);
+            sessionStorage.setItem('tenant_id', tenant.id);
+            sessionStorage.setItem('tenant_slug', tenant.slug);
+            sessionStorage.setItem('tenant_name', tenant.name);
+            sessionStorage.setItem('allowed_tabs', JSON.stringify(tenant.allowed_tabs || []));
+            
+            if (window.AndroidInterface) window.AndroidInterface.vibrate(80);
+            window.location.href = 'dashboard.html';
+          } else {
+            showError("Access Denied: Invalid Username or Password for this Outlet.");
+          }
+        });
+      }
+
+      // Handle registration submit
+      if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          errorBox.style.display = 'none';
+          
+          const name = document.getElementById('reg-name').value.trim();
+          const slug = document.getElementById('reg-slug').value.trim().toLowerCase();
+          const type = document.getElementById('reg-type').value;
+          const email = document.getElementById('reg-email').value.trim();
+          const countryCode = document.getElementById('reg-country-code').value;
+          let whatsappRaw = document.getElementById('reg-whatsapp').value.trim().replace(/\D/g, '');
+          
+          // Strip leading 0 if entered
+          if (whatsappRaw.startsWith('0')) {
+            whatsappRaw = whatsappRaw.substring(1);
+          }
+          
+          if (whatsappRaw.length < 7 || whatsappRaw.length > 12) {
+            showError("Please enter a valid WhatsApp mobile number.");
+            return;
+          }
+          
+          const whatsapp = countryCode + whatsappRaw;
+          const user = document.getElementById('reg-user').value.trim();
+          const pass = document.getElementById('reg-pass').value.trim();
+
+          // Validate slug (must be URL friendly)
+          if (!/^[a-z0-9-]+$/.test(slug)) {
+            showError("Slug can only contain lowercase letters, numbers, and hyphens (e.g. royal-dhaba).");
+            return;
+          }
+
+          if (!supabaseClient) {
+            showError("Supabase connection is offline. Cannot register.");
+            return;
+          }
+
+          // Check if slug already exists
+          const { data: existing, error: checkErr } = await supabaseClient
+            .from('saas_tenants')
+            .select('slug')
+            .eq('slug', slug);
+
+          if (checkErr) {
+            showError("Failed to validate unique slug: " + checkErr.message);
+            return;
+          }
+
+          if (existing && existing.length > 0) {
+            showError(`The Outlet ID "${slug}" is already taken. Try another unique slug.`);
+            return;
+          }
+
+          // Hash password
+          const passHash = await sha256(pass);
+
+          // Insert new pending tenant
+          const { error: insErr } = await supabaseClient
+            .from('saas_tenants')
+            .insert({
+              name,
+              slug,
+              outlet_type: type,
+              email,
+              phone: whatsapp,
+              username: user,
+              password_hash: passHash,
+              status: 'pending',
+              allowed_tabs: ['pos-tab', 'qr-orders-tab', 'bills-tab', 'inventory-tab', 'reports-tab', 'editor-tab', 'crm-tab', 'tax-tab', 'online-tab', 'kds-tab', 'tokens-tab', 'employees-tab'] // default all
+            });
+
+          if (insErr) {
+            showError("Registration failed: " + insErr.message);
+          } else {
+            showSuccess("Registration submitted successfully! Please wait for CodeArc to approve your account.");
+            
+            // Note: Registration confirmation alerts (WhatsApp & Email) are now processed securely 
+            // and asynchronously by the backend gateway server listening to Supabase Realtime changes on saas_tenants.
+            // This eliminates token exposure in the public client-side frontend code.
+
+            registerForm.reset();
+            // Scroll to top of card to show success message
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,2420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeArc RestoSuite | Premium Restaurant Operations Platform</title>
+  <meta name="description" content="State-of-the-art enterprise operating system for cafes, restaurants, dhabas, and food chains. Designed for elite, high-volume hospitality.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      /* Premium Light Swiggy & Zomato Inspired Color System */
+      --bg-dark: #FFFFFF;              /* Pure white background */
+      --bg-surface: #F8F9FA;           /* Soft light gray surface */
+      --bg-surface-elevated: #FFFFFF;  /* Card surface: clean white */
+      --bg-surface-hover: #F1F3F5;     /* Subtle gray hover surface */
+
+      --primary-brand: #FC8019;        /* Primary accent: Swiggy Tangerine Orange */
+      --primary-hover: #FD9139;        /* Hover accent: Swiggy Bright Orange */
+      --accent-red: #E23744;           /* Secondary accent: Zomato Crimson Red */
+      --primary-glow: rgba(252, 128, 25, 0.05); /* Soft Swiggy Orange glow */
+
+      --text-main: #1C1C1C;            /* Primary text: Deep Charcoal */
+      --text-secondary: #5E636A;       /* Secondary text: Slate Gray */
+      --text-muted: #8F959E;           /* Muted text: Soft Gray */
+
+      --success: #22c55e;              /* Success green */
+      --success-subtle: rgba(34, 197, 94, 0.08);
+      --warning: #f59e0b;
+      --error: #ef4444;
+
+      --border-color: #E2E8F0;         /* Subtle light border */
+      --border-subtle: #EDF2F7;        /* Soft separator */
+      --border-accent: rgba(252, 128, 25, 0.15);  /* Accent border */
+      --border-accent-strong: rgba(252, 128, 25, 0.28); /* Strong accent border */
+
+      --font-heading: 'Outfit', 'Inter', sans-serif;
+      --font-body: 'Inter', sans-serif;
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+
+      --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      overflow-x: hidden;
+      position: relative;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Noise texture overlay for a physical premium feel */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.015'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Translucent Header */
+    header {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border-bottom: 1px solid var(--border-color);
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 1000;
+      transition: var(--transition);
+    }
+    
+    .nav-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-family: var(--font-heading);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-mark {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--primary-brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #FFF;
+      font-weight: 800;
+    }
+
+    .logo span {
+      color: var(--text-secondary);
+      font-weight: 400;
+      font-size: 18px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 40px;
+      align-items: center;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-main);
+    }
+
+    .nav-links a.active-link::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--primary-brand);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-actions .btn-login {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: var(--transition);
+    }
+
+    .nav-actions .btn-login:hover {
+      color: var(--text-main);
+    }
+
+    .nav-actions .btn-portal {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13.5px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    .nav-actions .btn-portal:hover {
+      background: var(--bg-surface-hover);
+      color: var(--primary-brand);
+      border-color: var(--primary-brand);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 180px 32px 100px;
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.1fr 1.2fr;
+      align-items: center;
+      gap: 64px;
+    }
+
+    .hero-content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 5px 13px;
+      border-radius: 50px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .hero-badge .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--success);
+      animation: pulse-green 2.5s infinite;
+    }
+
+    @keyframes pulse-green {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      70% { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    .hero-title {
+      font-family: var(--font-heading);
+      font-size: 56px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      margin-bottom: 24px;
+      color: var(--text-main);
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #1C1C1C 20%, #FC8019 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: inline-block;
+    }
+
+    .hero-desc {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      max-width: 500px;
+      line-height: 1.6;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      padding: 14px 28px;
+      border-radius: var(--radius-sm);
+      font-size: 14.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: var(--transition);
+    }
+
+    .btn-primary {
+      background: var(--primary-brand);
+      color: #FFFFFF;
+      border: 1px solid var(--primary-brand);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(245, 158, 66, 0.15), 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    .btn-secondary {
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--primary-brand);
+      transform: translateY(-1px);
+    }
+
+    .hero-meta {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .hero-meta span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hero-meta i {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    /* High-Fidelity Operational Dashboard Mockup */
+    .hero-mockup {
+      width: 100%;
+      position: relative;
+    }
+
+    .dashboard-window {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.02) inset;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font-body);
+      transform: perspective(1200px) rotateY(-6deg) rotateX(4deg);
+      transition: var(--transition);
+      max-height: 520px;
+    }
+
+    .dashboard-window:hover {
+      transform: perspective(1200px) rotateY(-2deg) rotateX(1deg);
+    }
+
+    .window-header {
+      background: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .window-controls {
+      display: flex;
+      gap: 6px;
+    }
+
+    .window-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .window-dot.red { background-color: #ff5f56; }
+    .window-dot.yellow { background-color: #ffbd2e; }
+    .window-dot.green { background-color: #27c93f; }
+
+    .window-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .window-status-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+    }
+
+    .window-terminal {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.03);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .dashboard-body {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      height: 460px;
+    }
+
+    .dashboard-sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .sidebar-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .sidebar-icon.active {
+      background: rgba(245, 158, 66, 0.10);
+      color: var(--primary-brand);
+      border: 1px solid var(--border-accent);
+    }
+
+    .sidebar-icon:hover:not(.active) {
+      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .dashboard-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      background: var(--bg-surface);
+    }
+
+    /* Live Analytics Grid */
+    .dashboard-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .stat-mini-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .stat-value span {
+      font-size: 9px;
+      color: var(--success);
+      font-family: var(--font-body);
+      font-weight: 500;
+    }
+
+    /* Sub-panels: POS Billing & KDS Kitchen */
+    .dashboard-split {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+
+    .panel-widget {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .widget-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 6px;
+    }
+
+    .widget-badge {
+      font-size: 9px;
+      background: var(--success-subtle);
+      color: var(--success);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* POS Checkout Panel Layout */
+    .pos-billing-items {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .pos-billing-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+    }
+
+    .pos-item-name {
+      color: var(--text-secondary);
+    }
+
+    .pos-item-price {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .pos-divider {
+      height: 1px;
+      background: var(--border-color);
+      margin: 8px 0;
+    }
+
+    .pos-checkout-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .total-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .total-val {
+      font-family: var(--font-heading);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .pos-pay-btn {
+      background: var(--primary-brand);
+      border: 1px solid var(--primary-brand);
+      color: #FFFFFF;
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 8px;
+      border-radius: 6px;
+      text-align: center;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: var(--transition);
+    }
+
+    .pos-pay-btn:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    /* Kitchen KDS Ticket */
+    .kds-ticket-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .kds-ticket-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .kds-card-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10.5px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .kds-order-id {
+      color: var(--text-main);
+    }
+
+    .kds-timer {
+      color: var(--accent-red);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .kds-items {
+      list-style: none;
+      font-size: 11px;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .kds-items li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kds-items span {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Inventory Status Alerts */
+    .inventory-alerts-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .inv-alert-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+
+    .inv-name {
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .inv-warning-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--warning);
+    }
+
+    .inv-stock-level {
+      color: var(--warning);
+      font-weight: 600;
+      background: rgba(245, 158, 11, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* WhatsApp Receipt Float */
+    .whatsapp-float {
+      position: absolute;
+      bottom: -24px;
+      right: 32px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      width: 250px;
+      box-shadow: var(--shadow-md);
+      padding: 12px;
+      z-index: 10;
+      transform: translateY(-10px);
+      transition: var(--transition);
+    }
+
+    .whatsapp-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #EEEEEE;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
+    }
+
+    .whatsapp-logo {
+      color: #25d366;
+      font-size: 15px;
+    }
+
+    .whatsapp-header span {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #1C1C1C;
+    }
+
+    .whatsapp-bubble {
+      background: #E7FFDB;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 10px;
+      color: #1C1C1C;
+      line-height: 1.4;
+      position: relative;
+    }
+
+    .whatsapp-bubble strong {
+      color: #000000;
+    }
+
+    .whatsapp-time {
+      font-size: 8px;
+      color: rgba(0, 0, 0, 0.45);
+      float: right;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .whatsapp-time i {
+      color: #53bdeb;
+    }
+
+    /* Social Proof Metrics Strip */
+    .outlets-section {
+      border-top: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+      background: transparent;
+      padding: 48px 32px;
+    }
+
+    .outlets-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+
+    .proof-metric {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 0 56px;
+    }
+
+    .proof-number {
+      font-family: var(--font-heading);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.5px;
+    }
+
+    .proof-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .proof-divider {
+      width: 1px;
+      height: 36px;
+      background: var(--border-color);
+      flex-shrink: 0;
+    }
+
+    /* Features Section - Bento Grid Layout */
+    .features-section {
+      padding: 120px 32px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .section-head {
+      text-align: center;
+      margin-bottom: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .section-head-title {
+      font-family: var(--font-heading);
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 20px;
+      line-height: 1.2;
+    }
+
+    .section-head-desc {
+      font-size: 15px;
+      color: var(--text-secondary);
+      max-width: 550px;
+      line-height: 1.6;
+    }
+
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .bento-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
+      transition: var(--transition);
+    }
+
+    .bento-card:hover {
+      border-color: var(--primary-brand);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .bento-col-2 {
+      grid-column: span 2;
+    }
+
+    .bento-text {
+      margin-bottom: 32px;
+      z-index: 2;
+    }
+
+    .bento-title {
+      font-family: var(--font-heading);
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text-main);
+    }
+
+    .bento-desc {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 480px;
+    }
+
+    .bento-preview {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      width: 100%;
+      height: 180px;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Embedded POS Preview inside Bento Grid */
+    .bento-pos-screen {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      padding: 12px;
+      gap: 8px;
+      background: var(--bg-dark);
+    }
+
+    .bento-pos-split {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 8px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .bento-pos-items {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .bento-pos-tile {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 9px;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .bento-pos-tile i {
+      color: var(--primary-brand);
+      font-size: 12px;
+      opacity: 0.85;
+    }
+
+    .bento-pos-cart {
+      background: var(--bg-surface-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .bento-pos-cart-title {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-main);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+
+    .bento-cart-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 8.5px;
+      color: var(--text-secondary);
+    }
+
+    .bento-cart-list div {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* KDS Ticket Preview inside Bento Grid */
+    .bento-kds-ticket {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      width: 85%;
+      padding: 14px;
+    }
+
+    /* Stocks Alert Preview */
+    .bento-stocks-list {
+      width: 85%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bento-stock-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .bento-stock-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10.5px;
+      color: var(--text-secondary);
+    }
+
+    .bento-stock-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bento-stock-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    /* Embedded Analytics Graph inside Bento Grid */
+    .bento-analytics-wrapper {
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      background: var(--bg-dark);
+    }
+
+    .bento-analytics-left {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .bento-chart-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding-top: 20px;
+    }
+
+    .chart-bar {
+      flex: 1;
+      background: rgba(245, 158, 66, 0.12);
+      border: 1px solid rgba(245, 158, 66, 0.18);
+      border-bottom: none;
+      border-radius: 2px 2px 0 0;
+      position: relative;
+      transition: var(--transition);
+    }
+
+    .chart-bar:hover {
+      background: rgba(245, 158, 66, 0.25);
+    }
+
+    /* Loyalty Tier Preview */
+    .bento-loyalty-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      width: 85%;
+      padding: 16px;
+      position: relative;
+    }
+
+    .bento-loyalty-tier {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: rgba(0, 0, 0, 0.03);
+      border: 1px solid var(--border-color);
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+
+    /* WhatsApp Flow Preview */
+    .bento-whatsapp-preview {
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #E5DDD5;
+    }
+
+    /* Pricing Section */
+    .pricing-section {
+      background: var(--bg-dark);
+      border-top: 1px solid var(--border-color);
+      padding: 120px 32px;
+    }
+
+    .pricing-container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    .price-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 48px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .price-card:hover {
+      border-color: var(--primary-brand);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .price-card.popular {
+      border-color: var(--border-accent-strong);
+      background: var(--bg-surface-elevated);
+    }
+
+    .price-card.popular .popular-badge {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      background: rgba(245, 158, 66, 0.10);
+      border: 1px solid var(--border-accent);
+      color: var(--primary-brand);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .price-head {
+      margin-bottom: 32px;
+    }
+
+    .price-tier-name {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .price-amount {
+      font-family: var(--font-heading);
+      font-size: 40px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: baseline;
+      letter-spacing: -1px;
+    }
+
+    .price-amount span {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-left: 8px;
+      letter-spacing: 0;
+    }
+
+    .price-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .price-features li {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .price-features li.excluded {
+      color: var(--text-muted);
+    }
+
+    .price-features li i {
+      font-size: 13px;
+    }
+
+    .price-features li i.fa-circle-check {
+      color: var(--success);
+      opacity: 0.8;
+    }
+
+    .price-features li i.fa-circle-xmark {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    .price-card .btn {
+      width: 100%;
+    }
+
+    /* Minimal Enterprise Footer */
+    footer {
+      background: var(--bg-surface);
+      padding: 100px 32px 48px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .footer-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 96px;
+      margin-bottom: 80px;
+    }
+
+    .footer-left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 24px;
+    }
+
+    .footer-left p {
+      font-size: 14.5px;
+      color: var(--text-secondary);
+      max-width: 440px;
+      line-height: 1.6;
+    }
+
+    .footer-socials {
+      display: flex;
+      gap: 12px;
+    }
+
+    .social-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    .social-btn:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--primary-brand);
+      color: var(--primary-brand);
+    }
+
+    .footer-right {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .footer-right h4 {
+      font-family: var(--font-heading);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .footer-contacts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .footer-contact-row {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .footer-contact-row i {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 3px;
+    }
+
+    .footer-contact-row a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    .footer-contact-row a:hover {
+      color: var(--text-main);
+    }
+
+    .footer-bottom {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding-top: 32px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .footer-bottom-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-bottom-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    .footer-bottom-links a:hover {
+      color: var(--text-secondary);
+    }
+
+    /* Tablet & Mobile Responsiveness */
+    @media (max-width: 1024px) {
+      .hero {
+        grid-template-columns: 1fr;
+        padding-top: 140px;
+        gap: 48px;
+      }
+
+      .hero-content {
+        align-items: center;
+        text-align: center;
+      }
+
+      .hero-desc {
+        margin: 0 auto 40px;
+      }
+
+      .hero-actions {
+        justify-content: center;
+      }
+
+      .hero-meta {
+        justify-content: center;
+      }
+
+      .hero-mockup {
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      .dashboard-window {
+        transform: none !important;
+      }
+
+      .bento-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .bento-col-2 {
+        grid-column: span 1;
+      }
+
+      .pricing-grid {
+        grid-template-columns: 1fr;
+        max-width: 440px;
+      }
+
+      .footer-container {
+        grid-template-columns: 1fr;
+        gap: 60px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none;
+      }
+
+      .hero-title {
+        font-size: 40px;
+      }
+
+      .outlets-inner {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 28px;
+        justify-items: center;
+      }
+
+      .proof-divider {
+        display: none;
+      }
+      
+      .proof-metric {
+        padding: 0;
+        text-align: center;
+      }
+
+      .outlets-list {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .btn-login {
+        display: none;
+      }
+      .nav-container {
+        padding: 12px 16px;
+      }
+      .logo {
+        font-size: 18px;
+      }
+      .btn-portal {
+        padding: 6px 12px;
+        font-size: 12.5px;
+      }
+      
+      .hero {
+        padding: 120px 16px 64px;
+        gap: 32px;
+      }
+      .hero-badge {
+        margin-bottom: 16px;
+      }
+      .hero-title {
+        font-size: 32px;
+        letter-spacing: -1.2px;
+      }
+      .hero-desc {
+        font-size: 14.5px;
+        margin-bottom: 32px;
+      }
+      .hero-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 12px;
+      }
+      .hero-actions .btn {
+        width: 100%;
+      }
+      .hero-meta {
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* Mockup Dashboard Responsiveness on Mobile */
+      .dashboard-body {
+        grid-template-columns: 1fr;
+        height: auto;
+        max-height: 520px;
+      }
+      .dashboard-sidebar {
+        flex-direction: row;
+        justify-content: space-around;
+        padding: 8px 12px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        gap: 0;
+      }
+      .sidebar-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+      }
+      .dashboard-content {
+        padding: 12px;
+        max-height: 380px;
+        overflow-y: auto;
+      }
+      .dashboard-stats {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .dashboard-split {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      
+      /* WhatsApp Float on mobile */
+      .whatsapp-float {
+        position: relative;
+        bottom: 0;
+        right: 0;
+        width: 100%;
+        margin-top: 16px;
+        transform: none !important;
+      }
+
+      /* Bento Grid layout inside */
+      .bento-pos-split {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .bento-pos-items {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .bento-analytics-wrapper {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        height: auto;
+      }
+      .bento-chart-container {
+        height: 120px;
+      }
+      .bento-kds-ticket, .bento-stocks-list, .bento-loyalty-card {
+        width: 100%;
+      }
+      .bento-card {
+        padding: 24px;
+      }
+      
+      /* Pricing cards */
+      .price-card {
+        padding: 32px 20px;
+      }
+      .price-amount {
+        font-size: 32px;
+      }
+
+      /* Footer */
+      footer {
+        padding: 64px 16px 32px;
+      }
+      .footer-container {
+        gap: 40px;
+      }
+    }
+
+    /* Operations Directory Styles */
+    .modules-section {
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+      padding: 120px 32px;
+    }
+
+    .modules-container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      margin-top: 48px;
+    }
+
+    .module-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      transition: var(--transition);
+    }
+
+    .module-card:hover {
+      border-color: var(--primary-brand);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .module-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(252, 128, 25, 0.08);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: var(--primary-brand);
+      margin-bottom: 20px;
+      transition: var(--transition);
+    }
+
+    .module-card:hover .module-icon {
+      background: var(--primary-brand);
+      color: #FFFFFF;
+      transform: scale(1.05);
+    }
+
+    .module-title {
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 10px;
+    }
+
+    .module-text {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Sync Highlights Banner */
+    .sync-highlight-banner {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-xl);
+      padding: 48px;
+      margin-top: 64px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .sync-banner-content {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      align-items: center;
+      gap: 48px;
+    }
+
+    .sync-banner-text {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--primary-brand);
+      background: rgba(252, 128, 25, 0.06);
+      border: 1px solid var(--border-accent);
+      padding: 5px 12px;
+      border-radius: 50px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sync-banner-text h3 {
+      font-family: var(--font-heading);
+      font-size: 32px;
+      font-weight: 800;
+      margin: 20px 0 12px;
+      color: var(--text-main);
+      letter-spacing: -0.8px;
+      line-height: 1.2;
+    }
+
+    .sync-banner-text p {
+      font-size: 14.5px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .sync-banner-graphics {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .sync-device-circle {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      border: 2px dashed rgba(252, 128, 25, 0.2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .sync-device-circle i {
+      font-size: 24px;
+      color: var(--primary-brand);
+      position: absolute;
+      transition: var(--transition);
+    }
+
+    .sync-device-circle i:hover {
+      transform: scale(1.2);
+    }
+
+    .device-pos {
+      top: 15px;
+      left: calc(50% - 12px);
+    }
+
+    .device-phone {
+      bottom: 20px;
+      left: 20px;
+    }
+
+    .device-desktop {
+      bottom: 20px;
+      right: 20px;
+    }
+
+    .sync-pulse {
+      width: 70px;
+      height: 70px;
+      background: rgba(252, 128, 25, 0.08);
+      border-radius: 50%;
+      animation: sync-pulsate 2.5s infinite ease-in-out;
+      border: 1px solid rgba(252, 128, 25, 0.15);
+    }
+
+    @keyframes sync-pulsate {
+      0% { transform: scale(0.85); opacity: 0.4; }
+      50% { transform: scale(1.2); opacity: 0.8; }
+      100% { transform: scale(0.85); opacity: 0.4; }
+    }
+
+    @media (max-width: 1024px) {
+      .modules-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .sync-banner-content {
+        grid-template-columns: 1fr;
+        gap: 32px;
+        text-align: center;
+      }
+      .sync-banner-text {
+        align-items: center;
+      }
+      .sync-banner-graphics {
+        margin-top: 16px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .modules-grid {
+        grid-template-columns: 1fr;
+      }
+      .sync-highlight-banner {
+        padding: 24px;
+      }
+      .sync-banner-text h3 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Navigation -->
+  <header>
+    <div class="nav-container">
+      <a href="#" class="logo">
+        <div class="logo-mark"><i class="fa-solid fa-square-poll-horizontal"></i></div>
+        CodeArc <span>RestoSuite</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#contact">Contact Support</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="login.html" class="btn-login">Sign In</a>
+        <a href="login.html" class="btn-portal" id="nav-login-btn"><i class="fa-solid fa-shield-halved"></i> Client Portal</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="status-dot"></span> White-Label Enterprise Platform
+      </div>
+      <h1 class="hero-title">
+        The Operating System for <span>Serious Food Outlets</span>
+      </h1>
+      <p class="hero-desc">
+        Unify front-of-house billing POS, real-time kitchen queues, table management, live ingredient tracking, and WhatsApp automated checkouts. Purpose-built for cafes, restaurants, dhabas, and food chains.
+      </p>
+      <div class="hero-actions">
+        <a href="login.html?tab=register" class="btn btn-primary" id="hero-signup-btn">
+          Register Your Outlet <i class="fa-solid fa-arrow-right"></i>
+        </a>
+        <a href="#features" class="btn btn-secondary">Explore Systems</a>
+      </div>
+      <div class="hero-meta">
+        <span><i class="fa-solid fa-check"></i> 10-Minute Setup</span>
+        <span><i class="fa-solid fa-check"></i> Cloud Sync Gateway</span>
+      </div>
+    </div>
+    
+    <div class="hero-mockup">
+      <!-- High-Fidelity Operational Dashboard Preview -->
+      <div class="dashboard-window">
+        <div class="window-header">
+          <div class="window-controls">
+            <span class="window-dot red"></span>
+            <span class="window-dot yellow"></span>
+            <span class="window-dot green"></span>
+          </div>
+          <div class="window-title">
+            <span class="window-status-indicator"></span> Nagpur Bistro Terminal #04
+          </div>
+          <div class="window-terminal">Live Operator Dashboard</div>
+        </div>
+        
+        <div class="dashboard-body">
+          <!-- Sidebar -->
+          <div class="dashboard-sidebar">
+            <div class="sidebar-icon active"><i class="fa-solid fa-house"></i></div>
+            <div class="sidebar-icon"><i class="fa-solid fa-cash-register"></i></div>
+            <div class="sidebar-icon"><i class="fa-solid fa-kitchen-set"></i></div>
+            <div class="sidebar-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+            <div class="sidebar-icon"><i class="fa-solid fa-chart-line"></i></div>
+            <div class="sidebar-icon"><i class="fa-solid fa-users"></i></div>
+          </div>
+          
+          <!-- Content Area -->
+          <div class="dashboard-content">
+            <!-- Stats -->
+            <div class="dashboard-stats">
+              <div class="stat-mini-card">
+                <div class="stat-label">Net Sales Today</div>
+                <div class="stat-value">₹43,890.50 <span>+14.2%</span></div>
+              </div>
+              <div class="stat-mini-card">
+                <div class="stat-label">Active Tables</div>
+                <div class="stat-value">12 / 18 <span>66%</span></div>
+              </div>
+              <div class="stat-mini-card">
+                <div class="stat-label">Speed of Service</div>
+                <div class="stat-value">9.4 min <span>Target</span></div>
+              </div>
+            </div>
+            
+            <!-- Dashboard split panels -->
+            <div class="dashboard-split">
+              <!-- Left Panel: POS Bill Drawer -->
+              <div class="panel-widget">
+                <div class="widget-title">
+                  POS Active Order <span>Table 12</span>
+                </div>
+                <div class="pos-billing-items">
+                  <div class="pos-billing-row">
+                    <span class="pos-item-name">2x Paneer Tikka Masala</span>
+                    <span class="pos-item-price">₹480.00</span>
+                  </div>
+                  <div class="pos-billing-row">
+                    <span class="pos-item-name">1x Butter Chicken Half</span>
+                    <span class="pos-item-price">₹380.00</span>
+                  </div>
+                  <div class="pos-billing-row">
+                    <span class="pos-item-name">3x Butter Garlic Naan</span>
+                    <span class="pos-item-price">₹150.00</span>
+                  </div>
+                  <div class="pos-billing-row">
+                    <span class="pos-item-name">2x Mango Lassi Cream</span>
+                    <span class="pos-item-price">₹180.00</span>
+                  </div>
+                </div>
+                <div class="pos-divider"></div>
+                <div class="pos-checkout-total">
+                  <span class="total-label">Grand Total (Incl. GST)</span>
+                  <span class="total-val">₹1,190.00</span>
+                </div>
+                <div class="pos-pay-btn">
+                  <i class="fa-solid fa-receipt"></i> Complete & Print Invoice
+                </div>
+              </div>
+              
+              <!-- Right Panel: Kitchen KDS Ticket -->
+              <div class="panel-widget">
+                <div class="widget-title">
+                  KDS Active Prep <span class="widget-badge">1 Pending</span>
+                </div>
+                <div class="kds-ticket-list">
+                  <div class="kds-ticket-card">
+                    <div class="kds-card-header">
+                      <span class="kds-order-id">Order #1209 - T12</span>
+                      <span class="kds-timer"><i class="fa-regular fa-clock"></i> 04:12m</span>
+                    </div>
+                    <ul class="kds-items">
+                      <li><span>2x</span> Paneer Tikka</li>
+                      <li><span>1x</span> Butter Chicken</li>
+                      <li><span>3x</span> Garlic Naan</li>
+                      <li><span>2x</span> Mango Lassi</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Inventory Alerts -->
+            <div class="inventory-alerts-row">
+              <div class="inv-alert-card">
+                <div class="inv-name">
+                  <span class="inv-warning-dot"></span> Stock Warning: Paneer Cubes & Fresh Cream
+                </div>
+                <span class="inv-stock-level">Low Stock (2.0kg left)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- WhatsApp receipt overlay -->
+      <div class="whatsapp-float">
+        <div class="whatsapp-header">
+          <i class="fa-brands fa-whatsapp whatsapp-logo"></i>
+          <span>CodeArc RestoSuite Gateway</span>
+        </div>
+        <div class="whatsapp-bubble">
+          Hi Rahul! Your bill for Table 12 at <strong>Nagpur Bistro</strong> has been processed.<br><br>
+          💳 Total: <strong>₹1,190.00</strong><br>
+          📄 View PDF receipt: <strong>codearc.co/b/1209</strong><br><br>
+          Thank you for dining with us!
+          <div class="whatsapp-time">
+            17:25 <i class="fa-solid fa-check-double"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Outlet Strip Section -->
+  <section class="outlets-section">
+    <div class="outlets-inner">
+      <div class="proof-metric">
+        <div class="proof-number">500+</div>
+        <div class="proof-label">Active Outlets</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">₹12Cr+</div>
+        <div class="proof-label">Processed Monthly</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">4</div>
+        <div class="proof-label">Outlet Formats</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">&lt; 10 min</div>
+        <div class="proof-label">Setup Time</div>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-metric">
+        <div class="proof-number">99.9%</div>
+        <div class="proof-label">Uptime SLA</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bento Grid Features Section -->
+  <section class="features-section" id="features">
+    <div class="section-head">
+      <span class="section-label">Operations Suite</span>
+      <h2 class="section-head-title">Unified FOH Billing and BOH Preparation Suite.</h2>
+      <p class="section-head-desc">Avoid fragmented apps and lost orders. RestoSuite brings your entire ordering, prep queues, ingredient tracking, and patron records into a single high-fidelity terminal.</p>
+    </div>
+    
+    <div class="bento-grid">
+      <!-- Feature 1: POS Screen (Span 2) -->
+      <div class="bento-card bento-col-2">
+        <div class="bento-text">
+          <h3 class="bento-title">High-Speed POS Register Grid</h3>
+          <p class="bento-desc">Lightning-fast cashier billing screen optimized for high-volume service. Features visual modifiers selection, dynamic seat mappings, custom menus, and lightning-fast checkout actions.</p>
+        </div>
+        <div class="bento-preview">
+          <div class="bento-pos-screen">
+            <!-- Food Search Bar Mockup -->
+            <div style="background: rgba(0, 0, 0, 0.02); border: 1px solid rgba(252, 128, 25, 0.15); border-radius: 6px; padding: 6px 10px; display: flex; align-items: center; gap: 8px; font-size: 9px; color: var(--text-secondary); width: 100%;">
+              <i class="fa-solid fa-magnifying-glass" style="color: var(--primary-brand); font-size: 10px;"></i>
+              <span>Search menu: Butter Chicken, Paneer Tikka, Garlic Naan, Mango Lassi...</span>
+            </div>
+            
+            <div class="bento-pos-split">
+              <div class="bento-pos-items">
+                <div class="bento-pos-tile">
+                  <i class="fa-solid fa-fire"></i>
+                  <span>Paneer Tikka</span>
+                  <strong>₹240</strong>
+                </div>
+                <div class="bento-pos-tile" style="border-color: var(--primary-brand); background: rgba(252, 128, 25, 0.03);">
+                  <i class="fa-solid fa-bowl-food"></i>
+                  <span>Butter Chicken</span>
+                  <strong>₹380</strong>
+                </div>
+                <div class="bento-pos-tile">
+                  <i class="fa-solid fa-bread-slice"></i>
+                  <span>Butter Naan</span>
+                  <strong>₹50</strong>
+                </div>
+                <div class="bento-pos-tile">
+                  <i class="fa-solid fa-circle-dot"></i>
+                  <span>Masala Dosa</span>
+                  <strong>₹120</strong>
+                </div>
+                <div class="bento-pos-tile">
+                  <i class="fa-solid fa-ice-cream"></i>
+                  <span>Gulab Jamun</span>
+                  <strong>₹80</strong>
+                </div>
+                <div class="bento-pos-tile">
+                  <i class="fa-solid fa-glass-water"></i>
+                  <span>Mango Lassi</span>
+                  <strong>₹90</strong>
+                </div>
+              </div>
+              <div class="bento-pos-cart">
+                <div>
+                  <div class="bento-pos-cart-title">Cart Summary</div>
+                  <div class="bento-cart-list">
+                    <div><span>1x Butter Chicken</span> <span>₹380.00</span></div>
+                    <div><span>2x Butter Naan</span> <span>₹100.00</span></div>
+                  </div>
+                </div>
+                <div style="font-size: 10px; font-weight: 700; color: var(--primary-brand); text-align: right; padding-top: 6px; border-top: 1px solid var(--border-color);">
+                  Total: ₹480.00
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Feature 2: Kitchen KDS (Span 1) -->
+      <div class="bento-card">
+        <div class="bento-text">
+          <h3 class="bento-title">Kitchen Prep KDS Console</h3>
+          <p class="bento-desc">Eradicate lost paper tickets. Display incoming orders digitally with color-coded preparation targets, warning staff of delays in real-time.</p>
+        </div>
+        <div class="bento-preview">
+          <div class="bento-kds-ticket">
+            <div class="kds-card-header" style="margin-bottom: 8px;">
+              <span style="font-weight:600; color: var(--text-main); font-size: 11px;">Kitchen Queue #1210</span>
+              <span style="color: var(--accent-red); font-size: 11px;"><i class="fa-regular fa-clock"></i> 02:44m</span>
+            </div>
+            <div style="font-size: 10.5px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 4px;">
+              <div>• 1x Paneer Butter Masala</div>
+              <div>• 2x Mango Lassi Cream</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3: Gram-Level Stock (Span 1) -->
+      <div class="bento-card">
+        <div class="bento-text">
+          <h3 class="bento-title">Gram-Level Stock Auto-Deductions</h3>
+          <p class="bento-desc">Track raw inventory down to the gram. RestoSuite uses active recipe formulas to subtract ingredients and trigger alerts when items run thin.</p>
+        </div>
+        <div class="bento-preview">
+          <div class="bento-stocks-list">
+            <div class="bento-stock-row">
+              <div class="bento-stock-header">
+                <span>Espresso Roast Beans</span>
+                <span>82%</span>
+              </div>
+              <div class="bento-stock-bar">
+                <div class="bento-stock-fill" style="width: 82%; background-color: var(--success);"></div>
+              </div>
+            </div>
+            <div class="bento-stock-row">
+              <div class="bento-stock-header">
+                <span>Fresh Cream Cubes</span>
+                <span style="color: var(--warning);">12% (Low)</span>
+              </div>
+              <div class="bento-stock-bar">
+                <div class="bento-stock-fill" style="width: 12%; background-color: var(--warning);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 4: Shift Reconciliation (Span 2) -->
+      <div class="bento-card bento-col-2">
+        <div class="bento-text">
+          <h3 class="bento-title">Cashier Shift Reconciliation Studio</h3>
+          <p class="bento-desc">Perform end-of-shift audits, track cash-to-UPI payment splits, and analyze net turns. Proactively manage cash register drops and export daily tax reports instantly.</p>
+        </div>
+        <div class="bento-preview">
+          <div class="bento-analytics-wrapper">
+            <div class="bento-analytics-left">
+              <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase;">UPI Gateway Share</div>
+              <div style="font-size: 20px; font-weight: 700; color: var(--text-main); font-family: var(--font-heading);">84.6% <span style="font-size:10px; color: var(--success); font-family: var(--font-body); font-weight:500;">+2.4%</span></div>
+              <div style="font-size: 9.5px; color: var(--text-muted); line-height: 1.4;">Automated payment reconciliations of active restaurant registers.</div>
+            </div>
+            <div class="bento-chart-container">
+              <div class="chart-bar" style="height: 30%;"></div>
+              <div class="chart-bar" style="height: 50%;"></div>
+              <div class="chart-bar" style="height: 45%;"></div>
+              <div class="chart-bar" style="height: 85%;"></div>
+              <div class="chart-bar" style="height: 70%;"></div>
+              <div class="chart-bar" style="height: 90%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 5: CRM & Loyalty (Span 1) -->
+      <div class="bento-card">
+        <div class="bento-text">
+          <h3 class="bento-title">Dynamic Patron Loyalty CRM</h3>
+          <p class="bento-desc">Record patron details directly at checkout. Segment dining history automatically to track average check sizes and build custom VIP tier tiers.</p>
+        </div>
+        <div class="bento-preview">
+          <div class="bento-loyalty-card" style="background: linear-gradient(135deg, #FFFDF9 0%, #FAF5EB 100%); border: 1px solid #D4AF37; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.08);">
+            <div class="bento-loyalty-tier" style="background: rgba(212, 175, 55, 0.15); color: #B48A1D; border-color: rgba(212, 175, 55, 0.25);">Zomato Gold VIP Link</div>
+            <div style="font-size: 13px; font-weight: 700; color: #8C6615; margin-bottom: 4px;">Rahul Mehta <span style="font-size:9.5px; color: #22c55e; margin-left: 6px;"><i class="fa-solid fa-star"></i> 4.9 Rating</span></div>
+            <div style="font-size: 10px; color: var(--text-secondary);">24 Visits • Avg Check ₹1,190.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 6: WhatsApp Invoices (Span 2) -->
+      <div class="bento-card bento-col-2">
+        <div class="bento-text">
+          <h3 class="bento-title">Direct WhatsApp Digital Billing</h3>
+          <p class="bento-desc">Eradicate paper check roll expenses. Push formatted PDF bills directly to client WhatsApp profiles to increase customer retention and collect feedback reviews.</p>
+        </div>
+        <div class="bento-preview">
+          <div class="bento-whatsapp-preview">
+            <div class="whatsapp-bubble" style="width: 260px;">
+              ✅ <strong>Nagpur Bistro</strong> Order Received!<br>
+              Bill Amount: <strong>₹480.00</strong><br>
+              Order Status: <strong>Serving</strong><br>
+              Link: <strong>codearc.co/b/1211</strong>
+              <div class="whatsapp-time">17:26 <i class="fa-solid fa-check-double"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 Core Operations Engine Modules Directory -->
+  <section class="modules-section" id="modules">
+    <div class="modules-container">
+      <div class="section-head">
+        <span class="section-label">Operations Directory</span>
+        <h2 class="section-head-title">12 Core Engine Modules. Zero Fragmentation.</h2>
+        <p class="section-head-desc">Unify your entire cafe or restaurant operations. Every terminal is designed to speed up service lines and synchronize staff in real-time.</p>
+      </div>
+
+      <div class="modules-grid">
+        <!-- Card 1 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-mug-hot"></i></div>
+          <h4 class="module-title">Takeaway POS Grid</h4>
+          <p class="module-text">Lightning-fast cashier billing register with instant category toggles, custom item modifiers, and split payments (UPI, cash, card).</p>
+        </div>
+        <!-- Card 2 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-qrcode"></i></div>
+          <h4 class="module-title">Live Table Orders</h4>
+          <p class="module-text">Dynamic QR code self-service dine-in maps. Orders placed by patrons stream straight to cashiers for validation and approval.</p>
+        </div>
+        <!-- Card 3 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+          <h4 class="module-title">Delivery Platform Integrations</h4>
+          <p class="module-text">Consolidate third-party online delivery streams into a single dashboard queue, eliminating the clutter of multiple tablets.</p>
+        </div>
+        <!-- Card 4 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-tv"></i></div>
+          <h4 class="module-title">Kitchen KDS Console</h4>
+          <p class="module-text">High-visibility prep tickets with visual countdown alerts and target markers to keep cooks in sync and eliminate paper waste.</p>
+        </div>
+        <!-- Card 5 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-ticket"></i></div>
+          <h4 class="module-title">Smart Vocal Token Board</h4>
+          <p class="module-text">Vocal sound announcer synthesized directly on terminals to notify waiting guests of ready pickups without shouting.</p>
+        </div>
+        <!-- Card 6 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+          <h4 class="module-title">Bills & Invoices Ledger</h4>
+          <p class="module-text">Comprehensive transactional history vault with rapid filters, search, splits audits, and checkout adjustment logs.</p>
+        </div>
+        <!-- Card 7 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+          <h4 class="module-title">Gram-Level Inventory</h4>
+          <p class="module-text">Automated ingredient deductions based on active recipes. Instantly triggers alert notices when items run below thresholds.</p>
+        </div>
+        <!-- Card 8 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-chart-line"></i></div>
+          <h4 class="module-title">Sales Analytics Studio</h4>
+          <p class="module-text">Deep visual insights into shift closings, daily cashier reconciliation audits, hourly volume peaks, and payment type splits.</p>
+        </div>
+        <!-- Card 9 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+          <h4 class="module-title">Dynamic Menu Editor</h4>
+          <p class="module-text">Instant digital pricing and catalog modifications. Mark dishes as out-of-stock instantly across all terminals and client QR menus.</p>
+        </div>
+        <!-- Card 10 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-users-rectangle"></i></div>
+          <h4 class="module-title">VIP Loyalty CRM</h4>
+          <p class="module-text">Compile patron profiles automatically during checkout to track visit metrics, check size averages, and assign Gold tiers.</p>
+        </div>
+        <!-- Card 11 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-calculator"></i></div>
+          <h4 class="module-title">Auto-Tax & GST Compiler</h4>
+          <p class="module-text">Automatic breakdown of CGST/SGST per item, and one-click spreadsheet compilations formatted for direct GSTR-1 tax compliance reporting.</p>
+        </div>
+        <!-- Card 12 -->
+        <div class="module-card">
+          <div class="module-icon"><i class="fa-solid fa-users"></i></div>
+          <h4 class="module-title">Employee Ledger & Roles</h4>
+          <p class="module-text">Secure role-based views (Manager, Cashier, Kitchen) with custom access limits, shift logins tracking, and operational action audits.</p>
+        </div>
+      </div>
+
+      <!-- Live Sync & Sync Shield Highlight -->
+      <div class="sync-highlight-banner">
+        <div class="sync-banner-content">
+          <div class="sync-banner-text">
+            <span class="sync-badge"><i class="fa-solid fa-arrows-spin"></i> Direct Client Sync Gateway</span>
+            <h3>Continuous Syncing &amp; Dual-Vault Protection</h3>
+            <p>Every terminal synchronizes instantaneously. Carts, table layouts, and alerts updates across all client registers, tablet monitors, and manager dashboards in real-time. If the internet drops, our <strong>Dual-Vault Offline Shield</strong> backs up data locally and triggers an automatic synchronization sweep once reconnected.</p>
+          </div>
+          <div class="sync-banner-graphics">
+            <div class="sync-device-circle">
+              <i class="fa-solid fa-tablet-screen-button device-pos"></i>
+              <i class="fa-solid fa-mobile-screen-button device-phone"></i>
+              <i class="fa-solid fa-computer device-desktop"></i>
+              <div class="sync-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Plans -->
+  <section class="pricing-section" id="pricing">
+    <div class="pricing-container">
+      <div class="section-head">
+        <span class="section-label">Clear Subscription</span>
+        <h2 class="section-head-title">Sober, predictable billing structure</h2>
+        <p class="section-head-desc">Select the operational license that matches your daily volume. Upgrade or downgrade instantly as your operations expand.</p>
+      </div>
+      
+      <div class="pricing-grid">
+        <!-- Tier 1: Basic -->
+        <div class="price-card">
+          <div class="price-head">
+            <div class="price-tier-name">Basic Register</div>
+            <div class="price-amount">₹999<span>/ month</span></div>
+          </div>
+          <ul class="price-features">
+            <li><i class="fa-solid fa-circle-check"></i> Standard Billing POS</li>
+            <li><i class="fa-solid fa-circle-check"></i> Up to 100 Bills / Day</li>
+            <li><i class="fa-solid fa-circle-check"></i> Digital Menu Manager</li>
+            <li class="excluded"><i class="fa-solid fa-circle-xmark"></i> Live Kitchen KDS</li>
+            <li class="excluded"><i class="fa-solid fa-circle-xmark"></i> WhatsApp Invoicing</li>
+          </ul>
+          <a href="login.html?tab=register" class="btn btn-secondary">Deploy Basic</a>
+        </div>
+        
+        <!-- Tier 2: Standard Suite (Popular) -->
+        <div class="price-card popular">
+          <span class="popular-badge">Recommended</span>
+          <div class="price-head">
+            <div class="price-tier-name" style="color: var(--primary-brand);">Standard Suite</div>
+            <div class="price-amount">₹2,499<span>/ month</span></div>
+          </div>
+          <ul class="price-features">
+            <li><i class="fa-solid fa-circle-check"></i> Enterprise Billing POS</li>
+            <li><i class="fa-solid fa-circle-check"></i> Unlimited Bills & Sales</li>
+            <li><i class="fa-solid fa-circle-check"></i> Live Kitchen KDS screens</li>
+            <li><i class="fa-solid fa-circle-check"></i> Automated Loyalty Segment</li>
+            <li><i class="fa-solid fa-circle-check"></i> WhatsApp Gateway Integration</li>
+          </ul>
+          <a href="login.html?tab=register" class="btn btn-primary">Deploy Standard Suite</a>
+        </div>
+
+        <!-- Tier 3: Enterprise Hub -->
+        <div class="price-card">
+          <div class="price-head">
+            <div class="price-tier-name">Enterprise Hub</div>
+            <div class="price-amount">₹4,999<span>/ month</span></div>
+          </div>
+          <ul class="price-features">
+            <li><i class="fa-solid fa-circle-check"></i> Everything in Standard Suite</li>
+            <li><i class="fa-solid fa-circle-check"></i> Multi-Outlet Roster Sync</li>
+            <li><i class="fa-solid fa-circle-check"></i> Live WhatsApp Gateway Sync</li>
+            <li><i class="fa-solid fa-circle-check"></i> Dedicated Support Account</li>
+            <li><i class="fa-solid fa-circle-check"></i> AI Sales Intelligence Panel</li>
+          </ul>
+          <a href="login.html?tab=register" class="btn btn-secondary">Deploy Enterprise</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Minimal Enterprise Footer -->
+  <footer id="contact">
+    <div class="footer-container">
+      <div class="footer-left">
+        <a href="#" class="logo" style="margin-bottom: 8px;">
+          <div class="logo-mark"><i class="fa-solid fa-square-poll-horizontal"></i></div>
+          CodeArc <span>RestoSuite</span>
+        </a>
+        <p>Premium restaurant, cafe, and dhaba operating systems. We automate daily operations, eliminate prep bottlenecks, and dispatch digital notifications seamlessly.</p>
+        <div class="footer-socials">
+          <a href="https://wa.me/919983721179" target="_blank" class="social-btn" title="WhatsApp support channel"><i class="fa-brands fa-whatsapp"></i></a>
+          <a href="https://instagram.com" target="_blank" class="social-btn" title="Instagram profile"><i class="fa-brands fa-instagram"></i></a>
+          <a href="https://codearc.co.in" target="_blank" class="social-btn" title="CodeArc Main Portal"><i class="fa-solid fa-globe"></i></a>
+        </div>
+      </div>
+      
+      <div class="footer-right">
+        <h4>Corporate Connections</h4>
+        <div class="footer-contacts-list">
+          <div class="footer-contact-row">
+            <i class="fa-solid fa-phone"></i>
+            <div>
+              <strong>Direct Support:</strong><br>
+              <a href="tel:+919983721179">+91 99837 21179</a>
+            </div>
+          </div>
+          <div class="footer-contact-row">
+            <i class="fa-solid fa-envelope"></i>
+            <div>
+              <strong>Email Queries:</strong><br>
+              <a href="mailto:hello@codearc.co.in">hello@codearc.co.in</a>
+            </div>
+          </div>
+          <div class="footer-contact-row">
+            <i class="fa-solid fa-location-dot"></i>
+            <div>
+              <strong>Developer Agency:</strong><br>
+              <a href="https://codearc.co.in" target="_blank">CodeArc Tech Labs Private Limited</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer-bottom">
+      <div>&copy; 2026 CodeArc Tech Labs. All rights reserved. Registered SaaS platform.</div>
+      <div class="footer-bottom-links">
+        <a href="login.html">Client Portal Login</a>
+        <a href="https://codearc.co.in" target="_blank">Developer Agency Hub</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

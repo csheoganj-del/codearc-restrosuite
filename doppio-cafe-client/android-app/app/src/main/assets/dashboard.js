@@ -8449,7 +8449,6 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     
     const mCount = document.getElementById('mobile-cart-count');
     const mTotal = document.getElementById('mobile-cart-total');
-    const mobileFloatingCart = document.getElementById('mobile-floating-cart');
     
     if (mCount && mTotal) {
       const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -8459,14 +8458,6 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const taxRate = businessProfile.gstEnabled ? (businessProfile.gstRate || 18) : 0;
       const gst = Math.round(subtotal * (taxRate / 100));
       mTotal.textContent = `₹${subtotal + gst}`;
-      
-      if (mobileFloatingCart) {
-        if (totalQty > 0 && window.innerWidth <= 600) {
-          mobileFloatingCart.style.setProperty('display', 'flex', 'important');
-        } else {
-          mobileFloatingCart.style.setProperty('display', 'none', 'important');
-        }
-      }
     }
   };
 

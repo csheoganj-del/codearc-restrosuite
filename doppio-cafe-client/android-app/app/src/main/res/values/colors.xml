@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors -->
+    <color name="primary_brand">#2b1813</color> <!-- Deep Chocolate Brown -->
+    <color name="primary_brand_dark">#1b0d0a</color> <!-- Darker brown for status bar -->
+    <color name="accent_caramel">#C98A4A</color> <!-- Caramel Gold -->
+    <color name="bg_cream">#FDFBF7</color> <!-- Cream Background -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

@@ -1,0 +1,21 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Beautiful golden coffee cup icon -->
+    <path
+        android:fillColor="@color/accent_caramel"
+        android:pathData="M30,35 L70,35 C70,35 73,50 70,62 C67,74 54,80 50,80 C46,80 33,74 30,62 C27,50 30,35 30,35 Z" />
+    <path
+        android:fillColor="@color/white"
+        android:pathData="M70,42 C75,42 78,45 78,50 C78,55 75,58 70,58"
+        android:strokeWidth="3"
+        android:strokeColor="@color/accent_caramel" />
+    <!-- Steam waves -->
+    <path
+        android:strokeColor="@color/white"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M42,28 Q44,22 42,16 M50,28 Q52,22 50,16 M58,28 Q60,22 58,16" />
+</vector>

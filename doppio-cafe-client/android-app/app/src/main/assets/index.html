@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doppio Cafe Nagpur | Savor the Perfect Brew</title>
+  <meta name="description" content="Welcome to Doppio Cafe Nagpur. Indulge in our exquisite collection of double-shot espresso, lattes, peri peri fries, mocktails, and fresh combos. Located on London Street, Nagpur.">
+  <link rel="stylesheet" href="styles.css">
+  <!-- FontAwesome for Social Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <a href="#" class="logo" id="header-logo">
+      <span class="logo-doppio">DOPPIO</span>
+      <span class="logo-cafe">Café</span>
+    </a>
+    <nav aria-label="Main Navigation">
+      <a href="#home">Home</a>
+      <a href="#menu-section">Menu</a>
+      <a href="#why-us">Our Story</a>
+      <a href="#signature">Experience</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a href="#staff-login" class="nav-cta" id="cta-reserve">Staff Login</a>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero" id="home">
+    <div class="hero-container">
+      <div class="hero-content">
+        <span class="hero-tag">Nagpur's Premium Hangout Spot</span>
+        <h1 class="hero-title">Savor the<br>Perfect Brew!</h1>
+        <p class="hero-desc">
+          Experience the bold richness of authentic double-shot espresso crafted with passion at Doppio Cafe. Every cup is an art, roasted locally and poured to perfection on London Street, Nagpur.
+        </p>
+        <div class="hero-actions">
+          <a href="#menu-section" class="btn btn-primary" id="hero-cta-order">Order Now <i class="fa-solid fa-mug-hot"></i></a>
+          <a href="#menu-section" class="btn btn-secondary" id="hero-cta-menu">Explore Menu</a>
+        </div>
+      </div>
+      <div class="hero-image-container">
+        <div class="hero-image-wrapper">
+          <!-- Canvas Overlay for Interactive Physics -->
+          <canvas id="physics-canvas"></canvas>
+          <div class="physics-cue"><i class="fa-solid fa-wand-magic-sparkles"></i> Physics Interactive: Wave Mouse</div>
+          <img src="images/hero_coffee.png" alt="Premium Doppio Cafe cup with elegant latte art and steam rising on a rustic wooden table surrounded by roasted coffee beans" class="hero-img">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section / Specialties -->
+  <section class="features" id="features">
+    <div class="section-header">
+      <span class="section-tag">Our Specialties</span>
+      <h2 class="section-title">Features</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">☕</div>
+        <h3 class="feature-title">Espresso</h3>
+        <p class="feature-desc">Intense, robust double-shot extraction using premium single-origin Arabica beans.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">🥛</div>
+        <h3 class="feature-title">Latte</h3>
+        <p class="feature-desc">Silky steamed microfoam poured gracefully over a rich, full-bodied espresso base.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">🍪</div>
+        <h3 class="feature-title">Cappuccino</h3>
+        <p class="feature-desc">The perfect structural harmony of rich espresso, warm milk, and deep velvet foam.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">❄️</div>
+        <h3 class="feature-title">Cold Brew</h3>
+        <p class="feature-desc">Slow-steeped for 24 hours in cold water, delivering a smooth, low-acid flavor profile.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Searchable Cafe Menu -->
+  <section class="interactive-menu" id="menu-section">
+    <div class="section-header">
+      <span class="section-tag">Premium Collection</span>
+      <h2 class="section-title">Doppio Interactive Menu</h2>
+    </div>
+
+    <!-- Search Input Bar -->
+    <div class="menu-search-wrapper">
+      <i class="fa-solid fa-magnifying-glass menu-search-icon"></i>
+      <input type="text" id="menu-search" class="menu-search-bar" placeholder="Search for lattes, shakes, mocktails, pasta, garlic toast...">
+    </div>
+
+    <!-- Category Filters -->
+    <div class="menu-filters" id="menu-filters">
+      <button class="filter-btn active" data-category="ALL">All Categories</button>
+      <button class="filter-btn" data-category="COLD COFFEE">Cold Coffee</button>
+      <button class="filter-btn" data-category="HOT COFFEE">Hot Coffee</button>
+      <button class="filter-btn" data-category="MATCHA">Matcha</button>
+      <button class="filter-btn" data-category="FRIES & SHARE PLATES">Fries & Plates</button>
+      <button class="filter-btn" data-category="MOCKTAILS">Mocktails</button>
+      <button class="filter-btn" data-category="SANDWICHES">Sandwiches</button>
+      <button class="filter-btn" data-category="THICK SHAKES">Thick Shakes</button>
+      <button class="filter-btn" data-category="CLASSIC TOAST">Classic Toast</button>
+      <button class="filter-btn" data-category="EGGS">Eggs</button>
+      <button class="filter-btn" data-category="APPETIZERS">Appetizers</button>
+      <button class="filter-btn" data-category="COMBOS">Combos</button>
+      <button class="filter-btn" data-category="PASTA">Pasta</button>
+    </div>
+
+    <!-- Menu Items Grid Rendered Dynamically -->
+    <div class="menu-grid" id="menu-grid">
+      <!-- Items will load here via script.js -->
+    </div>
+  </section>
+
+  <!-- Why Choose Us & Promos Grid -->
+  <section class="promo-section" id="why-us">
+    <div class="promo-grid">
+      <!-- Card 1: Why Choose Us -->
+      <div class="promo-card promo-card-dark">
+        <div class="promo-content">
+          <h3>Why Choose Us?</h3>
+          <p>
+            We curate our beans ethically, sourcing them from organic high-altitude farms. Under our master roasters, each batch reveals notes of caramel, cacao, and hazelnut.
+          </p>
+        </div>
+        <a href="#menu-section" class="btn btn-secondary" id="promo-why-cta">Discover More</a>
+      </div>
+
+      <!-- Card 2: Aesthetic Image -->
+      <div class="promo-card promo-card-image">
+        <img src="images/barista_pour.png" alt="Close-up of professional barista hand pouring microfoam into dark espresso making a latte leaf art">
+      </div>
+
+      <!-- Card 3: Happy Hour Promo -->
+      <div class="promo-card promo-card-light">
+        <div class="promo-content">
+          <span class="section-tag">Morning Offer</span>
+          <h3>20% off from 8 - 10 am</h3>
+          <p>
+            Brighten your mornings with Doppio. Get an exclusive 20% discount on all premium signature drinks during our happy hours.
+          </p>
+          <div class="promo-detail">Morning Happy Hour</div>
+        </div>
+        <a href="#menu-section" class="btn btn-dark" id="promo-hour-cta">Claim Offer</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Signature Drinks / Visit Us Today -->
+  <section class="signature-drinks" id="signature">
+    <div class="section-header">
+      <span class="section-tag">Visit Us TODAY</span>
+      <h2 class="section-title">Signature Selections</h2>
+    </div>
+    <div class="drinks-grid">
+      <!-- Drink 1 -->
+      <div class="drink-card">
+        <div class="drink-image">
+          <img src="images/iced_latte.png" alt="Premium Chilled Iced Latte">
+        </div>
+        <div class="drink-details">
+          <h3 class="drink-title">Iced Latte <span class="drink-price">₹249</span></h3>
+          <p class="drink-desc">Creamy chilled latte served over ice, utilizing premium single-origin espresso.</p>
+        </div>
+      </div>
+      <!-- Drink 2 -->
+      <div class="drink-card">
+        <div class="drink-image">
+          <img src="images/cappuccino.png" alt="Perfect Velvet Cappuccino">
+        </div>
+        <div class="drink-details">
+          <h3 class="drink-title">Cappuccino <span class="drink-price">₹229</span></h3>
+          <p class="drink-desc">Warm espresso topped with beautiful microfoam latte art and steamed milk layers.</p>
+        </div>
+      </div>
+      <!-- Drink 3 -->
+      <div class="drink-card">
+        <div class="drink-image">
+          <img src="images/iced_strawberry_matcha.png" alt="Premium Iced Strawberry Matcha Drink">
+        </div>
+        <div class="drink-details">
+          <h3 class="drink-title">Iced Strawberry Matcha <span class="drink-price">₹349</span></h3>
+          <p class="drink-desc">Vibrant green matcha layered over creamy milk and fresh sweet strawberry base.</p>
+        </div>
+      </div>
+      <!-- Drink 4 -->
+      <div class="drink-card">
+        <div class="drink-image">
+          <img src="images/nutella_thickshake.png" alt="Rich Nutella Thickshake">
+        </div>
+        <div class="drink-details">
+          <h3 class="drink-title">Nutella Thickshake <span class="drink-price">₹299</span></h3>
+          <p class="drink-desc">Thick, chocolate-infused creamy hazelnut shake with whipped cream and Nutella drizzle.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="testimonials">
+    <div class="section-header">
+      <span class="section-tag">Client Reviews</span>
+      <h2 class="section-title">Coffee Lovers Speak</h2>
+    </div>
+    <div class="testimonials-grid">
+      <!-- Review 1 -->
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text">"Amazing experience! The cold coffee and peri peri fries are a must-try. The cafe has a very warm and homey atmosphere, and the staff is incredibly polite. Definitely my new favorite hangout spot in Nagpur!"</p>
+        <div class="user-profile">
+          <div class="user-avatar">AS</div>
+          <div class="user-info">
+            <h4>Aarav Sharma</h4>
+            <p>Nagpur Local</p>
+          </div>
+        </div>
+      </div>
+      <!-- Review 2 -->
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text">"The lattes here are brewed to perfection, and the cheese garlic toast is absolutely delicious. Extremely clean place with aesthetic seating. Highly recommend for quiet study sessions or family catchups."</p>
+        <div class="user-profile">
+          <div class="user-avatar">DP</div>
+          <div class="user-info">
+            <h4>Divya Patel</h4>
+            <p>Food Blogger</p>
+          </div>
+        </div>
+      </div>
+      <!-- Review 3 -->
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text">"Fantastic food and top-tier service. Their Alfredo pasta and Nutella thickshake are out of this world. Nagpur really needed a high-quality cafe like this. 10/10!"</p>
+        <div class="user-profile">
+          <div class="user-avatar">RV</div>
+          <div class="user-info">
+            <h4>Rohan Verma</h4>
+            <p>Regular Visitor</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer id="contact">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <h4>Doppio Cafe Nagpur</h4>
+        <p>Premium coffee experiences, locally roasted and served with passion daily on London Street.</p>
+        <p><i class="fa-solid fa-indian-rupee-sign"></i> Average Cost: ₹200 – ₹400 per person</p>
+        <div class="social-links">
+          <a href="https://www.instagram.com/doppioindia/?hl=en" class="social-btn" aria-label="Instagram" target="_blank"><i class="fa-brands fa-instagram"></i></a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <ul class="footer-links">
+          <li><a href="#home">Home</a></li>
+          <li><a href="#menu-section">Menu</a></li>
+          <li><a href="#why-us">Our Story</a></li>
+          <li><a href="#signature">Experience</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Hours</h4>
+        <p><i class="fa-solid fa-clock"></i> 9:00 AM - 10:30 PM</p>
+        <p>Open Daily (Monday - Sunday)</p>
+      </div>
+      <div class="footer-col">
+        <h4>Find Us</h4>
+        <p><i class="fa-solid fa-location-dot"></i> London Street, in front of Pantaloons, Sita Nagar, Jai Prakash Nagar, Somalwada, Nagpur, Maharashtra 440025</p>
+        <p><i class="fa-solid fa-phone"></i> +91 91300 03177</p>
+        <p><i class="fa-solid fa-envelope"></i> hello@doppionagpur.com</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-bottom-flex">
+        <span>&copy; 2026 Doppio Cafe Nagpur. All rights reserved. Crafted for premium coffee enthusiasts.</span>
+        <div class="visitor-counter">
+          <span class="live-pulse"></span>
+          <i class="fa-solid fa-users"></i> Visitors: <span id="visit-count">10,482</span>
+          <span class="divider">|</span>
+          <span class="crafted-by">Made by <a href="http://www.codearc.co.in" target="_blank" rel="noopener noreferrer" class="codearc-link">CodeArc</a></span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Staff Login Modal -->
+  <div class="login-modal" id="login-modal">
+    <div class="login-modal-card">
+      <div class="login-close" id="login-close"><i class="fa-solid fa-xmark"></i></div>
+      <div class="logo login-logo">
+        <span class="logo-doppio">DOPPIO</span>
+        <span class="logo-cafe">Café</span>
+      </div>
+      <h2 class="login-title">Staff Portal</h2>
+      <p class="login-subtitle">Enter your cashier credentials to enter dashboard</p>
+      
+      <form id="login-form">
+        <div class="login-field">
+          <i class="fa-solid fa-user"></i>
+          <input type="text" id="login-username" class="login-input" placeholder="Username" required autocomplete="username">
+        </div>
+        <div class="login-field" style="position: relative;">
+          <i class="fa-solid fa-key"></i>
+          <input type="password" id="login-password" class="login-input" placeholder="Password" required autocomplete="current-password" style="padding-right: 48px;">
+          <i class="fa-solid fa-eye" id="toggle-password" style="position: absolute; right: 20px; left: auto; cursor: pointer; color: var(--text-muted); transition: var(--transition); z-index: 10;"></i>
+        </div>
+        <button type="submit" class="login-btn">Log In</button>
+      </form>
+      <div class="login-error-msg" id="login-error">Invalid Username or Password. Please try again.</div>
+    </div>
+  </div>
+
+  <!-- Customer Floating Cart Button -->
+  <div class="customer-floating-cart" id="customer-floating-cart">
+    <div class="cart-btn-content">
+      <div class="cart-icon-wrapper">
+        <i class="fa-solid fa-basket-shopping"></i>
+        <span class="cart-badge-count" id="cart-badge-count">0</span>
+      </div>
+      <div class="cart-btn-text">
+        <span class="cart-label">My Cart</span>
+        <span class="cart-btn-total" id="cart-btn-total">₹0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer Cart Drawer -->
+  <div class="customer-cart-drawer" id="customer-cart-drawer">
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <div class="drawer-content">
+      <div class="drawer-header">
+        <div class="drawer-title-area">
+          <h3>Your Order</h3>
+          <span class="table-badge" id="drawer-table-badge" style="display: none;">Table 01</span>
+        </div>
+        <button class="close-drawer-btn" id="close-drawer-btn">&times;</button>
+      </div>
+      
+      <div class="drawer-body">
+        <!-- Dynamic Cart Items List -->
+        <div class="cart-items-container" id="customer-cart-items">
+          <!-- Loaded Dynamically -->
+        </div>
+        
+        <!-- Customer Details Form -->
+        <div class="customer-info-section">
+          <h4>Order Details</h4>
+          <div class="input-group">
+            <i class="fa-solid fa-user"></i>
+            <input type="text" id="cust-order-name" placeholder="Your Name (Required)" required>
+          </div>
+          <div class="input-group">
+            <i class="fa-solid fa-phone"></i>
+            <input type="tel" id="cust-order-phone" placeholder="Mobile Number (Optional)" maxlength="10">
+          </div>
+          <div class="input-group" id="table-select-group">
+            <i class="fa-solid fa-chair"></i>
+            <select id="cust-order-table">
+              <option value="">Select Table / Option</option>
+              <option value="Takeaway">Takeaway (At Counter)</option>
+              <option value="1">Table 01 (Ground Floor)</option>
+              <option value="2">Table 02 (Ground Floor)</option>
+              <option value="3">Table 03 (Ground Floor)</option>
+              <option value="4">Table 04 (First Floor)</option>
+              <option value="5">Table 05 (First Floor)</option>
+              <option value="6">Table 06 (Balcony Seating)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <div class="drawer-footer">
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="cust-subtotal">₹0</span>
+        </div>
+        <div class="summary-row">
+          <span>GST (18% included)</span>
+          <span id="cust-gst">₹0</span>
+        </div>
+        <div class="summary-row total-row">
+          <span>Grand Total</span>
+          <span id="cust-total" style="color: var(--accent-caramel); font-weight: 800; font-size: 20px;">₹0</span>
+        </div>
+        
+        <button class="checkout-submit-btn" id="checkout-submit-btn">
+          Place & Pay Order <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPI Payment Gateway Simulation Modal -->
+  <div class="upi-payment-modal" id="upi-payment-modal">
+    <div class="upi-modal-backdrop"></div>
+    <div class="upi-modal-card">
+      <div class="upi-modal-close" id="upi-modal-close"><i class="fa-solid fa-xmark"></i></div>
+      
+      <div class="upi-merchant-header">
+        <div class="merchant-badge"><i class="fa-solid fa-shield-halved"></i> Secured UPI Gateway</div>
+        <div class="logo login-logo" style="margin: 12px auto; display: table;">
+          <span class="logo-doppio">DOPPIO</span>
+          <span class="logo-cafe">Café</span>
+        </div>
+        <div class="merchant-name">Doppio Cafe Nagpur <i class="fa-solid fa-circle-check" style="color: #c98a4a;"></i></div>
+        <div class="merchant-vpa">pay.doppiocafe@oksbi</div>
+      </div>
+      
+      <div class="upi-amount-box">
+        <span class="amount-label">PAYING TO MERCHANT</span>
+        <span class="amount-val" id="upi-amount-val">₹0</span>
+      </div>
+      
+      <!-- Dynamic Scannable UPI QR Code -->
+      <div class="upi-qr-section">
+        <div class="qr-frame-wrapper">
+          <div class="qr-scanner-line"></div>
+          <img id="upi-qr-image" src="" alt="UPI QR Code for Payment">
+        </div>
+        <p class="qr-instructions">Scan with any UPI App (GPay, PhonePe, Paytm, BHIM) to pay instantly.</p>
+      </div>
+      
+      <div class="payment-sim-actions">
+        <button class="sim-btn sim-btn-success" id="sim-pay-success">
+          <i class="fa-solid fa-circle-check"></i> Simulate Payment Success
+        </button>
+        <button class="sim-btn sim-btn-cash" id="sim-pay-counter">
+          <i class="fa-solid fa-wallet"></i> Pay Cash at Counter
+        </button>
+      </div>
+      
+      <div class="payment-waiting-status">
+        <span class="spinner"></span>
+        <span>Awaiting network verification...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Success/Payment Complete Confetti & Modal -->
+  <div class="order-success-screen" id="order-success-screen">
+    <canvas id="success-confetti-canvas" style="position: fixed; top:0; left:0; width:100vw; height:100vh; z-index:99999; pointer-events:none;"></canvas>
+    <div class="success-card">
+      <div class="checkmark-circle">
+        <i class="fa-solid fa-check checkmark-icon"></i>
+      </div>
+      <h2 class="success-title">Order Placed!</h2>
+      <p class="success-subtitle" id="success-subtitle-text">Your order has been beamed to the kitchen.</p>
+      
+      <div class="receipt-box">
+        <div class="receipt-header">
+          <span id="receipt-table" style="font-weight: 800; color: var(--accent-caramel);">Table 3</span>
+          <span id="receipt-id">Order ID: DO-QR-9824</span>
+        </div>
+        <div class="receipt-divider">-----------------------------</div>
+        <div class="receipt-items" id="receipt-items-list">
+          <!-- Dynamic items -->
+        </div>
+        <div class="receipt-divider">-----------------------------</div>
+        <div class="receipt-footer">
+          <span>Total Amount Paid</span>
+          <span id="receipt-total-paid" style="font-weight: 800; color: var(--accent-caramel);">₹548</span>
+        </div>
+      </div>
+      
+      <p class="success-desc">The chef has received your order! We are preparing your fresh brew and hot food. Sit back and relax!</p>
+      <button class="btn btn-dark" id="success-done-btn" style="width: 100%;">Awesome!</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+</html>
