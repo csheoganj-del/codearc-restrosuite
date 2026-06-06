@@ -95,49 +95,45 @@ if (emailConfig.relayUrl) {
 
 async function sendMailHelper(to, subject, html, text = '') {
     if (emailConfig.relayUrl) {
-        // Send via HTTPS Relay Web App
-        const https = require('https');
-        const http = require('http');
-        const url = new URL(emailConfig.relayUrl);
-        const postData = JSON.stringify({ to, subject, html, text });
+        // Send via HTTPS Relay Web App using native fetch (automatically follows redirects)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
         
-        return new Promise((resolve, reject) => {
-            const lib = emailConfig.relayUrl.startsWith('https') ? https : http;
-            const req = lib.request(url, {
+        try {
+            const response = await fetch(emailConfig.relayUrl, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(postData)
+                    'Content-Type': 'application/json'
                 },
-                timeout: 15000 // 15 seconds timeout
-            }, (res) => {
-                let data = '';
-                res.on('data', chunk => data += chunk);
-                res.on('end', () => {
-                    try {
-                        const parsed = JSON.parse(data);
-                        if (parsed.status === 'success' || parsed.ok || parsed.status === 'ok') {
-                            resolve({ messageId: parsed.messageId || 'relay_ok' });
-                        } else {
-                            reject(new Error(parsed.error || 'Relay returned failure status'));
-                        }
-                    } catch (_) {
-                        if (res.statusCode >= 200 && res.statusCode < 300) {
-                            resolve({ messageId: 'relay_ok' });
-                        } else {
-                            reject(new Error(`Relay returned status ${res.statusCode}`));
-                        }
-                    }
-                });
+                body: JSON.stringify({ to, subject, html, text }),
+                signal: controller.signal
             });
-            req.on('error', reject);
-            req.on('timeout', () => {
-                req.destroy();
-                reject(new Error('Relay connection timeout'));
-            });
-            req.write(postData);
-            req.end();
-        });
+            
+            clearTimeout(timeoutId);
+            
+            const responseText = await response.text();
+            let parsed = null;
+            try {
+                parsed = JSON.parse(responseText);
+            } catch (_) {
+                // Not JSON response
+            }
+            
+            if (parsed && (parsed.status === 'success' || parsed.ok || parsed.status === 'ok')) {
+                return { messageId: parsed.messageId || 'relay_ok' };
+            } else if (response.ok || (response.status >= 200 && response.status < 300)) {
+                return { messageId: 'relay_ok' };
+            } else {
+                const errorMsg = parsed?.error || responseText || `Status ${response.status}`;
+                throw new Error(errorMsg);
+            }
+        } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') {
+                throw new Error('Relay connection timeout');
+            }
+            throw err;
+        }
     } else if (transporter) {
         // Send via SMTP
         return transporter.sendMail({
