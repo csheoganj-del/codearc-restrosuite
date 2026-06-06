@@ -3719,6 +3719,22 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
 
     window.endOnboardingTour = function() {
       try { localStorage.setItem(TOUR_KEY, '1'); } catch(e) {}
+      
+      // Save tour status to cloud business profile database to prevent popups on other devices/logins
+      if (typeof businessProfile !== 'undefined' && businessProfile) {
+        if (!businessProfile.featureFlags) businessProfile.featureFlags = {};
+        businessProfile.featureFlags.tourDone = true;
+        localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+        if (typeof setVaultData === 'function') setVaultData("doppio_business_profile", businessProfile);
+        
+        if (typeof supabaseClient !== 'undefined' && supabaseClient && typeof activeTenantId !== 'undefined' && activeTenantId) {
+          supabaseClient.from('doppio_business_profile')
+            .update({ feature_flags: JSON.stringify(businessProfile.featureFlags) })
+            .eq('tenant_id', activeTenantId)
+            .then();
+        }
+      }
+
       const overlay = document.getElementById('onboarding-overlay');
       if (overlay) {
         overlay.style.opacity = '0';
@@ -3780,9 +3796,24 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       setTimeout(function() {
         const role = sessionStorage.getItem('logged_in_role');
         if (role === 'superadmin') return;
+        
+        // 1. Check cloud business profile settings (persistent across devices/sessions)
+        try {
+          if (typeof businessProfile !== 'undefined' && businessProfile && businessProfile.featureFlags && businessProfile.featureFlags.tourDone) {
+            return;
+          }
+          const storedProf = localStorage.getItem('doppio_business_profile');
+          if (storedProf) {
+            const parsed = JSON.parse(storedProf);
+            if (parsed && parsed.featureFlags && parsed.featureFlags.tourDone) return;
+          }
+        } catch(e) {}
+
+        // 2. Check local browser cache fallback
         try {
           if (localStorage.getItem(TOUR_KEY)) return; // Already seen tour
         } catch(e) {}
+        
         startTour();
       }, 1200); // Wait for Supabase sync to settle first
     });
