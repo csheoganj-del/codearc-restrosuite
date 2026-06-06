@@ -12622,17 +12622,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       }
     })();
 
-    // 2. Fetch Dispatch Logs from Supabase gateway_health_log (Non-blocking)
+    // 2. Fetch Dispatch Logs from WhatsApp Gateway debug-logs endpoint (bypassing RLS)
     (async () => {
       const logsContainer = document.getElementById('saas-notification-logs-container');
       try {
-        const { data: logs, error } = await supabaseClient
-          .from('gateway_health_log')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (error) throw error;
+        const res = await fetch('https://kalpeshdeora1006-whatsapp-gateway.hf.space/debug-logs');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message || 'Failed to fetch logs');
+        const logs = data.logs || [];
 
         if (logsContainer) {
           if (!logs || logs.length === 0) {
