@@ -52,10 +52,70 @@
 document.addEventListener('DOMContentLoaded', async () => {
   document.body.classList.add('js-loaded');
 
+  const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
+  const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+  const TENANT_ACCESS_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-access`;
+  const TENANT_ADMIN_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-admin`;
+  const TENANT_DATA_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-data`;
+
+  async function callTenantAccess(action, payload = {}) {
+    const response = await fetch(TENANT_ACCESS_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': DEFAULT_SUPABASE_KEY,
+        'Authorization': `Bearer ${DEFAULT_SUPABASE_KEY}`
+      },
+      body: JSON.stringify({
+        action,
+        ...payload
+      })
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Session validation failed.');
+    return result;
+  }
+
+  async function validateStoredDashboardSession() {
+    const cachedRole = sessionStorage.getItem('logged_in_role');
+    const sessionToken = cachedRole === 'superadmin'
+      ? sessionStorage.getItem('superadmin_admin_token')
+      : sessionStorage.getItem('tenant_session_token');
+
+    if (!sessionToken) {
+      throw new Error('Missing signed session token.');
+    }
+
+    const result = await callTenantAccess('validate_session', { session_token: sessionToken });
+    const session = result.session || {};
+    const previousResetAt = sessionStorage.getItem('tenant_data_reset_at') || '';
+    const nextResetAt = session.data_reset_at || '';
+    if (session.role === 'admin' && previousResetAt && nextResetAt && previousResetAt !== nextResetAt) {
+      sessionStorage.setItem('tenant_data_reset_pending', 'true');
+    }
+    sessionStorage.setItem('logged_in_user', session.username || '');
+    sessionStorage.setItem('logged_in_role', session.role || '');
+    sessionStorage.setItem('tenant_id', session.tenant_id || '');
+    sessionStorage.setItem('tenant_slug', session.tenant_slug || '');
+    sessionStorage.setItem('tenant_name', session.tenant_name || '');
+    sessionStorage.setItem('allowed_tabs', JSON.stringify(session.allowed_tabs || []));
+    sessionStorage.setItem('tenant_data_reset_at', nextResetAt);
+    return session;
+  }
+
   // ==========================================
   // SESSION GUARD (Redirect if not logged in)
   // ==========================================
   if (!sessionStorage.getItem('logged_in_user')) {
+    window.location.href = 'login.html';
+    return;
+  }
+  try {
+    await validateStoredDashboardSession();
+  } catch (sessionError) {
+    console.warn('[Session Guard] Stored browser session failed backend validation:', sessionError);
+    sessionStorage.clear();
     window.location.href = 'login.html';
     return;
   }
@@ -66,6 +126,50 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
   let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
   let saasGatewayPollingInterval = null;
+
+  async function refreshAuthoritativeTenantSession(showToast = false) {
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
+    try {
+      const session = await validateStoredDashboardSession();
+      if (sessionStorage.getItem('tenant_data_reset_pending') === 'true') {
+        await clearIndexedDBVault();
+        for (let index = localStorage.length - 1; index >= 0; index--) {
+          const key = localStorage.key(index);
+          if (key && key.startsWith('doppio_')) {
+            localStorage.removeItem(key);
+          }
+        }
+        sessionStorage.removeItem('tenant_data_reset_pending');
+        window.location.reload();
+        return;
+      }
+      allowedTabs.length = 0;
+      (session.allowed_tabs || []).forEach(tab => allowedTabs.push(tab));
+      applyFeatureToggles();
+
+      const activeTabEl = document.querySelector('.tab-content.active');
+      const activeTabId = activeTabEl ? activeTabEl.id : null;
+      if (activeTabId && !allowedTabs.includes(activeTabId)) {
+        const firstAllowed = allowedTabs[0];
+        if (firstAllowed) {
+          document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+          const targetTab = document.getElementById(firstAllowed);
+          if (targetTab) targetTab.classList.add('active');
+          const targetLink = document.querySelector(`.sidebar-link[data-tab="${firstAllowed}"]`);
+          if (targetLink) targetLink.classList.add('active');
+        }
+      }
+
+      if (showToast) showNotificationToast('Your access permissions were updated.');
+    } catch (error) {
+      showNotificationToast('Workspace access changed. Please log in again.');
+      setTimeout(() => {
+        sessionStorage.clear();
+        window.location.href = 'login.html';
+      }, 1800);
+    }
+  }
 
   // ==========================================
   // SHARED STATE INITIALIZED EARLY FOR SAFETY
@@ -178,6 +282,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initIndexedDBVault();
   } catch (dbErr) {
     console.warn("[Resilience Vault] Failed to wait for vault initialization:", dbErr);
+  }
+
+  if (sessionStorage.getItem('tenant_data_reset_pending') === 'true') {
+    await clearIndexedDBVault();
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key && key.startsWith('doppio_')) {
+        localStorage.removeItem(key);
+      }
+    }
+    sessionStorage.removeItem('tenant_data_reset_pending');
   }
 
   if (localStorage.length === 0 || !localStorage.getItem('doppio_bills')) {
@@ -767,8 +882,176 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sync parameters
   let supabaseClient = null;
-  const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
-  const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+
+  async function callTenantAdmin(action, payload = {}) {
+    const adminToken = sessionStorage.getItem('superadmin_admin_token');
+    if (!adminToken) {
+      throw new Error('Superadmin session expired. Please log in again.');
+    }
+
+    const response = await fetch(TENANT_ADMIN_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': DEFAULT_SUPABASE_KEY,
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        action,
+        ...payload
+      })
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) {
+        sessionStorage.removeItem('superadmin_admin_token');
+      }
+      throw new Error(result.error || 'Superadmin request failed.');
+    }
+
+    return result;
+  }
+
+  function createTenantDataClient(nativeClient) {
+    const tenantTables = new Set([
+      'doppio_business_profile',
+      'doppio_menu',
+      'doppio_inventory',
+      'doppio_bills',
+      'doppio_pending_orders',
+      'doppio_shifts',
+      'doppio_shift_events',
+      'doppio_employees',
+      'doppio_leave_requests',
+      'doppio_attendance',
+      'doppio_crm',
+      'doppio_inventory_batches',
+      'doppio_notifications',
+      'doppio_custom_recipes',
+      'doppio_inventory_thresholds',
+      'doppio_pos_popularity',
+      'doppio_draft_orders'
+    ]);
+
+    function makeTenantQuery(table) {
+      const state = {
+        table,
+        operation: null,
+        columns: '*',
+        data: undefined,
+        filters: [],
+        order: null,
+        limit: null,
+        single: false,
+        maybeSingle: false,
+        returning: false,
+        options: {}
+      };
+
+      const execute = async () => {
+        const tenantToken = sessionStorage.getItem('tenant_session_token');
+        if (!tenantToken) {
+          return { data: null, error: { message: 'Tenant session expired. Please log in again.' } };
+        }
+
+        const response = await fetch(TENANT_DATA_FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': DEFAULT_SUPABASE_KEY,
+            'Authorization': `Bearer ${tenantToken}`
+          },
+          body: JSON.stringify(state)
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          return { data: null, error: { message: result.error || 'Tenant data request failed.' } };
+        }
+        return { data: result.data, error: null };
+      };
+
+      const builder = {
+        select(columns = '*') {
+          if (!state.operation) {
+            state.operation = 'select';
+          } else {
+            state.returning = true;
+          }
+          state.columns = columns;
+          return builder;
+        },
+        insert(data) {
+          state.operation = 'insert';
+          state.data = data;
+          return builder;
+        },
+        update(data) {
+          state.operation = 'update';
+          state.data = data;
+          return builder;
+        },
+        upsert(data, options = {}) {
+          state.operation = 'upsert';
+          state.data = data;
+          state.options = options;
+          return builder;
+        },
+        delete() {
+          state.operation = 'delete';
+          return builder;
+        },
+        eq(column, value) {
+          state.filters.push({ operator: 'eq', column, value });
+          return builder;
+        },
+        in(column, value) {
+          state.filters.push({ operator: 'in', column, value });
+          return builder;
+        },
+        order(column, options = {}) {
+          state.order = { column, ascending: options.ascending !== false };
+          return builder;
+        },
+        limit(value) {
+          state.limit = value;
+          return builder;
+        },
+        single() {
+          state.single = true;
+          return builder;
+        },
+        maybeSingle() {
+          state.maybeSingle = true;
+          return builder;
+        },
+        then(resolve, reject) {
+          if (!state.operation) state.operation = 'select';
+          return execute().then(resolve, reject);
+        },
+        catch(reject) {
+          if (!state.operation) state.operation = 'select';
+          return execute().catch(reject);
+        }
+      };
+
+      return builder;
+    }
+
+    return {
+      from(table) {
+        if (tenantTables.has(table)) return makeTenantQuery(table);
+        return nativeClient.from(table);
+      },
+      channel(...args) {
+        return nativeClient.channel(...args);
+      },
+      removeChannel(...args) {
+        return nativeClient.removeChannel(...args);
+      }
+    };
+  }
 
   // ==========================================
   // 2. SUPABASE INITIALIZER & QUEUES
@@ -776,7 +1059,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function initSupabase() {
     if (typeof supabase !== 'undefined') {
       try {
-        supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+        const nativeSupabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+        supabaseClient = sessionStorage.getItem('logged_in_role') === 'superadmin'
+          ? nativeSupabaseClient
+          : createTenantDataClient(nativeSupabaseClient);
         updateNetworkStatus(true);
 
         // Disable shiftEnabled in Supabase cloud db once for migration v4
@@ -1674,7 +1960,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             filter: `id=eq.${activeTenantId}`
           },
           (payload) => {
-            const updated = payload.new;
+            refreshAuthoritativeTenantSession(true);
+            return;
+            const updated = {};
             console.log('[SaaS Realtime] Own tenant record updated by SuperAdmin:', updated);
 
             // 1. Account suspended → kick to login immediately
@@ -1701,7 +1989,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (Array.isArray(updated.allowed_tabs)) {
               allowedTabs.length = 0;
               updated.allowed_tabs.forEach(t => allowedTabs.push(t));
-              sessionStorage.setItem('allowed_tabs', JSON.stringify(updated.allowed_tabs));
               console.log('[SaaS Realtime] allowedTabs updated live:', allowedTabs);
             }
 
@@ -1727,12 +2014,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         )
         .subscribe();
+
+      setInterval(() => {
+        refreshAuthoritativeTenantSession(false);
+      }, 60000);
+
+      setInterval(() => {
+        syncWithSupabase();
+      }, 30000);
     }
 
     // ⚡ REAL-TIME DATA RESET SYNC
     if (activeTenantId) {
       supabaseClient.channel('tenant-data-reset-realtime')
         .on('broadcast', { event: 'data-reset' }, (response) => {
+          return;
           if (response.payload && response.payload.tenantId === activeTenantId) {
             console.log('[SaaS Realtime] Data reset broadcast received. Wiping cache and reloading...');
             // Clear IndexedDB Vault first so Resilience Vault won't recover it
@@ -13006,12 +13302,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     if (!listContainer) return;
     listContainer.innerHTML = '<div style="padding: 32px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);"><i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #FC8019;"></i> Loading client workspace registry...</div>';
 
-    const { data: tenants, error } = await supabaseClient
-      .from('saas_tenants')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    let tenants = [];
+    try {
+      const result = await callTenantAdmin('list_tenants');
+      tenants = Array.isArray(result.tenants) ? result.tenants : [];
+    } catch (error) {
       listContainer.innerHTML = `<div style="padding: 32px; text-align: center; color: #ef4444; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(239,68,68,0.1);"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Error loading workspaces: ${error.message}</div>`;
       return;
     }
@@ -13159,18 +13454,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         if (confirm(`Are you sure you want to delete the ${checkedIds.length} selected client outlets?\n\nThis will permanently erase their registrations and all their associated data from Supabase!`)) {
           try {
             console.log("Bulk deleting tenant IDs:", checkedIds);
-            const { error } = await supabaseClient
-              .from('saas_tenants')
-              .delete()
-              .in('id', checkedIds);
-
-            if (error) {
-              console.error("Supabase bulk deletion error:", error);
-              alert("Failed to delete selected accounts: " + error.message);
-            } else {
-              showNotificationToast(`${checkedIds.length} client accounts successfully deleted.`);
-              await renderSuperAdminTab();
-            }
+            await callTenantAdmin('bulk_delete', { tenant_ids: checkedIds });
+            showNotificationToast(`${checkedIds.length} client accounts successfully deleted.`);
+            await renderSuperAdminTab();
           } catch (err) {
             console.error("Error in bulk delete handler:", err);
             alert("Client-side system error during bulk deletion: " + err.message);
@@ -13218,14 +13504,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their associated data from Supabase!`)) {
           try {
             console.log("Requesting deletion of tenant ID:", tenantId);
-            const { error } = await supabaseClient.from('saas_tenants').delete().eq('id', tenantId);
-            if (error) {
-              console.error("Supabase deletion error:", error);
-              alert("Failed to delete account: " + error.message);
-            } else {
-              showNotificationToast("Client account successfully deleted.");
-              await renderSuperAdminTab();
-            }
+            await callTenantAdmin('delete_tenant', { tenant_id: tenantId });
+            showNotificationToast("Client account successfully deleted.");
+            await renderSuperAdminTab();
           } catch (err) {
             console.error("Error in delete-single-tenant-btn handler:", err);
             alert("Client-side system error deleting client: " + err.message);
@@ -13371,6 +13652,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
 
           const updates = {
+            tenant_id: tenantId,
             username,
             status,
             allowed_tabs,
@@ -13378,25 +13660,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             email
           };
 
-          if (password !== '') {
-            console.log("Hashing new password...");
-            const hashed = await sha256(password);
-            updates.password_hash = hashed;
-          }
+          if (password !== '') updates.password = password;
 
-          console.log("Sending update request to Supabase for tenant ID:", tenantId, "Updates:", updates);
-          const { data, error } = await supabaseClient.from('saas_tenants').update(updates).eq('id', tenantId).select();
-          console.log("Supabase response:", { data, error });
-
-          if (error) {
-            console.error("Supabase update error:", error);
-            alert("Failed to save settings: " + error.message);
-          } else {
-            console.log("Update succeeded. Toasting and refreshing list.");
-            closeTenantModal();
-            showNotificationToast("Client configurations saved successfully!");
-            await renderSuperAdminTab();
-          }
+          console.log("Sending update request to backend for tenant ID:", tenantId, "Updates:", updates);
+          await callTenantAdmin('update_tenant', updates);
+          console.log("Update succeeded. Toasting and refreshing list.");
+          closeTenantModal();
+          showNotificationToast("Client configurations saved successfully!");
+          await renderSuperAdminTab();
         } catch (err) {
           console.error("Error in saveTenantBtn handler:", err);
           alert("Client-side system error saving settings: " + err.message);
@@ -13414,16 +13685,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
           if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their POS bills, inventory records, custom menus, and staff details from Supabase!`)) {
             console.log("Requesting deletion of tenant ID:", tenantId);
-            const { error } = await supabaseClient.from('saas_tenants').delete().eq('id', tenantId);
-            if (error) {
-              console.error("Supabase deletion error:", error);
-              alert("Failed to delete account: " + error.message);
-            } else {
-              console.log("Deletion succeeded. Refreshing UI.");
-              closeTenantModal();
-              showNotificationToast("Client account successfully deleted.");
-              await renderSuperAdminTab();
-            }
+            await callTenantAdmin('delete_tenant', { tenant_id: tenantId });
+            console.log("Deletion succeeded. Refreshing UI.");
+            closeTenantModal();
+            showNotificationToast("Client account successfully deleted.");
+            await renderSuperAdminTab();
           }
         } catch (err) {
           console.error("Error in deleteTenantBtn handler:", err);
@@ -13448,7 +13714,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           resetTenantDataBtn.disabled = true;
           resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Resetting...';
 
-          const tablesToReset = [
+          const result = await callTenantAdmin('reset_tenant_data', { tenant_id: tenantId });
+          const errors = Array.isArray(result.errors) ? result.errors : [];
+          /* const tablesToReset = [
             'doppio_bills',
             'doppio_pending_orders',
             'doppio_menu',
@@ -13516,6 +13784,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             console.log('✓ Cleared: doppio_business_profile (seeding_disabled=true set)');
           }
 
+          */
           if (errors.length > 0) {
             alert(`Data reset completed with some errors on tables:\n${errors.join(', ')}\n\nOther tables were cleared successfully.`);
           } else {

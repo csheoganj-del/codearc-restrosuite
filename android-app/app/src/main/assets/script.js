@@ -9,6 +9,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let supabaseClient = null;
   const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
   const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+  const TENANT_PUBLIC_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-public`;
 
   if (typeof supabase !== 'undefined') {
     try {
@@ -17,6 +18,26 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.error("Supabase fail to initialize on Customer side:", err);
     }
+  }
+
+  async function callTenantPublic(action, payload = {}) {
+    const response = await fetch(TENANT_PUBLIC_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': DEFAULT_SUPABASE_KEY,
+        'Authorization': `Bearer ${DEFAULT_SUPABASE_KEY}`
+      },
+      body: JSON.stringify({
+        action,
+        tenant_slug: 'doppio-nagpur',
+        ...payload
+      })
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Public tenant request failed.');
+    return result;
   }
   
   // ==========================================
@@ -116,12 +137,13 @@ window.addEventListener('DOMContentLoaded', () => {
     { name: 'Alfredo Pennei Pasta', description: 'Creamy rich Alfredo white sauce penne pasta.', price: '₹499', category: 'PASTA', icon: '🍝' }
   ];
 
-  // Fetch menuData dynamically from Supabase if available (Made by Antigravity)
+  // Fetch menuData dynamically through backend tenant boundary
   if (supabaseClient) {
-    supabaseClient.from('doppio_menu').select('*')
-      .then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
-          console.log("Dynamically loaded menu from Supabase:", data);
+    callTenantPublic('list_menu')
+      .then((result) => {
+        const data = Array.isArray(result.menu) ? result.menu : [];
+        if (data.length > 0) {
+          console.log("Dynamically loaded menu from backend:", data);
           const dbMenuMapped = data.map(item => ({
             name: item.name,
             description: item.description || '',
@@ -138,8 +160,11 @@ window.addEventListener('DOMContentLoaded', () => {
           // Re-render menu
           renderMenu();
         } else {
-          console.log("Supabase menu fetch empty or error. Using local fallback.");
+          console.log("Backend menu fetch empty. Using local fallback.");
         }
+      })
+      .catch((err) => {
+        console.log("Backend menu fetch failed. Using local fallback.", err);
       });
   }
 
@@ -1064,25 +1089,28 @@ window.addEventListener('DOMContentLoaded', () => {
       status: payMethod === 'Captain App' ? 'Accepted' : 'Pending Review'
     };
 
-    // 1. Sync via Supabase Database (Real-time Cloud Sync) (Made by Antigravity)
+    // 1. Sync via backend tenant boundary
     if (supabaseClient) {
-      supabaseClient.from('doppio_pending_orders').insert({
-        orderId: generatedOrderId,
-        customerName: nameVal,
-        customerPhone: phoneVal || 'Dine-in Customer',
-        dateTime: timestamp,
-        items: JSON.stringify(custCart),
-        subtotal: subtotal,
-        discount: 0,
-        gst: gst,
-        total: subtotal,
-        paymentMethod: payMethod,
-        orderType: tableVal === 'Takeaway' ? 'Takeaway' : 'Dine-in',
-        tableNumber: tableVal,
-        status: payMethod === 'Captain App' ? 'Accepted' : 'Pending Review'
-      }).then(({ error }) => {
-        if (error) console.error("Error inserting pending QR order to Supabase:", error);
-        else console.log("Pending QR order successfully uploaded to Supabase!");
+      callTenantPublic('create_order', {
+        order: {
+          orderId: generatedOrderId,
+          customerName: nameVal,
+          customerPhone: phoneVal || 'Dine-in Customer',
+          dateTime: timestamp,
+          items: JSON.stringify(custCart),
+          subtotal: subtotal,
+          discount: 0,
+          gst: gst,
+          total: subtotal,
+          paymentMethod: payMethod,
+          orderType: tableVal === 'Takeaway' ? 'Takeaway' : 'Dine-in',
+          tableNumber: tableVal,
+          status: payMethod === 'Captain App' ? 'Accepted' : 'Pending Review'
+        }
+      }).then(() => {
+        console.log("Pending QR order successfully uploaded to backend!");
+      }).catch((error) => {
+        console.error("Error submitting pending QR order to backend:", error);
       });
     }
 

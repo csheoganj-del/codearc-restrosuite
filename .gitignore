@@ -1,5 +1,6 @@
 .vercel
 .gradle/
+.android-home/
 .idea/
 build/
 app/build/
