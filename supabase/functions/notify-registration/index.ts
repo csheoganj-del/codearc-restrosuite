@@ -8,10 +8,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const GMAIL_USER = Deno.env.get("GMAIL_USER") || "csheoganj2024@gmail.com";
-const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD") || "xvkywpecxtqysuob";
+const GMAIL_USER = Deno.env.get("GMAIL_USER") || "";
+const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD") || "";
 const FROM_NAME = "CodeArc RestoSuite";
-const ADMIN_EMAIL = Deno.env.get("ADMIN_ALERT_EMAIL") || "csheoganj@gmail.com";
+const ADMIN_EMAIL = Deno.env.get("ADMIN_ALERT_EMAIL") || "";
 
 // Simple base64 encoder for SMTP AUTH
 function toBase64(str: string): string {

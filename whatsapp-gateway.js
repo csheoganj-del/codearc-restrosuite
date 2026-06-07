@@ -490,7 +490,12 @@ function maskPhone(phoneStr) {
 
 // Token validation helper
 function verifyToken(req) {
-    if (!GATEWAY_TOKEN) return true; // If no token is set in environment, allow request by default (convenient for local dev)
+    if (!GATEWAY_TOKEN) {
+        // Fail-closed: if the token is not configured, deny all requests.
+        // Set GATEWAY_TOKEN in your HuggingFace Space secrets to enable access.
+        console.warn('[Security] GATEWAY_TOKEN is not set. All authenticated endpoints are blocked. Configure it in environment secrets.');
+        return false;
+    }
     
     const authHeader = req.headers['authorization'];
     const xToken = req.headers['x-gateway-token'];
@@ -1161,6 +1166,9 @@ app.get('/', (req, res) => {
 
 // POST Endpoint to request a pairing code (alternative to QR scan)
 app.post('/pair-code', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
     let { phone } = req.body;
     if (!phone) {
         return res.status(400).json({ status: 'error', error: 'Missing phone number' });
@@ -1194,6 +1202,9 @@ app.post('/pair-code', async (req, res) => {
 
 // GET Endpoint to debug and manually trigger polling fallback (Made by Antigravity)
 app.get('/debug-poll', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
     const force = req.query.force === 'true';
     try {
         console.log(`[Debug Poll] Triggering polling fallback manually (force: ${force})...`);
@@ -1266,15 +1277,11 @@ app.get('/status', (req, res) => {
             recentHealthEvents
         });
     } else {
-        // Return masked status to prevent data leaks or QR hijacking
+        // Return only the bare minimum needed for public health checks —
+        // no QR code, no phone number, no session metadata.
         res.json({
-            status: connectionStatus,
+            status: connectionStatus === 'ready' ? 'ready' : 'unavailable',
             authenticated: connectionStatus === 'ready',
-            number: linkedNumber ? maskPhone(linkedNumber) : null,
-            qr: null, // Hide QR code from public view
-            secured: true,
-            sessionSavedAt,
-            reconnectAttempts
         });
     }
 });
@@ -1486,6 +1493,9 @@ app.post('/send-email', async (req, res) => {
 
 // Legacy HTTP Webhook Receiver endpoint (retained for backward compatibility)
 app.post('/supabase-webhook', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
     const { type, table, record } = req.body;
     if (type !== 'INSERT' || table !== 'doppio_bills' || !record) {
         return res.status(400).json({ status: 'ignored', reason: 'Not an insert on public.doppio_bills' });
@@ -2342,6 +2352,9 @@ function formatReceiptText(record, profile = businessProfile) {
 // DEBUG RELAY ENDPOINT — to check relay URL format safely
 // ============================================================
 app.get('/debug-relay', (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
     const relay = process.env.EMAIL_RELAY_URL || emailConfig.relayUrl || '';
     if (!relay) {
         return res.json({ configured: false, error: 'Relay URL is empty' });
@@ -2359,6 +2372,9 @@ app.get('/debug-relay', (req, res) => {
 
 // GET Endpoint to read recent DB health logs bypassing RLS
 app.get('/debug-logs', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
     try {
         if (!supabaseService) {
             return res.json({ status: 'error', reason: 'SUPABASE_SERVICE_KEY not set' });
@@ -2377,6 +2393,9 @@ app.get('/debug-logs', async (req, res) => {
 
 // GET Endpoint to inspect session storage bucket settings
 app.get('/debug-bucket', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
     try {
         if (!supabaseService) {
             return res.json({ status: 'error', reason: 'SUPABASE_SERVICE_KEY not set' });
@@ -2396,6 +2415,9 @@ app.get('/debug-bucket', async (req, res) => {
 });
 
 app.get('/test-relay-call', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
     const relay = process.env.EMAIL_RELAY_URL || emailConfig.relayUrl || '';
     if (!relay) return res.json({ error: 'No relay configured' });
     

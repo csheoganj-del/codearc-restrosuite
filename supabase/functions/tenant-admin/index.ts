@@ -18,6 +18,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 const TABLES_TO_RESET = [
   "doppio_bills",
   "doppio_pending_orders",
+  "doppio_draft_orders",
   "doppio_menu",
   "doppio_inventory",
   "doppio_inventory_batches",

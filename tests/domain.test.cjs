@@ -38,6 +38,18 @@ test("billing applies loyalty before GST", () => {
   );
 });
 
+test("loyalty discount does not apply on first visit (visits < 2)", () => {
+  const result = billing.calculateCartTotals({
+    cart: [{ price: 100, qty: 2 }],
+    businessProfile: { gstEnabled: false, loyaltyEnabled: true, loyaltyRate: 10 },
+    customers: [{ name: "Asha", phone: "999", visits: 1 }],
+    customerName: "Asha",
+    customerPhone: "999"
+  });
+  assert.equal(result.loyaltyDiscount, 0);
+  assert.equal(result.total, 200);
+});
+
 test("billing supports GST and loyalty being disabled", () => {
   const result = billing.calculateCartTotals({
     cart: [{ price: 249, qty: 2 }],
@@ -80,7 +92,15 @@ test("FEFO reports a shortfall without exposing negative stock totals", () => {
 
   assert.equal(result.shortfall, 4);
   assert.equal(result.total, 0);
+  // With empty batches and a fallback factory, a negative-qty tracking entry is created
   assert.equal(result.batches[0].qty, -4);
+});
+
+test("FEFO shortfall with no fallback factory does not create negative batches", () => {
+  const result = inventory.deductFefo([], 4);
+  assert.equal(result.shortfall, 4);
+  assert.equal(result.total, 0);
+  assert.equal(result.batches.length, 0);
 });
 
 test("tenant data adapter serializes protected not-in filters", async () => {
@@ -142,11 +162,18 @@ test("Indian bill dates parse with AM and PM correctly", () => {
   const morning = bills.parseBillDate("07/06/2026, 12:05:10 AM");
   const evening = bills.parseBillDate("07/06/2026, 6:30:00 PM");
 
+  assert.ok(morning instanceof Date, "morning should be a Date");
   assert.equal(morning.getFullYear(), 2026);
   assert.equal(morning.getMonth(), 5);
   assert.equal(morning.getDate(), 7);
   assert.equal(morning.getHours(), 0);
   assert.equal(evening.getHours(), 18);
+});
+
+test("parseBillDate returns null for invalid or missing input", () => {
+  assert.equal(bills.parseBillDate(null), null);
+  assert.equal(bills.parseBillDate(""), null);
+  assert.equal(bills.parseBillDate("not-a-date"), null);
 });
 
 test("bill CSV export escapes quotes and serializes items", () => {

@@ -9,11 +9,11 @@
   "use strict";
 
   function parseBillDate(value) {
-    if (!value) return new Date(0);
+    if (!value) return null;
     const dateString = typeof value === "object" && value !== null
       ? value.dateTime
       : value;
-    if (!dateString || typeof dateString !== "string") return new Date(0);
+    if (!dateString || typeof dateString !== "string") return null;
 
     try {
       const clean = dateString.replace(/[^0-9/:\sAMP,]/gi, "").trim();
@@ -28,7 +28,7 @@
           || !Number.isInteger(month)
           || !Number.isInteger(year)
         ) {
-          throw new Error("Invalid bill date components.");
+          return null;
         }
         let hour = 0;
         let minute = 0;
@@ -44,13 +44,14 @@
           if (period === "PM" && hour < 12) hour += 12;
           if (period === "AM" && hour === 12) hour = 0;
         }
-        return new Date(year, month, day, hour, minute, second);
+        const result = new Date(year, month, day, hour, minute, second);
+        return Number.isNaN(result.getTime()) ? null : result;
       }
     } catch (_) {
       // Fall through to native parsing for ISO and database timestamps.
     }
     const parsed = Date.parse(dateString);
-    return Number.isNaN(parsed) ? new Date(0) : new Date(parsed);
+    return Number.isNaN(parsed) ? null : new Date(parsed);
   }
 
   function convertToCSV(data) {

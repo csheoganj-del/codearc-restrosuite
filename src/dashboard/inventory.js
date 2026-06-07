@@ -32,17 +32,12 @@
     });
 
     if (remaining > 0) {
-      if (updated.length > 0) {
-        updated[updated.length - 1] = {
-          ...updated[updated.length - 1],
-          qty: updated[updated.length - 1].qty - remaining
-        };
-      } else {
-        const fallback = typeof createFallbackBatch === "function"
-          ? createFallbackBatch(remaining)
-          : { id: "untracked", expiryDate: null, receivedDate: null };
+      if (typeof createFallbackBatch === "function") {
+        // Caller provided a factory for tracking the shortfall as a negative batch
+        const fallback = createFallbackBatch(remaining);
         updated.push({ ...fallback, qty: -remaining });
       }
+      // If no fallback factory, we just report the shortfall without mutating any batch.
     }
 
     return {

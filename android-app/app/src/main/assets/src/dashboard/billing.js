@@ -40,7 +40,7 @@
     const loyaltyRate = profile.loyaltyRate !== undefined
       ? normalizeMoney(profile.loyaltyRate)
       : 10;
-    const loyaltyDiscount = customer && normalizeMoney(customer.visits) >= 1 && loyaltyEnabled
+    const loyaltyDiscount = customer && normalizeMoney(customer.visits) >= 2 && loyaltyEnabled
       ? Math.round(subtotal * (loyaltyRate / 100))
       : 0;
 

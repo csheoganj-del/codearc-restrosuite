@@ -350,6 +350,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
+  // HTML ESCAPE UTILITY — prevents XSS when inserting user data into innerHTML
+  // ==========================================
+  function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ==========================================
   // 1. DYNAMIC EXCEL-BASED RECIPE DATABASE & INITIAL STATE
   // ==========================================
 
@@ -2154,10 +2167,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.className = `pos-item-card ${cartCount > 0 ? 'selected-in-cart' : ''}`;
       card.setAttribute('tabindex', '0');
 
-      const descText = item.description ? `<div class="pos-item-desc">${item.description}</div>` : '';
+      const descText = item.description ? `<div class="pos-item-desc">${escHtml(item.description)}</div>` : '';
       card.innerHTML = `
         <div class="pos-item-info">
-          <div class="pos-item-title" title="${item.name}">${item.name}</div>
+          <div class="pos-item-title" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
           ${descText}
           <span class="pos-item-price">₹${item.price}</span>
         </div>
@@ -2526,14 +2539,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       row.className = 'cart-row';
       row.innerHTML = `
         <div class="cart-item-info">
-          <span class="cart-item-name">${item.name}</span>
-          <span class="cart-item-custom-options">${configLabel}</span>
+          <span class="cart-item-name">${escHtml(item.name)}</span>
+          <span class="cart-item-custom-options">${escHtml(configLabel)}</span>
           <span class="cart-item-price-unit">₹${item.price} each</span>
         </div>
         <div class="cart-item-controls">
-          <button class="cart-qty-btn decrease" data-key="${item.key}"><i class="fa-solid fa-minus"></i></button>
+          <button class="cart-qty-btn decrease" data-key="${escHtml(item.key)}"><i class="fa-solid fa-minus"></i></button>
           <span class="cart-item-qty">${item.qty}</span>
-          <button class="cart-qty-btn increase" data-key="${item.key}"><i class="fa-solid fa-plus"></i></button>
+          <button class="cart-qty-btn increase" data-key="${escHtml(item.key)}"><i class="fa-solid fa-plus"></i></button>
         </div>
         <span class="cart-item-total">₹${rowTotal}</span>
       `;
@@ -2650,7 +2663,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const itemsListStr = order.items.map(item => `
         <div class="qr-card-item-row">
-          <span>${item.name} x${item.qty}</span>
+          <span>${escHtml(item.name)} x${item.qty}</span>
           <span style="font-weight:700;">₹${item.price * item.qty}</span>
         </div>
       `).join('');
@@ -2658,14 +2671,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.innerHTML = `
         <div class="qr-card-header">
           <span class="qr-card-table-lbl" style="color:${themeColor}; font-weight:800;">
-            <i class="fa-solid fa-cloud" style="margin-right:4px;"></i> ${order.orderType} Channel
+            <i class="fa-solid fa-cloud" style="margin-right:4px;"></i> ${escHtml(order.orderType)} Channel
           </span>
           <span class="qr-card-paymethod-badge upi" style="background:${themeColor}; color:white;">Prepaid Online</span>
         </div>
         
         <div class="qr-card-cust-info">
-          <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user" style="font-size:10px; width:12px; margin-right:4px;"></i> ${order.customerName}</span>
-          <span style="font-size:11px; color: var(--text-muted);"><i class="fa-solid fa-clock" style="font-size:10px; width:12px; margin-right:4px;"></i> ${order.dateTime}</span>
+          <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.customerName)}</span>
+          <span style="font-size:11px; color: var(--text-muted);"><i class="fa-solid fa-clock" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.dateTime)}</span>
         </div>
 
         <div class="qr-card-items-box">
@@ -3469,25 +3482,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       const payMethod = bill.paymentMethod || 'UPI';
 
       tr.innerHTML = `
-        <td style="font-weight:700;">${bill.orderId || '-'}</td>
+        <td style="font-weight:700;">${escHtml(bill.orderId || '-')}</td>
         <td>
           <div class="customer-avatar-cell">
-            <div class="cust-avatar">${initials}</div>
+            <div class="cust-avatar">${escHtml(initials)}</div>
             <div style="display:flex; flex-direction:column;">
-              <span style="font-weight:600;">${custName}</span>
-              <span style="font-size:10px; color:var(--text-muted);">${bill.customerPhone || 'Walk-in Guest'}</span>
+              <span style="font-weight:600;">${escHtml(custName)}</span>
+              <span style="font-size:10px; color:var(--text-muted);">${escHtml(bill.customerPhone || 'Walk-in Guest')}</span>
             </div>
           </div>
         </td>
-        <td>${bill.dateTime || '-'}</td>
-        <td title="${billItems.map(i => `${i.name || '?'} (x${i.qty || 1})`).join(', ')}">${itemsListStr || '-'}</td>
-        <td><span class="payment-badge ${payMethod.toLowerCase()}">${payMethod}</span></td>
+        <td>${escHtml(bill.dateTime || '-')}</td>
+        <td title="${escHtml(billItems.map(i => `${i.name || '?'} (x${i.qty || 1})`).join(', '))}">${escHtml(itemsListStr || '-')}</td>
+        <td><span class="payment-badge ${escHtml(payMethod.toLowerCase())}">${escHtml(payMethod)}</span></td>
         <td style="font-weight:700; color:var(--accent-caramel);">₹${bill.total || 0}</td>
         <td>
-          <button class="table-action-btn print" data-id="${bill.orderId}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
-          <button class="table-action-btn whatsapp" data-id="${bill.orderId}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
-          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" title="Edit Bill"><i class="fa-solid fa-pen-to-square"></i></button>
-          <button class="table-action-btn delete" data-id="${bill.orderId}" title="Refund/Delete"><i class="fa-solid fa-trash-can"></i></button>
+          <button class="table-action-btn print" data-id="${escHtml(bill.orderId)}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
+          <button class="table-action-btn whatsapp" data-id="${escHtml(bill.orderId)}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
+          <button class="table-action-btn edit-bill" data-id="${escHtml(bill.orderId)}" title="Edit Bill"><i class="fa-solid fa-pen-to-square"></i></button>
+          <button class="table-action-btn delete" data-id="${escHtml(bill.orderId)}" title="Refund/Delete"><i class="fa-solid fa-trash-can"></i></button>
         </td>
       `;
       billsTableBody.appendChild(tr);
@@ -4695,8 +4708,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           item.style.borderBottom = '1px solid rgba(28, 28, 28,0.03)';
           item.innerHTML = `
             <div style="display:flex; flex-direction:column;">
-              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${bill.customerName || 'Walk-in'} (${bill.orderId || '-'})</span>
-              <span style="font-size:10px; color:var(--text-muted);">${bill.dateTime || '-'}</span>
+              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${escHtml(bill.customerName || 'Walk-in')} (${escHtml(bill.orderId || '-')})</span>
+              <span style="font-size:10px; color:var(--text-muted);">${escHtml(bill.dateTime || '-')}</span>
             </div>
             <span style="font-size:13px; font-weight:700; color:var(--accent-caramel);">₹${bill.total}</span>
           `;
@@ -12055,10 +12068,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const validEmployees = employees.filter(e => e && e.id && e.name);
 
     if (leaveEmpSelect) {
-      leaveEmpSelect.innerHTML = validEmployees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+      leaveEmpSelect.innerHTML = validEmployees.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)}</option>`).join('');
     }
     if (payrollEmpSelect) {
-      payrollEmpSelect.innerHTML = validEmployees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+      payrollEmpSelect.innerHTML = validEmployees.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)}</option>`).join('');
     }
 
     if (empDirectoryList) {
@@ -12071,13 +12084,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           : '';
         return `
           <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 35px; color: var(--text-dark);">
-            <td style="padding: 8px; font-weight:700; display:flex; align-items:center;">${statusDot}${emp.name}</td>
-            <td style="padding: 8px;">${(emp.role || '').toUpperCase()}</td>
-            <td style="padding: 8px;">${emp.shift || ''}</td>
+            <td style="padding: 8px; font-weight:700; display:flex; align-items:center;">${statusDot}${escHtml(emp.name)}</td>
+            <td style="padding: 8px;">${escHtml((emp.role || '').toUpperCase())}</td>
+            <td style="padding: 8px;">${escHtml(emp.shift || '')}</td>
             <td style="padding: 8px; font-weight:700;">₹${emp.baseSalary || 0}</td>
             <td style="padding: 8px;">CL: ${casualLeft} | SL: ${sickLeft}</td>
             <td style="padding: 8px; text-align: right;">
-              <button class="btn btn-secondary select-payroll-btn" data-id="${emp.id}" style="padding: 2px 8px; font-size: 10px; border-radius: 4px;">Select Payout</button>
+              <button class="btn btn-secondary select-payroll-btn" data-id="${escHtml(emp.id)}" style="padding: 2px 8px; font-size: 10px; border-radius: 4px;">Select Payout</button>
             </td>
           </tr>
         `;
@@ -12097,10 +12110,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     if (shiftRosterList) {
       shiftRosterList.innerHTML = validEmployees.map(emp => `
         <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 35px; color: var(--text-dark);">
-          <td style="padding: 6px; font-weight:700;">${emp.name}</td>
-          <td style="padding: 6px;">${emp.shift || ''}</td>
+          <td style="padding: 6px; font-weight:700;">${escHtml(emp.name)}</td>
+          <td style="padding: 6px;">${escHtml(emp.shift || '')}</td>
           <td style="padding: 6px;">
-            <button class="btn btn-secondary toggle-shift-btn" data-id="${emp.id}" style="padding: 2px 6px; font-size: 10px; border-radius:4px;"><i class="fa-solid fa-arrows-rotate"></i> Change</button>
+            <button class="btn btn-secondary toggle-shift-btn" data-id="${escHtml(emp.id)}" style="padding: 2px 6px; font-size: 10px; border-radius:4px;"><i class="fa-solid fa-arrows-rotate"></i> Change</button>
           </td>
         </tr>
       `).join('');
