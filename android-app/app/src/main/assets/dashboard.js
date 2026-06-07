@@ -1799,6 +1799,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }).subscribe();
 
+    // ── Live subscriptions for HR, CRM, and Menu data ──────────────────────
+    // These tables previously relied on the initial fetch only. Now any change
+    // made from another device or the superadmin panel reflects immediately.
+    if (loggedInRole !== 'superadmin' && activeTenantId) {
+      // Employees, attendance & leaves → re-render HR tab live
+      supabaseClient.channel('doppio-employees-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_employees', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          syncWithSupabase();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          syncWithSupabase();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          syncWithSupabase();
+        })
+        .subscribe();
+
+      // CRM loyalty members → re-render CRM tab live
+      supabaseClient.channel('doppio-crm-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_crm', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          syncWithSupabase();
+        })
+        .subscribe();
+
+      // Menu changes → sync POS grid and editor live (e.g. from another device)
+      supabaseClient.channel('doppio-menu-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_menu', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          syncWithSupabase();
+        })
+        .subscribe();
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // ⚡ REAL-TIME TENANT SYNC — SaaS Tenants table listener
     // ─────────────────────────────────────────────────────────────────────
@@ -1942,6 +1974,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const tabId = link.getAttribute('data-tab');
+
+      // Guard unsaved menu editor changes before navigating away
+      const currentTabEl = document.querySelector('.tab-content.active');
+      const currentTabId = currentTabEl ? currentTabEl.id : null;
+      if (currentTabId === 'editor-tab' && menuEditorDirty && tabId !== 'editor-tab') {
+        if (!confirm('You have unsaved changes in the Menu Editor. Leave anyway?')) {
+          return;
+        }
+        menuEditorDirty = false;
+      }
 
       // Stop SaaS Gateway polling if we switch away from gateway-monitor-tab
       if (tabId !== 'gateway-monitor-tab' && typeof stopSaaSGatewayPolling === 'function') {
@@ -5555,11 +5597,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Menu visual form submissions
   const menuEditorForm = document.getElementById('menu-item-editor-form');
+
+  // Track whether the menu editor form has unsaved changes
+  let menuEditorDirty = false;
+  if (menuEditorForm) {
+    menuEditorForm.addEventListener('input', () => { menuEditorDirty = true; });
+    menuEditorForm.addEventListener('change', () => { menuEditorDirty = true; });
+  }
+
   if (menuEditorForm) {
     menuEditorForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      menuEditorDirty = false; // cleared on save
       SoundEffects.playClick();
 
       const index = document.getElementById('edit-item-index').value;

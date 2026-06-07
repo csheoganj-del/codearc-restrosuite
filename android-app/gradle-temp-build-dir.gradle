@@ -1,0 +1,3 @@
+allprojects {
+    layout.buildDirectory = file("${rootDir}/.tmp-gradle-build/${project.path.replace(':', '_')}")
+}
