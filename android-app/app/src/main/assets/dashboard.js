@@ -1055,8 +1055,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {
       queue = [];
     }
-    if (!queue.some(b => b.orderId === bill.orderId)) {
-      queue.push(bill);
+    // Use a stable local UUID for deduplication — orderId alone can collide when
+    // two devices create bills simultaneously before syncing.
+    const localId = bill._localId || bill.orderId;
+    if (!queue.some(b => (b._localId || b.orderId) === localId)) {
+      queue.push({ ...bill, _localId: localId });
       localStorage.setItem('doppio_offline_bills_queue', JSON.stringify(queue));
     }
   }
@@ -1094,7 +1097,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           } catch (e) {
             currentQueue = [];
           }
-          const updatedQueue = currentQueue.filter(b => b.orderId !== bill.orderId);
+          const billLocalId = bill._localId || bill.orderId;
+          const updatedQueue = currentQueue.filter(b => (b._localId || b.orderId) !== billLocalId);
           localStorage.setItem('doppio_offline_bills_queue', JSON.stringify(updatedQueue));
         }
       } catch (err) {
@@ -3467,7 +3471,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const sortedBills = [...filteredBills].reverse();
-    sortedBills.forEach(bill => {
+
+    // ── Pagination ─────────────────────────────────────────────
+    const BILLS_PAGE_SIZE = 50;
+    let billsCurrentPage = Number(billsTableBody.getAttribute('data-page') || '1');
+    const totalPages = Math.max(1, Math.ceil(sortedBills.length / BILLS_PAGE_SIZE));
+    if (billsCurrentPage > totalPages) billsCurrentPage = totalPages;
+    billsTableBody.setAttribute('data-page', String(billsCurrentPage));
+
+    const pageStart = (billsCurrentPage - 1) * BILLS_PAGE_SIZE;
+    const pageBills = sortedBills.slice(pageStart, pageStart + BILLS_PAGE_SIZE);
+
+    if (billsCount) {
+      billsCount.textContent = sortedBills.length > BILLS_PAGE_SIZE
+        ? `Showing ${pageStart + 1}–${Math.min(pageStart + BILLS_PAGE_SIZE, sortedBills.length)} of ${sortedBills.length} Bills`
+        : `Showing ${sortedBills.length} Bills`;
+    }
+
+    pageBills.forEach(bill => {
       if (!bill) return;
       const tr = document.createElement('tr');
 
@@ -3505,6 +3526,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
       billsTableBody.appendChild(tr);
     });
+
+    // ── Pagination controls ─────────────────────────────────────
+    if (totalPages > 1) {
+      const paginationRow = document.createElement('tr');
+      paginationRow.innerHTML = `
+        <td colspan="7" style="padding:12px 8px; text-align:center; border-top:1px solid rgba(28,28,28,0.06);">
+          <div style="display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary);">
+            <button id="bills-prev-page" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:#fff; cursor:pointer; font-size:12px;" ${billsCurrentPage === 1 ? 'disabled' : ''}>← Prev</button>
+            <span>Page ${billsCurrentPage} of ${totalPages}</span>
+            <button id="bills-next-page" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:#fff; cursor:pointer; font-size:12px;" ${billsCurrentPage === totalPages ? 'disabled' : ''}>Next →</button>
+          </div>
+        </td>
+      `;
+      billsTableBody.appendChild(paginationRow);
+
+      const prevBtn = document.getElementById('bills-prev-page');
+      const nextBtn = document.getElementById('bills-next-page');
+      if (prevBtn) prevBtn.addEventListener('click', () => {
+        billsTableBody.setAttribute('data-page', String(billsCurrentPage - 1));
+        renderBills();
+      });
+      if (nextBtn) nextBtn.addEventListener('click', () => {
+        billsTableBody.setAttribute('data-page', String(billsCurrentPage + 1));
+        renderBills();
+      });
+    }
   }
 
   // Listeners for presets filter chips
@@ -3515,6 +3562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         billsPresetContainer.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         activePresetDate = chip.getAttribute('data-preset');
+        if (billsTableBody) billsTableBody.setAttribute('data-page', '1');
         renderBills();
       }
     });
@@ -3523,6 +3571,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (billsSearchInput) {
     billsSearchInput.addEventListener('input', (e) => {
       billsSearchQuery = e.target.value;
+      if (billsTableBody) billsTableBody.setAttribute('data-page', '1');
       renderBills();
     });
   }

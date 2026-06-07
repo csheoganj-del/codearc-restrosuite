@@ -18,8 +18,11 @@
 
   function calculatePayroll(baseSalary, lossOfPayDays) {
     const base = Math.max(0, Number(baseSalary) || 0);
-    const lop = Math.min(30, Math.max(0, Number(lossOfPayDays) || 0));
-    const effectiveBase = base * (30 - lop) / 30;
+    // Use actual days in the current calendar month for accurate per-day rate
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const lop = Math.min(daysInMonth, Math.max(0, Number(lossOfPayDays) || 0));
+    const effectiveBase = base * (daysInMonth - lop) / daysInMonth;
     const basic = effectiveBase * 0.5;
     const hra = basic * 0.4;
     const allowance = effectiveBase - basic - hra;
