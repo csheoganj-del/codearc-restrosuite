@@ -26,10 +26,37 @@
     const gross = effectiveBase;
     const pf = basic * 0.12;
     const pt = gross > 0 ? 200 : 0;
+
+    // Indian Income Tax — New Regime slabs (FY 2025-26)
+    // Standard deduction ₹75,000 applied under new regime
     const annualGross = gross * 12;
-    const tds = annualGross > 700000
-      ? ((annualGross - 700000) * 0.1) / 12
-      : 0;
+    const standardDeduction = 75000;
+    const taxableIncome = Math.max(0, annualGross - standardDeduction);
+
+    let annualTax = 0;
+    if (taxableIncome <= 400000) {
+      annualTax = 0; // Nil up to ₹4L (rebate u/s 87A covers up to ₹7L effectively)
+    } else if (taxableIncome <= 800000) {
+      annualTax = (taxableIncome - 400000) * 0.05;
+    } else if (taxableIncome <= 1200000) {
+      annualTax = 20000 + (taxableIncome - 800000) * 0.10;
+    } else if (taxableIncome <= 1600000) {
+      annualTax = 60000 + (taxableIncome - 1200000) * 0.15;
+    } else if (taxableIncome <= 2000000) {
+      annualTax = 120000 + (taxableIncome - 1600000) * 0.20;
+    } else if (taxableIncome <= 2400000) {
+      annualTax = 200000 + (taxableIncome - 2000000) * 0.25;
+    } else {
+      annualTax = 300000 + (taxableIncome - 2400000) * 0.30;
+    }
+
+    // Section 87A rebate: zero tax if taxable income ≤ ₹7L
+    if (taxableIncome <= 700000) annualTax = 0;
+
+    // Add 4% health & education cess
+    annualTax = annualTax * 1.04;
+
+    const tds = annualTax / 12;
     const deductions = pf + pt + tds;
 
     return {

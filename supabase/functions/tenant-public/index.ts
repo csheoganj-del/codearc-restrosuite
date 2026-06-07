@@ -89,9 +89,56 @@ serve(async (req) => {
         return jsonResponse({ error: "Invalid order items." }, 400);
       }
 
-      const total = Number(order.total || 0);
-      if (!Number.isFinite(total) || total <= 0 || total > 1000000) {
+      // Server-side price validation: fetch authoritative menu and verify item prices
+      const { data: menuData, error: menuError } = await supabaseAdmin
+        .from("doppio_menu")
+        .select("name, price")
+        .eq("tenant_id", tenant.id);
+
+      if (menuError) {
+        console.error("tenant-public price validation menu fetch failed:", menuError);
+        return jsonResponse({ error: "Failed to validate order." }, 500);
+      }
+
+      const priceMap = new Map<string, number>(
+        (menuData || []).map((item: { name: string; price: number }) => [
+          item.name.trim().toLowerCase(),
+          Number(item.price),
+        ])
+      );
+
+      // Validate each item's price against the authoritative menu
+      for (const rawItem of parsedItems as Array<Record<string, unknown>>) {
+        const itemName = String(rawItem.name || "").trim().toLowerCase();
+        const clientPrice = Number(rawItem.price || 0);
+        const quantity = Number(rawItem.qty || 1);
+        const serverPrice = priceMap.get(itemName);
+        if (serverPrice === undefined) {
+          return jsonResponse({ error: `Item not found in menu: ${String(rawItem.name || "").slice(0, 60)}` }, 400);
+        }
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+          return jsonResponse({ error: `Invalid quantity for item: ${String(rawItem.name || "").slice(0, 60)}` }, 400);
+        }
+        if (Math.abs(clientPrice - serverPrice) > 0.01) {
+          return jsonResponse({ error: `Price mismatch for item: ${String(rawItem.name || "").slice(0, 60)}` }, 400);
+        }
+      }
+
+      // Recalculate expected subtotal from authoritative prices
+      const expectedSubtotal = (parsedItems as Array<Record<string, unknown>>).reduce((sum, item) => {
+        const serverPrice = priceMap.get(String(item.name || "").trim().toLowerCase()) || 0;
+        const qty = Number(item.qty || 1);
+        return sum + serverPrice * qty;
+      }, 0);
+
+      const clientTotal = Number(order.total || 0);
+      // Allow up to ₹1 rounding difference for discounts/GST applied client-side
+      if (!Number.isFinite(clientTotal) || clientTotal <= 0 || clientTotal > 1000000) {
         return jsonResponse({ error: "Invalid order total." }, 400);
+      }
+      if (clientTotal < expectedSubtotal * 0.5) {
+        // Total is less than 50% of item prices — likely tampered
+        return jsonResponse({ error: "Order total does not match item prices." }, 400);
       }
 
       const safeOrder = {
@@ -104,7 +151,7 @@ serve(async (req) => {
         subtotal: Number(order.subtotal || 0),
         discount: Number(order.discount || 0),
         gst: Number(order.gst || 0),
-        total,
+        total: clientTotal,
         paymentMethod: String(order.paymentMethod || "").slice(0, 80),
         orderType: String(order.orderType || "Takeaway").slice(0, 40),
         tableNumber: String(order.tableNumber || "Takeaway").slice(0, 40),

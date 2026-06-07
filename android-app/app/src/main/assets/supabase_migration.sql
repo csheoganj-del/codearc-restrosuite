@@ -16,13 +16,19 @@ CREATE TABLE IF NOT EXISTS public.saas_tenants (
     created_at timestamp with time zone DEFAULT now()
 );
 
+ALTER TABLE public.saas_tenants
+ADD COLUMN IF NOT EXISTS data_reset_at timestamp with time zone;
+
 -- Production hardening:
 -- Keep this table private and route tenant login/registration through backend functions.
 ALTER TABLE public.saas_tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saas_tenants REPLICA IDENTITY FULL;
 
 -- 2. Insert default tenant (Doppio Cafe Nagpur) to avoid breaking existing data
--- Password hash is '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918' (SHA-256 for 'admin')
+-- IMPORTANT: The password_hash below is a placeholder SHA-256 value. On first login the
+-- tenant-access function will auto-upgrade it to PBKDF2. You MUST change the password
+-- immediately after deploying by logging in and using the superadmin dashboard to reset it.
+-- Never use 'admin' as a production password.
 INSERT INTO public.saas_tenants (id, name, slug, outlet_type, email, username, password_hash, status)
 VALUES ('d290f1ee-6c54-4b01-90e6-d701748f0851', 'Doppio Cafe Nagpur', 'doppio-nagpur', 'cafe', 'hello@codearc.co.in', 'admin', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'approved')
 ON CONFLICT (slug) DO NOTHING;
@@ -126,6 +132,6 @@ BEGIN
           AND schemaname = 'public'
           AND tablename = 'saas_tenants'
     ) THEN
-        EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.saas_tenants';
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.saas_tenants;
     END IF;
 END $$;

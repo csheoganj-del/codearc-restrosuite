@@ -21,6 +21,13 @@ test("public ordering uses the tenant public backend", () => {
   assert.match(customerApp, /callTenantPublic\(['"]create_order['"]/);
 });
 
+test("public order backend validates menu prices and quantities", () => {
+  const publicApi = read("supabase/functions/tenant-public/index.ts");
+  assert.match(publicApi, /priceMap/);
+  assert.match(publicApi, /Number\.isInteger\(quantity\)/);
+  assert.match(publicApi, /Price mismatch for item/);
+});
+
 test("tenant approval and reset require the admin backend", () => {
   const dashboard = read("dashboard.js");
   assert.match(dashboard, /callTenantAdmin\(['"]update_tenant['"]/);

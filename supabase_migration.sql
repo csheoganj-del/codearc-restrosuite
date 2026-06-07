@@ -132,6 +132,6 @@ BEGIN
           AND schemaname = 'public'
           AND tablename = 'saas_tenants'
     ) THEN
-        ALTER PUBLICATION supabase_realtime ADD TABLE public.saas_tenants;
+        EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.saas_tenants';
     END IF;
 END $$;

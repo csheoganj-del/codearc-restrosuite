@@ -8209,10 +8209,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:36px; height:36px; border-radius:50%; background:var(--accent-caramel); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">${initials}</div>
+            <div style="width:36px; height:36px; border-radius:50%; background:var(--accent-caramel); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">${escHtml(initials)}</div>
             <div>
-              <div style="font-weight:700; font-size:13px; color:var(--primary-brand);">${bill.customerName}</div>
-              <div style="font-size:11px; color:var(--text-muted);">${bill.orderId}</div>
+              <div style="font-weight:700; font-size:13px; color:var(--primary-brand);">${escHtml(bill.customerName)}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${escHtml(bill.orderId)}</div>
             </div>
           </div>
           <div style="text-align:right;">
@@ -10603,7 +10603,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
       const itemsListStr = order.items.map(item => `
         <div class="qr-card-item-row">
-          <span>${item.name} x${item.qty}</span>
+          <span>${escHtml(item.name)} x${item.qty}</span>
           <span style="font-weight:700;">₹${item.price * item.qty}</span>
         </div>
       `).join('');
@@ -10612,13 +10612,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
       card.innerHTML = `
         <div class="qr-card-header">
-          <span class="qr-card-table-lbl">${order.tableNumber === 'Takeaway' ? 'Takeaway Order' : `<i class="fa-solid fa-chair" style="color:var(--accent-caramel); margin-right:4px;"></i> Table 0${order.tableNumber}`}</span>
-          <span class="qr-card-paymethod-badge ${payPillClass}">${order.paymentMethod}</span>
+          <span class="qr-card-table-lbl">${order.tableNumber === 'Takeaway' ? 'Takeaway Order' : `<i class="fa-solid fa-chair" style="color:var(--accent-caramel); margin-right:4px;"></i> Table 0${escHtml(order.tableNumber)}`}</span>
+          <span class="qr-card-paymethod-badge ${payPillClass}">${escHtml(order.paymentMethod)}</span>
         </div>
         
         <div class="qr-card-cust-info">
-          <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user" style="font-size:10px; width:12px; margin-right:4px;"></i> ${order.customerName}</span>
-          <span style="font-size:11px; color: var(--text-muted);"><i class="fa-solid fa-clock" style="font-size:10px; width:12px; margin-right:4px;"></i> ${order.dateTime}</span>
+          <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.customerName)}</span>
+          <span style="font-size:11px; color: var(--text-muted);"><i class="fa-solid fa-clock" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.dateTime)}</span>
         </div>
 
         <div class="qr-card-items-box">
@@ -13026,24 +13026,24 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         <div class="tenant-workspace-card" style="display: flex; align-items: center; padding: 16px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.05); border-radius: 12px; gap: 16px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #1C1C1C; font-family: var(--font-body);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(28, 28, 28,0.05)'; this.style.borderColor='rgba(252, 128, 25,0.2)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'; this.style.borderColor='rgba(28, 28, 28,0.05)';">
           <!-- Selection Checkbox -->
           <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <input type="checkbox" class="tenant-select-checkbox" data-id="${t.id}" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
+            <input type="checkbox" class="tenant-select-checkbox" data-id="${escHtml(t.id)}" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
           </div>
           
           <!-- Name & Avatar -->
           <div style="flex: 2.5; min-width: 200px; display: flex; align-items: center; gap: 12px; overflow: hidden;">
             <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(252, 128, 25, 0.1); color: #FC8019; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; text-transform: uppercase;">
-              ${(t.name || 'U').substring(0, 2)}
+              ${escHtml((t.name || 'U').substring(0, 2))}
             </div>
             <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
-              <div style="font-size: 14px; font-weight: 700; color: #1C1C1C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.name}</div>
-              <div style="font-size: 10px; color: #6B7280; font-family: monospace;">workspace: ${t.slug}</div>
+              <div style="font-size: 14px; font-weight: 700; color: #1C1C1C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(t.name)}</div>
+              <div style="font-size: 10px; color: #6B7280; font-family: monospace;">workspace: ${escHtml(t.slug)}</div>
             </div>
           </div>
 
           <!-- Outlet Type / Category Pill -->
           <div style="flex: 1; min-width: 100px; display: flex; align-items: center;">
             <span style="font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: rgba(252, 128, 25, 0.08); color: #FC8019; text-transform: uppercase; letter-spacing: 0.5px;">
-              ${outletLabel}
+              ${escHtml(outletLabel)}
             </span>
           </div>
 
@@ -13051,34 +13051,34 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           <div style="flex: 2; min-width: 180px; display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #6B7280; overflow: hidden;">
             <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
               <i class="fa-solid fa-envelope" style="width: 12px; color: #9CA3AF; flex-shrink: 0;"></i>
-              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.email || '-'}</span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(t.email || '-')}</span>
             </div>
             ${t.phone ? `
             <div style="display: flex; align-items: center; gap: 6px;">
               <i class="fa-brands fa-whatsapp" style="width: 12px; color: #22C55E; flex-shrink: 0;"></i>
-              <strong style="color: #4B5563;">+${t.phone}</strong>
+              <strong style="color: #4B5563;">+${escHtml(t.phone)}</strong>
             </div>` : ''}
           </div>
 
           <!-- System Login Details -->
           <div style="flex: 1.5; min-width: 120px; display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #6B7280;">
             <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #9CA3AF; font-weight: 700;">Admin User</div>
-            <div style="font-weight: 600; color: #4B5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.username}</div>
+            <div style="font-weight: 600; color: #4B5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(t.username)}</div>
           </div>
 
           <!-- Status Badge -->
           <div style="flex: 1; min-width: 100px; display: flex; align-items: center; justify-content: center;">
             <span class="status-badge" style="padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid transparent; ${badgeStyle}">
-              ${statusText}
+              ${escHtml(statusText)}
             </span>
           </div>
 
           <!-- Actions -->
           <div style="flex: 1.5; min-width: 150px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0;">
-            <button class="btn manage-tenant-btn" data-id="${t.id}" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.08); color: #1C1C1C; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='#1C1C1C'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#FFFFFF'; this.style.color='#1C1C1C';">
+            <button class="btn manage-tenant-btn" data-id="${escHtml(t.id)}" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.08); color: #1C1C1C; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='#1C1C1C'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#FFFFFF'; this.style.color='#1C1C1C';">
               <i class="fa-solid fa-gear" style="font-size: 10px;"></i> Manage
             </button>
-            <button class="btn delete-single-tenant-btn" data-id="${t.id}" data-name="${t.name}" style="padding: 6px; width: 28px; height: 28px; font-size: 11px; border-radius: 8px; background: rgba(239, 68, 68, 0.05); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.15); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#FFFFFF';" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#ef4444';">
+            <button class="btn delete-single-tenant-btn" data-id="${escHtml(t.id)}" data-name="${escHtml(t.name)}" style="padding: 6px; width: 28px; height: 28px; font-size: 11px; border-radius: 8px; background: rgba(239, 68, 68, 0.05); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.15); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#FFFFFF';" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#ef4444';">
               <i class="fa-solid fa-trash"></i>
             </button>
           </div>

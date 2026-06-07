@@ -261,8 +261,18 @@ test("payroll calculation applies LOP, PF, PT, and TDS consistently", () => {
   assert.equal(payroll.hra, 16200);
   assert.equal(payroll.pf, 4860);
   assert.equal(payroll.pt, 200);
+  // TDS: annualGross ₹9.72L, taxable after ₹75K std deduction = ₹8.97L
+  // Slab: ₹20K + (8.97L - 8L)*10% = ₹29.7K + 4% cess = ₹30,888/yr → ₹2,574/mo
+  assert.equal(payroll.tds, 2574);
   assert.ok(payroll.tds > 0);
   assert.equal(payroll.net, payroll.gross - payroll.deductions);
+});
+
+test("payroll TDS is zero for income within section 87A rebate limit", () => {
+  // Annual gross ≤ ₹7L after standard deduction → zero tax via rebate
+  const payroll = people.calculatePayroll(30000, 0); // ₹3.6L/yr, taxable = ₹2.85L (< ₹4L slab)
+  assert.equal(payroll.tds, 0);
+  assert.ok(payroll.net > 0);
 });
 
 test("WhatsApp phone and gateway normalization is deterministic", () => {
