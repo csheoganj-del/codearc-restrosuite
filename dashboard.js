@@ -7,12 +7,12 @@
 // ==========================================
 // NAMESPACE LOCALSTORAGE BY TENANT
 // ==========================================
-(function() {
+(function () {
   const originalGetItem = Storage.prototype.getItem;
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
 
-  Storage.prototype.getItem = function(key) {
+  Storage.prototype.getItem = function (key) {
     const tenantId = originalGetItem.call(sessionStorage, 'tenant_id') || 'default';
     if (this === localStorage && key && typeof key === 'string' && key.startsWith('doppio_') && !key.endsWith(`_${tenantId}`)) {
       return originalGetItem.call(this, `${key}_${tenantId}`);
@@ -20,7 +20,7 @@
     return originalGetItem.call(this, key);
   };
 
-  Storage.prototype.setItem = function(key, value) {
+  Storage.prototype.setItem = function (key, value) {
     const tenantId = originalGetItem.call(sessionStorage, 'tenant_id') || 'default';
     let targetKey = key;
     let result;
@@ -30,7 +30,7 @@
     } else {
       result = originalSetItem.call(this, key, value);
     }
-    
+
     // Redundant write to Resilience Vault (IndexedDB)
     if (this === localStorage && targetKey && typeof targetKey === 'string' && targetKey.startsWith('doppio_')) {
       if (typeof window.writeToResilienceVault === 'function') {
@@ -40,7 +40,7 @@
     return result;
   };
 
-  Storage.prototype.removeItem = function(key) {
+  Storage.prototype.removeItem = function (key) {
     const tenantId = originalGetItem.call(sessionStorage, 'tenant_id') || 'default';
     if (this === localStorage && key && typeof key === 'string' && key.startsWith('doppio_') && !key.endsWith(`_${tenantId}`)) {
       return originalRemoveItem.call(this, `${key}_${tenantId}`);
@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
   let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
   let saasGatewayPollingInterval = null;
-  
+
   // ==========================================
   // SHARED STATE INITIALIZED EARLY FOR SAFETY
   // ==========================================
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_notifications'));
       return Array.isArray(parsed) ? parsed.filter(n => n && typeof n === 'object' && n.id) : [];
-    } catch(e) {
+    } catch (e) {
       return [];
     }
   })();
@@ -123,10 +123,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  window.writeToResilienceVault = function(key, value) {
+  window.writeToResilienceVault = function (key, value) {
     try {
       setVaultData(key, JSON.parse(value));
-    } catch(e) {
+    } catch (e) {
       setVaultData(key, value);
     }
   };
@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         request.onsuccess = (e) => {
           try {
             resolve(e.target.result ? JSON.parse(e.target.result) : null);
-          } catch(err) {
+          } catch (err) {
             resolve(e.target.result);
           }
         };
@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (dbErr) {
     console.warn("[Resilience Vault] Failed to wait for vault initialization:", dbErr);
   }
-  
+
   if (localStorage.length === 0 || !localStorage.getItem('doppio_bills')) {
     console.log("[Resilience Vault] LocalStorage empty or bills missing! Attempting IndexedDB vault restoration...");
     try {
@@ -198,11 +198,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (restoredShift) localStorage.setItem('doppio_current_shift', JSON.stringify(restoredShift));
       if (restoredShiftsLocal) localStorage.setItem('doppio_shifts_local', JSON.stringify(restoredShiftsLocal));
       if (restoredShiftEventsLocal) localStorage.setItem('doppio_shift_events_local', JSON.stringify(restoredShiftEventsLocal));
-      
+
       if (restoredBills || restoredInv) {
         console.log("[Resilience Vault] Successfully recovered POS state from IndexedDB vault!");
       }
-    } catch(err) {
+    } catch (err) {
       console.error("[Resilience Vault] Recovery error:", err);
     }
   }
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   // Sales popularity database map
-  let posPopularityMap = (() => { try { return JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {}; } catch(e) { return {}; } })();
+  let posPopularityMap = (() => { try { return JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {}; } catch (e) { return {}; } })();
   let isSplitPaymentActive = false;
 
   async function sha256(string) {
@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   // 1. DYNAMIC EXCEL-BASED RECIPE DATABASE & INITIAL STATE
   // ==========================================
-  
+
   // Cleaned active recipe specs mapped directly from updated commercial database
   const excelRecipes = {
     // COLD COFFEE
@@ -514,8 +514,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   ];
 
   // Load custom recipes and thresholds
-  let customRecipes = (() => { try { return JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {}; } catch(e) { return {}; } })();
-  let thresholds = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {}; } catch(e) { return {}; } })();
+  let customRecipes = (() => { try { return JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {}; } catch (e) { return {}; } })();
+  let thresholds = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {}; } catch (e) { return {}; } })();
 
   // Menu and inventory start empty — Supabase sync (syncWithSupabase) is the authoritative source.
   // Do NOT pre-populate from localStorage here as it causes a flash of stale/reset data
@@ -594,7 +594,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_business_profile'));
       return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : null;
-    } catch(e) {
+    } catch (e) {
       return null;
     }
   })() || {
@@ -631,9 +631,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   // SHIFT MANAGEMENT STATE ENGINE (Declared at top of scope to prevent Temporal Dead Zone crashes during bootstrap)
   // ==========================================
-  let activeShift = (() => { try { return JSON.parse(localStorage.getItem('doppio_current_shift')) || null; } catch(e) { return null; } })();
-  let shiftHistory = (() => { try { return JSON.parse(localStorage.getItem('doppio_shifts_local')) || []; } catch(e) { return []; } })();
-  let shiftEvents = (() => { try { return JSON.parse(localStorage.getItem('doppio_shift_events_local')) || []; } catch(e) { return []; } })();
+  let activeShift = (() => { try { return JSON.parse(localStorage.getItem('doppio_current_shift')) || null; } catch (e) { return null; } })();
+  let shiftHistory = (() => { try { return JSON.parse(localStorage.getItem('doppio_shifts_local')) || []; } catch (e) { return []; } })();
+  let shiftEvents = (() => { try { return JSON.parse(localStorage.getItem('doppio_shift_events_local')) || []; } catch (e) { return []; } })();
 
   // Force default sound off for existing storage/users
   if (localStorage.getItem('doppio_sound_default_off_v2') !== 'true') {
@@ -649,8 +649,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('doppio_shift_default_off_v4', 'true');
   }
 
-  let cart = (() => { try { return JSON.parse(localStorage.getItem('doppio_cart')) || []; } catch(e) { localStorage.removeItem('doppio_cart'); return []; } })();
-  
+  let cart = (() => { try { return JSON.parse(localStorage.getItem('doppio_cart')) || []; } catch (e) { localStorage.removeItem('doppio_cart'); return []; } })();
+
+  // Helper function to save cart state to localStorage and Resilience Vault
+  function saveCartState() {
+    localStorage.setItem('doppio_cart', JSON.stringify(cart));
+    if (typeof window.writeToResilienceVault === 'function') {
+      window.writeToResilienceVault('doppio_cart', JSON.stringify(cart));
+    }
+  }
+
+  // Helper function to clear cart state from localStorage and Resilience Vault
+  function clearCartState() {
+    localStorage.removeItem('doppio_cart');
+    if (typeof window.writeToResilienceVault === 'function') {
+      window.writeToResilienceVault('doppio_cart', null);
+    }
+  }
+
   // Custom global variables for ERP upgrades
   let activeTableSession = null;
   let tableCarts = (() => {
@@ -663,7 +679,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return parsed;
       }
       return { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
-    } catch(e) {
+    } catch (e) {
       return { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
     }
   })();
@@ -693,13 +709,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   let inventoryBatches = (() => {
     try {
       return JSON.parse(localStorage.getItem('doppio_inventory_batches')) || {};
-    } catch(e) {
+    } catch (e) {
       return {};
     }
   })();
 
   // Inventory batches start from localStorage only (no default seeding)
-  
+
   let activeInventoryFilter = 'all';
 
   const defaultEmployees = [
@@ -737,7 +753,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_draft_orders'));
       return Array.isArray(parsed) ? parsed.filter(d => d && typeof d === 'object' && d.id) : [];
-    } catch(e) {
+    } catch (e) {
       return [];
     }
   })();
@@ -762,7 +778,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
         updateNetworkStatus(true);
-        
+
         // Disable shiftEnabled in Supabase cloud db once for migration v4
         if (localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
           supabaseClient.from('doppio_business_profile').update({ shift_enabled: false }).eq('tenant_id', activeTenantId)
@@ -780,7 +796,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           syncWithSupabase();
         }
-        
+
         syncOfflineBills();
         setupSupabaseRealtime();
       } catch (err) {
@@ -794,7 +810,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateNetworkStatus(online) {
     const desktopStatusText = document.getElementById('supabase-sync-text');
     const mobileBadge = document.getElementById('mobile-network-status-badge');
-    
+
     if (online) {
       if (desktopStatusText) desktopStatusText.innerHTML = 'Live';
       const desktopBadge = document.getElementById('network-status-badge');
@@ -858,7 +874,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       text.textContent = 'Sync Error';
       text.title = errorMsg;
     }
-    
+
     setTimeout(() => {
       if (navigator.onLine) {
         updateNetworkStatus(true);
@@ -874,9 +890,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function handleSyncError(operationName, error) {
     const errorMsg = error ? (error.message || error) : 'Unknown Error';
     console.error(`[Supabase Sync Fail] ${operationName}:`, errorMsg);
-    
+
     triggerSyncErrorState(errorMsg);
-    
+
     if (navigator.onLine) {
       showNotificationToast(`Sync Failed: ${operationName} error (${errorMsg})`);
     } else {
@@ -888,7 +904,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let queue = [];
     try {
       queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
-    } catch(e) {
+    } catch (e) {
       queue = [];
     }
     if (!queue.some(b => b.orderId === bill.orderId)) {
@@ -902,11 +918,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let queue = [];
     try {
       queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
-    } catch(e) {
+    } catch (e) {
       queue = [];
     }
     if (queue.length === 0) return;
-    
+
     const billsToSync = [...queue];
     for (const bill of billsToSync) {
       try {
@@ -922,12 +938,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           total: bill.total,
           paymentMethod: bill.paymentMethod
         });
-        
+
         if (!error) {
           let currentQueue = [];
           try {
             currentQueue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
-          } catch(e) {
+          } catch (e) {
             currentQueue = [];
           }
           const updatedQueue = currentQueue.filter(b => b.orderId !== bill.orderId);
@@ -994,14 +1010,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             whatsappGatewayToken: dbProfile.whatsapp_gateway_token || businessProfile.whatsappGatewayToken,
             featureFlags: dbProfile.feature_flags ? JSON.parse(dbProfile.feature_flags) : (businessProfile.featureFlags || {})
           };
-          
+
           if (businessProfile.whatsappGatewayUrl === undefined || !businessProfile.whatsappGatewayUrl || businessProfile.whatsappGatewayUrl.trim() === '' || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
             businessProfile.whatsappGatewayUrl = 'http://localhost:8001/api/mock-whatsapp';
           }
           if (businessProfile.whatsappGatewayEnabled === undefined || businessProfile.whatsappGatewayEnabled === false) {
             businessProfile.whatsappGatewayEnabled = true;
           }
-          
+
           localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
           setVaultData("doppio_business_profile", businessProfile);
           applyFeatureToggles();
@@ -1055,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (typeof items === 'string') {
               try {
                 items = JSON.parse(items);
-              } catch(err) {
+              } catch (err) {
                 items = [];
               }
             }
@@ -1110,7 +1126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const parsedPending = dbPending.map(o => {
               let items = o.items;
               if (typeof items === 'string') {
-                try { items = JSON.parse(items); } catch(e) { items = []; }
+                try { items = JSON.parse(items); } catch (e) { items = []; }
               }
               return {
                 orderId: o.orderId,
@@ -1451,7 +1467,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               if (itemName) {
                 let ingredients = row.ingredients;
                 if (typeof ingredients === 'string') {
-                  try { ingredients = JSON.parse(ingredients); } catch(e) { ingredients = []; }
+                  try { ingredients = JSON.parse(ingredients); } catch (e) { ingredients = []; }
                 }
                 // Cloud wins (overwrite local recipe for this item)
                 customRecipes[itemName] = Array.isArray(ingredients) ? ingredients : [];
@@ -1499,28 +1515,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn("Supabase POS popularity sync failed:", err);
       }
 
-    } catch(e) {
+    } catch (e) {
       console.warn("Supabase initial sync fallback", e);
     }
   }
 
   function setupSupabaseRealtime() {
     if (!supabaseClient) return;
-    
+
     // Subscribe to standard bills changes
-    supabaseClient.channel('doppio-bills-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills', filter: 'tenant_id=eq.' + activeTenantId }, payload => {})
+    supabaseClient.channel('doppio-bills-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills', filter: 'tenant_id=eq.' + activeTenantId }, payload => { })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills' }, () => {
         syncWithSupabase();
       }).subscribe();
 
     // Subscribe to live QR self-ordering queue & table sessions (Made by Antigravity)
-    supabaseClient.channel('doppio-pending-orders-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: 'tenant_id=eq.' + activeTenantId }, payload => {})
+    supabaseClient.channel('doppio-pending-orders-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: 'tenant_id=eq.' + activeTenantId }, payload => { })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders' }, (payload) => {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const newOrder = payload.new;
           let items = newOrder.items;
           if (typeof items === 'string') {
-            try { items = JSON.parse(items); } catch(e) { items = []; }
+            try { items = JSON.parse(items); } catch (e) { items = []; }
           }
           const orderObj = {
             orderId: newOrder.orderId,
@@ -1591,7 +1607,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (deletedOrderId) {
             pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== deletedOrderId);
             localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-            
+
             // If it was a table active session, clear it locally
             if (deletedOrderId.startsWith('TABLE-')) {
               const parts = deletedOrderId.split('-');
@@ -1732,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               sessionStorage.removeItem('doppio_menu');
               sessionStorage.removeItem('doppio_inventory');
               sessionStorage.removeItem('doppio_bills');
-              
+
               // Reload page to re-sync
               window.location.reload();
             });
@@ -1764,26 +1780,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const tabId = link.getAttribute('data-tab');
-      
+
       // Stop SaaS Gateway polling if we switch away from gateway-monitor-tab
       if (tabId !== 'gateway-monitor-tab' && typeof stopSaaSGatewayPolling === 'function') {
         stopSaaSGatewayPolling();
       }
-      
-      // If takeaway tab is clicked and there are items in the cart, clear it
-      if (tabId === 'pos-tab' && cart.length > 0) {
-        SoundEffects.playRemove();
-        cart = [];
-        const custNameInput = document.getElementById('cust-name');
-        const custPhoneInput = document.getElementById('cust-phone');
-        if (custNameInput) custNameInput.value = '';
-        if (custPhoneInput) custPhoneInput.value = '';
-        if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-        renderCart();
-      }
+
+      // Cart is intentionally NOT cleared when switching tabs.
+      // Cart contents persist until the "Print Bill" action is completed.
 
       SoundEffects.playClick();
-      
+
       sidebarLinks.forEach(l => l.classList.remove('active'));
       link.classList.add('active');
 
@@ -1792,7 +1799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (targetTab) targetTab.classList.add('active');
 
       tabTitle.textContent = link.textContent.trim();
-      
+
       if (tabId === 'pos-tab') tabSubtitle.textContent = 'Default Tab: Selection Grid';
       else if (tabId === 'qr-orders-tab') {
         tabSubtitle.textContent = 'Dine-in self-service active';
@@ -1853,7 +1860,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateHeaderSummaryStats() {
     const headerSales = document.getElementById('header-sales-today');
     const headerBills = document.getElementById('header-bills-today');
-    
+
     // Calculate values specifically for today
     const today = new Date().toLocaleDateString('en-IN');
     const todayBills = bills.filter(b => b && b.dateTime && b.dateTime.includes(today));
@@ -1868,7 +1875,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (input) {
       const nextNum = bills.length === 0 ? 1001 : (1000 + bills.length + 1);
       input.value = 'DO-' + nextNum;
-      
+
       const badge = document.getElementById('cart-order-badge');
       if (badge) {
         badge.textContent = 'Order: DO-' + nextNum;
@@ -1950,15 +1957,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!posCategories) return;
     const categories = ['ALL', ...new Set(menu.map(item => item.category))];
     posCategories.innerHTML = '';
-    
+
     categories.forEach(cat => {
       const btn = document.createElement('button');
       btn.className = `pos-cat-btn ${cat === activePOSCategory ? 'active' : ''}`;
       btn.setAttribute('data-category', cat);
-      
+
       let label = cat.toLowerCase().replace('&', 'and');
       label = label.charAt(0).toUpperCase() + label.slice(1);
-      
+
       const icon = categoryIconsMap[cat] || '<i class="fa-solid fa-mug-hot"></i>';
       btn.innerHTML = `${icon} ${label}`;
       posCategories.appendChild(btn);
@@ -1971,8 +1978,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const filteredItems = menu.filter(item => {
       const matchesCategory = activePOSCategory === 'ALL' || item.category === activePOSCategory;
-      const matchesSearch = (item.name && item.name.toLowerCase().includes(posSearchQuery.toLowerCase())) || 
-                            (item.description && item.description.toLowerCase().includes(posSearchQuery.toLowerCase()));
+      const matchesSearch = (item.name && item.name.toLowerCase().includes(posSearchQuery.toLowerCase())) ||
+        (item.description && item.description.toLowerCase().includes(posSearchQuery.toLowerCase()));
       return matchesCategory && matchesSearch;
     });
 
@@ -1997,11 +2004,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     filteredItems.forEach(item => {
       // Find matching items in cart to calculate quick badges
       const cartCount = cart.filter(i => i.name === item.name).reduce((sum, i) => sum + i.qty, 0);
-      
+
       const card = document.createElement('div');
       card.className = `pos-item-card ${cartCount > 0 ? 'selected-in-cart' : ''}`;
       card.setAttribute('tabindex', '0');
-      
+
       const descText = item.description ? `<div class="pos-item-desc">${item.description}</div>` : '';
       card.innerHTML = `
         <div class="pos-item-info">
@@ -2053,13 +2060,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!customModal) return;
     document.getElementById('cust-target-item-name').value = item.name;
     custModalTitle.innerHTML = `<i class="fa-solid fa-gears" style="font-size:20px; color:var(--accent-caramel); margin-right:8px;"></i> Customize ${item.name}`;
-    
+
     // Reset selections
     selectedSizeOpt = 'Small';
     selectedSugarOpt = 'Regular';
     selectedIceOpt = 'Regular';
     custNotesInput.value = '';
-    
+
     document.getElementById('addon-shot').checked = false;
     document.getElementById('addon-drizzle').checked = false;
     document.getElementById('addon-cream').checked = false;
@@ -2119,7 +2126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       let finalPrice = baseItem.price;
       if (selectedSizeOpt === 'Medium') finalPrice += 30;
       if (selectedSizeOpt === 'Large') finalPrice += 60;
-      
+
       let toppings = [];
       if (extraShot) { finalPrice += 40; toppings.push('Extra Shot'); }
       if (drizzle) { finalPrice += 20; toppings.push('Caramel Drizzle'); }
@@ -2269,7 +2276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const total = taxableAmount + gst;
 
     if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
-    
+
     if (cartGst) {
       if (loyaltyDiscount > 0) {
         cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
@@ -2283,7 +2290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderCart() {
     if (!cartList) return;
-    
+
     // Restore customer details on initial load
     const nameInput = document.getElementById('cust-name');
     const phoneInput = document.getElementById('cust-phone');
@@ -2334,7 +2341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (cartSubtotal) cartSubtotal.textContent = '₹0.00';
       if (cartGst) cartGst.textContent = '₹0.00';
       if (cartTotal) cartTotal.textContent = '₹0.00';
-      
+
       // Clear customer inputs in DOM
       if (nameInput) nameInput.value = '';
       if (phoneInput) phoneInput.value = '';
@@ -2362,7 +2369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('doppio_cart', JSON.stringify([]));
       localStorage.setItem('doppio_cart_cust_name', '');
       localStorage.setItem('doppio_cart_cust_phone', '');
-      
+
       return;
     }
 
@@ -2425,7 +2432,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const total = taxableAmount + gst;
 
     if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
-    
+
     if (cartGst) {
       if (loyaltyDiscount > 0) {
         cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
@@ -2436,9 +2443,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (cartTotal) cartTotal.textContent = `₹${total}`;
     if (typeof calculateSplitBalance === 'function') calculateSplitBalance();
-    
+
     // Save to localStorage for persistence across reloads/logouts/tabs
-    localStorage.setItem('doppio_cart', JSON.stringify(cart));
+    saveCartState();
     if (activeTableSession !== null) {
       tableCarts[activeTableSession] = cart;
       localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
@@ -2462,7 +2469,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleZomatoCheck = document.getElementById('toggle-zomato');
   const toggleSwiggyCheck = document.getElementById('toggle-swiggy');
   const toggleDunzoCheck = document.getElementById('toggle-dunzo');
-  
+
   const btnSimulateZomato = document.getElementById('btn-simulate-zomato');
   const btnSimulateSwiggy = document.getElementById('btn-simulate-swiggy');
 
@@ -2478,7 +2485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     onlineOrdersQueue.innerHTML = '';
 
     const pendingOnline = pendingQrOrders.filter(o => (o.orderType === 'ZOMATO' || o.orderType === 'SWIGGY') && o.status === 'Pending Review');
-    
+
     if (onlineOrdersBadge) {
       if (pendingOnline.length > 0) {
         onlineOrdersBadge.textContent = pendingOnline.length;
@@ -2508,7 +2515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.className = 'qr-order-queue-card';
       const themeColor = order.orderType === 'ZOMATO' ? '#e23744' : '#fc8019';
       card.style.borderLeft = `4px solid ${themeColor}`;
-      
+
       const itemsListStr = order.items.map(item => `
         <div class="qr-card-item-row">
           <span>${item.name} x${item.qty}</span>
@@ -2563,7 +2570,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const originalUpdateQrUI = updateQrOrdersDashboardUI;
-  updateQrOrdersDashboardUI = function() {
+  updateQrOrdersDashboardUI = function () {
     if (originalUpdateQrUI) originalUpdateQrUI();
     renderOnlineOrdersTab();
     if (typeof renderKDSTab === 'function') renderKDSTab();
@@ -2641,7 +2648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     order.status = 'Accepted';
     localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-    
+
     if (supabaseClient) {
       supabaseClient.from('doppio_pending_orders')
         .update({ status: 'Accepted' })
@@ -2656,13 +2663,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     SoundEffects.playRemove();
     pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== orderId);
     localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-    
+
     if (supabaseClient) {
       supabaseClient.from('doppio_pending_orders')
         .delete()
         .eq('orderId', orderId).then();
     }
-    
+
     updateQrOrdersDashboardUI();
     showNotificationToast(`Online order ${orderId} declined.`);
   }
@@ -2682,7 +2689,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const orderNum = Math.floor(1000 + Math.random() * 9000);
     const orderId = `${aggregator.slice(0, 3)}-${orderNum}`;
-    
+
     const randomNames = ["Kalpesh Deora", "Rohan Sharma", "Sneha Patel", "Anjali Deshmukh", "Piyush Joshi"];
     const name = randomNames[Math.floor(Math.random() * randomNames.length)];
     const phone = `913000${Math.floor(1000 + Math.random() * 9000)}`;
@@ -2783,7 +2790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateCartQty(key, delta) {
     const item = cart.find(i => i.key === key);
     if (!item) return;
-    
+
     if (delta > 0) {
       SoundEffects.playPop();
       item.qty += delta;
@@ -2802,6 +2809,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     clearCartBtn.addEventListener('click', () => {
       SoundEffects.playRemove();
       cart = [];
+      clearCartState();
       document.getElementById('cust-name').value = '';
       document.getElementById('cust-phone').value = '';
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
@@ -2873,7 +2881,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             oldDeductions[ing] = (oldDeductions[ing] || 0) + (specs[ing] * item.qty);
           });
         });
-        
+
         // Temporarily restore original deductions back to inventory level and batches
         Object.keys(oldDeductions).forEach(ing => {
           if (inventory[ing] === undefined) inventory[ing] = 1000;
@@ -2924,21 +2932,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
     const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
     const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-    
+
     let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const phoneInput = document.getElementById('cust-phone');
     const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-    
+
     let loyaltyDiscount = 0;
     let matchedCustomer = null;
     if (phoneVal || custName) {
       matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
     }
-    
+
     if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
       loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
     }
-    
+
     const taxableAmount = subtotal - loyaltyDiscount;
     const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
     const total = taxableAmount + gst;
@@ -3017,18 +3025,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     localStorage.setItem('doppio_bills', JSON.stringify(bills));
     if (typeof trackItemPopularity === 'function') trackItemPopularity(cart);
-    
+
     // CRM dynamic ledger upgrades
     if (phoneVal || (custName && custName !== 'Walk-in Guest')) {
       updateCRMMember(custName, phoneVal, total);
     }
-    
+
     SoundEffects.playSuccess();
 
     // Android vocal announcement
     if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
-      const engText = editingBillId 
-        ? "Doppio Cafe Nagpur. Bill " + billIdToSave + " updated!" 
+      const engText = editingBillId
+        ? "Doppio Cafe Nagpur. Bill " + billIdToSave + " updated!"
         : "Doppio Cafe Nagpur. Payment of Rupees " + total + " received!";
       window.AndroidInterface.speak(engText);
     }
@@ -3070,36 +3078,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       tableCarts[billedTableId] = [];
       localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
       localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
-      
+
       // Delete DineIn Active and KDS entries in Supabase
       if (supabaseClient) {
         supabaseClient.from('doppio_pending_orders').delete().eq('orderId', `TABLE-${billedTableId}`).then();
         supabaseClient.from('doppio_pending_orders').delete().eq('tableNumber', `0${billedTableId}`).then();
       }
-      
+
       // Remove from local KDS orders list
       pendingQrOrders = pendingQrOrders.filter(o => o.tableNumber !== `0${billedTableId}`);
       localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-      
+
       renderTablesMap();
       if (typeof renderKDSTab === 'function') renderKDSTab();
     }
 
-    // Clean Cart Drawer
-    cart = [];
-    if (custNameInput) custNameInput.value = '';
-    if (phoneInput) phoneInput.value = '';
-    if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-    if (takeawayFields) {
-      takeawayFields.style.display = 'none';
-      if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
-      if (guestToggleBtn) {
-        guestToggleBtn.style.background = 'var(--bg-cream-light)';
-        guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
+    // Clear the cart only when the bill has been printed.
+    // "Save" (shouldPrint=false) keeps the cart so the cashier can still print later.
+    if (shouldPrint) {
+      cart = [];
+      clearCartState();
+      if (custNameInput) custNameInput.value = '';
+      if (phoneInput) phoneInput.value = '';
+      if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
+      if (takeawayFields) {
+        takeawayFields.style.display = 'none';
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+        if (guestToggleBtn) {
+          guestToggleBtn.style.background = 'var(--bg-cream-light)';
+          guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
+        }
       }
+      generateOrderNumber();
     }
-    
-    generateOrderNumber();
+
     renderCart();
     updateHeaderSummaryStats();
     renderBills();
@@ -3146,10 +3158,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       dateStr = val.dateTime;
     }
     if (!dateStr || typeof dateStr !== 'string') return new Date(0);
-    
+
     let parsed = Date.parse(dateStr);
     if (!isNaN(parsed)) return new Date(parsed);
-    
+
     // Robust Indian locale parser: 'DD/MM/YYYY, hh:mm:ss AM/PM'
     try {
       const clean = dateStr.replace(/[^0-9/:\sAMP]/gi, '').trim();
@@ -3159,7 +3171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let day = parseInt(dateParts[0], 10);
         let month = parseInt(dateParts[1], 10) - 1;
         let year = parseInt(dateParts[2], 10);
-        
+
         let hour = 0, minute = 0, second = 0;
         if (parts[1]) {
           const timeParts = parts[1].trim().split(' ');
@@ -3167,7 +3179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           hour = parseInt(hms[0], 10);
           minute = parseInt(hms[1], 10) || 0;
           second = parseInt(hms[2], 10) || 0;
-          
+
           if (timeParts[1] && timeParts[1].toUpperCase() === 'PM' && hour < 12) {
             hour += 12;
           } else if (timeParts[1] && timeParts[1].toUpperCase() === 'AM' && hour === 12) {
@@ -3189,15 +3201,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     SoundEffects.playPop();
     editingBillId = orderId;
     localStorage.setItem('doppio_editing_bill_id', orderId);
-    
+
     // Deep copy cart items
     cart = JSON.parse(JSON.stringify(bill.items));
-    
+
     const cn = document.getElementById('cust-name');
     const cp = document.getElementById('cust-phone');
     if (cn) cn.value = bill.customerName;
     if (cp) cp.value = bill.customerPhone || '';
-    
+
     // Update order type active selection
     if (bill.orderType) {
       activeOrderType = bill.orderType;
@@ -3243,18 +3255,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   function cancelEditingBill() {
     editingBillId = null;
     localStorage.removeItem('doppio_editing_bill_id');
-    
+
     // Clear cart and fields
     cart = [];
+    clearCartState();
     const cn = document.getElementById('cust-name');
     const cp = document.getElementById('cust-phone');
     if (cn) cn.value = '';
     if (cp) cp.value = '';
-    
+
     // Hide banner
     const banner = document.getElementById('editing-bill-banner');
     if (banner) banner.style.display = 'none';
-    
+
     // Re-generate order number & badge
     generateOrderNumber();
     renderCart();
@@ -3270,21 +3283,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     let dateFrom = null;
     if (fromVal) {
       dateFrom = new Date(fromVal);
-      dateFrom.setHours(0,0,0,0);
+      dateFrom.setHours(0, 0, 0, 0);
     }
     let dateTo = null;
     if (toVal) {
       dateTo = new Date(toVal);
-      dateTo.setHours(0,0,0,0);
+      dateTo.setHours(0, 0, 0, 0);
     }
 
     const filteredBills = bills.filter(bill => {
       // Search matches
       const q = billsSearchQuery.toLowerCase();
-      const matchesSearch = !q || 
-                            (bill.customerName && bill.customerName.toLowerCase().includes(q)) || 
-                            (bill.orderId && bill.orderId.toLowerCase().includes(q)) || 
-                            (bill.customerPhone && bill.customerPhone.includes(q));
+      const matchesSearch = !q ||
+        (bill.customerName && bill.customerName.toLowerCase().includes(q)) ||
+        (bill.orderId && bill.orderId.toLowerCase().includes(q)) ||
+        (bill.customerPhone && bill.customerPhone.includes(q));
 
       // Presets filter matches
       let matchesPreset = true;
@@ -3332,7 +3345,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cashPct = document.getElementById('bills-cash-percent');
     if (revCard) revCard.textContent = `₹${dailySalesTotal}`;
     if (totCard) totCard.textContent = `${filteredBills.length} Invoices`;
-    
+
     // Average Order Value calculations
     const aov = filteredBills.length === 0 ? 0 : Math.round(dailySalesTotal / filteredBills.length);
     if (aovCardEl) aovCardEl.textContent = `₹${aov}`;
@@ -3358,7 +3371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           </td>
         </tr>
       `;
-      
+
       const backPos = document.getElementById('btn-back-pos');
       if (backPos) {
         backPos.addEventListener('click', () => {
@@ -3372,15 +3385,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     sortedBills.forEach(bill => {
       if (!bill) return;
       const tr = document.createElement('tr');
-      
+
       // Items string format details
       const billItems = Array.isArray(bill.items) ? bill.items : [];
       let itemsListStr = billItems.map(item => `${item.name || '?'} (${item.qty || 1})`).join(', ');
       if (itemsListStr.length > 36) itemsListStr = itemsListStr.substring(0, 33) + '...';
-      
+
       // Avatar Initials details
       const custName = bill.customerName || 'Walk-in';
-      const initials = custName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      const initials = custName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       const payMethod = bill.paymentMethod || 'UPI';
 
       tr.innerHTML = `
@@ -3450,7 +3463,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Requires secure cashier validation PIN triggers
         showAdminPinModal(() => {
           const bill = bills[idx];
-          
+
           // Revert Stock
           bill.items.forEach(cartItem => {
             const specs = getDeductionSpecs(cartItem);
@@ -3459,10 +3472,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
           });
           localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-          
+
           bills.splice(idx, 1);
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
-          
+
           if (supabaseClient) {
             supabaseClient.from('doppio_bills').delete().eq('orderId', orderId).then();
           }
@@ -3569,13 +3582,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const w1 = 20; // Item column width
       const w2 = 5;  // Qty column width
       const w3 = 7;  // Amt column width
-      
+
       let c1 = col1.slice(0, w1 - 1);
       c1 = c1.padEnd(w1, ' ');
-      
+
       const c2 = col2.toString().padStart(w2, ' ');
       const c3 = col3.toString().padStart(w3, ' ');
-      
+
       return c1 + c2 + c3;
     }
 
@@ -3591,33 +3604,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const borderDouble = '='.repeat(32);
     const borderSingle = '-'.repeat(32);
-    
+
     let txt = '';
     txt += borderDouble + '\n';
     txt += centerText32(businessProfile.name) + '\n';
     txt += centerText32(businessProfile.address) + '\n';
     txt += centerText32(businessProfile.phone) + '\n';
     txt += borderDouble + '\n\n';
-    
+
     const leftBill = `Bill: ${bill.orderId}`;
     const rightPay = bill.paymentMethod || 'Cash';
     txt += leftBill + rightPay.padStart(32 - leftBill.length, ' ') + '\n';
     txt += `Date: ${bill.dateTime}\n`;
     txt += `Guest: ${bill.customerName || 'Walk-in Guest'}\n\n`;
-    
+
     txt += borderSingle + '\n';
     txt += formatRow32('Item', 'Qty', 'Amt') + '\n';
     txt += borderSingle + '\n';
-    
+
     bill.items.forEach(item => {
       let displayName = `${item.name}`;
       if (item.size && item.size !== 'Small') {
         displayName += ` (${item.size.charAt(0)})`;
       }
-      
+
       txt += formatRow32(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
       txt += `  (₹${item.price} each)\n`;
-      
+
       if (item.toppings && item.toppings.length > 0) {
         txt += `  + ${item.toppings.join(', ')}\n`;
       }
@@ -3625,19 +3638,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         txt += `  * Note: ${item.notes}\n`;
       }
     });
-    
+
     txt += borderSingle + '\n';
     txt += formatDouble32('Subtotal', bill.subtotal.toString()) + '\n';
-    
+
     // Print GST line only if GST is enabled in the business profile
     if (businessProfile.gstEnabled !== false) {
       txt += formatDouble32('GST', bill.gst.toString()) + '\n';
     }
-    
+
     if (bill.discount && bill.discount > 0) {
       txt += formatDouble32('Discount', `-${bill.discount}`) + '\n';
     }
-    
+
     txt += borderDouble + '\n';
     txt += formatDouble32('GRAND TOTAL', bill.total.toString()) + '\n';
     txt += borderDouble + '\n\n';
@@ -3646,7 +3659,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     txt += borderSingle + '\n';
     txt += centerText32(vibeQuote) + '\n';
     txt += borderSingle + '\n\n';
-    
+
     txt += centerText32('Thank you for visiting!') + '\n';
     txt += centerText32('Visit Again ☕') + '\n';
 
@@ -3668,18 +3681,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       phoneNum = prompt("Enter customer's 10-digit WhatsApp number:", "");
       if (!phoneNum) return; // user cancelled
     }
-    
+
     phoneNum = phoneNum.replace(/\D/g, '');
-    
+
     if (phoneNum.length === 10) {
       phoneNum = "91" + phoneNum;
     }
-    
+
     if (phoneNum.length < 10) {
       alert("Invalid phone number! Please enter a valid number.");
       return;
     }
-    
+
     // Monospace alignment helpers (matching ultra-safe 24-char mobile WhatsApp specs)
     function centerText24(text) {
       const width = 24;
@@ -3687,11 +3700,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const leftPad = Math.floor((width - text.length) / 2);
         return ' '.repeat(leftPad) + text;
       }
-      
+
       const words = text.split(' ');
       const lines = [];
       let currentLine = '';
-      
+
       words.forEach(word => {
         if ((currentLine + (currentLine ? ' ' : '') + word).length <= width) {
           currentLine += (currentLine ? ' ' : '') + word;
@@ -3701,7 +3714,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
       if (currentLine) lines.push(currentLine);
-      
+
       return lines.map(line => {
         const leftPad = Math.floor((width - line.length) / 2);
         return ' '.repeat(leftPad) + line;
@@ -3712,13 +3725,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const w1 = 13; // Item column width
       const w2 = 4;  // Qty column width
       const w3 = 7;  // Amt column width
-      
+
       let c1 = col1.slice(0, w1 - 1);
       c1 = c1.padEnd(w1, ' ');
-      
+
       const c2 = col2.toString().padStart(w2, ' ');
       const c3 = col3.toString().padStart(w3, ' ');
-      
+
       return c1 + c2 + c3;
     }
 
@@ -3734,7 +3747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const borderDouble = '='.repeat(24);
     const borderSingle = '-'.repeat(24);
-    
+
     // Build receipt wrapped in WhatsApp's triple backticks monospace block
     let msg = "```\n";
     msg += borderDouble + '\n';
@@ -3742,7 +3755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     msg += centerText24(businessProfile.address || 'London Street, Nagpur') + '\n';
     msg += centerText24(businessProfile.phone || '+91 91300 03177') + '\n';
     msg += borderDouble + '\n\n';
-    
+
     let leftBill = `Bill: ${bill.orderId}`;
     let rightPay = bill.paymentMethod || 'Cash';
     if (rightPay.length > 8) {
@@ -3754,25 +3767,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       msg += leftBill + rightPay.padStart(padSize, ' ') + '\n';
     }
-    
+
     // Extract raw date part for compactness
     const dateOnly = bill.dateTime ? bill.dateTime.split(',')[0] : new Date().toLocaleDateString('en-IN');
     msg += `Date: ${dateOnly}\n`;
     msg += `Guest: ${(bill.customerName || 'Walk-in Guest').slice(0, 17)}\n\n`;
-    
+
     msg += borderSingle + '\n';
     msg += formatRow24('Item', 'Qty', 'Amt') + '\n';
     msg += borderSingle + '\n';
-    
+
     bill.items.forEach(item => {
       let displayName = `${item.name}`;
       if (item.size && item.size !== 'Small') {
         displayName += ` (${item.size.charAt(0)})`;
       }
-      
+
       msg += formatRow24(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
       msg += `  (₹${item.price} each)\n`;
-      
+
       if (item.toppings && item.toppings.length > 0) {
         msg += `  + ${item.toppings.join(', ')}\n`;
       }
@@ -3780,18 +3793,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         msg += `  * Note: ${item.notes}\n`;
       }
     });
-    
+
     msg += borderSingle + '\n';
     msg += formatDouble24('Subtotal', bill.subtotal.toString()) + '\n';
-    
+
     if (businessProfile.gstEnabled !== false) {
       msg += formatDouble24('GST', bill.gst.toString()) + '\n';
     }
-    
+
     if (bill.discount && bill.discount > 0) {
       msg += formatDouble24('Discount', `-${bill.discount}`) + '\n';
     }
-    
+
     msg += borderDouble + '\n';
     msg += formatDouble24('GRAND TOTAL', bill.total.toString()) + '\n';
     msg += borderDouble + '\n\n';
@@ -3800,25 +3813,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     msg += borderSingle + '\n';
     msg += centerText24(vibeQuote) + '\n';
     msg += borderSingle + '\n\n';
-    
+
     msg += centerText24('Thank you for visiting!') + '\n';
     msg += centerText24('Visit Again ☕') + '\n';
     msg += "```";
-    
+
     const encodedMsg = encodeURIComponent(msg);
-    
+
     function openManualWhatsApp(phone, encoded) {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       if (isMobile) {
         // Use native protocol handler to directly open native WhatsApp app on Android/iOS
         const deepLinkUrl = `whatsapp://send?phone=${phone}&text=${encoded}`;
         window.location.href = deepLinkUrl;
-        
+
         // Safety fallback: if the deep link is not supported or not handled, fall back to API redirect
         setTimeout(() => {
           try {
             window.location.href = `https://api.whatsapp.com/send?phone=${phone}&text=${encoded}`;
-          } catch (e) {}
+          } catch (e) { }
         }, 600);
       } else {
         // Direct WhatsApp Web send URL on desktop - instantly opens web chat and bypasses landing page!
@@ -3829,9 +3842,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (businessProfile.whatsappGatewayEnabled && businessProfile.whatsappGatewayUrl && businessProfile.whatsappGatewayUrl.trim() !== '') {
       showNotificationToast("Sending WhatsApp Bill...");
-      
+
       const gatewayUrl = businessProfile.whatsappGatewayUrl.trim();
-      
+
       // Local Mock Simulator: immediately triggers success toast locally (bypasses network/CORS blocks during testing)
       if (gatewayUrl.includes('/api/mock-whatsapp') || gatewayUrl.includes('httpbin.org')) {
         setTimeout(() => {
@@ -3847,11 +3860,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         message: msg,
         text: msg
       };
-      
+
       const headers = {
         "Content-Type": "application/json"
       };
-      
+
       if (businessProfile.whatsappGatewayToken && businessProfile.whatsappGatewayToken.trim() !== '') {
         const token = businessProfile.whatsappGatewayToken.trim();
         const colonIndex = token.indexOf(':');
@@ -3867,9 +3880,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         }
       }
-      
+
       let dispatchUrl = businessProfile.whatsappGatewayUrl.trim();
-      
+
       // Auto-failover recursive sender
       function trySend(targetUrl, isFallback = false) {
         let actualUrl = targetUrl;
@@ -3886,28 +3899,28 @@ document.addEventListener('DOMContentLoaded', async () => {
           headers: headers,
           body: JSON.stringify(payload)
         })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error("HTTP status " + response.status);
-          }
-          return response.json().catch(() => ({}));
-        })
-        .then(data => {
-          showNotificationToast(isFallback ? "WhatsApp Sent via Backup Gateway!" : "WhatsApp Bill Sent Successfully!");
-        })
-        .catch(err => {
-          console.error("Failed to send WhatsApp bill via: " + targetUrl, err);
-          if (!isFallback) {
-            const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
-            const fallbackUrl = isLocal ? 'https://kalpeshdeora1006-whatsapp-gateway.hf.space' : 'http://localhost:3000';
-            
-            showNotificationToast("Primary Gateway Offline. Trying Backup...");
-            console.log("Triggering auto-failover to backup: " + fallbackUrl);
-            return trySend(fallbackUrl, true);
-          } else {
-            showNotificationToast("All WhatsApp Gateways Offline!");
-          }
-        });
+          .then(response => {
+            if (!response.ok) {
+              throw new Error("HTTP status " + response.status);
+            }
+            return response.json().catch(() => ({}));
+          })
+          .then(data => {
+            showNotificationToast(isFallback ? "WhatsApp Sent via Backup Gateway!" : "WhatsApp Bill Sent Successfully!");
+          })
+          .catch(err => {
+            console.error("Failed to send WhatsApp bill via: " + targetUrl, err);
+            if (!isFallback) {
+              const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
+              const fallbackUrl = isLocal ? 'https://kalpeshdeora1006-whatsapp-gateway.hf.space' : 'http://localhost:3000';
+
+              showNotificationToast("Primary Gateway Offline. Trying Backup...");
+              console.log("Triggering auto-failover to backup: " + fallbackUrl);
+              return trySend(fallbackUrl, true);
+            } else {
+              showNotificationToast("All WhatsApp Gateways Offline!");
+            }
+          });
       }
 
       trySend(dispatchUrl);
@@ -3920,7 +3933,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 9. INTELLIGENT INVENTORY OVERHAUL (TAB 3)
   // ==========================================
   const inventoryGrid = document.getElementById('inventory-grid');
-  
+
   function renderInventory() {
     if (!inventoryGrid) return;
     inventoryGrid.innerHTML = '';
@@ -4021,17 +4034,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
         <div class="batches-dropdown-content" style="display: none; padding: 8px 0; border-top: 1px dashed rgba(28, 28, 28,0.08); margin-top: 6px;">
           ${ingredientBatchesList.map((b, idx) => {
-            if (b.qty <= 0) return '';
-            const exp = new Date(b.expiryDate);
-            let statusBadge = "";
-            let itemColor = "var(--text-dark)";
-            if (exp <= today) {
-              statusBadge = '<span style="color:var(--danger-color); font-weight:bold;">[EXP]</span>';
-              itemColor = "var(--danger-color)";
-            } else if (exp <= tomorrow) {
-              statusBadge = '<span style="color:var(--warning-color); font-weight:bold;">[SOON]</span>';
-            }
-            return `
+        if (b.qty <= 0) return '';
+        const exp = new Date(b.expiryDate);
+        let statusBadge = "";
+        let itemColor = "var(--text-dark)";
+        if (exp <= today) {
+          statusBadge = '<span style="color:var(--danger-color); font-weight:bold;">[EXP]</span>';
+          itemColor = "var(--danger-color)";
+        } else if (exp <= tomorrow) {
+          statusBadge = '<span style="color:var(--warning-color); font-weight:bold;">[SOON]</span>';
+        }
+        return `
               <div style="display: flex; justify-content: space-between; font-size: 9.5px; margin-bottom: 4px; color: ${itemColor}; align-items: center;">
                 <span>Batch ${idx + 1}: ${b.qty} (Exp: ${b.expiryDate}) ${statusBadge}</span>
                 ${exp <= today ? `
@@ -4041,7 +4054,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ` : ''}
               </div>
             `;
-          }).join('') || '<div style="font-size: 9px; color: var(--text-muted);">No active batches.</div>'}
+      }).join('') || '<div style="font-size: 9px; color: var(--text-muted);">No active batches.</div>'}
         </div>
 
         <div class="inventory-card-actions" style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:12px;">
@@ -4082,12 +4095,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         inventory[key] = maxVal;
         localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-        
+
         // Sync manual refill to Supabase immediately
         if (supabaseClient) {
           supabaseClient.from('doppio_inventory').update({ current: maxVal }).eq('key', key).then();
         }
-        
+
         renderInventory();
         checkLowStockAlerts();
       });
@@ -4153,7 +4166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.style.background = 'var(--accent-caramel)';
       btn.style.color = 'white';
       btn.style.borderColor = 'var(--accent-caramel)';
-      
+
       activeInventoryFilter = btn.getAttribute('data-filter') || 'all';
       renderInventory();
     });
@@ -4163,7 +4176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!inventoryBatches[ingredientKey]) {
       inventoryBatches[ingredientKey] = [];
     }
-    
+
     // Sort batches by expiry date
     inventoryBatches[ingredientKey].sort((a, b) => {
       const da = a.expiryDate ? new Date(a.expiryDate) : new Date("2099-12-31");
@@ -4209,7 +4222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const total = updatedBatches.reduce((sum, b) => sum + b.qty, 0);
     inventory[ingredientKey] = Math.max(0, total);
     localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-    
+
     // Sync to Supabase
     if (supabaseClient) {
       supabaseClient.from('doppio_inventory')
@@ -4255,7 +4268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let batches = inventoryBatches[ing] || [];
     if (batches.length === 0) {
       batches.push({
-        id: "batch_" + Date.now() + "_" + Math.floor(Math.random()*10000),
+        id: "batch_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
         qty: qty,
         expiryDate: getDefaultExpiryDate(ing),
         receivedDate: new Date().toISOString().split('T')[0]
@@ -4274,10 +4287,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const batchIndex = inventoryBatches[key].findIndex(b => b.id === batchId);
     if (batchIndex === -1) return;
     const batch = inventoryBatches[key][batchIndex];
-    
+
     SoundEffects.playRemove();
     showNotificationToast(`Wastage: Discarded ${batch.qty} units of expired ${getLabelFromKey(key)}.`);
-    
+
     // Remove the batch
     inventoryBatches[key].splice(batchIndex, 1);
     localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
@@ -4338,7 +4351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function checkLowStockAlerts() {
     const banner = document.getElementById('low-stock-alerts');
     if (!banner) return;
-    
+
     let lowIngredients = [];
     Object.keys(inventory).forEach(key => {
       const maxVal = defaultInventory[key];
@@ -4353,7 +4366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       banner.innerHTML = `
         <div class="alert-banner">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          <span>Low stock alerts for Nagpur Branch: <strong>${lowIngredients.slice(0,4).join(', ')}${lowIngredients.length > 4 ? '...' : ''}</strong></span>
+          <span>Low stock alerts for Nagpur Branch: <strong>${lowIngredients.slice(0, 4).join(', ')}${lowIngredients.length > 4 ? '...' : ''}</strong></span>
         </div>
       `;
       // Play soft alert sounds
@@ -4391,12 +4404,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     let dateFrom = null;
     if (fromVal) {
       dateFrom = new Date(fromVal);
-      dateFrom.setHours(0,0,0,0);
+      dateFrom.setHours(0, 0, 0, 0);
     }
     let dateTo = null;
     if (toVal) {
       dateTo = new Date(toVal);
-      dateTo.setHours(0,0,0,0);
+      dateTo.setHours(0, 0, 0, 0);
     }
 
     const filteredBills = bills.filter(bill => {
@@ -4431,13 +4444,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (dateFrom || dateTo) {
       numDays = 1;
     }
-    
+
     // Revenue
     const revenueVal = totalRevenueSum;
-    
+
     // COGS (35%)
     const cogsVal = Math.round(revenueVal * 0.35);
-    
+
     // Labor cost calculations
     // 1. Clocked wages in selected date range
     const clockedWagesSum = attendanceLogs
@@ -4449,20 +4462,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         return true;
       })
       .reduce((sum, log) => sum + ((log && log.wages) || 0), 0);
-      
+
     // 2. Fixed salary (admin Bonie Deora's pro-rated salary for this range: ₹45,000/30 = ₹1,500/day)
     const fixedLaborVal = Math.round((45000 / 30) * numDays);
     const laborVal = clockedWagesSum + fixedLaborVal;
-    
+
     // Fixed Operating Expenses (pro-rated ₹32,000/mo = ₹1,067/day)
     const fixedVal = Math.round((32000 / 30) * numDays);
-    
+
     // Gross Margin
     const grossMarginVal = revenueVal - cogsVal;
-    
+
     // Net profit
     const netProfitVal = grossMarginVal - laborVal - fixedVal;
-    
+
     // Populating Sales Report tab UI components
     const reportNetProfit = document.getElementById('report-net-profit');
     if (reportNetProfit) {
@@ -4473,7 +4486,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         reportNetProfit.style.color = '#e74c3c';
       }
     }
-    
+
     // Populating Detailed P&L statement table
     const plRev = document.getElementById('pl-revenue');
     const plCogs = document.getElementById('pl-cogs');
@@ -4481,7 +4494,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const plLabor = document.getElementById('pl-labor');
     const plFixed = document.getElementById('pl-fixed');
     const plNet = document.getElementById('pl-net-profit');
-    
+
     if (plRev) plRev.textContent = `₹${revenueVal.toLocaleString('en-IN')}`;
     if (plCogs) plCogs.textContent = `-₹${cogsVal.toLocaleString('en-IN')}`;
     if (plGross) plGross.textContent = `₹${grossMarginVal.toLocaleString('en-IN')}`;
@@ -4554,10 +4567,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Renders custom SVG curved line trends chart inside report Visual box
     if (revenueChartBox) {
       revenueChartBox.innerHTML = '';
-      
+
       const width = 460;
       const height = 180;
-      
+
       // Calculate revenue points specifically for last 5 orders of the filtered set
       const chartBills = [...filteredBills].slice(-5);
       let dataPoints = chartBills.map(b => (b && b.total) || 0);
@@ -4575,8 +4588,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       let pathD = `M ${points[0].x} ${points[0].y}`;
       for (let i = 1; i < points.length; i++) {
         // Curve interpolation
-        const cpX1 = points[i-1].x + (points[i].x - points[i-1].x) / 2;
-        const cpY1 = points[i-1].y;
+        const cpX1 = points[i - 1].x + (points[i].x - points[i - 1].x) / 2;
+        const cpY1 = points[i - 1].y;
         const cpX2 = cpX1;
         const cpY2 = points[i].y;
         pathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${points[i].x} ${points[i].y}`;
@@ -4594,9 +4607,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             </linearGradient>
           </defs>
           <!-- Grid lines -->
-          <line x1="30" y1="30" x2="${width-30}" y2="30" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
-          <line x1="30" y1="90" x2="${width-30}" y2="90" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
-          <line x1="30" y1="${height-30}" x2="${width-30}" y2="${height-30}" stroke="rgba(28, 28, 28,0.08)" stroke-width="1.5"/>
+          <line x1="30" y1="30" x2="${width - 30}" y2="30" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
+          <line x1="30" y1="90" x2="${width - 30}" y2="90" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
+          <line x1="30" y1="${height - 30}" x2="${width - 30}" y2="${height - 30}" stroke="rgba(28, 28, 28,0.08)" stroke-width="1.5"/>
           
           <!-- Area Underlay -->
           <path d="${areaD}" fill="url(#chartAreaGrad)" />
@@ -4670,11 +4683,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const reconBox = document.getElementById('reconciliation-chart-box');
     if (reconBox) {
       reconBox.innerHTML = '';
-      
+
       let directGross = 0;
       let zomatoGross = 0;
       let swiggyGross = 0;
-      
+
       filteredBills.forEach(b => {
         const type = b.orderType || 'Takeaway';
         if (type === 'ZOMATO') {
@@ -4685,16 +4698,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           directGross += b.total || 0;
         }
       });
-      
+
       const onlineGross = zomatoGross + swiggyGross;
       const commissionLoss = Math.round(onlineGross * 0.22);
       const onlinePayout = onlineGross - commissionLoss;
-      
+
       const maxSales = Math.max(directGross, onlineGross, 100);
-      
+
       const directPct = Math.min(100, Math.round((directGross / maxSales) * 100));
       const onlinePct = Math.min(100, Math.round((onlineGross / maxSales) * 100));
-      
+
       reconBox.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 14px; padding: 10px 0;">
           <!-- Direct Sales Bar -->
@@ -4796,7 +4809,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       SoundEffects.playSuccess();
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += "Ingredient Key,Ingredient Label,Current Stock,Max Capacity,Stock Percentage,Status\n";
-      
+
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
         const currentVal = inventory[key];
@@ -4809,11 +4822,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         csvContent += `${key},${label},${currentVal},${maxVal},${percent}%,${status}\n`;
       });
-      
+
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `doppio_inventory_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute("download", `doppio_inventory_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -4826,7 +4839,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     expInvPdfBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       const printWindow = window.open('', '_blank');
-      
+
       let rowsHTML = '';
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
@@ -4843,7 +4856,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           status = "Medium";
           statusStyle = "color: #ef6c00; font-weight: bold;";
         }
-        
+
         rowsHTML += `
           <tr>
             <td>${label}</td>
@@ -4854,7 +4867,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           </tr>
         `;
       });
-      
+
       printWindow.document.write(`
         <html>
         <head>
@@ -4938,17 +4951,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     expLowInvExcelBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       if (invExportMenu) invExportMenu.classList.remove('active');
-      
+
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += "Ingredient Key,Ingredient Label,Current Stock,Max Capacity,Stock Percentage,Status\n";
-      
+
       let count = 0;
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
         const currentVal = inventory[key];
         const percent = Math.round((currentVal / maxVal) * 100);
         const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
-        
+
         if (percent < itemThreshold) {
           const label = getLabelFromKey(key).replace(/,/g, '');
           const status = currentVal <= 0 ? "Out of Stock" : "Low Stock";
@@ -4956,15 +4969,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           count++;
         }
       });
-      
+
       if (count === 0) {
         csvContent += "N/A,All stock levels are currently healthy! No warnings.,N/A,N/A,N/A,Healthy\n";
       }
-      
+
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `doppio_low_inventory_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute("download", `doppio_low_inventory_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -4977,22 +4990,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     expLowInvPdfBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       if (invExportMenu) invExportMenu.classList.remove('active');
-      
+
       const printWindow = window.open('', '_blank');
       let rowsHTML = '';
       let count = 0;
-      
+
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
         const currentVal = inventory[key];
         const percent = Math.round((currentVal / maxVal) * 100);
         const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
-        
+
         if (percent < itemThreshold) {
           const label = getLabelFromKey(key);
           const status = currentVal <= 0 ? "Out of Stock" : "Low Stock";
           const statusStyle = "color: #c62828; font-weight: bold;";
-          
+
           rowsHTML += `
             <tr>
               <td>${label}</td>
@@ -5005,7 +5018,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           count++;
         }
       });
-      
+
       if (count === 0) {
         rowsHTML = `
           <tr>
@@ -5015,7 +5028,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           </tr>
         `;
       }
-      
+
       printWindow.document.write(`
         <html>
         <head>
@@ -5080,19 +5093,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (expSalesExcelBtn) {
     expSalesExcelBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
-      
+
       const fromVal = document.getElementById('reports-date-from') ? document.getElementById('reports-date-from').value : '';
       const toVal = document.getElementById('reports-date-to') ? document.getElementById('reports-date-to').value : '';
 
       let dateFrom = null;
       if (fromVal) {
         dateFrom = new Date(fromVal);
-        dateFrom.setHours(0,0,0,0);
+        dateFrom.setHours(0, 0, 0, 0);
       }
       let dateTo = null;
       if (toVal) {
         dateTo = new Date(toVal);
-        dateTo.setHours(0,0,0,0);
+        dateTo.setHours(0, 0, 0, 0);
       }
 
       const filteredBills = bills.filter(bill => {
@@ -5104,7 +5117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += "Order ID,Customer Name,Phone,Date & Time,Order Type,Payment Method,Subtotal,Discount,GST,Total,Items Ordered\n";
-      
+
       filteredBills.forEach(b => {
         if (!b) return;
         const guestName = (b.customerName || '').replace(/,/g, '');
@@ -5134,11 +5147,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       csvContent += `UPI / Online,₹${payUPI}\n`;
       csvContent += `Card,₹${payCard}\n`;
       csvContent += `Cash,₹${payCash}\n`;
-      
+
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `doppio_sales_report_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute("download", `doppio_sales_report_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -5151,19 +5164,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     expSalesPdfBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       const printWindow = window.open('', '_blank');
-      
+
       const fromVal = document.getElementById('reports-date-from') ? document.getElementById('reports-date-from').value : '';
       const toVal = document.getElementById('reports-date-to') ? document.getElementById('reports-date-to').value : '';
 
       let dateFrom = null;
       if (fromVal) {
         dateFrom = new Date(fromVal);
-        dateFrom.setHours(0,0,0,0);
+        dateFrom.setHours(0, 0, 0, 0);
       }
       let dateTo = null;
       if (toVal) {
         dateTo = new Date(toVal);
-        dateTo.setHours(0,0,0,0);
+        dateTo.setHours(0, 0, 0, 0);
       }
 
       const filteredBills = bills.filter(bill => {
@@ -5177,11 +5190,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const totalGST = filteredBills.reduce((sum, b) => sum + ((b && b.gst) || 0), 0);
       const totalDiscount = filteredBills.reduce((sum, b) => sum + ((b && b.discount) || 0), 0);
       const totalSubtotal = filteredBills.reduce((sum, b) => sum + ((b && b.subtotal) || 0), 0);
-      
+
       const payUPI = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'UPI').reduce((sum, b) => sum + b.total, 0);
       const payCard = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'CARD').reduce((sum, b) => sum + b.total, 0);
       const payCash = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'CASH').reduce((sum, b) => sum + b.total, 0);
-      
+
       let rowsHTML = '';
       filteredBills.forEach(b => {
         if (!b) return;
@@ -5205,10 +5218,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
       });
 
-      const rangeStr = fromVal || toVal 
+      const rangeStr = fromVal || toVal
         ? `Period: ${fromVal ? fromVal : 'Beginning'} to ${toVal ? toVal : 'Present'}`
         : 'Period: All-Time Sales Report';
-      
+
       printWindow.document.write(`
         <html>
         <head>
@@ -5314,7 +5327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 11. MENU EDITOR & PREVIEWS (TAB 5)
   // ==========================================
   const editorItemsGrid = document.getElementById('editor-items-grid');
-  
+
   function renderMenuEditor() {
     if (!editorItemsGrid) return;
     editorItemsGrid.innerHTML = '';
@@ -5370,7 +5383,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const nameLower = item.name.toLowerCase().trim();
           menu.splice(index, 1);
           localStorage.setItem('doppio_menu', JSON.stringify(menu));
-          
+
           // delete custom recipe
           delete customRecipes[nameLower];
           localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
@@ -5599,7 +5612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         crmData = JSON.parse(localCRM);
         if (!Array.isArray(crmData)) crmData = [];
-      } catch(err) {
+      } catch (err) {
         console.warn("Corrupted CRM data", err);
         crmData = [];
       }
@@ -5619,19 +5632,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderCRMTab() {
     if (!crmTableBody) return;
     crmTableBody.innerHTML = '';
-    
+
     const searchVal = (crmSearchInput ? crmSearchInput.value : '').trim().toLowerCase();
     const filtered = crmData.filter(c => {
-      return (c.name && c.name.toLowerCase().includes(searchVal)) || 
-             (c.phone && c.phone.includes(searchVal));
+      return (c.name && c.name.toLowerCase().includes(searchVal)) ||
+        (c.phone && c.phone.includes(searchVal));
     });
-    
+
     // Update crm counters
     if (document.getElementById('crm-total-members')) {
       document.getElementById('crm-total-members').textContent = crmData.length;
     }
     if (document.getElementById('crm-top-spender') && crmData.length > 0) {
-      const top = [...crmData].sort((a,b) => b.total_spend - a.total_spend)[0];
+      const top = [...crmData].sort((a, b) => b.total_spend - a.total_spend)[0];
       document.getElementById('crm-top-spender').textContent = `${top.name} (₹${Math.round(top.total_spend)})`;
     }
 
@@ -5651,7 +5664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       filtered.forEach(c => {
         const tier = getLoyaltyTier(c.total_spend);
         const lastVisitStr = c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-IN') : '-';
-        
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td style="font-weight:600; color:var(--primary-brand);">${c.name}</td>
@@ -5674,12 +5687,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!custNameInput || !custPhoneInput) return;
     const name = custNameInput.value.trim().toLowerCase();
     const phone = custPhoneInput.value.trim();
-    
+
     localStorage.setItem('doppio_cart_cust_name', custNameInput.value);
     localStorage.setItem('doppio_cart_cust_phone', custPhoneInput.value);
-    
+
     updateCartTotalsOnly();
-    
+
     if (loyaltyStatusBox) {
       loyaltyStatusBox.style.display = 'none';
     }
@@ -5747,7 +5760,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         SoundEffects.playClick();
         custNameInput.value = member.name;
         custPhoneInput.value = member.phone || '';
-        
+
         // Hide suggestions
         crmSuggestions.style.display = 'none';
         crmSuggestions.innerHTML = '';
@@ -5782,7 +5795,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const guestToggleBtn = document.getElementById('guest-toggle-btn');
   const takeawayFields = document.querySelector('.takeaway-fields');
   const guestToggleIndicator = document.getElementById('guest-toggle-indicator');
-  
+
   if (guestToggleBtn && takeawayFields) {
     guestToggleBtn.addEventListener('click', () => {
       if (takeawayFields.style.display === 'none') {
@@ -5802,7 +5815,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateCRMMember(name, phone, spendAmount) {
     let member = crmData.find(c => (phone && c.phone === phone) || c.name.toLowerCase() === name.toLowerCase());
     const nowISO = new Date().toISOString();
-    
+
     if (member) {
       member.visits += 1;
       member.total_spend = parseFloat((parseFloat(member.total_spend) + spendAmount).toFixed(2));
@@ -5844,26 +5857,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const taxDateTo = document.getElementById('tax-date-to');
   const taxFilterBtn = document.getElementById('tax-filter-btn');
   const taxResetBtn = document.getElementById('tax-reset-btn');
-  
+
   const taxNetSalesCard = document.getElementById('tax-net-sales-card');
   const taxCgstCard = document.getElementById('tax-cgst-card');
   const taxSgstCard = document.getElementById('tax-sgst-card');
   const taxTotalCollectedCard = document.getElementById('tax-total-collected-card');
   const taxAverageRateCard = document.getElementById('tax-average-rate-card');
-  
+
   const gstr1B2CVal = document.getElementById('gstr1-b2c-val');
   const gstr1CountVal = document.getElementById('gstr1-count-val');
   const gstr3bTaxableVal = document.getElementById('gstr3b-taxable-val');
   const gstr3bLiabilityVal = document.getElementById('gstr3b-liability-val');
   const taxLedgerCount = document.getElementById('tax-ledger-count');
-  
+
   const exportTaxJsonBtn = document.getElementById('export-tax-json-btn');
   const exportTaxCsvBtn = document.getElementById('export-tax-csv-btn');
   const exportTaxSqlBtn = document.getElementById('export-tax-sql-btn');
   const importTaxTriggerBtn = document.getElementById('import-tax-trigger-btn');
   const importTaxFileInput = document.getElementById('import-tax-file-input');
   const showSqlSchemaBtn = document.getElementById('show-sql-schema-btn');
-  
+
   const sqlSchemaModal = document.getElementById('sql-schema-modal');
   const closeSchemaModal = document.getElementById('close-schema-modal');
   const closeSchemaBtn = document.getElementById('close-schema-btn');
@@ -5874,27 +5887,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchVal = (taxSearchInput ? taxSearchInput.value : '').trim().toLowerCase();
     const fromVal = taxDateFrom ? taxDateFrom.value : '';
     const toVal = taxDateTo ? taxDateTo.value : '';
-    
+
     let fromDate = fromVal ? new Date(fromVal) : null;
-    if (fromDate) fromDate.setHours(0,0,0,0);
-    
+    if (fromDate) fromDate.setHours(0, 0, 0, 0);
+
     let toDate = toVal ? new Date(toVal) : null;
-    if (toDate) toDate.setHours(23,59,59,999);
-    
+    if (toDate) toDate.setHours(23, 59, 59, 999);
+
     return bills.filter(b => {
       if (!b) return false;
-      const matchesSearch = !searchVal || 
-                            (b.orderId && b.orderId.toLowerCase().includes(searchVal)) ||
-                            (b.customerName && b.customerName.toLowerCase().includes(searchVal)) ||
-                            (b.paymentMethod && b.paymentMethod.toLowerCase().includes(searchVal));
-      
+      const matchesSearch = !searchVal ||
+        (b.orderId && b.orderId.toLowerCase().includes(searchVal)) ||
+        (b.customerName && b.customerName.toLowerCase().includes(searchVal)) ||
+        (b.paymentMethod && b.paymentMethod.toLowerCase().includes(searchVal));
+
       if (!matchesSearch) return false;
       if (!fromDate && !toDate) return true;
-      
+
       const billDate = parseBillDate(b.dateTime);
       if (fromDate && billDate < fromDate) return false;
       if (toDate && billDate > toDate) return false;
-      
+
       return true;
     });
   }
@@ -5902,21 +5915,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderTaxTab() {
     if (!taxTableBody) return;
     taxTableBody.innerHTML = '';
-    
+
     const filteredBills = getActivePeriodBills();
-    
+
     // Sort reverse chronological
     filteredBills.sort((a, b) => {
       const db = b ? parseBillDate(b.dateTime) : new Date(0);
       const da = a ? parseBillDate(a.dateTime) : new Date(0);
       return db - da;
     });
-    
+
     let netSales = 0;
     let totalTax = 0;
     let cgst = 0;
     let sgst = 0;
-    
+
     if (filteredBills.length === 0) {
       taxTableBody.innerHTML = `
         <tr>
@@ -5933,20 +5946,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       filteredBills.forEach(b => {
         const taxable = b.subtotal - (b.discount || 0);
         netSales += taxable;
-        
+
         const tax = b.gst || 0;
         totalTax += tax;
         cgst += tax / 2;
         sgst += tax / 2;
-        
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td style="font-weight:700; color:var(--accent-caramel);">${b.orderId}</td>
           <td style="font-weight:600; color:var(--primary-brand);">${b.customerName || 'Walk-in Guest'}</td>
           <td style="font-size: 11px;">${b.dateTime}</td>
           <td>₹${taxable.toFixed(2)}</td>
-          <td style="color:#27ae60;">₹${(tax/2).toFixed(2)}</td>
-          <td style="color:#2980b9;">₹${(tax/2).toFixed(2)}</td>
+          <td style="color:#27ae60;">₹${(tax / 2).toFixed(2)}</td>
+          <td style="color:#2980b9;">₹${(tax / 2).toFixed(2)}</td>
           <td style="font-weight:600; color:var(--text-dark);">₹${tax.toFixed(2)}</td>
           <td style="font-weight:700; color:var(--primary-brand);">₹${(b.total || 0).toFixed(2)}</td>
           <td><span class="payment-badge ${b.paymentMethod ? b.paymentMethod.toLowerCase() : 'upi'}">${b.paymentMethod || 'UPI'}</span></td>
@@ -5954,16 +5967,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         taxTableBody.appendChild(tr);
       });
     }
-    
+
     // Update summary labels
     if (taxNetSalesCard) taxNetSalesCard.textContent = `₹${netSales.toFixed(2)}`;
     if (taxCgstCard) taxCgstCard.textContent = `₹${cgst.toFixed(2)}`;
     if (taxSgstCard) taxSgstCard.textContent = `₹${sgst.toFixed(2)}`;
     if (taxTotalCollectedCard) taxTotalCollectedCard.textContent = `₹${totalTax.toFixed(2)}`;
-    
+
     const avgRate = netSales > 0 ? (totalTax / netSales) * 100 : 18;
     if (taxAverageRateCard) taxAverageRateCard.textContent = `Avg Rate: ${avgRate.toFixed(1)}%`;
-    
+
     if (gstr1B2CVal) gstr1B2CVal.textContent = `₹${netSales.toFixed(2)}`;
     if (gstr1CountVal) gstr1CountVal.textContent = `${filteredBills.length} Invoices`;
     if (gstr3bTaxableVal) gstr3bTaxableVal.textContent = `₹${netSales.toFixed(2)}`;
@@ -6031,7 +6044,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     sql += `INSERT INTO public.doppio_bills ("orderId", "customerName", "dateTime", items, subtotal, gst, total, "paymentMethod") VALUES\n`;
-    
+
     const valueRows = data.map(b => {
       const orderId = b.orderId.replace(/'/g, "''");
       const customerName = (b.customerName || 'Walk-in Guest').replace(/'/g, "''");
@@ -6042,10 +6055,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const gst = b.gst || 0;
       const total = b.total || 0;
       const paymentMethod = (b.paymentMethod || 'UPI').replace(/'/g, "''");
-      
+
       return `('${orderId}', '${customerName}', '${dateTime}', '${itemsEscaped}', ${subtotal}, ${gst}, ${total}, '${paymentMethod}')`;
     });
-    
+
     sql += valueRows.join(',\n') + '\n';
     sql += `ON CONFLICT ("orderId") DO UPDATE SET\n`;
     sql += `  "customerName" = EXCLUDED."customerName",\n`;
@@ -6055,7 +6068,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     sql += `  gst = EXCLUDED.gst,\n`;
     sql += `  total = EXCLUDED.total,\n`;
     sql += `  "paymentMethod" = EXCLUDED."paymentMethod";\n`;
-    
+
     return sql;
   }
 
@@ -6064,11 +6077,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const lines = [];
     let row = [""];
     let inQuotes = false;
-    
+
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
-      const next = text[i+1];
-      
+      const next = text[i + 1];
+
       if (char === '"') {
         if (inQuotes && next === '"') {
           row[row.length - 1] += '"';
@@ -6089,16 +6102,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     if (row.length > 1 || row[0] !== '') {
       lines.push(row);
     }
-    
+
     if (lines.length === 0) return [];
-    
+
     const headers = lines[0].map(h => h.trim());
     const data = [];
-    
+
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i];
       if (values.length < headers.length) continue;
-      
+
       const obj = {};
       headers.forEach((header, index) => {
         let val = values[index];
@@ -6114,7 +6127,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     exportTaxJsonBtn.addEventListener('click', () => {
       SoundEffects.playClick();
       const activePeriodBills = getActivePeriodBills();
-      
+
       const exportData = activePeriodBills.map(b => ({
         orderId: b.orderId,
         customerName: b.customerName || 'Walk-in Guest',
@@ -6125,7 +6138,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         total: b.total,
         paymentMethod: b.paymentMethod
       }));
-      
+
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -6134,12 +6147,12 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       a.click();
     });
   }
-  
+
   if (exportTaxCsvBtn) {
     exportTaxCsvBtn.addEventListener('click', () => {
       SoundEffects.playClick();
       const activePeriodBills = getActivePeriodBills();
-      
+
       const exportData = activePeriodBills.map(b => ({
         orderId: b.orderId,
         customerName: b.customerName || 'Walk-in Guest',
@@ -6150,7 +6163,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         total: b.total,
         paymentMethod: b.paymentMethod
       }));
-      
+
       const csvContent = convertToCSV(exportData);
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -6160,12 +6173,12 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       a.click();
     });
   }
-  
+
   if (exportTaxSqlBtn) {
     exportTaxSqlBtn.addEventListener('click', () => {
       SoundEffects.playClick();
       const activePeriodBills = getActivePeriodBills();
-      
+
       const sqlContent = generateSQLScript(activePeriodBills);
       const blob = new Blob([sqlContent], { type: 'text/plain;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -6186,9 +6199,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         alert("No invoices found in the selected date range to export GSTR!");
         return;
       }
-      
+
       let csvContent = "Invoice Number,Invoice Date,Customer Name,Customer GSTIN,Place of Supply,Taxable Value,CGST (Rate 9%),SGST (Rate 9%),IGST,Total Invoice Value\n";
-      
+
       activePeriodBills.forEach(b => {
         const invNo = b.orderId;
         const invDate = b.dateTime ? b.dateTime.split(',')[0] : '';
@@ -6196,21 +6209,21 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         const totalVal = b.total || 0;
         const gstVal = b.gst || 0;
         const taxableVal = totalVal - gstVal;
-        
+
         const cgst = (gstVal / 2).toFixed(2);
         const sgst = (gstVal / 2).toFixed(2);
         const igst = (0).toFixed(2);
-        
+
         csvContent += `"${invNo}","${invDate}","${custName.replace(/"/g, '""')}","","Local (State)",${taxableVal.toFixed(2)},${cgst},${sgst},${igst},${totalVal.toFixed(2)}\n`;
       });
-      
+
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `gstr1_report_${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
-      
+
       showNotificationToast(`GSTR-1 report containing ${activePeriodBills.length} invoices exported!`);
     });
   }
@@ -6221,16 +6234,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       SoundEffects.playClick();
       importTaxFileInput.click();
     });
-    
+
     importTaxFileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      
+
       const reader = new FileReader();
       reader.onload = async (event) => {
         const text = event.target.result;
         let imported = [];
-        
+
         try {
           if (file.name.endsWith('.json')) {
             imported = JSON.parse(text);
@@ -6240,25 +6253,25 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
             alert('Unsupported file format! Please upload a JSON or CSV file.');
             return;
           }
-          
+
           if (!Array.isArray(imported)) {
             imported = [imported];
           }
-          
+
           if (imported.length === 0) {
             alert('The uploaded file is empty.');
             return;
           }
-          
+
           const first = imported[0];
           if (!first.orderId) {
             alert('Invalid data structure! The file must contain an "orderId" field.');
             return;
           }
-          
+
           let mergedCount = 0;
           let newCount = 0;
-          
+
           const parsedBills = imported.map(b => {
             let parsedItems = b.items;
             if (typeof parsedItems === 'string') {
@@ -6268,7 +6281,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                 parsedItems = [{ name: parsedItems, qty: 1, price: parseFloat(b.total) || 0 }];
               }
             }
-            
+
             return {
               orderId: b.orderId,
               customerName: b.customerName || 'Walk-in Guest',
@@ -6283,7 +6296,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
               orderType: b.orderType || 'Takeaway'
             };
           });
-          
+
           parsedBills.forEach(newBill => {
             const index = bills.findIndex(b => b.orderId === newBill.orderId);
             if (index !== -1) {
@@ -6294,9 +6307,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
               newCount++;
             }
           });
-          
+
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
-          
+
           if (supabaseClient && navigator.onLine) {
             const formattedSupabase = parsedBills.map(b => ({
               orderId: b.orderId,
@@ -6308,19 +6321,19 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
               total: b.total,
               paymentMethod: b.paymentMethod
             }));
-            
+
             supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'orderId' })
               .then(() => console.log('Imported bills successfully synced to Supabase.'))
               .catch(err => console.error('Supabase import sync error:', err));
           }
-          
+
           SoundEffects.playSuccess();
           alert(`Successfully imported backup!\nNew Invoices: ${newCount}\nUpdated/Merged: ${mergedCount}`);
-          
+
           renderTaxTab();
           if (typeof renderBills === 'function') renderBills();
           updateHeaderSummaryStats();
-          
+
         } catch (err) {
           console.error('Import error:', err);
           alert(`Failed to parse file: ${err.message}`);
@@ -6340,7 +6353,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   }
   if (closeSchemaModal) closeSchemaModal.addEventListener('click', () => sqlSchemaModal.classList.remove('active'));
   if (closeSchemaBtn) closeSchemaBtn.addEventListener('click', () => sqlSchemaModal.classList.remove('active'));
-  
+
   if (copySqlSchemaBtn) {
     copySqlSchemaBtn.addEventListener('click', () => {
       SoundEffects.playClick();
@@ -6358,7 +6371,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   function applyFeatureToggles() {
     const loggedInUser = sessionStorage.getItem('logged_in_user');
     const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
-    
+
     if (loggedInRole === 'superadmin') {
       // Dynamically update brand name to RESTO Suite for Super-Admin
       const brandNameEl = document.getElementById('sidebar-brand-name');
@@ -6392,7 +6405,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (saLink) saLink.style.display = 'flex';
       const gmLink = document.getElementById('sidebar-gateway-monitor-link');
       if (gmLink) gmLink.style.display = 'flex';
-      
+
       const sidebarLinks = document.querySelectorAll('.sidebar-link');
       sidebarLinks.forEach(link => {
         const tabId = link.getAttribute('data-tab');
@@ -6407,7 +6420,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           link.style.display = 'none';
         }
       });
-      
+
       const headerCenter = document.querySelector('.header-center-metrics');
       if (headerCenter) headerCenter.style.display = 'none';
       const notificationsBell = document.getElementById('notifications-bell');
@@ -6416,20 +6429,20 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (profileBtn) profileBtn.style.display = 'none';
       const shiftPill = document.getElementById('header-shift-pill');
       if (shiftPill) shiftPill.style.display = 'none';
-      
+
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       const saTab = document.getElementById('super-admin-tab');
       if (saTab) saTab.classList.add('active');
-      
+
       const tabTitle = document.getElementById('tab-title');
       if (tabTitle) tabTitle.textContent = "SaaS Super-Admin Console";
       const tabSubtitle = document.getElementById('tab-subtitle');
       if (tabSubtitle) tabSubtitle.textContent = "Manage client subscriptions, features, and system access";
-      
+
       renderSuperAdminTab();
       return;
     }
-    
+
     if (!loggedInUser) {
       window.location.href = 'login.html';
       return;
@@ -6447,7 +6460,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const featureFlags = businessProfile.featureFlags || {};
 
     // Update dynamic user pill in sidebar
-        // Dynamically white-label the logo branding in the sidebar header
+    // Dynamically white-label the logo branding in the sidebar header
     const brandNameEl = document.getElementById('sidebar-brand-name');
     const brandTypeEl = document.getElementById('sidebar-brand-type');
     const mobileBrandTitleEl = document.getElementById('mobile-brand-title');
@@ -6512,14 +6525,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const notificationsBell = document.getElementById('notifications-bell');
     const profileBtn = document.getElementById('open-profile-btn');
     const shiftPill = document.getElementById('header-shift-pill');
-    
+
     const isOperationalRole = loggedInRole === 'kitchen' || loggedInRole === 'customer_display';
     if (headerCenter) headerCenter.style.display = isOperationalRole ? 'none' : 'flex';
-    
+
     // Notifications bell
     const isBellVisible = !isOperationalRole && (featureFlags['notifications'] !== false);
     if (notificationsBell) notificationsBell.style.display = isBellVisible ? 'flex' : 'none';
-    
+
     if (profileBtn) profileBtn.style.display = (loggedInRole === 'admin') ? 'flex' : 'none'; // Only Admin can open settings!
     if (shiftPill) {
       const isShiftEnabled = businessProfile.shiftEnabled === true;
@@ -6533,7 +6546,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (!tabId) return;
       const isAllowedByRole = rolePermissions[loggedInRole].includes(tabId);
       const isEnabledByFlag = featureFlags[tabId] !== false; // enabled by default
-      
+
       const isAllowedBySaaS = allowedTabs.includes(tabId);
       if (isAllowedByRole && isEnabledByFlag && isAllowedBySaaS) {
         link.style.display = 'flex';
@@ -6819,40 +6832,40 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   function openProfileModal() {
     if (!profileModal) return;
-    
+
     // Start polling gateway connection status
     startWhatsAppPolling();
-    
+
     document.getElementById('profile-name-input').value = businessProfile.name;
     document.getElementById('profile-address-input').value = businessProfile.address;
     document.getElementById('profile-phone-input').value = businessProfile.phone;
-    
+
     document.getElementById('profile-gst-enabled').checked = businessProfile.gstEnabled;
     document.getElementById('profile-gst-rate').value = businessProfile.gstRate || 18;
     document.getElementById('profile-loyalty-enabled').checked = businessProfile.loyaltyEnabled;
     document.getElementById('profile-loyalty-rate').value = businessProfile.loyaltyRate || 10;
-    
+
     const lockEl = document.getElementById('profile-lock-enabled');
     if (lockEl) lockEl.checked = businessProfile.passcodeLockEnabled || false;
-    
+
     // Load collapse sidebar setting
     const collapseSidebarEl = document.getElementById('profile-collapse-sidebar');
     if (collapseSidebarEl) collapseSidebarEl.checked = businessProfile.collapseSidebar || false;
 
     document.getElementById('profile-sound-enabled').checked = businessProfile.soundEnabled !== false;
-    
+
     const whatsappEl = document.getElementById('profile-whatsapp-enabled');
     if (whatsappEl) whatsappEl.checked = businessProfile.whatsappEnabled !== false;
 
     const waGatewayEnabledEl = document.getElementById('profile-wa-gateway-enabled');
     if (waGatewayEnabledEl) waGatewayEnabledEl.checked = businessProfile.whatsappGatewayEnabled || false;
-    
+
     const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
     if (waGatewayUrlEl) waGatewayUrlEl.value = businessProfile.whatsappGatewayUrl || '';
-    
+
     const waGatewayTokenEl = document.getElementById('profile-wa-gateway-token');
     if (waGatewayTokenEl) waGatewayTokenEl.value = businessProfile.whatsappGatewayToken || '';
-    
+
     // Module Feature Toggles
     document.getElementById('profile-crm-enabled').checked = businessProfile.crmEnabled !== false;
     document.getElementById('profile-tax-enabled').checked = businessProfile.taxEnabled !== false;
@@ -6909,16 +6922,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     // Shift Control Settings
     const shiftEnabledEl = document.getElementById('profile-shift-enabled');
     if (shiftEnabledEl) shiftEnabledEl.checked = businessProfile.shiftEnabled || false;
-    
+
     const floatEl = document.getElementById('profile-shift-default-float');
     if (floatEl) floatEl.value = businessProfile.shiftDefaultFloat || 2000;
-    
+
     const maxDrawerEl = document.getElementById('profile-shift-max-drawer');
     if (maxDrawerEl) maxDrawerEl.value = businessProfile.shiftMaxDrawer || 5000;
-    
+
     const posLockEl = document.getElementById('profile-shift-pos-lock');
     if (posLockEl) posLockEl.checked = businessProfile.shiftPosLock !== false;
-    
+
     profileModal.classList.add('active');
     updateReceiptSimulator();
   }
@@ -6958,7 +6971,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       stopWhatsAppPolling();
     });
   }
-  
+
   if (cancelProfileBtn) {
     cancelProfileBtn.addEventListener('click', () => {
       profileModal.classList.remove('active');
@@ -6975,7 +6988,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   }
 
   const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
-  
+
   // Quick gateway selector button click listeners
   const waSelectLocalBtn = document.getElementById('wa-select-local');
   if (waSelectLocalBtn) {
@@ -7012,7 +7025,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   if (waLogoutBtn) {
     waLogoutBtn.addEventListener('click', () => {
       if (!confirm('Are you sure you want to unlink the current WhatsApp account?')) return;
-      
+
       SoundEffects.playClick();
       let url = waGatewayUrlEl ? waGatewayUrlEl.value.trim() : 'http://localhost:3000';
       if (!url) url = 'http://localhost:3000';
@@ -7145,7 +7158,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       }
 
       const reader = new FileReader();
-      reader.onload = async function(evt) {
+      reader.onload = async function (evt) {
         try {
           const data = JSON.parse(evt.target.result);
           if (data.bills && data.inventory && data.menu) {
@@ -7442,7 +7455,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           } else {
             alert("Invalid backup file format! Missing core POS tables.");
           }
-        } catch(err) {
+        } catch (err) {
           console.error("Backup restoration failed:", err);
           alert("Restore failed! File is corrupted or not valid JSON.");
         }
@@ -7456,27 +7469,27 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const simName = document.getElementById('receipt-preview-store-name');
     const simAddr = document.getElementById('receipt-preview-address');
     const simPhone = document.getElementById('receipt-preview-phone');
-    
+
     if (simName) simName.textContent = (profileNameInput ? profileNameInput.value : '') || 'DOPPIO CAFE';
     if (simAddr) simAddr.textContent = (profileAddrInput ? profileAddrInput.value : '') || 'London Street, Nagpur';
     if (simPhone) simPhone.textContent = `Ph: ${(profilePhoneInput ? profilePhoneInput.value : '') || '+91 91300 03177'}`;
 
     const taxEnabled = profileGstCheck ? profileGstCheck.checked : true;
     const taxRate = parseFloat(profileGstRate ? profileGstRate.value : 18) || 0;
-    
+
     const loyaltyEnabled = profileLoyaltyCheck ? profileLoyaltyCheck.checked : true;
     const loyaltyValue = parseFloat(profileLoyaltyRate ? profileLoyaltyRate.value : 10) || 0;
-    
+
     const subtotal = 259.00;
     let discount = 0;
     if (loyaltyEnabled) {
       discount = subtotal * (loyaltyValue / 100);
     }
-    
+
     const taxableSubtotal = subtotal - discount;
     const taxAmount = taxEnabled ? taxableSubtotal * (taxRate / 100) : 0;
     const total = taxableSubtotal + taxAmount;
-    
+
     const simSummary = document.getElementById('receipt-preview-summary');
     if (simSummary) {
       let html = `Subtotal: ₹${subtotal.toFixed(2)}<br>`;
@@ -7505,10 +7518,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const crmEnabled = document.getElementById('profile-crm-enabled').checked;
       const taxEnabled = document.getElementById('profile-tax-enabled').checked;
       const soundEnabled = document.getElementById('profile-sound-enabled').checked;
-      
+
       const whatsappEl = document.getElementById('profile-whatsapp-enabled');
       const whatsappEnabled = whatsappEl ? whatsappEl.checked : true;
-      
+
       const lockEl = document.getElementById('profile-lock-enabled');
       const passcodeLockEnabled = lockEl ? lockEl.checked : false;
 
@@ -7536,11 +7549,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         featureFlags[`${t}-tab`] = el ? el.checked : true;
       });
 
-      businessProfile = { 
-        name, address, phone, 
-        gstEnabled, gstRate, 
-        loyaltyEnabled, loyaltyRate, 
-        passcodeLockEnabled, 
+      businessProfile = {
+        name, address, phone,
+        gstEnabled, gstRate,
+        loyaltyEnabled, loyaltyRate,
+        passcodeLockEnabled,
         crmEnabled, taxEnabled,
         soundEnabled,
         whatsappEnabled,
@@ -7682,14 +7695,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   // ==========================================
   const SoundEffects = {
     audioCtx: null,
-    
+
     init() {
       if (businessProfile.soundEnabled === false) return;
       if (!this.audioCtx) {
         this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
     },
-    
+
     playPop() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -7698,24 +7711,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(400, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.1);
-      
+
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
     },
-    
+
     playClick() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -7724,24 +7737,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(550, ctx.currentTime);
       osc.frequency.setValueAtTime(220, ctx.currentTime + 0.03);
-      
+
       gain.gain.setValueAtTime(0.08, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.05);
     },
-    
+
     playSuccess() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -7751,7 +7764,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const playTone = (freq, delay, duration) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -7764,11 +7777,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         osc.start(ctx.currentTime + delay);
         osc.stop(ctx.currentTime + delay + duration);
       };
-      
-      playTone(523.25, 0, 0.4); 
-      playTone(659.25, 0.08, 0.4); 
-      playTone(783.99, 0.16, 0.4); 
-      playTone(987.77, 0.24, 0.5); 
+
+      playTone(523.25, 0, 0.4);
+      playTone(659.25, 0.08, 0.4);
+      playTone(783.99, 0.16, 0.4);
+      playTone(987.77, 0.24, 0.5);
     },
 
     playRemove() {
@@ -7779,24 +7792,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(250, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.15);
-      
+
       gain.gain.setValueAtTime(0.06, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
     },
-    
+
     playAlert() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -7806,20 +7819,20 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(140, ctx.currentTime);
       osc.frequency.setValueAtTime(130, ctx.currentTime + 0.08);
-      
+
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.2);
     }
@@ -7887,7 +7900,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   function handleLockKeypadClick(val) {
     if (!lockPasscodeInput) return;
-    
+
     if (val === 'clear') {
       enteredLockPin = '';
       lockPasscodeInput.value = '';
@@ -7901,7 +7914,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         lockPasscodeInput.value = enteredLockPin;
         SoundEffects.playClick();
         if (lockPasscodeError) lockPasscodeError.textContent = '';
-        
+
         if (enteredLockPin.length === 4) {
           setTimeout(verifyLockPIN, 150);
         }
@@ -7925,7 +7938,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         lockPasscodeInput.value = '';
         lockPasscodeInput.focus();
       }
-      
+
       // Shake animation effect
       const lockCard = document.querySelector('.lock-card');
       if (lockCard) {
@@ -7976,17 +7989,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       stopSaaSGatewayPolling();
     }
 
-    // Clear cart if navigating away from POS
-    if (tabId === 'pos-tab' && cart.length > 0) {
-      SoundEffects.playRemove();
-      cart = [];
-      const custNameInput = document.getElementById('cust-name');
-      const custPhoneInput = document.getElementById('cust-phone');
-      if (custNameInput) custNameInput.value = '';
-      if (custPhoneInput) custPhoneInput.value = '';
-      if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-      renderCart();
-    }
+    // Cart is intentionally NOT cleared when switching tabs.
+    // Cart contents persist until the "Print Bill" action is completed.
 
     // Sync mobile bottom nav active state
     mobileNavLinks.forEach(l => {
@@ -8167,7 +8171,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     sortedBills.forEach(bill => {
-      const initials = bill.customerName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      const initials = bill.customerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       const payClass = bill.paymentMethod ? bill.paymentMethod.toLowerCase() : 'upi';
 
       const card = document.createElement('div');
@@ -8330,7 +8334,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       try {
         draftOrders = JSON.parse(localDrafts);
         if (!Array.isArray(draftOrders)) draftOrders = [];
-      } catch(err) {
+      } catch (err) {
         console.warn("Corrupted draft orders", err);
         draftOrders = [];
       }
@@ -8409,7 +8413,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
       const draftName = prompt('Enter a name or Table number to hold this order:', defaultDraftName);
       if (draftName === null) return; // Cancelled
-      
+
       const trimmedName = draftName.trim() || defaultDraftName;
 
       // Calculate totals
@@ -8458,9 +8462,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       }
 
       SoundEffects.playSuccess();
-      
-      // Clear cart
+
+      // Clear cart (holding the order moves it to drafts, so cart should be freed)
       cart = [];
+      clearCartState();
       if (custNameInput) custNameInput.value = '';
       if (custPhoneInput) custPhoneInput.value = '';
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
@@ -8485,7 +8490,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const draftCard = document.createElement('div');
       draftCard.className = 'draft-card';
       draftCard.style.cssText = 'border: 1px solid rgba(252, 128, 25, 0.2); border-radius: 10px; padding: 12px; background: #fff; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; margin-bottom: 8px;';
-      
+
       const itemCount = d.items.reduce((sum, i) => sum + i.qty, 0);
       const timeStr = new Date(d.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
       const dateStr = new Date(d.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
@@ -8522,11 +8527,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         if (!draft) return;
 
         SoundEffects.playClick();
-        
+
         // 1. Set cart and inputs
         cart = draft.items;
         selectedPaymentMethod = draft.paymentMethod || 'UPI';
-        
+
         const custNameInput = document.getElementById('cust-name');
         const custPhoneInput = document.getElementById('cust-phone');
         if (custNameInput) custNameInput.value = draft.customerName || '';
@@ -8555,10 +8560,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         }
 
         renderCart();
-        
+
         // Close modal
         if (draftsModal) draftsModal.classList.remove('active');
-        
+
         alert(`Resumed order "${draft.draftName}"!`);
       });
     });
@@ -8572,7 +8577,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
         if (confirm(`Are you sure you want to delete draft "${draft.draftName}"?`)) {
           SoundEffects.playRemove();
-          
+
           draftOrders = draftOrders.filter(d => d.draftId !== id);
           localStorage.setItem('doppio_draft_orders', JSON.stringify(draftOrders));
           updateDraftsBadge();
@@ -8616,22 +8621,22 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   // Update mobile cart badge count and prices inside renderCart()
   const originalRenderCart = renderCart;
-  renderCart = function() {
+  renderCart = function () {
     originalRenderCart();
-    
+
     const mCount = document.getElementById('mobile-cart-count');
     const mTotal = document.getElementById('mobile-cart-total');
     const mobileFloatingCart = document.getElementById('mobile-floating-cart');
-    
+
     if (mCount && mTotal) {
       const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
       mCount.textContent = totalQty;
-      
+
       const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
       const taxRate = businessProfile.gstEnabled ? (businessProfile.gstRate || 18) : 0;
       const gst = Math.round(subtotal * (taxRate / 100));
       mTotal.textContent = `₹${subtotal + gst}`;
-      
+
       if (mobileFloatingCart) {
         if (totalQty > 0 && window.innerWidth <= 600) {
           mobileFloatingCart.style.setProperty('display', 'flex', 'important');
@@ -8651,28 +8656,28 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         customAddonModal.classList.remove('active');
         SoundEffects.playClick();
       }
-      
+
       // Admin Pin Modal
       const adminPinModal = document.getElementById('admin-pin-modal');
       if (adminPinModal && adminPinModal.classList.contains('active')) {
         closeAdminPinModal();
         SoundEffects.playClick();
       }
-      
+
       // Business Profile Modal
       const profileModal = document.getElementById('profile-modal');
       if (profileModal && profileModal.classList.contains('active')) {
         profileModal.classList.remove('active');
         SoundEffects.playClick();
       }
-      
+
       // SQL Schema Modal
       const sqlSchemaModal = document.getElementById('sql-schema-modal');
       if (sqlSchemaModal && sqlSchemaModal.classList.contains('active')) {
         sqlSchemaModal.classList.remove('active');
         SoundEffects.playClick();
       }
-      
+
       // Mobile POS Cart Sidebar Drawer
       const posCartSidebar = document.getElementById('pos-cart-sidebar');
       if (posCartSidebar && posCartSidebar.classList.contains('active')) {
@@ -8697,15 +8702,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   // Automatically toggles 'no-scroll' class on body when any drawer/modal is active
   const modalScrollLockObserver = new MutationObserver(() => {
-    const isAnyOverlayActive = 
-      document.querySelector('.modal-backdrop.active') || 
-      document.querySelector('.more-nav-sheet.active') || 
+    const isAnyOverlayActive =
+      document.querySelector('.modal-backdrop.active') ||
+      document.querySelector('.more-nav-sheet.active') ||
       document.querySelector('.pos-cart-sidebar.active') ||
       document.querySelector('.menu-editor-form-panel.active');
-    
+
     // Temporarily disconnect the observer to avoid infinite loop when changing body class
     modalScrollLockObserver.disconnect();
-    
+
     if (isAnyOverlayActive) {
       if (!document.body.classList.contains('no-scroll')) {
         document.body.classList.add('no-scroll');
@@ -8715,7 +8720,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         document.body.classList.remove('no-scroll');
       }
     }
-    
+
     // Re-observe class changes
     modalScrollLockObserver.observe(document.body, {
       attributes: true,
@@ -8732,13 +8737,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   });
 
   // Global callback for native Android online/offline monitoring updates
-  window.updateAndroidOfflineStatus = function(isOffline) {
+  window.updateAndroidOfflineStatus = function (isOffline) {
     console.log("Android network status update: isOffline =", isOffline);
     const badge = document.getElementById('network-status-badge');
     const mobileBadge = document.getElementById('mobile-network-status-badge');
     const text = document.getElementById('supabase-sync-text');
     const offlineBanner = document.getElementById('offline-banner');
-    
+
     if (badge) {
       const dot = badge.querySelector('.status-dot');
       if (isOffline) {
@@ -8757,7 +8762,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         if (dot) dot.className = 'status-dot green';
       }
     }
-    
+
     // High visibility banner toggle
     if (offlineBanner) {
       offlineBanner.style.display = isOffline ? 'flex' : 'none';
@@ -8791,11 +8796,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     } else {
       document.body.classList.remove('dark-theme');
     }
-    
+
     // Update icons
     const iconClass = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
     const iconColor = isDark ? '#F1C40F' : 'var(--primary-brand)';
-    
+
     if (themeToggleBtn) {
       const icon = themeToggleBtn.querySelector('i');
       if (icon) {
@@ -8830,7 +8835,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   // ==========================================
   // MICRO-INTERACTION BUMP EFFECTS
   // ==========================================
-  window.triggerCartBump = function() {
+  window.triggerCartBump = function () {
     const targets = [
       document.querySelector('.cart-header-title'),
       document.getElementById('cart-total'),
@@ -8855,12 +8860,12 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   const cancelReceiptPreviewBtn = document.getElementById('cancel-receipt-preview-btn');
   const confirmReceiptCheckoutBtn = document.getElementById('confirm-receipt-checkout-btn');
 
-  window.openReceiptPreview = function(shouldPrint) {
+  window.openReceiptPreview = function (shouldPrint) {
     if (cart.length === 0) {
       alert('Cart is empty! Add items before checking out.');
       return;
     }
-    
+
     // Validate stock levels first before opening preview
     let sufficientStock = true;
     let missingItem = '';
@@ -8886,32 +8891,32 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     pendingCheckoutPrint = shouldPrint;
-    
+
     // Construct the proposed bill object to show in receipt preview
     const custNameInput = document.getElementById('cust-name');
     const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
     const orderNum = document.getElementById('order-num').value;
     const billIdToSave = editingBillId || orderNum;
-    
+
     const isGstEnabled = businessProfile.gstEnabled !== false;
     const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
     const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
     const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-    
+
     let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const phoneInput = document.getElementById('cust-phone');
     const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-    
+
     let loyaltyDiscount = 0;
     let matchedCustomer = null;
     if (phoneVal || custName) {
       matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
     }
-    
+
     if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
       loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
     }
-    
+
     const taxableAmount = subtotal - loyaltyDiscount;
     const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
     const total = taxableAmount + gst;
@@ -8960,24 +8965,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
     const borderDouble = '='.repeat(32);
     const borderSingle = '-'.repeat(32);
-    
+
     let txt = '';
     txt += borderDouble + '\n';
     txt += centerText32(businessProfile.name) + '\n';
     txt += centerText32(businessProfile.address) + '\n';
     txt += centerText32(businessProfile.phone) + '\n';
     txt += borderDouble + '\n\n';
-    
+
     const leftBill = `Bill: ${proposedBill.orderId}`;
     const rightPay = proposedBill.paymentMethod || 'Cash';
     txt += leftBill + rightPay.padStart(32 - leftBill.length, ' ') + '\n';
     txt += `Date: ${proposedBill.dateTime}\n`;
     txt += `Guest: ${proposedBill.customerName}\n\n`;
-    
+
     txt += borderSingle + '\n';
     txt += formatRow32('Item', 'Qty', 'Amt') + '\n';
     txt += borderSingle + '\n';
-    
+
     proposedBill.items.forEach(item => {
       let displayName = item.name;
       if (item.size && item.size !== 'Small') {
@@ -8992,7 +8997,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         txt += `  * Note: ${item.notes}\n`;
       }
     });
-    
+
     txt += borderSingle + '\n';
     txt += formatDouble32('Subtotal', proposedBill.subtotal.toString()) + '\n';
     if (businessProfile.gstEnabled !== false) {
@@ -9010,7 +9015,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     if (receiptPreviewContainer) {
       receiptPreviewContainer.innerHTML = `<pre style="margin:0; font-weight:600; font-family:'Courier New', monospace; white-space:pre; color:#000;">${txt}</pre>`;
     }
-    
+
     if (confirmReceiptCheckoutBtn) {
       if (shouldPrint) {
         confirmReceiptCheckoutBtn.innerHTML = '<i class="fa-solid fa-print"></i> Confirm & Print';
@@ -9027,7 +9032,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     SoundEffects.playPop();
   };
 
-  window.closeReceiptPreview = function() {
+  window.closeReceiptPreview = function () {
     if (receiptPreviewModal) {
       receiptPreviewModal.classList.remove('active');
     }
@@ -9035,7 +9040,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   if (closeReceiptPreviewBtn) closeReceiptPreviewBtn.addEventListener('click', window.closeReceiptPreview);
   if (cancelReceiptPreviewBtn) cancelReceiptPreviewBtn.addEventListener('click', window.closeReceiptPreview);
-  
+
   if (confirmReceiptCheckoutBtn) {
     confirmReceiptCheckoutBtn.addEventListener('click', () => {
       window.closeReceiptPreview();
@@ -9049,13 +9054,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   document.addEventListener('keydown', (e) => {
     const active = document.activeElement;
     const isCard = active && active.classList.contains('pos-item-card');
-    
+
     // Alt+D Toggle theme
     if (e.altKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
       toggleTheme();
     }
-    
+
     // Alt+C Clear cart
     if (e.altKey && e.key.toLowerCase() === 'c') {
       e.preventDefault();
@@ -9076,19 +9081,19 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const printBtn = document.getElementById('checkout-print-btn');
       if (printBtn) printBtn.click();
     }
-    
+
     // Spatial grid navigation
     if (isCard) {
       const cards = Array.from(document.querySelectorAll('#pos-items-grid .pos-item-card'));
       const index = cards.indexOf(active);
       if (index === -1) return;
-      
+
       const grid = document.getElementById('pos-items-grid');
       const gridWidth = grid.offsetWidth;
       const cardWidth = active.offsetWidth;
       const gap = 20; // grid gap is 20px
       const cols = Math.max(1, Math.floor((gridWidth + gap) / (cardWidth + gap)));
-      
+
       if (e.key === 'ArrowRight') {
         e.preventDefault();
         const next = cards[index + 1] || cards[0];
@@ -9163,7 +9168,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   // ==========================================
   // SALES POPULARITY TRACKER ACTIONS
   // ==========================================
-  window.trackItemPopularity = function(items) {
+  window.trackItemPopularity = function (items) {
     const changedItems = [];
     items.forEach(item => {
       const key = item.name.toLowerCase().trim();
@@ -9202,7 +9207,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   const toggleSplitPayBtn = document.getElementById('toggle-split-pay-btn');
   const singlePayContainer = document.getElementById('single-pay-container');
   const splitPayContainer = document.getElementById('split-pay-container');
-  
+
   const splitUpiInput = document.getElementById('split-pay-upi');
   const splitCashInput = document.getElementById('split-pay-cash');
   const splitCardInput = document.getElementById('split-pay-card');
@@ -9211,19 +9216,19 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   function calculateSplitBalance() {
     if (!isSplitPaymentActive) return;
-    
+
     // Get final order total directly from computed state
     let total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const isGstEnabled = businessProfile.gstEnabled !== false;
     const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
     const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
     const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-    
+
     const custNameInput = document.getElementById('cust-name');
     const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
     const phoneInput = document.getElementById('cust-phone');
     const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-    
+
     let loyaltyDiscount = 0;
     let matchedCustomer = null;
     if (phoneVal || custName) {
@@ -9232,7 +9237,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
       loyaltyDiscount = Math.round(total * (loyaltyDiscountPercentage / 100));
     }
-    
+
     const taxableAmount = total - loyaltyDiscount;
     const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
     const finalTotal = taxableAmount + gst;
@@ -9240,7 +9245,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const upi = parseInt(splitUpiInput.value) || 0;
     const cash = parseInt(splitCashInput.value) || 0;
     const card = parseInt(splitCardInput.value) || 0;
-    
+
     const remaining = finalTotal - (upi + cash + card);
 
     if (splitRemainingVal) {
@@ -9248,7 +9253,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         splitStatusLabel.textContent = "Remaining:";
         splitRemainingVal.textContent = `₹${remaining}`;
         splitRemainingVal.style.color = 'var(--danger-color)';
-        
+
         // Disable checkout buttons to prevent saving an unbalanced split bill
         if (checkoutSaveBtn) checkoutSaveBtn.disabled = true;
         if (checkoutPrintBtn) checkoutPrintBtn.disabled = true;
@@ -9258,7 +9263,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         splitStatusLabel.textContent = "Overpaid:";
         splitRemainingVal.textContent = `₹${Math.abs(remaining)}`;
         splitRemainingVal.style.color = '#F39C12';
-        
+
         // Disable checkout buttons
         if (checkoutSaveBtn) checkoutSaveBtn.disabled = true;
         if (checkoutPrintBtn) checkoutPrintBtn.disabled = true;
@@ -9268,7 +9273,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         splitStatusLabel.textContent = "Balanced:";
         splitRemainingVal.textContent = "₹0.00";
         splitRemainingVal.style.color = 'var(--success-color)';
-        
+
         // Enable checkout buttons
         if (checkoutSaveBtn) checkoutSaveBtn.disabled = false;
         if (checkoutPrintBtn) checkoutPrintBtn.disabled = false;
@@ -9289,19 +9294,19 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         toggleSplitPayBtn.innerHTML = '<i class="fa-solid fa-arrows-split-up-and-left"></i> Single Pay';
         if (singlePayContainer) singlePayContainer.style.display = 'none';
         if (splitPayContainer) splitPayContainer.style.display = 'flex';
-        
+
         // Pre-fill UPI input with the entire total to make checkout fast
         let total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
         const isGstEnabled = businessProfile.gstEnabled !== false;
         const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
         const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
         const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-        
+
         const custNameInput = document.getElementById('cust-name');
         const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
         const phoneInput = document.getElementById('cust-phone');
         const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-        
+
         let loyaltyDiscount = 0;
         let matchedCustomer = null;
         if (phoneVal || custName) {
@@ -9311,17 +9316,17 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           loyaltyDiscount = Math.round(total * (loyaltyDiscountPercentage / 100));
         }
         const finalTotal = total - loyaltyDiscount + (isGstEnabled ? Math.round((total - loyaltyDiscount) * (gstPercentage / 100)) : 0);
-        
+
         if (splitUpiInput) splitUpiInput.value = finalTotal;
         if (splitCashInput) splitCashInput.value = 0;
         if (splitCardInput) splitCardInput.value = 0;
-        
+
         calculateSplitBalance();
       } else {
         toggleSplitPayBtn.innerHTML = '<i class="fa-solid fa-arrows-split-up-and-left"></i> Split Pay';
         if (singlePayContainer) singlePayContainer.style.display = 'flex';
         if (splitPayContainer) splitPayContainer.style.display = 'none';
-        
+
         // Restore checkout buttons to enabled state
         if (checkoutSaveBtn) checkoutSaveBtn.disabled = false;
         if (checkoutPrintBtn) checkoutPrintBtn.disabled = false;
@@ -9389,7 +9394,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
 
   // Expose activeShift internationally for checkout tagging
-  window.getActiveShiftId = function() {
+  window.getActiveShiftId = function () {
     return activeShift ? activeShift.shiftId : null;
   };
 
@@ -9397,7 +9402,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   function evaluateShiftStatusUI() {
     const isShiftEnabled = businessProfile.shiftEnabled === true;
     const isLockActive = businessProfile.shiftPosLock !== false;
-    
+
     const lockOverlay = document.getElementById('shift-lock-overlay');
     const headerPill = document.getElementById('header-shift-pill');
     const shiftStatus = document.getElementById('header-shift-status');
@@ -9438,10 +9443,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   // Expected Cash calculation
   function getDrawerCashExpected() {
     if (!activeShift) return 0;
-    
+
     // Starting float
     const float = parseFloat(activeShift.openingFloat) || 0;
-    
+
     // Cash Sales
     const shiftBills = bills.filter(b => b && b.shiftId === activeShift.shiftId);
     let cashSalesTotal = 0;
@@ -9511,7 +9516,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     shiftOpenForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       SoundEffects.playSuccess();
-      
+
       const cashierName = document.getElementById('shift-cashier-select').value;
       const openingFloat = parseFloat(document.getElementById('shift-opening-float-input').value) || 0;
 
@@ -9560,17 +9565,17 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   // Active shift actions details modal
   const shiftDetailsModal = document.getElementById('shift-details-modal');
   const closeShiftDetailsModal = document.getElementById('close-shift-details-modal');
-  
+
   function openShiftDetailsModal() {
     if (!shiftDetailsModal || !activeShift) return;
-    
+
     document.getElementById('details-cashier-name').textContent = activeShift.cashierName;
     document.getElementById('details-opened-at').textContent = new Date(activeShift.openedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date(activeShift.openedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
     document.getElementById('details-opening-float').textContent = `₹${activeShift.openingFloat}`;
-    
+
     const expected = getDrawerCashExpected();
     document.getElementById('details-drawer-cash').textContent = `₹${expected}`;
-    
+
     const maxLimit = businessProfile.shiftMaxDrawer || 5000;
     const detailsMaxLimitEl = document.getElementById('details-max-limit-info');
     if (detailsMaxLimitEl) {
@@ -9590,7 +9595,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   const closeShiftActionModal = document.getElementById('close-shift-action-modal');
   const cancelShiftActionBtn = document.getElementById('cancel-shift-action-btn');
   const shiftActionForm = document.getElementById('shift-action-form');
-  
+
   const btnPayout = document.getElementById('btn-shift-payout');
   const btnDrop = document.getElementById('btn-shift-drop');
 
@@ -9682,15 +9687,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (!activeShift) return;
       SoundEffects.playClick();
       shiftDetailsModal.classList.remove('active');
-      
+
       // Calculate active shift summaries
       const floatVal = parseFloat(activeShift.openingFloat) || 0;
       const sessionBills = bills.filter(b => b.shiftId === activeShift.shiftId);
-      
+
       let cashSales = 0;
       let upiSales = 0;
       let cardSales = 0;
-      
+
       sessionBills.forEach(b => {
         if (b.paymentMethod === 'Cash') {
           cashSales += parseFloat(b.total) || 0;
@@ -9724,7 +9729,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       document.getElementById('close-summary-payouts').textContent = `₹${payouts}`;
       document.getElementById('close-summary-drops').textContent = `₹${drops}`;
       document.getElementById('close-summary-expected').textContent = `₹${expected}`;
-      
+
       document.getElementById('shift-actual-cash-input').value = '';
       document.getElementById('variance-alert-row').style.display = 'none';
       document.getElementById('shift-notes-input').value = '';
@@ -9741,12 +9746,12 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const expectedText = document.getElementById('close-summary-expected').textContent.replace('₹', '');
       const expected = parseFloat(expectedText) || 0;
       const variance = actual - expected;
-      
+
       const varianceEl = document.getElementById('close-summary-variance');
       const alertRow = document.getElementById('variance-alert-row');
-      
+
       if (alertRow) alertRow.style.display = 'flex';
-      
+
       if (varianceEl) {
         if (variance === 0) {
           varianceEl.textContent = `₹0.00 (Balanced)`;
@@ -9909,7 +9914,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 `;
 
     reportContent.textContent = html;
-    
+
     // Save report reference globally for printing triggers
     window.activeZReportData = html;
 
@@ -9923,7 +9928,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
   if (closeShiftAuditModal) closeShiftAuditModal.addEventListener('click', () => document.getElementById('shift-audit-modal').classList.remove('active'));
   if (closeShiftAuditBtn) closeShiftAuditBtn.addEventListener('click', () => document.getElementById('shift-audit-modal').classList.remove('active'));
-  
+
   if (printShiftAuditBtn) {
     printShiftAuditBtn.addEventListener('click', () => {
       SoundEffects.playClick();
@@ -9960,7 +9965,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       if (!activeShift) return;
       SoundEffects.playClick();
       shiftDetailsModal.classList.remove('active');
-      
+
       const sessionEvents = shiftEvents.filter(e => e.shiftId === activeShift.shiftId);
       if (sessionEvents.length === 0) {
         alert('No manual cash adjustments logged for this shift yet!');
@@ -9971,7 +9976,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       let logText = `Manual cash transactions for active shift:\n`;
       sessionEvents.forEach((e, idx) => {
         const time = new Date(e.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-        logText += `${idx+1}. [${time}] ${e.eventType}: ₹${e.amount} (${e.reason})\n`;
+        logText += `${idx + 1}. [${time}] ${e.eventType}: ₹${e.amount} (${e.reason})\n`;
       });
       alert(logText);
       openShiftDetailsModal();
@@ -10063,13 +10068,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const mock = getMockPendingQrOrders();
       localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(mock));
       return mock;
-    } catch(e) {
+    } catch (e) {
       return [];
     }
   })();
   let qrRevenueToday = parseFloat(localStorage.getItem('doppio_qr_revenue_today')) || 0;
   let completedQrOrdersCount = parseInt(localStorage.getItem('doppio_completed_qr_orders_count')) || 0;
-  
+
   // Tables state: EMPTY, ORDERING, PENDING, SERVED
   let tablesState = (() => {
     try {
@@ -10080,12 +10085,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         }
         return parsed;
       }
-      const initial = activeTenantId 
+      const initial = activeTenantId
         ? { 1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" }
         : { 1: "EMPTY", 2: "EMPTY", 3: "ORDERING", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
       localStorage.setItem('doppio_tables_state', JSON.stringify(initial));
       return initial;
-    } catch(e) {
+    } catch (e) {
       return activeTenantId
         ? { 1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" }
         : { 1: "EMPTY", 2: "EMPTY", 3: "ORDERING", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
@@ -10125,12 +10130,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
     if (e.data.type === 'NEW_QR_ORDER') {
       const newOrder = e.data.order;
-      
+
       // Prevent duplicates in queue
       if (!pendingQrOrders.some(o => o.orderId === newOrder.orderId)) {
         pendingQrOrders.push(newOrder);
         localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-        
+
         // Transition table status to PENDING checkout
         if (newOrder.tableNumber && newOrder.tableNumber !== 'Takeaway') {
           tablesState[newOrder.tableNumber] = "PENDING";
@@ -10148,7 +10153,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         tablesState[tbl] = "ORDERING";
         localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
         renderTablesMap();
-        
+
         // Timeout back to EMPTY after 35 seconds of no activity
         setTimeout(() => {
           if (tablesState[tbl] === "ORDERING") {
@@ -10166,19 +10171,19 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const frequencies = [261.63, 329.63, 392.00, 523.25]; // C4 -> E4 -> G4 -> C5
-      
+
       frequencies.forEach((freq, idx) => {
         setTimeout(() => {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.connect(gain);
           gain.connect(audioCtx.destination);
-          
+
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
           gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-          
+
           osc.start();
           osc.stop(audioCtx.currentTime + 0.25);
         }, idx * 120);
@@ -10230,7 +10235,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const listContainer = document.getElementById('notifications-list-container');
     const badgeEl = document.getElementById('bell-badge');
     const mobileBadgeEl = document.getElementById('mobile-bell-badge');
-    
+
     if (!listContainer) return;
     listContainer.innerHTML = '';
 
@@ -10269,15 +10274,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     filtered.forEach(n => {
       const item = document.createElement('div');
       item.style.marginBottom = '6px';
-      
+
       const itemBg = n.isRead ? 'transparent' : 'rgba(252, 128, 25, 0.04)';
       const itemBorder = n.isRead ? 'rgba(28, 28, 28,0.05)' : 'rgba(252, 128, 25, 0.15)';
-      
+
       let iconHtml = '<i class="fa-solid fa-circle-info"></i>';
       if (n.type === 'order') iconHtml = '<i class="fa-solid fa-qrcode"></i>';
       else if (n.type === 'inventory') iconHtml = '<i class="fa-solid fa-triangle-exclamation" style="color:var(--warning-color);"></i>';
       else if (n.type === 'shift') iconHtml = '<i class="fa-solid fa-clock"></i>';
-      
+
       item.innerHTML = `
         <div class="notification-row-item" data-id="${n.id}" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 8px; background: ${itemBg}; border: 1px solid ${itemBorder}; cursor: pointer; transition: all 0.2s;">
           <div style="font-size: 14px; color: var(--accent-caramel); padding-top: 2px; width: 18px; text-align: center;">
@@ -10305,7 +10310,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           renderNotifications();
         });
       }
-      
+
       item.querySelector('.notification-row-item').addEventListener('click', () => {
         n.isRead = true;
         localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
@@ -10378,7 +10383,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       type = 'shift';
       title = 'Shift Event';
     }
-    
+
     if (type === 'order') {
       // Notify kitchen, waiters, and admin
       addSystemNotification(title, msg, 'kitchen', type);
@@ -10425,9 +10430,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     toast.style.animation = 'none';
 
     toast.innerHTML = `<i class="${iconClass}" style="color: ${iconColor}; margin-right: 8px;"></i> <span style="font-family: var(--font-body); font-weight:700; color: #fff;">${msg}</span>`;
-    
+
     document.body.appendChild(toast);
-    
+
     // Slide in
     setTimeout(() => {
       toast.style.transform = 'translateX(-50%) translateY(0)';
@@ -10442,10 +10447,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
   function updateQrStatsHeaders() {
     if (qrRevenueTodayEl) qrRevenueTodayEl.textContent = `₹${qrRevenueToday.toFixed(2)}`;
-    
+
     const pendingCount = pendingQrOrders.length;
     if (pendingQrOrdersCount) pendingQrOrdersCount.textContent = `${pendingCount} Order${pendingCount !== 1 ? 's' : ''}`;
-    
+
     // Update active badges
     if (pendingCount > 0) {
       if (liveQrBadge) {
@@ -10485,7 +10490,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const state = tablesState[tableId] || "EMPTY";
       const card = document.createElement('div');
       card.className = `table-card state-${state.toLowerCase()}`;
-      
+
       let stateLabel = "Clean & Empty";
       let statusClass = "state-empty";
       let iconColor = "var(--text-muted)";
@@ -10510,10 +10515,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         
         <div class="table-card-actions">
           <button class="table-card-btn generate-qr" data-table="${tableId}" title="Generate Scannable Table QR"><i class="fa-solid fa-qrcode"></i> QR Link</button>
-          ${state === 'SERVED' ? 
-            `<button class="table-card-btn clear-table" data-table="${tableId}" style="background: rgba(46,204,113,0.06); border-color: rgba(46,204,113,0.15); color: #27ae60;" title="Served & Clean Table"><i class="fa-solid fa-broom"></i> Clean</button>` : 
-            `<button class="table-card-btn simulate-scan" data-table="${tableId}" title="Simulate mobile scan link"><i class="fa-solid fa-mobile-screen"></i> Scan</button>`
-          }
+          ${state === 'SERVED' ?
+          `<button class="table-card-btn clear-table" data-table="${tableId}" style="background: rgba(46,204,113,0.06); border-color: rgba(46,204,113,0.15); color: #27ae60;" title="Served & Clean Table"><i class="fa-solid fa-broom"></i> Clean</button>` :
+          `<button class="table-card-btn simulate-scan" data-table="${tableId}" title="Simulate mobile scan link"><i class="fa-solid fa-mobile-screen"></i> Scan</button>`
+        }
         </div>
       `;
 
@@ -10572,7 +10577,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     pendingQrOrders.forEach(order => {
       const card = document.createElement('div');
       card.className = 'qr-order-queue-card';
-      
+
       const itemsListStr = order.items.map(item => `
         <div class="qr-card-item-row">
           <span>${item.name} x${item.qty}</span>
@@ -10792,7 +10797,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   // Open Table QR Viewer Modal (Robust & Defensive Upgrade by Antigravity)
   function openTableQRViewerModal(tableNum) {
     console.log(`[Doppio POS] Opening QR Viewer Modal for Table ${tableNum}`);
-    
+
     if (!qrViewerModal) {
       console.error("[Doppio POS] qrViewerModal element not found in DOM! Checking ID 'qr-viewer-modal'");
       alert("Error: 'qr-viewer-modal' container element is missing in dashboard.html!");
@@ -10804,22 +10809,22 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     } catch (e) {
       console.warn("Sound effects clicked play bypassed", e);
     }
-    
+
     const lockedLink = `${window.location.origin}/index.html?table=${tableNum}`;
     const formattedTitle = `Table 0${tableNum} QR Ordering Station`;
-    
+
     if (qrViewerTitle) {
       qrViewerTitle.textContent = formattedTitle;
     } else {
       console.warn("[Doppio POS] 'qr-viewer-title' element not found in DOM.");
     }
-    
+
     if (qrPrintTableNum) {
       qrPrintTableNum.textContent = `TABLE 0${tableNum}`;
     } else {
       console.warn("[Doppio POS] 'qr-print-table-num' element not found in DOM.");
     }
-    
+
     if (qrViewerLinkLbl) {
       qrViewerLinkLbl.textContent = lockedLink;
     } else {
@@ -10842,7 +10847,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     } else {
       console.warn("[Doppio POS] 'btn-print-table-qr' button not found in DOM.");
     }
-    
+
     if (btnSimulateQrScan) {
       btnSimulateQrScan.setAttribute('data-link', lockedLink);
     } else {
@@ -10862,7 +10867,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(link)}`;
 
       SoundEffects.playClick();
-      
+
       const printWindow = window.open('', '_blank', 'width=450,height=600');
       printWindow.document.write(`
         <html>
@@ -10941,9 +10946,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
   // Autofill WhatsApp number when preview opens
   const originalOpenReceiptPreview = window.openReceiptPreview;
-  window.openReceiptPreview = function(shouldPrint) {
+  window.openReceiptPreview = function (shouldPrint) {
     if (originalOpenReceiptPreview) originalOpenReceiptPreview(shouldPrint);
-    
+
     // Toggle visibility based on whether WhatsApp is enabled in settings
     if (whatsappSection) {
       whatsappSection.style.display = businessProfile.whatsappEnabled !== false ? 'block' : 'none';
@@ -10962,12 +10967,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         alert("Please enter a customer's WhatsApp number!");
         return;
       }
-      
+
       phoneNum = phoneNum.replace(/\D/g, '');
       if (phoneNum.length === 10) {
         phoneNum = "91" + phoneNum;
       }
-      
+
       if (phoneNum.length < 10) {
         alert("Invalid phone number! Enter a 10-digit mobile number.");
         return;
@@ -10983,7 +10988,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
       const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
       const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-      
+
       let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
       let loyaltyDiscount = 0;
       let matchedCustomer = null;
@@ -10993,7 +10998,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
         loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
       }
-      
+
       const taxableAmount = subtotal - loyaltyDiscount;
       const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
       const total = taxableAmount + gst;
@@ -11032,19 +11037,19 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
     // Retrieve daily sales ledger
     const totalBillsCount = bills.length;
-    
+
     // Simulate daily average active days (minimum 2 days to prevent massive single-sale skewing)
-    const activeDays = Math.max(2, Math.ceil(totalBillsCount / 4)); 
+    const activeDays = Math.max(2, Math.ceil(totalBillsCount / 4));
 
     const consumption = {};
-    
+
     // Calculate total ingredient depletion from all historical bills
     bills.forEach(bill => {
       if (!bill.items) return;
       // Handle array or string-JSON parsing
       let billItems = bill.items;
       if (typeof billItems === 'string') {
-        try { billItems = JSON.parse(billItems); } catch(e) { billItems = []; }
+        try { billItems = JSON.parse(billItems); } catch (e) { billItems = []; }
       }
       if (Array.isArray(billItems)) {
         billItems.forEach(item => {
@@ -11082,20 +11087,20 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const label = getLabelFromKey(topIngredient);
     const emoji = categoryIconsMap[topIngredient] || '🥛';
     const unit = topIngredient.includes('beans') || topIngredient.includes('powder') || topIngredient.includes('ice') || topIngredient.includes('fries') || topIngredient.includes('veggies') ? 'g' : 'ml';
-    
+
     aiTopMaterial.innerHTML = `${label} (${emoji})`;
-    
+
     // Display average daily consumption velocity
     const roundedVel = topBurnVelocity.toFixed(1);
     aiBurnRate.textContent = `${roundedVel} ${unit} / day`;
 
     // Calculate days remaining
     const currentStock = inventory[topIngredient] !== undefined ? inventory[topIngredient] : defaultInventory[topIngredient];
-    
+
     if (topBurnVelocity > 0) {
       const remainingDays = currentStock / topBurnVelocity;
       aiCriticalDays.textContent = `${label} depletes in ${remainingDays.toFixed(1)} days!`;
-      
+
       if (remainingDays <= 2) {
         aiCriticalDays.style.color = 'var(--danger-color)';
         aiCriticalDays.style.fontWeight = '800';
@@ -11117,7 +11122,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   if (aiAutoReorderBtn) {
     aiAutoReorderBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
-      
+
       // Refill all items to 100% capacity and sync batches & Supabase
       Object.keys(defaultInventory).forEach(key => {
         const maxVal = defaultInventory[key];
@@ -11149,10 +11154,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           supabaseClient.from('doppio_inventory').update({ current: maxVal }).eq('key', key).then();
         }
       });
-      
+
       localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
       localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
-      
+
       renderInventory();
       checkLowStockAlerts();
       updateAIForecast();
@@ -11163,7 +11168,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
   // Hook AI updates to standard rendering
   const originalRenderInventory = renderInventory;
-  renderInventory = function() {
+  renderInventory = function () {
     originalRenderInventory();
     updateAIForecast();
   };
@@ -11194,7 +11199,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       }
 
       addP2PLog("Pinging all local client terminal nodes...");
-      
+
       setTimeout(() => {
         SoundEffects.playSuccess();
         addP2PLog(`<span style="color:#27ae60;">✔ Reply from [KITCHEN-KDS-1] (192.168.1.102) - Latency: 2ms</span>`);
@@ -11207,12 +11212,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   }
 
   // Broadcast function when checkout finishes
-  window.broadcastP2POrder = function(orderId, total) {
+  window.broadcastP2POrder = function (orderId, total) {
     const isEnabled = p2pEnabledInput ? p2pEnabledInput.checked : true;
     if (!isEnabled) return;
 
     addP2PLog(`Broadcasting new Order [${orderId}] to local sync grid...`);
-    
+
     setTimeout(() => {
       addP2PLog(`[KDS-TERMINAL] Acknowledged: Added order ${orderId} (₹${total}) to kitchen screen.`);
     }, 600);
@@ -11220,22 +11225,22 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
   // Wrap performCheckout to broadcast sync
   const originalPerformCheckout = performCheckout;
-  performCheckout = function(shouldPrint) {
+  performCheckout = function (shouldPrint) {
     const orderNum = document.getElementById('order-num').value;
     const billIdToSave = editingBillId || orderNum;
-    
+
     // Compute total for logging
     let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const isGstEnabled = businessProfile.gstEnabled !== false;
     const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
     const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
     const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-    
+
     const custNameInput = document.getElementById('cust-name');
     const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
     const phoneInput = document.getElementById('cust-phone');
     const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-    
+
     let loyaltyDiscount = 0;
     let matchedCustomer = null;
     if (phoneVal || custName) {
@@ -11264,7 +11269,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       tableNumber: 'ONLINE',
       status: 'Accepted'
     };
-    
+
     // Add locally to pendingQrOrders so KDS picks it up!
     pendingQrOrders.push(mockKdsOrder);
     localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
@@ -11289,7 +11294,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     }
 
     originalPerformCheckout(shouldPrint);
-    
+
     // Broadcast P2P order
     window.broadcastP2POrder(billIdToSave, total);
   };
@@ -11316,7 +11321,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       e.preventDefault();
       excelDropzone.style.borderColor = 'rgba(252, 128, 25, 0.25)';
       excelDropzone.style.background = 'rgba(252, 128, 25, 0.01)';
-      
+
       if (e.dataTransfer.files.length > 0) {
         excelFileInput.files = e.dataTransfer.files;
         handleExcelUpload(e.dataTransfer.files[0]);
@@ -11332,13 +11337,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
   function handleExcelUpload(file) {
     if (!file) return;
-    
+
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        
+
         let importedCount = 0;
         let recipeCount = 0;
 
@@ -11380,12 +11385,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         workbook.SheetNames.forEach(sheetName => {
           const worksheet = workbook.Sheets[sheetName];
           const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
+
           let currentCategory = sheetName;
-          
+
           rows.forEach(row => {
             if (!row || row.length === 0) return;
-            
+
             const filledCells = row.filter(c => c !== null && c !== undefined && c !== '');
             if (filledCells.length === 1 && typeof row[0] === 'string' && !row[0].endsWith(' ')) {
               currentCategory = row[0].trim();
@@ -11394,11 +11399,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
             if (row[0] && typeof row[0] === 'string') {
               const itemName = row[0].trim();
-              
-              let price = 250; 
+
+              let price = 250;
               let description = `Spreadsheet Imported Premium ${itemName}`;
               let ingredientStartIndex = 1;
-              
+
               // Detect pricing and description column (Made by Antigravity)
               const val1 = Number(row[1]);
               if (row[1] !== undefined && !isNaN(val1) && typeof row[1] !== 'string') {
@@ -11418,7 +11423,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
                   ingredientStartIndex = 2;
                 }
               }
-              
+
               const ingredients = {};
               for (let i = ingredientStartIndex; i < row.length; i += 2) {
                 if (i + 1 < row.length) {
@@ -11470,7 +11475,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
         localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
         localStorage.setItem('doppio_menu', JSON.stringify(menu));
-        
+
         SoundEffects.playSuccess();
         if (excelDropText) {
           excelDropText.innerHTML = `<span style="color:#27ae60;"><i class="fa-solid fa-circle-check"></i> Onboarded Successful!</span>`;
@@ -11482,7 +11487,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         renderPOSItems();
         renderInventory();
         checkLowStockAlerts();
-        
+
         alert(`Excel Import Success! Onboarded ${importedCount} new menu items and configured ${recipeCount} dynamic recipes instantly.`);
 
       } catch (err) {
@@ -11502,20 +11507,20 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const kdsCountPending = document.getElementById('kds-count-pending');
     const kdsCountPreparing = document.getElementById('kds-count-preparing');
     const kdsCountReady = document.getElementById('kds-count-ready');
-    
+
     if (!kdsGrid) return;
     kdsGrid.innerHTML = '';
-    
+
     const pendingCount = pendingQrOrders.filter(o => o.status === 'Pending Review').length;
     const preparingCount = pendingQrOrders.filter(o => o.status === 'Accepted').length;
     const readyCount = pendingQrOrders.filter(o => o.status === 'Ready').length;
-    
+
     if (kdsCountPending) kdsCountPending.textContent = `${pendingCount} Pending`;
     if (kdsCountPreparing) kdsCountPreparing.textContent = `${preparingCount} Cooking`;
     if (kdsCountReady) kdsCountReady.textContent = `${readyCount} Ready to Serve`;
-    
+
     const cookingOrders = pendingQrOrders.filter(o => o.status === 'Accepted');
-    
+
     if (cookingOrders.length === 0) {
       kdsGrid.innerHTML = `
         <div class="premium-empty-state" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; width:100%; box-sizing: border-box; background: var(--white); border-radius: var(--border-radius-md); border: 1px solid rgba(28, 28, 28,0.05);">
@@ -11526,12 +11531,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       `;
       return;
     }
-    
+
     cookingOrders.forEach(order => {
       const card = document.createElement('div');
       const typeLower = (order.orderType || 'Takeaway').toLowerCase();
       card.className = `kds-card type-${typeLower === 'dine-in' ? 'dine-in' : typeLower === 'swiggy' ? 'swiggy' : typeLower === 'zomato' ? 'zomato' : 'takeaway'}`;
-      
+
       // Calculate elapsed minutes
       let elapsedMins = 0;
       if (order.dateTime) {
@@ -11542,19 +11547,19 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           elapsedMins = Math.max(0, Math.floor(elapsedMs / 60000));
         }
       }
-      
+
       // Build items list
       const itemsHtml = order.items.map((item, idx) => {
         const checkedClass = item.isDone ? 'checked' : '';
         const checkedAttr = item.isDone ? 'checked' : '';
-        
+
         const customizations = [];
         if (item.size && item.size !== 'Regular') customizations.push(item.size);
         if (item.sugar && item.sugar !== 'Regular') customizations.push(item.sugar);
         if (item.ice && item.ice !== 'Regular') customizations.push(item.ice);
         if (item.toppings && item.toppings.length > 0) customizations.push(item.toppings.join(', '));
         const descHtml = customizations.length > 0 ? `<span class="kds-item-desc">${customizations.join(' | ')}</span>` : '';
-        
+
         return `
           <div class="kds-item-row ${checkedClass}" data-item-idx="${idx}">
             <input type="checkbox" ${checkedAttr}>
@@ -11566,7 +11571,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           </div>
         `;
       }).join('');
-      
+
       card.innerHTML = `
         <div class="kds-card-header">
           <div class="kds-card-title">
@@ -11585,7 +11590,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           </button>
         </div>
       `;
-      
+
       // Checkbox click listener
       card.querySelectorAll('.kds-item-row input[type="checkbox"]').forEach(chk => {
         chk.addEventListener('change', (e) => {
@@ -11599,7 +11604,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             order.items[itemIdx].isDone = false;
           }
           localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-          
+
           if (supabaseClient) {
             supabaseClient.from('doppio_pending_orders')
               .update({ items: JSON.stringify(order.items) })
@@ -11607,16 +11612,16 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           }
         });
       });
-      
+
       // Bump button listener
       card.querySelector('.kds-bump-btn').addEventListener('click', () => {
         bumpKDSTicket(order.orderId);
       });
-      
+
       kdsGrid.appendChild(card);
     });
   }
-  
+
   function parseCustomLocaleString(str) {
     try {
       // Handles localized strings like '2/6/2026, 6:50:28 AM'
@@ -11628,43 +11633,43 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           if (!isNaN(date.getTime())) return date.getTime();
         }
       }
-    } catch(e) {}
+    } catch (e) { }
     return null;
   }
-  
+
   function bumpKDSTicket(orderId) {
     const order = pendingQrOrders.find(o => o.orderId === orderId);
     if (!order) return;
-    
+
     // Play kitchen bump chime
     SoundEffects.playSuccess();
-    
+
     order.status = 'Ready';
     localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-    
+
     if (supabaseClient) {
       supabaseClient.from('doppio_pending_orders')
         .update({ status: 'Ready' })
         .eq('orderId', orderId).then();
     }
-    
+
     renderKDSTab();
     renderTokensTab();
     showNotificationToast(`Order ${orderId} prepared! Bumped to Pickup Screen.`);
   }
-  
+
   function renderTokensTab() {
     const preparingList = document.getElementById('tokens-preparing-list');
     const readyList = document.getElementById('tokens-ready-list');
-    
+
     if (!preparingList || !readyList) return;
-    
+
     preparingList.innerHTML = '';
     readyList.innerHTML = '';
-    
+
     const preparingOrders = pendingQrOrders.filter(o => o.status === 'Accepted');
     const readyOrders = pendingQrOrders.filter(o => o.status === 'Ready');
-    
+
     if (preparingOrders.length === 0) {
       preparingList.innerHTML = '<span style="font-size:11px; color:var(--text-muted); grid-column:1/-1; text-align:center; padding:20px;">No preparing tokens.</span>';
     } else {
@@ -11676,7 +11681,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         preparingList.appendChild(badge);
       });
     }
-    
+
     if (readyOrders.length === 0) {
       readyList.innerHTML = '<span style="font-size:11px; color:var(--text-muted); grid-column:1/-1; text-align:center; padding:20px;">No ready tokens.</span>';
     } else {
@@ -11685,39 +11690,39 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         badge.className = 'token-badge ready';
         badge.style.cursor = 'pointer';
         badge.title = 'Click to Pick Up & Archive';
-        
+
         const shortToken = order.orderId.includes('-') ? order.orderId.split('-').slice(-1)[0] : order.orderId;
         badge.innerHTML = `
           <span>${shortToken}</span>
           <div style="font-size: 8px; font-weight:800; color:var(--success-color); margin-top:2px;">READY</div>
         `;
-        
+
         badge.addEventListener('click', () => {
           dismissToken(order.orderId);
         });
-        
+
         readyList.appendChild(badge);
       });
     }
   }
-  
+
   function dismissToken(orderId) {
     SoundEffects.playClick();
-    
+
     pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== orderId);
     localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-    
+
     if (supabaseClient) {
       supabaseClient.from('doppio_pending_orders')
         .delete()
         .eq('orderId', orderId).then();
     }
-    
+
     renderKDSTab();
     renderTokensTab();
     showNotificationToast(`Token ${orderId} picked up & archived!`);
   }
-  
+
   // Expose these functions globally so other files can call them easily
   window.renderKDSTab = renderKDSTab;
   window.renderTokensTab = renderTokensTab;
@@ -11810,18 +11815,18 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const totalEl = document.getElementById('table-session-modal-total');
     const startBtn = document.getElementById('table-session-modal-start-order-btn');
     const billBtn = document.getElementById('table-session-modal-bill-btn');
-    
+
     if (!modal) return;
-    
+
     title.textContent = `Table 0${tableId} Details`;
     const state = tablesState[tableId] || "EMPTY";
-    
+
     let stateLabel = "Clean & Empty";
     if (state === "ORDERING") stateLabel = "Occupied (Ordering)";
     else if (state === "PENDING") stateLabel = "Checkout Pending!";
     else if (state === "SERVED") stateLabel = "Eating / Served";
     status.textContent = stateLabel;
-    
+
     status.className = "status-indicator-badge";
     if (state === "EMPTY") {
       status.style.background = "rgba(46, 204, 113, 0.08)";
@@ -11833,11 +11838,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       status.style.background = "rgba(231, 76, 60, 0.08)";
       status.style.color = "var(--danger-color)";
     }
-    
+
     const items = tableCarts[tableId] || [];
     itemsList.innerHTML = '';
     let subtotal = 0;
-    
+
     if (items.length === 0) {
       itemsList.innerHTML = `<div style="font-size: 11px; text-align: center; color: var(--text-muted); padding: 20px 0;">No active items in session.</div>`;
       startBtn.innerHTML = `<i class="fa-solid fa-cart-plus"></i> Start Order`;
@@ -11861,21 +11866,21 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       billBtn.style.display = 'block';
     }
     totalEl.textContent = `₹${subtotal.toFixed(2)}`;
-    
+
     const newStartBtn = startBtn.cloneNode(true);
     startBtn.parentNode.replaceChild(newStartBtn, startBtn);
     newStartBtn.addEventListener('click', () => {
       modal.style.display = 'none';
       startTableSessionEdit(tableId);
     });
-    
+
     const newBillBtn = billBtn.cloneNode(true);
     billBtn.parentNode.replaceChild(newBillBtn, billBtn);
     newBillBtn.addEventListener('click', () => {
       modal.style.display = 'none';
       closeAndBillTable(tableId);
     });
-    
+
     modal.style.display = 'flex';
   }
 
@@ -11884,21 +11889,21 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     activeTableSession = tableId;
     sessionStorage.setItem('doppio_takeaway_cart_backup', JSON.stringify(cart));
     cart = tableCarts[tableId] || [];
-    
+
     if ((tablesState[tableId] || "EMPTY") === "EMPTY") {
       tablesState[tableId] = "ORDERING";
       localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
       syncActiveTableSessionToSupabase(tableId);
     }
-    
+
     const banner = document.getElementById('table-session-banner');
     const bannerTitle = document.getElementById('table-session-title');
     if (banner) banner.style.display = 'flex';
     if (bannerTitle) bannerTitle.textContent = `Table 0${tableId} Dine-In Order Active`;
-    
+
     const posLink = document.querySelector('[data-tab="pos-tab"]');
     if (posLink) posLink.click();
-    
+
     renderCart();
     renderTablesMap();
   }
@@ -11908,7 +11913,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const items = tableCarts[tableId] || [];
     const total = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const orderId = `TABLE-${tableId}`;
-    
+
     supabaseClient.from('doppio_pending_orders')
       .upsert({
         orderId: orderId,
@@ -11935,10 +11940,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       alert("Cannot send empty cart to KDS!");
       return;
     }
-    
+
     tablesState[tableId] = "SERVED";
     localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
-    
+
     const orderId = `TABLE-${tableId}-${Date.now().toString().slice(-4)}`;
     const tableOrder = {
       orderId: orderId,
@@ -11955,13 +11960,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       tableNumber: `0${tableId}`,
       status: 'Accepted'
     };
-    
+
     const existingIdx = pendingQrOrders.findIndex(o => o.tableNumber === `0${tableId}` && o.status === 'Accepted');
     if (existingIdx !== -1) {
       pendingQrOrders[existingIdx].items = [...items];
       pendingQrOrders[existingIdx].subtotal = tableOrder.subtotal;
       pendingQrOrders[existingIdx].total = tableOrder.total;
-      
+
       if (supabaseClient) {
         supabaseClient.from('doppio_pending_orders')
           .update({
@@ -11995,18 +12000,18 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         supabaseClient.from('doppio_pending_orders').delete().eq('orderId', `TABLE-${tableId}`).then();
       }
     }
-    
+
     localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
     SoundEffects.playSuccess();
     showNotificationToast(`Sent Table 0${tableId} order to KDS!`);
-    
+
     const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
     cart = backup ? JSON.parse(backup) : [];
     activeTableSession = null;
-    
+
     const banner = document.getElementById('table-session-banner');
     if (banner) banner.style.display = 'none';
-    
+
     renderCart();
     renderTablesMap();
     if (typeof renderKDSTab === 'function') renderKDSTab();
@@ -12019,25 +12024,25 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       alert("No items in this table's session to bill!");
       return;
     }
-    
+
     cart = [...items];
     localStorage.setItem('doppio_cart', JSON.stringify(cart));
-    
+
     const nameInput = document.getElementById('cust-name');
     if (nameInput) nameInput.value = `Table 0${tableId}`;
-    
+
     tablesState[tableId] = "PENDING";
     localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
-    
+
     if (activeTableSession === tableId) {
       activeTableSession = null;
       const banner = document.getElementById('table-session-banner');
       if (banner) banner.style.display = 'none';
     }
-    
+
     const posLink = document.querySelector('[data-tab="pos-tab"]');
     if (posLink) posLink.click();
-    
+
     renderCart();
     renderTablesMap();
   }
@@ -12049,22 +12054,22 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const payrollEmpSelect = document.getElementById('payroll-emp-select');
     const leaveApprovalsList = document.getElementById('leave-approvals-list');
     const shiftRosterList = document.getElementById('shift-roster-list');
-    
+
     const validEmployees = employees.filter(e => e && e.id && e.name);
-    
+
     if (leaveEmpSelect) {
       leaveEmpSelect.innerHTML = validEmployees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
     }
     if (payrollEmpSelect) {
       payrollEmpSelect.innerHTML = validEmployees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
     }
-    
+
     if (empDirectoryList) {
       empDirectoryList.innerHTML = validEmployees.map(emp => {
         const casualLeft = emp.leaves ? emp.leaves.casual : 15;
         const sickLeft = emp.leaves ? emp.leaves.sick : 10;
         const isClockedIn = attendanceLogs.some(log => log && log.employeeId === emp.id && log.status === 'Active');
-        const statusDot = isClockedIn 
+        const statusDot = isClockedIn
           ? `<span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#2ecc71; margin-right:6px; animation: pulse 1.5s infinite;"></span>`
           : '';
         return `
@@ -12080,7 +12085,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           </tr>
         `;
       }).join('');
-      
+
       empDirectoryList.querySelectorAll('.select-payroll-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const empId = btn.getAttribute('data-id');
@@ -12091,7 +12096,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         });
       });
     }
-    
+
     if (shiftRosterList) {
       shiftRosterList.innerHTML = validEmployees.map(emp => `
         <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 35px; color: var(--text-dark);">
@@ -12102,7 +12107,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           </td>
         </tr>
       `).join('');
-      
+
       shiftRosterList.querySelectorAll('.toggle-shift-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           SoundEffects.playClick();
@@ -12129,11 +12134,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         });
       });
     }
-    
+
     if (leaveApprovalsList) {
       leaveApprovalsList.innerHTML = '';
       const pendingLeaves = leaveRequests.filter(r => r && r.status === 'Pending');
-      
+
       if (pendingLeaves.length === 0) {
         leaveApprovalsList.innerHTML = `<div style="font-size: 10px; color:var(--text-muted); padding: 10px 0; text-align:center;">No pending leave approvals.</div>`;
       } else {
@@ -12156,7 +12161,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
               </div>
             </div>
           `;
-          
+
           item.querySelector('.approve-leave-btn').addEventListener('click', () => {
             SoundEffects.playSuccess();
             req.status = 'Approved';
@@ -12178,7 +12183,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             showNotificationToast(`Leave approved for ${req.employeeName}.`);
             updateEmployeeAnalytics();
           });
-          
+
           item.querySelector('.reject-leave-btn').addEventListener('click', () => {
             SoundEffects.playRemove();
             req.status = 'Rejected';
@@ -12190,29 +12195,29 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             showNotificationToast(`Leave request rejected for ${req.employeeName}.`);
             updateEmployeeAnalytics();
           });
-          
+
           leaveApprovalsList.appendChild(item);
         });
       }
     }
-    
+
     // Render Daily Clocking system list & dropdown
     const attendanceEmpSelect = document.getElementById('attendance-emp-select');
     const attendanceLedgerList = document.getElementById('attendance-ledger-list');
-    
+
     if (attendanceEmpSelect && attendanceEmpSelect.children.length === 0) {
       attendanceEmpSelect.innerHTML = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
     }
-    
+
     if (attendanceLedgerList) {
       const sortedLogs = [...attendanceLogs]
         .filter(log => log && log.date && log.employeeName)
-        .sort((a,b) => {
+        .sort((a, b) => {
           const dateA = (a.date || '') + ' ' + (a.clockInTime || '00:00');
           const dateB = (b.date || '') + ' ' + (b.clockInTime || '00:00');
           return dateB.localeCompare(dateA);
         });
-      
+
       attendanceLedgerList.innerHTML = sortedLogs.map(log => {
         let statusBadge = '';
         if (log.status === 'Active') {
@@ -12241,14 +12246,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const empStatTotal = document.getElementById('emp-stat-total');
     const empStatLeave = document.getElementById('emp-stat-leave');
     const empStatPayroll = document.getElementById('emp-stat-payroll');
-    
+
     const validEmps = employees.filter(e => e && e.id);
     if (empStatTotal) empStatTotal.textContent = `${validEmps.length} Staff Members`;
-    
+
     const todayStr = new Date().toISOString().split('T')[0];
     const leaveCount = leaveRequests.filter(r => r && r.status === 'Approved' && r.startDate && r.endDate && todayStr >= r.startDate && todayStr <= r.endDate).length;
     if (empStatLeave) empStatLeave.textContent = `${leaveCount} Staff`;
-    
+
     const totalEstPayroll = validEmps.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
     if (empStatPayroll) empStatPayroll.textContent = `₹${totalEstPayroll.toLocaleString('en-IN')}`;
   }
@@ -12258,39 +12263,39 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   if (leaveForm) {
     leaveForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+
       const empSelectEl = document.getElementById('leave-emp-select');
       const typeSelectEl = document.getElementById('leave-type-select');
       const startDateEl = document.getElementById('leave-start-date');
       const endDateEl = document.getElementById('leave-end-date');
       const reasonEl = document.getElementById('leave-reason');
-      
+
       if (!empSelectEl || !typeSelectEl || !startDateEl || !endDateEl || !reasonEl) return;
-      
+
       const empId = empSelectEl.value;
       const type = typeSelectEl.value;
       const startDate = startDateEl.value;
       const endDate = endDateEl.value;
       const reason = reasonEl.value;
-      
+
       if (!empId || !startDate || !endDate || !reason) {
         alert("Please fill in all leave request fields.");
         return;
       }
-      
+
       const emp = employees.find(el => el && el.id === empId);
       if (!emp) return;
-      
+
       const start = new Date(startDate);
       const end = new Date(endDate);
       if (end < start) {
         alert("End date cannot be before start date!");
         return;
       }
-      
+
       const diffTime = Math.abs(end - start);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      
+
       const newRequest = {
         id: "leave_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
         employeeId: empId,
@@ -12302,20 +12307,20 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         status: 'Pending',
         days: diffDays
       };
-      
+
       leaveRequests.push(newRequest);
       localStorage.setItem('doppio_leave_requests', JSON.stringify(leaveRequests));
       if (supabaseClient) {
         supabaseClient.from('doppio_leave_requests').insert(newRequest).then();
       }
-      
+
       SoundEffects.playPop();
       showNotificationToast(`Leave request submitted for ${emp.name} (${diffDays} days).`);
-      
+
       document.getElementById('leave-start-date').value = '';
       document.getElementById('leave-end-date').value = '';
       document.getElementById('leave-reason').value = '';
-      
+
       renderEmployeesTab();
     });
   }
@@ -12325,28 +12330,28 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   const payrollDaysWorked = document.getElementById('payroll-days-worked');
   const payrollLop = document.getElementById('payroll-lop');
   const payrollBaseSalary = document.getElementById('payroll-base-salary');
-  
+
   function updateLivePayrollCalculator() {
     if (!payrollEmpSelect) return;
     const empId = payrollEmpSelect.value;
     const emp = employees.find(e => e && e.id === empId);
     if (!emp) return;
-    
+
     if (payrollBaseSalary) {
       payrollBaseSalary.value = emp.baseSalary || 0;
     }
-    
+
     const daysWorked = parseInt(payrollDaysWorked ? payrollDaysWorked.value : 30) || 0;
     const lop = parseInt(payrollLop ? payrollLop.value : 0) || 0;
     const base = emp.baseSalary || 0;
-    
+
     const effectiveBase = base * Math.max(0, (30 - lop)) / 30.0;
-    
+
     const basic = effectiveBase * 0.5;
     const hra = basic * 0.4;
     const allowance = effectiveBase - basic - hra;
     const gross = effectiveBase;
-    
+
     const pf = basic * 0.12;
     const pt = 200;
     const annualGross = gross * 12;
@@ -12354,9 +12359,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     if (annualGross > 700000) {
       tds = ((annualGross - 700000) * 0.1) / 12;
     }
-    
+
     const net = Math.max(0, gross - pf - pt - tds);
-    
+
     const breakdown = document.getElementById('payroll-breakdown');
     if (breakdown) {
       breakdown.innerHTML = `
@@ -12404,13 +12409,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   const generatePayslipBtn = document.getElementById('payroll-generate-payslip-btn');
   const payslipModal = document.getElementById('payslip-modal');
   const payslipCloseBtn1 = document.getElementById('payslip-modal-close');
-  
+
   if (payslipCloseBtn1) {
     payslipCloseBtn1.addEventListener('click', () => {
       if (payslipModal) payslipModal.style.display = 'none';
     });
   }
-  
+
   if (payslipModal) {
     payslipModal.addEventListener('click', (e) => {
       if (e.target.id === 'payslip-modal-close-btn') {
@@ -12418,10 +12423,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       } else if (e.target.id === 'payslip-print-btn' || e.target.closest('#payslip-print-btn')) {
         const printArea = document.getElementById('payslip-print-area');
         if (!printArea) return;
-        
+
         const actionsSection = printArea.querySelector('.no-print');
         if (actionsSection) actionsSection.style.display = 'none';
-        
+
         const printWindow = window.open('', '', 'height=600,width=800');
         printWindow.document.write('<html><head><title>Doppio Cafe Nagpur - Salary Slip</title>');
         printWindow.document.write('<style>body{font-family:sans-serif;padding:20px;color:#000;}table{width:100%;border-collapse:collapse;margin:15px 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background:#f5f5f5;}hr{border:none;border-top:1px dashed #ddd;margin:15px 0;}.no-print{display:none;}</style>');
@@ -12429,9 +12434,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         printWindow.document.write(printArea.innerHTML);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
-        
+
         if (actionsSection) actionsSection.style.display = 'flex';
-        
+
         printWindow.print();
       }
     });
@@ -12445,11 +12450,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         alert("Please select a staff member first.");
         return;
       }
-      
+
       const daysWorked = parseInt(payrollDaysWorked ? payrollDaysWorked.value : 30) || 0;
       const lop = parseInt(payrollLop ? payrollLop.value : 0) || 0;
       const base = emp.baseSalary;
-      
+
       const effectiveBase = base * Math.max(0, (30 - lop)) / 30.0;
       const basic = effectiveBase * 0.5;
       const hra = basic * 0.4;
@@ -12463,7 +12468,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         tds = ((annualGross - 700000) * 0.1) / 12;
       }
       const net = Math.max(0, gross - pf - pt - tds);
-      
+
       const printArea = document.getElementById('payslip-print-area');
       if (printArea) {
         printArea.innerHTML = `
@@ -12534,7 +12539,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           </div>
         `;
       }
-      
+
       if (payslipModal) payslipModal.style.display = 'flex';
       SoundEffects.playClick();
     });
@@ -12565,30 +12570,30 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   // 6b. Daily Attendance system Clock In / Out listeners (Made by Antigravity)
   const clockInBtn = document.getElementById('attendance-clockin-btn');
   const clockOutBtn = document.getElementById('attendance-clockout-btn');
-  
+
   if (clockInBtn) {
     clockInBtn.addEventListener('click', () => {
       SoundEffects.playClick();
       const empSelect = document.getElementById('attendance-emp-select');
       const shiftSelect = document.getElementById('attendance-shift-select');
       if (!empSelect || !shiftSelect) return;
-      
+
       const empId = empSelect.value;
       const shiftVal = shiftSelect.value;
       const emp = employees.find(e => e.id === empId);
       if (!emp) return;
-      
+
       // Check if already clocked in today (log with status === 'Active')
       const activeLog = attendanceLogs.find(l => l.employeeId === empId && l.status === 'Active');
       if (activeLog) {
         alert(`${emp.name} is already clocked in! Please clock out first.`);
         return;
       }
-      
+
       const now = new Date();
       const dateStr = now.toISOString().split('T')[0];
-      const timeStr = now.toTimeString().split(' ')[0].substring(0,5);
-      
+      const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
       const newLog = {
         id: 'att_' + Date.now(),
         employeeId: empId,
@@ -12601,54 +12606,54 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         wages: 0,
         status: 'Active'
       };
-      
+
       attendanceLogs.push(newLog);
       localStorage.setItem('doppio_attendance', JSON.stringify(attendanceLogs));
       if (supabaseClient) {
         supabaseClient.from('doppio_attendance').insert(newLog).then();
       }
-      
+
       showNotificationToast(`${emp.name} clocked in successfully at ${timeStr}`);
       renderEmployeesTab();
     });
   }
-  
+
   if (clockOutBtn) {
     clockOutBtn.addEventListener('click', () => {
       const empSelect = document.getElementById('attendance-emp-select');
       if (!empSelect) return;
-      
+
       const empId = empSelect.value;
       const emp = employees.find(e => e.id === empId);
       if (!emp) return;
-      
+
       // Find active clock-in log
       const activeLog = attendanceLogs.find(l => l.employeeId === empId && l.status === 'Active');
       if (!activeLog) {
         alert(`${emp.name} is not clocked in!`);
         return;
       }
-      
+
       SoundEffects.playSuccess();
       const now = new Date();
-      const clockOutStr = now.toTimeString().split(' ')[0].substring(0,5);
-      
+      const clockOutStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
       // Calculate elapsed time
       const [inH, inM] = activeLog.clockInTime.split(':').map(Number);
       const [outH, outM] = clockOutStr.split(':').map(Number);
-      
+
       let diffMins = (outH * 60 + outM) - (inH * 60 + inM);
       if (diffMins < 0) diffMins += 24 * 60; // handle overnight shifts
-      
+
       const hours = Math.round((diffMins / 60) * 10) / 10;
       activeLog.clockOutTime = clockOutStr;
       activeLog.hoursWorked = hours;
       activeLog.status = 'Completed';
-      
+
       // Wages = baseSalary / 30 days / 8 hours * actual clocked hours
       const hourlyRate = emp.baseSalary / 240;
       activeLog.wages = Math.round(hourlyRate * hours);
-      
+
       localStorage.setItem('doppio_attendance', JSON.stringify(attendanceLogs));
       if (supabaseClient) {
         supabaseClient.from('doppio_attendance').update({
@@ -12659,7 +12664,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         }).eq('id', activeLog.id).then();
       }
       showNotificationToast(`${emp.name} clocked out successfully. Hours: ${hours}, Earnings: ₹${activeLog.wages}`);
-      
+
       renderEmployeesTab();
       if (typeof renderReports === 'function') renderReports();
     });
@@ -12765,7 +12770,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         } else if (data.status === 'qr') {
           if (connectedView) connectedView.style.display = 'none';
           if (qrContainer) qrContainer.style.display = 'flex';
-          
+
           if (data.qr) {
             if (qrSpinner) qrSpinner.style.display = 'none';
             if (qrImg) {
@@ -12825,11 +12830,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             const logDate = log.created_at ? new Date(log.created_at) : new Date();
             const timeStr = logDate.toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
             const dateStr = logDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-            
+
             const eventStr = log.event || '';
             const statusStr = log.status || '';
             const details = log.details || {};
-            
+
             let eventTitle = eventStr || 'System Event';
             let detailsHtml = '';
             let channelBadge = '';
@@ -12946,12 +12951,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           try {
             resetBtn.disabled = true;
             resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-            
+
             const res = await fetch('https://kalpeshdeora1006-whatsapp-gateway.hf.space/reset', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' }
             });
-            
+
             if (res.ok) {
               showNotificationToast("WhatsApp Gateway reset successfully. Scan QR code to re-authenticate.");
               await pollSuperAdminGateway();
@@ -13031,11 +13036,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const badgeClass = t.status === 'approved' ? 'paid' : t.status === 'suspended' ? 'void' : 'hold';
       const statusText = t.status === 'approved' ? 'Active' : t.status === 'suspended' ? 'Suspended' : 'Pending';
       const outletLabel = (t.outlet_type || 'cafe').toUpperCase();
-      
-      const badgeStyle = t.status === 'approved' 
-        ? 'background: rgba(34, 197, 94, 0.1); color: #22C55E;' 
-        : t.status === 'suspended' 
-          ? 'background: rgba(239, 68, 68, 0.1); color: #EF4444;' 
+
+      const badgeStyle = t.status === 'approved'
+        ? 'background: rgba(34, 197, 94, 0.1); color: #22C55E;'
+        : t.status === 'suspended'
+          ? 'background: rgba(239, 68, 68, 0.1); color: #EF4444;'
           : 'background: rgba(245, 158, 11, 0.1); color: #F59E0B;';
 
       return `
@@ -13106,7 +13111,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     function updateDeleteSelectedBtnVisibility() {
       const checkboxes = listContainer.querySelectorAll('.tenant-select-checkbox');
       const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
-      
+
       if (deleteSelectedBtn) {
         if (checkedBoxes.length > 0) {
           deleteSelectedBtn.style.display = 'flex';
@@ -13114,7 +13119,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           deleteSelectedBtn.style.display = 'none';
         }
       }
-      
+
       if (selectAllCheckbox) {
         if (checkboxes.length > 0 && checkedBoxes.length === checkboxes.length) {
           selectAllCheckbox.checked = true;
@@ -13148,9 +13153,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         const checkedIds = Array.from(checkboxes)
           .filter(cb => cb.checked)
           .map(cb => cb.getAttribute('data-id'));
-        
+
         if (checkedIds.length === 0) return;
-        
+
         if (confirm(`Are you sure you want to delete the ${checkedIds.length} selected client outlets?\n\nThis will permanently erase their registrations and all their associated data from Supabase!`)) {
           try {
             console.log("Bulk deleting tenant IDs:", checkedIds);
@@ -13158,7 +13163,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
               .from('saas_tenants')
               .delete()
               .in('id', checkedIds);
-              
+
             if (error) {
               console.error("Supabase bulk deletion error:", error);
               alert("Failed to delete selected accounts: " + error.message);
@@ -13188,11 +13193,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         e.stopPropagation();
         const tenantId = btn.getAttribute('data-id');
         console.log("SuperAdmin Click: tenantId = ", tenantId);
-        
+
         // Find tenant using loose string conversion for safety
         const tenant = tenants.find(t => String(t.id) === String(tenantId));
         console.log("SuperAdmin Click: found tenant = ", tenant);
-        
+
         if (tenant) {
           openTenantManageModal(tenant);
         } else {
@@ -13209,7 +13214,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         e.stopPropagation();
         const tenantId = btn.getAttribute('data-id');
         const tenantName = btn.getAttribute('data-name');
-        
+
         if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their associated data from Supabase!`)) {
           try {
             console.log("Requesting deletion of tenant ID:", tenantId);
@@ -13242,15 +13247,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
       initTenantManageModalEvents();
 
-      const tenantIdEl   = document.getElementById('manage-tenant-id');
+      const tenantIdEl = document.getElementById('manage-tenant-id');
       const tenantNameEl = document.getElementById('manage-tenant-name');
-      const avatarEl     = document.getElementById('manage-tenant-avatar');
-      const statusBadge  = document.getElementById('manage-status-badge');
-      const usernameEl   = document.getElementById('manage-username');
-      const passwordEl   = document.getElementById('manage-password');
-      const statusEl     = document.getElementById('manage-status');
-      const phoneEl      = document.getElementById('manage-phone');
-      const emailEl      = document.getElementById('manage-email');
+      const avatarEl = document.getElementById('manage-tenant-avatar');
+      const statusBadge = document.getElementById('manage-status-badge');
+      const usernameEl = document.getElementById('manage-username');
+      const passwordEl = document.getElementById('manage-password');
+      const statusEl = document.getElementById('manage-status');
+      const phoneEl = document.getElementById('manage-phone');
+      const emailEl = document.getElementById('manage-email');
 
       // ── Populate hidden store + IDs ──
       if (tenantIdEl) {
@@ -13269,14 +13274,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       if (statusBadge) {
         const s = tenant.status || 'pending';
         const badgeMap = {
-          approved:  { dot: '#22C55E', bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  color: '#16A34A', label: 'Active'    },
-          pending:   { dot: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', color: '#B45309', label: 'Pending'   },
-          suspended: { dot: '#EF4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  color: '#DC2626', label: 'Suspended' }
+          approved: { dot: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', label: 'Active' },
+          pending: { dot: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', color: '#B45309', label: 'Pending' },
+          suspended: { dot: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', color: '#DC2626', label: 'Suspended' }
         };
         const b = badgeMap[s] || badgeMap.pending;
-        statusBadge.style.background    = b.bg;
-        statusBadge.style.borderColor   = b.border;
-        statusBadge.style.color         = b.color;
+        statusBadge.style.background = b.bg;
+        statusBadge.style.borderColor = b.border;
+        statusBadge.style.color = b.color;
         statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${b.dot};display:inline-block;"></span>${b.label}`;
       }
 
@@ -13291,7 +13296,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       if (emailEl) emailEl.value = tenant.email || '';
 
       // ── Feature checkboxes + card highlight ──
-      const allowed   = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [];
+      const allowed = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [];
       const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
       console.log(`Checking ${checkboxes.length} checkboxes against allowed tabs:`, allowed);
 
@@ -13302,15 +13307,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         if (card) {
           if (cb.checked) {
             card.style.borderColor = 'rgba(252,128,25,0.45)';
-            card.style.background  = 'rgba(252,128,25,0.06)';
+            card.style.background = 'rgba(252,128,25,0.06)';
           } else {
             card.style.borderColor = '#E2E8F0';
-            card.style.background  = '#FAFAFA';
+            card.style.background = '#FAFAFA';
           }
           // Keep card in sync when user clicks
           cb.addEventListener('change', () => {
             card.style.borderColor = cb.checked ? 'rgba(252,128,25,0.45)' : '#E2E8F0';
-            card.style.background  = cb.checked ? 'rgba(252,128,25,0.06)' : '#FAFAFA';
+            card.style.background = cb.checked ? 'rgba(252,128,25,0.06)' : '#FAFAFA';
           }, { once: false });
         }
       });
@@ -13406,7 +13411,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         try {
           const tenantId = document.getElementById('manage-tenant-id').value;
           const tenantName = document.getElementById('manage-tenant-name').textContent;
-          
+
           if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their POS bills, inventory records, custom menus, and staff details from Supabase!`)) {
             console.log("Requesting deletion of tenant ID:", tenantId);
             const { error } = await supabaseClient.from('saas_tenants').delete().eq('id', tenantId);
@@ -13486,7 +13491,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
                 ? JSON.parse(existingProfile.feature_flags)
                 : existingProfile.feature_flags;
             }
-          } catch(e) {}
+          } catch (e) { }
           existingFlags.seeding_disabled = true;
 
           const { error: profileError } = await supabaseClient
