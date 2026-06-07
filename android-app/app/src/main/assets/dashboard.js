@@ -54,55 +54,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
   const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
-  const TENANT_ACCESS_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-access`;
-  const TENANT_ADMIN_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-admin`;
-  const TENANT_DATA_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-data`;
+  const apiDomain = window.RestroSuite && window.RestroSuite.api;
+  const authDomain = window.RestroSuite && window.RestroSuite.auth;
+  const billingDomain = window.RestroSuite && window.RestroSuite.billing;
+  const billsDomain = window.RestroSuite && window.RestroSuite.bills;
+  const inventoryDomain = window.RestroSuite && window.RestroSuite.inventory;
+  const operationsDomain = window.RestroSuite && window.RestroSuite.operations;
+  const peopleDomain = window.RestroSuite && window.RestroSuite.people;
+  const posDomain = window.RestroSuite && window.RestroSuite.pos;
+  const superadminDomain = window.RestroSuite && window.RestroSuite.superadmin;
+  const whatsappDomain = window.RestroSuite && window.RestroSuite.whatsapp;
 
-  async function callTenantAccess(action, payload = {}) {
-    const response = await fetch(TENANT_ACCESS_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': DEFAULT_SUPABASE_KEY,
-        'Authorization': `Bearer ${DEFAULT_SUPABASE_KEY}`
-      },
-      body: JSON.stringify({
-        action,
-        ...payload
-      })
-    });
-
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Session validation failed.');
-    return result;
+  if (
+    !apiDomain
+    || !authDomain
+    || !billingDomain
+    || !billsDomain
+    || !inventoryDomain
+    || !operationsDomain
+    || !peopleDomain
+    || !posDomain
+    || !superadminDomain
+    || !whatsappDomain
+  ) {
+    throw new Error('Dashboard domain modules failed to load.');
   }
 
-  async function validateStoredDashboardSession() {
-    const cachedRole = sessionStorage.getItem('logged_in_role');
-    const sessionToken = cachedRole === 'superadmin'
-      ? sessionStorage.getItem('superadmin_admin_token')
-      : sessionStorage.getItem('tenant_session_token');
-
-    if (!sessionToken) {
-      throw new Error('Missing signed session token.');
-    }
-
-    const result = await callTenantAccess('validate_session', { session_token: sessionToken });
-    const session = result.session || {};
-    const previousResetAt = sessionStorage.getItem('tenant_data_reset_at') || '';
-    const nextResetAt = session.data_reset_at || '';
-    if (session.role === 'admin' && previousResetAt && nextResetAt && previousResetAt !== nextResetAt) {
-      sessionStorage.setItem('tenant_data_reset_pending', 'true');
-    }
-    sessionStorage.setItem('logged_in_user', session.username || '');
-    sessionStorage.setItem('logged_in_role', session.role || '');
-    sessionStorage.setItem('tenant_id', session.tenant_id || '');
-    sessionStorage.setItem('tenant_slug', session.tenant_slug || '');
-    sessionStorage.setItem('tenant_name', session.tenant_name || '');
-    sessionStorage.setItem('allowed_tabs', JSON.stringify(session.allowed_tabs || []));
-    sessionStorage.setItem('tenant_data_reset_at', nextResetAt);
-    return session;
-  }
+  const tenantApi = apiDomain.createTenantApi({
+    baseUrl: DEFAULT_SUPABASE_URL,
+    anonKey: DEFAULT_SUPABASE_KEY,
+    fetchImpl: window.fetch.bind(window),
+    getAdminToken: () => sessionStorage.getItem('superadmin_admin_token'),
+    getTenantToken: () => sessionStorage.getItem('tenant_session_token'),
+    onAdminUnauthorized: () => sessionStorage.removeItem('superadmin_admin_token')
+  });
+  const callTenantAccess = tenantApi.access;
+  const sessionManager = authDomain.createSessionManager({
+    storage: sessionStorage,
+    validateSession: (sessionToken) => callTenantAccess('validate_session', {
+      session_token: sessionToken
+    })
+  });
+  const validateStoredDashboardSession = sessionManager.validateStoredSession;
 
   // ==========================================
   // SESSION GUARD (Redirect if not logged in)
@@ -882,176 +875,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sync parameters
   let supabaseClient = null;
+  window.RestroSuite.dashboard = {
+    isTourComplete() {
+      return Boolean(
+        businessProfile
+        && businessProfile.featureFlags
+        && businessProfile.featureFlags.tourDone
+      );
+    },
+    async markTourComplete() {
+      businessProfile.featureFlags = businessProfile.featureFlags || {};
+      businessProfile.featureFlags.tourDone = true;
+      localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+      setVaultData('doppio_business_profile', businessProfile);
 
-  async function callTenantAdmin(action, payload = {}) {
-    const adminToken = sessionStorage.getItem('superadmin_admin_token');
-    if (!adminToken) {
-      throw new Error('Superadmin session expired. Please log in again.');
-    }
-
-    const response = await fetch(TENANT_ADMIN_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': DEFAULT_SUPABASE_KEY,
-        'Authorization': `Bearer ${adminToken}`
-      },
-      body: JSON.stringify({
-        action,
-        ...payload
-      })
-    });
-
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      if (response.status === 401) {
-        sessionStorage.removeItem('superadmin_admin_token');
+      if (supabaseClient && activeTenantId) {
+        const { error } = await supabaseClient
+          .from('doppio_business_profile')
+          .update({ feature_flags: JSON.stringify(businessProfile.featureFlags) })
+          .eq('tenant_id', activeTenantId);
+        if (error) throw error;
       }
-      throw new Error(result.error || 'Superadmin request failed.');
     }
+  };
 
-    return result;
-  }
-
-  function createTenantDataClient(nativeClient) {
-    const tenantTables = new Set([
-      'doppio_business_profile',
-      'doppio_menu',
-      'doppio_inventory',
-      'doppio_bills',
-      'doppio_pending_orders',
-      'doppio_shifts',
-      'doppio_shift_events',
-      'doppio_employees',
-      'doppio_leave_requests',
-      'doppio_attendance',
-      'doppio_crm',
-      'doppio_inventory_batches',
-      'doppio_notifications',
-      'doppio_custom_recipes',
-      'doppio_inventory_thresholds',
-      'doppio_pos_popularity',
-      'doppio_draft_orders'
-    ]);
-
-    function makeTenantQuery(table) {
-      const state = {
-        table,
-        operation: null,
-        columns: '*',
-        data: undefined,
-        filters: [],
-        order: null,
-        limit: null,
-        single: false,
-        maybeSingle: false,
-        returning: false,
-        options: {}
-      };
-
-      const execute = async () => {
-        const tenantToken = sessionStorage.getItem('tenant_session_token');
-        if (!tenantToken) {
-          return { data: null, error: { message: 'Tenant session expired. Please log in again.' } };
-        }
-
-        const response = await fetch(TENANT_DATA_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': DEFAULT_SUPABASE_KEY,
-            'Authorization': `Bearer ${tenantToken}`
-          },
-          body: JSON.stringify(state)
-        });
-
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          return { data: null, error: { message: result.error || 'Tenant data request failed.' } };
-        }
-        return { data: result.data, error: null };
-      };
-
-      const builder = {
-        select(columns = '*') {
-          if (!state.operation) {
-            state.operation = 'select';
-          } else {
-            state.returning = true;
-          }
-          state.columns = columns;
-          return builder;
-        },
-        insert(data) {
-          state.operation = 'insert';
-          state.data = data;
-          return builder;
-        },
-        update(data) {
-          state.operation = 'update';
-          state.data = data;
-          return builder;
-        },
-        upsert(data, options = {}) {
-          state.operation = 'upsert';
-          state.data = data;
-          state.options = options;
-          return builder;
-        },
-        delete() {
-          state.operation = 'delete';
-          return builder;
-        },
-        eq(column, value) {
-          state.filters.push({ operator: 'eq', column, value });
-          return builder;
-        },
-        in(column, value) {
-          state.filters.push({ operator: 'in', column, value });
-          return builder;
-        },
-        order(column, options = {}) {
-          state.order = { column, ascending: options.ascending !== false };
-          return builder;
-        },
-        limit(value) {
-          state.limit = value;
-          return builder;
-        },
-        single() {
-          state.single = true;
-          return builder;
-        },
-        maybeSingle() {
-          state.maybeSingle = true;
-          return builder;
-        },
-        then(resolve, reject) {
-          if (!state.operation) state.operation = 'select';
-          return execute().then(resolve, reject);
-        },
-        catch(reject) {
-          if (!state.operation) state.operation = 'select';
-          return execute().catch(reject);
-        }
-      };
-
-      return builder;
-    }
-
-    return {
-      from(table) {
-        if (tenantTables.has(table)) return makeTenantQuery(table);
-        return nativeClient.from(table);
-      },
-      channel(...args) {
-        return nativeClient.channel(...args);
-      },
-      removeChannel(...args) {
-        return nativeClient.removeChannel(...args);
-      }
-    };
-  }
+  const callTenantAdmin = tenantApi.admin;
+  const createTenantDataClient = tenantApi.createTenantDataClient;
 
   // ==========================================
   // 2. SUPABASE INITIALIZER & QUEUES
@@ -2547,29 +2396,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('doppio_cart_cust_name', nameInput.value);
     localStorage.setItem('doppio_cart_cust_phone', phoneInput.value);
 
-    let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-
-    const isGstEnabled = businessProfile.gstEnabled !== false;
-    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-
-    let loyaltyDiscount = 0;
     const phoneVal = phoneInput.value.trim();
     const nameVal = nameInput.value.trim();
-
-    let matchedCustomer = null;
-    if (phoneVal || nameVal) {
-      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (nameVal && c.name.toLowerCase() === nameVal.toLowerCase()));
-    }
-
-    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-    }
-
-    const taxableAmount = subtotal - loyaltyDiscount;
-    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-    const total = taxableAmount + gst;
+    const totals = billingDomain.calculateCartTotals({
+      cart,
+      businessProfile,
+      customers: crmData,
+      customerName: nameVal,
+      customerPhone: phoneVal
+    });
+    const { subtotal, loyaltyDiscount, gst, total } = totals;
 
     if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
 
@@ -3191,13 +3027,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let sufficientStock = true;
     let missingItem = '';
 
-    const proposedDeductions = {};
-    cart.forEach(cartItem => {
-      const specs = getDeductionSpecs(cartItem);
-      Object.keys(specs).forEach(ing => {
-        proposedDeductions[ing] = (proposedDeductions[ing] || 0) + (specs[ing] * cartItem.qty);
-      });
-    });
+    const proposedDeductions = billingDomain.aggregateDeductions(cart, getDeductionSpecs);
 
     Object.keys(proposedDeductions).forEach(ing => {
       if (inventory[ing] === undefined) inventory[ing] = 1000;
@@ -3223,29 +3053,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       deductStockFEFO(ing, proposedDeductions[ing]);
     });
 
-    // GST and loyalties final ledger sync
-    const isGstEnabled = businessProfile.gstEnabled !== false;
-    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-
-    let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const phoneInput = document.getElementById('cust-phone');
     const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-
-    let loyaltyDiscount = 0;
-    let matchedCustomer = null;
-    if (phoneVal || custName) {
-      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
-    }
-
-    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-    }
-
-    const taxableAmount = subtotal - loyaltyDiscount;
-    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-    const total = taxableAmount + gst;
+    const totals = billingDomain.calculateCartTotals({
+      cart,
+      businessProfile,
+      customers: crmData,
+      customerName: custName,
+      customerPhone: phoneVal
+    });
+    const { subtotal, loyaltyDiscount, gst, total } = totals;
 
     let finalBillObject = null;
 
@@ -3447,48 +3264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activePresetDate = 'all';
   let billsSearchQuery = '';
 
-  function parseBillDate(val) {
-    if (!val) return new Date(0);
-    let dateStr = val;
-    if (typeof val === 'object' && val !== null) {
-      dateStr = val.dateTime;
-    }
-    if (!dateStr || typeof dateStr !== 'string') return new Date(0);
-
-    let parsed = Date.parse(dateStr);
-    if (!isNaN(parsed)) return new Date(parsed);
-
-    // Robust Indian locale parser: 'DD/MM/YYYY, hh:mm:ss AM/PM'
-    try {
-      const clean = dateStr.replace(/[^0-9/:\sAMP]/gi, '').trim();
-      const parts = clean.split(',');
-      const dateParts = parts[0].trim().split('/');
-      if (dateParts.length === 3) {
-        let day = parseInt(dateParts[0], 10);
-        let month = parseInt(dateParts[1], 10) - 1;
-        let year = parseInt(dateParts[2], 10);
-
-        let hour = 0, minute = 0, second = 0;
-        if (parts[1]) {
-          const timeParts = parts[1].trim().split(' ');
-          const hms = timeParts[0].split(':');
-          hour = parseInt(hms[0], 10);
-          minute = parseInt(hms[1], 10) || 0;
-          second = parseInt(hms[2], 10) || 0;
-
-          if (timeParts[1] && timeParts[1].toUpperCase() === 'PM' && hour < 12) {
-            hour += 12;
-          } else if (timeParts[1] && timeParts[1].toUpperCase() === 'AM' && hour === 12) {
-            hour = 0;
-          }
-        }
-        return new Date(year, month, day, hour, minute, second);
-      }
-    } catch (e) {
-      console.error("parseBillDate failed on:", dateStr, e);
-    }
-    return new Date(dateStr);
-  }
+  const parseBillDate = billsDomain.parseBillDate;
 
   function startEditingBill(orderId) {
     const bill = bills.find(b => b.orderId === orderId);
@@ -3978,13 +3754,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!phoneNum) return; // user cancelled
     }
 
-    phoneNum = phoneNum.replace(/\D/g, '');
-
-    if (phoneNum.length === 10) {
-      phoneNum = "91" + phoneNum;
-    }
-
-    if (phoneNum.length < 10) {
+    phoneNum = whatsappDomain.normalizeIndianPhone(phoneNum);
+    if (!phoneNum) {
       alert("Invalid phone number! Please enter a valid number.");
       return;
     }
@@ -4181,14 +3952,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Auto-failover recursive sender
       function trySend(targetUrl, isFallback = false) {
-        let actualUrl = targetUrl;
-        if (!actualUrl.endsWith('/send') && !actualUrl.endsWith('/api/mock-whatsapp') && !actualUrl.includes('httpbin.org')) {
-          if (actualUrl.endsWith('/')) {
-            actualUrl += 'send';
-          } else {
-            actualUrl += '/send';
-          }
-        }
+        const actualUrl = whatsappDomain.resolveGatewaySendUrl(targetUrl);
 
         return fetch(actualUrl, {
           method: "POST",
@@ -4469,54 +4233,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function deductStockFEFO(ingredientKey, requiredQty) {
-    if (!inventoryBatches[ingredientKey]) {
-      inventoryBatches[ingredientKey] = [];
-    }
-
-    // Sort batches by expiry date
-    inventoryBatches[ingredientKey].sort((a, b) => {
-      const da = a.expiryDate ? new Date(a.expiryDate) : new Date("2099-12-31");
-      const db = b.expiryDate ? new Date(b.expiryDate) : new Date("2099-12-31");
-      return da - db;
-    });
-
-    let remaining = requiredQty;
-    let updatedBatches = [];
-
-    for (let batch of inventoryBatches[ingredientKey]) {
-      if (remaining <= 0) {
-        updatedBatches.push(batch);
-        continue;
-      }
-      if (batch.qty > remaining) {
-        batch.qty -= remaining;
-        remaining = 0;
-        updatedBatches.push(batch);
-      } else {
-        remaining -= batch.qty;
-      }
-    }
-
-    // If there is still a remaining quantity to deduct, subtract from the last batch even if negative
-    if (remaining > 0) {
-      if (updatedBatches.length > 0) {
-        updatedBatches[updatedBatches.length - 1].qty -= remaining;
-      } else {
-        updatedBatches.push({
+    const result = inventoryDomain.deductFefo(
+      inventoryBatches[ingredientKey],
+      requiredQty,
+      () => ({
           id: "batch_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
-          qty: -remaining,
           expiryDate: getDefaultExpiryDate(ingredientKey),
           receivedDate: new Date().toISOString().split('T')[0]
-        });
-      }
-    }
+      })
+    );
 
-    inventoryBatches[ingredientKey] = updatedBatches;
+    inventoryBatches[ingredientKey] = result.batches;
     localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
 
-    // Calculate total stock
-    const total = updatedBatches.reduce((sum, b) => sum + b.qty, 0);
-    inventory[ingredientKey] = Math.max(0, total);
+    inventory[ingredientKey] = result.total;
     localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
 
     // Sync to Supabase
@@ -5895,12 +5625,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const custPhoneInput = document.getElementById('cust-phone');
   const loyaltyStatusBox = document.getElementById('loyalty-status-box');
 
-  function getLoyaltyTier(spend) {
-    if (spend >= 5000) return 'Platinum';
-    if (spend >= 2500) return 'Gold';
-    if (spend >= 1000) return 'Silver';
-    return 'Bronze';
-  }
+  const getLoyaltyTier = peopleDomain.getLoyaltyTier;
 
   async function loadCRMData() {
     const localCRM = localStorage.getItem('doppio_crm_local');
@@ -6299,19 +6024,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Export CSV generator
-  function convertToCSV(data) {
-    const headers = ["orderId", "customerName", "dateTime", "items", "subtotal", "gst", "total", "paymentMethod"];
-    const rows = data.map(row => {
-      return headers.map(header => {
-        let val = row[header];
-        if (val === null || val === undefined) return '""';
-        if (typeof val === 'object') val = JSON.stringify(val);
-        const escaped = ('' + val).replace(/"/g, '""');
-        return `"${escaped}"`;
-      }).join(',');
-    });
-    return [headers.join(','), ...rows].join('\n');
-  }
+  const convertToCSV = billsDomain.convertToCSV;
 
   // Export SQL Script generator
   function generateSQLScript(data) {
@@ -9542,7 +9255,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const cash = parseInt(splitCashInput.value) || 0;
     const card = parseInt(splitCardInput.value) || 0;
 
-    const remaining = finalTotal - (upi + cash + card);
+    const splitPayment = posDomain.evaluateSplitPayment(finalTotal, { upi, cash, card });
+    const remaining = splitPayment.remaining;
 
     if (splitRemainingVal) {
       if (remaining > 0) {
@@ -11918,20 +11632,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     });
   }
 
-  function parseCustomLocaleString(str) {
-    try {
-      // Handles localized strings like '2/6/2026, 6:50:28 AM'
-      const parts = str.split(', ');
-      if (parts.length === 2) {
-        const dateParts = parts[0].split('/');
-        if (dateParts.length === 3) {
-          const date = new Date(parts[0] + ' ' + parts[1]);
-          if (!isNaN(date.getTime())) return date.getTime();
-        }
-      }
-    } catch (e) { }
-    return null;
-  }
+  const parseCustomLocaleString = operationsDomain.parseCustomLocaleString;
 
   function bumpKDSTicket(orderId) {
     const order = pendingQrOrders.find(o => o.orderId === orderId);
@@ -12641,22 +12342,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const lop = parseInt(payrollLop ? payrollLop.value : 0) || 0;
     const base = emp.baseSalary || 0;
 
-    const effectiveBase = base * Math.max(0, (30 - lop)) / 30.0;
-
-    const basic = effectiveBase * 0.5;
-    const hra = basic * 0.4;
-    const allowance = effectiveBase - basic - hra;
-    const gross = effectiveBase;
-
-    const pf = basic * 0.12;
-    const pt = 200;
-    const annualGross = gross * 12;
-    let tds = 0;
-    if (annualGross > 700000) {
-      tds = ((annualGross - 700000) * 0.1) / 12;
-    }
-
-    const net = Math.max(0, gross - pf - pt - tds);
+    const { basic, hra, allowance, gross, pf, pt, tds, net } =
+      peopleDomain.calculatePayroll(base, lop);
 
     const breakdown = document.getElementById('payroll-breakdown');
     if (breakdown) {
@@ -12751,19 +12438,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const lop = parseInt(payrollLop ? payrollLop.value : 0) || 0;
       const base = emp.baseSalary;
 
-      const effectiveBase = base * Math.max(0, (30 - lop)) / 30.0;
-      const basic = effectiveBase * 0.5;
-      const hra = basic * 0.4;
-      const allowance = effectiveBase - basic - hra;
-      const gross = effectiveBase;
-      const pf = basic * 0.12;
-      const pt = 200;
-      const annualGross = gross * 12;
-      let tds = 0;
-      if (annualGross > 700000) {
-        tds = ((annualGross - 700000) * 0.1) / 12;
-      }
-      const net = Math.max(0, gross - pf - pt - tds);
+      const { basic, hra, allowance, gross, pf, pt, tds, net } =
+        peopleDomain.calculatePayroll(base, lop);
 
       const printArea = document.getElementById('payslip-print-area');
       if (printArea) {
@@ -13328,15 +13004,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     }
 
     listContainer.innerHTML = tenants.map(t => {
-      const badgeClass = t.status === 'approved' ? 'paid' : t.status === 'suspended' ? 'void' : 'hold';
-      const statusText = t.status === 'approved' ? 'Active' : t.status === 'suspended' ? 'Suspended' : 'Pending';
+      const statusPresentation = superadminDomain.getTenantStatusPresentation(t.status);
+      const statusText = statusPresentation.text;
       const outletLabel = (t.outlet_type || 'cafe').toUpperCase();
-
-      const badgeStyle = t.status === 'approved'
-        ? 'background: rgba(34, 197, 94, 0.1); color: #22C55E;'
-        : t.status === 'suspended'
-          ? 'background: rgba(239, 68, 68, 0.1); color: #EF4444;'
-          : 'background: rgba(245, 158, 11, 0.1); color: #F59E0B;';
+      const badgeStyle = statusPresentation.style;
 
       return `
         <div class="tenant-workspace-card" style="display: flex; align-items: center; padding: 16px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.05); border-radius: 12px; gap: 16px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #1C1C1C; font-family: var(--font-body);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(28, 28, 28,0.05)'; this.style.borderColor='rgba(252, 128, 25,0.2)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'; this.style.borderColor='rgba(28, 28, 28,0.05)';">
@@ -13406,26 +13077,18 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     function updateDeleteSelectedBtnVisibility() {
       const checkboxes = listContainer.querySelectorAll('.tenant-select-checkbox');
       const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+      const selectionState = superadminDomain.getSelectionState(
+        checkboxes.length,
+        checkedBoxes.length
+      );
 
       if (deleteSelectedBtn) {
-        if (checkedBoxes.length > 0) {
-          deleteSelectedBtn.style.display = 'flex';
-        } else {
-          deleteSelectedBtn.style.display = 'none';
-        }
+        deleteSelectedBtn.style.display = selectionState.showBulkDelete ? 'flex' : 'none';
       }
 
       if (selectAllCheckbox) {
-        if (checkboxes.length > 0 && checkedBoxes.length === checkboxes.length) {
-          selectAllCheckbox.checked = true;
-          selectAllCheckbox.indeterminate = false;
-        } else if (checkedBoxes.length > 0) {
-          selectAllCheckbox.checked = false;
-          selectAllCheckbox.indeterminate = true;
-        } else {
-          selectAllCheckbox.checked = false;
-          selectAllCheckbox.indeterminate = false;
-        }
+        selectAllCheckbox.checked = selectionState.checked;
+        selectAllCheckbox.indeterminate = selectionState.indeterminate;
       }
     }
 

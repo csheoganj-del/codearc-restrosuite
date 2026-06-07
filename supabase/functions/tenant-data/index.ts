@@ -150,6 +150,12 @@ function applyFilters(query: any, filters: unknown[], tenantId: string) {
     if (!column || column === "tenant_id") continue;
     if (typed.operator === "in" && Array.isArray(typed.value)) {
       nextQuery = nextQuery.in(column, typed.value);
+    } else if (
+      typed.operator === "not"
+      && typed.comparisonOperator === "in"
+      && typeof typed.value === "string"
+    ) {
+      nextQuery = nextQuery.not(column, "in", typed.value);
     } else {
       nextQuery = nextQuery.eq(column, typed.value);
     }

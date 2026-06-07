@@ -24,6 +24,10 @@ $FilesToCopy = @(
     "recipes.json"
 )
 
+$DirectoriesToCopy = @(
+    "src"
+)
+
 # Copy individual files
 foreach ($File in $FilesToCopy) {
     $SrcFile = Join-Path $SourceDir $File
@@ -34,6 +38,18 @@ foreach ($File in $FilesToCopy) {
         Write-Host "Synced: $File -> android-app" -ForegroundColor Cyan
     } else {
         Write-Warning "Source file not found: $File"
+    }
+}
+
+foreach ($Directory in $DirectoriesToCopy) {
+    $SrcDirectory = Join-Path $SourceDir $Directory
+    $DstDirectory = Join-Path $DestDir $Directory
+
+    if (Test-Path $SrcDirectory) {
+        Copy-Item -Path $SrcDirectory -Destination $DestDir -Recurse -Force
+        Write-Host "Synced directory: $Directory -> android-app" -ForegroundColor Cyan
+    } else {
+        Write-Warning "Source directory not found: $Directory"
     }
 }
 

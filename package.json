@@ -1,0 +1,30 @@
+{
+  "name": "codearc-restrosuite",
+  "version": "2.0.0",
+  "private": true,
+  "description": "RestoSuite restaurant POS, tenant dashboard, customer ordering, and WhatsApp gateway.",
+  "main": "whatsapp-gateway.js",
+  "scripts": {
+    "start:gateway": "node whatsapp-gateway.js",
+    "test": "node --test --test-isolation=none tests/*.test.cjs",
+    "check": "node scripts/check-project.cjs",
+    "sync:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./sync-assets.ps1",
+    "build:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-android.ps1",
+    "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/release.ps1"
+  },
+  "engines": {
+    "node": ">=20 <26"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "archiver": "^7.0.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "nodemailer": "^8.0.10",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "unzipper": "^0.12.3",
+    "whatsapp-web.js": "^1.34.1",
+    "ws": "^8.18.3"
+  }
+}

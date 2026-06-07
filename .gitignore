@@ -7,12 +7,14 @@ app/build/
 **/build/
 *.apk
 *.aar
+dashboard-phase2-restore.zip
 local.properties
 .DS_Store
 
 # Node
 node_modules/
 node_modules_old/
+.npm-cache/
 node-portable/
 node.zip
 
