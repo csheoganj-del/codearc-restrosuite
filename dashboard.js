@@ -54,13 +54,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
   const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+  const ZERO_COST_LAUNCH_MODE = true;
+  const CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+  const FAST_INTERACTION_MODE = true;
+  const runWhenIdle = window.requestIdleCallback
+    ? (task, timeout = 800) => window.requestIdleCallback(task, { timeout })
+    : (task) => window.setTimeout(task, 16);
+
+  function debounce(fn, delay = 80) {
+    let timer = null;
+    return function debounced(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
+
+  function frameTask(fn) {
+    return window.requestAnimationFrame ? window.requestAnimationFrame(fn) : setTimeout(fn, 0);
+  }
   const apiDomain = window.RestroSuite && window.RestroSuite.api;
   const authDomain = window.RestroSuite && window.RestroSuite.auth;
   const billingDomain = window.RestroSuite && window.RestroSuite.billing;
   const billsDomain = window.RestroSuite && window.RestroSuite.bills;
   const inventoryDomain = window.RestroSuite && window.RestroSuite.inventory;
+  const observabilityDomain = window.RestroSuite && window.RestroSuite.observability;
   const operationsDomain = window.RestroSuite && window.RestroSuite.operations;
   const peopleDomain = window.RestroSuite && window.RestroSuite.people;
+  const staffAccessDomain = window.RestroSuite && window.RestroSuite.staffAccess;
   const posDomain = window.RestroSuite && window.RestroSuite.pos;
   const superadminDomain = window.RestroSuite && window.RestroSuite.superadmin;
   const whatsappDomain = window.RestroSuite && window.RestroSuite.whatsapp;
@@ -71,8 +91,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     || !billingDomain
     || !billsDomain
     || !inventoryDomain
+    || !observabilityDomain
     || !operationsDomain
     || !peopleDomain
+    || !staffAccessDomain
     || !posDomain
     || !superadminDomain
     || !whatsappDomain
@@ -89,6 +111,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     onAdminUnauthorized: () => sessionStorage.removeItem('superadmin_admin_token')
   });
   const callTenantAccess = tenantApi.access;
+  const callTenantStaff = tenantApi.staff;
+  const appReporter = observabilityDomain.createReporter({
+    baseUrl: DEFAULT_SUPABASE_URL,
+    anonKey: DEFAULT_SUPABASE_KEY,
+    fetchImpl: window.fetch.bind(window),
+    source: 'dashboard',
+    appVersion: '2.0'
+  });
+  appReporter.installGlobalHandlers(() => ({
+    tenant_id: sessionStorage.getItem('tenant_id') || '',
+    tenant_slug: sessionStorage.getItem('tenant_slug') || '',
+    metadata: {
+      role: sessionStorage.getItem('logged_in_role') || '',
+      active_tab: document.querySelector('.tab-content.active')?.id || ''
+    }
+  }));
   const sessionManager = authDomain.createSessionManager({
     storage: sessionStorage,
     validateSession: (sessionToken) => callTenantAccess('validate_session', {
@@ -119,6 +157,65 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
   let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
   let saasGatewayPollingInterval = null;
+
+  // ==========================================
+  // DYNAMIC BRANDING — tenant name, user, avatar
+  // ==========================================
+  (function bootstrapDynamicBranding() {
+    const loggedInUser = sessionStorage.getItem('logged_in_user') || '';
+    const loggedInRole = sessionStorage.getItem('logged_in_role') || 'staff';
+    const displayName = sessionStorage.getItem('display_name') || loggedInUser;
+    const avatarInitial = (displayName || loggedInUser || '?').charAt(0).toUpperCase();
+    const roleLabel = {
+      admin: 'Administrator', cashier: 'Cashier', kitchen: 'Kitchen Staff',
+      waiter: 'Waiter', customer_display: 'Customer Display', superadmin: 'Super Admin'
+    }[loggedInRole] || loggedInRole;
+
+    // Sidebar brand — show restaurant name
+    const brandNameEl = document.getElementById('sidebar-brand-name');
+    const brandTypeEl = document.getElementById('sidebar-brand-type');
+    if (brandNameEl && activeTenantName) {
+      // Show up to first word of tenant name, capped at 10 chars for sidebar
+      const parts = activeTenantName.split(' ');
+      brandNameEl.textContent = (parts[0] || 'RESTRO').toUpperCase().slice(0, 10);
+      if (brandTypeEl && parts.length > 1) {
+        brandTypeEl.textContent = parts.slice(1).join(' ').slice(0, 8);
+      } else if (brandTypeEl) {
+        brandTypeEl.textContent = 'Suite';
+      }
+    }
+
+    // Mobile brand title
+    const mobileBrand = document.getElementById('mobile-brand-text');
+    if (mobileBrand) mobileBrand.textContent = activeTenantName || 'RestoSuite';
+
+    // Sidebar avatar + user details
+    const sidebarAvatarLetter = document.getElementById('sidebar-avatar-letter');
+    if (sidebarAvatarLetter) sidebarAvatarLetter.textContent = avatarInitial;
+    const sidebarUserName = document.getElementById('sidebar-user-name');
+    if (sidebarUserName) sidebarUserName.textContent = displayName || loggedInUser;
+    const sidebarUserRole = document.getElementById('sidebar-user-role');
+    if (sidebarUserRole) sidebarUserRole.textContent = roleLabel;
+
+    // Mobile profile avatar
+    const mobileProfileBtn = document.getElementById('mobile-profile-btn');
+    if (mobileProfileBtn) mobileProfileBtn.textContent = avatarInitial;
+
+    // Lock screen brand
+    const lockBrandName = document.getElementById('lock-brand-name');
+    const lockBrandDesc = document.getElementById('lock-brand-desc');
+    if (lockBrandName) lockBrandName.textContent = (activeTenantName || 'RESTRO').toUpperCase().slice(0, 12);
+    if (lockBrandDesc) lockBrandDesc.textContent = 'SECURE TERMINAL';
+
+    // Window title
+    document.title = `${activeTenantName || 'RestoSuite'} — Dashboard`;
+  })();
+
+  staffAccessDomain.initialize({
+    callStaff: callTenantStaff,
+    notify: (message) => showNotificationToast(message),
+    role: sessionStorage.getItem('logged_in_role')
+  });
 
   async function refreshAuthoritativeTenantSession(showToast = false) {
     if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
@@ -209,6 +306,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  const vaultWriteQueue = new Map();
+  let vaultFlushScheduled = false;
+
   function setVaultData(key, value) {
     if (!dbInstance) return;
     try {
@@ -220,11 +320,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function flushVaultWrites() {
+    vaultFlushScheduled = false;
+    const pending = Array.from(vaultWriteQueue.entries());
+    vaultWriteQueue.clear();
+    pending.forEach(([key, value]) => setVaultData(key, value));
+  }
+
   window.writeToResilienceVault = function (key, value) {
     try {
-      setVaultData(key, JSON.parse(value));
+      vaultWriteQueue.set(key, JSON.parse(value));
     } catch (e) {
-      setVaultData(key, value);
+      vaultWriteQueue.set(key, value);
+    }
+    if (!vaultFlushScheduled) {
+      vaultFlushScheduled = true;
+      runWhenIdle(flushVaultWrites, 1200);
     }
   };
 
@@ -332,15 +443,82 @@ document.addEventListener('DOMContentLoaded', async () => {
     errIndicator.style.zIndex = '999999';
     errIndicator.style.fontFamily = 'monospace';
     errIndicator.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-    errIndicator.innerHTML = `⚠️ Terminal Script Exception (Line ${lineNo}): ${msg.slice(0, 50)}...`;
+    errIndicator.textContent = `Terminal Script Exception (Line ${lineNo}): ${msg.slice(0, 50)}...`;
     document.body.appendChild(errIndicator);
     setTimeout(() => { if (errIndicator.parentNode) errIndicator.parentNode.removeChild(errIndicator); }, 8000);
     return false;
   };
 
-  // Sales popularity database map
-  let posPopularityMap = (() => { try { return JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {}; } catch (e) { return {}; } })();
-  let isSplitPaymentActive = false;
+  // ==========================================
+  // PIN LOCK SCREEN — Attempt Lockout (max 5 tries, 60s cooldown)
+  // ==========================================
+  (function initPinLockoutSecurity() {
+    const pageLockOverlay = document.getElementById('page-lock-overlay');
+    if (!pageLockOverlay) return;
+
+    let pinAttempts = 0;
+    const MAX_PIN_ATTEMPTS = 5;
+    const LOCKOUT_DURATION_MS = 60 * 1000; // 60 seconds
+    let lockoutTimer = null;
+
+    function getLockPasscodeInput() { return document.getElementById('lock-passcode-input'); }
+    function getLockPasscodeError() { return document.getElementById('lock-passcode-error'); }
+    function getLockPinButtons() { return document.querySelectorAll('.lock-pin-btn'); }
+
+    function disablePinEntry(secondsRemaining) {
+      const errorEl = getLockPasscodeError();
+      const inputEl = getLockPasscodeInput();
+      if (inputEl) { inputEl.disabled = true; inputEl.value = ''; }
+      getLockPinButtons().forEach(btn => { btn.disabled = true; btn.style.opacity = '0.4'; });
+      if (errorEl) errorEl.textContent = `Too many attempts. Wait ${secondsRemaining}s...`;
+      let remaining = secondsRemaining;
+      lockoutTimer = setInterval(() => {
+        remaining--;
+        if (errorEl) errorEl.textContent = remaining > 0 ? `Too many attempts. Wait ${remaining}s...` : '';
+        if (remaining <= 0) {
+          clearInterval(lockoutTimer);
+          lockoutTimer = null;
+          pinAttempts = 0;
+          if (inputEl) { inputEl.disabled = false; }
+          getLockPinButtons().forEach(btn => { btn.disabled = false; btn.style.opacity = ''; });
+        }
+      }, 1000);
+    }
+
+    function onPinWrongAttempt() {
+      pinAttempts++;
+      const errorEl = getLockPasscodeError();
+      if (pinAttempts >= MAX_PIN_ATTEMPTS) {
+        disablePinEntry(Math.round(LOCKOUT_DURATION_MS / 1000));
+      } else {
+        const remaining = MAX_PIN_ATTEMPTS - pinAttempts;
+        if (errorEl) errorEl.textContent = `Incorrect PIN. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`;
+        const inputEl = getLockPasscodeInput();
+        if (inputEl) inputEl.value = '';
+      }
+    }
+
+    // Patch: intercept unlock attempts on the existing lock screen
+    // The unlock button (data-val="unlock") triggers the existing handler.
+    // We wrap at the document level to count wrong attempts.
+    const originalUnlockHandler = window.__originalLockUnlockHandler;
+    pageLockOverlay.addEventListener('click', (e) => {
+      const btn = e.target.closest('.lock-pin-btn');
+      if (!btn) return;
+      if (btn.dataset.val === 'unlock') {
+        // Allow existing handler to run first via setTimeout 0
+        setTimeout(() => {
+          // If overlay is still visible after the handler ran, it was a wrong PIN
+          if (pageLockOverlay.style.display !== 'none' && pageLockOverlay.style.display !== '') {
+            if (!lockoutTimer) onPinWrongAttempt();
+          } else {
+            // Correct PIN — reset counter
+            pinAttempts = 0;
+          }
+        }, 50);
+      }
+    }, true); // capture phase so we run after the bubbled handler
+  })();
 
   async function sha256(string) {
     const utf8 = new TextEncoder().encode(string);
@@ -734,17 +912,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (businessProfile.crmEnabled === undefined) businessProfile.crmEnabled = true;
   if (businessProfile.taxEnabled === undefined) businessProfile.taxEnabled = true;
   if (businessProfile.soundEnabled === undefined) businessProfile.soundEnabled = false;
-  if (businessProfile.whatsappEnabled === undefined) businessProfile.whatsappEnabled = true;
+  if (businessProfile.whatsappEnabled === undefined) businessProfile.whatsappEnabled = false;
   if (businessProfile.shiftEnabled === undefined) businessProfile.shiftEnabled = false;
   if (businessProfile.shiftDefaultFloat === undefined) businessProfile.shiftDefaultFloat = 2000;
   if (businessProfile.shiftMaxDrawer === undefined) businessProfile.shiftMaxDrawer = 5000;
   if (businessProfile.shiftPosLock === undefined) businessProfile.shiftPosLock = true;
-  if (businessProfile.whatsappGatewayUrl === undefined || !businessProfile.whatsappGatewayUrl || businessProfile.whatsappGatewayUrl.trim() === '' || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
-    businessProfile.whatsappGatewayUrl = 'http://localhost:8001/api/mock-whatsapp';
+  if (businessProfile.whatsappGatewayUrl === undefined || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
+    businessProfile.whatsappGatewayUrl = '';
   }
-  if (businessProfile.whatsappGatewayEnabled === undefined || businessProfile.whatsappGatewayEnabled === false) {
-    businessProfile.whatsappGatewayEnabled = true;
-  }
+  if (businessProfile.whatsappGatewayEnabled === undefined) businessProfile.whatsappGatewayEnabled = false;
   if (businessProfile.whatsappGatewayToken === undefined) businessProfile.whatsappGatewayToken = '';
   if (businessProfile.collapseSidebar === undefined) businessProfile.collapseSidebar = false;
   document.body.classList.toggle('sidebar-collapsed', businessProfile.collapseSidebar === true);
@@ -1163,12 +1339,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             featureFlags: dbProfile.feature_flags ? JSON.parse(dbProfile.feature_flags) : (businessProfile.featureFlags || {})
           };
 
-          if (businessProfile.whatsappGatewayUrl === undefined || !businessProfile.whatsappGatewayUrl || businessProfile.whatsappGatewayUrl.trim() === '' || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
-            businessProfile.whatsappGatewayUrl = 'http://localhost:8001/api/mock-whatsapp';
+          if (businessProfile.whatsappGatewayUrl === undefined || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
+            businessProfile.whatsappGatewayUrl = '';
           }
-          if (businessProfile.whatsappGatewayEnabled === undefined || businessProfile.whatsappGatewayEnabled === false) {
-            businessProfile.whatsappGatewayEnabled = true;
-          }
+          if (businessProfile.whatsappGatewayEnabled === undefined) businessProfile.whatsappGatewayEnabled = false;
 
           localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
           setVaultData("doppio_business_profile", businessProfile);
@@ -1882,12 +2056,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         .subscribe();
 
       setInterval(() => {
-        refreshAuthoritativeTenantSession(false);
+        if (!document.hidden) refreshAuthoritativeTenantSession(false);
       }, 60000);
 
       setInterval(() => {
-        syncWithSupabase();
-      }, 30000);
+        if (!document.hidden && navigator.onLine) syncWithSupabase();
+      }, 60000);
     }
 
     // ⚡ REAL-TIME DATA RESET SYNC
@@ -1937,11 +2111,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   const tabContents = document.querySelectorAll('.tab-content');
   const tabTitle = document.getElementById('tab-title');
   const tabSubtitle = document.getElementById('tab-subtitle');
+  let menuEditorDirty = false;
 
   sidebarLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const tabId = link.getAttribute('data-tab');
+      const currentTab = document.querySelector('.tab-content.active');
+      if (
+        currentTab
+        && currentTab.id === 'editor-tab'
+        && tabId !== 'editor-tab'
+        && menuEditorDirty
+        && !window.confirm('You have unsaved menu changes. Leave without saving?')
+      ) {
+        return;
+      }
+      if (currentTab && currentTab.id === 'editor-tab' && tabId !== 'editor-tab') {
+        menuEditorDirty = false;
+      }
 
       // Stop SaaS Gateway polling if we switch away from gateway-monitor-tab
       if (tabId !== 'gateway-monitor-tab' && typeof stopSaaSGatewayPolling === 'function') {
@@ -1965,55 +2153,59 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (tabId === 'pos-tab') tabSubtitle.textContent = 'Default Tab: Selection Grid';
       else if (tabId === 'qr-orders-tab') {
         tabSubtitle.textContent = 'Dine-in self-service active';
-        updateQrOrdersDashboardUI();
+        frameTask(updateQrOrdersDashboardUI);
       }
       else if (tabId === 'bills-tab') {
         tabSubtitle.textContent = 'Print, Refund, or Edit Invoices';
-        renderBills();
+        frameTask(renderBills);
       }
       else if (tabId === 'inventory-tab') {
         tabSubtitle.textContent = 'Live Ingredient & Resource Levels';
-        renderInventory();
+        frameTask(renderInventory);
       }
       else if (tabId === 'reports-tab') {
         tabSubtitle.textContent = 'Nagpur Branch Sales & Analytics';
-        renderReports();
+        frameTask(renderReports);
       }
       else if (tabId === 'editor-tab') {
         tabSubtitle.textContent = 'Manage Drink & Food Items';
-        renderMenuEditor();
+        frameTask(renderMenuEditor);
       }
       else if (tabId === 'crm-tab') {
         tabSubtitle.textContent = 'Customer Relationship & Loyalty Ledger';
-        renderCRMTab();
+        frameTask(renderCRMTab);
       }
       else if (tabId === 'tax-tab') {
         tabSubtitle.textContent = 'Central & State Tax Ledger Filing Hub';
-        renderTaxTab();
+        frameTask(renderTaxTab);
       }
       else if (tabId === 'employees-tab') {
         tabSubtitle.textContent = 'India Payroll, Shifts & Leaves';
-        renderEmployeesTab();
+        frameTask(renderEmployeesTab);
+      }
+      else if (tabId === 'growth-hub-tab') {
+        tabSubtitle.textContent = 'Onboarding, support, billing, reservations, procurement, offers, refunds, devices, backups, and launch operations';
+        frameTask(renderGrowthHub);
       }
       else if (tabId === 'online-tab') {
         tabSubtitle.textContent = 'Online Delivery Channel Integration Center';
-        renderOnlineOrdersTab();
+        frameTask(renderOnlineOrdersTab);
       }
       else if (tabId === 'kds-tab') {
         tabSubtitle.textContent = 'Kitchen Cooking Live Preparation Board';
-        if (typeof renderKDSTab === 'function') renderKDSTab();
+        if (typeof renderKDSTab === 'function') frameTask(renderKDSTab);
       }
       else if (tabId === 'tokens-tab') {
         tabSubtitle.textContent = 'Live Takeaway & Delivery Pickup Screen';
-        if (typeof renderTokensTab === 'function') renderTokensTab();
+        if (typeof renderTokensTab === 'function') frameTask(renderTokensTab);
       }
       else if (tabId === 'super-admin-tab') {
         tabSubtitle.textContent = 'Manage client subscriptions, features, and system access';
-        renderSuperAdminTab();
+        frameTask(renderSuperAdminTab);
       }
       else if (tabId === 'gateway-monitor-tab') {
         tabSubtitle.textContent = 'Monitor WhatsApp and Email notifications dispatch';
-        setupGatewayMonitorTab();
+        frameTask(setupGatewayMonitorTab);
       }
     });
   });
@@ -2118,30 +2310,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderPOSCategories() {
     if (!posCategories) return;
     const categories = ['ALL', ...new Set(menu.map(item => item.category))];
-    posCategories.innerHTML = '';
-
-    categories.forEach(cat => {
-      const btn = document.createElement('button');
-      btn.className = `pos-cat-btn ${cat === activePOSCategory ? 'active' : ''}`;
-      btn.setAttribute('data-category', cat);
-
+    posCategories.innerHTML = categories.map(cat => {
       let label = cat.toLowerCase().replace('&', 'and');
       label = label.charAt(0).toUpperCase() + label.slice(1);
-
       const icon = categoryIconsMap[cat] || '<i class="fa-solid fa-mug-hot"></i>';
-      btn.innerHTML = `${icon} ${label}`;
-      posCategories.appendChild(btn);
-    });
+      return `<button type="button" class="pos-cat-btn ${cat === activePOSCategory ? 'active' : ''}" data-category="${escHtml(cat)}">${icon} ${escHtml(label)}</button>`;
+    }).join('');
   }
 
   function renderPOSItems() {
     if (!posItemsGrid) return;
-    posItemsGrid.innerHTML = '';
-
+    const normalizedSearch = posSearchQuery.trim().toLowerCase();
     const filteredItems = menu.filter(item => {
       const matchesCategory = activePOSCategory === 'ALL' || item.category === activePOSCategory;
-      const matchesSearch = (item.name && item.name.toLowerCase().includes(posSearchQuery.toLowerCase())) ||
-        (item.description && item.description.toLowerCase().includes(posSearchQuery.toLowerCase()));
+      const matchesSearch = !normalizedSearch
+        || (item.name && item.name.toLowerCase().includes(normalizedSearch))
+        || (item.description && item.description.toLowerCase().includes(normalizedSearch));
       return matchesCategory && matchesSearch;
     });
 
@@ -2190,17 +2374,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (posSearch) {
+    const renderFilteredPOSItems = debounce(renderPOSItems, 70);
     posSearch.addEventListener('input', (e) => {
       posSearchQuery = e.target.value;
-      renderPOSItems();
-    });
+      renderFilteredPOSItems();
+    }, { passive: true });
   }
 
   if (posCategories) {
     posCategories.addEventListener('click', (e) => {
       const btn = e.target.closest('.pos-cat-btn');
       if (btn) {
-        document.querySelectorAll('.pos-cat-btn').forEach(b => b.classList.remove('active'));
+        posCategories.querySelectorAll('.pos-cat-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activePOSCategory = btn.getAttribute('data-category');
         renderPOSItems();
@@ -3969,7 +4154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    if (businessProfile.whatsappGatewayEnabled && businessProfile.whatsappGatewayUrl && businessProfile.whatsappGatewayUrl.trim() !== '') {
+    if (!ZERO_COST_LAUNCH_MODE && businessProfile.whatsappGatewayEnabled && businessProfile.whatsappGatewayUrl && businessProfile.whatsappGatewayUrl.trim() !== '') {
       showNotificationToast("Sending WhatsApp Bill...");
 
       const gatewayUrl = businessProfile.whatsappGatewayUrl.trim();
@@ -4034,7 +4219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error("Failed to send WhatsApp bill via: " + targetUrl, err);
             if (!isFallback) {
               const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
-              const fallbackUrl = isLocal ? 'https://kalpeshdeora1006-whatsapp-gateway.hf.space' : 'http://localhost:3000';
+              const fallbackUrl = isLocal && CLOUD_WHATSAPP_GATEWAY_URL ? CLOUD_WHATSAPP_GATEWAY_URL : 'http://localhost:3000';
 
               showNotificationToast("Primary Gateway Offline. Trying Backup...");
               console.log("Triggering auto-failover to backup: " + fallbackUrl);
@@ -5558,8 +5743,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Menu visual form submissions
   const menuEditorForm = document.getElementById('menu-item-editor-form');
   if (menuEditorForm) {
+    menuEditorForm.addEventListener('input', () => { menuEditorDirty = true; });
+    menuEditorForm.addEventListener('change', () => { menuEditorDirty = true; });
     menuEditorForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      menuEditorDirty = false;
       SoundEffects.playClick();
 
       const index = document.getElementById('edit-item-index').value;
@@ -5750,12 +5938,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td style="font-weight:600; color:var(--primary-brand);">${c.name}</td>
-          <td>${c.phone || '-'}</td>
-          <td>${c.visits}</td>
-          <td style="font-weight:600;">₹${c.total_spend}</td>
-          <td><span class="status-badge paid" style="font-weight:700;">${tier}</span></td>
-          <td>${lastVisitStr}</td>
+          <td style="font-weight:600; color:var(--primary-brand);">${escHtml(c.name)}</td>
+          <td>${escHtml(c.phone || '-')}</td>
+          <td>${Number(c.visits) || 0}</td>
+          <td style="font-weight:600;">₹${Number(c.total_spend) || 0}</td>
+          <td><span class="status-badge paid" style="font-weight:700;">${escHtml(tier)}</span></td>
+          <td>${escHtml(lastVisitStr)}</td>
         `;
         crmTableBody.appendChild(tr);
       });
@@ -6731,11 +6919,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const localTxt = document.getElementById('wa-local-txt');
     const cloudTxt = document.getElementById('wa-cloud-txt');
 
-    if (!waGatewayEnabledEl || !waGatewayEnabledEl.checked) {
+    if (ZERO_COST_LAUNCH_MODE || !waGatewayEnabledEl || !waGatewayEnabledEl.checked) {
       if (qrContainer) qrContainer.style.display = 'none';
       if (connectedContainer) connectedContainer.style.display = 'none';
       if (statusBadge) {
-        statusBadge.textContent = 'DISABLED';
+        statusBadge.textContent = ZERO_COST_LAUNCH_MODE ? 'ZERO-COST MODE' : 'DISABLED';
         statusBadge.style.background = '#e0e0e0';
         statusBadge.style.color = '#666';
       }
@@ -6808,23 +6996,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         }
       });
 
-    // Ping Cloud Gateway Status
-    fetch('https://kalpeshdeora1006-whatsapp-gateway.hf.space/status')
-      .then(res => res.json())
-      .then(data => {
-        if (cloudDot && cloudTxt) {
-          cloudTxt.textContent = data.status === 'ready' ? 'online' : data.status;
-          cloudTxt.style.color = data.status === 'ready' ? '#155724' : '#856404';
-          cloudDot.style.background = data.status === 'ready' ? '#28a745' : '#ffc107';
-        }
-      })
-      .catch(() => {
-        if (cloudDot && cloudTxt) {
-          cloudTxt.textContent = 'offline';
-          cloudTxt.style.color = '#721c24';
-          cloudDot.style.background = '#dc3545';
-        }
-      });
+    if (CLOUD_WHATSAPP_GATEWAY_URL) {
+      fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/status`)
+        .then(res => res.json())
+        .then(data => {
+          if (cloudDot && cloudTxt) {
+            cloudTxt.textContent = data.status === 'ready' ? 'online' : data.status;
+            cloudTxt.style.color = data.status === 'ready' ? '#155724' : '#856404';
+            cloudDot.style.background = data.status === 'ready' ? '#28a745' : '#ffc107';
+          }
+        })
+        .catch(() => {
+          if (cloudDot && cloudTxt) {
+            cloudTxt.textContent = 'offline';
+            cloudTxt.style.color = '#721c24';
+            cloudDot.style.background = '#dc3545';
+          }
+        });
+    }
 
     // Fetch details from the currently selected Gateway (for main settings display & QR code rendering)
     fetch(`${url}/status`)
@@ -6891,6 +7080,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   function startWhatsAppPolling() {
     if (waPollingInterval) clearInterval(waPollingInterval);
     pollWhatsAppGatewayStatus();
+    if (ZERO_COST_LAUNCH_MODE) return;
     waPollingInterval = setInterval(pollWhatsAppGatewayStatus, 3000);
   }
 
@@ -7075,10 +7265,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   const waSelectCloudBtn = document.getElementById('wa-select-cloud');
   if (waSelectCloudBtn) {
+    if (ZERO_COST_LAUNCH_MODE) {
+      waSelectCloudBtn.disabled = true;
+      waSelectCloudBtn.title = 'Available after moving to paid infrastructure';
+    }
     waSelectCloudBtn.addEventListener('click', () => {
+      if (ZERO_COST_LAUNCH_MODE || !CLOUD_WHATSAPP_GATEWAY_URL) return;
       SoundEffects.playClick();
       if (waGatewayUrlEl) {
-        waGatewayUrlEl.value = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+        waGatewayUrlEl.value = CLOUD_WHATSAPP_GATEWAY_URL;
         const changeEvent = new Event('change');
         waGatewayUrlEl.dispatchEvent(changeEvent);
       }
@@ -8904,6 +9099,326 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   updateThemeUI(savedTheme);
 
   // ==========================================
+  // GROWTH HUB: SaaS launch and restaurant expansion modules
+  // ==========================================
+  const growthCollections = {
+    onboarding: 'doppio_onboarding_tasks',
+    support: 'doppio_support_tickets',
+    reservations: 'doppio_reservations',
+    vendors: 'doppio_vendors',
+    purchaseOrders: 'doppio_purchase_orders',
+    costs: 'doppio_item_costs',
+    offers: 'doppio_offers',
+    refunds: 'doppio_refund_requests',
+    devices: 'doppio_device_setups',
+    backups: 'doppio_backup_snapshots',
+    outlets: 'doppio_outlets',
+    migrations: 'doppio_migration_status',
+    invoices: 'doppio_saas_invoices'
+  };
+
+  const growthDefaults = {
+    onboarding: [
+      { task_key: 'profile', title: 'Business profile, GST, UPI and logo configured', status: businessProfile.name ? 'done' : 'pending' },
+      { task_key: 'menu', title: 'Menu imported and prices verified', status: menu.length > 0 ? 'done' : 'pending' },
+      { task_key: 'staff', title: 'Staff roles and permissions created', status: 'pending' },
+      { task_key: 'tables', title: 'QR table codes generated and tested', status: 'pending' },
+      { task_key: 'printer', title: 'Thermal printer and Android receipt test completed', status: 'pending' },
+      { task_key: 'first-order', title: 'First POS and QR test order completed', status: bills.length > 0 ? 'done' : 'pending' }
+    ],
+    support: [],
+    reservations: [],
+    purchaseOrders: [],
+    costs: [],
+    offers: [],
+    refunds: [],
+    devices: [{ device_type: 'printer', device_name: 'Thermal receipt printer', status: 'pending', notes: 'Run one test receipt before launch.' }],
+    backups: [{ label: 'Manual JSON export readiness', backup_version: '2.0', scope: 'full', status: 'available' }],
+    outlets: [{ outlet_name: activeTenantName || 'Primary Outlet', outlet_code: activeTenantSlug || 'primary', status: 'active' }],
+    migrations: [{ version: '2.0-growth-hub', status: 'complete', notes: 'Growth Hub launch modules registered.' }],
+    invoices: [{
+      invoice_number: `DRAFT-${new Date().toISOString().slice(0, 10)}`,
+      plan_code: sessionStorage.getItem('tenant_plan_code') || 'starter',
+      amount: 0,
+      status: 'draft',
+      due_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+    }]
+  };
+
+  const growthState = {};
+  Object.keys(growthCollections).forEach(key => {
+    try {
+      growthState[key] = JSON.parse(localStorage.getItem(growthCollections[key])) || growthDefaults[key] || [];
+    } catch {
+      growthState[key] = growthDefaults[key] || [];
+    }
+  });
+
+  function persistGrowthCollection(key) {
+    const table = growthCollections[key];
+    if (!table) return;
+    localStorage.setItem(table, JSON.stringify(growthState[key] || []));
+  }
+
+  async function cloudInsertGrowth(key, row) {
+    const table = growthCollections[key];
+    if (!supabaseClient || !table) return;
+    try {
+      const payload = { ...row };
+      if (payload.id && String(payload.id).startsWith('local-')) delete payload.id;
+      const conflictTargets = {
+        onboarding: 'tenant_id,task_key',
+        costs: 'tenant_id,item_name',
+        offers: 'tenant_id,code',
+        outlets: 'tenant_id,outlet_code',
+        migrations: 'tenant_id,version',
+        invoices: 'tenant_id,invoice_number'
+      };
+      const request = conflictTargets[key]
+        ? supabaseClient.from(table).upsert(payload, { onConflict: conflictTargets[key] })
+        : supabaseClient.from(table).insert(payload);
+      const { error } = await request;
+      if (error) console.warn(`Growth Hub cloud insert failed for ${table}:`, error.message);
+    } catch (error) {
+      console.warn(`Growth Hub cloud insert failed for ${table}:`, error.message);
+    }
+  }
+
+  function growthItem(title, detail, pill) {
+    return `
+      <div class="growth-item">
+        <div>
+          <strong>${escHtml(title)}</strong>
+          <span>${escHtml(detail || '')}</span>
+        </div>
+        ${pill ? `<span class="growth-pill">${escHtml(pill)}</span>` : ''}
+      </div>
+    `;
+  }
+
+  function renderGrowthHub() {
+    renderGrowthOnboarding();
+    renderGrowthSupport();
+    renderGrowthBilling();
+    renderGrowthReservations();
+    renderGrowthProcurement();
+    renderGrowthCosting();
+    renderGrowthOffers();
+    renderGrowthRefunds();
+    renderGrowthDevices();
+    renderGrowthOutlets();
+    renderGrowthReliability();
+  }
+
+  function renderGrowthOnboarding() {
+    const list = document.getElementById('growth-onboarding-list');
+    if (!list) return;
+    list.innerHTML = growthState.onboarding.map(task => `
+      <label class="growth-item growth-check">
+        <input type="checkbox" data-growth-task="${escHtml(task.task_key)}" ${task.status === 'done' ? 'checked' : ''}>
+        <div>
+          <strong>${escHtml(task.title)}</strong>
+          <span>${task.status === 'done' ? 'Ready for launch' : 'Pending setup'}</span>
+        </div>
+      </label>
+    `).join('');
+  }
+
+  function renderGrowthSupport() {
+    const list = document.getElementById('growth-support-list');
+    if (!list) return;
+    const tickets = growthState.support.slice(-4).reverse();
+    list.innerHTML = tickets.length
+      ? tickets.map(ticket => growthItem(ticket.subject, ticket.last_message || ticket.category || 'Support request', ticket.status || 'open')).join('')
+      : growthItem('No support tickets yet', 'Create a ticket when a tenant issue needs tracking.', 'clear');
+  }
+
+  function renderGrowthBilling() {
+    const target = document.getElementById('growth-billing-summary');
+    if (!target) return;
+    const plan = sessionStorage.getItem('tenant_plan_name') || 'Starter';
+    const status = sessionStorage.getItem('tenant_subscription_status') || 'active';
+    const limits = JSON.parse(sessionStorage.getItem('tenant_plan_limits') || '{}');
+    const invoices = growthState.invoices || [];
+    target.innerHTML = [
+      growthItem('Current plan', `${plan} · ${status}`, sessionStorage.getItem('tenant_plan_code') || 'starter'),
+      growthItem('Usage guardrail', `${limits.max_staff || 5} staff · ${limits.monthly_order_limit || 300} online orders/month`, 'free tier'),
+      growthItem('Invoice records', `${invoices.length} draft/issued invoice records ready for Razorpay or Stripe`, 'billing')
+    ].join('');
+  }
+
+  function renderGrowthReservations() {
+    const list = document.getElementById('growth-reservation-list');
+    if (!list) return;
+    const reservations = growthState.reservations.slice(-4).reverse();
+    list.innerHTML = reservations.length
+      ? reservations.map(item => growthItem(item.guest_name, `${item.party_size || 2} guests · ${item.table_number || 'waitlist'}`, item.status || 'booked')).join('')
+      : growthItem('No reservations', 'Use this to manage bookings and waitlist.', 'booked');
+  }
+
+  function renderGrowthProcurement() {
+    const list = document.getElementById('growth-procurement-list');
+    if (!list) return;
+    const rows = growthState.purchaseOrders.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => growthItem(row.item_name, `${row.vendor_name} · ₹${Number(row.expected_cost || 0)}`, row.status || 'draft')).join('')
+      : growthItem('No purchase orders', 'Track supplier orders, receiving, and vendor bills here.', 'draft');
+  }
+
+  function renderGrowthCosting() {
+    const list = document.getElementById('growth-costing-list');
+    if (!list) return;
+    const rows = growthState.costs.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => {
+        const price = Number(row.menu_price || 0);
+        const cost = Number(row.estimated_cost || 0);
+        const margin = price > 0 ? Math.round(((price - cost) / price) * 100) : 0;
+        return growthItem(row.item_name, `Price ₹${price} · Cost ₹${cost}`, `${margin}% margin`);
+      }).join('')
+      : growthItem('No costing records', 'Add top sellers to monitor food cost and gross margin.', 'margin');
+  }
+
+  function renderGrowthOffers() {
+    const list = document.getElementById('growth-offer-list');
+    if (!list) return;
+    const rows = growthState.offers.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => growthItem(row.code, `${row.title} · ${row.discount_value}%`, row.status || 'active')).join('')
+      : growthItem('No offers yet', 'Create coupons, bundles, happy hours, and birthday offers.', 'offer');
+  }
+
+  function renderGrowthRefunds() {
+    const list = document.getElementById('growth-refund-list');
+    if (!list) return;
+    const rows = growthState.refunds.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => growthItem(row.order_id, `₹${Number(row.amount || 0)} · ${row.reason}`, row.status || 'pending')).join('')
+      : growthItem('No refund requests', 'Manager approval requests will appear here.', 'clear');
+  }
+
+  function renderGrowthDevices() {
+    const list = document.getElementById('growth-device-list');
+    if (!list) return;
+    list.innerHTML = growthState.devices.map(row => growthItem(row.device_name, row.notes || row.device_type, row.status || 'pending')).join('');
+  }
+
+  function renderGrowthOutlets() {
+    const list = document.getElementById('growth-outlet-list');
+    if (!list) return;
+    list.innerHTML = growthState.outlets.map(row => growthItem(row.outlet_name, row.address || row.outlet_code, row.status || 'active')).join('');
+  }
+
+  function renderGrowthReliability() {
+    const backupList = document.getElementById('growth-backup-list');
+    const complianceList = document.getElementById('growth-compliance-list');
+    if (backupList) {
+      backupList.innerHTML = [
+        ...growthState.backups.map(row => growthItem(row.label, `${row.scope || 'full'} · v${row.backup_version || '2.0'}`, row.status || 'available')),
+        growthItem('Restore preview required', 'Preview and undo restore should be used before large imports.', 'safety')
+      ].join('');
+    }
+    if (complianceList) {
+      complianceList.innerHTML = [
+        growthItem('Terms, Privacy, Refund Policy', 'Static policy pages are ready and should be reviewed before launch.', 'legal'),
+        growthItem('Migration status', `${growthState.migrations.length} migration marker recorded`, 'complete'),
+        growthItem('E2E test queue', 'Login, checkout, QR order, staff, tenant approval and mobile flows are marked for Playwright coverage.', 'qa')
+      ].join('');
+    }
+  }
+
+  function addGrowthRow(key, row) {
+    const item = { id: `local-${Date.now()}-${Math.random().toString(16).slice(2)}`, ...row };
+    growthState[key] = growthState[key] || [];
+    growthState[key].push(item);
+    persistGrowthCollection(key);
+    cloudInsertGrowth(key, item);
+    renderGrowthHub();
+    showNotificationToast('Growth Hub updated.');
+  }
+
+  function setupGrowthHubHandlers() {
+    const refresh = document.getElementById('growth-refresh-btn');
+    if (refresh && !refresh.dataset.bound) {
+      refresh.dataset.bound = 'true';
+      refresh.addEventListener('click', renderGrowthHub);
+    }
+
+    const sample = document.getElementById('growth-save-demo-btn');
+    if (sample && !sample.dataset.bound) {
+      sample.dataset.bound = 'true';
+      sample.addEventListener('click', () => {
+        addGrowthRow('support', { subject: 'Launch readiness review', category: 'onboarding', priority: 'normal', status: 'open', last_message: 'Review setup before first paid customer.' });
+        addGrowthRow('reservations', { guest_name: 'Walk-in Waitlist', party_size: 4, reserved_for: new Date().toISOString(), table_number: 'Waitlist', status: 'booked' });
+        addGrowthRow('purchaseOrders', { vendor_name: 'Primary Supplier', item_name: 'Milk and disposables', quantity: 1, expected_cost: 2500, status: 'draft' });
+      });
+    }
+
+    const onboarding = document.getElementById('growth-onboarding-list');
+    if (onboarding && !onboarding.dataset.bound) {
+      onboarding.dataset.bound = 'true';
+      onboarding.addEventListener('change', (event) => {
+        const checkbox = event.target.closest('[data-growth-task]');
+        if (!checkbox) return;
+        const task = growthState.onboarding.find(item => item.task_key === checkbox.dataset.growthTask);
+        if (!task) return;
+        task.status = checkbox.checked ? 'done' : 'pending';
+        task.completed_at = checkbox.checked ? new Date().toISOString() : null;
+        persistGrowthCollection('onboarding');
+        cloudInsertGrowth('onboarding', task);
+        renderGrowthOnboarding();
+      });
+    }
+
+    const forms = [
+      ['growth-support-form', 'support', () => ({ subject: document.getElementById('growth-support-subject').value.trim(), priority: document.getElementById('growth-support-priority').value, category: 'support', status: 'open', last_message: 'Created from Growth Hub.' }), ['subject']],
+      ['growth-reservation-form', 'reservations', () => ({ guest_name: document.getElementById('growth-reservation-name').value.trim(), phone: document.getElementById('growth-reservation-phone').value.trim(), party_size: Number(document.getElementById('growth-reservation-party').value || 2), reserved_for: new Date().toISOString(), status: 'booked' }), ['guest_name']],
+      ['growth-procurement-form', 'purchaseOrders', () => ({ vendor_name: document.getElementById('growth-vendor-name').value.trim(), item_name: document.getElementById('growth-po-item').value.trim(), expected_cost: Number(document.getElementById('growth-po-cost').value || 0), status: 'draft' }), ['vendor_name', 'item_name']],
+      ['growth-costing-form', 'costs', () => ({ item_name: document.getElementById('growth-cost-item').value.trim(), menu_price: Number(document.getElementById('growth-cost-price').value || 0), estimated_cost: Number(document.getElementById('growth-cost-cost').value || 0), target_margin_percent: 65 }), ['item_name']],
+      ['growth-offer-form', 'offers', () => ({ code: document.getElementById('growth-offer-code').value.trim().toUpperCase(), title: document.getElementById('growth-offer-title').value.trim(), discount_type: 'percent', discount_value: Number(document.getElementById('growth-offer-value').value || 0), status: 'active' }), ['code', 'title']],
+      ['growth-refund-form', 'refunds', () => ({ order_id: document.getElementById('growth-refund-order').value.trim(), amount: Number(document.getElementById('growth-refund-amount').value || 0), reason: document.getElementById('growth-refund-reason').value.trim(), status: 'pending' }), ['order_id', 'reason']],
+      ['growth-outlet-form', 'outlets', () => ({ outlet_name: document.getElementById('growth-outlet-name').value.trim(), outlet_code: document.getElementById('growth-outlet-code').value.trim().toLowerCase(), status: 'active' }), ['outlet_name', 'outlet_code']]
+    ];
+    forms.forEach(([formId, key, build, requiredFields]) => {
+      const form = document.getElementById(formId);
+      if (!form || form.dataset.bound) return;
+      form.dataset.bound = 'true';
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const row = build();
+        const isValid = requiredFields.every(field => String(row[field] || '').trim());
+        if (!isValid) return;
+        addGrowthRow(key, row);
+        form.reset();
+      });
+    });
+
+    const deviceBtn = document.getElementById('growth-device-test-btn');
+    if (deviceBtn && !deviceBtn.dataset.bound) {
+      deviceBtn.dataset.bound = 'true';
+      deviceBtn.addEventListener('click', () => {
+        const device = growthState.devices[0] || { device_type: 'printer', device_name: 'Thermal receipt printer' };
+        device.status = 'tested';
+        device.last_test_at = new Date().toISOString();
+        growthState.devices[0] = device;
+        persistGrowthCollection('devices');
+        cloudInsertGrowth('devices', device);
+        renderGrowthDevices();
+      });
+    }
+
+    const upgradeBtn = document.getElementById('growth-upgrade-request-btn');
+    if (upgradeBtn && !upgradeBtn.dataset.bound) {
+      upgradeBtn.dataset.bound = 'true';
+      upgradeBtn.addEventListener('click', () => {
+        addGrowthRow('support', { subject: 'Plan upgrade request', category: 'billing', priority: 'high', status: 'open', last_message: 'Tenant requested a paid plan upgrade discussion.' });
+      });
+    }
+  }
+
+  setupGrowthHubHandlers();
+
+  // ==========================================
   // MICRO-INTERACTION BUMP EFFECTS
   // ==========================================
   window.triggerCartBump = function () {
@@ -10501,7 +11016,16 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     toast.style.minWidth = '300px';
     toast.style.animation = 'none';
 
-    toast.innerHTML = `<i class="${iconClass}" style="color: ${iconColor}; margin-right: 8px;"></i> <span style="font-family: var(--font-body); font-weight:700; color: #fff;">${msg}</span>`;
+    const icon = document.createElement('i');
+    icon.className = iconClass;
+    icon.style.color = iconColor;
+    icon.style.marginRight = '8px';
+    const message = document.createElement('span');
+    message.style.fontFamily = 'var(--font-body)';
+    message.style.fontWeight = '700';
+    message.style.color = '#fff';
+    message.textContent = String(msg);
+    toast.append(icon, message);
 
     document.body.appendChild(toast);
 
@@ -12207,12 +12731,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           item.innerHTML = `
             <div style="background: rgba(28, 28, 28,0.02); border: 1px solid rgba(28, 28, 28,0.05); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 10.5px;">
               <div style="display:flex; justify-content:space-between; font-weight:700;">
-                <span>${req.employeeName || ''} (${req.type || ''})</span>
-                <span style="color:var(--accent-caramel);">${req.days || 0} days</span>
+                <span>${escHtml(req.employeeName || '')} (${escHtml(req.type || '')})</span>
+                <span style="color:var(--accent-caramel);">${Number(req.days) || 0} days</span>
               </div>
               <div style="color:var(--text-muted); font-size: 9.5px; line-height: 1.3;">
-                <span>${req.startDate || ''} to ${req.endDate || ''}</span>
-                <br><span>Reason: ${req.reason || ''}</span>
+                <span>${escHtml(req.startDate || '')} to ${escHtml(req.endDate || '')}</span>
+                <br><span>Reason: ${escHtml(req.reason || '')}</span>
               </div>
               <div style="display:flex; gap:6px; margin-top:4px;">
                 <button type="button" class="btn btn-primary approve-leave-btn" data-id="${req.id}" style="flex:1; padding:2px 6px; font-size:9.5px; background:#2ecc71; border:none; color:white; border-radius:3px; cursor:pointer;">Approve</button>
@@ -12704,42 +13228,24 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     });
   }
 
-  // Pre-load UI states on dashboard initialization with defensive try/catch to prevent freezing the tabs
-  try {
-    updateQrOrdersDashboardUI();
-  } catch (err) {
-    console.error("Error in updateQrOrdersDashboardUI:", err);
-  }
-
-  try {
-    if (typeof renderKDSTab === 'function') renderKDSTab();
-  } catch (err) {
-    console.error("Error in renderKDSTab:", err);
-  }
-
-  try {
-    if (typeof renderTokensTab === 'function') renderTokensTab();
-  } catch (err) {
-    console.error("Error in renderTokensTab:", err);
-  }
-
-  try {
-    updateAIForecast();
-  } catch (err) {
-    console.error("Error in updateAIForecast:", err);
-  }
-
-  try {
-    renderEmployeesTab();
-  } catch (err) {
-    console.error("Error in renderEmployeesTab:", err);
-  }
-
-  try {
-    if (typeof renderReports === 'function') renderReports();
-  } catch (err) {
-    console.error("Error in renderReports:", err);
-  }
+  // Prepare non-visible modules after the first interactive frame.
+  runWhenIdle(() => {
+    const backgroundRenders = [
+      ['updateQrOrdersDashboardUI', () => updateQrOrdersDashboardUI()],
+      ['renderKDSTab', () => { if (typeof renderKDSTab === 'function') renderKDSTab(); }],
+      ['renderTokensTab', () => { if (typeof renderTokensTab === 'function') renderTokensTab(); }],
+      ['updateAIForecast', () => updateAIForecast()],
+      ['renderEmployeesTab', () => renderEmployeesTab()],
+      ['renderReports', () => { if (typeof renderReports === 'function') renderReports(); }]
+    ];
+    backgroundRenders.forEach(([name, render]) => {
+      try {
+        render();
+      } catch (error) {
+        console.error(`Error in ${name}:`, error);
+      }
+    });
+  }, 1500);
 
   // End Live QR Ordering system module
 
@@ -12756,6 +13262,32 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   // ==========================================================
 
   async function pollSuperAdminGateway() {
+    if (ZERO_COST_LAUNCH_MODE || !CLOUD_WHATSAPP_GATEWAY_URL) {
+      const statusBadge = document.getElementById('saas-gateway-status');
+      const phoneEl = document.getElementById('saas-gateway-phone');
+      const sessionEl = document.getElementById('saas-gateway-session-saved');
+      const qrContainer = document.getElementById('saas-gateway-qr-container');
+      const qrSpinner = document.getElementById('saas-gateway-qr-spinner');
+      const connectedView = document.getElementById('saas-gateway-connected-view');
+      const logsContainer = document.getElementById('saas-notification-logs-container');
+      if (statusBadge) {
+        statusBadge.textContent = 'ZERO-COST MODE';
+        statusBadge.style.background = 'rgba(107, 114, 128, 0.1)';
+        statusBadge.style.color = '#6B7280';
+      }
+      if (phoneEl) phoneEl.textContent = 'Disabled';
+      if (sessionEl) sessionEl.textContent = 'Upgrade add-on';
+      if (connectedView) connectedView.style.display = 'none';
+      if (qrContainer) qrContainer.style.display = 'flex';
+      if (qrSpinner) {
+        qrSpinner.innerHTML = `<i class="fa-solid fa-circle-info" style="margin-bottom: 6px; font-size: 16px; color: #6B7280;"></i><br>Gateway disabled for zero-cost launch<br><span style="font-size: 8px; color: #9CA3AF; margin-top: 4px; display: block;">Manual WhatsApp sharing remains available.</span>`;
+        qrSpinner.style.display = 'block';
+      }
+      if (logsContainer) {
+        logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #6B7280;">Gateway logs are disabled in zero-cost launch mode.</div>';
+      }
+      return;
+    }
     // 1. Fetch Gateway Status (Non-blocking)
     (async () => {
       const statusBadge = document.getElementById('saas-gateway-status');
@@ -12767,7 +13299,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const connectedView = document.getElementById('saas-gateway-connected-view');
 
       try {
-        const res = await fetch('https://kalpeshdeora1006-whatsapp-gateway.hf.space/status');
+        const res = await fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/status`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
@@ -12848,7 +13380,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     (async () => {
       const logsContainer = document.getElementById('saas-notification-logs-container');
       try {
-        const res = await fetch('https://kalpeshdeora1006-whatsapp-gateway.hf.space/debug-logs');
+        const res = await fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/debug-logs`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.status !== 'success') throw new Error(data.message || 'Failed to fetch logs');
@@ -12965,6 +13497,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   function startSaaSGatewayPolling() {
     if (saasGatewayPollingInterval) clearInterval(saasGatewayPollingInterval);
     pollSuperAdminGateway();
+    if (ZERO_COST_LAUNCH_MODE) return;
     saasGatewayPollingInterval = setInterval(pollSuperAdminGateway, 5000);
   }
 
@@ -12972,6 +13505,69 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     if (saasGatewayPollingInterval) {
       clearInterval(saasGatewayPollingInterval);
       saasGatewayPollingInterval = null;
+    }
+  }
+
+  function formatIncidentTime(value) {
+    if (!value) return 'Unknown time';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Unknown time';
+    return date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  function renderIncidentEmpty(title, detail, icon = 'fa-circle-check') {
+    return `
+      <div class="app-incidents-empty">
+        <i class="fa-solid ${icon}"></i>
+        <strong>${escHtml(title)}</strong>
+        <span>${escHtml(detail)}</span>
+      </div>
+    `;
+  }
+
+  async function loadAppIncidents() {
+    const list = document.getElementById('app-incidents-list');
+    const filter = document.getElementById('app-incidents-status-filter');
+    if (!list) return;
+    list.innerHTML = renderIncidentEmpty('Loading incidents', 'Checking the latest platform error reports.', 'fa-spinner fa-spin');
+    try {
+      const status = filter ? filter.value : 'open';
+      const payload = { limit: 100 };
+      if (status === 'open' || status === 'resolved') payload.status = status;
+      const result = await callTenantAdmin('list_error_reports', payload);
+      const reports = Array.isArray(result.reports) ? result.reports : [];
+      if (!reports.length) {
+        list.innerHTML = renderIncidentEmpty('No incidents found', 'This status queue is currently clear.');
+        return;
+      }
+      list.innerHTML = reports.map((report) => {
+        const severity = String(report.severity || 'error');
+        const statusLabel = String(report.status || 'open');
+        const stack = report.stack ? `<code>${escHtml(report.stack)}</code>` : '';
+        const resolveButton = statusLabel === 'open'
+          ? `<button type="button" class="staff-secondary-btn app-incident-resolve-btn" data-report-id="${escHtml(report.id)}">Resolve</button>`
+          : '';
+        return `
+          <article class="app-incident-card">
+            <div>
+              <strong>${escHtml(report.message || 'Unknown application error')}</strong>
+              <span>${escHtml(report.tenant_slug || 'unknown workspace')} · ${escHtml(report.source || 'dashboard')} · ${escHtml(report.url_path || 'unknown path')}</span>
+              ${stack}
+              <div class="app-incident-meta">
+                <span class="app-incident-pill ${escHtml(severity)}">${escHtml(severity)}</span>
+                <span class="app-incident-pill">${escHtml(statusLabel)}</span>
+                <span class="app-incident-pill">${escHtml(report.app_version || 'v?')}</span>
+              </div>
+            </div>
+            <div class="app-incident-actions">
+              <time>${escHtml(formatIncidentTime(report.created_at))}</time>
+              ${resolveButton}
+            </div>
+          </article>
+        `;
+      }).join('');
+    } catch (error) {
+      list.innerHTML = renderIncidentEmpty('Incidents unavailable', error.message || 'Try refreshing this panel.', 'fa-triangle-exclamation');
     }
   }
 
@@ -12986,7 +13582,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             resetBtn.disabled = true;
             resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
 
-            const res = await fetch('https://kalpeshdeora1006-whatsapp-gateway.hf.space/reset', {
+            if (ZERO_COST_LAUNCH_MODE || !CLOUD_WHATSAPP_GATEWAY_URL) {
+              alert("Gateway automation is disabled in zero-cost launch mode.");
+              return;
+            }
+
+            const res = await fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/reset`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' }
             });
@@ -13024,8 +13625,42 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       });
     }
 
+    const refreshIncidentsBtn = document.getElementById('btn-refresh-app-incidents');
+    if (refreshIncidentsBtn && !refreshIncidentsBtn.dataset.listenerBound) {
+      refreshIncidentsBtn.dataset.listenerBound = 'true';
+      refreshIncidentsBtn.addEventListener('click', loadAppIncidents);
+    }
+
+    const incidentFilter = document.getElementById('app-incidents-status-filter');
+    if (incidentFilter && !incidentFilter.dataset.listenerBound) {
+      incidentFilter.dataset.listenerBound = 'true';
+      incidentFilter.addEventListener('change', loadAppIncidents);
+    }
+
+    const incidentsList = document.getElementById('app-incidents-list');
+    if (incidentsList && !incidentsList.dataset.listenerBound) {
+      incidentsList.dataset.listenerBound = 'true';
+      incidentsList.addEventListener('click', async (event) => {
+        const target = event.target;
+        const button = target && typeof target.closest === 'function'
+          ? target.closest('.app-incident-resolve-btn')
+          : null;
+        if (!button) return;
+        button.disabled = true;
+        try {
+          await callTenantAdmin('resolve_error_report', { report_id: Number(button.dataset.reportId) });
+          showNotificationToast('Application incident resolved.');
+          await loadAppIncidents();
+        } catch (error) {
+          showNotificationToast(error.message || 'Could not resolve incident.');
+          button.disabled = false;
+        }
+      });
+    }
+
     // Start polling when loading the tab
     startSaaSGatewayPolling();
+    await loadAppIncidents();
   }
 
   async function sha256(string) {
@@ -13033,6 +13668,23 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function renderPlatformSummary(tenants = []) {
+    const target = document.getElementById('saas-platform-summary');
+    if (!target) return;
+    const total = tenants.length;
+    const active = tenants.filter(t => t.status === 'approved' || t.status === 'active').length;
+    const pending = tenants.filter(t => t.status === 'pending').length;
+    const paidTier = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code)).length;
+    const risk = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status)).length;
+    const conversion = total ? Math.round((paidTier / total) * 100) : 0;
+    target.innerHTML = [
+      growthItem('Client workspaces', `${total} total - ${active} active`, total ? 'registry' : 'empty'),
+      growthItem('Approvals queue', `${pending} pending workspace requests`, pending ? 'review' : 'clear'),
+      growthItem('Paid-tier mix', `${paidTier} paid-tier tenants - ${conversion}% conversion`, 'growth'),
+      growthItem('Subscription risk', `${risk} past-due or canceled tenants`, risk ? 'attention' : 'healthy')
+    ].join('');
   }
 
   async function renderSuperAdminTab() {
@@ -13044,7 +13696,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     try {
       const result = await callTenantAdmin('list_tenants');
       tenants = Array.isArray(result.tenants) ? result.tenants : [];
+      renderPlatformSummary(tenants);
     } catch (error) {
+      renderPlatformSummary([]);
       listContainer.innerHTML = `<div style="padding: 32px; text-align: center; color: #ef4444; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(239,68,68,0.1);"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Error loading workspaces: ${error.message}</div>`;
       return;
     }
@@ -13260,6 +13914,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const usernameEl = document.getElementById('manage-username');
       const passwordEl = document.getElementById('manage-password');
       const statusEl = document.getElementById('manage-status');
+      const planCodeEl = document.getElementById('manage-plan-code');
+      const subscriptionStatusEl = document.getElementById('manage-subscription-status');
       const phoneEl = document.getElementById('manage-phone');
       const emailEl = document.getElementById('manage-email');
 
@@ -13300,6 +13956,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       }
       if (phoneEl) phoneEl.value = tenant.phone || '';
       if (emailEl) emailEl.value = tenant.email || '';
+      if (planCodeEl) planCodeEl.value = tenant.plan_code || 'starter';
+      if (subscriptionStatusEl) subscriptionStatusEl.value = tenant.subscription_status || 'active';
 
       // ── Feature checkboxes + card highlight ──
       const allowed = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [];
@@ -13370,8 +14028,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           const prevStatus = statusEl.getAttribute('data-prev-status') || 'pending';
           const phone = document.getElementById('manage-phone').value.trim();
           const email = document.getElementById('manage-email').value.trim();
+          const plan_code = document.getElementById('manage-plan-code').value;
+          const subscription_status = document.getElementById('manage-subscription-status').value;
 
-          console.log("Input values gathered:", { tenantId, username, status, prevStatus, phone, email });
+          console.log("Input values gathered:", { tenantId, username, status, prevStatus, phone, email, plan_code, subscription_status });
 
           const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
           const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
@@ -13380,6 +14040,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
             tenant_id: tenantId,
             username,
             status,
+            plan_code,
+            subscription_status,
             allowed_tabs,
             phone,
             email

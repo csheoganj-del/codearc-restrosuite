@@ -12,6 +12,7 @@ const GMAIL_USER = Deno.env.get("GMAIL_USER") || "";
 const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD") || "";
 const FROM_NAME = "CodeArc RestoSuite";
 const ADMIN_EMAIL = Deno.env.get("ADMIN_ALERT_EMAIL") || "";
+const ZERO_COST_EMAILS_DISABLED = (Deno.env.get("ZERO_COST_EMAILS_DISABLED") || "true") === "true";
 
 // Simple base64 encoder for SMTP AUTH
 function toBase64(str: string): string {
@@ -22,9 +23,14 @@ function toBase64(str: string): string {
 // We use the Deno SMTP library available as a CDN import
 // Send email via Google Apps Script Web App Relay
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (ZERO_COST_EMAILS_DISABLED || !to) {
+    console.log("[Edge Email] Skipped in zero-cost launch mode.");
+    return;
+  }
   const relayUrl = Deno.env.get("EMAIL_RELAY_URL");
   if (!relayUrl) {
-    throw new Error("EMAIL_RELAY_URL environment variable is not configured.");
+    console.log("[Edge Email] EMAIL_RELAY_URL is not configured; skipping optional email.");
+    return;
   }
 
   const response = await fetch(relayUrl, {

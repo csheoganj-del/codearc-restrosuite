@@ -21,7 +21,13 @@ $FilesToCopy = @(
     "dashboard-styles.css",
     "script.js",
     "dashboard.js",
-    "recipes.json"
+    "recipes.json",
+    "pwa.js",
+    "manifest.webmanifest",
+    "legal.css",
+    "terms.html",
+    "privacy.html",
+    "refund-policy.html"
 )
 
 $DirectoriesToCopy = @(

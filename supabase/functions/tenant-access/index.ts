@@ -1,11 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://codearc-restrosuite.vercel.app";
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = origin === ALLOWED_ORIGIN || origin.endsWith(".vercel.app") ? origin : ALLOWED_ORIGIN;
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -32,13 +39,68 @@ const DEFAULT_ALLOWED_TABS = [
   "kds-tab",
   "tokens-tab",
   "employees-tab",
+  "growth-hub-tab",
 ];
 
-function jsonResponse(body: Record<string, unknown>, status = 200) {
+const ROLE_DEFAULT_TABS: Record<string, string[]> = {
+  admin: DEFAULT_ALLOWED_TABS,
+  cashier: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab"],
+  kitchen: ["kds-tab"],
+  waiter: ["qr-orders-tab"],
+  customer_display: ["tokens-tab"],
+};
+
+const PLAN_ENTITLEMENTS: Record<string, { name: string; maxStaff: number; monthlyOrderLimit: number; allowedTabs: string[] }> = {
+  starter: {
+    name: "Starter",
+    maxStaff: 5,
+    monthlyOrderLimit: 300,
+    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+  },
+  growth: {
+    name: "Growth",
+    maxStaff: 15,
+    monthlyOrderLimit: 8000,
+    allowedTabs: DEFAULT_ALLOWED_TABS,
+  },
+  enterprise: {
+    name: "Enterprise",
+    maxStaff: 75,
+    monthlyOrderLimit: 100000,
+    allowedTabs: DEFAULT_ALLOWED_TABS,
+  },
+};
+
+function activeSubscription(status: unknown) {
+  return ["active", "trialing"].includes(String(status || "active"));
+}
+
+function planFor(code: unknown) {
+  return PLAN_ENTITLEMENTS[String(code || "starter")] || PLAN_ENTITLEMENTS.starter;
+}
+
+function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
+  const planTabs = planFor(planCode).allowedTabs;
+  const requestedTabs = Array.isArray(tenantTabs) && tenantTabs.length > 0
+    ? tenantTabs.map(String)
+    : planTabs;
+  return requestedTabs.filter((tab) => planTabs.includes(tab));
+}
+
+function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {
+  const roleTabs = ROLE_DEFAULT_TABS[role] || [];
+  const requestedTabs = Array.isArray(userTabs) && userTabs.length > 0
+    ? userTabs.map(String)
+    : roleTabs;
+  const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
+  return requestedTabs.filter((tab) => roleTabs.includes(tab) && enabledTenantTabs.includes(tab));
+}
+
+function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...(req ? getCorsHeaders(req) : { "Access-Control-Allow-Origin": ALLOWED_ORIGIN }),
       "Content-Type": "application/json; charset=utf-8",
     },
   });
@@ -50,6 +112,33 @@ async function sha256Hex(value: string) {
   return Array.from(new Uint8Array(hashBuffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+async function checkRateLimit(req: Request, action: string) {
+  const rules: Record<string, { limit: number; windowSeconds: number }> = {
+    check_slug: { limit: 60, windowSeconds: 60 },
+    login: { limit: 10, windowSeconds: 15 * 60 },
+    register: { limit: 5, windowSeconds: 60 * 60 },
+  };
+  const rule = rules[action];
+  if (!rule) return { allowed: true };
+
+  const forwardedFor = req.headers.get("x-forwarded-for") || "";
+  const clientAddress = forwardedFor.split(",")[0].trim()
+    || req.headers.get("cf-connecting-ip")
+    || "unknown";
+  const bucket = await sha256Hex(`tenant-access:${action}:${clientAddress}`);
+  const { data, error } = await supabaseAdmin.rpc("consume_api_rate_limit", {
+    p_bucket: bucket,
+    p_limit: rule.limit,
+    p_window_seconds: rule.windowSeconds,
+  });
+
+  if (error) {
+    console.error("tenant-access rate limit failed:", error);
+    return { allowed: false, unavailable: true };
+  }
+  return { allowed: data === true };
 }
 
 function randomBase64Url(byteLength = 18) {
@@ -175,9 +264,9 @@ function normalizeEmail(raw: string) {
   return raw.trim().toLowerCase();
 }
 
-async function handleCheckSlug(slug: string) {
+async function handleCheckSlug(slug: string, req: Request) {
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
-    return jsonResponse({ available: false, error: "Invalid outlet ID format." }, 400);
+    return jsonResponse({ available: false, error: "Invalid outlet ID format." }, 400, req);
   }
 
   const { data, error } = await supabaseAdmin
@@ -188,13 +277,13 @@ async function handleCheckSlug(slug: string) {
 
   if (error) {
     console.error("check_slug failed:", error);
-    return jsonResponse({ available: false, error: "Availability check failed." }, 500);
+    return jsonResponse({ available: false, error: "Availability check failed." }, 500, req);
   }
 
-  return jsonResponse({ available: !data });
+  return jsonResponse({ available: !data }, 200, req);
 }
 
-async function handleLogin(payload: Record<string, unknown>) {
+async function handleLogin(payload: Record<string, unknown>, req: Request) {
   const slug = normalizeSlug(String(payload.slug || ""));
   const username = normalizeUsername(String(payload.username || ""));
   const password = String(payload.password || "");
@@ -233,7 +322,7 @@ async function handleLogin(payload: Record<string, unknown>) {
 
   const { data: tenant, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, slug, username, password_hash, status, allowed_tabs, data_reset_at")
+    .select("id, name, slug, username, password_hash, status, allowed_tabs, data_reset_at, plan_code, subscription_status, subscription_current_period_end")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -252,6 +341,90 @@ async function handleLogin(payload: Record<string, unknown>) {
 
   if (tenant.status === "suspended") {
     return jsonResponse({ error: "Access Denied: Account suspended. Please contact hello@codearc.co.in" }, 403);
+  }
+
+  if (!activeSubscription(tenant.subscription_status)) {
+    return jsonResponse({ error: "Access Denied: Subscription is not active. Please contact CodeArc support." }, 402);
+  }
+
+  const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
+  const plan = planFor(tenant.plan_code);
+
+  const usernameNormalized = username.toLowerCase();
+  const { data: staffUser, error: staffError } = await supabaseAdmin
+    .from("tenant_users")
+    .select("id, username, display_name, password_hash, role, allowed_tabs, status, session_version")
+    .eq("tenant_id", tenant.id)
+    .eq("username_normalized", usernameNormalized)
+    .maybeSingle();
+
+  if (staffError) {
+    console.error("staff login lookup failed:", staffError);
+    return jsonResponse({ error: "Authentication service unavailable." }, 500);
+  }
+
+  if (staffUser) {
+    if (staffUser.status !== "active") {
+      return jsonResponse({ error: "Access Denied: Staff account is suspended." }, 403);
+    }
+    if (!await verifyPassword(password, staffUser.password_hash)) {
+      return jsonResponse({ error: "Access Denied: Invalid Username or Password for this Outlet." }, 401);
+    }
+
+    if (!staffUser.password_hash.startsWith("pbkdf2$")) {
+      await supabaseAdmin
+        .from("tenant_users")
+        .update({ password_hash: await hashPassword(password), updated_at: new Date().toISOString() })
+        .eq("id", staffUser.id);
+    }
+
+    const allowedTabs = effectiveTabs(staffUser.role, staffUser.allowed_tabs, tenantTabs);
+    const sessionToken = await createSignedSessionToken({
+      role: staffUser.role,
+      username: staffUser.username,
+      tenant_id: tenant.id,
+      tenant_slug: tenant.slug,
+      user_id: staffUser.id,
+      session_version: staffUser.session_version,
+    });
+
+    await supabaseAdmin
+      .from("tenant_users")
+      .update({ last_login_at: new Date().toISOString() })
+      .eq("id", staffUser.id);
+
+    await supabaseAdmin.from("tenant_audit_logs").insert({
+      tenant_id: tenant.id,
+      actor_user_id: staffUser.id,
+      actor_username: staffUser.username,
+      actor_role: staffUser.role,
+      action: "auth.login",
+      target_type: "tenant_user",
+      target_id: staffUser.id,
+    });
+
+    return jsonResponse({
+      session: {
+        username: staffUser.username,
+        display_name: staffUser.display_name,
+        user_id: staffUser.id,
+        role: staffUser.role,
+        tenant_id: tenant.id,
+        tenant_slug: tenant.slug,
+        tenant_name: tenant.name,
+        allowed_tabs: allowedTabs,
+        data_reset_at: tenant.data_reset_at || null,
+        plan_code: tenant.plan_code || "starter",
+        plan_name: plan.name,
+        subscription_status: tenant.subscription_status || "active",
+        subscription_current_period_end: tenant.subscription_current_period_end || null,
+        plan_limits: {
+          max_staff: plan.maxStaff,
+          monthly_order_limit: plan.monthlyOrderLimit,
+        },
+        session_token: sessionToken,
+      },
+    });
   }
 
   const usernameMatches = username === tenant.username;
@@ -275,6 +448,7 @@ async function handleLogin(payload: Record<string, unknown>) {
     username,
     tenant_id: tenant.id,
     tenant_slug: tenant.slug,
+    legacy_owner: true,
   });
 
   return jsonResponse({
@@ -284,14 +458,22 @@ async function handleLogin(payload: Record<string, unknown>) {
       tenant_id: tenant.id,
       tenant_slug: tenant.slug,
       tenant_name: tenant.name,
-      allowed_tabs: Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [],
+      allowed_tabs: tenantTabs,
       data_reset_at: tenant.data_reset_at || null,
+      plan_code: tenant.plan_code || "starter",
+      plan_name: plan.name,
+      subscription_status: tenant.subscription_status || "active",
+      subscription_current_period_end: tenant.subscription_current_period_end || null,
+      plan_limits: {
+        max_staff: plan.maxStaff,
+        monthly_order_limit: plan.monthlyOrderLimit,
+      },
       session_token: sessionToken,
     },
   });
 }
 
-async function handleValidateSession(payload: Record<string, unknown>) {
+async function handleValidateSession(payload: Record<string, unknown>, req: Request) {
   const token = String(payload.session_token || "");
   const verified = await verifySignedSessionToken(token);
   if (!verified.ok) return jsonResponse({ error: verified.error }, 401);
@@ -315,7 +497,7 @@ async function handleValidateSession(payload: Record<string, unknown>) {
 
   const { data: tenant, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, slug, username, status, allowed_tabs, data_reset_at")
+    .select("id, name, slug, username, status, allowed_tabs, data_reset_at, plan_code, subscription_status, subscription_current_period_end")
     .eq("id", tenantId)
     .maybeSingle();
 
@@ -326,6 +508,53 @@ async function handleValidateSession(payload: Record<string, unknown>) {
 
   if (!tenant) return jsonResponse({ error: "Workspace no longer exists." }, 401);
   if (tenant.status !== "approved") return jsonResponse({ error: "Workspace access is not active." }, 403);
+  if (!activeSubscription(tenant.subscription_status)) return jsonResponse({ error: "Workspace subscription is not active." }, 402);
+
+  const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
+  const plan = planFor(tenant.plan_code);
+
+  const userId = String(sessionPayload.user_id || "");
+  if (userId) {
+    const { data: staffUser, error: staffError } = await supabaseAdmin
+      .from("tenant_users")
+      .select("id, username, display_name, role, allowed_tabs, status, session_version")
+      .eq("id", userId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+
+    if (staffError) {
+      console.error("validate staff session lookup failed:", staffError);
+      return jsonResponse({ error: "Failed to validate staff session." }, 500);
+    }
+    if (!staffUser || staffUser.status !== "active") {
+      return jsonResponse({ error: "Staff account is no longer active." }, 401);
+    }
+    if (Number(sessionPayload.session_version) !== Number(staffUser.session_version)) {
+      return jsonResponse({ error: "Session was revoked. Please log in again." }, 401);
+    }
+
+    return jsonResponse({
+      session: {
+        username: staffUser.username,
+        display_name: staffUser.display_name,
+        user_id: staffUser.id,
+        role: staffUser.role,
+        tenant_id: tenant.id,
+        tenant_slug: tenant.slug,
+        tenant_name: tenant.name,
+        allowed_tabs: effectiveTabs(staffUser.role, staffUser.allowed_tabs, tenantTabs),
+        data_reset_at: tenant.data_reset_at || null,
+        plan_code: tenant.plan_code || "starter",
+        plan_name: plan.name,
+        subscription_status: tenant.subscription_status || "active",
+        subscription_current_period_end: tenant.subscription_current_period_end || null,
+        plan_limits: {
+          max_staff: plan.maxStaff,
+          monthly_order_limit: plan.monthlyOrderLimit,
+        },
+      },
+    });
+  }
 
   return jsonResponse({
     session: {
@@ -334,13 +563,21 @@ async function handleValidateSession(payload: Record<string, unknown>) {
       tenant_id: tenant.id,
       tenant_slug: tenant.slug,
       tenant_name: tenant.name,
-      allowed_tabs: Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [],
+      allowed_tabs: tenantTabs,
       data_reset_at: tenant.data_reset_at || null,
+      plan_code: tenant.plan_code || "starter",
+      plan_name: plan.name,
+      subscription_status: tenant.subscription_status || "active",
+      subscription_current_period_end: tenant.subscription_current_period_end || null,
+      plan_limits: {
+        max_staff: plan.maxStaff,
+        monthly_order_limit: plan.monthlyOrderLimit,
+      },
     },
   });
 }
 
-async function handleRegister(payload: Record<string, unknown>) {
+async function handleRegister(payload: Record<string, unknown>, req: Request) {
   const name = String(payload.name || "").trim();
   const slug = normalizeSlug(String(payload.slug || ""));
   const outletType = String(payload.outlet_type || "cafe").trim().toLowerCase();
@@ -401,7 +638,7 @@ async function handleRegister(payload: Record<string, unknown>) {
     username,
     password_hash: passwordHash,
     status: "pending",
-    allowed_tabs: DEFAULT_ALLOWED_TABS,
+    allowed_tabs: planFor("starter").allowedTabs,
   });
 
   if (insertErr) {
@@ -417,40 +654,48 @@ async function handleRegister(payload: Record<string, unknown>) {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req) });
   }
 
   if (req.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed." }, 405);
+    return jsonResponse({ error: "Method not allowed." }, 405, req);
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return jsonResponse({ error: "Backend auth function is not configured." }, 500);
+    return jsonResponse({ error: "Backend auth function is not configured." }, 500, req);
   }
 
   try {
     const payload = await req.json();
     const action = String(payload?.action || "");
+    const rateLimit = await checkRateLimit(req, action);
+    if (!rateLimit.allowed) {
+      return jsonResponse(
+        { error: rateLimit.unavailable ? "Authentication protection is unavailable." : "Too many requests. Please try again later." },
+        rateLimit.unavailable ? 503 : 429,
+        req,
+      );
+    }
 
     if (action === "check_slug") {
-      return await handleCheckSlug(normalizeSlug(String(payload.slug || "")));
+      return await handleCheckSlug(normalizeSlug(String(payload.slug || "")), req);
     }
 
     if (action === "login") {
-      return await handleLogin(payload);
+      return await handleLogin(payload, req);
     }
 
     if (action === "validate_session") {
-      return await handleValidateSession(payload);
+      return await handleValidateSession(payload, req);
     }
 
     if (action === "register") {
-      return await handleRegister(payload);
+      return await handleRegister(payload, req);
     }
 
-    return jsonResponse({ error: "Unsupported action." }, 400);
+    return jsonResponse({ error: "Unsupported action." }, 400, req);
   } catch (error) {
     console.error("tenant-access function error:", error);
-    return jsonResponse({ error: "Unexpected server error." }, 500);
+    return jsonResponse({ error: "Unexpected server error." }, 500, req);
   }
 });

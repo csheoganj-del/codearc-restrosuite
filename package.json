@@ -2,12 +2,12 @@
   "name": "codearc-restrosuite",
   "version": "2.0.0",
   "private": true,
-  "description": "RestoSuite restaurant POS, tenant dashboard, customer ordering, and WhatsApp gateway.",
-  "main": "whatsapp-gateway.js",
+  "description": "RestoSuite zero-cost restaurant SaaS on Vercel and Supabase, with an optional WhatsApp gateway add-on.",
   "scripts": {
     "start:gateway": "node whatsapp-gateway.js",
+    "check:free-tier": "node scripts/check-free-tier.cjs",
     "test": "node --test --test-isolation=none tests/*.test.cjs",
-    "check": "node scripts/check-project.cjs",
+    "check": "node scripts/check-project.cjs && node scripts/check-free-tier.cjs",
     "sync:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./sync-assets.ps1",
     "build:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-android.ps1",
     "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/release.ps1"

@@ -1,11 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://codearc-restrosuite.vercel.app";
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = origin === ALLOWED_ORIGIN || origin.endsWith(".vercel.app") ? origin : ALLOWED_ORIGIN;
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -33,6 +40,19 @@ const TENANT_TABLES = new Set([
   "doppio_inventory_thresholds",
   "doppio_pos_popularity",
   "doppio_draft_orders",
+  "doppio_support_tickets",
+  "doppio_onboarding_tasks",
+  "doppio_reservations",
+  "doppio_vendors",
+  "doppio_purchase_orders",
+  "doppio_item_costs",
+  "doppio_offers",
+  "doppio_refund_requests",
+  "doppio_device_setups",
+  "doppio_backup_snapshots",
+  "doppio_outlets",
+  "doppio_migration_status",
+  "doppio_saas_invoices",
 ]);
 
 const TABLE_TAB_ACCESS: Record<string, string[]> = {
@@ -52,13 +72,85 @@ const TABLE_TAB_ACCESS: Record<string, string[]> = {
   doppio_custom_recipes: ["pos-tab", "editor-tab"],
   doppio_pos_popularity: ["pos-tab", "reports-tab"],
   doppio_draft_orders: ["pos-tab"],
+  doppio_support_tickets: ["growth-hub-tab"],
+  doppio_onboarding_tasks: ["growth-hub-tab"],
+  doppio_reservations: ["growth-hub-tab", "qr-orders-tab"],
+  doppio_vendors: ["growth-hub-tab", "inventory-tab"],
+  doppio_purchase_orders: ["growth-hub-tab", "inventory-tab"],
+  doppio_item_costs: ["growth-hub-tab", "inventory-tab", "reports-tab"],
+  doppio_offers: ["growth-hub-tab", "crm-tab"],
+  doppio_refund_requests: ["growth-hub-tab", "bills-tab"],
+  doppio_device_setups: ["growth-hub-tab"],
+  doppio_backup_snapshots: ["growth-hub-tab"],
+  doppio_outlets: ["growth-hub-tab", "reports-tab"],
+  doppio_migration_status: ["growth-hub-tab"],
+  doppio_saas_invoices: ["growth-hub-tab"],
 };
 
-function jsonResponse(body: Record<string, unknown>, status = 200) {
+const ROLE_DEFAULT_TABS: Record<string, string[]> = {
+  admin: Array.from(new Set(Object.values(TABLE_TAB_ACCESS).flat())),
+  cashier: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab"],
+  kitchen: ["kds-tab"],
+  waiter: ["qr-orders-tab"],
+  customer_display: ["tokens-tab"],
+};
+
+const TABLE_WRITE_ROLES: Record<string, string[]> = {
+  doppio_inventory: ["cashier"],
+  doppio_inventory_batches: ["cashier"],
+  doppio_bills: ["cashier"],
+  doppio_pending_orders: ["cashier", "kitchen", "waiter"],
+  doppio_shifts: ["cashier"],
+  doppio_shift_events: ["cashier"],
+  doppio_crm: ["cashier"],
+  doppio_notifications: ["cashier", "kitchen", "waiter"],
+  doppio_pos_popularity: ["cashier"],
+  doppio_draft_orders: ["cashier", "waiter"],
+  doppio_support_tickets: ["cashier", "kitchen", "waiter"],
+  doppio_reservations: ["cashier", "waiter"],
+};
+
+const ZERO_COST_DEFAULT_LIMIT = 250;
+const ZERO_COST_MAX_LIMIT = 500;
+
+const PLAN_ENTITLEMENTS: Record<string, { allowedTabs: string[] }> = {
+  starter: {
+    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+  },
+  growth: {
+    allowedTabs: ROLE_DEFAULT_TABS.admin,
+  },
+  enterprise: {
+    allowedTabs: ROLE_DEFAULT_TABS.admin,
+  },
+};
+
+function activeSubscription(status: unknown) {
+  return ["active", "trialing"].includes(String(status || "active"));
+}
+
+function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
+  const planTabs = (PLAN_ENTITLEMENTS[String(planCode || "starter")] || PLAN_ENTITLEMENTS.starter).allowedTabs;
+  const requestedTabs = Array.isArray(tenantTabs) && tenantTabs.length > 0
+    ? tenantTabs.map(String)
+    : planTabs;
+  return requestedTabs.filter((tab) => planTabs.includes(tab));
+}
+
+function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {
+  const roleTabs = ROLE_DEFAULT_TABS[role] || [];
+  const requestedTabs = Array.isArray(userTabs) && userTabs.length > 0
+    ? userTabs.map(String)
+    : roleTabs;
+  const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
+  return requestedTabs.filter((tab) => roleTabs.includes(tab) && enabledTenantTabs.includes(tab));
+}
+
+function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...(req ? getCorsHeaders(req) : { "Access-Control-Allow-Origin": ALLOWED_ORIGIN }),
       "Content-Type": "application/json; charset=utf-8",
     },
   });
@@ -107,12 +199,14 @@ async function verifyTenantSession(req: Request) {
   try {
     const payloadText = new TextDecoder().decode(decodeBase64Url(payloadEncoded));
     const payload = JSON.parse(payloadText);
-    if (payload.role !== "admin") return { ok: false, error: "Tenant session required." };
+    if (!Object.hasOwn(ROLE_DEFAULT_TABS, String(payload.role || ""))) {
+      return { ok: false, error: "Tenant session required." };
+    }
     if (!payload.exp || Date.now() > Number(payload.exp)) return { ok: false, error: "Session expired. Please log in again." };
 
     const { data: tenant, error } = await supabaseAdmin
       .from("saas_tenants")
-      .select("id, status, allowed_tabs")
+      .select("id, status, allowed_tabs, plan_code, subscription_status")
       .eq("id", String(payload.tenant_id || ""))
       .maybeSingle();
 
@@ -123,11 +217,54 @@ async function verifyTenantSession(req: Request) {
 
     if (!tenant) return { ok: false, error: "Workspace no longer exists." };
     if (tenant.status !== "approved") return { ok: false, error: "Workspace access is not active." };
+    if (!activeSubscription(tenant.subscription_status)) return { ok: false, error: "Workspace subscription is not active." };
+
+    const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
+
+    const userId = String(payload.user_id || "");
+    if (userId) {
+      const { data: staffUser, error: staffError } = await supabaseAdmin
+        .from("tenant_users")
+        .select("id, username, role, allowed_tabs, status, session_version")
+        .eq("id", userId)
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+
+      if (staffError) {
+        console.error("tenant-data staff session lookup failed:", staffError);
+        return { ok: false, error: "Failed to validate staff session." };
+      }
+      if (!staffUser || staffUser.status !== "active") {
+        return { ok: false, error: "Staff account is no longer active." };
+      }
+      if (
+        Number(payload.session_version) !== Number(staffUser.session_version)
+        || String(payload.role) !== staffUser.role
+      ) {
+        return { ok: false, error: "Session was revoked. Please log in again." };
+      }
+
+      return {
+        ok: true,
+        tenantId: tenant.id,
+        allowedTabs: effectiveTabs(staffUser.role, staffUser.allowed_tabs, tenantTabs),
+        actorUserId: staffUser.id,
+        actorUsername: staffUser.username,
+        actorRole: staffUser.role,
+      };
+    }
+
+    if (payload.role !== "admin" || payload.legacy_owner !== true) {
+      return { ok: false, error: "Invalid tenant session." };
+    }
 
     return {
       ok: true,
       tenantId: tenant.id,
-      allowedTabs: Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [],
+      allowedTabs: tenantTabs,
+      actorUserId: null,
+      actorUsername: String(payload.username || "owner"),
+      actorRole: "admin",
     };
   } catch {
     return { ok: false, error: "Invalid session token." };
@@ -139,6 +276,12 @@ function withTenantId(input: unknown, tenantId: string) {
     return input.map((row) => ({ ...(row && typeof row === "object" ? row : {}), tenant_id: tenantId }));
   }
   return { ...(input && typeof input === "object" ? input as Record<string, unknown> : {}), tenant_id: tenantId };
+}
+
+function withoutTenantId(input: unknown) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const { tenant_id: _ignoredTenantId, ...safeInput } = input as Record<string, unknown>;
+  return safeInput;
 }
 
 function applyFilters(query: any, filters: unknown[], tenantId: string) {
@@ -165,19 +308,19 @@ function applyFilters(query: any, filters: unknown[], tenantId: string) {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req) });
   }
 
   if (req.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed." }, 405);
+    return jsonResponse({ error: "Method not allowed." }, 405, req);
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return jsonResponse({ error: "Tenant data backend is not configured." }, 500);
+    return jsonResponse({ error: "Tenant data backend is not configured." }, 500, req);
   }
 
   const verified = await verifyTenantSession(req);
-  if (!verified.ok) return jsonResponse({ error: verified.error as string }, 401);
+  if (!verified.ok) return jsonResponse({ error: verified.error as string }, 401, req);
 
   try {
     const payload = await req.json();
@@ -186,11 +329,18 @@ serve(async (req) => {
     const filters = Array.isArray(payload.filters) ? payload.filters : [];
     const columns = typeof payload.columns === "string" && payload.columns.trim() ? payload.columns : "*";
 
-    if (!TENANT_TABLES.has(table)) return jsonResponse({ error: "Table is not available through tenant data API." }, 400);
+    if (!TENANT_TABLES.has(table)) return jsonResponse({ error: "Table is not available through tenant data API." }, 400, req);
 
     const allowedTableTabs = TABLE_TAB_ACCESS[table];
     if (allowedTableTabs && !allowedTableTabs.some((tab) => (verified.allowedTabs as string[]).includes(tab))) {
-      return jsonResponse({ error: "You do not have permission to access this module." }, 403);
+      return jsonResponse({ error: "You do not have permission to access this module." }, 403, req);
+    }
+    if (
+      operation !== "select"
+      && verified.actorRole !== "admin"
+      && !(TABLE_WRITE_ROLES[table] || []).includes(verified.actorRole as string)
+    ) {
+      return jsonResponse({ error: "Your role has read-only access to this module." }, 403, req);
     }
 
     let query: any;
@@ -200,7 +350,11 @@ serve(async (req) => {
         const order = payload.order as Record<string, unknown>;
         query = query.order(String(order.column || "id"), { ascending: order.ascending !== false });
       }
-      if (Number.isFinite(Number(payload.limit))) query = query.limit(Number(payload.limit));
+      const requestedLimit = Number(payload.limit);
+      const safeLimit = Number.isFinite(requestedLimit)
+        ? Math.min(Math.max(requestedLimit, 1), ZERO_COST_MAX_LIMIT)
+        : ZERO_COST_DEFAULT_LIMIT;
+      query = query.limit(safeLimit);
       if (payload.single === true) query = query.single();
       if (payload.maybeSingle === true) query = query.maybeSingle();
     } else if (operation === "insert") {
@@ -211,23 +365,43 @@ serve(async (req) => {
       query = supabaseAdmin.from(table).upsert(withTenantId(payload.data, verified.tenantId as string), options);
       if (payload.returning) query = query.select(columns);
     } else if (operation === "update") {
-      query = applyFilters(supabaseAdmin.from(table).update(payload.data || {}), filters, verified.tenantId as string);
+      const safeUpdate = withoutTenantId(payload.data);
+      if (Object.keys(safeUpdate).length === 0) {
+        return jsonResponse({ error: "No valid fields were provided for update." }, 400, req);
+      }
+      query = applyFilters(supabaseAdmin.from(table).update(safeUpdate), filters, verified.tenantId as string);
       if (payload.returning) query = query.select(columns);
     } else if (operation === "delete") {
       query = applyFilters(supabaseAdmin.from(table).delete(), filters, verified.tenantId as string);
     } else {
-      return jsonResponse({ error: "Unsupported data operation." }, 400);
+      return jsonResponse({ error: "Unsupported data operation." }, 400, req);
     }
 
     const { data, error } = await query;
     if (error) {
       console.error(`tenant-data ${operation} failed for ${table}:`, error);
-      return jsonResponse({ error: error.message || "Tenant data operation failed." }, 500);
+      return jsonResponse({ error: error.message || "Tenant data operation failed." }, 500, req);
     }
 
-    return jsonResponse({ data });
+    if (operation !== "select") {
+      const { error: auditError } = await supabaseAdmin.from("tenant_audit_logs").insert({
+        tenant_id: verified.tenantId,
+        actor_user_id: verified.actorUserId,
+        actor_username: verified.actorUsername,
+        actor_role: verified.actorRole,
+        action: `data.${operation}`,
+        target_type: table,
+        metadata: {
+          filters,
+          returning: payload.returning === true,
+        },
+      });
+      if (auditError) console.error("tenant-data audit log failed:", auditError);
+    }
+
+    return jsonResponse({ data }, 200, req);
   } catch (error) {
     console.error("tenant-data function error:", error);
-    return jsonResponse({ error: "Unexpected server error." }, 500);
+    return jsonResponse({ error: "Unexpected server error." }, 500, req);
   }
 });

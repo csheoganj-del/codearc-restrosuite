@@ -1,0 +1,20 @@
+{
+  "name": "CodeArc RestoSuite",
+  "short_name": "RestoSuite",
+  "description": "Restaurant POS, kitchen, inventory, billing, and customer ordering.",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FC8019",
+  "orientation": "any",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/images/hero_coffee.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

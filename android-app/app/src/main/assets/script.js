@@ -5,6 +5,20 @@
 
 window.addEventListener('DOMContentLoaded', () => {
 
+  function escHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function safeImageUrl(value) {
+    const url = String(value || '').trim();
+    return /^(https:\/\/|\/|images\/)/i.test(url) ? escHtml(url) : '';
+  }
+
   // Initialize Supabase Client (Made by Antigravity)
   let supabaseClient = null;
   const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
@@ -21,6 +35,9 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   async function callTenantPublic(action, payload = {}) {
+    // tenant_slug is read dynamically from page URL params or defaults to a generic value
+    const urlParams = new URLSearchParams(window.location.search);
+    const tenantSlug = urlParams.get('outlet') || urlParams.get('tenant') || '';
     const response = await fetch(TENANT_PUBLIC_FUNCTION_URL, {
       method: 'POST',
       headers: {
@@ -30,7 +47,7 @@ window.addEventListener('DOMContentLoaded', () => {
       },
       body: JSON.stringify({
         action,
-        tenant_slug: 'doppio-nagpur',
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
         ...payload
       })
     });
@@ -201,10 +218,16 @@ window.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'menu-item-card';
 
-      const imageHTML = item.image 
-        ? `<img src="${item.image}" alt="${item.name}">`
+      const safeName = escHtml(item.name);
+      const safeDescription = escHtml(item.description);
+      const safePrice = escHtml(item.price);
+      const safeCategory = escHtml(item.category);
+      const safeIcon = escHtml(item.icon);
+      const safeImage = safeImageUrl(item.image);
+      const imageHTML = safeImage
+        ? `<img src="${safeImage}" alt="${safeName}">`
         : `<div class="menu-item-placeholder">
-             ${item.icon}
+             ${safeIcon}
              <span>Doppio Cafe</span>
            </div>`;
 
@@ -214,13 +237,13 @@ window.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="menu-item-details">
           <div class="menu-item-header">
-            <h3 class="menu-item-title">${item.name}</h3>
-            <span class="menu-item-price">${item.price}</span>
+            <h3 class="menu-item-title">${safeName}</h3>
+            <span class="menu-item-price">${safePrice}</span>
           </div>
-          <p class="menu-item-desc">${item.description}</p>
+          <p class="menu-item-desc">${safeDescription}</p>
           <div class="menu-item-footer">
-            <span class="menu-item-category">${item.category}</span>
-            <button class="menu-item-order-btn" data-name="${item.name}" title="Add to Order">
+            <span class="menu-item-category">${safeCategory}</span>
+            <button class="menu-item-order-btn" data-name="${safeName}" title="Add to Order">
               <i class="fa-solid fa-plus"></i>
             </button>
           </div>
@@ -526,6 +549,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ==========================================
   // 3. STAFF LOGIN PORTAL LOGIC
+  // (Login is handled by login.html — this modal redirects there)
   // ==========================================
   const loginBtn = document.getElementById('cta-reserve');
   const loginModal = document.getElementById('login-modal');
@@ -547,30 +571,12 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  async function sha256(string) {
-    const utf8 = new TextEncoder().encode(string);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
   if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
+    loginForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const username = document.getElementById('login-username').value.trim();
-      const password = document.getElementById('login-password').value.trim();
-
-      const userVal = username.toLowerCase();
-      const hashPwd = await sha256(password);
-
-      if ((userVal === 'bonie' && hashPwd === '94fc8a8d6e4987e5698d49128da76928b31e8059839cad4b933f53f4b2635eda') || 
-          (userVal === 'staff' && hashPwd === '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6')) {
-        sessionStorage.setItem('just_logged_in', 'true');
-        sessionStorage.setItem('logged_in_user', username);
-        window.location.href = 'dashboard.html';
-      } else {
-        if (loginError) loginError.style.display = 'block';
-      }
+      // Staff login is handled exclusively by the proper login portal at /login
+      // Redirect to the full multi-tenant login page
+      window.location.href = 'login.html';
     });
   }
 
@@ -594,64 +600,36 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 4. REAL VISITOR COUNTER LOGIC (MADE BY CODEARC)
+  // 4. VISITOR COUNTER LOGIC
   // ==========================================
   const visitCountEl = document.getElementById('visit-count');
   if (visitCountEl) {
-    // A. Fetch or initialize local base visitor count
-    let baseCount = localStorage.getItem('doppio_visitor_count');
-    if (!baseCount) {
-      baseCount = 10482; // Start with a realistic, premium traffic base
-      localStorage.setItem('doppio_visitor_count', baseCount);
-    } else {
-      baseCount = parseInt(baseCount, 10);
-    }
-
-    // B. Session validation to increment once per session
-    let hasCounted = sessionStorage.getItem('doppio_counted_session');
-    if (!hasCounted) {
-      baseCount += 1;
-      localStorage.setItem('doppio_visitor_count', baseCount);
-    }
-
-    // C. Format count with commas (e.g., 10,483)
     function formatCount(num) {
       return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
 
-    visitCountEl.textContent = formatCount(baseCount);
+    // Track unique sessions via counterapi.dev (no artificial offset)
+    const hasCounted = sessionStorage.getItem('restrosuite_counted_session');
+    const endpoint = !hasCounted
+      ? 'https://api.counterapi.dev/v1/restrosuite/visitors/up/'
+      : 'https://api.counterapi.dev/v1/restrosuite/visitors/';
 
-    // D. Multi-device sync counter API integration
-    try {
-      // If we haven't counted this session yet, hit the "up" counter endpoint (increments by 1)
-      // Otherwise, query the static counter value so we don't spam fake counts on refreshes
-      const endpoint = !hasCounted 
-        ? 'https://api.counterapi.dev/v1/doppiocafe/global/up/' 
-        : 'https://api.counterapi.dev/v1/doppiocafe/global/';
-
-      fetch(endpoint)
-        .then(response => response.json())
-        .then(data => {
-          const countVal = data.count || data.value;
-          if (typeof countVal !== 'undefined') {
-            const cloudValue = parseInt(countVal, 10);
-            const finalCount = 10480 + cloudValue;
-            visitCountEl.textContent = formatCount(finalCount);
-            localStorage.setItem('doppio_visitor_count', finalCount);
-            
-            // Mark session as counted after successful cloud sync
-            sessionStorage.setItem('doppio_counted_session', 'true');
-          }
-        })
-        .catch(err => {
-          console.log("Cloud Counter API offline, using local visitor simulation.", err);
+    fetch(endpoint)
+      .then(response => response.json())
+      .then(data => {
+        const countVal = data.count || data.value;
+        if (typeof countVal !== 'undefined') {
+          visitCountEl.textContent = formatCount(parseInt(countVal, 10));
           if (!hasCounted) {
-            sessionStorage.setItem('doppio_counted_session', 'true');
+            sessionStorage.setItem('restrosuite_counted_session', 'true');
           }
-        });
-    } catch (e) {
-      console.log("Counter API call error", e);
-    }
+        }
+      })
+      .catch(() => {
+        // Silently hide the counter if the API is unavailable
+        const counterEl = visitCountEl.closest('.visitor-counter');
+        if (counterEl) counterEl.style.display = 'none';
+      });
   }
 
   // ==========================================================
@@ -931,13 +909,13 @@ window.addEventListener('DOMContentLoaded', () => {
       row.className = 'cust-cart-row';
       row.innerHTML = `
         <div class="cust-cart-item-info">
-          <span class="cust-cart-item-name">${item.icon} ${item.name}</span>
+          <span class="cust-cart-item-name">${escHtml(item.icon)} ${escHtml(item.name)}</span>
           <span class="cust-cart-item-price">₹${item.price} each</span>
         </div>
         <div class="cust-cart-controls">
-          <button class="cust-qty-btn decrease" data-name="${item.name}"><i class="fa-solid fa-minus"></i></button>
+          <button class="cust-qty-btn decrease" data-name="${escHtml(item.name)}"><i class="fa-solid fa-minus"></i></button>
           <span class="cust-cart-qty">${item.qty}</span>
-          <button class="cust-qty-btn increase" data-name="${item.name}"><i class="fa-solid fa-plus"></i></button>
+          <button class="cust-qty-btn increase" data-name="${escHtml(item.name)}"><i class="fa-solid fa-plus"></i></button>
         </div>
         <span class="cust-cart-total-item">₹${item.price * item.qty}</span>
       `;
@@ -1068,8 +1046,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const subtotal = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const gst = Math.round(subtotal * 0.1525);
 
-    const randomIdSuffix = Math.floor(1000 + Math.random() * 9000);
-    const generatedOrderId = `DO-QR-${randomIdSuffix}`;
+    const randomIdSuffix = crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
+    const generatedOrderId = `DO-QR-${Date.now().toString(36).toUpperCase()}-${randomIdSuffix}`;
     const timestamp = new Date().toLocaleString('en-IN');
 
     // Create the finalized Order Object matching standard sales records
@@ -1168,8 +1146,8 @@ window.addEventListener('DOMContentLoaded', () => {
       if (receiptTotalPaid) receiptTotalPaid.textContent = `₹${subtotal}`;
       
       if (successSubtitleText) {
-        successSubtitleText.textContent = payMethod === 'UPI' 
-          ? 'UPI Payment Verified & Received!' 
+        successSubtitleText.textContent = payMethod === 'UPI'
+          ? 'UPI selected. Staff will verify payment before preparation.'
           : 'Pending payment logged. Pay cash at counter!';
       }
 
@@ -1179,7 +1157,7 @@ window.addEventListener('DOMContentLoaded', () => {
           const row = document.createElement('div');
           row.className = 'receipt-item-row';
           row.innerHTML = `
-            <span>${item.name} x${item.qty}</span>
+            <span>${escHtml(item.name)} x${Number(item.qty) || 0}</span>
             <span>₹${item.price * item.qty}</span>
           `;
           receiptItemsList.appendChild(row);

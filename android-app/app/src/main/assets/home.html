@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FC8019">
+  <link rel="manifest" href="manifest.webmanifest">
   <title>Doppio Cafe Nagpur | Savor the Perfect Brew</title>
   <meta name="description" content="Welcome to Doppio Cafe Nagpur. Indulge in our exquisite collection of double-shot espresso, lattes, peri peri fries, mocktails, and fresh combos. Located on London Street, Nagpur.">
   <link rel="stylesheet" href="styles.css">
@@ -432,7 +434,7 @@
       
       <div class="payment-sim-actions">
         <button class="sim-btn sim-btn-success" id="sim-pay-success">
-          <i class="fa-solid fa-circle-check"></i> Simulate Payment Success
+          <i class="fa-solid fa-mobile-screen-button"></i> Place UPI Order
         </button>
         <button class="sim-btn sim-btn-cash" id="sim-pay-counter">
           <i class="fa-solid fa-wallet"></i> Pay Cash at Counter
@@ -441,7 +443,7 @@
       
       <div class="payment-waiting-status">
         <span class="spinner"></span>
-        <span>Awaiting network verification...</span>
+        <span>Payment will be verified by restaurant staff.</span>
       </div>
     </div>
   </div>
@@ -467,7 +469,7 @@
         </div>
         <div class="receipt-divider">-----------------------------</div>
         <div class="receipt-footer">
-          <span>Total Amount Paid</span>
+          <span>Order Total</span>
           <span id="receipt-total-paid" style="font-weight: 800; color: var(--accent-caramel);">₹548</span>
         </div>
       </div>
@@ -479,5 +481,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>

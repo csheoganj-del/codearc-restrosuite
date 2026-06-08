@@ -25,7 +25,20 @@
     "doppio_custom_recipes",
     "doppio_inventory_thresholds",
     "doppio_pos_popularity",
-    "doppio_draft_orders"
+    "doppio_draft_orders",
+    "doppio_support_tickets",
+    "doppio_onboarding_tasks",
+    "doppio_reservations",
+    "doppio_vendors",
+    "doppio_purchase_orders",
+    "doppio_item_costs",
+    "doppio_offers",
+    "doppio_refund_requests",
+    "doppio_device_setups",
+    "doppio_backup_snapshots",
+    "doppio_outlets",
+    "doppio_migration_status",
+    "doppio_saas_invoices"
   ]);
 
   function createTenantApi(options) {
@@ -33,6 +46,8 @@
     const fetchImpl = config.fetchImpl || fetch;
     const baseUrl = String(config.baseUrl || "").replace(/\/$/, "");
     const anonKey = String(config.anonKey || "");
+    const readCache = new Map();
+    const READ_CACHE_TTL_MS = 1500;
 
     async function post(functionName, body, token, fallbackMessage) {
       const response = await fetchImpl(`${baseUrl}/functions/v1/${functionName}`, {
@@ -80,6 +95,17 @@
       }
     }
 
+    async function staff(action, payload) {
+      const token = config.getTenantToken && config.getTenantToken();
+      if (!token) throw new Error("Tenant session expired. Please log in again.");
+      return post(
+        "tenant-users",
+        { action, ...(payload || {}) },
+        token,
+        "Staff account request failed."
+      );
+    }
+
     function createTenantDataClient(nativeClient) {
       function makeTenantQuery(table) {
         const state = {
@@ -104,13 +130,24 @@
               error: { message: "Tenant session expired. Please log in again." }
             };
           }
+          const payload = JSON.parse(JSON.stringify(state));
+          const isCacheableRead = payload.operation === "select" && !payload.single && !payload.maybeSingle;
+          const cacheKey = isCacheableRead ? JSON.stringify(payload) : "";
+          if (isCacheableRead) {
+            const cached = readCache.get(cacheKey);
+            if (cached && Date.now() - cached.time < READ_CACHE_TTL_MS) {
+              return { data: cached.data, error: null };
+            }
+          }
           try {
             const result = await post(
               "tenant-data",
-              state,
+              payload,
               token,
               "Tenant data request failed."
             );
+            if (isCacheableRead) readCache.set(cacheKey, { time: Date.now(), data: result.data });
+            if (payload.operation !== "select") readCache.clear();
             return { data: result.data, error: null };
           } catch (error) {
             return { data: null, error: { message: error.message } };
@@ -203,7 +240,7 @@
       };
     }
 
-    return { access, admin, createTenantDataClient };
+    return { access, admin, staff, createTenantDataClient };
   }
 
   return { createTenantApi };

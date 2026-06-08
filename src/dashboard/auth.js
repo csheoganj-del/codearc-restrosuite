@@ -32,12 +32,18 @@
         storage.setItem("tenant_data_reset_pending", "true");
       }
       storage.setItem("logged_in_user", session.username || "");
+      storage.setItem("logged_in_display_name", session.display_name || session.username || "");
       storage.setItem("logged_in_role", session.role || "");
+      storage.setItem("tenant_user_id", session.user_id || "");
       storage.setItem("tenant_id", session.tenant_id || "");
       storage.setItem("tenant_slug", session.tenant_slug || "");
       storage.setItem("tenant_name", session.tenant_name || "");
       storage.setItem("allowed_tabs", JSON.stringify(session.allowed_tabs || []));
       storage.setItem("tenant_data_reset_at", nextResetAt);
+      storage.setItem("tenant_plan_code", session.plan_code || "");
+      storage.setItem("tenant_plan_name", session.plan_name || "");
+      storage.setItem("tenant_subscription_status", session.subscription_status || "");
+      storage.setItem("tenant_plan_limits", JSON.stringify(session.plan_limits || {}));
       return session;
     }
 

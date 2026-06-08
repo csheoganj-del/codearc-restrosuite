@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FC8019">
+  <link rel="manifest" href="manifest.webmanifest">
   <title>RestoSuite Portal | CodeArc Staff Access</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
@@ -1349,11 +1351,17 @@
             const session = result.session;
             sessionStorage.setItem('just_logged_in', 'true');
             sessionStorage.setItem('logged_in_user', session.username);
+            sessionStorage.setItem('logged_in_display_name', session.display_name || session.username);
             sessionStorage.setItem('logged_in_role', session.role);
+            sessionStorage.setItem('tenant_user_id', session.user_id || '');
             sessionStorage.setItem('tenant_id', session.tenant_id);
             sessionStorage.setItem('tenant_slug', session.tenant_slug);
             sessionStorage.setItem('tenant_name', session.tenant_name);
             sessionStorage.setItem('allowed_tabs', JSON.stringify(session.allowed_tabs || []));
+            sessionStorage.setItem('tenant_plan_code', session.plan_code || '');
+            sessionStorage.setItem('tenant_plan_name', session.plan_name || '');
+            sessionStorage.setItem('tenant_subscription_status', session.subscription_status || '');
+            sessionStorage.setItem('tenant_plan_limits', JSON.stringify(session.plan_limits || {}));
             sessionStorage.setItem('tenant_data_reset_at', session.data_reset_at || '');
             if (session.admin_token) {
               sessionStorage.setItem('superadmin_admin_token', session.admin_token);
@@ -1438,5 +1446,6 @@
       }
     });
   </script>
+  <script src="pwa.js"></script>
 </body>
 </html>
