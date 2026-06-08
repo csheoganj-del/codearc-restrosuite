@@ -1,0 +1,410 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const root = path.resolve(__dirname, "..");
+
+function read(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), "utf8");
+}
+
+test("login uses the tenant access backend", () => {
+  const login = read("login.html");
+  assert.match(login, /functions\/v1\/tenant-access/);
+  assert.doesNotMatch(login, /superadmin.*admin.*bypass/i);
+});
+
+test("public ordering uses the tenant public backend", () => {
+  const customerApp = read("script.js");
+  assert.match(customerApp, /functions\/v1\/tenant-public/);
+  assert.match(customerApp, /callTenantPublic\(['"]create_order['"]/);
+});
+
+test("public order backend validates menu prices and quantities", () => {
+  const publicApi = read("supabase/functions/tenant-public/index.ts");
+  assert.match(publicApi, /priceMap/);
+  assert.match(publicApi, /Number\.isInteger\(quantity\)/);
+  assert.match(publicApi, /Price mismatch for item/);
+  assert.match(publicApi, /Math\.abs\(clientSubtotal - expectedSubtotal\)/);
+  assert.match(publicApi, /UPI - Pending Verification/);
+  assert.match(publicApi, /This order was already submitted/);
+  assert.match(publicApi, /const safeItems/);
+  assert.match(publicApi, /items: JSON\.stringify\(safeItems\)/);
+  assert.doesNotMatch(publicApi, /expectedSubtotal \* 0\.5/);
+});
+
+test("public authentication and ordering endpoints use database rate limits", () => {
+  const accessApi = read("supabase/functions/tenant-access/index.ts");
+  const publicApi = read("supabase/functions/tenant-public/index.ts");
+  const migration = read("supabase/migrations/20260608090000_public_api_rate_limits.sql");
+  assert.match(accessApi, /consume_api_rate_limit/);
+  assert.match(publicApi, /consume_api_rate_limit/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.api_rate_limits/);
+  assert.match(migration, /SECURITY DEFINER/);
+  assert.match(migration, /GRANT EXECUTE.*service_role/);
+});
+
+test("tenant updates cannot mutate tenant ownership", () => {
+  const tenantData = read("supabase/functions/tenant-data/index.ts");
+  assert.match(tenantData, /function withoutTenantId/);
+  assert.match(tenantData, /update\(safeUpdate\)/);
+  assert.doesNotMatch(tenantData, /update\(payload\.data \|\| \{\}\)/);
+});
+
+test("customer ordering does not claim simulated payment verification", () => {
+  const customerPage = read("home.html");
+  const customerApp = read("script.js");
+  assert.doesNotMatch(customerPage, /Simulate Payment Success/);
+  assert.doesNotMatch(customerApp, /Payment Verified & Received/);
+  assert.match(customerApp, /Staff will verify payment/);
+});
+
+test("dynamic customer and staff content is escaped before HTML rendering", () => {
+  const customerApp = read("script.js");
+  const dashboard = read("dashboard.js");
+  assert.match(customerApp, /function escHtml/);
+  assert.match(customerApp, /const safeName = escHtml\(item\.name\)/);
+  assert.match(dashboard, /escHtml\(c\.name\)/);
+  assert.match(dashboard, /escHtml\(req\.reason \|\| ''\)/);
+});
+
+test("deployment and Android wrappers enforce baseline security controls", () => {
+  const vercel = read("vercel.json");
+  const manifest = read("android-app/app/src/main/AndroidManifest.xml");
+  const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
+  assert.match(vercel, /Content-Security-Policy/);
+  assert.match(vercel, /Strict-Transport-Security/);
+  assert.match(manifest, /android:allowBackup="false"/);
+  assert.match(manifest, /android:usesCleartextTraffic="false"/);
+  assert.match(activity, /MIXED_CONTENT_NEVER_ALLOW/);
+});
+
+test("the web app is installable without caching tenant API traffic", () => {
+  const manifest = read("manifest.webmanifest");
+  const serviceWorker = read("service-worker.js");
+  const login = read("login.html");
+  assert.match(manifest, /"display": "standalone"/);
+  assert.match(login, /rel="manifest"/);
+  assert.match(serviceWorker, /url\.origin !== self\.location\.origin/);
+  assert.match(serviceWorker, /request\.method !== "GET"/);
+});
+
+test("tenant approval and reset require the admin backend", () => {
+  const dashboard = read("dashboard.js");
+  assert.match(dashboard, /callTenantAdmin\(['"]update_tenant['"]/);
+  assert.match(dashboard, /callTenantAdmin\(['"]reset_tenant_data['"]/);
+});
+
+test("production migration forces tenant RLS", () => {
+  const migration = read("supabase/migrations/20260607053000_production_auth_hardening.sql");
+  assert.match(migration, /ALTER TABLE public\.saas_tenants FORCE ROW LEVEL SECURITY/);
+  assert.match(migration, /tenant_id uuid REFERENCES public\.saas_tenants/);
+});
+
+test("staff identities are tenant-scoped, revocable, and protected by RLS", () => {
+  const migration = read("supabase/migrations/20260608110000_tenant_staff_identity.sql");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.tenant_users/);
+  assert.match(migration, /UNIQUE \(tenant_id, username_normalized\)/);
+  assert.match(migration, /session_version integer NOT NULL DEFAULT 1/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.tenant_audit_logs/);
+  assert.match(migration, /FORCE ROW LEVEL SECURITY/);
+});
+
+test("staff login and session validation use authoritative account state", () => {
+  const accessApi = read("supabase/functions/tenant-access/index.ts");
+  assert.match(accessApi, /\.from\("tenant_users"\)/);
+  assert.match(accessApi, /effectiveTabs\(staffUser\.role/);
+  assert.match(accessApi, /session_version: staffUser\.session_version/);
+  assert.match(accessApi, /Session was revoked/);
+});
+
+test("tenant data authorization enforces roles and records writes", () => {
+  const tenantData = read("supabase/functions/tenant-data/index.ts");
+  assert.match(tenantData, /ROLE_DEFAULT_TABS/);
+  assert.match(tenantData, /TABLE_WRITE_ROLES/);
+  assert.match(tenantData, /staffUser\.session_version/);
+  assert.match(tenantData, /String\(payload\.role\) !== staffUser\.role/);
+  assert.match(tenantData, /Your role has read-only access to this module/);
+  assert.match(tenantData, /\.from\("tenant_audit_logs"\)\.insert/);
+  assert.match(tenantData, /action: `data\.\$\{operation\}`/);
+});
+
+test("tenant administrators can manage staff without exposing password hashes", () => {
+  const staffApi = read("supabase/functions/tenant-users/index.ts");
+  const browserApi = read("src/dashboard/api.js");
+  assert.match(staffApi, /action === "list_users"/);
+  assert.match(staffApi, /action === "create_user"/);
+  assert.match(staffApi, /action === "update_user"/);
+  assert.match(staffApi, /action === "reset_password"/);
+  assert.match(staffApi, /action === "revoke_user_sessions"/);
+  assert.match(staffApi, /async function hashPassword/);
+  assert.match(staffApi, /You cannot remove your own administrator access/);
+  assert.doesNotMatch(staffApi, /\.select\("[^"]*password_hash[^"]*"\).*list_users/);
+  assert.match(browserApi, /"tenant-users"/);
+});
+
+test("browser sessions retain staff identity fields", () => {
+  const login = read("login.html");
+  const auth = read("src/dashboard/auth.js");
+  assert.match(login, /logged_in_display_name/);
+  assert.match(login, /tenant_user_id/);
+  assert.match(auth, /logged_in_display_name/);
+  assert.match(auth, /tenant_user_id/);
+});
+
+test("tenant administrators have a complete staff access dashboard", () => {
+  const dashboard = read("dashboard.html");
+  const app = read("dashboard.js");
+  const staffUi = read("src/dashboard/staff-access.js");
+  assert.match(dashboard, /id="staff-access-panel"/);
+  assert.match(dashboard, /id="staff-account-form"/);
+  assert.match(dashboard, /data-staff-view="activity"/);
+  assert.match(app, /staffAccessDomain\.initialize/);
+  assert.match(app, /callTenantStaff/);
+  assert.match(staffUi, /role !== "admin"/);
+  assert.match(staffUi, /callStaff\("create_user"/);
+  assert.match(staffUi, /callStaff\("update_user"/);
+  assert.match(staffUi, /callStaff\("reset_password"/);
+  assert.match(staffUi, /callStaff\("revoke_user_sessions"/);
+  assert.match(staffUi, /callStaff\("audit_logs"/);
+});
+
+test("saas plan entitlements are persisted and enforced server-side", () => {
+  const migration = read("supabase/migrations/20260608130000_saas_plan_entitlements.sql");
+  const accessApi = read("supabase/functions/tenant-access/index.ts");
+  const dataApi = read("supabase/functions/tenant-data/index.ts");
+  const publicApi = read("supabase/functions/tenant-public/index.ts");
+  const staffApi = read("supabase/functions/tenant-users/index.ts");
+  const adminApi = read("supabase/functions/tenant-admin/index.ts");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.saas_plans/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS plan_code/);
+  assert.match(migration, /subscription_status IN \('trialing', 'active', 'past_due', 'canceled'\)/);
+  assert.match(accessApi, /effectiveTenantTabs/);
+  assert.match(accessApi, /plan_limits/);
+  assert.match(dataApi, /Workspace subscription is not active/);
+  assert.match(publicApi, /Monthly online order limit reached/);
+  assert.match(staffApi, /supports up to/);
+  assert.match(adminApi, /plan_code/);
+  assert.match(adminApi, /subscription_status/);
+});
+
+test("plan information is visible in tenant and superadmin workflows", () => {
+  const login = read("login.html");
+  const auth = read("src/dashboard/auth.js");
+  const dashboard = read("dashboard.html");
+  const staffUi = read("src/dashboard/staff-access.js");
+  const dashboardJs = read("dashboard.js");
+  assert.match(login, /tenant_plan_code/);
+  assert.match(auth, /tenant_plan_limits/);
+  assert.match(dashboard, /id="staff-plan-usage"/);
+  assert.match(dashboard, /id="manage-plan-code"/);
+  assert.match(dashboard, /id="manage-subscription-status"/);
+  assert.match(staffUi, /active_staff/);
+  assert.match(dashboardJs, /plan_code/);
+  assert.match(dashboardJs, /subscription_status/);
+});
+
+test("application observability stores safe rate-limited incident reports", () => {
+  const migration = read("supabase/migrations/20260608150000_app_error_reports.sql");
+  const observabilityApi = read("supabase/functions/app-observability/index.ts");
+  const adminApi = read("supabase/functions/tenant-admin/index.ts");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.app_error_reports/);
+  assert.match(migration, /status text NOT NULL DEFAULT 'open'/);
+  assert.match(migration, /FORCE ROW LEVEL SECURITY/);
+  assert.match(observabilityApi, /consume_api_rate_limit/);
+  assert.match(observabilityApi, /function cleanText/);
+  assert.match(observabilityApi, /\[email\]/);
+  assert.match(observabilityApi, /\[number\]/);
+  assert.match(adminApi, /list_error_reports/);
+  assert.match(adminApi, /resolve_error_report/);
+});
+
+test("dashboard captures and displays application incidents for superadmin", () => {
+  const dashboard = read("dashboard.html");
+  const app = read("dashboard.js");
+  const observability = read("src/dashboard/observability.js");
+  const checks = read("scripts/check-project.cjs");
+  assert.match(dashboard, /id="app-incidents-list"/);
+  assert.match(dashboard, /src\/dashboard\/observability\.js/);
+  assert.match(app, /observabilityDomain\.createReporter/);
+  assert.match(app, /installGlobalHandlers/);
+  assert.match(app, /list_error_reports/);
+  assert.match(app, /resolve_error_report/);
+  assert.match(observability, /window\.addEventListener\("error"/);
+  assert.match(observability, /unhandledrejection/);
+  assert.match(observability, /function redact/);
+  assert.match(checks, /src\/dashboard\/observability\.js/);
+});
+
+test("visual system uses a restrained SaaS palette and consistent radius", () => {
+  const dashboardCss = read("dashboard-styles.css");
+  const publicCss = read("styles.css");
+  assert.match(dashboardCss, /--primary-brand: #111827/);
+  assert.match(dashboardCss, /--accent-caramel: #F97316/);
+  assert.match(dashboardCss, /--tracking-base: 0/);
+  assert.match(dashboardCss, /WORLD-CLASS SAAS UI REFINEMENT LAYER/);
+  assert.match(dashboardCss, /body::before\s*\{\s*display: none;/);
+  assert.match(publicCss, /--primary-brand: #111827/);
+  assert.match(publicCss, /--border-radius: 8px/);
+  assert.match(publicCss, /CODEARC SAAS DESIGN REFINEMENT LAYER/);
+  assert.doesNotMatch(publicCss, /--primary-brand: #2C1B18/);
+  assert.doesNotMatch(`${dashboardCss}\n${publicCss}`, /letter-spacing:\s*-/);
+});
+
+test("mobile and Android app shells share a professional native layout", () => {
+  const dashboardCss = read("dashboard-styles.css");
+  const dashboard = read("dashboard.html");
+  const checks = read("scripts/check-project.cjs");
+  const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
+  const androidColors = read("android-app/app/src/main/res/values/colors.xml");
+  const androidTheme = read("android-app/app/src/main/res/values/themes.xml");
+
+  assert.match(dashboardCss, /MOBILE APP SHELL REFINEMENT/);
+  assert.match(dashboardCss, /--mobile-topbar-height: 62px/);
+  assert.match(dashboardCss, /--mobile-nav-height: 72px/);
+  assert.match(dashboardCss, /env\(safe-area-inset-top\)/);
+  assert.match(dashboardCss, /env\(safe-area-inset-bottom\)/);
+  assert.match(dashboardCss, /min-height: 44px/);
+  assert.match(dashboardCss, /#mobile-brand-title/);
+  assert.match(dashboard, /Workspace Menu/);
+  assert.match(checks, /dashboard-styles\.css/);
+  assert.match(checks, /styles\.css/);
+  assert.match(androidColors, /<color name="bg_cream">#F6F7F9<\/color>/);
+  assert.match(androidColors, /<color name="accent_caramel">#F97316<\/color>/);
+  assert.match(androidTheme, /android:windowLightStatusBar/);
+  assert.match(androidTheme, /android:windowLightNavigationBar/);
+  assert.match(activity, /setStatusBarColor\(Color\.WHITE\)/);
+  assert.match(activity, /SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR/);
+  assert.match(activity, /setBackgroundColor\(Color\.rgb\(246, 247, 249\)\)/);
+});
+
+test("zero-cost launch mode keeps paid add-ons optional and caps free-tier usage", () => {
+  const dashboard = read("dashboard.js");
+  const vercel = read("vercel.json");
+  const packageJson = read("package.json");
+  const tenantData = read("supabase/functions/tenant-data/index.ts");
+  const tenantPublic = read("supabase/functions/tenant-public/index.ts");
+  const tenantAccess = read("supabase/functions/tenant-access/index.ts");
+  const notifyRegistration = read("supabase/functions/notify-registration/index.ts");
+  const retention = read("supabase/migrations/20260608170000_zero_cost_retention.sql");
+  const docs = read("ZERO_COST_LAUNCH.md");
+
+  assert.match(dashboard, /const ZERO_COST_LAUNCH_MODE = true/);
+  assert.match(dashboard, /CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE \? ''/);
+  assert.doesNotMatch(vercel, /connect-src[^"]*hf\.space/);
+  assert.match(packageJson, /check:free-tier/);
+  assert.match(tenantData, /ZERO_COST_DEFAULT_LIMIT = 250/);
+  assert.match(tenantData, /ZERO_COST_MAX_LIMIT = 500/);
+  assert.match(tenantPublic, /ZERO_COST_MENU_LIMIT = 300/);
+  assert.match(tenantPublic, /starter: \{ monthlyOrderLimit: 300 \}/);
+  assert.match(tenantAccess, /monthlyOrderLimit: 300/);
+  assert.match(notifyRegistration, /ZERO_COST_EMAILS_DISABLED/);
+  assert.match(retention, /cleanup_zero_cost_operational_data/);
+  assert.match(retention, /app_error_reports[\s\S]*30 days/);
+  assert.match(retention, /tenant_audit_logs[\s\S]*90 days/);
+  assert.match(docs, /Upgrade Triggers/);
+});
+
+test("dashboard interactions are optimized for instant feedback", () => {
+  const dashboard = read("dashboard.js");
+  const browserApi = read("src/dashboard/api.js");
+  const dashboardCss = read("dashboard-styles.css");
+  const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
+
+  assert.match(dashboard, /const FAST_INTERACTION_MODE = true/);
+  assert.match(dashboard, /function debounce/);
+  assert.match(dashboard, /requestIdleCallback/);
+  assert.match(dashboard, /vaultWriteQueue/);
+  assert.match(dashboard, /frameTask\(renderBills\)/);
+  assert.match(dashboard, /if \(!document\.hidden && navigator\.onLine\) syncWithSupabase\(\)/);
+  assert.match(browserApi, /READ_CACHE_TTL_MS = 1500/);
+  assert.match(browserApi, /readCache\.set/);
+  assert.match(browserApi, /readCache\.clear/);
+  assert.match(dashboardCss, /INSTANT INTERACTION PERFORMANCE LAYER/);
+  assert.match(dashboardCss, /content-visibility: hidden/);
+  assert.match(dashboardCss, /touch-action: manipulation/);
+  assert.match(activity, /setLayerType\(View\.LAYER_TYPE_HARDWARE, null\)/);
+});
+
+test("growth hub delivers the recommended restaurant and SaaS workflows", () => {
+  const dashboard = read("dashboard.html");
+  const dashboardJs = read("dashboard.js");
+  const dashboardCss = read("dashboard-styles.css");
+  const browserApi = read("src/dashboard/api.js");
+  const tenantData = read("supabase/functions/tenant-data/index.ts");
+  const tenantAccess = read("supabase/functions/tenant-access/index.ts");
+  const tenantAdmin = read("supabase/functions/tenant-admin/index.ts");
+  const migration = read("supabase/migrations/20260608190000_growth_hub_modules.sql");
+  const growthIndex = dashboard.indexOf('id="growth-hub-tab"');
+  const mainCloseIndex = dashboard.indexOf("</main>");
+
+  assert.match(dashboard, /id="growth-hub-tab"/);
+  assert.ok(growthIndex > 0 && mainCloseIndex > growthIndex, "Growth Hub should render inside the main dashboard tab container.");
+  assert.match(dashboard, /id="sidebar-growth-hub-link"/);
+  assert.match(dashboard, /id="growth-onboarding-list"/);
+  assert.match(dashboard, /id="growth-support-form"/);
+  assert.match(dashboard, /id="growth-reservation-form"/);
+  assert.match(dashboard, /id="growth-procurement-form"/);
+  assert.match(dashboard, /id="growth-costing-form"/);
+  assert.match(dashboard, /id="growth-offer-form"/);
+  assert.match(dashboard, /id="growth-refund-form"/);
+  assert.match(dashboard, /id="growth-device-test-btn"/);
+  assert.match(dashboard, /id="growth-outlet-form"/);
+  assert.match(dashboard, /id="saas-platform-summary"/);
+  assert.match(dashboardJs, /function renderGrowthHub/);
+  assert.match(dashboardJs, /function renderPlatformSummary/);
+  assert.match(dashboardJs, /conflictTargets/);
+  assert.match(dashboardCss, /GROWTH HUB PRODUCT MODULES/);
+  assert.match(browserApi, /doppio_support_tickets/);
+  assert.match(tenantData, /doppio_saas_invoices/);
+  assert.match(tenantAccess, /growth-hub-tab/);
+  assert.match(tenantAdmin, /doppio_backup_snapshots/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.doppio_reservations/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.doppio_purchase_orders/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.doppio_refund_requests/);
+  assert.match(migration, /FORCE ROW LEVEL SECURITY/);
+});
+
+test("public launch policies are linked and mobile readable", () => {
+  const home = read("index.html");
+  const legalCss = read("legal.css");
+  const terms = read("terms.html");
+  const privacy = read("privacy.html");
+  const refunds = read("refund-policy.html");
+
+  assert.match(home, /href="terms\.html"/);
+  assert.match(home, /href="privacy\.html"/);
+  assert.match(home, /href="refund-policy\.html"/);
+  assert.match(terms, /Terms of Service/);
+  assert.match(privacy, /Privacy Policy/);
+  assert.match(refunds, /Refund Policy/);
+  assert.match(legalCss, /@media \(max-width: 640px\)/);
+  assert.match(legalCss, /width: min\(820px/);
+});
+
+test("production launch runbooks cover deployment, QA, support, billing, backups, monitoring, and demos", () => {
+  const launch = read("LAUNCH_RUNBOOK.md");
+  const qa = read("PRODUCTION_QA_CHECKLIST.md");
+  const support = read("SUPPORT_SOP.md");
+  const billing = read("REFUND_AND_BILLING_SOP.md");
+  const backup = read("BACKUP_RESTORE_SOP.md");
+  const monitoring = read("MONITORING_ALERTS.md");
+  const demo = read("CLIENT_DEMO_SCRIPT.md");
+
+  assert.match(launch, /Supabase Setup/);
+  assert.match(launch, /Vercel Setup/);
+  assert.match(launch, /Go\/No-Go Gate/);
+  assert.match(qa, /Growth Hub/);
+  assert.match(qa, /Mobile and Android/);
+  assert.match(support, /Priority Levels/);
+  assert.match(support, /Escalation/);
+  assert.match(billing, /Future Razorpay or Stripe Integration/);
+  assert.match(billing, /verified webhooks/);
+  assert.match(backup, /Restore Safety/);
+  assert.match(backup, /Tenant Reset Safety/);
+  assert.match(monitoring, /Alert Conditions/);
+  assert.match(monitoring, /Supabase quota/);
+  assert.match(demo, /12-Minute Demo Flow/);
+  assert.match(demo, /zero-cost pilot/);
+});

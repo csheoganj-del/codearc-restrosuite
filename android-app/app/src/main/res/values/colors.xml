@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors -->
+    <color name="primary_brand">#111827</color>
+    <color name="primary_brand_dark">#111827</color>
+    <color name="accent_caramel">#F97316</color>
+    <color name="bg_cream">#F6F7F9</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>
