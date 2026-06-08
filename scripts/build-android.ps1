@@ -14,17 +14,11 @@ if (-not (Test-Path $AndroidStudioJava)) {
 $env:JAVA_HOME = $AndroidStudioJava
 $env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA "Android\Sdk"
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
-$env:ANDROID_USER_HOME = Join-Path $Root ".tmp-android-home"
-$env:GRADLE_USER_HOME = Join-Path $AndroidRoot ".gradle"
-
-New-Item -ItemType Directory -Force -Path $env:ANDROID_USER_HOME | Out-Null
-New-Item -ItemType Directory -Force -Path $env:GRADLE_USER_HOME | Out-Null
-
-$TempBuildDirInit = Join-Path $AndroidRoot "gradle-temp-build-dir.gradle"
+$env:ANDROID_USER_HOME = Join-Path $AndroidRoot ".android-home"
 
 Push-Location $AndroidRoot
 try {
-    & $Gradle --no-daemon --init-script $TempBuildDirInit assembleDebug
+    & $Gradle --no-daemon assembleDebug
     if ($LASTEXITCODE -ne 0) {
         throw "Android build failed with exit code $LASTEXITCODE"
     }
