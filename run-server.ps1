@@ -1,11 +1,11 @@
-# Native PowerShell HTTP Server for Doppio Cafe POS
+# Native PowerShell HTTP Server for RestoSuite local development
 $port = 8001
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
 
 try {
     $listener.Start()
-    Write-Host "Doppio Cafe POS server successfully running at: http://localhost:$port/" -ForegroundColor Green
+    Write-Host "RestoSuite dev server running at: http://localhost:$port/" -ForegroundColor Green
     Write-Host "Leave this window open. Press Ctrl+C in terminal to stop." -ForegroundColor Yellow
     
     while ($listener.IsListening) {

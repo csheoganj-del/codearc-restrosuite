@@ -355,7 +355,10 @@
       if (overlay) {
         overlay.style.opacity = '0';
         overlay.style.transition = 'opacity 0.4s ease';
-        setTimeout(() => { overlay.style.display = 'none'; }, 400);
+        setTimeout(() => {
+          overlay.style.display = 'none';
+          document.body.classList.remove('onboarding-active');
+        }, 400);
       }
       // Collapse sidebar
       const sidebar = document.querySelector('.sidebar');
@@ -371,6 +374,7 @@
       initSteps();
       if (steps.length === 0) return;
 
+      document.body.classList.add('onboarding-active');
       overlay.style.display = 'block';
       overlay.style.opacity = '0';
       overlay.style.transition = 'opacity 0.5s ease';

@@ -182,9 +182,17 @@ BEGIN
     END LOOP;
 END $$;
 
-UPDATE public.saas_plans
-SET allowed_tabs = ARRAY(
-    SELECT DISTINCT tab
-    FROM unnest(allowed_tabs || ARRAY['growth-hub-tab']::text[]) AS tab
-)
-WHERE NOT ('growth-hub-tab' = ANY(allowed_tabs));
+-- saas_plans is created by 20260608130000_saas_plan_entitlements.sql.
+-- Keep this migration runnable on databases where that earlier migration has
+-- not been applied yet.
+DO $$
+BEGIN
+    IF to_regclass('public.saas_plans') IS NOT NULL THEN
+        UPDATE public.saas_plans
+        SET allowed_tabs = ARRAY(
+            SELECT DISTINCT tab
+            FROM unnest(allowed_tabs || ARRAY['growth-hub-tab']::text[]) AS tab
+        )
+        WHERE NOT ('growth-hub-tab' = ANY(allowed_tabs));
+    END IF;
+END $$;

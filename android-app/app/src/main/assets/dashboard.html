@@ -411,7 +411,7 @@
       </div>
 
       <!-- Mobile User Profile Avatar -->
-      <div class="avatar" id="mobile-profile-btn" style="width:32px; height:32px; font-size:12px; display:flex; align-items:center; justify-content:center; background:var(--accent-caramel); color:white; border-radius:50%; font-weight:700; cursor:pointer;" id="mobile-avatar-initial">?</div>
+      <button type="button" class="avatar" id="mobile-profile-btn" style="width:32px; height:32px; font-size:12px; display:flex; align-items:center; justify-content:center; background:var(--accent-caramel); color:white; border:0; border-radius:50%; font-weight:700; cursor:pointer;" aria-label="Open business profile">?</button>
     </div>
   </div>
 
@@ -568,7 +568,7 @@
       <!-- High-visibility Offline Warning Banner -->
       <div id="offline-banner" class="offline-banner-strip" style="display: none;">
         <i class="fa-solid fa-triangle-exclamation"></i>
-        <span>Nagpur Terminal Offline Mode Active. Sales backed up locally. Cloud sync paused.</span>
+        <span>Terminal Offline Mode Active. Sales backed up locally. Cloud sync paused.</span>
       </div>
 
       <!-- Alert Banners container for Low Inventory Notifications -->
@@ -648,7 +648,7 @@
                     <span style="font-size: 10px; font-weight: 700; color: var(--accent-caramel); background: rgba(252, 128, 25, 0.06); border: 1px solid rgba(252, 128, 25, 0.12); padding: 2px 6px; border-radius: 12px;" id="cart-order-badge">Order: DO-1001</span>
                   </div>
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <button class="clear-cart-btn" id="clear-cart" style="background:transparent; border:none; color:var(--danger-color); cursor:pointer; font-size:12px; transition:var(--transition); padding:6px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(231,76,60,0.06);" title="Clear Cart"><i class="fa-solid fa-trash-can"></i></button>
+                    <button class="clear-cart-btn" id="clear-cart" style="background:transparent; border:none; color:var(--danger-color); cursor:pointer; font-size:12px; transition:var(--transition); padding:6px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(231,76,60,0.06);" title="Clear Cart" aria-label="Clear cart"><i class="fa-solid fa-trash-can"></i></button>
                     <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none; background:rgba(28, 28, 28,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
                   </div>
                 </div>
@@ -1095,7 +1095,7 @@
             <!-- Sales Action Bar -->
             <div class="reports-header-actions">
               <div class="report-filters">
-                <span class="report-span" style="font-family:var(--font-heading); font-size:22px; font-weight:700; color:var(--primary-brand);">Doppio Nagpur Analytics Studio</span>
+                <span class="report-span" style="font-family:var(--font-heading); font-size:22px; font-weight:700; color:var(--primary-brand);" id="analytics-studio-title">Analytics Studio</span>
               </div>
               <div class="export-actions">
                 <button class="export-btn excel btn btn-secondary" id="export-excel-btn"><i class="fa-solid fa-file-excel"></i> Export Excel (CSV)</button>
@@ -1177,7 +1177,7 @@
                 <div class="ai-recommendations-box">
                   <h4 style="font-size:12px; font-weight:700; color:var(--accent-caramel); margin-bottom:8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Business Intelligence Insights</h4>
                   <div id="ai-insights-list">
-                    <div class="ai-tip-item"><i class="fa-solid fa-circle-check"></i> <span>Dine-in combinations represent the highest average ticket size at Nagpur.</span></div>
+                    <div class="ai-tip-item"><i class="fa-solid fa-circle-check"></i> <span>Dine-in combinations represent the highest average ticket size.</span></div>
                     <div class="ai-tip-item"><i class="fa-solid fa-circle-check"></i> <span>Peak hourly transactions occur between 18:00 and 20:30 (happy hours).</span></div>
                   </div>
                 </div>
@@ -1211,7 +1211,7 @@
           <!-- Detailed P&L Statement Panel -->
           <div class="report-panel" style="margin-top: 20px; padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
               <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
-                <i class="fa-solid fa-file-invoice-dollar"></i> Doppio Café Nagpur - Detailed Profit & Loss Statement
+                  <i class="fa-solid fa-file-invoice-dollar"></i> <span id="pnl-statement-title">Detailed Profit &amp; Loss Statement</span>
               </h3>
               <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px;">
                 <!-- Left Side: Table breakdown -->
@@ -1247,7 +1247,7 @@
                 </div>
                 <!-- Right Side: Business Financial Insights -->
                 <div style="background: rgba(200, 138, 88, 0.02); border: 1px solid rgba(200, 138, 88, 0.15); border-radius: 8px; padding: 16px; font-size: 11px;">
-                  <h4 style="font-size: 12px; font-weight: 700; color: var(--accent-caramel); margin-bottom: 8px;"><i class="fa-solid fa-lightbulb"></i> Nagpur Outlet Financial Insights</h4>
+                  <h4 style="font-size: 12px; font-weight: 700; color: var(--accent-caramel); margin-bottom: 8px;"><i class="fa-solid fa-lightbulb"></i> Outlet Financial Insights</h4>
                   <ul style="padding-left: 16px; display: flex; flex-direction: column; gap: 8px; line-height: 1.4; color: var(--text-dark);">
                     <li><strong>Wage-to-Revenue Ratio:</strong> Ideal ratio is below 20%. Your actual labor utilization is dynamically calculated based on employee clockings.</li>
                     <li><strong>Prime Cost (COGS + Labor):</strong> The standard metric of restaurant profitability. Keeping prime costs below 60% ensures high profitability.</li>
@@ -1360,7 +1360,7 @@
 
               <!-- Right Side: Touch card listings grid -->
               <div class="menu-editor-list-panel">
-                <h3>Active Nagpur Cafe Menu List</h3>
+                <h3>Active Menu Items</h3>
                 <div class="menu-editor-grid" id="editor-items-grid">
                   <!-- Dynamic cards injected in JS -->
                 </div>
@@ -1715,7 +1715,7 @@
                 <div class="bills-stat-info">
                   <span class="bills-stat-title">Active Employees</span>
                   <span class="bills-stat-val" id="emp-stat-total">4 Staff Members</span>
-                  <span class="bills-stat-trend">Nagpur Branch Roster</span>
+                  <span class="bills-stat-trend">Branch Roster</span>
                 </div>
               </div>
               <div class="bills-stat-card">
@@ -1829,7 +1829,7 @@
               <!-- Left Column: Employee Directory -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
                 <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
-                  <i class="fa-solid fa-user-tie"></i> Nagpur Staff Directory
+                  <i class="fa-solid fa-user-tie"></i> Staff Directory
                 </h3>
                 <div style="overflow-x: auto;">
                   <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;" id="emp-directory-table">
@@ -1904,7 +1904,7 @@
               <!-- Shift Scheduling Panel -->
               <div class="report-panel" style="padding: 20px; border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-sm);">
                 <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 16px; font-weight: 700; margin: 0 0 12px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 8px;">
-                  <i class="fa-solid fa-clock"></i> Weekly Shift Roster (Nagpur Branch)
+                  <i class="fa-solid fa-clock"></i> Weekly Shift Roster
                 </h3>
                 <div style="overflow-x: auto;">
                   <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;" id="shift-roster-table">
@@ -2435,7 +2435,7 @@
   <div class="modal-backdrop" id="profile-modal">
     <div class="glass-modal" style="max-width: 580px;">
       <div class="modal-header">
-        <h2><i class="fa-solid fa-store"></i> Doppio Cafe Settings Control</h2>
+        <h2><i class="fa-solid fa-store"></i> Business Settings</h2>
         <button class="close-modal-btn" id="close-profile-modal">&times;</button>
       </div>
       <div class="modal-body">
@@ -2459,15 +2459,15 @@
             <div class="settings-tab-content" id="info-sec">
               <div class="form-group" style="margin-bottom: 12px;">
                 <label>Business / Branch Name</label>
-                <input type="text" id="profile-name-input" placeholder="e.g. Doppio Cafe Nagpur" required>
+                <input type="text" id="profile-name-input" placeholder="e.g. My Restaurant" required>
               </div>
               <div class="form-group" style="margin-bottom: 12px;">
                 <label>Address Details</label>
-                <input type="text" id="profile-address-input" placeholder="e.g. London Street, Nagpur" required>
+                <input type="text" id="profile-address-input" placeholder="e.g. 123 Main Street, City" required>
               </div>
               <div class="form-group" style="margin-bottom: 12px;">
                 <label>Phone Number</label>
-                <input type="text" id="profile-phone-input" placeholder="e.g. +91 91300 03177" required>
+                <input type="text" id="profile-phone-input" placeholder="e.g. +91 98765 43210" required>
               </div>
             </div>
 
@@ -2850,9 +2850,9 @@
 -- Table Definition for doppio_business_profile in Supabase
 CREATE TABLE IF NOT EXISTS public.doppio_business_profile (
     id bigint PRIMARY KEY,
-    business_name text DEFAULT 'Doppio Cafe'::text,
-    address text DEFAULT 'London Street, Nagpur'::text,
-    phone text DEFAULT '+91 91300 03177'::text,
+    business_name text DEFAULT 'My Restaurant'::text,
+    address text DEFAULT ''::text,
+    phone text DEFAULT ''::text,
     gst_enabled boolean DEFAULT false,
     gst_rate numeric DEFAULT 18.00,
     loyalty_discount_enabled boolean DEFAULT false,
@@ -3261,8 +3261,8 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       <button class="close-modal-btn" id="qr-viewer-close" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
       
       <div class="logo login-logo" style="margin: 0 auto; display: table;">
-        <span class="logo-doppio">DOPPIO</span>
-        <span class="logo-cafe">Café</span>
+        <span class="logo-doppio" id="qr-modal-brand-name">RESTRO</span>
+        <span class="logo-cafe">Suite</span>
       </div>
       
       <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 20px; font-weight: 700; margin: 0;" id="qr-viewer-title">Table 01 QR Ordering Template</h3>
@@ -3330,8 +3330,8 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       <div style="display: flex; flex-direction: column; gap: 15px;" id="payslip-print-area">
         <!-- Logo and header -->
         <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px;">
-          <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 22px;">DOPPIO CAFÉ</h2>
-          <p style="margin: 2px 0 0 0; font-size: 10px; text-transform: uppercase; color: var(--text-muted);">Nagpur Premium Outlet • Salary Slip</p>
+          <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 22px;" id="payslip-header-name">RESTROSUITE</h2>
+          <p style="margin: 2px 0 0 0; font-size: 10px; text-transform: uppercase; color: var(--text-muted);">Salary Slip</p>
         </div>
         
         <!-- Details grid -->

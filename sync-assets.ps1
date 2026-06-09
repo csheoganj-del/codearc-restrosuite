@@ -1,4 +1,4 @@
-# Doppio Cafe Android POS Assets Synchronization Script
+# RestoSuite Android POS Assets Synchronisation Script
 # Run this script whenever you update your web files to sync them with the Android App assets.
 
 $SourceDir = $PSScriptRoot
@@ -23,6 +23,7 @@ $FilesToCopy = @(
     "dashboard.js",
     "recipes.json",
     "pwa.js",
+    "service-worker.js",
     "manifest.webmanifest",
     "legal.css",
     "terms.html",

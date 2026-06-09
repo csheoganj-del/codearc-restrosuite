@@ -362,6 +362,13 @@ serve(async (req) => {
       if (payload.returning) query = query.select(columns);
     } else if (operation === "upsert") {
       const options = payload.options && typeof payload.options === "object" ? payload.options : {};
+      const conflictColumns = String((options as Record<string, unknown>).onConflict || "")
+        .split(",")
+        .map((column) => column.trim())
+        .filter(Boolean);
+      if (!conflictColumns.includes("tenant_id")) {
+        return jsonResponse({ error: "Tenant upserts must use a tenant-scoped conflict key." }, 400, req);
+      }
       query = supabaseAdmin.from(table).upsert(withTenantId(payload.data, verified.tenantId as string), options);
       if (payload.returning) query = query.select(columns);
     } else if (operation === "update") {

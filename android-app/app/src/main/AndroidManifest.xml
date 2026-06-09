@@ -12,7 +12,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.DoppioPOS"
+        android:theme="@style/Theme.RestoSuitePOS"
         android:usesCleartextTraffic="false">
         
         <activity

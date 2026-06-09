@@ -331,6 +331,16 @@ test("dashboard interactions are optimized for instant feedback", () => {
 
   assert.match(dashboard, /const FAST_INTERACTION_MODE = true/);
   assert.match(dashboard, /const ENABLE_DEMO_TOOLS = false/);
+  assert.match(dashboard, /employees-tab', 'growth-hub-tab'/);
+  assert.match(dashboard, /document\.querySelectorAll\('\.more-sheet-link\[data-tab\]'\)/);
+  assert.match(dashboard, /else if \(tabId === 'growth-hub-tab'\) \{\s*renderGrowthHub\(\)/);
+  assert.match(read("dashboard-styles.css"), /\.floating-cart-bar\s*\{[\s\S]*?top: auto !important;[\s\S]*?bottom: calc\(var\(--mobile-nav-height\)/);
+  assert.match(read("dashboard-styles.css"), /\.tab-content\.active\s*\{[\s\S]*?content-visibility: visible;/);
+  assert.match(read("src/dashboard/onboarding.js"), /document\.body\.classList\.add\('onboarding-active'\)/);
+  assert.match(read("src/dashboard/onboarding.js"), /document\.body\.classList\.remove\('onboarding-active'\)/);
+  const dashboardRealtimeMigration = read("supabase/migrations/20260609090000_client_dashboard_realtime.sql");
+  assert.match(dashboardRealtimeMigration, /ALTER PUBLICATION supabase_realtime ADD TABLE/);
+  assert.match(dashboardRealtimeMigration, /doppio_menu_tenant_name_uidx/);
   assert.match(dashboard, /function debounce/);
   assert.match(dashboard, /requestIdleCallback/);
   assert.match(dashboard, /vaultWriteQueue/);
@@ -340,7 +350,13 @@ test("dashboard interactions are optimized for instant feedback", () => {
   assert.match(dashboard, /table: 'doppio_attendance', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
   assert.match(dashboard, /table: 'doppio_leave_requests', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
   assert.match(dashboard, /channel\('doppio-crm-realtime'\)/);
-  assert.match(dashboard, /channel\('doppio-menu-realtime'\)/);
+  assert.match(dashboard, /channel\(`doppio-menu-realtime-\$\{activeTenantId\}`\)/);
+  assert.match(dashboard, /event: 'menu-updated'/);
+  assert.match(dashboard, /broadcastMenuUpdate\(\)/);
+  assert.match(dashboard, /await Promise\.all\(cloudWrites\)/);
+  assert.match(dashboard, /Recipe import failed for \$\{newItem\.name\}/);
+  assert.match(dashboard, /onConflict: 'tenant_id,name'/);
+  assert.match(dashboard, /onConflict: 'tenant_id,item_name'/);
   assert.match(dashboard, /table: 'doppio_bills', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
   assert.match(dashboard, /table: 'doppio_pending_orders', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
   assert.doesNotMatch(dashboard, /table: 'doppio_bills' \},/);
@@ -440,4 +456,15 @@ test("production launch runbooks cover deployment, QA, support, billing, backups
   assert.match(monitoring, /Supabase quota/);
   assert.match(demo, /12-Minute Demo Flow/);
   assert.match(demo, /zero-cost pilot/);
+});
+
+test("nested POS controls expose split payment and touch customization", () => {
+  const dashboardJs = read("dashboard.js");
+  const dashboardCss = read("dashboard-styles.css");
+
+  assert.match(dashboardJs, /let isSplitPaymentActive = false;/);
+  assert.match(dashboardJs, /class="pos-customize-btn"/);
+  assert.match(dashboardJs, /openCustomizationModal\(item\)/);
+  assert.match(dashboardCss, /\.pos-customize-btn/);
+  assert.match(dashboardCss, /@media \(hover: none\), \(max-width: 600px\)/);
 });

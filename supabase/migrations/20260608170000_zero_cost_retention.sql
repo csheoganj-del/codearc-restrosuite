@@ -8,14 +8,17 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-    DELETE FROM public.api_rate_limits
-    WHERE window_started_at < now() - interval '2 days';
+    IF to_regclass('public.api_rate_limits') IS NOT NULL THEN
+        EXECUTE 'DELETE FROM public.api_rate_limits WHERE window_started_at < now() - interval ''2 days''';
+    END IF;
 
-    DELETE FROM public.app_error_reports
-    WHERE created_at < now() - interval '30 days';
+    IF to_regclass('public.app_error_reports') IS NOT NULL THEN
+        EXECUTE 'DELETE FROM public.app_error_reports WHERE created_at < now() - interval ''30 days''';
+    END IF;
 
-    DELETE FROM public.tenant_audit_logs
-    WHERE created_at < now() - interval '90 days';
+    IF to_regclass('public.tenant_audit_logs') IS NOT NULL THEN
+        EXECUTE 'DELETE FROM public.tenant_audit_logs WHERE created_at < now() - interval ''90 days''';
+    END IF;
 
     IF to_regclass('public.gateway_health_log') IS NOT NULL THEN
         EXECUTE 'DELETE FROM public.gateway_health_log WHERE created_at < now() - interval ''14 days''';
@@ -41,14 +44,22 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS app_error_reports_zero_cost_cleanup ON public.app_error_reports;
-CREATE TRIGGER app_error_reports_zero_cost_cleanup
-AFTER INSERT ON public.app_error_reports
-FOR EACH ROW EXECUTE FUNCTION public.zero_cost_cleanup_after_insert();
+DO $$
+BEGIN
+    IF to_regclass('public.app_error_reports') IS NOT NULL THEN
+        EXECUTE 'DROP TRIGGER IF EXISTS app_error_reports_zero_cost_cleanup ON public.app_error_reports';
+        EXECUTE 'CREATE TRIGGER app_error_reports_zero_cost_cleanup
+                 AFTER INSERT ON public.app_error_reports
+                 FOR EACH ROW EXECUTE FUNCTION public.zero_cost_cleanup_after_insert()';
+    END IF;
 
-DROP TRIGGER IF EXISTS tenant_audit_logs_zero_cost_cleanup ON public.tenant_audit_logs;
-CREATE TRIGGER tenant_audit_logs_zero_cost_cleanup
-AFTER INSERT ON public.tenant_audit_logs
-FOR EACH ROW EXECUTE FUNCTION public.zero_cost_cleanup_after_insert();
+    IF to_regclass('public.tenant_audit_logs') IS NOT NULL THEN
+        EXECUTE 'DROP TRIGGER IF EXISTS tenant_audit_logs_zero_cost_cleanup ON public.tenant_audit_logs';
+        EXECUTE 'CREATE TRIGGER tenant_audit_logs_zero_cost_cleanup
+                 AFTER INSERT ON public.tenant_audit_logs
+                 FOR EACH ROW EXECUTE FUNCTION public.zero_cost_cleanup_after_insert()';
+    END IF;
+END;
+$$;
 
 SELECT public.cleanup_zero_cost_operational_data();

@@ -12,8 +12,8 @@ const unzipper = require('unzipper');
 // ============================================================
 // SUPABASE CLIENTS
 // ============================================================
-const SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://htkauiibuejetimfiavs.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
 
 // Service-role key for Supabase Storage access (set as env variable in HuggingFace Secrets)
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
@@ -519,7 +519,7 @@ const os = require('os');
 // Determine data path dynamically to support both Windows local execution and Linux cloud containers
 let authDataPath = process.env.AUTH_DATA_PATH || path.join(__dirname, '.wwebjs_auth');
 if (!process.env.AUTH_DATA_PATH && os.platform() === 'win32') {
-    authDataPath = path.join(os.homedir(), '.gemini', 'antigravity', 'doppio-auth');
+    authDataPath = path.join(os.homedir(), '.restrosuite', 'whatsapp-auth');
 }
 
 // Initialize WhatsApp client with local session caching
@@ -2149,9 +2149,9 @@ realtimeChannel.subscribe((status) => {
 // MONOSPACE RECEIPT FORMATTER UTILITIES
 // ======================================================
 const businessProfile = {
-    name: 'DOPPIO CAFE NAGPUR',
-    address: 'London Street, Nagpur',
-    phone: '+91 91300 03177',
+    name: process.env.BUSINESS_NAME || 'RESTROSUITE',
+    address: process.env.BUSINESS_ADDRESS || '',
+    phone: process.env.BUSINESS_PHONE || '',
     gstEnabled: true
 };
 

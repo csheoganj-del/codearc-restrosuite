@@ -12,6 +12,12 @@ dashboard-phase2-restore.zip
 local.properties
 .DS_Store
 
+# Android release signing — NEVER commit keystores or signing credentials
+*.jks
+*.keystore
+android-app/gradle.properties
+
+
 # Node
 node_modules/
 node_modules_old/

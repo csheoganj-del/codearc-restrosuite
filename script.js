@@ -1,5 +1,5 @@
 /**
- * Doppio Cafe - Premium Interactive Web Platform
+ * RestoSuite — Interactive Customer Web Platform
  * Contains the custom 2D Canvas Physics Engine and the Complete Rupee-Priced Interactive Menu Database
  */
 
@@ -228,7 +228,7 @@ window.addEventListener('DOMContentLoaded', () => {
         ? `<img src="${safeImage}" alt="${safeName}">`
         : `<div class="menu-item-placeholder">
              ${safeIcon}
-             <span>Doppio Cafe</span>
+             <span>RestoSuite</span>
            </div>`;
 
       card.innerHTML = `
@@ -995,14 +995,30 @@ window.addEventListener('DOMContentLoaded', () => {
       const totalAmount = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
       // UPI deep link generation
-      // pay.doppiocafe@oksbi is the merchant VPA
-      const upiUrl = `upi://pay?pa=pay.doppiocafe@oksbi&pn=Doppio%20Cafe%20Nagpur&am=${totalAmount}&cu=INR&tn=Table_${tableVal}_Order`;
+      // The merchant VPA and business name are loaded from the tenant's business profile.
+      // tenantPublicProfile is populated at page load from the backend (list_profile action).
+      // If not yet loaded, the UPI QR will be skipped and only cash/counter pay is offered.
+      const merchantVpa = (window.tenantPublicProfile && window.tenantPublicProfile.upi_vpa) || '';
+      const merchantName = (window.tenantPublicProfile && window.tenantPublicProfile.name) || 'Restaurant';
+      const encodedName = encodeURIComponent(merchantName.slice(0, 30));
+      const upiUrl = merchantVpa
+        ? `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodedName}&am=${totalAmount}&cu=INR&tn=Table_${tableVal}_Order`
+        : '';
       
       // Dynamic High-Fidelity QR Code Generator URL via open QRServer API
-      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+      const qrApiUrl = upiUrl
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`
+        : '';
       
       if (upiAmountVal) upiAmountVal.textContent = `₹${totalAmount}`;
-      if (upiQrImage) upiQrImage.src = qrApiUrl;
+      if (upiQrImage) {
+        if (qrApiUrl) {
+          upiQrImage.src = qrApiUrl;
+          upiQrImage.style.display = '';
+        } else {
+          upiQrImage.style.display = 'none';
+        }
+      }
 
       // Close Cart Drawer and Open UPI Modal
       toggleCartDrawer(false);

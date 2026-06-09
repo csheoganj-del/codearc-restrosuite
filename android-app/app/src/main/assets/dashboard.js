@@ -1,5 +1,5 @@
 /**
- * Doppio Cafe - Nagpur Premium Cashier Takeaway POS & Inventory Dashboard Control System
+ * RestoSuite — Multi-Tenant Cashier POS & Inventory Dashboard
  * Redesigned for commercial-grade touchscreen tablets and desktop PCs.
  * Keeps existing brown-cream branding, Supabase sync, and synthesiser chimes.
  */
@@ -158,6 +158,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
   let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
   let saasGatewayPollingInterval = null;
+  let menuRealtimeChannel = null;
+
+  function broadcastMenuUpdate() {
+    if (!menuRealtimeChannel) return;
+    menuRealtimeChannel.send({
+      type: 'broadcast',
+      event: 'menu-updated',
+      payload: { tenantId: activeTenantId }
+    }).catch(error => console.warn('Menu realtime signal failed:', error));
+  }
 
   // ==========================================
   // DYNAMIC BRANDING — tenant name, user, avatar
@@ -165,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   (function bootstrapDynamicBranding() {
     const loggedInUser = sessionStorage.getItem('logged_in_user') || '';
     const loggedInRole = sessionStorage.getItem('logged_in_role') || 'staff';
-    const displayName = sessionStorage.getItem('display_name') || loggedInUser;
+    const displayName = sessionStorage.getItem('logged_in_display_name') || loggedInUser;
     const avatarInitial = (displayName || loggedInUser || '?').charAt(0).toUpperCase();
     const roleLabel = {
       admin: 'Administrator', cashier: 'Cashier', kitchen: 'Kitchen Staff',
@@ -208,8 +218,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lockBrandName) lockBrandName.textContent = (activeTenantName || 'RESTRO').toUpperCase().slice(0, 12);
     if (lockBrandDesc) lockBrandDesc.textContent = 'SECURE TERMINAL';
 
+    // QR viewer modal brand
+    const qrModalBrand = document.getElementById('qr-modal-brand-name');
+    if (qrModalBrand) qrModalBrand.textContent = (activeTenantName || 'RestoSuite').toUpperCase().slice(0, 8);
+
     // Window title
     document.title = `${activeTenantName || 'RestoSuite'} — Dashboard`;
+
+    // Payslip preview header
+    const payslipHeaderName = document.getElementById('payslip-header-name');
+    if (payslipHeaderName) payslipHeaderName.textContent = (activeTenantName || 'RestoSuite').toUpperCase();
+
+    // Analytics studio title
+    const analyticsTitle = document.getElementById('analytics-studio-title');
+    if (analyticsTitle) analyticsTitle.textContent = `${activeTenantName || 'RestoSuite'} — Analytics Studio`;
   })();
 
   staffAccessDomain.initialize({
@@ -429,9 +451,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Redundant write to Resilience Vault (IndexedDB) is handled via Storage.prototype.setItem hook
 
-  // Premium Low-overhead Global Exception Logger for Nagpur Branch POS Diagnostics
+  // Global Exception Logger for POS Diagnostics
   window.onerror = function (msg, url, lineNo, columnNo, error) {
-    console.error(`[Doppio Cafe POS Crash Alert] Error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
+    console.error(`[RestoSuite POS Crash Alert] Error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
     const errIndicator = document.createElement('div');
     errIndicator.style.position = 'fixed';
     errIndicator.style.bottom = '10px';
@@ -1046,6 +1068,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let attendanceLogs = [];
 
   let selectedPaymentMethod = localStorage.getItem('doppio_cart_pay_method') || 'UPI';
+  let isSplitPaymentActive = false;
   let activeOrderType = 'Takeaway';
   let draftOrders = (() => {
     try {
@@ -1337,7 +1360,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             whatsappGatewayEnabled: dbProfile.whatsapp_gateway_enabled !== undefined ? dbProfile.whatsapp_gateway_enabled : businessProfile.whatsappGatewayEnabled,
             whatsappGatewayUrl: dbProfile.whatsapp_gateway_url || businessProfile.whatsappGatewayUrl,
             whatsappGatewayToken: dbProfile.whatsapp_gateway_token || businessProfile.whatsappGatewayToken,
-            featureFlags: dbProfile.feature_flags ? JSON.parse(dbProfile.feature_flags) : (businessProfile.featureFlags || {})
+            featureFlags: typeof dbProfile.feature_flags === 'string'
+              ? JSON.parse(dbProfile.feature_flags)
+              : (dbProfile.feature_flags || businessProfile.featureFlags || {})
           };
 
           if (businessProfile.whatsappGatewayUrl === undefined || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
@@ -1797,7 +1822,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   try { ingredients = JSON.parse(ingredients); } catch (e) { ingredients = []; }
                 }
                 // Cloud wins (overwrite local recipe for this item)
-                customRecipes[itemName] = Array.isArray(ingredients) ? ingredients : [];
+                customRecipes[itemName] = ingredients && typeof ingredients === 'object' ? ingredients : {};
               }
             });
             localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
@@ -2003,8 +2028,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_crm', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
         .subscribe();
 
-      supabaseClient.channel('doppio-menu-realtime')
+      menuRealtimeChannel = supabaseClient.channel(`doppio-menu-realtime-${activeTenantId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_menu', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .on('broadcast', { event: 'menu-updated' }, (message) => {
+          if (String(message.payload?.tenantId || '') === String(activeTenantId)) {
+            scheduleTenantDataSync();
+          }
+        })
         .subscribe();
     }
 
@@ -2187,7 +2217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         frameTask(renderInventory);
       }
       else if (tabId === 'reports-tab') {
-        tabSubtitle.textContent = 'Nagpur Branch Sales & Analytics';
+        tabSubtitle.textContent = (activeTenantName ? activeTenantName + ' — ' : '') + 'Sales & Analytics';
         frameTask(renderReports);
       }
       else if (tabId === 'editor-tab') {
@@ -2385,11 +2415,19 @@ document.addEventListener('DOMContentLoaded', async () => {
           ${descText}
           <span class="pos-item-price">₹${item.price}</span>
         </div>
+        <button type="button" class="pos-customize-btn" aria-label="Customize ${escHtml(item.name)}" title="Customize item">
+          <i class="fa-solid fa-sliders"></i>
+        </button>
       `;
 
       // Click card to add directly to cart (pass DOM ref for flash animation)
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('.pos-customize-btn')) return;
         addDefaultToCart(item, card);
+      });
+      card.querySelector('.pos-customize-btn').addEventListener('click', (event) => {
+        event.stopPropagation();
+        openCustomizationModal(item);
       });
 
       posItemsGrid.appendChild(card);
@@ -3278,7 +3316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Deduct stock levels permanently using FEFO (Nagpur compliance)
+    // Deduct stock levels permanently using FEFO (First Expired, First Out)
     Object.keys(proposedDeductions).forEach(ing => {
       deductStockFEFO(ing, proposedDeductions[ing]);
     });
@@ -3379,8 +3417,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Android vocal announcement
     if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
       const engText = editingBillId
-        ? "Doppio Cafe Nagpur. Bill " + billIdToSave + " updated!"
-        : "Doppio Cafe Nagpur. Payment of Rupees " + total + " received!";
+        ? (activeTenantName || 'RestoSuite') + ". Bill " + billIdToSave + " updated!"
+        : (activeTenantName || 'RestoSuite') + ". Payment of Rupees " + total + " received!";
       window.AndroidInterface.speak(engText);
     }
 
@@ -4093,9 +4131,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Build receipt wrapped in WhatsApp's triple backticks monospace block
     let msg = "```\n";
     msg += borderDouble + '\n';
-    msg += centerText24(businessProfile.name || 'DOPPIO CAFE NAGPUR') + '\n';
-    msg += centerText24(businessProfile.address || 'London Street, Nagpur') + '\n';
-    msg += centerText24(businessProfile.phone || '+91 91300 03177') + '\n';
+    msg += centerText24(businessProfile.name || activeTenantName || 'RESTROSUITE') + '\n';
+    msg += centerText24(businessProfile.address || '') + '\n';
+    msg += centerText24(businessProfile.phone || '') + '\n';
     msg += borderDouble + '\n\n';
 
     let leftBill = `Bill: ${bill.orderId}`;
@@ -4260,6 +4298,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       trySend(dispatchUrl);
     } else {
+      // Gateway unavailable (not configured or zero-cost mode active).
+      // Notify the user and fall back to manual WhatsApp share.
+      if (ZERO_COST_LAUNCH_MODE) {
+        showNotificationToast("Auto-gateway disabled. Opening WhatsApp manually…");
+      }
       openManualWhatsApp(phoneNum, encodedMsg);
     }
   }
@@ -4423,7 +4466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               qty: newBatch.qty,
               expiryDate: newBatch.expiryDate,
               receivedDate: newBatch.receivedDate
-            }, { onConflict: 'id' }).then(({ error }) => {
+            }, { onConflict: 'tenant_id,id' }).then(({ error }) => {
               if (error) handleSyncError('Batch Refill', error);
             });
           }
@@ -4450,7 +4493,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Sync threshold to Supabase
           if (supabaseClient) {
             supabaseClient.from('doppio_inventory_thresholds')
-              .upsert({ ingredient_key: key, threshold: val, updated_at: new Date().toISOString() }, { onConflict: 'ingredient_key' })
+              .upsert({ ingredient_key: key, threshold: val, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,ingredient_key' })
               .then(({ error }) => {
                 if (error) handleSyncError('Inventory Threshold Save', error);
               });
@@ -4552,7 +4595,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         expiryDate: b.expiryDate,
         receivedDate: b.receivedDate
       }));
-      supabaseClient.from('doppio_inventory_batches').upsert(upsertData, { onConflict: 'id' }).then(({ error }) => {
+      supabaseClient.from('doppio_inventory_batches').upsert(upsertData, { onConflict: 'tenant_id,id' }).then(({ error }) => {
         if (error) handleSyncError('Batch Quantity Sync', error);
       });
     } else {
@@ -4667,7 +4710,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       banner.innerHTML = `
         <div class="alert-banner">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          <span>Low stock alerts for Nagpur Branch: <strong>${lowIngredients.slice(0, 4).join(', ')}${lowIngredients.length > 4 ? '...' : ''}</strong></span>
+          <span>Low stock alert: <strong>${lowIngredients.slice(0, 4).join(', ')}${lowIngredients.length > 4 ? '...' : ''}</strong></span>
         </div>
       `;
       // Play soft alert sounds
@@ -5172,7 +5215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       printWindow.document.write(`
         <html>
         <head>
-          <title>Doppio Cafe - Stock & Inventory Report</title>
+          <title>RestoSuite - Stock &amp; Inventory Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
@@ -5191,7 +5234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="header">
             <div>
               <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">Nagpur Commercial POS & Inventory Control</p>
+              <p class="meta">${escHtml(activeTenantName || 'RestoSuite')} — POS &amp; Inventory Control</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Stock Level Inventory Report</h2>
@@ -5213,7 +5256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </tbody>
           </table>
           <div class="footer">
-            Doppio Cafe Nagpur. Confidential Commercial Stock Ledger Report. Authorized access only.
+            ${escHtml(activeTenantName || 'RestoSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
           </div>
           <script>
             window.onload = function() {
@@ -5333,7 +5376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       printWindow.document.write(`
         <html>
         <head>
-          <title>Doppio Cafe - Low Stock Alert Report</title>
+          <title>RestoSuite - Low Stock Alert Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e74c3c; padding-bottom: 15px; margin-bottom: 20px; }
@@ -5352,7 +5395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="header">
             <div>
               <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">Nagpur Commercial POS & Inventory Control</p>
+              <p class="meta">${escHtml(activeTenantName || 'RestoSuite')} — POS &amp; Inventory Control</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Low Stock Alert Report</h2>
@@ -5374,7 +5417,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </tbody>
           </table>
           <div class="footer">
-            Doppio Cafe Nagpur. Confidential Commercial Stock Ledger Report. Authorized access only.
+            ${escHtml(activeTenantName || 'RestoSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
           </div>
           <script>
             window.onload = function() {
@@ -5526,7 +5569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       printWindow.document.write(`
         <html>
         <head>
-          <title>Doppio Cafe - Sales & Revenue Audit Report</title>
+          <title>RestoSuite - Sales &amp; Revenue Audit Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
@@ -5551,7 +5594,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="header">
             <div>
               <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">Nagpur Commercial Analytics Studio</p>
+              <p class="meta">${escHtml(activeTenantName || 'RestoSuite')} — Analytics Studio</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Sales & Revenue Audit Report</h2>
@@ -5609,7 +5652,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </tbody>
           </table>
           <div class="footer">
-            Doppio Cafe Nagpur - Authorized Financial Ledger Document
+            ${escHtml(activeTenantName || 'RestoSuite')} - Authorized Financial Ledger Document
           </div>
           <script>
             window.onload = function() {
@@ -5627,6 +5670,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   // 11. MENU EDITOR & PREVIEWS (TAB 5)
   // ==========================================
+  async function requireTenantWrite(query, actionLabel) {
+    const { data, error } = await query;
+    if (error) throw new Error(`${actionLabel}: ${error.message || 'Cloud write failed.'}`);
+    return data;
+  }
+
   const editorItemsGrid = document.getElementById('editor-items-grid');
 
   function renderMenuEditor() {
@@ -5679,25 +5728,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       card.querySelector('.delete-btn').addEventListener('click', () => {
-        showAdminPinModal(() => {
-          SoundEffects.playRemove();
-          const nameLower = item.name.toLowerCase().trim();
-          menu.splice(index, 1);
-          localStorage.setItem('doppio_menu', JSON.stringify(menu));
-
-          // delete custom recipe
-          delete customRecipes[nameLower];
-          localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
-
-          if (supabaseClient) {
-            supabaseClient.from('doppio_menu').delete().eq('name', item.name).then();
-            // Also delete the custom recipe from cloud
-            supabaseClient.from('doppio_custom_recipes').delete().eq('item_name', nameLower).then();
+        showAdminPinModal(async () => {
+          try {
+            if (!supabaseClient) throw new Error('Cloud connection is unavailable.');
+            const nameLower = item.name.toLowerCase().trim();
+            await requireTenantWrite(
+              supabaseClient.from('doppio_menu').delete().eq('name', item.name),
+              'Menu item deletion failed'
+            );
+            await requireTenantWrite(
+              supabaseClient.from('doppio_custom_recipes').delete().eq('item_name', nameLower),
+              'Recipe deletion failed'
+            );
+            SoundEffects.playRemove();
+            menu.splice(index, 1);
+            localStorage.setItem('doppio_menu', JSON.stringify(menu));
+            delete customRecipes[nameLower];
+            localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
+            renderMenuEditor();
+            renderPOSCategories();
+            renderPOSItems();
+            broadcastMenuUpdate();
+            showNotificationToast('Menu item deleted from this outlet.');
+          } catch (error) {
+            console.error('Menu delete failed:', error);
+            showNotificationToast(error.message || 'Menu item could not be deleted.');
           }
-
-          renderMenuEditor();
-          renderPOSCategories();
-          renderPOSItems();
         });
       });
 
@@ -5773,9 +5829,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (menuEditorForm) {
     menuEditorForm.addEventListener('input', () => { menuEditorDirty = true; });
     menuEditorForm.addEventListener('change', () => { menuEditorDirty = true; });
-    menuEditorForm.addEventListener('submit', (e) => {
+    menuEditorForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      menuEditorDirty = false;
       SoundEffects.playClick();
 
       const index = document.getElementById('edit-item-index').value;
@@ -5786,28 +5841,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       const icon = document.getElementById('item-icon-input').value.trim();
 
       const newItem = { name, category, price, description, icon };
+      const originalName = index !== '' && menu[Number(index)] ? menu[Number(index)].name : '';
 
+      try {
+      if (!supabaseClient) throw new Error('Cloud connection is unavailable.');
       if (index !== '') {
         menu[index] = newItem;
-        if (supabaseClient) {
-          supabaseClient.from('doppio_menu').update({
-            price: newItem.price,
-            description: newItem.description,
-            icon: newItem.icon,
-            category: newItem.category
-          }).eq('name', newItem.name).then();
-        }
-      } else {
-        menu.push(newItem);
-        if (supabaseClient) {
-          supabaseClient.from('doppio_menu').insert({
+          await requireTenantWrite(supabaseClient.from('doppio_menu').update({
             name: newItem.name,
             price: newItem.price,
             description: newItem.description,
             icon: newItem.icon,
             category: newItem.category
-          }).then();
-        }
+          }).eq('name', originalName), 'Menu item update failed');
+      } else {
+        menu.push(newItem);
+          await requireTenantWrite(supabaseClient.from('doppio_menu').insert({
+            name: newItem.name,
+            price: newItem.price,
+            description: newItem.description,
+            icon: newItem.icon,
+            category: newItem.category
+          }), 'Menu item creation failed');
       }
 
       // Save dynamic custom recipe specifications
@@ -5832,22 +5887,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Sync recipe to Supabase
       if (supabaseClient) {
         if (Object.keys(recipeSpecs).length > 0) {
-          supabaseClient.from('doppio_custom_recipes')
+          await requireTenantWrite(supabaseClient.from('doppio_custom_recipes')
             .upsert({
               item_name: nameLower,
               ingredients: recipeSpecs,
               updated_at: new Date().toISOString()
-            }, { onConflict: 'item_name' })
-            .then(({ error }) => {
-              if (error) console.warn('Supabase custom recipe upsert failed:', error.message);
-            });
+            }, { onConflict: 'tenant_id,item_name' }), 'Recipe save failed');
         } else {
           // No ingredients — delete the recipe from cloud
-          supabaseClient.from('doppio_custom_recipes').delete().eq('item_name', nameLower).then();
+          await requireTenantWrite(
+            supabaseClient.from('doppio_custom_recipes').delete().eq('item_name', nameLower),
+            'Recipe cleanup failed'
+          );
         }
       }
 
       localStorage.setItem('doppio_menu', JSON.stringify(menu));
+      setVaultData('doppio_menu', menu);
+      menuEditorDirty = false;
       menuEditorForm.reset();
       document.getElementById('edit-item-index').value = '';
       document.getElementById('form-panel-title').textContent = 'Add New Menu Item';
@@ -5860,6 +5917,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderMenuEditor();
       renderPOSCategories();
       renderPOSItems();
+      broadcastMenuUpdate();
+      showNotificationToast('Menu saved to this outlet and synced to the cloud.');
+      } catch (error) {
+        console.error('Menu save failed:', error);
+        showNotificationToast(error.message || 'Menu could not be saved.');
+      }
     });
   }
 
@@ -6141,7 +6204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         total_spend: member.total_spend,
         last_visit: member.last_visit,
         updated_at: nowISO
-      }, { onConflict: 'phone' }).then(({ error }) => {
+      }, { onConflict: 'tenant_id,phone' }).then(({ error }) => {
         if (error) console.warn('Supabase CRM upsert failed:', error.message);
       });
     }
@@ -6306,21 +6369,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Export SQL Script generator
   function generateSQLScript(data) {
-    let sql = `-- DOPPIO CAFE CLOUD POSTGRES INTEGRATION SCRIPT
+    const tenantId = String(activeTenantId || '').trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
+      throw new Error('A valid tenant session is required before exporting SQL.');
+    }
+    let sql = `-- RESTROSUITE CLOUD POSTGRES INTEGRATION SCRIPT
 -- Generated on ${new Date().toLocaleString('en-IN')}
 -- Compatible with Cloud Postgres SQL Editors
 
 CREATE TABLE IF NOT EXISTS public.doppio_bills (
     id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    "orderId" text UNIQUE NOT NULL,
-    "customerName" text DEFAULT 'Walk-in Guest'::text,
-    "dateTime" text,
-    items text,
-    subtotal numeric DEFAULT 0,
-    gst numeric DEFAULT 0,
-    total numeric DEFAULT 0,
-    "paymentMethod" text DEFAULT 'UPI'::text
+    tenant_id uuid NOT NULL,
+    "orderId" text NOT NULL,
+    "customerName" text DEFAULT 'Walk-in Guest',
+    "customerPhone" text DEFAULT '',
+    "dateTime" text NOT NULL DEFAULT '',
+    items jsonb NOT NULL DEFAULT '[]'::jsonb,
+    subtotal numeric NOT NULL DEFAULT 0,
+    discount numeric NOT NULL DEFAULT 0,
+    gst numeric NOT NULL DEFAULT 0,
+    total numeric NOT NULL DEFAULT 0,
+    "paymentMethod" text NOT NULL DEFAULT 'UPI',
+    "orderType" text NOT NULL DEFAULT 'Takeaway',
+    "tableNumber" text DEFAULT '',
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, "orderId")
 );
 
 `;
@@ -6330,31 +6403,39 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       return sql;
     }
 
-    sql += `INSERT INTO public.doppio_bills ("orderId", "customerName", "dateTime", items, subtotal, gst, total, "paymentMethod") VALUES\n`;
+    sql += `INSERT INTO public.doppio_bills (tenant_id, "orderId", "customerName", "customerPhone", "dateTime", items, subtotal, discount, gst, total, "paymentMethod", "orderType", "tableNumber") VALUES\n`;
 
     const valueRows = data.map(b => {
       const orderId = b.orderId.replace(/'/g, "''");
       const customerName = (b.customerName || 'Walk-in Guest').replace(/'/g, "''");
+      const customerPhone = (b.customerPhone || '').replace(/'/g, "''");
       const dateTime = (b.dateTime || '').replace(/'/g, "''");
       const rawItems = typeof b.items === 'string' ? b.items : JSON.stringify(b.items);
       const itemsEscaped = rawItems.replace(/'/g, "''");
       const subtotal = b.subtotal || 0;
+      const discount = b.discount || 0;
       const gst = b.gst || 0;
       const total = b.total || 0;
       const paymentMethod = (b.paymentMethod || 'UPI').replace(/'/g, "''");
+      const orderType = (b.orderType || 'Takeaway').replace(/'/g, "''");
+      const tableNumber = (b.tableNumber || '').replace(/'/g, "''");
 
-      return `('${orderId}', '${customerName}', '${dateTime}', '${itemsEscaped}', ${subtotal}, ${gst}, ${total}, '${paymentMethod}')`;
+      return `('${tenantId}', '${orderId}', '${customerName}', '${customerPhone}', '${dateTime}', '${itemsEscaped}'::jsonb, ${subtotal}, ${discount}, ${gst}, ${total}, '${paymentMethod}', '${orderType}', '${tableNumber}')`;
     });
 
     sql += valueRows.join(',\n') + '\n';
-    sql += `ON CONFLICT ("orderId") DO UPDATE SET\n`;
+    sql += `ON CONFLICT (tenant_id, "orderId") DO UPDATE SET\n`;
     sql += `  "customerName" = EXCLUDED."customerName",\n`;
+    sql += `  "customerPhone" = EXCLUDED."customerPhone",\n`;
     sql += `  "dateTime" = EXCLUDED."dateTime",\n`;
     sql += `  items = EXCLUDED.items,\n`;
     sql += `  subtotal = EXCLUDED.subtotal,\n`;
+    sql += `  discount = EXCLUDED.discount,\n`;
     sql += `  gst = EXCLUDED.gst,\n`;
     sql += `  total = EXCLUDED.total,\n`;
-    sql += `  "paymentMethod" = EXCLUDED."paymentMethod";\n`;
+    sql += `  "paymentMethod" = EXCLUDED."paymentMethod",\n`;
+    sql += `  "orderType" = EXCLUDED."orderType",\n`;
+    sql += `  "tableNumber" = EXCLUDED."tableNumber";\n`;
 
     return sql;
   }
@@ -6466,13 +6547,18 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       SoundEffects.playClick();
       const activePeriodBills = getActivePeriodBills();
 
-      const sqlContent = generateSQLScript(activePeriodBills);
-      const blob = new Blob([sqlContent], { type: 'text/plain;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `doppio_cloud_bills_sync_${new Date().toISOString().slice(0, 10)}.sql`;
-      a.click();
+      try {
+        const sqlContent = generateSQLScript(activePeriodBills);
+        const blob = new Blob([sqlContent], { type: 'text/plain;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `doppio_cloud_bills_sync_${new Date().toISOString().slice(0, 10)}.sql`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        alert(error.message);
+      }
     });
   }
 
@@ -6597,6 +6683,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
 
+          let cloudImportError = null;
           if (supabaseClient && navigator.onLine) {
             const formattedSupabase = parsedBills.map(b => ({
               orderId: b.orderId,
@@ -6609,13 +6696,22 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
               paymentMethod: b.paymentMethod
             }));
 
-            supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'orderId' })
-              .then(() => console.log('Imported bills successfully synced to Supabase.'))
-              .catch(err => console.error('Supabase import sync error:', err));
+            try {
+              await requireTenantWrite(
+                supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'tenant_id,orderId' }),
+                'Imported bills could not be synced to the cloud'
+              );
+            } catch (error) {
+              cloudImportError = error;
+            }
           }
 
           SoundEffects.playSuccess();
-          alert(`Successfully imported backup!\nNew Invoices: ${newCount}\nUpdated/Merged: ${mergedCount}`);
+          if (cloudImportError) {
+            alert(`Imported on this device, but cloud synchronization failed.\n${cloudImportError.message}`);
+          } else {
+            alert(`Successfully imported backup!\nNew Invoices: ${newCount}\nUpdated/Merged: ${mergedCount}`);
+          }
 
           renderTaxTab();
           if (typeof renderBills === 'function') renderBills();
@@ -6736,7 +6832,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     const rolePermissions = {
-      admin: ['pos-tab', 'qr-orders-tab', 'online-tab', 'kds-tab', 'tokens-tab', 'bills-tab', 'inventory-tab', 'reports-tab', 'editor-tab', 'crm-tab', 'tax-tab', 'employees-tab'],
+      admin: ['pos-tab', 'qr-orders-tab', 'online-tab', 'kds-tab', 'tokens-tab', 'bills-tab', 'inventory-tab', 'reports-tab', 'editor-tab', 'crm-tab', 'tax-tab', 'employees-tab', 'growth-hub-tab'],
       cashier: ['pos-tab', 'qr-orders-tab', 'online-tab', 'tokens-tab', 'bills-tab', 'crm-tab'],
       waiter: ['qr-orders-tab', 'pos-tab', 'tokens-tab'],
       kitchen: ['kds-tab'],
@@ -6856,6 +6952,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       } else {
         link.style.display = 'none';
       }
+    });
+
+    document.querySelectorAll('.more-sheet-link[data-tab]').forEach(link => {
+      const tabId = link.getAttribute('data-tab');
+      if (!tabId) return;
+      const isAllowedByRole = rolePermissions[loggedInRole].includes(tabId);
+      const isEnabledByFlag = featureFlags[tabId] !== false;
+      const isAllowedBySaaS = allowedTabs.includes(tabId);
+      link.style.display = isAllowedByRole && isEnabledByFlag && isAllowedBySaaS ? 'flex' : 'none';
     });
 
     // Only explicitly hide mobile nav/header for operational roles (kitchen, display).
@@ -7425,7 +7530,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         notifications: JSON.parse(localStorage.getItem('doppio_notifications')) || [],
         // Metadata
         timestamp: new Date().toISOString(),
-        branch: "Nagpur Premium Hub",
+        branch: activeTenantName || "RestoSuite",
         version: "2.0"
       };
 
@@ -7500,6 +7605,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
             if (data.shiftHistory) setVaultData('doppio_shifts_local', data.shiftHistory);
             if (data.shiftEvents) setVaultData('doppio_shift_events_local', data.shiftEvents);
 
+            let cloudRestoreError = null;
             // Sync restored bills to Supabase
             if (supabaseClient) {
               try {
@@ -7515,56 +7621,61 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                   dateTime: b.dateTime
                 }));
                 if (formattedSupabase.length > 0) {
-                  await supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'orderId' });
+                  await requireTenantWrite(
+                    supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'tenant_id,orderId' }),
+                    'Bills restore failed'
+                  );
                 }
                 // Sync employees
                 if (data.employees && data.employees.length > 0) {
-                  await supabaseClient.from('doppio_employees').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_employees').upsert(
                     data.employees.filter(e => e && e.id).map(e => ({
                       id: e.id, name: e.name, role: e.role, contact: e.contact,
                       baseSalary: e.baseSalary, shift: e.shift, leaves: e.leaves
-                    })), { onConflict: 'id' }
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Employees restore failed'
                   );
                 }
                 // Sync CRM
                 if (data.crmData && data.crmData.length > 0) {
                   const crmWithPhone = data.crmData.filter(c => c && c.phone);
                   if (crmWithPhone.length > 0) {
-                    await supabaseClient.from('doppio_crm').upsert(crmWithPhone.map(c => ({
+                    await requireTenantWrite(supabaseClient.from('doppio_crm').upsert(crmWithPhone.map(c => ({
                       phone: c.phone, name: c.name, visits: c.visits,
                       total_spend: c.total_spend, last_visit: c.last_visit
-                    })), { onConflict: 'phone' });
+                    })), { onConflict: 'tenant_id,phone' }), 'CRM restore failed');
                   }
                 }
                 // Sync Menu
                 if (data.menu && data.menu.length > 0) {
-                  await supabaseClient.from('doppio_menu').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_menu').upsert(
                     data.menu.filter(m => m && m.name).map(m => ({
                       name: m.name,
                       category: m.category || '',
                       price: parseFloat(m.price || 0),
                       description: m.description || '',
                       icon: m.icon || ''
-                    })), { onConflict: 'name' }
+                    })), { onConflict: 'tenant_id,name' }),
+                    'Menu restore failed'
                   );
                 }
                 // Sync Inventory
                 if (data.inventory && typeof data.inventory === 'object') {
                   const invKeys = Object.keys(data.inventory);
                   if (invKeys.length > 0) {
-                    await supabaseClient.from('doppio_inventory').upsert(
+                    await requireTenantWrite(supabaseClient.from('doppio_inventory').upsert(
                       invKeys.map(k => ({
                         key: k,
                         current: parseFloat(data.inventory[k] || 0)
-                      })), { onConflict: 'key' }
+                      })), { onConflict: 'tenant_id,key' }),
+                      'Inventory restore failed'
                     );
                   }
                 }
                 // Sync Business Profile
                 if (data.businessProfile) {
                   const bp = data.businessProfile;
-                  await supabaseClient.from('doppio_business_profile').upsert({
-                    id: 1,
+                  await requireTenantWrite(supabaseClient.from('doppio_business_profile').upsert({
                     business_name: bp.name || bp.business_name || '',
                     address: bp.address || '',
                     phone: bp.phone || '',
@@ -7585,11 +7696,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                     whatsapp_gateway_url: bp.whatsapp_gateway_url || bp.whatsappGatewayUrl || '',
                     whatsapp_gateway_token: bp.whatsapp_gateway_token || bp.whatsappGatewayToken || '',
                     feature_flags: typeof bp.feature_flags === 'string' ? bp.feature_flags : JSON.stringify(bp.featureFlags || bp.feature_flags || {})
-                  }, { onConflict: 'id' });
+                  }, { onConflict: 'tenant_id' }), 'Business profile restore failed');
                 }
                 // Sync Draft Orders
                 if (data.draftOrders && data.draftOrders.length > 0) {
-                  await supabaseClient.from('doppio_draft_orders').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_draft_orders').upsert(
                     data.draftOrders.filter(d => d && d.draftId).map(d => ({
                       draftId: d.draftId,
                       draftName: d.draftName || '',
@@ -7601,12 +7712,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                       gst: parseFloat(d.gst || 0),
                       total: parseFloat(d.total || 0),
                       createdAt: d.createdAt || new Date().toISOString()
-                    })), { onConflict: 'draftId' }
+                    })), { onConflict: 'tenant_id,draftId' }),
+                    'Draft orders restore failed'
                   );
                 }
                 // Sync Shift History
                 if (data.shiftHistory && data.shiftHistory.length > 0) {
-                  await supabaseClient.from('doppio_shifts').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_shifts').upsert(
                     data.shiftHistory.filter(s => s && s.shiftId).map(s => ({
                       shiftId: s.shiftId,
                       cashierName: s.cashierName || '',
@@ -7623,12 +7735,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                       totalSafeDrops: parseFloat(s.totalSafeDrops || 0),
                       status: s.status,
                       notes: s.notes || ''
-                    })), { onConflict: 'shiftId' }
+                    })), { onConflict: 'tenant_id,shiftId' }),
+                    'Shift history restore failed'
                   );
                 }
                 // Sync Shift Events
                 if (data.shiftEvents && data.shiftEvents.length > 0) {
-                  await supabaseClient.from('doppio_shift_events').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_shift_events').upsert(
                     data.shiftEvents.filter(e => e && e.eventId).map(e => ({
                       eventId: e.eventId,
                       shiftId: e.shiftId,
@@ -7636,12 +7749,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                       amount: parseFloat(e.amount || 0),
                       reason: e.reason || '',
                       createdAt: e.createdAt
-                    })), { onConflict: 'eventId' }
+                    })), { onConflict: 'tenant_id,eventId' }),
+                    'Shift events restore failed'
                   );
                 }
                 // Sync Leave Requests
                 if (data.leaveRequests && data.leaveRequests.length > 0) {
-                  await supabaseClient.from('doppio_leave_requests').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_leave_requests').upsert(
                     data.leaveRequests.filter(r => r && r.id).map(r => ({
                       id: r.id,
                       employeeId: r.employeeId,
@@ -7652,12 +7766,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                       reason: r.reason || '',
                       status: r.status || 'Pending',
                       days: parseInt(r.days || 1)
-                    })), { onConflict: 'id' }
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Leave requests restore failed'
                   );
                 }
                 // Sync Attendance Logs
                 if (data.attendanceLogs && data.attendanceLogs.length > 0) {
-                  await supabaseClient.from('doppio_attendance').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_attendance').upsert(
                     data.attendanceLogs.filter(a => a && a.id).map(a => ({
                       id: a.id,
                       employeeId: a.employeeId,
@@ -7669,7 +7784,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                       shift: a.shift || '',
                       wages: parseFloat(a.wages || 0),
                       status: a.status || 'Active'
-                    })), { onConflict: 'id' }
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Attendance restore failed'
                   );
                 }
                 // Sync Inventory Batches
@@ -7692,19 +7808,23 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                     }
                   });
                   if (flatBatches.length > 0) {
-                    await supabaseClient.from('doppio_inventory_batches').upsert(flatBatches, { onConflict: 'id' });
+                  await requireTenantWrite(
+                    supabaseClient.from('doppio_inventory_batches').upsert(flatBatches, { onConflict: 'tenant_id,id' }),
+                    'Inventory batch restore failed'
+                  );
                   }
                 }
                 // Sync Inventory Thresholds
                 if (data.inventoryThresholds && typeof data.inventoryThresholds === 'object') {
                   const thresholdKeys = Object.keys(data.inventoryThresholds);
                   if (thresholdKeys.length > 0) {
-                    await supabaseClient.from('doppio_inventory_thresholds').upsert(
+                    await requireTenantWrite(supabaseClient.from('doppio_inventory_thresholds').upsert(
                       thresholdKeys.map(k => ({
                         ingredient_key: k,
                         threshold: parseInt(data.inventoryThresholds[k] || 20),
                         updated_at: new Date().toISOString()
-                      })), { onConflict: 'ingredient_key' }
+                      })), { onConflict: 'tenant_id,ingredient_key' }),
+                      'Inventory thresholds restore failed'
                     );
                   }
                 }
@@ -7712,12 +7832,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                 if (data.customRecipes && typeof data.customRecipes === 'object') {
                   const recipeKeys = Object.keys(data.customRecipes);
                   if (recipeKeys.length > 0) {
-                    await supabaseClient.from('doppio_custom_recipes').upsert(
+                    await requireTenantWrite(supabaseClient.from('doppio_custom_recipes').upsert(
                       recipeKeys.map(k => ({
                         item_name: k,
                         ingredients: data.customRecipes[k] || {},
                         updated_at: new Date().toISOString()
-                      })), { onConflict: 'item_name' }
+                      })), { onConflict: 'tenant_id,item_name' }),
+                      'Recipe restore failed'
                     );
                   }
                 }
@@ -7725,18 +7846,19 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                 if (data.posPopularity && typeof data.posPopularity === 'object') {
                   const popKeys = Object.keys(data.posPopularity);
                   if (popKeys.length > 0) {
-                    await supabaseClient.from('doppio_pos_popularity').upsert(
+                    await requireTenantWrite(supabaseClient.from('doppio_pos_popularity').upsert(
                       popKeys.map(k => ({
                         item_name: k,
                         count: parseInt(data.posPopularity[k] || 0),
                         updated_at: new Date().toISOString()
-                      })), { onConflict: 'item_name' }
+                      })), { onConflict: 'tenant_id,item_name' }),
+                      'Popularity restore failed'
                     );
                   }
                 }
                 // Sync Notifications
                 if (data.notifications && data.notifications.length > 0) {
-                  await supabaseClient.from('doppio_notifications').upsert(
+                  await requireTenantWrite(supabaseClient.from('doppio_notifications').upsert(
                     data.notifications.filter(n => n && n.id).map(n => ({
                       id: n.id,
                       tenant_id: activeTenantId,
@@ -7747,16 +7869,22 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                       timestamp: n.timestamp || new Date().toISOString(),
                       isRead: n.isRead || false,
                       created_at: n.created_at || new Date().toISOString()
-                    })), { onConflict: 'id' }
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Notifications restore failed'
                   );
                 }
               } catch (syncErr) {
                 console.warn('Supabase restore sync partial failure (local restore still succeeded):', syncErr);
+                cloudRestoreError = syncErr;
               }
             }
 
             SoundEffects.playSuccess();
-            alert("Backup Restored Successfully! All sales, inventory, shifts, employees, CRM, and settings recovered.");
+            if (cloudRestoreError) {
+              alert(`Backup restored on this device, but cloud synchronization was incomplete.\n${cloudRestoreError.message || 'Review the console and retry after checking connectivity.'}`);
+            } else {
+              alert("Backup Restored Successfully! All sales, inventory, shifts, employees, CRM, and settings recovered.");
+            }
             location.reload();
           } else {
             alert("Invalid backup file format! Missing core POS tables.");
@@ -7776,9 +7904,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const simAddr = document.getElementById('receipt-preview-address');
     const simPhone = document.getElementById('receipt-preview-phone');
 
-    if (simName) simName.textContent = (profileNameInput ? profileNameInput.value : '') || 'DOPPIO CAFE';
-    if (simAddr) simAddr.textContent = (profileAddrInput ? profileAddrInput.value : '') || 'London Street, Nagpur';
-    if (simPhone) simPhone.textContent = `Ph: ${(profilePhoneInput ? profilePhoneInput.value : '') || '+91 91300 03177'}`;
+    if (simName) simName.textContent = (profileNameInput ? profileNameInput.value : '') || (activeTenantName ? activeTenantName.toUpperCase() : 'YOUR RESTAURANT');
+    if (simAddr) simAddr.textContent = (profileAddrInput ? profileAddrInput.value : '') || 'Your Address Here';
+    if (simPhone) simPhone.textContent = `Ph: ${(profilePhoneInput ? profilePhoneInput.value : '') || ''}`;
 
     const taxEnabled = profileGstCheck ? profileGstCheck.checked : true;
     const taxRate = parseFloat(profileGstRate ? profileGstRate.value : 18) || 0;
@@ -7886,7 +8014,6 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       // Reload cloud tables upserts defensively
       if (supabaseClient) {
         const fullPayload = {
-          id: 1,
           business_name: name,
           address,
           phone,
@@ -7910,7 +8037,6 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         };
 
         const basicPayload = {
-          id: 1,
           business_name: name,
           address,
           phone,
@@ -7920,11 +8046,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           loyalty_discount_rate: loyaltyRate
         };
 
-        supabaseClient.from('doppio_business_profile').upsert(fullPayload, { onConflict: 'id' })
+        supabaseClient.from('doppio_business_profile').upsert(fullPayload, { onConflict: 'tenant_id' })
           .then(({ error }) => {
             if (error) {
               console.warn("Full settings sync failed (likely missing database columns), trying basic sync fallback:", error);
-              supabaseClient.from('doppio_business_profile').upsert(basicPayload, { onConflict: 'id' })
+              supabaseClient.from('doppio_business_profile').upsert(basicPayload, { onConflict: 'tenant_id' })
                 .then(({ error: basicError }) => {
                   if (basicError) {
                     console.error("Supabase basic settings sync failed:", basicError);
@@ -8331,6 +8457,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       renderTaxTab();
     } else if (tabId === 'employees-tab') {
       renderEmployeesTab();
+    } else if (tabId === 'growth-hub-tab') {
+      renderGrowthHub();
     } else if (tabId === 'online-tab') {
       if (typeof renderOnlineOrdersTab === 'function') renderOnlineOrdersTab();
     } else if (tabId === 'kds-tab') {
@@ -8761,7 +8889,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
             gst: newDraft.gst,
             total: newDraft.total,
             createdAt: newDraft.createdAt
-          }, { onConflict: 'draftId' }).then();
+          }, { onConflict: 'tenant_id,draftId' }).then();
         } catch (e) {
           console.warn('Failed to sync draft to Supabase:', e);
         }
@@ -9812,7 +9940,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           item_name: c.item_name,
           count: c.count,
           updated_at: new Date().toISOString()
-        })), { onConflict: 'item_name' })
+        })), { onConflict: 'tenant_id,item_name' })
         .then(({ error }) => {
           if (error) console.warn('Supabase popularity upsert failed:', error.message);
         });
@@ -10474,7 +10602,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
             totalSafeDrops: activeShift.totalSafeDrops,
             status: 'CLOSED',
             notes: activeShift.notes
-          }, { onConflict: 'shiftId' });
+          }, { onConflict: 'tenant_id,shiftId' });
         } catch (err) {
           console.warn('Supabase shift closure push failed (saved locally):', err);
         }
@@ -10506,7 +10634,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
     let html = `
 --------------------------------
-      DOPPIO CAFE NAGPUR        
+  ${(activeTenantName || 'RESTROSUITE').toUpperCase().slice(0, 30).padEnd(30)}
   Z-REPORT SHIFT CLOSURE AUDIT  
 --------------------------------
 SHIFT ID   : ${shift.shiftId}
@@ -11520,8 +11648,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         </head>
         <body>
           <div class="print-frame">
-            <div class="logo">DOPPIO Café</div>
-            <div style="font-size:9px; text-transform:uppercase; letter-spacing:3px; font-weight:700; color:#C88A58; margin-bottom: 20px;">Nagpur Premium Spot</div>
+            <div class="logo">${escHtml(activeTenantName || 'RestoSuite')}</div>
+            <div style="font-size:9px; text-transform:uppercase; letter-spacing:3px; font-weight:700; color:#C88A58; margin-bottom: 20px;">${escHtml(activeTenantName || 'RestoSuite')}</div>
             <div class="table-num">TABLE ${table}</div>
             <div class="qr-box">
               <img src="${qrUrl}" style="width: 200px; height: 200px; object-fit: contain;">
@@ -11779,7 +11907,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
               qty: newBatch.qty,
               expiryDate: newBatch.expiryDate,
               receivedDate: newBatch.receivedDate
-            }, { onConflict: 'id' }).then(({ error }) => {
+            }, { onConflict: 'tenant_id,id' }).then(({ error }) => {
               if (error) console.warn('Supabase auto-reorder batch upsert failed:', error.message);
             });
           }
@@ -11797,7 +11925,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       checkLowStockAlerts();
       updateAIForecast();
 
-      alert("AI On-Demand Restock successful! Nagpur Branch raw material levels refilled to 100% capacity. Restock Invoice generated.");
+      alert("AI On-Demand Restock successful! Raw material levels refilled to 100% capacity. Restock Invoice generated.");
     });
   }
 
@@ -11974,13 +12102,16 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
+      const menuBeforeImport = menu.map(item => ({ ...item }));
+      const recipesBeforeImport = JSON.parse(JSON.stringify(customRecipes));
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
         let importedCount = 0;
         let recipeCount = 0;
+        const cloudWrites = [];
 
         function mapFuzzyIngredientKey(name) {
           const clean = String(name).trim().toLowerCase();
@@ -12096,20 +12227,29 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
               }
 
               if (supabaseClient) {
-                supabaseClient.from('doppio_menu').upsert({
+                cloudWrites.push(requireTenantWrite(supabaseClient.from('doppio_menu').upsert({
                   name: newItem.name,
                   category: newItem.category,
                   price: newItem.price,
                   description: newItem.description,
                   icon: newItem.icon
-                }, { onConflict: 'name' }).then();
+                }, { onConflict: 'tenant_id,name' }), `Menu import failed for ${newItem.name}`));
+                cloudWrites.push(requireTenantWrite(supabaseClient.from('doppio_custom_recipes').upsert({
+                  item_name: nameLower,
+                  ingredients,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'tenant_id,item_name' }), `Recipe import failed for ${newItem.name}`));
               }
             }
           });
         });
 
+        if (!supabaseClient) throw new Error('Cloud connection is unavailable.');
+        await Promise.all(cloudWrites);
+
         localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
         localStorage.setItem('doppio_menu', JSON.stringify(menu));
+        setVaultData('doppio_menu', menu);
 
         SoundEffects.playSuccess();
         if (excelDropText) {
@@ -12122,13 +12262,16 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         renderPOSItems();
         renderInventory();
         checkLowStockAlerts();
+        broadcastMenuUpdate();
 
         alert(`Excel Import Success! Onboarded ${importedCount} new menu items and configured ${recipeCount} dynamic recipes instantly.`);
 
       } catch (err) {
         console.error("Excel import failed:", err);
+        menu = menuBeforeImport;
+        customRecipes = recipesBeforeImport;
         SoundEffects.playRemove();
-        alert("Excel Parsing failed! Ensure spreadsheet structure has ingredient names and quantities.");
+        alert(`Excel import failed and no local changes were kept.\n${err.message || 'Check the spreadsheet structure and try again.'}`);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -12380,7 +12523,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       renderInventory();
       checkLowStockAlerts();
       updateAIForecast();
-      alert("Manual restock successful! Nagpur Branch raw material levels refilled to 100% capacity.");
+      alert("Manual restock successful! Raw material levels refilled to 100% capacity.");
     });
   }
 
@@ -12551,7 +12694,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         orderType: 'Dine-In',
         tableNumber: `0${tableId}`,
         status: 'DineIn Active'
-      }, { onConflict: 'orderId' }).then();
+      }, { onConflict: 'tenant_id,orderId' }).then();
   }
 
   function sendTableSessionToKDS() {
@@ -12978,7 +13121,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           <strong>₹${basic.toFixed(0)}</strong>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
-          <span>HRA Allowance (Nagpur 40%)</span>
+          <span>HRA Allowance (40%)</span>
           <strong>₹${hra.toFixed(0)}</strong>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
@@ -12994,7 +13137,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           <strong>- ₹${pf.toFixed(0)}</strong>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom: 4px; color: var(--danger-color);">
-          <span>Professional Tax (PT - Nagpur Fixed)</span>
+          <span>Professional Tax (PT - Fixed)</span>
           <strong>- ₹${pt.toFixed(0)}</strong>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom: 4px; color: var(--danger-color);">
@@ -13036,7 +13179,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         if (actionsSection) actionsSection.style.display = 'none';
 
         const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>Doppio Cafe Nagpur - Salary Slip</title>');
+        printWindow.document.write('<html><head><title>' + (activeTenantName || 'RestoSuite') + ' - Salary Slip</title>');
         printWindow.document.write('<style>body{font-family:sans-serif;padding:20px;color:#000;}table{width:100%;border-collapse:collapse;margin:15px 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background:#f5f5f5;}hr{border:none;border-top:1px dashed #ddd;margin:15px 0;}.no-print{display:none;}</style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write(printArea.innerHTML);
@@ -13070,8 +13213,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       if (printArea) {
         printArea.innerHTML = `
           <div style="text-align: center; border-bottom: 2px solid var(--primary-brand); padding-bottom: 10px; margin-bottom: 15px;">
-            <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 18px; font-weight:800;">DOPPIO CAFÉ</h2>
-            <span style="font-size: 10px; color: var(--text-muted);">Nagpur Branch Office | Nagpur, Maharashtra</span>
+            <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 18px; font-weight:800;">${escHtml((activeTenantName || 'RestoSuite').toUpperCase())}</h2>
+            <span style="font-size: 10px; color: var(--text-muted);">${escHtml(businessProfile.address || '')}</span>
             <h3 style="margin: 5px 0 0 0; font-size: 12px; font-weight:700;">SALARY SLIP / PAYSLIP</h3>
           </div>
           
@@ -13101,7 +13244,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
                 <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${pf.toFixed(0)}</td>
               </tr>
               <tr>
-                <td style="padding: 6px; border: 1px solid #ddd;">HRA (Nagpur 40%)</td>
+                <td style="padding: 6px; border: 1px solid #ddd;">HRA (40%)</td>
                 <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${hra.toFixed(0)}</td>
                 <td style="padding: 6px; border: 1px solid #ddd;">Professional Tax (PT)</td>
                 <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${pt.toFixed(0)}</td>
@@ -13127,7 +13270,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           </div>
           
           <div style="font-size: 8px; color: var(--text-muted); text-align: center; margin-top: 20px; font-style: italic;">
-            This is a system generated compliance salary slip copy for Nagpur Branch.
+            This is a system generated salary slip.
           </div>
           
           <div style="display: flex; gap: 10px; margin-top: 15px;" class="no-print">

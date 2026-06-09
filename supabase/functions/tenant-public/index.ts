@@ -45,8 +45,8 @@ function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request
 }
 
 function normalizeSlug(raw: unknown) {
-  const slug = String(raw || "doppio-nagpur").trim().toLowerCase();
-  return /^[a-z0-9-]+$/.test(slug) ? slug : "doppio-nagpur";
+  const slug = String(raw || "").trim().toLowerCase();
+  return /^[a-z0-9-]+$/.test(slug) ? slug : "";
 }
 
 async function sha256Hex(value: string) {

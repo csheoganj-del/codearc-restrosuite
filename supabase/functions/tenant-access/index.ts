@@ -22,6 +22,10 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.");
 }
 
+if (!SUPERADMIN_SESSION_SECRET) {
+  console.error("Missing SUPERADMIN_SESSION_SECRET environment variable. All logins will fail with HTTP 500.");
+}
+
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
@@ -340,7 +344,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
   }
 
   if (tenant.status === "suspended") {
-    return jsonResponse({ error: "Access Denied: Account suspended. Please contact hello@codearc.co.in" }, 403);
+    return jsonResponse({ error: "Access Denied: Account suspended. Please contact CodeArc support." }, 403);
   }
 
   if (!activeSubscription(tenant.subscription_status)) {
@@ -387,6 +391,10 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
       user_id: staffUser.id,
       session_version: staffUser.session_version,
     });
+
+    if (!sessionToken) {
+      return jsonResponse({ error: "Authentication service is misconfigured: session signing secret is missing. Please contact support." }, 500);
+    }
 
     await supabaseAdmin
       .from("tenant_users")
@@ -450,6 +458,10 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
     tenant_slug: tenant.slug,
     legacy_owner: true,
   });
+
+  if (!sessionToken) {
+    return jsonResponse({ error: "Authentication service is misconfigured: session signing secret is missing. Please contact support." }, 500);
+  }
 
   return jsonResponse({
     session: {
