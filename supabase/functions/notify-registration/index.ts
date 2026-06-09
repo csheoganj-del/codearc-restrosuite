@@ -2,41 +2,69 @@
 // Deploy to: supabase/functions/notify-registration/index.ts
 // Triggered by: Supabase Database Webhook on INSERT to public.saas_tenants
 //
-// This function sends registration & approval emails using Gmail SMTP via fetch.
+// This function sends registration & approval emails through an HTTPS relay.
 // It runs in Supabase's cloud — completely independent of the WhatsApp gateway.
-// Email ALWAYS works even if the gateway is 100% down.
+// Email continues to work when the WhatsApp gateway is down.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const GMAIL_USER = Deno.env.get("GMAIL_USER") || "";
-const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD") || "";
-const FROM_NAME = "CodeArc RestoSuite";
 const ADMIN_EMAIL = Deno.env.get("ADMIN_ALERT_EMAIL") || "";
-const ZERO_COST_EMAILS_DISABLED = (Deno.env.get("ZERO_COST_EMAILS_DISABLED") || "true") === "true";
+const EMAIL_RELAY_URL = Deno.env.get("EMAIL_RELAY_URL") || "";
+const EMAIL_RELAY_TOKEN = Deno.env.get("EMAIL_RELAY_TOKEN") || "";
+const EMAIL_WEBHOOK_SECRET = Deno.env.get("EMAIL_WEBHOOK_SECRET") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const ZERO_COST_EMAILS_DISABLED = (Deno.env.get("ZERO_COST_EMAILS_DISABLED") || "false") === "true";
 
-// Simple base64 encoder for SMTP AUTH
-function toBase64(str: string): string {
-  return btoa(unescape(encodeURIComponent(str)));
+type DeliveryResult = {
+  recipient: string;
+  status: "sent" | "failed" | "skipped";
+  reason?: string;
+};
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-// Send email via Gmail SMTP using Deno's built-in TCP (via smtp library)
-// We use the Deno SMTP library available as a CDN import
+function authorized(req: Request): boolean {
+  if (!EMAIL_WEBHOOK_SECRET) return false;
+  const explicitSecret = req.headers.get("x-webhook-secret") || "";
+  const authorization = req.headers.get("authorization") || "";
+  return explicitSecret === EMAIL_WEBHOOK_SECRET || authorization === `Bearer ${EMAIL_WEBHOOK_SECRET}`;
+}
+
+async function logDelivery(event: string, status: "ok" | "error" | "warning", details: Record<string, unknown>) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/gateway_health_log`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({ event, status, details }),
+    });
+  } catch (error) {
+    console.error("[Edge Email] Failed to write delivery log:", error);
+  }
+}
+
 // Send email via Google Apps Script Web App Relay
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  if (ZERO_COST_EMAILS_DISABLED || !to) {
-    console.log("[Edge Email] Skipped in zero-cost launch mode.");
-    return;
-  }
-  const relayUrl = Deno.env.get("EMAIL_RELAY_URL");
-  if (!relayUrl) {
-    console.log("[Edge Email] EMAIL_RELAY_URL is not configured; skipping optional email.");
-    return;
-  }
+  if (!to) throw new Error("Recipient email is missing.");
+  if (ZERO_COST_EMAILS_DISABLED) throw new Error("Email delivery is disabled by ZERO_COST_EMAILS_DISABLED.");
+  if (!EMAIL_RELAY_URL) throw new Error("EMAIL_RELAY_URL is not configured.");
 
-  const response = await fetch(relayUrl, {
+  const response = await fetch(EMAIL_RELAY_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",
+      ...(EMAIL_RELAY_TOKEN ? { "Authorization": `Bearer ${EMAIL_RELAY_TOKEN}` } : {}),
     },
     body: JSON.stringify({ to, subject, html }),
   });
@@ -46,8 +74,8 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
     throw new Error(`Relay request failed: ${response.status} - ${errText}`);
   }
 
-  const resJson = await response.json();
-  if (resJson.status !== "success") {
+  const resJson = await response.json().catch(() => ({}));
+  if (!(resJson.status === "success" || resJson.status === "ok" || resJson.ok === true)) {
     throw new Error(`Relay returned failure status: ${JSON.stringify(resJson)}`);
   }
 }
@@ -368,23 +396,36 @@ function buildAdminNewRegistrationEmailHtml(record: Record<string, string>): str
 serve(async (req: Request) => {
   // Allow only POST requests
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  if (!authorized(req)) {
+    return jsonResponse({ error: "Unauthorized webhook request" }, 401);
+  }
+
+  if (ZERO_COST_EMAILS_DISABLED) {
+    return jsonResponse({ status: "disabled", error: "Email delivery is disabled." }, 503);
+  }
+
+  if (!EMAIL_RELAY_URL) {
+    return jsonResponse({ status: "misconfigured", error: "EMAIL_RELAY_URL is not configured." }, 503);
   }
 
   let body: { type?: string; table?: string; record?: Record<string, string>; old_record?: Record<string, string> };
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400 });
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
   const { type, table, record, old_record } = body;
 
   if (!record || table !== "saas_tenants") {
-    return new Response(JSON.stringify({ status: "ignored", reason: "Not a saas_tenants event" }), { status: 200 });
+    return jsonResponse({ status: "ignored", reason: "Not a saas_tenants event" });
   }
 
   const errors: string[] = [];
+  const deliveries: DeliveryResult[] = [];
 
   try {
     // ---- NEW REGISTRATION (INSERT) ----
@@ -401,23 +442,55 @@ serve(async (req: Request) => {
             buildRegistrationEmailHtml(record)
           );
           console.log(`[Edge Email] Registration confirmation sent to customer: ${customerEmail}`);
+          deliveries.push({ recipient: customerEmail, status: "sent" });
+          await logDelivery("registration_email_sent", "ok", {
+            email: customerEmail,
+            name: record.name,
+            slug: record.slug,
+          });
         } catch (err) {
           console.error(`[Edge Email Error] Customer email failed:`, err);
           errors.push(`customer_email: ${err}`);
+          deliveries.push({ recipient: customerEmail, status: "failed", reason: String(err) });
+          await logDelivery("registration_email_failed", "error", {
+            email: customerEmail,
+            name: record.name,
+            slug: record.slug,
+            error: String(err),
+          });
         }
+      } else {
+        deliveries.push({ recipient: "customer", status: "skipped", reason: "No customer email supplied." });
       }
 
       // 2. Send admin notification
-      try {
-        await sendEmail(
-          adminEmail,
-          `🔔 New Registration: ${record.name} (${record.slug})`,
-          buildAdminNewRegistrationEmailHtml(record)
-        );
-        console.log(`[Edge Email] Admin notification sent to: ${adminEmail}`);
-      } catch (err) {
-        console.error(`[Edge Email Error] Admin email failed:`, err);
-        errors.push(`admin_email: ${err}`);
+      if (adminEmail) {
+        try {
+          await sendEmail(
+            adminEmail,
+            `🔔 New Registration: ${record.name} (${record.slug})`,
+            buildAdminNewRegistrationEmailHtml(record)
+          );
+          console.log(`[Edge Email] Admin notification sent to: ${adminEmail}`);
+          deliveries.push({ recipient: adminEmail, status: "sent" });
+          await logDelivery("registration_admin_email_sent", "ok", {
+            email: adminEmail,
+            name: record.name,
+            slug: record.slug,
+          });
+        } catch (err) {
+          console.error(`[Edge Email Error] Admin email failed:`, err);
+          errors.push(`admin_email: ${err}`);
+          deliveries.push({ recipient: adminEmail, status: "failed", reason: String(err) });
+          await logDelivery("registration_admin_email_failed", "error", {
+            email: adminEmail,
+            name: record.name,
+            slug: record.slug,
+            error: String(err),
+          });
+        }
+      } else {
+        deliveries.push({ recipient: "admin", status: "skipped", reason: "ADMIN_ALERT_EMAIL is not configured." });
       }
     }
 
@@ -436,23 +509,36 @@ serve(async (req: Request) => {
               buildApprovalEmailHtml(record)
             );
             console.log(`[Edge Email] Approval email sent to: ${customerEmail}`);
+            deliveries.push({ recipient: customerEmail, status: "sent" });
+            await logDelivery("approval_email_sent", "ok", {
+              email: customerEmail,
+              name: record.name,
+              slug: record.slug,
+            });
           } catch (err) {
             console.error(`[Edge Email Error] Approval email failed:`, err);
             errors.push(`approval_email: ${err}`);
+            deliveries.push({ recipient: customerEmail, status: "failed", reason: String(err) });
+            await logDelivery("approval_email_failed", "error", {
+              email: customerEmail,
+              name: record.name,
+              slug: record.slug,
+              error: String(err),
+            });
           }
+        } else {
+          deliveries.push({ recipient: "customer", status: "skipped", reason: "No customer email supplied." });
         }
       }
     }
   } catch (err) {
     console.error("[Edge Function] Unexpected error:", err);
-    return new Response(JSON.stringify({ status: "error", error: String(err) }), { status: 500 });
+    return jsonResponse({ status: "error", error: String(err) }, 500);
   }
 
-  return new Response(
-    JSON.stringify({
-      status: errors.length === 0 ? "success" : "partial",
-      errors: errors.length > 0 ? errors : undefined,
-    }),
-    { status: 200, headers: { "Content-Type": "application/json" } }
-  );
+  return jsonResponse({
+    status: errors.length === 0 ? "success" : "partial",
+    deliveries,
+    errors: errors.length > 0 ? errors : undefined,
+  }, errors.length === 0 ? 200 : 207);
 });

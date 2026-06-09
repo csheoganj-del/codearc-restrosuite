@@ -53,7 +53,7 @@ try {
                 continue
             }
 
-            if ($urlPath -eq "/") { $urlPath = "/login.html" }
+            if ($urlPath -eq "/") { $urlPath = "/index.html" }
             
             # Resolve real file path on disk
             $filePath = Join-Path $PSScriptRoot $urlPath.Replace("/", "\")

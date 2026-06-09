@@ -5,14 +5,14 @@
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#FC8019",
+  "background_color": "#FFFDFA",
+  "theme_color": "#172033",
   "orientation": "any",
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "/images/hero_coffee.png",
-      "sizes": "1024x1024",
+      "src": "/images/restrosuite-mark.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }

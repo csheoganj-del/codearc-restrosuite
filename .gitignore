@@ -25,6 +25,9 @@ node.zip
 
 # Sensitive config (contains passwords)
 email-config.json
+.env
+.env.*
+!*.env.example
 
 # Sample/dev files
 sample_dashboard.css

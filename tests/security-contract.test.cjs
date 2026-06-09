@@ -300,6 +300,11 @@ test("zero-cost launch mode keeps paid add-ons optional and caps free-tier usage
   assert.match(tenantPublic, /starter: \{ monthlyOrderLimit: 300 \}/);
   assert.match(tenantAccess, /monthlyOrderLimit: 300/);
   assert.match(notifyRegistration, /ZERO_COST_EMAILS_DISABLED/);
+  assert.match(notifyRegistration, /EMAIL_WEBHOOK_SECRET/);
+  assert.match(notifyRegistration, /EMAIL_RELAY_TOKEN/);
+  assert.match(notifyRegistration, /registration_email_sent/);
+  assert.match(notifyRegistration, /EMAIL_RELAY_URL is not configured/);
+  assert.match(read("supabase/config.toml"), /\[functions\.notify-registration\][\s\S]*verify_jwt = false/);
   assert.match(retention, /cleanup_zero_cost_operational_data/);
   assert.match(retention, /app_error_reports[\s\S]*30 days/);
   assert.match(retention, /tenant_audit_logs[\s\S]*90 days/);

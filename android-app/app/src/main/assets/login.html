@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#FC8019">
+  <meta name="theme-color" content="#172033">
+  <meta name="description" content="Sign in to your CodeArc RestoSuite workspace or request registration for a new restaurant outlet.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="images/restrosuite-mark.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>RestoSuite Portal | CodeArc Staff Access</title>
+  <title>RestoSuite Access | Sign In or Register Your Outlet</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -463,13 +466,692 @@
         display: none; /* Hidden in favor of physics canvas */
       }
     }
+
+    /* RestoSuite access experience */
+    :root {
+      --bg-dark: #fffdfa;
+      --bg-surface: #f7f8fa;
+      --bg-surface-elevated: #ffffff;
+      --bg-surface-hover: #fff5ec;
+      --primary-brand: #f36f21;
+      --primary-hover: #c94f0b;
+      --accent-red: #c4320a;
+      --text-main: #172033;
+      --text-secondary: #475467;
+      --text-muted: #7d899b;
+      --success: #16845b;
+      --error: #c4320a;
+      --border-color: #dfe3ea;
+      --border-subtle: #edf0f4;
+      --shadow-lg: 0 28px 80px rgba(23, 32, 51, 0.14);
+    }
+
+    html {
+      color-scheme: light;
+    }
+
+    body {
+      display: block;
+      min-height: 100vh;
+      padding: 0;
+      background:
+        radial-gradient(circle at 10% 10%, rgba(243, 111, 33, 0.11), transparent 27%),
+        radial-gradient(circle at 92% 12%, rgba(68, 86, 217, 0.10), transparent 24%),
+        #fffdfa;
+    }
+
+    body::before {
+      z-index: 0;
+      opacity: 0.2;
+      background-image:
+        linear-gradient(rgba(23, 32, 51, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 32, 51, 0.045) 1px, transparent 1px);
+      background-size: 52px 52px;
+      mask-image: linear-gradient(to bottom, #000, transparent 80%);
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 3px solid rgba(68, 86, 217, 0.35);
+      outline-offset: 3px;
+    }
+
+    .access-header {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      width: min(calc(100% - 48px), 1240px);
+      min-height: 78px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 0 auto;
+    }
+
+    .access-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-main);
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      text-decoration: none;
+    }
+
+    .access-brand .brand-product {
+      color: var(--primary-brand);
+    }
+
+    .access-brand-mark {
+      position: relative;
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      overflow: hidden;
+      border-radius: 11px;
+      background: var(--text-main);
+    }
+
+    .access-brand-mark::before,
+    .access-brand-mark::after {
+      position: absolute;
+      border-radius: 50%;
+      content: "";
+    }
+
+    .access-brand-mark::before {
+      width: 17px;
+      height: 17px;
+      background: var(--primary-brand);
+      transform: translate(-4px, 4px);
+    }
+
+    .access-brand-mark::after {
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      transform: translate(7px, -7px);
+    }
+
+    .back-home {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .back-home:hover {
+      color: var(--text-main);
+    }
+
+    .access-main {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      width: min(calc(100% - 48px), 1240px);
+      min-height: calc(100vh - 126px);
+      grid-template-columns: minmax(360px, 0.88fr) minmax(440px, 1.12fr);
+      align-items: center;
+      gap: 74px;
+      margin: 0 auto;
+      padding: 42px 0 68px;
+    }
+
+    .access-story {
+      max-width: 520px;
+      animation: fadeInUp 0.55s ease;
+    }
+
+    .story-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 22px;
+      padding: 7px 11px;
+      border: 1px solid #fed7bb;
+      border-radius: 999px;
+      color: #9f3f09;
+      background: rgba(255, 245, 236, 0.9);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .story-eyebrow::before {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 5px rgba(22, 132, 91, 0.11);
+      content: "";
+    }
+
+    .access-story h1 {
+      margin-bottom: 20px;
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(42px, 5vw, 66px);
+      line-height: 0.98;
+      letter-spacing: -2.6px;
+    }
+
+    .access-story h1 span {
+      color: var(--primary-brand);
+    }
+
+    .access-story > p {
+      max-width: 500px;
+      margin-bottom: 30px;
+      color: var(--text-secondary);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .story-flow {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+
+    .story-step {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 13px;
+      border: 1px solid rgba(223, 227, 234, 0.85);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(10px);
+    }
+
+    .story-step strong,
+    .story-step span {
+      display: block;
+    }
+
+    .story-step strong {
+      color: var(--text-main);
+      font-size: 13px;
+    }
+
+    .story-step span {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .story-step-no {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 10px;
+      color: #4456d9;
+      background: #eef0ff;
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .story-support {
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .story-support a {
+      color: var(--text-main);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .story-support a:hover {
+      color: var(--primary-brand);
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 610px;
+      margin: 0 0 0 auto;
+    }
+
+    .login-card {
+      padding: 38px;
+      border-color: rgba(208, 213, 221, 0.9);
+      border-radius: 28px;
+      box-shadow: var(--shadow-lg);
+      text-align: left;
+    }
+
+    .brand-logo {
+      margin-bottom: 24px;
+    }
+
+    .logo-container {
+      display: none;
+    }
+
+    .login-title {
+      margin-bottom: 8px;
+      color: var(--text-main);
+      font-size: 29px;
+      letter-spacing: -1px;
+    }
+
+    .login-subtitle {
+      max-width: 470px;
+      margin-bottom: 0;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .tab-header {
+      margin-bottom: 26px;
+      padding: 5px;
+      border-radius: 13px;
+      background: #f5f6f8;
+    }
+
+    .tab-btn {
+      min-height: 42px;
+      border-radius: 9px;
+      font-size: 13px;
+    }
+
+    .tab-btn.active {
+      box-shadow: 0 7px 18px rgba(243, 111, 33, 0.18);
+    }
+
+    .form-section {
+      margin: 25px 0 16px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .form-section:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .form-section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .form-section-head strong {
+      display: block;
+      color: var(--text-main);
+      font-size: 13px;
+    }
+
+    .form-section-head span {
+      display: block;
+      margin-top: 2px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .section-count {
+      display: grid;
+      width: 29px;
+      height: 29px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 9px;
+      color: #4456d9 !important;
+      background: #eef0ff;
+      font-size: 10px !important;
+      font-weight: 850;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px;
+    }
+
+    .form-group {
+      min-width: 0;
+      margin-bottom: 16px;
+    }
+
+    .form-grid .form-group {
+      margin-bottom: 0;
+    }
+
+    .form-group.full {
+      grid-column: 1 / -1;
+    }
+
+    .form-group label {
+      color: var(--text-secondary);
+      font-size: 10px;
+      letter-spacing: 0.07em;
+    }
+
+    .form-group i.input-icon {
+      top: 35px;
+      bottom: auto;
+    }
+
+    .field-help {
+      margin-top: 6px;
+      color: var(--text-muted);
+      font-size: 10.5px;
+      line-height: 1.4;
+    }
+
+    .form-input {
+      min-height: 48px;
+      padding-top: 12px;
+      padding-bottom: 12px;
+      border-color: var(--border-color);
+      border-radius: 11px;
+      color: var(--text-main);
+    }
+
+    .form-input:hover {
+      border-color: #b8c0cd;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary-brand);
+      box-shadow: 0 0 0 4px rgba(243, 111, 33, 0.10);
+    }
+
+    .toggle-pwd {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      right: 7px;
+      top: 25px;
+      bottom: auto;
+      border: 0;
+      border-radius: 9px;
+      color: var(--text-muted);
+      background: transparent;
+    }
+
+    .toggle-pwd:hover {
+      color: var(--primary-brand);
+      background: var(--bg-surface-hover);
+    }
+
+    .password-input {
+      padding-right: 48px;
+    }
+
+    .submit-btn {
+      min-height: 50px;
+      margin-top: 8px;
+      border-radius: 11px;
+      background: var(--primary-brand);
+      box-shadow: 0 10px 24px rgba(243, 111, 33, 0.20);
+    }
+
+    .submit-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .submit-btn:disabled {
+      cursor: wait;
+      opacity: 0.72;
+      transform: none;
+    }
+
+    #register-form .submit-btn {
+      background: var(--text-main) !important;
+      box-shadow: 0 10px 24px rgba(23, 32, 51, 0.17) !important;
+    }
+
+    #register-form .submit-btn:hover {
+      background: #27334a !important;
+    }
+
+    .error-box,
+    .success-box {
+      padding: 13px 14px;
+      border-radius: 11px;
+      font-size: 12px;
+    }
+
+    .error-box {
+      border-color: #fecdca;
+      color: #b42318;
+      background: #fffbfa;
+    }
+
+    .success-box {
+      border-color: #abefc6;
+      color: #067647;
+      background: #f6fef9;
+    }
+
+    .registration-note,
+    .login-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 16px;
+      padding: 12px 13px;
+      border-radius: 11px;
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .registration-note i,
+    .login-note i {
+      margin-top: 2px;
+      color: #4456d9;
+    }
+
+    .legal-check {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      align-items: start;
+      gap: 9px;
+      margin: 18px 0 4px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .legal-check input {
+      width: 16px;
+      height: 16px;
+      margin-top: 1px;
+      accent-color: var(--primary-brand);
+    }
+
+    .legal-check a {
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .access-footer {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      width: min(calc(100% - 48px), 1240px);
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin: -34px auto 0;
+      padding: 0 0 24px;
+      color: var(--text-muted);
+      font-size: 10.5px;
+    }
+
+    .access-footer-links {
+      display: flex;
+      gap: 16px;
+    }
+
+    .access-footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+
+    #aroma-canvas {
+      display: none !important;
+    }
+
+    @media (max-width: 960px) {
+      .access-main {
+        grid-template-columns: 1fr;
+        gap: 34px;
+        padding-top: 24px;
+      }
+
+      .access-story {
+        max-width: 700px;
+        text-align: center;
+        margin: 0 auto;
+      }
+
+      .access-story > p {
+        margin-right: auto;
+        margin-left: auto;
+      }
+
+      .story-flow {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .story-step {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+
+      .story-step-no {
+        margin: 0 auto;
+      }
+
+      .login-container {
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      .access-footer {
+        margin-top: 0;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .access-header,
+      .access-main,
+      .access-footer {
+        width: min(calc(100% - 28px), 1240px);
+      }
+
+      .access-header {
+        min-height: 66px;
+      }
+
+      .back-home span {
+        display: none;
+      }
+
+      .access-main {
+        min-height: auto;
+        padding: 30px 0 88px;
+      }
+
+      .access-story h1 {
+        font-size: 38px;
+        letter-spacing: -1.7px;
+      }
+
+      .access-story > p {
+        font-size: 14px;
+        margin-bottom: 24px;
+      }
+
+      .story-flow {
+        display: none;
+      }
+
+      .story-support {
+        display: none;
+      }
+
+      .login-card {
+        padding: 26px 18px 22px;
+        border-radius: 20px;
+      }
+
+      .login-title {
+        font-size: 24px;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-group.full {
+        grid-column: auto;
+      }
+
+      .form-input {
+        font-size: 16px;
+      }
+
+      .access-footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 <body>
 
+  <header class="access-header">
+    <a class="access-brand" href="index.html" aria-label="CodeArc RestoSuite home">
+      <span class="access-brand-mark" aria-hidden="true"></span>
+      <span>CodeArc <span class="brand-product">RestoSuite</span></span>
+    </a>
+    <a class="back-home" href="index.html"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span>Back to product overview</span></a>
+  </header>
 
+  <main class="access-main">
+    <section class="access-story" aria-labelledby="access-story-title">
+      <span class="story-eyebrow">Secure outlet workspace</span>
+      <h1 id="access-story-title">One login for your <span>whole operation.</span></h1>
+      <p>Access the tools your role needs, from billing and kitchen queues to inventory, staff controls, and management reports.</p>
+      <div class="story-flow" aria-label="RestoSuite access benefits">
+        <div class="story-step"><span class="story-step-no">01</span><div><strong>Outlet-specific access</strong><span>Each business has a unique workspace ID.</span></div></div>
+        <div class="story-step"><span class="story-step-no">02</span><div><strong>Role-controlled tools</strong><span>Staff only see approved operational areas.</span></div></div>
+        <div class="story-step"><span class="story-step-no">03</span><div><strong>Session protection</strong><span>Access is validated against active account state.</span></div></div>
+      </div>
+      <p class="story-support">Need help accessing an existing outlet? <a href="https://wa.me/919983721179" target="_blank" rel="noopener noreferrer">Contact CodeArc support</a>.</p>
+    </section>
 
-  <div class="login-container">
+    <div class="login-container">
     <div class="login-card" id="login-card">
       
       <!-- Brand Logo -->
@@ -478,26 +1160,27 @@
           <div class="logo-mark" style="width: 24px; height: 24px; border-radius: 6px; background: var(--primary-brand); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #FFF; font-weight: 800;"><i class="fa-solid fa-square-poll-horizontal"></i></div>
           <span class="logo-text">CodeArc <span>RestoSuite</span></span>
         </div>
-        <h2 class="login-title" id="portal-title">Client Access Portal</h2>
-        <p class="login-subtitle" id="portal-subtitle">Access your restaurant or food outlet terminal</p>
+        <h2 class="login-title" id="portal-title">Sign in to your workspace</h2>
+        <p class="login-subtitle" id="portal-subtitle">Enter the outlet ID and staff credentials assigned to you.</p>
       </div>
 
       <!-- Tab Switcher -->
-      <div class="tab-header">
-        <button class="tab-btn active" id="tab-login-btn">Login Terminal</button>
-        <button class="tab-btn" id="tab-register-btn">Register Outlet</button>
+      <div class="tab-header" role="tablist" aria-label="Access options">
+        <button class="tab-btn active" id="tab-login-btn" type="button" role="tab" aria-selected="true" aria-controls="login-form">Sign in</button>
+        <button class="tab-btn" id="tab-register-btn" type="button" role="tab" aria-selected="false" aria-controls="register-form">Register outlet</button>
       </div>
 
       <!-- Alerts -->
-      <div class="error-box" id="error-box"></div>
-      <div class="success-box" id="success-box"></div>
+      <div class="error-box" id="error-box" role="alert" aria-live="assertive" tabindex="-1"></div>
+      <div class="success-box" id="success-box" role="status" aria-live="polite" tabindex="-1"></div>
 
       <!-- LOGIN FORM -->
-      <form id="login-form">
+      <form id="login-form" role="tabpanel" aria-labelledby="tab-login-btn">
         <div class="form-group">
           <label for="tenant-id">Outlet ID / Slug</label>
-          <input type="text" id="tenant-id" class="form-input" placeholder="e.g. royal-dhaba" required autocomplete="off">
+          <input type="text" id="tenant-id" class="form-input" placeholder="e.g. royal-dhaba" required autocomplete="organization" autocapitalize="none" spellcheck="false">
           <i class="fa-solid fa-hotel input-icon"></i>
+          <p class="field-help">Use the outlet ID created during registration, not the business display name.</p>
         </div>
 
         <div class="form-group">
@@ -508,29 +1191,34 @@
 
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" id="password" class="form-input" placeholder="Password" required autocomplete="current-password">
+          <input type="password" id="password" class="form-input password-input" placeholder="Password" required autocomplete="current-password">
           <i class="fa-solid fa-lock input-icon"></i>
-          <i class="fa-solid fa-eye toggle-pwd" id="toggle-pwd"></i>
+          <button class="toggle-pwd" id="toggle-pwd" type="button" aria-label="Show password" aria-pressed="false"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
         </div>
 
         <button type="submit" class="submit-btn">
-          Log In Terminal <i class="fa-solid fa-right-to-bracket"></i>
+          Sign in securely <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
         </button>
+        <div class="login-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Your outlet, username, role, and subscription status are verified before dashboard access is granted.</span></div>
       </form>
 
       <!-- REGISTRATION FORM -->
-      <form id="register-form" style="display: none;">
-        <div class="form-group">
+      <form id="register-form" role="tabpanel" aria-labelledby="tab-register-btn" style="display: none;">
+        <section class="form-section">
+          <div class="form-section-head"><div><strong>Outlet details</strong><span>Tell us which food business needs a workspace.</span></div><span class="section-count">01</span></div>
+          <div class="form-grid">
+        <div class="form-group full">
           <label for="reg-name">Outlet / Business Name</label>
-          <input type="text" id="reg-name" class="form-input" placeholder="e.g. Royal Restaurant & Dhaba" required>
+          <input type="text" id="reg-name" class="form-input" placeholder="e.g. Royal Restaurant & Dhaba" required autocomplete="organization">
           <i class="fa-solid fa-store input-icon"></i>
         </div>
 
         <div class="form-group">
-          <label for="reg-slug">Outlet ID / Unique Slug <span style="text-transform: none; font-weight: normal; color: var(--text-muted); font-size: 10.5px; margin-left: 4px;">(Must be unique & non-repetitive)</span></label>
-          <input type="text" id="reg-slug" class="form-input" placeholder="e.g. royal-dhaba (letters & hyphens)" required>
+          <label for="reg-slug">Unique Outlet ID</label>
+          <input type="text" id="reg-slug" class="form-input" placeholder="e.g. royal-dhaba" required autocomplete="off" autocapitalize="none" spellcheck="false">
           <i class="fa-solid fa-link input-icon"></i>
-          <div id="slug-status" style="font-size: 11px; margin-top: 5px; font-weight: 600; display: none; text-align: left; transition: var(--transition);"></div>
+          <p class="field-help">Lowercase letters, numbers, and hyphens. This becomes your sign-in ID.</p>
+          <div id="slug-status" role="status" aria-live="polite" style="font-size: 11px; margin-top: 5px; font-weight: 600; display: none; text-align: left; transition: var(--transition);"></div>
         </div>
 
         <div class="form-group">
@@ -543,10 +1231,15 @@
             <option value="other">Other Food Outlet</option>
           </select>
         </div>
+          </div>
+        </section>
 
+        <section class="form-section">
+          <div class="form-section-head"><div><strong>Owner contact</strong><span>Used for review, approval, and important account updates.</span></div><span class="section-count">02</span></div>
+          <div class="form-grid">
         <div class="form-group">
           <label for="reg-email">Owner Email</label>
-          <input type="email" id="reg-email" class="form-input" placeholder="owner@email.com" required>
+          <input type="email" id="reg-email" class="form-input" placeholder="owner@email.com" required autocomplete="email">
           <i class="fa-solid fa-envelope input-icon"></i>
         </div>
 
@@ -706,30 +1399,51 @@
               <option value="260">🇿🇲 +260</option>
               <option value="263">🇿🇼 +263</option>
             </select>
-            <input type="tel" id="reg-whatsapp" class="form-input" placeholder="e.g. 9876543210" required>
+            <input type="tel" id="reg-whatsapp" class="form-input" placeholder="e.g. 9876543210" required autocomplete="tel-national" inputmode="numeric">
             <i class="fa-brands fa-whatsapp"></i>
           </div>
         </div>
+          </div>
+        </section>
 
+        <section class="form-section">
+          <div class="form-section-head"><div><strong>Administrator account</strong><span>Create the first manager-level credential for this outlet.</span></div><span class="section-count">03</span></div>
+          <div class="form-grid">
         <div class="form-group">
           <label for="reg-user">Admin Username</label>
-          <input type="text" id="reg-user" class="form-input" placeholder="e.g. admin" required>
+          <input type="text" id="reg-user" class="form-input" placeholder="e.g. admin" required autocomplete="username" autocapitalize="none" spellcheck="false">
           <i class="fa-solid fa-user-gear input-icon"></i>
         </div>
 
         <div class="form-group">
           <label for="reg-pass">Admin Password</label>
-          <input type="password" id="reg-pass" class="form-input" placeholder="Choose Password" required>
+          <input type="password" id="reg-pass" class="form-input password-input" placeholder="Choose a strong password" required autocomplete="new-password" minlength="10">
           <i class="fa-solid fa-key input-icon"></i>
+          <button class="toggle-pwd" id="toggle-reg-pwd" type="button" aria-label="Show registration password" aria-pressed="false"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+          <p class="field-help">Use at least 10 characters and avoid reusing a personal password.</p>
         </div>
+          </div>
+        </section>
 
-        <button type="submit" class="submit-btn" style="background-color: #22c55e !important; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);">
-          Request Registration <i class="fa-solid fa-paper-plane"></i>
+        <label class="legal-check">
+          <input type="checkbox" id="registration-consent" required>
+          <span>I confirm that I am authorized to register this outlet and agree to the <a href="terms.html" target="_blank">Terms</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.</span>
+        </label>
+
+        <button type="submit" class="submit-btn">
+          Submit registration request <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
         </button>
+        <div class="registration-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>Submitting does not charge you or activate a subscription. CodeArc reviews the request before issuing workspace access.</span></div>
       </form>
 
     </div>
   </div>
+  </main>
+
+  <footer class="access-footer">
+    <span>© 2026 CodeArc Tech Labs Private Limited</span>
+    <div class="access-footer-links"><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refund-policy.html">Refund policy</a></div>
+  </footer>
 
   <script>
     const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
@@ -746,6 +1460,7 @@
       
       // --- INTERACTIVE STEAM, AROMA & BOKEH DYNAMIC CANVAS ---
       (function() {
+        return;
         const canvas = document.createElement('canvas');
         canvas.id = 'aroma-canvas';
         canvas.style.position = 'fixed';
@@ -1124,6 +1839,8 @@
       
       const togglePwdBtn = document.getElementById('toggle-pwd');
       const passwordInput = document.getElementById('password');
+      const toggleRegPwdBtn = document.getElementById('toggle-reg-pwd');
+      const registerPasswordInput = document.getElementById('reg-pass');
 
       // Check URL query parameters for direct tab activation
       const urlParams = new URLSearchParams(window.location.search);
@@ -1139,6 +1856,7 @@
         void loginCard.offsetWidth; // trigger reflow
         loginCard.classList.add('shake-anim');
         if (window.AndroidInterface) window.AndroidInterface.vibrate(300);
+        errorBox.focus({ preventScroll: true });
       }
 
       function showSuccess(msg) {
@@ -1146,44 +1864,68 @@
         successBox.textContent = msg;
         successBox.style.display = 'block';
         if (window.AndroidInterface) window.AndroidInterface.vibrate(80);
+        successBox.focus({ preventScroll: true });
       }
 
-      // Password visibility eye toggler
-      if (togglePwdBtn && passwordInput) {
-        togglePwdBtn.addEventListener('click', () => {
-          if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            togglePwdBtn.classList.remove('fa-eye');
-            togglePwdBtn.classList.add('fa-eye-slash');
-            togglePwdBtn.style.color = 'var(--primary-brand)';
-          } else {
-            passwordInput.type = 'password';
-            togglePwdBtn.classList.remove('fa-eye-slash');
-            togglePwdBtn.classList.add('fa-eye');
-            togglePwdBtn.style.color = 'var(--text-muted)';
+      function bindPasswordToggle(button, input, label) {
+        if (!button || !input) return;
+        button.addEventListener('click', () => {
+          const showing = input.type === 'text';
+          const icon = button.querySelector('i');
+          input.type = showing ? 'password' : 'text';
+          button.setAttribute('aria-pressed', String(!showing));
+          button.setAttribute('aria-label', `${showing ? 'Show' : 'Hide'} ${label}`);
+          if (icon) {
+            icon.classList.toggle('fa-eye', showing);
+            icon.classList.toggle('fa-eye-slash', !showing);
           }
         });
       }
 
+      bindPasswordToggle(togglePwdBtn, passwordInput, 'password');
+      bindPasswordToggle(toggleRegPwdBtn, registerPasswordInput, 'registration password');
+
+      function setFormBusy(form, busy, busyText) {
+        const button = form ? form.querySelector('button[type="submit"]') : null;
+        if (!button) return;
+        if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+        button.disabled = busy;
+        button.setAttribute('aria-busy', String(busy));
+        button.innerHTML = busy
+          ? `<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> ${busyText}`
+          : button.dataset.defaultHtml;
+      }
+
+      function updateTabState(activeTab) {
+        const loginActive = activeTab === 'login';
+        tabLoginBtn.classList.toggle('active', loginActive);
+        tabRegisterBtn.classList.toggle('active', !loginActive);
+        tabLoginBtn.setAttribute('aria-selected', String(loginActive));
+        tabRegisterBtn.setAttribute('aria-selected', String(!loginActive));
+        loginForm.hidden = !loginActive;
+        registerForm.hidden = loginActive;
+        loginForm.style.display = loginActive ? 'block' : 'none';
+        registerForm.style.display = loginActive ? 'none' : 'block';
+        document.body.classList.toggle('register-mode', !loginActive);
+      }
+
       // Switch tabs
       tabLoginBtn.addEventListener('click', () => {
-        tabRegisterBtn.classList.remove('active');
-        tabLoginBtn.classList.add('active');
-        loginForm.style.display = 'block';
-        registerForm.style.display = 'none';
-        document.getElementById('portal-title').textContent = "Client Access Portal";
-        document.getElementById('portal-subtitle').textContent = "Access your restaurant or food outlet terminal";
+        updateTabState('login');
+        document.getElementById('portal-title').textContent = "Sign in to your workspace";
+        document.getElementById('portal-subtitle').textContent = "Enter the outlet ID and staff credentials assigned to you.";
+        document.title = "Sign In | CodeArc RestoSuite";
+        history.replaceState(null, '', 'login.html');
         errorBox.style.display = 'none';
         successBox.style.display = 'none';
       });
 
       function activateRegisterTab() {
-        tabLoginBtn.classList.remove('active');
-        tabRegisterBtn.classList.add('active');
-        loginForm.style.display = 'none';
-        registerForm.style.display = 'block';
-        document.getElementById('portal-title').textContent = "Register Your Outlet";
-        document.getElementById('portal-subtitle').textContent = "Submit a request to CodeArc for a new SaaS instance";
+        updateTabState('register');
+        document.getElementById('portal-title').textContent = "Request a RestoSuite workspace";
+        document.getElementById('portal-subtitle').textContent = "Share your outlet and administrator details for account review.";
+        document.title = "Register Your Outlet | CodeArc RestoSuite";
+        history.replaceState(null, '', 'login.html?tab=register');
         errorBox.style.display = 'none';
         successBox.style.display = 'none';
       }
@@ -1331,6 +2073,7 @@
         loginForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           errorBox.style.display = 'none';
+          setFormBusy(loginForm, true, 'Verifying access...');
           
           const slugVal = document.getElementById('tenant-id').value.trim().toLowerCase();
           const userVal = document.getElementById('username').value.trim();
@@ -1339,6 +2082,7 @@
           // Ensure Supabase is working
           if (!supabaseClient) {
             showError("Backend connection is offline. Cannot authenticate.");
+            setFormBusy(loginForm, false);
             return;
           }
 
@@ -1378,6 +2122,8 @@
             window.location.href = 'dashboard.html';
           } catch (err) {
             showError(err.message || "Authentication failed.");
+          } finally {
+            setFormBusy(loginForm, false);
           }
         });
       }
@@ -1387,6 +2133,7 @@
         registerForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           errorBox.style.display = 'none';
+          setFormBusy(registerForm, true, 'Submitting request...');
           
           const name = document.getElementById('reg-name').value.trim();
           const slug = document.getElementById('reg-slug').value.trim().toLowerCase();
@@ -1402,6 +2149,7 @@
           
           if (whatsappRaw.length < 7 || whatsappRaw.length > 12) {
             showError("Please enter a valid WhatsApp mobile number.");
+            setFormBusy(registerForm, false);
             return;
           }
           
@@ -1412,11 +2160,13 @@
           // Validate slug (must be URL friendly)
           if (!/^[a-z0-9-]+$/.test(slug)) {
             showError("Slug can only contain lowercase letters, numbers, and hyphens (e.g. royal-dhaba).");
+            setFormBusy(registerForm, false);
             return;
           }
 
           if (!supabaseClient) {
             showError("Backend connection is offline. Cannot register.");
+            setFormBusy(registerForm, false);
             return;
           }
 
@@ -1441,6 +2191,8 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
           } catch (err) {
             showError(err.message || "Registration failed.");
+          } finally {
+            setFormBusy(registerForm, false);
           }
         });
       }

@@ -49,6 +49,7 @@ let emailConfig = {
     fromName: process.env.FROM_NAME || 'CodeArc RestoSuite',
     relayUrl: process.env.EMAIL_RELAY_URL || ''
 };
+const REGISTRATION_EMAILS_ENABLED = String(process.env.REGISTRATION_EMAILS_ENABLED || 'false').toLowerCase() === 'true';
 
 const configPath = path.join(__dirname, 'email-config.json');
 if (fs.existsSync(configPath)) {
@@ -1590,8 +1591,9 @@ async function handleNewRegistrationNotification(record) {
         });
     }
 
-    // 2. Send Email Confirmation
-    if (email && (transporter || emailConfig.relayUrl)) {
+    // Registration emails are owned by the Supabase notify-registration function.
+    // Keep this opt-in only for deployments that intentionally use the gateway as the sender.
+    if (REGISTRATION_EMAILS_ENABLED && email && (transporter || emailConfig.relayUrl)) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
         const emailSubject = `Registration Received - CodeArc RestoSuite (Outlet: ${name})`;
@@ -1836,7 +1838,9 @@ async function handleNewRegistrationNotification(record) {
             });
     } else {
         await logHealthEvent('registration_email_skipped', 'warning', {
-            reason: !email ? 'no_email' : 'transporter_and_relay_not_configured'
+            reason: !REGISTRATION_EMAILS_ENABLED
+                ? 'handled_by_supabase_edge_function'
+                : (!email ? 'no_email' : 'transporter_and_relay_not_configured')
         });
     }
 }
@@ -1869,8 +1873,8 @@ async function handleApprovalNotification(record) {
         });
     }
 
-    // 2. Send Email Approval Alert
-    if (email && (transporter || emailConfig.relayUrl)) {
+    // Approval emails are owned by the Supabase notify-registration function.
+    if (REGISTRATION_EMAILS_ENABLED && email && (transporter || emailConfig.relayUrl)) {
         const emailSubject = `✅ Account Approved & Active - CodeArc RestoSuite (Outlet: ${name})`;
         const emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; color: #333;">
@@ -1916,7 +1920,9 @@ async function handleApprovalNotification(record) {
             });
     } else {
         await logHealthEvent('approval_email_skipped', 'warning', {
-            reason: !email ? 'no_email' : 'transporter_and_relay_not_configured'
+            reason: !REGISTRATION_EMAILS_ENABLED
+                ? 'handled_by_supabase_edge_function'
+                : (!email ? 'no_email' : 'transporter_and_relay_not_configured')
         });
     }
 }
@@ -2544,5 +2550,4 @@ app.listen(PORT, async () => {
 
     console.log(`[Keep-Alive] Self-ping scheduler started → ${selfUrl} (every 4 min)`);
 });
-
 

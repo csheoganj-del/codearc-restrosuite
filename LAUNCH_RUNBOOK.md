@@ -22,7 +22,11 @@ Use this runbook before every production launch or major release. It assumes the
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `SUPERADMIN_SESSION_SECRET`
-  - `ZERO_COST_EMAILS_DISABLED=true` for free launch
+  - `EMAIL_RELAY_URL`
+  - `EMAIL_RELAY_TOKEN` when the relay requires bearer authentication
+  - `EMAIL_WEBHOOK_SECRET`
+  - `ADMIN_ALERT_EMAIL`
+  - `ZERO_COST_EMAILS_DISABLED=false`
 - Deploy these Edge Functions:
   - `tenant-access`
   - `tenant-admin`
@@ -30,6 +34,8 @@ Use this runbook before every production launch or major release. It assumes the
   - `tenant-public`
   - `notify-registration`
   - `report-error`
+- Create the `saas_tenants` INSERT/UPDATE database webhook described in
+  `EMAIL_NOTIFICATION_SETUP.md`.
 
 ## Vercel Setup
 
