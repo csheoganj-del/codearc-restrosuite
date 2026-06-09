@@ -15,7 +15,14 @@ Use this runbook before every production launch or major release. It assumes the
 ## Supabase Setup
 
 - Create or open the production Supabase project.
+- Confirm the production project already contains the core POS tables listed in
+  `scripts/check-launch.cjs`. The current repository does not contain their
+  complete `CREATE TABLE` schema, so export that schema before a clean rebuild.
+- Apply `supabase_migration.sql` to create/harden the tenant registry and attach
+  existing core tables to tenants.
 - Apply every migration in `supabase/migrations` in timestamp order.
+- Apply `supabase_gateway_migration.sql` only when the optional WhatsApp gateway
+  and session backup are being enabled.
 - Confirm all tenant-owned tables have RLS enabled and forced.
 - Confirm `anon` and `authenticated` do not have direct table access to tenant data tables.
 - Add required Edge Function secrets:
@@ -27,13 +34,15 @@ Use this runbook before every production launch or major release. It assumes the
   - `EMAIL_WEBHOOK_SECRET`
   - `ADMIN_ALERT_EMAIL`
   - `ZERO_COST_EMAILS_DISABLED=false`
+  - `ALLOWED_ORIGIN=https://codearc-restrosuite.vercel.app`
 - Deploy these Edge Functions:
   - `tenant-access`
   - `tenant-admin`
   - `tenant-data`
   - `tenant-public`
+  - `tenant-users`
   - `notify-registration`
-  - `report-error`
+  - `app-observability`
 - Create the `saas_tenants` INSERT/UPDATE database webhook described in
   `EMAIL_NOTIFICATION_SETUP.md`.
 
@@ -84,6 +93,7 @@ Use this runbook before every production launch or major release. It assumes the
 
 Launch only when:
 
+- `npm run check:launch` passes.
 - `npm test` passes.
 - `npm run check` passes.
 - `npm run check:free-tier` passes.

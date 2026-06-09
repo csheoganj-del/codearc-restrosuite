@@ -180,10 +180,22 @@ vector_port = 54328
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
 
+[functions.tenant-access]
+verify_jwt = false
+
 [functions.tenant-admin]
 verify_jwt = false
 
 [functions.tenant-data]
+verify_jwt = false
+
+[functions.tenant-public]
+verify_jwt = false
+
+[functions.tenant-users]
+verify_jwt = false
+
+[functions.app-observability]
 verify_jwt = false
 
 [functions.notify-registration]

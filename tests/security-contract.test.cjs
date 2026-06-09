@@ -67,14 +67,24 @@ test("dynamic customer and staff content is escaped before HTML rendering", () =
   assert.match(customerApp, /const safeName = escHtml\(item\.name\)/);
   assert.match(dashboard, /escHtml\(c\.name\)/);
   assert.match(dashboard, /escHtml\(req\.reason \|\| ''\)/);
+  assert.match(dashboard, /custModalTitle\.replaceChildren/);
+  assert.match(dashboard, /escHtml\(log\.employeeName\)/);
+  assert.match(dashboard, /Failed to load logs: \$\{escHtml\(err\.message\)\}/);
+  assert.match(dashboard, /Error loading workspaces: \$\{escHtml\(error\.message\)\}/);
+  assert.match(dashboard, /const maxBackupBytes = 10 \* 1024 \* 1024/);
+  assert.match(dashboard, /Array\.isArray\(data\.bills\)/);
+  assert.match(dashboard, /Array\.isArray\(data\.menu\)/);
 });
 
 test("deployment and Android wrappers enforce baseline security controls", () => {
   const vercel = read("vercel.json");
+  const gitignore = read(".gitignore");
   const manifest = read("android-app/app/src/main/AndroidManifest.xml");
   const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
   assert.match(vercel, /Content-Security-Policy/);
   assert.match(vercel, /Strict-Transport-Security/);
+  assert.match(gitignore, /\.tmp-gradle-build\//);
+  assert.doesNotMatch(manifest, /<manifest[^>]*\spackage=/);
   assert.match(manifest, /android:allowBackup="false"/);
   assert.match(manifest, /android:usesCleartextTraffic="false"/);
   assert.match(activity, /MIXED_CONTENT_NEVER_ALLOW/);
@@ -305,6 +315,8 @@ test("zero-cost launch mode keeps paid add-ons optional and caps free-tier usage
   assert.match(notifyRegistration, /registration_email_sent/);
   assert.match(notifyRegistration, /EMAIL_RELAY_URL is not configured/);
   assert.match(read("supabase/config.toml"), /\[functions\.notify-registration\][\s\S]*verify_jwt = false/);
+  assert.match(read("supabase/config.toml"), /\[functions\.tenant-users\][\s\S]*verify_jwt = false/);
+  assert.match(read("supabase/config.toml"), /\[functions\.app-observability\][\s\S]*verify_jwt = false/);
   assert.match(retention, /cleanup_zero_cost_operational_data/);
   assert.match(retention, /app_error_reports[\s\S]*30 days/);
   assert.match(retention, /tenant_audit_logs[\s\S]*90 days/);
@@ -318,11 +330,27 @@ test("dashboard interactions are optimized for instant feedback", () => {
   const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
 
   assert.match(dashboard, /const FAST_INTERACTION_MODE = true/);
+  assert.match(dashboard, /const ENABLE_DEMO_TOOLS = false/);
   assert.match(dashboard, /function debounce/);
   assert.match(dashboard, /requestIdleCallback/);
   assert.match(dashboard, /vaultWriteQueue/);
   assert.match(dashboard, /frameTask\(renderBills\)/);
   assert.match(dashboard, /if \(!document\.hidden && navigator\.onLine\) syncWithSupabase\(\)/);
+  assert.match(dashboard, /channel\('doppio-employees-realtime'\)/);
+  assert.match(dashboard, /table: 'doppio_attendance', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
+  assert.match(dashboard, /table: 'doppio_leave_requests', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
+  assert.match(dashboard, /channel\('doppio-crm-realtime'\)/);
+  assert.match(dashboard, /channel\('doppio-menu-realtime'\)/);
+  assert.match(dashboard, /table: 'doppio_bills', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
+  assert.match(dashboard, /table: 'doppio_pending_orders', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);
+  assert.doesNotMatch(dashboard, /table: 'doppio_bills' \},/);
+  assert.doesNotMatch(dashboard, /table: 'doppio_pending_orders' \},/);
+  assert.match(dashboard, /const belongsToActiveTenant = bills\.some/);
+  assert.match(dashboard, /if \(!belongsToActiveTenant\) return/);
+  assert.match(dashboard, /const scheduleTenantDataSync/);
+  assert.match(dashboard, /String\(response\.payload\.tenantId\) === String\(activeTenantId\)/);
+  assert.doesNotMatch(dashboard, /event: 'data-reset' \}, \(response\) => \{\s*return;/);
+  assert.doesNotMatch(dashboard, /localStorage\.setItem\('doppio_pending_qr_orders', JSON\.stringify\(mock\)\)/);
   assert.match(browserApi, /READ_CACHE_TTL_MS = 1500/);
   assert.match(browserApi, /readCache\.set/);
   assert.match(browserApi, /readCache\.clear/);

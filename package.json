@@ -8,6 +8,7 @@
     "check:free-tier": "node scripts/check-free-tier.cjs",
     "test": "node --test --test-isolation=none tests/*.test.cjs",
     "check": "node scripts/check-project.cjs && node scripts/check-free-tier.cjs",
+    "check:launch": "node scripts/check-launch.cjs",
     "sync:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./sync-assets.ps1",
     "build:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-android.ps1",
     "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/release.ps1"

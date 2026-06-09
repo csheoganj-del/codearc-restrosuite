@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
   const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
   const ZERO_COST_LAUNCH_MODE = true;
+  const ENABLE_DEMO_TOOLS = false;
   const CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
   const FAST_INTERACTION_MODE = true;
   const runWhenIdle = window.requestIdleCallback
@@ -897,12 +898,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       return null;
     }
   })() || {
-    name: 'Doppio Cafe Nagpur',
-    address: 'London Street, Nagpur',
-    phone: '+91 91300 03177',
-    gstEnabled: true,
+    name: activeTenantName || 'RestoSuite',
+    address: '',
+    phone: '',
+    gstEnabled: false,
     gstRate: 18,
-    loyaltyEnabled: true,
+    loyaltyEnabled: false,
     loyaltyRate: 10,
     passcodeLockEnabled: false,
     crmEnabled: true,
@@ -1300,16 +1301,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           const { data: newProfile } = await supabaseClient.from('doppio_business_profile').insert({
             tenant_id: activeTenantId,
             business_name: activeTenantName,
-            address: 'India',
-            phone: '+353 85 225 8004',
-            gst_enabled: true,
+            address: '',
+            phone: '',
+            gst_enabled: false,
             gst_rate: 18,
-            loyalty_discount_enabled: true,
+            loyalty_discount_enabled: false,
             loyalty_discount_rate: 10,
             crm_enabled: true,
-            tax_enabled: true,
+            tax_enabled: false,
             sound_enabled: false,
-            whatsapp_enabled: true,
+            whatsapp_enabled: false,
             shift_enabled: false
           }).select('*');
           if (newProfile && newProfile.length > 0) dbProfileList = newProfile;
@@ -1848,16 +1849,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function setupSupabaseRealtime() {
     if (!supabaseClient) return;
+    const loggedInRole = sessionStorage.getItem('logged_in_role');
 
-    // Subscribe to standard bills changes
-    supabaseClient.channel('doppio-bills-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills', filter: 'tenant_id=eq.' + activeTenantId }, payload => { })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills' }, () => {
-        syncWithSupabase();
-      }).subscribe();
+    if (loggedInRole !== 'superadmin' && activeTenantId) {
+      // Subscribe to standard bills changes for the active workspace only.
+      supabaseClient.channel('doppio-bills-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          syncWithSupabase();
+        }).subscribe();
 
-    // Subscribe to live QR self-ordering queue & table sessions (Made by Antigravity)
-    supabaseClient.channel('doppio-pending-orders-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: 'tenant_id=eq.' + activeTenantId }, payload => { })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders' }, (payload) => {
+      // Subscribe to live QR self-ordering queue and table sessions.
+      supabaseClient.channel('doppio-pending-orders-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}` }, (payload) => {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const newOrder = payload.new;
           let items = newOrder.items;
@@ -1960,12 +1963,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderTablesMap();
           }
         }
-      }).subscribe();
+        }).subscribe();
+    }
 
     // Subscribe to WhatsApp Broadcast delivery status messages (Made by Antigravity)
     supabaseClient.channel('whatsapp-billing-status')
       .on('broadcast', { event: 'status' }, (payload) => {
         const { orderId, status, error } = payload.payload;
+        const belongsToActiveTenant = bills.some(bill => String(bill.orderId || bill.id) === String(orderId))
+          || pendingQrOrders.some(order => String(order.orderId || order.id) === String(orderId));
+        if (!belongsToActiveTenant) return;
         if (status === 'success') {
           showNotificationToast(`Bill ${orderId}: WhatsApp Sent Successfully!`);
         } else {
@@ -1976,7 +1983,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ─────────────────────────────────────────────────────────────────────
     // ⚡ REAL-TIME TENANT SYNC — SaaS Tenants table listener
     // ─────────────────────────────────────────────────────────────────────
-    const loggedInRole = sessionStorage.getItem('logged_in_role');
+    let tenantDataSyncTimer = null;
+    const scheduleTenantDataSync = () => {
+      clearTimeout(tenantDataSyncTimer);
+      tenantDataSyncTimer = setTimeout(() => {
+        tenantDataSyncTimer = null;
+        syncWithSupabase();
+      }, 150);
+    };
+
+    if (loggedInRole !== 'superadmin' && activeTenantId) {
+      supabaseClient.channel('doppio-employees-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_employees', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .subscribe();
+
+      supabaseClient.channel('doppio-crm-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_crm', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .subscribe();
+
+      supabaseClient.channel('doppio-menu-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_menu', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .subscribe();
+    }
 
     // Super-Admin: refresh registry table whenever any tenant row changes
     if (loggedInRole === 'superadmin') {
@@ -2067,27 +2097,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ⚡ REAL-TIME DATA RESET SYNC
     if (activeTenantId) {
       supabaseClient.channel('tenant-data-reset-realtime')
-        .on('broadcast', { event: 'data-reset' }, (response) => {
-          return;
-          if (response.payload && response.payload.tenantId === activeTenantId) {
+        .on('broadcast', { event: 'data-reset' }, async (response) => {
+          if (response.payload && String(response.payload.tenantId) === String(activeTenantId)) {
             console.log('[SaaS Realtime] Data reset broadcast received. Wiping cache and reloading...');
-            // Clear IndexedDB Vault first so Resilience Vault won't recover it
-            clearIndexedDBVault().then(() => {
-              // Clear all local storage keys starting with doppio_
-              for (let i = localStorage.length - 1; i >= 0; i--) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('doppio_')) {
-                  localStorage.removeItem(key);
-                }
+            await clearIndexedDBVault();
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith('doppio_')) {
+                localStorage.removeItem(key);
               }
-              // Clear session storage as well
-              sessionStorage.removeItem('doppio_menu');
-              sessionStorage.removeItem('doppio_inventory');
-              sessionStorage.removeItem('doppio_bills');
-
-              // Reload page to re-sync
-              window.location.reload();
-            });
+            }
+            sessionStorage.removeItem('doppio_menu');
+            sessionStorage.removeItem('doppio_inventory');
+            sessionStorage.removeItem('doppio_bills');
+            window.location.reload();
           }
         })
         .subscribe();
@@ -2406,7 +2429,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function openCustomizationModal(item) {
     if (!customModal) return;
     document.getElementById('cust-target-item-name').value = item.name;
-    custModalTitle.innerHTML = `<i class="fa-solid fa-gears" style="font-size:20px; color:var(--accent-caramel); margin-right:8px;"></i> Customize ${item.name}`;
+    const titleIcon = document.createElement('i');
+    titleIcon.className = 'fa-solid fa-gears';
+    titleIcon.style.cssText = 'font-size:20px; color:var(--accent-caramel); margin-right:8px;';
+    custModalTitle.replaceChildren(titleIcon, document.createTextNode(`Customize ${item.name}`));
 
     // Reset selections
     selectedSizeOpt = 'Small';
@@ -3104,10 +3130,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  if (btnSimulateZomato) {
+  if (btnSimulateZomato) btnSimulateZomato.hidden = !ENABLE_DEMO_TOOLS;
+  if (btnSimulateSwiggy) btnSimulateSwiggy.hidden = !ENABLE_DEMO_TOOLS;
+  if (ENABLE_DEMO_TOOLS && btnSimulateZomato) {
     btnSimulateZomato.addEventListener('click', () => simulateOnlineOrder('ZOMATO'));
   }
-  if (btnSimulateSwiggy) {
+  if (ENABLE_DEMO_TOOLS && btnSimulateSwiggy) {
     btnSimulateSwiggy.addEventListener('click', () => simulateOnlineOrder('SWIGGY'));
   }
 
@@ -7416,6 +7444,12 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     restoreBackupFileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      const maxBackupBytes = 10 * 1024 * 1024;
+      if (file.size > maxBackupBytes) {
+        alert("Restore failed! Backup files must be 10 MB or smaller.");
+        restoreBackupFileInput.value = '';
+        return;
+      }
 
       SoundEffects.playPop();
       if (!confirm("Are you sure you want to restore POS from this backup? This will overwrite your current active bills, inventory, shifts, employees, and all settings!")) {
@@ -7427,7 +7461,13 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       reader.onload = async function (evt) {
         try {
           const data = JSON.parse(evt.target.result);
-          if (data.bills && data.inventory && data.menu) {
+          const validCoreBackup = data
+            && Array.isArray(data.bills)
+            && data.inventory
+            && typeof data.inventory === 'object'
+            && !Array.isArray(data.inventory)
+            && Array.isArray(data.menu);
+          if (validCoreBackup) {
             // Core POS
             localStorage.setItem('doppio_bills', JSON.stringify(data.bills));
             localStorage.setItem('doppio_inventory', JSON.stringify(data.inventory));
@@ -9345,7 +9385,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     const sample = document.getElementById('growth-save-demo-btn');
-    if (sample && !sample.dataset.bound) {
+    if (sample) sample.hidden = !ENABLE_DEMO_TOOLS;
+    if (ENABLE_DEMO_TOOLS && sample && !sample.dataset.bound) {
       sample.dataset.bound = 'true';
       sample.addEventListener('click', () => {
         addGrowthRow('support', { subject: 'Launch readiness review', category: 'onboarding', priority: 'normal', status: 'open', last_message: 'Review setup before first paid customer.' });
@@ -10652,9 +10693,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       if (activeTenantId) {
         return [];
       }
-      const mock = getMockPendingQrOrders();
-      localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(mock));
-      return mock;
+      return [];
     } catch (e) {
       return [];
     }
@@ -12789,7 +12828,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const attendanceLedgerList = document.getElementById('attendance-ledger-list');
 
     if (attendanceEmpSelect && attendanceEmpSelect.children.length === 0) {
-      attendanceEmpSelect.innerHTML = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+      attendanceEmpSelect.innerHTML = employees.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)}</option>`).join('');
     }
 
     if (attendanceLedgerList) {
@@ -12810,12 +12849,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         }
         return `
           <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px; color: var(--text-dark);">
-            <td style="padding: 6px; font-weight:700;">${log.employeeName}</td>
-            <td style="padding: 6px;">${log.date}</td>
-            <td style="padding: 6px;">${log.clockInTime}</td>
-            <td style="padding: 6px;">${log.clockOutTime}</td>
-            <td style="padding: 6px; font-weight: 600;">${log.hoursWorked ? log.hoursWorked + ' hrs' : '-'}</td>
-            <td style="padding: 6px; font-weight: 700;">₹${log.wages || 0}</td>
+            <td style="padding: 6px; font-weight:700;">${escHtml(log.employeeName)}</td>
+            <td style="padding: 6px;">${escHtml(log.date)}</td>
+            <td style="padding: 6px;">${escHtml(log.clockInTime || '-')}</td>
+            <td style="padding: 6px;">${escHtml(log.clockOutTime || '-')}</td>
+            <td style="padding: 6px; font-weight: 600;">${escHtml(log.hoursWorked ? log.hoursWorked + ' hrs' : '-')}</td>
+            <td style="padding: 6px; font-weight: 700;">₹${escHtml(log.wages || 0)}</td>
             <td style="padding: 6px; text-align: right;">${statusBadge}</td>
           </tr>
         `;
@@ -13488,7 +13527,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       } catch (err) {
         console.error('SuperAdmin: Error fetching gateway health logs:', err);
         if (logsContainer) {
-          logsContainer.innerHTML = `<div style="text-align: center; padding: 32px; color: #EF4444;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Failed to load logs: ${err.message}</div>`;
+          logsContainer.innerHTML = `<div style="text-align: center; padding: 32px; color: #EF4444;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Failed to load logs: ${escHtml(err.message)}</div>`;
         }
       }
     })();
@@ -13699,7 +13738,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       renderPlatformSummary(tenants);
     } catch (error) {
       renderPlatformSummary([]);
-      listContainer.innerHTML = `<div style="padding: 32px; text-align: center; color: #ef4444; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(239,68,68,0.1);"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Error loading workspaces: ${error.message}</div>`;
+      listContainer.innerHTML = `<div style="padding: 32px; text-align: center; color: #ef4444; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(239,68,68,0.1);"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Error loading workspaces: ${escHtml(error.message)}</div>`;
       return;
     }
 
