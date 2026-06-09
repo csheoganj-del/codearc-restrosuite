@@ -1,0 +1,4 @@
+MenuItem,IngredientKey,Quantity,Unit
+Cappuccino,espresso_shot,30,ml
+Cappuccino,milk,180,ml
+Veg Grilled Sandwich,bread,2,slices

@@ -226,6 +226,14 @@ async function deleteTenant(payload: Record<string, unknown>, req: Request) {
 async function updateTenant(payload: Record<string, unknown>, req: Request) {
   const tenantId = String(payload.tenant_id || "").trim();
   if (!tenantId) return jsonResponse({ error: "Tenant ID is required." }, 400, req);
+  const { data: currentTenant, error: currentTenantError } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("username, auth_version")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (currentTenantError || !currentTenant) {
+    return jsonResponse({ error: "Client workspace was not found." }, 404, req);
+  }
 
   const updates: Record<string, unknown> = {};
   if (typeof payload.username === "string") updates.username = payload.username.trim();
@@ -252,12 +260,49 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
       return jsonResponse({ error: "Password must be at least 10 characters." }, 400, req);
     }
     updates.password_hash = await hashPassword(payload.password);
+    updates.auth_version = Number(currentTenant.auth_version || 1) + 1;
+  }
+
+  let migratedOwner = null;
+  if (
+    (typeof payload.username === "string" && payload.username.trim())
+    || (typeof payload.password === "string" && payload.password.trim() !== "")
+  ) {
+    const { data } = await supabaseAdmin
+      .from("tenant_users")
+      .select("id, session_version")
+      .eq("tenant_id", tenantId)
+      .eq("username_normalized", String(currentTenant.username || "").trim().toLowerCase())
+      .eq("role", "admin")
+      .maybeSingle();
+    migratedOwner = data;
   }
 
   const { error } = await supabaseAdmin.from("saas_tenants").update(updates).eq("id", tenantId);
   if (error) {
     console.error("update_tenant failed:", error);
     return jsonResponse({ error: "Failed to save settings." }, 500, req);
+  }
+
+  const migratedOwnerUpdates: Record<string, unknown> = {};
+  if (typeof payload.username === "string" && payload.username.trim()) {
+    migratedOwnerUpdates.username = payload.username.trim();
+    migratedOwnerUpdates.username_normalized = payload.username.trim().toLowerCase();
+  }
+  if (typeof payload.password === "string" && payload.password.trim() !== "") {
+    migratedOwnerUpdates.password_hash = await hashPassword(payload.password);
+    migratedOwnerUpdates.session_version = Number(migratedOwner?.session_version || 1) + 1;
+    migratedOwnerUpdates.updated_at = new Date().toISOString();
+  }
+  if (migratedOwner && Object.keys(migratedOwnerUpdates).length > 0) {
+    const { error: ownerError } = await supabaseAdmin
+      .from("tenant_users")
+      .update(migratedOwnerUpdates)
+      .eq("id", migratedOwner.id);
+    if (ownerError) {
+      console.error("migrated owner credential update failed:", ownerError);
+      return jsonResponse({ error: "Workspace updated, but migrated owner credentials could not be synchronized." }, 500, req);
+    }
   }
   return jsonResponse({ success: true }, 200, req);
 }

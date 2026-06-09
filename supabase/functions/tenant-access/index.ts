@@ -17,6 +17,10 @@ function getCorsHeaders(req: Request) {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const SUPERADMIN_SESSION_SECRET = Deno.env.get("SUPERADMIN_SESSION_SECRET") || "";
+const EMAIL_RELAY_URL = Deno.env.get("EMAIL_RELAY_URL") || "";
+const EMAIL_RELAY_TOKEN = Deno.env.get("EMAIL_RELAY_TOKEN") || "";
+const PUBLIC_APP_URL = (Deno.env.get("PUBLIC_APP_URL") || ALLOWED_ORIGIN).replace(/\/+$/, "");
+const ZERO_COST_EMAILS_DISABLED = (Deno.env.get("ZERO_COST_EMAILS_DISABLED") || "false") === "true";
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.");
@@ -123,6 +127,8 @@ async function checkRateLimit(req: Request, action: string) {
     check_slug: { limit: 60, windowSeconds: 60 },
     login: { limit: 10, windowSeconds: 15 * 60 },
     register: { limit: 5, windowSeconds: 60 * 60 },
+    request_recovery: { limit: 5, windowSeconds: 60 * 60 },
+    reset_password: { limit: 10, windowSeconds: 60 * 60 },
   };
   const rule = rules[action];
   if (!rule) return { allowed: true };
@@ -268,6 +274,166 @@ function normalizeEmail(raw: string) {
   return raw.trim().toLowerCase();
 }
 
+function escapeHtml(value: unknown) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+async function sendRecoveryEmail(email: string, tenant: Record<string, unknown>, token: string) {
+  if (ZERO_COST_EMAILS_DISABLED || !EMAIL_RELAY_URL) {
+    console.warn("Credential recovery email skipped because email delivery is not configured.");
+    return false;
+  }
+  const resetUrl = `${PUBLIC_APP_URL}/login.html?recovery=${encodeURIComponent(token)}`;
+  const response = await fetch(EMAIL_RELAY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...(EMAIL_RELAY_TOKEN ? { "Authorization": `Bearer ${EMAIL_RELAY_TOKEN}` } : {}),
+    },
+    body: JSON.stringify({
+      to: email,
+      subject: "RestoSuite credential recovery",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#1f2937">
+          <h2>Reset your RestoSuite password</h2>
+          <p>A credential recovery request was received for <strong>${escapeHtml(tenant.name || "your outlet")}</strong>.</p>
+          <p><strong>Outlet ID:</strong> ${escapeHtml(tenant.slug)}<br><strong>Username:</strong> ${escapeHtml(tenant.username)}</p>
+          <p><a href="${resetUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Set a new password</a></p>
+          <p>This link expires in 30 minutes and can be used once. If you did not request it, ignore this email.</p>
+        </div>
+      `,
+    }),
+  });
+  if (!response.ok) throw new Error(`Recovery relay failed with HTTP ${response.status}.`);
+  const result = await response.json().catch(() => ({}));
+  if (!(result.status === "success" || result.status === "ok" || result.ok === true)) {
+    throw new Error("Recovery relay rejected the message.");
+  }
+  return true;
+}
+
+async function handleRequestRecovery(payload: Record<string, unknown>, req: Request) {
+  const slug = normalizeSlug(String(payload.slug || ""));
+  const email = normalizeEmail(String(payload.email || ""));
+  const generic = {
+    success: true,
+    message: "If the outlet ID and registered owner email match, a recovery link will be sent shortly.",
+  };
+  if (!email) return jsonResponse(generic, 200, req);
+
+  let query = supabaseAdmin
+    .from("saas_tenants")
+    .select("id, name, slug, username, email, status")
+    .eq("email", email)
+    .eq("status", "approved")
+    .limit(5);
+  if (slug) query = query.eq("slug", slug);
+  const { data: tenants, error } = await query;
+  if (error) {
+    console.error("recovery lookup failed:", error);
+    return jsonResponse(generic, 200, req);
+  }
+  if (!tenants || tenants.length === 0) {
+    return jsonResponse(generic, 200, req);
+  }
+
+  const clientAddress = (req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown").split(",")[0].trim();
+  const ipHash = await sha256Hex(clientAddress);
+  await supabaseAdmin.from("tenant_password_resets").delete().lt("expires_at", new Date().toISOString());
+  for (const tenant of tenants) {
+    const rawToken = randomBase64Url(32);
+    const tokenHash = await sha256Hex(rawToken);
+    await supabaseAdmin.from("tenant_password_resets").delete().eq("tenant_id", tenant.id).is("used_at", null);
+    const { error: insertError } = await supabaseAdmin.from("tenant_password_resets").insert({
+      tenant_id: tenant.id,
+      token_hash: tokenHash,
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      requested_ip_hash: ipHash,
+    });
+    if (insertError) {
+      console.error("recovery token insert failed:", insertError);
+      continue;
+    }
+    try {
+      await sendRecoveryEmail(email, tenant, rawToken);
+    } catch (deliveryError) {
+      console.error("recovery email failed:", deliveryError);
+    }
+  }
+  return jsonResponse(generic, 200, req);
+}
+
+async function handleResetPassword(payload: Record<string, unknown>, req: Request) {
+  const token = String(payload.token || "").trim();
+  const password = String(payload.password || "");
+  if (!token || password.length < 10) {
+    return jsonResponse({ error: "A valid recovery link and a password of at least 10 characters are required." }, 400, req);
+  }
+  const tokenHash = await sha256Hex(token);
+  const { data: reset, error } = await supabaseAdmin
+    .from("tenant_password_resets")
+    .select("id, tenant_id, expires_at, used_at")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+  if (error || !reset || reset.used_at || Date.now() > new Date(reset.expires_at).getTime()) {
+    return jsonResponse({ error: "This recovery link is invalid or has expired." }, 400, req);
+  }
+
+  const now = new Date().toISOString();
+  const { data: claimed, error: claimError } = await supabaseAdmin
+    .from("tenant_password_resets")
+    .update({ used_at: now })
+    .eq("id", reset.id)
+    .is("used_at", null)
+    .select("id")
+    .maybeSingle();
+  if (claimError || !claimed) return jsonResponse({ error: "This recovery link has already been used." }, 409, req);
+
+  const { data: tenant, error: tenantError } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("auth_version, username")
+    .eq("id", reset.tenant_id)
+    .maybeSingle();
+  if (tenantError || !tenant) {
+    return jsonResponse({ error: "Password reset failed. Please request a new link." }, 500, req);
+  }
+  const { error: updateError } = await supabaseAdmin
+    .from("saas_tenants")
+    .update({
+      password_hash: await hashPassword(password),
+      auth_version: Number(tenant.auth_version || 1) + 1,
+    })
+    .eq("id", reset.tenant_id);
+  if (updateError) {
+    console.error("password recovery update failed:", updateError);
+    return jsonResponse({ error: "Password reset failed. Please request a new link." }, 500, req);
+  }
+  const { data: ownerUser } = await supabaseAdmin
+    .from("tenant_users")
+    .select("id, session_version")
+    .eq("tenant_id", reset.tenant_id)
+    .eq("username_normalized", String(tenant.username || "").trim().toLowerCase())
+    .eq("role", "admin")
+    .maybeSingle();
+  if (ownerUser) {
+    const { error: ownerUpdateError } = await supabaseAdmin.from("tenant_users").update({
+      password_hash: await hashPassword(password),
+      session_version: Number(ownerUser.session_version || 1) + 1,
+      updated_at: now,
+    }).eq("id", ownerUser.id);
+    if (ownerUpdateError) {
+      console.error("migrated owner password recovery update failed:", ownerUpdateError);
+      return jsonResponse({ error: "Password reset was incomplete. Please contact support." }, 500, req);
+    }
+  }
+  return jsonResponse({ success: true, message: "Password updated. You can now sign in with the new password." }, 200, req);
+}
+
 async function handleCheckSlug(slug: string, req: Request) {
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
     return jsonResponse({ available: false, error: "Invalid outlet ID format." }, 400, req);
@@ -326,7 +492,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
 
   const { data: tenant, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, slug, username, password_hash, status, allowed_tabs, data_reset_at, plan_code, subscription_status, subscription_current_period_end")
+    .select("id, name, slug, username, password_hash, status, allowed_tabs, data_reset_at, plan_code, subscription_status, subscription_current_period_end, auth_version")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -457,6 +623,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
     tenant_id: tenant.id,
     tenant_slug: tenant.slug,
     legacy_owner: true,
+    auth_version: tenant.auth_version,
   });
 
   if (!sessionToken) {
@@ -509,7 +676,7 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
 
   const { data: tenant, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, slug, username, status, allowed_tabs, data_reset_at, plan_code, subscription_status, subscription_current_period_end")
+    .select("id, name, slug, username, status, allowed_tabs, data_reset_at, plan_code, subscription_status, subscription_current_period_end, auth_version")
     .eq("id", tenantId)
     .maybeSingle();
 
@@ -521,11 +688,14 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
   if (!tenant) return jsonResponse({ error: "Workspace no longer exists." }, 401);
   if (tenant.status !== "approved") return jsonResponse({ error: "Workspace access is not active." }, 403);
   if (!activeSubscription(tenant.subscription_status)) return jsonResponse({ error: "Workspace subscription is not active." }, 402);
+  const userId = String(sessionPayload.user_id || "");
+  if (!userId && Number(sessionPayload.auth_version) !== Number(tenant.auth_version)) {
+    return jsonResponse({ error: "Session was revoked. Please log in again." }, 401);
+  }
 
   const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
   const plan = planFor(tenant.plan_code);
 
-  const userId = String(sessionPayload.user_id || "");
   if (userId) {
     const { data: staffUser, error: staffError } = await supabaseAdmin
       .from("tenant_users")
@@ -703,6 +873,14 @@ serve(async (req) => {
 
     if (action === "register") {
       return await handleRegister(payload, req);
+    }
+
+    if (action === "request_recovery") {
+      return await handleRequestRecovery(payload, req);
+    }
+
+    if (action === "reset_password") {
+      return await handleResetPassword(payload, req);
     }
 
     return jsonResponse({ error: "Unsupported action." }, 400, req);

@@ -1,0 +1,4 @@
+IngredientKey,IngredientName,Category,CurrentStock,MaxStock,Unit,ReorderLevelPercent,ExpiryDate
+espresso_shot,Espresso Shot,drinks,3000,6000,ml,20,
+milk,Milk,drinks,6000,10000,ml,25,2026-06-16
+bread,Bread,food,60,100,slices,20,2026-06-13

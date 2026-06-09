@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_inventory (
     key         text NOT NULL,
     current     numeric NOT NULL DEFAULT 0,
     unit        text NOT NULL DEFAULT 'ml',
+    label       text DEFAULT '',
+    max_stock   numeric NOT NULL DEFAULT 1000,
+    category    text NOT NULL DEFAULT 'food',
     updated_at  timestamp with time zone NOT NULL DEFAULT now(),
     UNIQUE (tenant_id, key)
 );

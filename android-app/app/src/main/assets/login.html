@@ -893,6 +893,96 @@
       padding-right: 48px;
     }
 
+    .credential-help-row {
+      display: flex;
+      justify-content: flex-end;
+      margin: -8px 0 15px;
+    }
+
+    .credential-help-link {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #ea580c;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .recovery-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(17, 24, 39, 0.64);
+    }
+
+    .recovery-modal.active {
+      display: grid;
+    }
+
+    .recovery-card {
+      width: min(500px, 100%);
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
+      padding: 24px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 24px 70px rgba(17, 24, 39, 0.3);
+      color: #111827;
+    }
+
+    .recovery-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .recovery-head h3 {
+      margin: 0 0 5px;
+      font-size: 20px;
+    }
+
+    .recovery-head p,
+    .recovery-note {
+      margin: 0;
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .recovery-close {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      border: 1px solid #e5e7eb;
+      border-radius: 9px;
+      background: #f9fafb;
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .recovery-guidance {
+      display: grid;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .recovery-guidance div {
+      padding: 11px;
+      border: 1px solid #e5e7eb;
+      border-radius: 9px;
+      background: #f9fafb;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
     .submit-btn {
       min-height: 50px;
       margin-top: 8px;
@@ -1195,12 +1285,62 @@
           <i class="fa-solid fa-lock input-icon"></i>
           <button class="toggle-pwd" id="toggle-pwd" type="button" aria-label="Show password" aria-pressed="false"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
         </div>
+        <div class="credential-help-row">
+          <button type="button" class="credential-help-link" id="open-recovery-btn">Forgot outlet ID, username, or password?</button>
+        </div>
 
         <button type="submit" class="submit-btn">
           Sign in securely <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
         </button>
         <div class="login-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Your outlet, username, role, and subscription status are verified before dashboard access is granted.</span></div>
       </form>
+
+      <div class="recovery-modal" id="recovery-modal" aria-hidden="true">
+        <section class="recovery-card" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+          <div class="recovery-head">
+            <div>
+              <h3 id="recovery-title">Recover credentials</h3>
+              <p id="recovery-subtitle">Outlet owners can receive a secure reset link at the registered email address.</p>
+            </div>
+            <button type="button" class="recovery-close" id="close-recovery-btn" aria-label="Close recovery">&times;</button>
+          </div>
+
+          <form id="recovery-request-form">
+            <div class="form-group">
+              <label for="recovery-slug">Outlet ID <span style="font-weight:500;color:#9ca3af;">(optional)</span></label>
+              <input type="text" id="recovery-slug" class="form-input" placeholder="Leave blank if forgotten" autocapitalize="none" spellcheck="false">
+              <i class="fa-solid fa-store input-icon"></i>
+              <p class="field-help">If omitted, recovery instructions are sent for approved outlets registered to the email.</p>
+            </div>
+            <div class="form-group">
+              <label for="recovery-email">Registered owner email</label>
+              <input type="email" id="recovery-email" class="form-input" placeholder="owner@example.com" required autocomplete="email">
+              <i class="fa-solid fa-envelope input-icon"></i>
+            </div>
+            <button type="submit" class="submit-btn">Send secure recovery link</button>
+          </form>
+
+          <form id="recovery-reset-form" hidden>
+            <input type="text" name="username" value="outlet-owner" autocomplete="username" hidden>
+            <div class="form-group">
+              <label for="recovery-new-password">New password</label>
+              <input type="password" id="recovery-new-password" class="form-input" minlength="10" required autocomplete="new-password" placeholder="At least 10 characters">
+              <i class="fa-solid fa-key input-icon"></i>
+            </div>
+            <div class="form-group">
+              <label for="recovery-confirm-password">Confirm new password</label>
+              <input type="password" id="recovery-confirm-password" class="form-input" minlength="10" required autocomplete="new-password" placeholder="Repeat new password">
+              <i class="fa-solid fa-shield-halved input-icon"></i>
+            </div>
+            <button type="submit" class="submit-btn">Set new password</button>
+          </form>
+
+          <div class="recovery-guidance" id="recovery-guidance">
+            <div><strong>Staff member:</strong> Ask your outlet administrator to open Employees &gt; Staff Access and reset your password. All old sessions are revoked.</div>
+            <div><strong>Superadmin:</strong> Recovery is intentionally unavailable publicly. The platform owner must rotate <code>SUPERADMIN_PASSWORD_HASH</code> in Supabase secrets and redeploy <code>tenant-access</code>.</div>
+          </div>
+        </section>
+      </div>
 
       <!-- REGISTRATION FORM -->
       <form id="register-form" role="tabpanel" aria-labelledby="tab-register-btn" style="display: none;">
@@ -1841,9 +1981,13 @@
       const passwordInput = document.getElementById('password');
       const toggleRegPwdBtn = document.getElementById('toggle-reg-pwd');
       const registerPasswordInput = document.getElementById('reg-pass');
+      const recoveryModal = document.getElementById('recovery-modal');
+      const recoveryRequestForm = document.getElementById('recovery-request-form');
+      const recoveryResetForm = document.getElementById('recovery-reset-form');
 
       // Check URL query parameters for direct tab activation
       const urlParams = new URLSearchParams(window.location.search);
+      const recoveryToken = urlParams.get('recovery') || '';
       if (urlParams.get('tab') === 'register') {
         activateRegisterTab();
       }
@@ -2067,6 +2211,78 @@
 
         return result;
       }
+
+      function openRecoveryModal(resetMode = false) {
+        recoveryModal.classList.add('active');
+        recoveryModal.setAttribute('aria-hidden', 'false');
+        recoveryRequestForm.hidden = resetMode;
+        recoveryResetForm.hidden = !resetMode;
+        document.getElementById('recovery-guidance').hidden = resetMode;
+        document.getElementById('recovery-title').textContent = resetMode ? 'Set a new password' : 'Recover credentials';
+        document.getElementById('recovery-subtitle').textContent = resetMode
+          ? 'This single-use recovery link expires after 30 minutes.'
+          : 'Outlet owners can receive the outlet ID, username, and a secure reset link at the registered email.';
+        setTimeout(() => {
+          document.getElementById(resetMode ? 'recovery-new-password' : 'recovery-slug').focus();
+        }, 50);
+      }
+
+      function closeRecoveryModal() {
+        recoveryModal.classList.remove('active');
+        recoveryModal.setAttribute('aria-hidden', 'true');
+      }
+
+      document.getElementById('open-recovery-btn').addEventListener('click', () => {
+        const slug = document.getElementById('tenant-id').value.trim();
+        if (slug) document.getElementById('recovery-slug').value = slug;
+        openRecoveryModal(false);
+      });
+      document.getElementById('close-recovery-btn').addEventListener('click', closeRecoveryModal);
+      recoveryModal.addEventListener('click', event => {
+        if (event.target === recoveryModal) closeRecoveryModal();
+      });
+
+      recoveryRequestForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        setFormBusy(recoveryRequestForm, true, 'Sending recovery link...');
+        try {
+          const result = await callTenantAccess('request_recovery', {
+            slug: document.getElementById('recovery-slug').value.trim().toLowerCase(),
+            email: document.getElementById('recovery-email').value.trim().toLowerCase()
+          });
+          showSuccess(result.message || 'If the details match, a recovery link will be sent shortly.');
+          closeRecoveryModal();
+          recoveryRequestForm.reset();
+        } catch (error) {
+          showError(error.message || 'Recovery request failed.');
+        } finally {
+          setFormBusy(recoveryRequestForm, false);
+        }
+      });
+
+      recoveryResetForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const password = document.getElementById('recovery-new-password').value;
+        const confirmation = document.getElementById('recovery-confirm-password').value;
+        if (password !== confirmation) {
+          showError('The new passwords do not match.');
+          return;
+        }
+        setFormBusy(recoveryResetForm, true, 'Updating password...');
+        try {
+          const result = await callTenantAccess('reset_password', { token: recoveryToken, password });
+          history.replaceState(null, '', 'login.html');
+          showSuccess(result.message || 'Password updated. You can now sign in.');
+          closeRecoveryModal();
+          recoveryResetForm.reset();
+        } catch (error) {
+          showError(error.message || 'Password reset failed.');
+        } finally {
+          setFormBusy(recoveryResetForm, false);
+        }
+      });
+
+      if (recoveryToken) openRecoveryModal(true);
 
       // Handle login submit
       if (loginForm) {

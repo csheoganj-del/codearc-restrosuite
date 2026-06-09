@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const billingDomain = window.RestroSuite && window.RestroSuite.billing;
   const billsDomain = window.RestroSuite && window.RestroSuite.bills;
   const inventoryDomain = window.RestroSuite && window.RestroSuite.inventory;
+  const importsDomain = window.RestroSuite && window.RestroSuite.imports;
   const observabilityDomain = window.RestroSuite && window.RestroSuite.observability;
   const operationsDomain = window.RestroSuite && window.RestroSuite.operations;
   const peopleDomain = window.RestroSuite && window.RestroSuite.people;
@@ -92,6 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     || !billingDomain
     || !billsDomain
     || !inventoryDomain
+    || !importsDomain
     || !observabilityDomain
     || !operationsDomain
     || !peopleDomain
@@ -838,6 +840,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load custom recipes and thresholds
   let customRecipes = (() => { try { return JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {}; } catch (e) { return {}; } })();
   let thresholds = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {}; } catch (e) { return {}; } })();
+  let posPopularityMap = (() => { try { return JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {}; } catch (e) { return {}; } })();
 
   // Menu and inventory start empty — Supabase sync (syncWithSupabase) is the authoritative source.
   // Do NOT pre-populate from localStorage here as it causes a flash of stale/reset data
@@ -845,6 +848,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   let menu = [];
 
   let inventory = {};
+  let inventoryMetadata = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_inventory_metadata'));
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  })();
 
 
   const getMockBills = () => [
@@ -1404,8 +1415,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         dbInv.forEach(row => {
           inventory[row.key] = row.current;
+          const maxStock = Number(row.max_stock);
+          if (Number.isFinite(maxStock) && maxStock > 0) defaultInventory[row.key] = maxStock;
+          inventoryMetadata[row.key] = {
+            label: row.label || inventoryMetadata[row.key]?.label || '',
+            unit: row.unit || inventoryMetadata[row.key]?.unit || 'unit',
+            category: row.category || inventoryMetadata[row.key]?.category || 'food'
+          };
         });
         localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+        localStorage.setItem('doppio_inventory_metadata', JSON.stringify(inventoryMetadata));
         renderInventory();
         checkLowStockAlerts();
       }
@@ -4319,9 +4338,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Calculate dynamic states count for Top stats panels
     let lowCount = 0;
     let emptyCount = 0;
+    const totalTracked = document.getElementById('inv-total-tracked');
+    if (totalTracked) totalTracked.textContent = `${Object.keys(inventory).length} items`;
 
     Object.keys(inventory).forEach(key => {
-      const maxVal = defaultInventory[key];
+      const maxVal = Number(defaultInventory[key]) > 0 ? Number(defaultInventory[key]) : Math.max(Number(inventory[key]) || 0, 1);
       const currentVal = inventory[key];
       const percent = Math.round((currentVal / maxVal) * 100);
       const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
@@ -4658,11 +4679,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function getIngredientCategory(key) {
+    if (inventoryMetadata[key] && inventoryMetadata[key].category) {
+      return inventoryMetadata[key].category;
+    }
     const drinksKeys = ['espresso_shot', 'milk', 'ice', 'sugar_syrup', 'water', 'irish_syrup', 'cream', 'chocolate_syrup', 'frappe_base', 'caramel_syrup', 'hazelnut_syrup', 'ginger_ale', 'vanilla_ice_cream', 'cocoa_powder', 'matcha_powder', 'strawberry_puree', 'vanilla_syrup', 'mango_puree', 'soda', 'mint', 'lemon'];
     return drinksKeys.includes(key) ? 'drinks' : 'food';
   }
 
   function getLabelFromKey(key) {
+    if (inventoryMetadata[key] && inventoryMetadata[key].label) {
+      const unit = inventoryMetadata[key].unit ? ` (${inventoryMetadata[key].unit})` : '';
+      return `${inventoryMetadata[key].label}${unit}`;
+    }
     const map = {
       espresso_shot: 'Espresso Shot (ml)', milk: 'Milk (ml)', ice: 'Ice (g)',
       sugar_syrup: 'Sugar Syrup (ml)', water: 'Water (ml)', irish_syrup: 'Irish Syrup (ml)',
@@ -5979,13 +6007,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         crmData = [];
       }
     } else {
-      crmData = [
-        { name: 'Aniket Sharma', phone: '9823012345', visits: 6, total_spend: 2840, last_visit: new Date().toISOString() },
-        { name: 'Priya Deshmukh', phone: '9130098765', visits: 12, total_spend: 6420, last_visit: new Date().toISOString() },
-        { name: 'Rahul Verma', phone: '8888776655', visits: 2, total_spend: 1150, last_visit: new Date().toISOString() },
-        { name: 'Kunal Sen', phone: '9552147890', visits: 24, total_spend: 12850, last_visit: new Date().toISOString() },
-        { name: 'Aditi Rao', phone: '9372154687', visits: 1, total_spend: 350, last_visit: new Date().toISOString() }
-      ];
+      crmData = [];
       localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
     }
     renderCRMTab();
@@ -12066,6 +12088,246 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   const excelDropzone = document.getElementById('excel-drag-dropzone');
   const excelFileInput = document.getElementById('excel-file-input');
   const excelDropText = document.getElementById('excel-drop-text');
+  const excelImportStatus = document.getElementById('excel-import-status');
+  const downloadImportTemplateBtn = document.getElementById('download-import-template-btn');
+  const loadSampleWorkspaceBtn = document.getElementById('load-sample-workspace-btn');
+
+  function setExcelImportStatus(message, type = '') {
+    if (!excelImportStatus) return;
+    excelImportStatus.textContent = message;
+    excelImportStatus.className = `excel-import-status${type ? ` is-${type}` : ''}`;
+  }
+
+  function csvFromRows(rows) {
+    if (!rows.length) return '';
+    const headers = Object.keys(rows[0]);
+    const escapeCell = value => {
+      const text = String(value === undefined || value === null ? '' : value);
+      return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    return [headers.join(','), ...rows.map(row => headers.map(header => escapeCell(row[header])).join(','))].join('\r\n');
+  }
+
+  function downloadBlob(name, blob) {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+
+  function downloadImportTemplate() {
+    if (!importsDomain || !importsDomain.TEMPLATE_SHEETS) return;
+    if (window.XLSX) {
+      const workbook = XLSX.utils.book_new();
+      Object.entries(importsDomain.TEMPLATE_SHEETS).forEach(([name, rows]) => {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), name);
+      });
+      XLSX.writeFile(workbook, 'RestroSuite_Import_Template.xlsx');
+      setExcelImportStatus('Template downloaded. Fill the existing columns, then upload the workbook.', 'success');
+      return;
+    }
+    Object.entries(importsDomain.TEMPLATE_SHEETS).forEach(([name, rows], index) => {
+      setTimeout(() => downloadBlob(`${name}.csv`, new Blob([csvFromRows(rows)], { type: 'text/csv;charset=utf-8' })), index * 150);
+    });
+    setExcelImportStatus('Excel support is unavailable, so separate CSV templates were downloaded.', 'success');
+  }
+
+  async function parseImportFile(file) {
+    const extension = String(file.name || '').split('.').pop().toLowerCase();
+    if (extension === 'csv') {
+      const sheetName = String(file.name || 'Menu').replace(/\.csv$/i, '');
+      return { [sheetName]: importsDomain.parseCsv(await file.text()) };
+    }
+    if (!window.XLSX) throw new Error('Excel support did not load. Refresh the page or upload one of the CSV templates.');
+    const data = new Uint8Array(await file.arrayBuffer());
+    const workbook = XLSX.read(data, { type: 'array' });
+    return Object.fromEntries(workbook.SheetNames.map(name => [
+      name,
+      XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: '' })
+    ]));
+  }
+
+  function mergeImportedRows(items, incoming, keyOf) {
+    const merged = items.map(item => ({ ...item }));
+    incoming.forEach(item => {
+      const key = keyOf(item);
+      const index = merged.findIndex(existing => keyOf(existing) === key);
+      if (index >= 0) merged[index] = { ...merged[index], ...item };
+      else merged.push(item);
+    });
+    return merged;
+  }
+
+  async function applyStructuredImport(parsed, options = {}) {
+    const timestamp = Date.now();
+    const nextMenu = mergeImportedRows(menu, parsed.menu, item => String(item.name || '').trim().toLowerCase());
+    const nextEmployees = mergeImportedRows(employees, parsed.employees.map(item => ({ ...item, status: 'active' })), item => item.id);
+    const nextCRM = mergeImportedRows(crmData, parsed.customers, item => item.phone);
+    const nextInventory = { ...inventory };
+    const nextDefaultInventory = { ...defaultInventory };
+    const nextInventoryMetadata = { ...inventoryMetadata };
+    const nextThresholds = { ...thresholds };
+    const nextBatches = JSON.parse(JSON.stringify(inventoryBatches));
+    const nextRecipes = { ...customRecipes, ...parsed.recipes };
+
+    parsed.inventory.forEach((item, index) => {
+      nextInventory[item.key] = item.current;
+      nextDefaultInventory[item.key] = item.max;
+      nextInventoryMetadata[item.key] = { label: item.label, unit: item.unit, category: item.category || 'food' };
+      nextThresholds[item.key] = item.threshold;
+      if (item.expiryDate) {
+        nextBatches[item.key] = [{
+          id: `${options.sample ? 'sample' : 'import'}_${item.key}_${timestamp}_${index}`,
+          qty: item.current,
+          expiryDate: item.expiryDate,
+          receivedDate: new Date().toISOString().split('T')[0]
+        }];
+      }
+    });
+
+    if (supabaseClient) {
+      const writes = [];
+      if (parsed.menu.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_menu').upsert(parsed.menu.map(item => ({
+        name: item.name, category: item.category, price: item.price, description: item.description,
+        icon: item.icon, bestseller: item.bestseller, available: item.available, prep_time: item.prepTime
+      })), { onConflict: 'tenant_id,name' }), 'Menu import failed'));
+      if (parsed.inventory.length) {
+        writes.push(requireTenantWrite(supabaseClient.from('doppio_inventory').upsert(parsed.inventory.map(item => ({
+          key: item.key, current: item.current, unit: item.unit, label: item.label,
+          max_stock: item.max, category: item.category || 'food', updated_at: new Date().toISOString()
+        })), { onConflict: 'tenant_id,key' }), 'Inventory import failed'));
+        writes.push(requireTenantWrite(supabaseClient.from('doppio_inventory_thresholds').upsert(parsed.inventory.map(item => ({
+          ingredient_key: item.key, threshold: item.threshold, updated_at: new Date().toISOString()
+        })), { onConflict: 'tenant_id,ingredient_key' }), 'Inventory threshold import failed'));
+        const batches = parsed.inventory.flatMap((item, index) => item.expiryDate ? [{
+          id: `${options.sample ? 'sample' : 'import'}_${item.key}_${timestamp}_${index}`,
+          ingredient_key: item.key, qty: item.current, expiryDate: item.expiryDate,
+          receivedDate: new Date().toISOString().split('T')[0]
+        }] : []);
+        if (batches.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_inventory_batches').upsert(batches, { onConflict: 'tenant_id,id' }), 'Inventory batch import failed'));
+      }
+      const recipes = Object.entries(parsed.recipes).map(([item_name, ingredients]) => ({ item_name, ingredients, updated_at: new Date().toISOString() }));
+      if (recipes.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_custom_recipes').upsert(recipes, { onConflict: 'tenant_id,item_name' }), 'Recipe import failed'));
+      if (parsed.employees.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_employees').upsert(parsed.employees.map(item => ({
+        id: item.id, name: item.name, role: item.role, contact: item.contact, baseSalary: item.baseSalary,
+        shift: item.shift, leaves: item.leaves, status: 'active'
+      })), { onConflict: 'tenant_id,id' }), 'Employee import failed'));
+      if (parsed.customers.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_crm').upsert(parsed.customers.map(item => ({
+        phone: item.phone, name: item.name, visits: item.visits, total_spend: item.total_spend,
+        loyalty_points: item.loyalty_points, notes: item.notes, last_visit: item.last_visit, updated_at: new Date().toISOString()
+      })), { onConflict: 'tenant_id,phone' }), 'Customer import failed'));
+      await Promise.all(writes);
+    }
+
+    menu = nextMenu;
+    employees = nextEmployees;
+    crmData = nextCRM;
+    inventory = nextInventory;
+    Object.assign(defaultInventory, nextDefaultInventory);
+    inventoryMetadata = nextInventoryMetadata;
+    thresholds = nextThresholds;
+    inventoryBatches = nextBatches;
+    customRecipes = nextRecipes;
+    localStorage.setItem('doppio_menu', JSON.stringify(menu));
+    localStorage.setItem('doppio_employees', JSON.stringify(employees));
+    localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
+    localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+    localStorage.setItem('doppio_inventory_defaults', JSON.stringify(defaultInventory));
+    localStorage.setItem('doppio_inventory_metadata', JSON.stringify(inventoryMetadata));
+    localStorage.setItem('doppio_inventory_thresholds', JSON.stringify(thresholds));
+    localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+    localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
+    setVaultData('doppio_menu', menu);
+    renderPOSCategories();
+    renderPOSItems();
+    renderMenuEditor();
+    renderInventory();
+    renderEmployeesTab();
+    renderCRMTab();
+    checkLowStockAlerts();
+    updateAIForecast();
+    broadcastMenuUpdate();
+  }
+
+  function buildSampleImport() {
+    const sheets = JSON.parse(JSON.stringify(importsDomain.TEMPLATE_SHEETS));
+    sheets.Menu.forEach(row => { row.Name = `SAMPLE ${row.Name}`; });
+    sheets.Inventory.forEach(row => {
+      row.IngredientKey = `sample_${row.IngredientKey}`;
+      row.IngredientName = `SAMPLE ${row.IngredientName}`;
+    });
+    sheets.Recipes.forEach(row => {
+      row.MenuItem = `SAMPLE ${row.MenuItem}`;
+      row.IngredientKey = `sample_${row.IngredientKey}`;
+    });
+    sheets.Employees.forEach(row => {
+      row.EmployeeId = `sample_${row.EmployeeId}`;
+      row.Name = `SAMPLE ${row.Name}`;
+    });
+    sheets.Customers.forEach(row => {
+      row.Name = `SAMPLE ${row.Name}`;
+      row.Notes = 'SAMPLE DATA - safe to replace';
+    });
+    return importsDomain.parseImportSheets(sheets);
+  }
+
+  async function addSampleOperationalData() {
+    const now = new Date();
+    const items = [{ name: 'SAMPLE Cappuccino', price: 180, qty: 2 }];
+    const sampleBills = [
+      { orderId: 'SAMPLE-BILL-001', customerName: 'SAMPLE Customer', customerPhone: '9876500001', dateTime: now.toISOString(), items, subtotal: 360, gst: 65, total: 425, paymentMethod: 'UPI' },
+      { orderId: 'SAMPLE-BILL-002', customerName: 'SAMPLE Walk-in', customerPhone: '', dateTime: new Date(now.getTime() - 86400000).toISOString(), items: [{ name: 'SAMPLE Veg Grilled Sandwich', price: 220, qty: 1 }], subtotal: 220, gst: 40, total: 260, paymentMethod: 'Cash' }
+    ];
+    const sampleOrders = [
+      { orderId: 'SAMPLE-QR-001', customerName: 'SAMPLE QR Guest', customerPhone: '9876500002', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'UPI', orderType: 'Dine-In', tableNumber: '2', status: 'Pending Review' },
+      { orderId: 'SAMPLE-KDS-001', customerName: 'SAMPLE Kitchen Guest', customerPhone: '', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'Cash', orderType: 'Takeaway', tableNumber: 'Takeaway', status: 'Accepted' },
+      { orderId: 'SAMPLE-TOKEN-001', customerName: 'SAMPLE Ready Guest', customerPhone: '', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'Card', orderType: 'Takeaway', tableNumber: 'Takeaway', status: 'Ready' },
+      { orderId: 'SAMPLE-ONLINE-001', customerName: 'SAMPLE Online Guest', customerPhone: '9876500003', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'Online', orderType: 'Zomato', tableNumber: 'Online', status: 'Pending Review' }
+    ];
+    if (supabaseClient) {
+      await Promise.all([
+        requireTenantWrite(supabaseClient.from('doppio_bills').upsert(sampleBills, { onConflict: 'tenant_id,orderId' }), 'Sample bills could not be saved'),
+        requireTenantWrite(supabaseClient.from('doppio_pending_orders').upsert(sampleOrders, { onConflict: 'tenant_id,orderId' }), 'Sample orders could not be saved')
+      ]);
+    }
+    bills = mergeImportedRows(bills, sampleBills, item => item.orderId);
+    pendingQrOrders = mergeImportedRows(pendingQrOrders, sampleOrders, item => item.orderId);
+    localStorage.setItem('doppio_bills', JSON.stringify(bills));
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+    renderBills();
+    renderReports();
+    updateHeaderSummaryStats();
+    updateQrOrdersDashboardUI();
+    renderKDSTab();
+    renderTokensTab();
+    renderOnlineOrdersTab();
+  }
+
+  async function loadSampleWorkspace() {
+    if (!confirm('Load clearly labeled SAMPLE data into menu, inventory, recipes, employees and CRM? Existing matching records will be updated, not erased.')) return;
+    try {
+      setExcelImportStatus('Loading sample workspace...');
+      await applyStructuredImport(buildSampleImport(), { sample: true });
+      await addSampleOperationalData();
+      localStorage.setItem('doppio_demo_workspace', 'true');
+      if (loadSampleWorkspaceBtn) loadSampleWorkspaceBtn.textContent = 'Sample Workspace Loaded';
+      setExcelImportStatus('Sample workspace loaded. Every example is labeled SAMPLE.', 'success');
+      SoundEffects.playSuccess();
+    } catch (err) {
+      console.error('Sample workspace failed:', err);
+      setExcelImportStatus(err.message || 'Sample workspace could not be loaded.', 'error');
+      SoundEffects.playRemove();
+    }
+  }
+
+  if (downloadImportTemplateBtn) downloadImportTemplateBtn.addEventListener('click', downloadImportTemplate);
+  if (loadSampleWorkspaceBtn) {
+    if (localStorage.getItem('doppio_demo_workspace') === 'true') loadSampleWorkspaceBtn.textContent = 'Sample Workspace Loaded';
+    loadSampleWorkspaceBtn.addEventListener('click', loadSampleWorkspace);
+  }
 
   if (excelDropzone && excelFileInput) {
     excelDropzone.addEventListener('click', () => excelFileInput.click());
@@ -12098,7 +12360,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     });
   }
 
-  function handleExcelUpload(file) {
+  function handleExcelUploadLegacy(file) {
     if (!file) return;
 
     const reader = new FileReader();
@@ -12275,6 +12537,35 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       }
     };
     reader.readAsArrayBuffer(file);
+  }
+
+  async function handleExcelUpload(file) {
+    if (!file) return;
+    try {
+      setExcelImportStatus(`Validating ${file.name}...`);
+      const sheets = await parseImportFile(file);
+      const parsed = importsDomain.parseImportSheets(sheets);
+      if (parsed.errors.length) {
+        const visibleErrors = parsed.errors.slice(0, 8).join('\n');
+        const remaining = parsed.errors.length > 8 ? `\n...and ${parsed.errors.length - 8} more errors.` : '';
+        throw new Error(`Nothing was imported:\n${visibleErrors}${remaining}`);
+      }
+      const recipeCount = Object.keys(parsed.recipes).length;
+      const total = parsed.menu.length + parsed.inventory.length + recipeCount + parsed.employees.length + parsed.customers.length;
+      if (!total) throw new Error('No supported rows were found. Use sheets named Menu, Inventory, Recipes, Employees or Customers.');
+      await applyStructuredImport(parsed);
+      const summary = `${parsed.menu.length} menu, ${parsed.inventory.length} inventory, ${recipeCount} recipes, ${parsed.employees.length} employees and ${parsed.customers.length} customers`;
+      const warnings = parsed.warnings.length ? ` Warnings: ${parsed.warnings.slice(0, 3).join(' ')}` : '';
+      setExcelImportStatus(`Published ${summary}.${supabaseClient ? ' Cloud sync complete.' : ' Saved on this device; cloud is not connected.'}${warnings}`, 'success');
+      if (excelDropText) excelDropText.textContent = file.name;
+      SoundEffects.playSuccess();
+    } catch (err) {
+      console.error('Excel import failed:', err);
+      setExcelImportStatus(err.message || 'Check the spreadsheet structure and try again.', 'error');
+      SoundEffects.playRemove();
+    } finally {
+      if (excelFileInput) excelFileInput.value = '';
+    }
   }
 
   // ==========================================

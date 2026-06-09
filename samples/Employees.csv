@@ -1,0 +1,2 @@
+EmployeeId,Name,Role,Contact,BaseSalary,Shift,CasualLeaveBalance,SickLeaveBalance
+emp_001,Sample Cashier,cashier,9876543210,24000,Morning Shift,15,10

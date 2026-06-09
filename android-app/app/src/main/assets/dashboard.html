@@ -294,15 +294,15 @@
       <!-- Card top: step badge + close -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
         <div id="tour-step-badge">
-          <span id="tour-step-icon" style="font-size:11px;">✨</span>
+          <span id="tour-step-icon" style="font-size:11px;">1/1</span>
           <span id="tour-step-label">Welcome</span>
         </div>
-        <button id="tour-skip-btn" onclick="window.endOnboardingTour()" title="Skip tour">×</button>
+        <button id="tour-skip-btn" onclick="window.endOnboardingTour()" title="Skip tour" aria-label="Skip tour">&times;</button>
       </div>
 
       <!-- Icon + Title -->
       <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px;">
-        <div id="tour-feature-icon">🏪</div>
+        <div id="tour-feature-icon"><i class="fa-solid fa-compass"></i></div>
         <div>
           <h3 id="tour-title" style="margin:0 0 4px; font-size:17px; font-weight:800; line-height:1.2;">Welcome to RestoSuite</h3>
           <p id="tour-subtitle" style="margin:0; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; opacity:0.8;">Your Complete Restaurant OS</p>
@@ -313,14 +313,17 @@
       <p id="tour-desc" style="font-size:13px; line-height:1.65; margin:0 0 20px; min-height:56px; opacity:0.9;">
         Let's take a quick tour of your dashboard. We'll walk through every feature so you can get started confidently. Takes about 60 seconds.
       </p>
+      <div id="tour-action" class="tour-first-action">
+        <strong>Start here:</strong> Complete your business profile, import your menu, and run one test order.
+      </div>
 
       <!-- Progress dots -->
       <div id="tour-dots" style="display:flex; gap:6px; align-items:center; margin-bottom:20px; flex-wrap:wrap;"></div>
 
       <!-- Navigation buttons -->
       <div style="display:flex; gap:10px; align-items:center;">
-        <button id="tour-prev-btn" onclick="window.tourNavigate(-1)">← Prev</button>
-        <button id="tour-next-btn" onclick="window.tourNavigate(1)">Next →</button>
+        <button id="tour-prev-btn" onclick="window.tourNavigate(-1)">Previous</button>
+        <button id="tour-next-btn" onclick="window.tourNavigate(1)">Next</button>
       </div>
 
       <!-- Skip text -->
@@ -330,7 +333,7 @@
           font-size:11px; cursor:pointer; font-family:'Inter',sans-serif;
           transition:color 0.2s;
         " onmouseover="this.style.color='var(--accent-caramel)'" onmouseout="this.style.color='var(--text-muted)'">
-          Skip tour — I'll explore on my own
+          Skip tour - I will use Help &amp; Setup later
         </button>
       </div>
     </div>
@@ -489,7 +492,7 @@
 
       <div class="sidebar-footer">
         <button class="profile-sidebar-btn" id="open-profile-btn"><i class="fa-solid fa-store"></i> Business Profile</button>
-        <button class="profile-sidebar-btn client-only" onclick="window.startOnboardingTour && window.startOnboardingTour()" style="background:rgba(252,128,25,0.08); border:1px dashed rgba(252,128,25,0.25); color:var(--accent-caramel); margin-top:6px;" title="Replay the feature tour"><i class="fa-solid fa-compass"></i> Feature Tour</button>
+        <button class="profile-sidebar-btn client-only" id="open-product-guide-btn" onclick="window.openProductGuide && window.openProductGuide()" style="background:rgba(252,128,25,0.08); border:1px solid rgba(252,128,25,0.22); color:var(--accent-caramel); margin-top:6px;" title="Open setup checklist and feature guide"><i class="fa-solid fa-circle-question"></i> Help &amp; Setup</button>
         <a href="login.html" id="sidebar-logout-btn" class="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
       </div>
     </aside>
@@ -1008,6 +1011,17 @@
                   <span style="font-size: 12px; font-weight: 700; color: var(--primary-brand);" id="excel-drop-text">Drag & Drop Excel here or Click to Browse</span>
                   <span style="font-size: 9.5px; color: var(--text-muted); margin-top: 4px;">Compatible with .xlsx, .xls, .csv recipe formats</span>
                   <input type="file" id="excel-file-input" style="display: none;" accept=".xlsx, .xls, .csv">
+                </div>
+                <div class="excel-setup-actions">
+                  <button type="button" class="btn btn-secondary" id="download-import-template-btn">
+                    <i class="fa-solid fa-download"></i> Download Excel Template
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="load-sample-workspace-btn">
+                    <i class="fa-solid fa-flask"></i> Load Sample Workspace
+                  </button>
+                </div>
+                <div id="excel-import-status" class="excel-import-status" aria-live="polite">
+                  <strong>Workbook sheets:</strong> Menu, Inventory, Recipes, Employees, Customers.
                 </div>
               </div>
 
@@ -2038,6 +2052,14 @@
                   </div>
                   <span class="growth-pill">live</span>
                 </div>
+              </div>
+              <div class="superadmin-demo-client">
+                <span class="demo-data-badge">SAMPLE DATA</span>
+                <div>
+                  <strong>Sunrise Bistro - illustrative client readiness</strong>
+                  <span>24 menu items · 38 stock items · 12 recipes · 128 bills · 6 staff accounts</span>
+                </div>
+                <span class="growth-pill">demo only</span>
               </div>
             </div>
 
@@ -3666,6 +3688,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
   <script src="src/dashboard/billing.js?v=2.0"></script>
   <script src="src/dashboard/bills.js?v=2.0"></script>
   <script src="src/dashboard/inventory.js?v=2.0"></script>
+  <script src="src/dashboard/imports.js?v=2.0"></script>
   <script src="src/dashboard/operations.js?v=2.0"></script>
   <script src="src/dashboard/observability.js?v=2.0"></script>
   <script src="src/dashboard/people.js?v=2.0"></script>
