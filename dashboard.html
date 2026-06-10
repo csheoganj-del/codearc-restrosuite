@@ -844,7 +844,7 @@
             <!-- Two Column Live Dashboard Workspace -->
             <div class="reports-columns" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; width: 100%;">
               
-              <!-- Left Column: Visual Tables Map Grid -->
+              <!-- Left Column: Visual Tables Map Grid & QR Codes -->
               <div class="report-panel" style="padding: 24px; border-radius: 18px; display: flex; flex-direction: column; gap: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px;">
                   <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin: 0; font-weight: 700;"><i class="fa-solid fa-table-cells"></i> Active Tables Map</h3>
@@ -854,6 +854,22 @@
                 <!-- Live Tables Grid -->
                 <div class="tables-map-grid" id="tables-map-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                   <!-- Injected dynamically in JS (6 tables) -->
+                </div>
+                
+                <!-- QR Code Display Area -->
+                <div id="qr-code-display-area" style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(28, 28, 28,0.08); display: none;">
+                  <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px;"><i class="fa-solid fa-qrcode"></i> Table QR Code</h4>
+                  <div style="display: flex; gap: 16px; align-items: flex-start;">
+                    <div id="qr-code-container" style="padding: 12px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06);"></div>
+                    <div style="flex: 1;">
+                      <p id="qr-code-table-label" style="font-weight: 600; margin-bottom: 8px; font-size: 13px;"></p>
+                      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 12px;">Customers can scan this QR to order directly</p>
+                      <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-primary" id="print-qr-btn" style="padding: 8px 16px; font-size: 12px;"><i class="fa-solid fa-print"></i> Print QR</button>
+                        <button type="button" class="btn btn-secondary" id="close-qr-btn" style="padding: 8px 16px; font-size: 12px;"><i class="fa-solid fa-xmark"></i> Close</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -889,7 +905,7 @@
                 <div class="bills-stat-info">
                   <span class="bills-stat-title">Daily Sales Turnover</span>
                   <span class="bills-stat-val" id="bills-revenue-card">₹0.00</span>
-                  <span class="bills-stat-trend">↑ +14% vs. Yesterday</span>
+                  <span class="bills-stat-trend" id="bills-trend-card">Calculating...</span>
                 </div>
               </div>
               <div class="bills-stat-card">
