@@ -841,6 +841,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let customRecipes = (() => { try { return JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {}; } catch (e) { return {}; } })();
   let thresholds = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {}; } catch (e) { return {}; } })();
   let posPopularityMap = (() => { try { return JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {}; } catch (e) { return {}; } })();
+  // Discount state
+  let discountType = localStorage.getItem('doppio_discount_type') || 'flat';
+  let discountValue = parseFloat(localStorage.getItem('doppio_discount_value')) || 0;
 
   // Menu and inventory start empty — Supabase sync (syncWithSupabase) is the authoritative source.
   // Do NOT pre-populate from localStorage here as it causes a flash of stale/reset data
@@ -941,7 +944,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     passcodeLockEnabled: false,
     crmEnabled: true,
     taxEnabled: true,
-    soundEnabled: false
+    soundEnabled: false,
+    numberOfTables: 6
   };
   if (businessProfile.crmEnabled === undefined) businessProfile.crmEnabled = true;
   if (businessProfile.taxEnabled === undefined) businessProfile.taxEnabled = true;
@@ -957,6 +961,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (businessProfile.whatsappGatewayEnabled === undefined) businessProfile.whatsappGatewayEnabled = false;
   if (businessProfile.whatsappGatewayToken === undefined) businessProfile.whatsappGatewayToken = '';
   if (businessProfile.collapseSidebar === undefined) businessProfile.collapseSidebar = false;
+  if (businessProfile.numberOfTables === undefined) businessProfile.numberOfTables = 6;
   document.body.classList.toggle('sidebar-collapsed', businessProfile.collapseSidebar === true);
 
   // ==========================================
@@ -1004,14 +1009,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_table_carts'));
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        for (let i = 1; i <= 6; i++) {
+        for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
           if (!Array.isArray(parsed[i])) parsed[i] = [];
         }
         return parsed;
       }
-      return { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+      const initial = {};
+      for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+        initial[i] = [];
+      }
+      return initial;
     } catch (e) {
-      return { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+      const initial = {};
+      for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+        initial[i] = [];
+      }
+      return initial;
     }
   })();
 
@@ -1158,6 +1171,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         syncOfflineBills();
         setupSupabaseRealtime();
+
+        // Refresh KDS every 60 seconds to update timers
+        setInterval(() => {
+          if (typeof renderKDSTab === 'function') renderKDSTab();
+        }, 60000);
       } catch (err) {
         console.error("Supabase failed:", err);
       }
@@ -1483,8 +1501,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (dbPending) {
           if (dbPending.length === 0) {
             pendingQrOrders = [];
-            // Reset tables 1-6 to vacant default carts
-            for (let i = 1; i <= 6; i++) {
+            // Reset tables 1-N to vacant default carts
+            for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
               tableCarts[i] = [];
               tablesState[i] = "VACANT";
             }
@@ -1520,7 +1538,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const localMap = new Map(pendingQrOrders.map(o => [o.orderId, o]));
 
             // First reset table status to Vacant, then let database state overwrite
-            for (let i = 1; i <= 6; i++) {
+            for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
               tablesState[i] = "VACANT";
               tableCarts[i] = [];
             }
@@ -1528,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             parsedPending.forEach(p => {
               if (p.status === 'DineIn Active') {
                 const tableId = parseInt(p.tableNumber);
-                if (!isNaN(tableId) && tableId >= 1 && tableId <= 6) {
+                if (!isNaN(tableId) && tableId >= 1 && tableId <= (businessProfile.numberOfTables || 6)) {
                   tableCarts[tableId] = p.items;
                   tablesState[tableId] = "ORDERING";
                 }
@@ -1590,6 +1608,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             shiftHistory = Array.from(localMap.values()).sort((a, b) => new Date(b.openedAt) - new Date(a.openedAt));
             localStorage.setItem('doppio_shifts_local', JSON.stringify(shiftHistory));
+            
+            // Set activeShift to the first OPEN shift from DB
+            const openShiftFromDb = dbShifts.find(s => s.status === 'OPEN');
+            if (openShiftFromDb) {
+              activeShift = {
+                shiftId: openShiftFromDb.shiftId,
+                cashierName: openShiftFromDb.cashierName,
+                openedAt: openShiftFromDb.openedAt,
+                closedAt: openShiftFromDb.closedAt,
+                openingFloat: parseFloat(openShiftFromDb.openingFloat || 0),
+                expectedCash: parseFloat(openShiftFromDb.expectedCash || 0),
+                actualCash: parseFloat(openShiftFromDb.actualCash || 0),
+                variance: parseFloat(openShiftFromDb.variance || 0),
+                totalSalesCash: parseFloat(openShiftFromDb.totalSalesCash || 0),
+                totalSalesUpi: parseFloat(openShiftFromDb.totalSalesUpi || 0),
+                totalSalesCard: parseFloat(openShiftFromDb.totalSalesCard || 0),
+                totalPayouts: parseFloat(openShiftFromDb.totalPayouts || 0),
+                totalSafeDrops: parseFloat(openShiftFromDb.totalSafeDrops || 0),
+                status: openShiftFromDb.status,
+                notes: openShiftFromDb.notes || ''
+              };
+              localStorage.setItem('doppio_current_shift', JSON.stringify(activeShift));
+            }
           }
         }
       } catch (err) {
@@ -1924,13 +1965,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             paymentMethod: newOrder.paymentMethod,
             orderType: newOrder.orderType,
             tableNumber: newOrder.tableNumber,
-            status: newOrder.status
+            status: newOrder.status,
+            priority: newOrder.priority || 'normal'
           };
 
           // 1. Check if it's a Dine-In Active session cart sync
           if (orderObj.status === 'DineIn Active') {
             const tableId = parseInt(orderObj.tableNumber);
-            if (!isNaN(tableId) && tableId >= 1 && tableId <= 6) {
+            if (!isNaN(tableId) && tableId >= 1 && tableId <= (businessProfile.numberOfTables || 6)) {
               tableCarts[tableId] = items;
               tablesState[tableId] = "ORDERING";
               localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
@@ -2241,11 +2283,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       else if (tabId === 'editor-tab') {
         tabSubtitle.textContent = 'Manage Drink & Food Items';
-        frameTask(renderMenuEditor);
+        frameTask(() => { renderMenuEditor(); renderGlobalModifiersList(); renderSchedulingOverview(); });
       }
       else if (tabId === 'crm-tab') {
         tabSubtitle.textContent = 'Customer Relationship & Loyalty Ledger';
-        frameTask(renderCRMTab);
+        frameTask(() => { renderCRMTab(); renderFeedbackTable(); loadLoyaltyRulesUI(); });
       }
       else if (tabId === 'tax-tab') {
         tabSubtitle.textContent = 'Central & State Tax Ledger Filing Hub';
@@ -2253,7 +2295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       else if (tabId === 'employees-tab') {
         tabSubtitle.textContent = 'India Payroll, Shifts & Leaves';
-        frameTask(renderEmployeesTab);
+        frameTask(() => { renderEmployeesTab(); renderBulkPayrollTable(); renderPayrollHistory(); });
       }
       else if (tabId === 'growth-hub-tab') {
         tabSubtitle.textContent = 'Onboarding, support, billing, reservations, procurement, offers, refunds, devices, backups, and launch operations';
@@ -2261,7 +2303,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       else if (tabId === 'online-tab') {
         tabSubtitle.textContent = 'Online Delivery Channel Integration Center';
-        frameTask(renderOnlineOrdersTab);
+        frameTask(async () => {
+          await loadOnlineIntegrationsConfig();
+          renderOnlineOrdersTab();
+        });
       }
       else if (tabId === 'kds-tab') {
         tabSubtitle.textContent = 'Kitchen Cooking Live Preparation Board';
@@ -2296,16 +2341,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (headerBills) headerBills.textContent = `${todayBills.length} Bills`;
   }
 
+  function getTodayKey() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  }
+
   function generateOrderNumber() {
     const input = document.getElementById('order-num');
-    if (input) {
-      const nextNum = bills.length === 0 ? 1001 : (1000 + bills.length + 1);
-      input.value = 'DO-' + nextNum;
+    if (!input) return;
 
-      const badge = document.getElementById('cart-order-badge');
-      if (badge) {
-        badge.textContent = 'Order: DO-' + nextNum;
-      }
+    const todayKey = getTodayKey();
+    const storedData = localStorage.getItem(`doppio_token_counter_${activeTenantId}`);
+    let tokenData = storedData ? JSON.parse(storedData) : { date: null, count: 0 };
+
+    // Reset if date has changed
+    if (tokenData.date !== todayKey) {
+      tokenData = { date: todayKey, count: 0 };
+    }
+
+    tokenData.count += 1;
+    localStorage.setItem(`doppio_token_counter_${activeTenantId}`, JSON.stringify(tokenData));
+
+    const nextNum = tokenData.count;
+    input.value = 'DO-' + nextNum;
+
+    const badge = document.getElementById('cart-order-badge');
+    if (badge) {
+      badge.textContent = 'Order: DO-' + nextNum;
     }
   }
 
@@ -2315,9 +2377,113 @@ document.addEventListener('DOMContentLoaded', async () => {
   const posSearch = document.getElementById('pos-search');
   const posCategories = document.getElementById('pos-categories');
   const posItemsGrid = document.getElementById('pos-items-grid');
+  const scanBtn = document.getElementById('scan-barcode-btn');
+  const scannerModal = document.getElementById('scanner-modal');
+  const closeScannerBtn = document.getElementById('close-scanner-btn');
+  const scannerVideo = document.getElementById('scanner-video');
+  const scannerCanvas = document.getElementById('scanner-canvas');
+  const scannerStatus = document.getElementById('scanner-status');
+  let scannerStream = null;
+  let scanInterval = null;
 
   let activePOSCategory = 'ALL';
   let posSearchQuery = '';
+
+  // Scanner functionality
+  async function startScanner() {
+    try {
+      scannerStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      scannerVideo.srcObject = scannerStream;
+      await scannerVideo.play();
+      scannerStatus.textContent = 'Camera ready. Point at barcode/QR.';
+      
+      // Start scanning loop
+      scanInterval = setInterval(scanFrame, 500);
+    } catch (error) {
+      console.error('Scanner error:', error);
+      scannerStatus.textContent = 'Failed to access camera: ' + error.message;
+    }
+  }
+
+  function stopScanner() {
+    if (scanInterval) {
+      clearInterval(scanInterval);
+      scanInterval = null;
+    }
+    if (scannerStream) {
+      scannerStream.getTracks().forEach(track => track.stop());
+      scannerStream = null;
+    }
+    scannerModal.style.display = 'none';
+  }
+
+  async function scanFrame() {
+    if (!scannerVideo || !scannerVideo.videoWidth) return;
+    
+    const canvas = scannerCanvas;
+    const ctx = canvas.getContext('2d');
+    canvas.width = scannerVideo.videoWidth;
+    canvas.height = scannerVideo.videoHeight;
+    ctx.drawImage(scannerVideo, 0, 0, canvas.width, canvas.height);
+    
+    // Try BarcodeDetector API first
+    if ('BarcodeDetector' in window) {
+      try {
+        const detector = new BarcodeDetector();
+        const [barcode] = await detector.detect(canvas);
+        if (barcode) {
+          handleScanResult(barcode.rawValue);
+        }
+      } catch (e) {
+        // Fallback to just searching by name if detection fails
+      }
+    }
+  }
+
+  function handleScanResult(code) {
+    scannerStatus.textContent = 'Scanned: ' + code;
+    // Find item by sku or name
+    let item = menu.find(i => i.sku === code);
+    if (!item) {
+      item = menu.find(i => i.name.toLowerCase().includes(code.toLowerCase()));
+    }
+    if (item) {
+      addDefaultToCart(item);
+      // Play sound
+      SoundEffects.playPop();
+      // Close scanner
+      stopScanner();
+    } else {
+      scannerStatus.textContent = 'Item not found: ' + code;
+      // Clear status after 2 seconds
+      setTimeout(() => {
+        scannerStatus.textContent = 'Camera ready. Point at barcode/QR.';
+      }, 2000);
+    }
+  }
+
+  // Scan button listener
+  if (scanBtn) {
+    scanBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      scannerModal.style.display = 'flex';
+      startScanner();
+    });
+  }
+
+  // Close scanner listeners
+  if (closeScannerBtn) {
+    closeScannerBtn.addEventListener('click', stopScanner);
+  }
+  if (scannerModal) {
+    scannerModal.addEventListener('click', (e) => {
+      if (e.target === scannerModal) {
+        stopScanner();
+      }
+    });
+  }
 
   // Focus search indicator keyboard listener
   document.addEventListener('keydown', (e) => {
@@ -2390,14 +2556,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }).join('');
   }
 
+  // Check if an item is currently available based on scheduling
+  function isItemScheduledAvailable(item) {
+    if (!item.scheduling || !item.scheduling.enabled) return true;
+    
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+    
+    // Check if today is an available day
+    if (!item.scheduling.days.includes(currentDay)) return false;
+    
+    const { startTime, endTime } = item.scheduling;
+    if (!startTime || !endTime) return true;
+    
+    // Check time range
+    if (startTime <= endTime) {
+      return currentTime >= startTime && currentTime <= endTime;
+    } else {
+      // Overnight range (e.g., 22:00 - 02:00)
+      return currentTime >= startTime || currentTime <= endTime;
+    }
+  }
+
   function renderPOSItems() {
     if (!posItemsGrid) return;
+    posItemsGrid.innerHTML = '';
     const normalizedSearch = posSearchQuery.trim().toLowerCase();
     const filteredItems = menu.filter(item => {
       const matchesCategory = activePOSCategory === 'ALL' || item.category === activePOSCategory;
       const matchesSearch = !normalizedSearch
         || (item.name && item.name.toLowerCase().includes(normalizedSearch))
         || (item.description && item.description.toLowerCase().includes(normalizedSearch));
+      const isAvailable = item.available !== false && isItemScheduledAvailable(item);
       return matchesCategory && matchesSearch;
     });
 
@@ -2422,32 +2613,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     filteredItems.forEach(item => {
       // Find matching items in cart to calculate quick badges
       const cartCount = cart.filter(i => i.name === item.name).reduce((sum, i) => sum + i.qty, 0);
+      const isAvailable = item.available !== false;
 
       const card = document.createElement('div');
-      card.className = `pos-item-card ${cartCount > 0 ? 'selected-in-cart' : ''}`;
-      card.setAttribute('tabindex', '0');
+      card.className = `pos-item-card ${cartCount > 0 ? 'selected-in-cart' : ''} ${!isAvailable ? 'unavailable' : ''}`;
+      card.setAttribute('tabindex', isAvailable ? '0' : '-1');
+      card.setAttribute('aria-disabled', !isAvailable);
 
       const descText = item.description ? `<div class="pos-item-desc">${escHtml(item.description)}</div>` : '';
+      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : `<div style="font-size:40px; color:var(--accent-caramel); margin-bottom:8px;">${item.icon || '☕'}</div>`;
       card.innerHTML = `
         <div class="pos-item-info">
-          <div class="pos-item-title" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
+          ${imageHTML}
+          <div class="pos-item-title" title="${escHtml(item.name)}">${escHtml(item.name)}${!isAvailable ? ' <span style="color:#e74c3c;font-size:0.7em;font-weight:bold;">(OUT OF STOCK)</span>' : ''}</div>
           ${descText}
           <span class="pos-item-price">₹${item.price}</span>
         </div>
-        <button type="button" class="pos-customize-btn" aria-label="Customize ${escHtml(item.name)}" title="Customize item">
+        <button type="button" class="pos-customize-btn" aria-label="Customize ${escHtml(item.name)}" title="Customize item" ${!isAvailable ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
           <i class="fa-solid fa-sliders"></i>
         </button>
       `;
 
-      // Click card to add directly to cart (pass DOM ref for flash animation)
-      card.addEventListener('click', (event) => {
-        if (event.target.closest('.pos-customize-btn')) return;
-        addDefaultToCart(item, card);
-      });
-      card.querySelector('.pos-customize-btn').addEventListener('click', (event) => {
-        event.stopPropagation();
-        openCustomizationModal(item);
-      });
+      if (isAvailable) {
+        // Click card to add directly to cart (pass DOM ref for flash animation)
+        card.addEventListener('click', (event) => {
+          if (event.target.closest('.pos-customize-btn')) return;
+          addDefaultToCart(item, card);
+        });
+        const customizeBtn = card.querySelector('.pos-customize-btn');
+        if (customizeBtn) {
+          customizeBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openCustomizationModal(item);
+          });
+        }
+      }
 
       posItemsGrid.appendChild(card);
     });
@@ -2472,6 +2672,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  
+  // Refresh POS menu every minute for time-based scheduling
+  setInterval(() => {
+    renderPOSItems();
+  }, 60000);
 
   // ==========================================
   // 5. TOUCH CUSTOMIZATION DRAWER POPUP LOGIC
@@ -2491,89 +2696,127 @@ document.addEventListener('DOMContentLoaded', async () => {
     titleIcon.style.cssText = 'font-size:20px; color:var(--accent-caramel); margin-right:8px;';
     custModalTitle.replaceChildren(titleIcon, document.createTextNode(`Customize ${item.name}`));
 
-    // Reset selections
-    selectedSizeOpt = 'Small';
-    selectedSugarOpt = 'Regular';
-    selectedIceOpt = 'Regular';
+    // Reset notes
     custNotesInput.value = '';
-
-    document.getElementById('addon-shot').checked = false;
-    document.getElementById('addon-drizzle').checked = false;
-    document.getElementById('addon-cream').checked = false;
-
-    // Reset UI Pills active states
-    resetPillsSelection('cust-size-row', 'Small');
-    resetPillsSelection('cust-sugar-row', 'Regular');
-    resetPillsSelection('cust-ice-row', 'Regular');
+    
+    // Render modifiers
+    const modifiersContainer = document.getElementById('cust-modifiers-container');
+    modifiersContainer.innerHTML = '';
+    
+    if (item.modifiers && item.modifiers.length > 0) {
+      item.modifiers.forEach((modGroup, groupIndex) => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'cust-options-section';
+        
+        const groupTitle = document.createElement('h4');
+        groupTitle.textContent = modGroup.name;
+        groupEl.appendChild(groupTitle);
+        
+        // Decide if it's single-select or multi-select
+        const isMulti = modGroup.max > 1;
+        
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = isMulti ? 'cust-checkboxes' : 'cust-pills-row';
+        optionsContainer.dataset.groupIndex = groupIndex;
+        optionsContainer.dataset.groupName = modGroup.name;
+        optionsContainer.dataset.groupMin = modGroup.min;
+        optionsContainer.dataset.groupMax = modGroup.max;
+        
+        modGroup.options.forEach((opt, optIndex) => {
+          if (isMulti) {
+            const checkboxItem = document.createElement('div');
+            checkboxItem.className = 'cust-checkbox-item';
+            
+            const label = document.createElement('label');
+            label.htmlFor = `cust-mod-${groupIndex}-${optIndex}`;
+            label.textContent = `${opt.name} (+₹${opt.price})`;
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `cust-mod-${groupIndex}-${optIndex}`;
+            checkbox.dataset.optionName = opt.name;
+            checkbox.dataset.optionPrice = opt.price;
+            checkbox.style.cssText = 'width: 16px; height: 16px; accent-color: var(--accent-caramel);';
+            
+            checkboxItem.appendChild(label);
+            checkboxItem.appendChild(checkbox);
+            optionsContainer.appendChild(checkboxItem);
+          } else {
+            const pill = document.createElement('span');
+            pill.className = 'cust-pill-opt';
+            if (optIndex === 0) pill.classList.add('active');
+            pill.textContent = `${opt.name} (+₹${opt.price})`;
+            pill.dataset.optionName = opt.name;
+            pill.dataset.optionPrice = opt.price;
+            
+            pill.addEventListener('click', () => {
+              optionsContainer.querySelectorAll('.cust-pill-opt').forEach(p => p.classList.remove('active'));
+              pill.classList.add('active');
+            });
+            
+            optionsContainer.appendChild(pill);
+          }
+        });
+        
+        groupEl.appendChild(optionsContainer);
+        modifiersContainer.appendChild(groupEl);
+      });
+    } else {
+      const noMods = document.createElement('div');
+      noMods.textContent = 'No customizations available for this item.';
+      noMods.style.cssText = 'padding: 10px; color: var(--text-muted); font-style: italic;';
+      modifiersContainer.appendChild(noMods);
+    }
 
     customModal.classList.add('active');
   }
 
-  function resetPillsSelection(rowId, defaultVal) {
-    const container = document.getElementById(rowId);
-    if (!container) return;
-    container.querySelectorAll('.cust-pill-opt').forEach(pill => {
-      pill.classList.remove('active');
-      if (pill.innerText.includes(defaultVal)) pill.classList.add('active');
-    });
-  }
-
-  // Listen to visual pills adjustments in Customize drawer
-  setupPillListeners('cust-size-row', (val) => { selectedSizeOpt = val; });
-  setupPillListeners('cust-sugar-row', (val) => { selectedSugarOpt = val; });
-  setupPillListeners('cust-ice-row', (val) => { selectedIceOpt = val; });
-
-  function setupPillListeners(rowId, callback) {
-    const container = document.getElementById(rowId);
-    if (!container) return;
-    container.addEventListener('click', (e) => {
-      const pill = e.target.closest('.cust-pill-opt');
-      if (pill) {
-        container.querySelectorAll('.cust-pill-opt').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        // Parse the option value
-        const option = pill.getAttribute('data-size') || pill.getAttribute('data-sugar') || pill.getAttribute('data-ice');
-        callback(option);
-      }
-    });
-  }
-
-  if (closeCustModal) closeCustModal.addEventListener('click', () => customModal.classList.remove('active'));
-  if (cancelCustBtn) cancelCustBtn.addEventListener('click', () => customModal.classList.remove('active'));
-
+  // Listen to confirm button in customization modal
   if (confirmCustBtn) {
     confirmCustBtn.addEventListener('click', () => {
       const itemName = document.getElementById('cust-target-item-name').value;
       const baseItem = menu.find(i => i.name === itemName);
       if (!baseItem) return;
 
-      const extraShot = document.getElementById('addon-shot').checked;
-      const drizzle = document.getElementById('addon-drizzle').checked;
-      const whip = document.getElementById('addon-cream').checked;
       const notes = custNotesInput.value.trim();
-
-      // Custom price calculations based on selections
+      
       let finalPrice = baseItem.price;
-      if (selectedSizeOpt === 'Medium') finalPrice += 30;
-      if (selectedSizeOpt === 'Large') finalPrice += 60;
-
-      let toppings = [];
-      if (extraShot) { finalPrice += 40; toppings.push('Extra Shot'); }
-      if (drizzle) { finalPrice += 20; toppings.push('Caramel Drizzle'); }
-      if (whip) { finalPrice += 30; toppings.push('Whipped Cream'); }
+      const selectedModifiers = [];
+      const modifiersContainer = document.getElementById('cust-modifiers-container');
+      
+      modifiersContainer.querySelectorAll('.cust-options-section').forEach(section => {
+        const optionsContainer = section.querySelector('.cust-pills-row, .cust-checkboxes');
+        const groupName = optionsContainer.dataset.groupName;
+        const isMulti = optionsContainer.classList.contains('cust-checkboxes');
+        
+        if (isMulti) {
+          const checkedBoxes = optionsContainer.querySelectorAll('input[type="checkbox"]:checked');
+          checkedBoxes.forEach(checkbox => {
+            const optName = checkbox.dataset.optionName;
+            const optPrice = parseFloat(checkbox.dataset.optionPrice) || 0;
+            finalPrice += optPrice;
+            selectedModifiers.push(`${groupName}: ${optName}`);
+          });
+        } else {
+          const activePill = optionsContainer.querySelector('.cust-pill-opt.active');
+          if (activePill) {
+            const optName = activePill.dataset.optionName;
+            const optPrice = parseFloat(activePill.dataset.optionPrice) || 0;
+            finalPrice += optPrice;
+            selectedModifiers.push(`${groupName}: ${optName}`);
+          }
+        }
+      });
 
       // Compose a composite unique key for this customized item
-      const compositeKey = `${itemName}_${selectedSizeOpt}_Sugar:${selectedSugarOpt}_Ice:${selectedIceOpt}_Addons:${toppings.join(',')}_Notes:${notes}`;
+      const compositeKey = `${itemName}_Mods:${selectedModifiers.join('|')}_Notes:${notes}`;
 
       const cartItem = {
         name: baseItem.name,
         key: compositeKey,
         basePrice: baseItem.price,
         price: finalPrice,
-        size: selectedSizeOpt,
-        sugar: selectedSugarOpt,
-        ice: selectedIceOpt,
-        toppings: toppings,
+        modifiers: selectedModifiers,
         notes: notes,
         icon: baseItem.icon,
         qty: 1
@@ -2584,10 +2827,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  if (closeCustModal) closeCustModal.addEventListener('click', () => customModal.classList.remove('active'));
+  if (cancelCustBtn) cancelCustBtn.addEventListener('click', () => customModal.classList.remove('active'));
+
   // Quick default add mapping
   function addDefaultToCart(menuItem, sourceCardEl) {
     SoundEffects.playPop();
-    const compositeKey = `${menuItem.name}_Small_Sugar:Regular_Ice:Regular_Addons:_Notes:`;
+    const compositeKey = `${menuItem.name}_Mods:_Notes:`;
     const existing = cart.find(item => item.key === compositeKey);
     if (existing) {
       existing.qty += 1;
@@ -2597,10 +2843,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         key: compositeKey,
         basePrice: menuItem.price,
         price: menuItem.price,
-        size: 'Small',
-        sugar: 'Regular',
-        ice: 'Regular',
-        toppings: [],
+        modifiers: [],
         notes: '',
         icon: menuItem.icon,
         qty: 1
@@ -2665,6 +2908,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Toggling Priority options
+  let activePriority = 'normal';
+  const priorityBtns = document.querySelectorAll('.priority-btn');
+  priorityBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      priorityBtns.forEach(b => {
+        b.classList.remove('active');
+        if (b.getAttribute('data-priority') === 'normal') {
+          b.style.borderColor = '#f39c12';
+          b.style.backgroundColor = 'rgba(243,156,18,0.1)';
+          b.style.color = '#f39c12';
+        } else {
+          b.style.borderColor = 'rgba(231,76,60,0.3)';
+          b.style.backgroundColor = 'rgba(231,76,60,0.05)';
+          b.style.color = 'rgba(231,76,60,0.7)';
+        }
+      });
+      btn.classList.add('active');
+      activePriority = btn.getAttribute('data-priority');
+      if (activePriority === 'urgent') {
+        btn.style.borderColor = '#e74c3c';
+        btn.style.backgroundColor = 'rgba(231,76,60,0.15)';
+        btn.style.color = '#e74c3c';
+      } else {
+        btn.style.borderColor = '#f39c12';
+        btn.style.backgroundColor = 'rgba(243,156,18,0.15)';
+        btn.style.color = '#f39c12';
+      }
+      SoundEffects.playClick();
+    });
+  });
+
   // ==========================================
   // 6. DETAILED TOUCH CART PANEL RENDERING
   // ==========================================
@@ -2676,10 +2951,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateCartTotalsOnly() {
     const nameInput = document.getElementById('cust-name');
     const phoneInput = document.getElementById('cust-phone');
+    const discountTypeInput = document.getElementById('discount-type');
+    const discountValueInput = document.getElementById('discount-value');
     if (!nameInput || !phoneInput) return;
 
     localStorage.setItem('doppio_cart_cust_name', nameInput.value);
     localStorage.setItem('doppio_cart_cust_phone', phoneInput.value);
+
+    // Update discount state from inputs
+    if (discountTypeInput) {
+      discountType = discountTypeInput.value;
+      localStorage.setItem('doppio_discount_type', discountType);
+    }
+    if (discountValueInput) {
+      discountValue = parseFloat(discountValueInput.value) || 0;
+      localStorage.setItem('doppio_discount_value', discountValue);
+    }
 
     const phoneVal = phoneInput.value.trim();
     const nameVal = nameInput.value.trim();
@@ -2688,15 +2975,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       businessProfile,
       customers: crmData,
       customerName: nameVal,
-      customerPhone: phoneVal
+      customerPhone: phoneVal,
+      discountType,
+      discountValue
     });
-    const { subtotal, loyaltyDiscount, gst, total } = totals;
+    const { subtotal, loyaltyDiscount, customDiscount, totalDiscount, gst, total } = totals;
 
     if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
 
     if (cartGst) {
-      if (loyaltyDiscount > 0) {
-        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
+      if (totalDiscount > 0) {
+        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${totalDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
       } else {
         cartGst.textContent = `₹${gst}`;
       }
@@ -2711,6 +3000,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Restore customer details on initial load
     const nameInput = document.getElementById('cust-name');
     const phoneInput = document.getElementById('cust-phone');
+    const discountTypeInput = document.getElementById('discount-type');
+    const discountValueInput = document.getElementById('discount-value');
     let hasRestoredDetails = false;
     if (nameInput && !nameInput.value) {
       const storedName = localStorage.getItem('doppio_cart_cust_name');
@@ -2725,6 +3016,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         phoneInput.value = storedPhone;
         hasRestoredDetails = true;
       }
+    }
+    // Set discount inputs initial values
+    if (discountTypeInput) discountTypeInput.value = discountType;
+    if (discountValueInput) discountValueInput.value = discountValue;
+    
+    // Add event listeners to discount inputs (once)
+    if (discountTypeInput && !discountTypeInput.dataset.listenerAttached) {
+      discountTypeInput.dataset.listenerAttached = 'true';
+      discountTypeInput.addEventListener('change', () => {
+        updateCartTotalsOnly();
+        renderCart();
+      });
+    }
+    if (discountValueInput && !discountValueInput.dataset.listenerAttached) {
+      discountValueInput.dataset.listenerAttached = 'true';
+      discountValueInput.addEventListener('input', () => {
+        updateCartTotalsOnly();
+        renderCart();
+      });
     }
 
     // Auto-expand customer details container if details were restored
@@ -2762,6 +3072,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Clear customer inputs in DOM
       if (nameInput) nameInput.value = '';
       if (phoneInput) phoneInput.value = '';
+      // Reset discount
+      discountType = 'flat';
+      discountValue = 0;
+      localStorage.setItem('doppio_discount_type', discountType);
+      localStorage.setItem('doppio_discount_value', discountValue);
+      if (discountTypeInput) discountTypeInput.value = discountType;
+      if (discountValueInput) discountValueInput.value = discountValue;
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
 
       // Collapse customer details container on empty cart
@@ -2825,34 +3142,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       cartList.appendChild(row);
     });
 
-    // GST & Loyalty calculations
-    const isGstEnabled = businessProfile.gstEnabled !== false;
-    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-
-    let loyaltyDiscount = 0;
+    // Use calculateCartTotals for consistent results
     const phoneVal = phoneInput ? phoneInput.value.trim() : '';
     const nameVal = nameInput ? nameInput.value.trim() : '';
+    const totals = billingDomain.calculateCartTotals({
+      cart,
+      businessProfile,
+      customers: crmData,
+      customerName: nameVal,
+      customerPhone: phoneVal,
+      discountType,
+      discountValue
+    });
+    const { subtotal: calculatedSubtotal, totalDiscount, gst, total } = totals;
 
-    let matchedCustomer = null;
-    if (phoneVal || nameVal) {
-      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (nameVal && c.name.toLowerCase() === nameVal.toLowerCase()));
-    }
-
-    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-    }
-
-    const taxableAmount = subtotal - loyaltyDiscount;
-    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-    const total = taxableAmount + gst;
-
-    if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
+    if (cartSubtotal) cartSubtotal.textContent = `₹${calculatedSubtotal}`;
 
     if (cartGst) {
-      if (loyaltyDiscount > 0) {
-        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
+      if (totalDiscount > 0) {
+        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${totalDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
       } else {
         cartGst.textContent = `₹${gst}`;
       }
@@ -3037,7 +3345,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       gst: order.gst || 0,
       total: order.total,
       paymentMethod: order.paymentMethod,
-      orderType: order.orderType
+      orderType: order.orderType,
+      cashier: sessionStorage.getItem('logged_in_display_name') || sessionStorage.getItem('logged_in_user') || 'Staff'
     };
 
     bills.push(approvedBill);
@@ -3089,6 +3398,108 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateQrOrdersDashboardUI();
     showNotificationToast(`Online order ${orderId} declined.`);
+  }
+
+  // Online Integrations Config Functions
+  let onlineIntegrationsConfig = {};
+
+  async function loadOnlineIntegrationsConfig() {
+    if (!supabaseClient || !activeTenantId) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('doppio_online_integrations')
+        .select('*')
+        .eq('tenant_id', activeTenantId);
+      if (error) throw error;
+      onlineIntegrationsConfig = {};
+      data.forEach(item => {
+        onlineIntegrationsConfig[item.aggregator] = item;
+      });
+      updateOnlineIntegrationsUI();
+    } catch (err) {
+      console.error('Failed to load online integrations config:', err);
+    }
+  }
+
+  async function saveOnlineIntegrationConfig(aggregator, config) {
+    if (!supabaseClient || !activeTenantId) return;
+    try {
+      const existing = onlineIntegrationsConfig[aggregator];
+      const payload = {
+        tenant_id: activeTenantId,
+        aggregator: aggregator,
+        is_enabled: config.is_enabled || false,
+        api_key: config.api_key || null,
+        api_secret: config.api_secret || null,
+        store_id: config.store_id || null,
+        webhook_url: config.webhook_url || null,
+        config: config.config || {}
+      };
+
+      let result;
+      if (existing) {
+        result = await supabaseClient
+          .from('doppio_online_integrations')
+          .update(payload)
+          .eq('tenant_id', activeTenantId)
+          .eq('aggregator', aggregator);
+      } else {
+        result = await supabaseClient
+          .from('doppio_online_integrations')
+          .insert(payload);
+      }
+
+      if (result.error) throw result.error;
+      onlineIntegrationsConfig[aggregator] = payload;
+      updateOnlineIntegrationsUI();
+      showNotificationToast(`${aggregator.charAt(0).toUpperCase() + aggregator.slice(1)} configuration saved!`);
+    } catch (err) {
+      console.error('Failed to save online integration config:', err);
+      showNotificationToast(`Failed to save ${aggregator} config: ${err.message}`);
+    }
+  }
+
+  function updateOnlineIntegrationsUI() {
+    // OrderEasy
+    const ordereasyConfig = onlineIntegrationsConfig['ordereasy'];
+    const toggleOrdereasy = document.getElementById('toggle-ordereasy');
+    const ordereasyApiKey = document.getElementById('ordereasy-api-key');
+    const ordereasyStoreId = document.getElementById('ordereasy-store-id');
+    const ordereasyStatusText = document.getElementById('ordereasy-status-text');
+    if (ordereasyConfig) {
+      if (toggleOrdereasy) toggleOrdereasy.checked = ordereasyConfig.is_enabled;
+      if (ordereasyApiKey) ordereasyApiKey.value = ordereasyConfig.api_key || '';
+      if (ordereasyStoreId) ordereasyStoreId.value = ordereasyConfig.store_id || '';
+      if (ordereasyStatusText) ordereasyStatusText.textContent = ordereasyConfig.is_enabled ? 'Enabled' : 'Disabled';
+    }
+
+    // Thrive
+    const thriveConfig = onlineIntegrationsConfig['thrive'];
+    const toggleThrive = document.getElementById('toggle-thrive');
+    const thriveApiKey = document.getElementById('thrive-api-key');
+    const thriveStoreId = document.getElementById('thrive-store-id');
+    const thriveStatusText = document.getElementById('thrive-status-text');
+    if (thriveConfig) {
+      if (toggleThrive) toggleThrive.checked = thriveConfig.is_enabled;
+      if (thriveApiKey) thriveApiKey.value = thriveConfig.api_key || '';
+      if (thriveStoreId) thriveStoreId.value = thriveConfig.store_id || '';
+      if (thriveStatusText) thriveStatusText.textContent = thriveConfig.is_enabled ? 'Enabled' : 'Disabled';
+    }
+
+    // UrbanPiper
+    const urbanpiperConfig = onlineIntegrationsConfig['urbanpiper'];
+    const toggleUrbanpiper = document.getElementById('toggle-urbanpiper');
+    const urbanpiperApiKey = document.getElementById('urbanpiper-api-key');
+    const urbanpiperApiSecret = document.getElementById('urbanpiper-api-secret');
+    const urbanpiperStoreId = document.getElementById('urbanpiper-store-id');
+    const urbanpiperStatusText = document.getElementById('urbanpiper-status-text');
+    if (urbanpiperConfig) {
+      if (toggleUrbanpiper) toggleUrbanpiper.checked = urbanpiperConfig.is_enabled;
+      if (urbanpiperApiKey) urbanpiperApiKey.value = urbanpiperConfig.api_key || '';
+      if (urbanpiperApiSecret) urbanpiperApiSecret.value = urbanpiperConfig.api_secret || '';
+      if (urbanpiperStoreId) urbanpiperStoreId.value = urbanpiperConfig.store_id || '';
+      if (urbanpiperStatusText) urbanpiperStatusText.textContent = urbanpiperConfig.is_enabled ? 'Enabled' : 'Disabled';
+    }
   }
 
   async function simulateOnlineOrder(aggregator) {
@@ -3194,6 +3605,51 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   if (ENABLE_DEMO_TOOLS && btnSimulateSwiggy) {
     btnSimulateSwiggy.addEventListener('click', () => simulateOnlineOrder('SWIGGY'));
+  }
+
+  // Online Integrations save button listeners
+  const saveOrdereasyBtn = document.getElementById('save-ordereasy-config');
+  if (saveOrdereasyBtn) {
+    saveOrdereasyBtn.addEventListener('click', () => {
+      const toggleOrdereasy = document.getElementById('toggle-ordereasy');
+      const ordereasyApiKey = document.getElementById('ordereasy-api-key');
+      const ordereasyStoreId = document.getElementById('ordereasy-store-id');
+      saveOnlineIntegrationConfig('ordereasy', {
+        is_enabled: toggleOrdereasy ? toggleOrdereasy.checked : false,
+        api_key: ordereasyApiKey ? ordereasyApiKey.value : null,
+        store_id: ordereasyStoreId ? ordereasyStoreId.value : null
+      });
+    });
+  }
+
+  const saveThriveBtn = document.getElementById('save-thrive-config');
+  if (saveThriveBtn) {
+    saveThriveBtn.addEventListener('click', () => {
+      const toggleThrive = document.getElementById('toggle-thrive');
+      const thriveApiKey = document.getElementById('thrive-api-key');
+      const thriveStoreId = document.getElementById('thrive-store-id');
+      saveOnlineIntegrationConfig('thrive', {
+        is_enabled: toggleThrive ? toggleThrive.checked : false,
+        api_key: thriveApiKey ? thriveApiKey.value : null,
+        store_id: thriveStoreId ? thriveStoreId.value : null
+      });
+    });
+  }
+
+  const saveUrbanpiperBtn = document.getElementById('save-urbanpiper-config');
+  if (saveUrbanpiperBtn) {
+    saveUrbanpiperBtn.addEventListener('click', () => {
+      const toggleUrbanpiper = document.getElementById('toggle-urbanpiper');
+      const urbanpiperApiKey = document.getElementById('urbanpiper-api-key');
+      const urbanpiperApiSecret = document.getElementById('urbanpiper-api-secret');
+      const urbanpiperStoreId = document.getElementById('urbanpiper-store-id');
+      saveOnlineIntegrationConfig('urbanpiper', {
+        is_enabled: toggleUrbanpiper ? toggleUrbanpiper.checked : false,
+        api_key: urbanpiperApiKey ? urbanpiperApiKey.value : null,
+        api_secret: urbanpiperApiSecret ? urbanpiperApiSecret.value : null,
+        store_id: urbanpiperStoreId ? urbanpiperStoreId.value : null
+      });
+    });
   }
 
   if (cartList) {
@@ -3347,9 +3803,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       businessProfile,
       customers: crmData,
       customerName: custName,
-      customerPhone: phoneVal
+      customerPhone: phoneVal,
+      discountType,
+      discountValue
     });
-    const { subtotal, loyaltyDiscount, gst, total } = totals;
+    const { subtotal, loyaltyDiscount, customDiscount, totalDiscount, gst, total } = totals;
 
     let finalBillObject = null;
 
@@ -3364,7 +3822,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           dateTime: originalDateTime,
           items: [...cart],
           subtotal: subtotal,
-          discount: loyaltyDiscount,
+          discount: totalDiscount,
           gst: gst,
           total: total,
           paymentMethod: finalPaymentMethod,
@@ -3380,6 +3838,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             customerPhone: phoneVal || null,
             items: JSON.stringify(cart),
             subtotal: subtotal,
+            discount: totalDiscount,
             gst: gst,
             total: total,
             paymentMethod: finalPaymentMethod
@@ -3394,12 +3853,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         dateTime: new Date().toLocaleString('en-IN'),
         items: [...cart],
         subtotal: subtotal,
-        discount: loyaltyDiscount,
+        discount: totalDiscount,
         gst: gst,
         total: total,
         paymentMethod: finalPaymentMethod,
         orderType: activeOrderType,
-        shiftId: activeShift ? activeShift.shiftId : null
+        shiftId: activeShift ? activeShift.shiftId : null,
+        cashier: sessionStorage.getItem('logged_in_display_name') || sessionStorage.getItem('logged_in_user') || 'Staff'
       };
       bills.push(newBill);
       finalBillObject = newBill;
@@ -3520,6 +3980,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const checkoutSaveBtn = document.getElementById('checkout-save-btn');
   const checkoutPrintBtn = document.getElementById('checkout-print-btn');
+  const printKotBtn = document.getElementById('print-kot-btn');
 
   if (checkoutSaveBtn) {
     checkoutSaveBtn.addEventListener('click', () => {
@@ -3530,6 +3991,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (checkoutPrintBtn) {
     checkoutPrintBtn.addEventListener('click', () => {
       openReceiptPreview(true);
+    });
+  }
+
+  if (printKotBtn) {
+    printKotBtn.addEventListener('click', () => {
+      if (cart.length > 0) {
+        triggerKOTPrint(cart);
+      }
     });
   }
 
@@ -3695,6 +4164,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       return matchesSearch && matchesPreset && matchesCustomRange;
     });
 
+    // Helper to get date range for specific day
+    function getDayRange(date) {
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    
+    // Calculate today's and yesterday's sales totals
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const todayRange = getDayRange(today);
+    const yesterdayRange = getDayRange(yesterday);
+    
+    let todaySales = 0;
+    let yesterdaySales = 0;
+    bills.forEach(bill => {
+      const billDate = parseBillDate(bill);
+      if (!billDate) return;
+      if (billDate >= todayRange.start && billDate <= todayRange.end) {
+        todaySales += bill.total || 0;
+      } else if (billDate >= yesterdayRange.start && billDate <= yesterdayRange.end) {
+        yesterdaySales += bill.total || 0;
+      }
+    });
+
     // Update Top Billing stats indicators
     const dailySalesTotal = filteredBills.reduce((sum, b) => sum + (b.total || 0), 0);
     const revCard = document.getElementById('bills-revenue-card');
@@ -3702,8 +4199,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const aovCardEl = document.getElementById('bills-aov-card');
     const upiPct = document.getElementById('bills-upi-percent');
     const cashPct = document.getElementById('bills-cash-percent');
+    const trendCard = document.getElementById('bills-trend-card');
     if (revCard) revCard.textContent = `₹${dailySalesTotal}`;
     if (totCard) totCard.textContent = `${filteredBills.length} Invoices`;
+    
+    // Calculate trend vs yesterday
+    if (trendCard) {
+      if (yesterdaySales === 0) {
+        trendCard.textContent = todaySales > 0 ? '↑ New sales recorded' : 'No prior data';
+      } else {
+        const change = ((todaySales - yesterdaySales) / yesterdaySales) * 100;
+        const roundedChange = Math.round(change);
+        const arrow = change >= 0 ? '↑' : '↓';
+        trendCard.textContent = `${arrow} ${Math.abs(roundedChange)}% vs. Yesterday`;
+      }
+    }
 
     // Average Order Value calculations
     const aov = filteredBills.length === 0 ? 0 : Math.round(dailySalesTotal / filteredBills.length);
@@ -3753,9 +4263,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pageBills = sortedBills.slice(pageStart, pageStart + BILLS_PAGE_SIZE);
 
     if (billsCount) {
-      billsCount.textContent = sortedBills.length > BILLS_PAGE_SIZE
-        ? `Showing ${pageStart + 1}–${Math.min(pageStart + BILLS_PAGE_SIZE, sortedBills.length)} of ${sortedBills.length} Bills`
-        : `Showing ${sortedBills.length} Bills`;
+      const textSpan = billsCount.querySelector('span');
+      if (textSpan) {
+        textSpan.textContent = sortedBills.length > BILLS_PAGE_SIZE
+          ? `Showing ${pageStart + 1}–${Math.min(pageStart + BILLS_PAGE_SIZE, sortedBills.length)} of ${sortedBills.length} Bills`
+          : `Showing ${sortedBills.length} Bills`;
+      }
     }
 
     pageBills.forEach(bill => {
@@ -3772,8 +4285,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const initials = custName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       const payMethod = bill.paymentMethod || 'UPI';
 
+      const isRefunded = bill.status === 'refunded';
+      const isRefund = bill.status === 'refund';
       tr.innerHTML = `
-        <td style="font-weight:700;">${escHtml(bill.orderId || '-')}</td>
+        <td style="font-weight:700;">
+          ${escHtml(bill.orderId || '-')}
+          ${isRefunded ? '<span style="font-size:10px; color:#e74c3c; margin-left:4px;">(Refunded)</span>' : ''}
+          ${isRefund ? '<span style="font-size:10px; color:#3498db; margin-left:4px;">(Refund)</span>' : ''}
+        </td>
         <td>
           <div class="customer-avatar-cell">
             <div class="cust-avatar">${escHtml(initials)}</div>
@@ -3786,12 +4305,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>${escHtml(bill.dateTime || '-')}</td>
         <td title="${escHtml(billItems.map(i => `${i.name || '?'} (x${i.qty || 1})`).join(', '))}">${escHtml(itemsListStr || '-')}</td>
         <td><span class="payment-badge ${escHtml(payMethod.toLowerCase())}">${escHtml(payMethod)}</span></td>
-        <td style="font-weight:700; color:var(--accent-caramel);">₹${bill.total || 0}</td>
+        <td style="font-weight:700; color:${isRefund ? '#e74c3c' : 'var(--accent-caramel)'};">₹${bill.total || 0}</td>
         <td>
           <button class="table-action-btn print" data-id="${escHtml(bill.orderId)}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
           <button class="table-action-btn whatsapp" data-id="${escHtml(bill.orderId)}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
-          <button class="table-action-btn edit-bill" data-id="${escHtml(bill.orderId)}" title="Edit Bill"><i class="fa-solid fa-pen-to-square"></i></button>
-          <button class="table-action-btn delete" data-id="${escHtml(bill.orderId)}" title="Refund/Delete"><i class="fa-solid fa-trash-can"></i></button>
+          ${!isRefunded && !isRefund ? `<button class="table-action-btn edit-bill" data-id="${escHtml(bill.orderId)}" title="Edit Bill"><i class="fa-solid fa-pen-to-square"></i></button>` : ''}
+          ${!isRefunded && !isRefund ? `<button class="table-action-btn delete" data-id="${escHtml(bill.orderId)}" title="Refund"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
         </td>
       `;
       billsTableBody.appendChild(tr);
@@ -3823,6 +4342,210 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
   }
+
+  // Export functions for bills
+  function exportBillsCSV(billsToExport) {
+    const csv = billsDomain.convertToCSV(billsToExport);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bills_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function exportBillsExcel(billsToExport) {
+    // Using SheetJS (xlsx) which is already included
+    const ws_data = [
+      ['Order ID', 'Customer Name', 'Phone', 'Date', 'Items', 'Subtotal', 'GST', 'Discount', 'Total', 'Payment Method']
+    ];
+    billsToExport.forEach(bill => {
+      const itemsStr = Array.isArray(bill.items) ? bill.items.map(i => `${i.name} x${i.qty}`).join('; ') : '';
+      ws_data.push([
+        bill.orderId || '',
+        bill.customerName || '',
+        bill.customerPhone || '',
+        bill.dateTime || '',
+        itemsStr,
+        bill.subtotal || 0,
+        bill.gst || 0,
+        bill.discount || 0,
+        bill.total || 0,
+        bill.paymentMethod || ''
+      ]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Bills');
+    XLSX.writeFile(wb, `bills_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
+  function exportBillsPDF(billsToExport) {
+    // Simple print-based PDF export
+    let printContent = `
+      <html>
+        <head>
+          <title>Bills Export</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>Bills Export</h1>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer Name</th>
+                <th>Phone</th>
+                <th>Date</th>
+                <th>Items</th>
+                <th>Subtotal</th>
+                <th>GST</th>
+                <th>Discount</th>
+                <th>Total</th>
+                <th>Payment Method</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+    billsToExport.forEach(bill => {
+      const itemsStr = Array.isArray(bill.items) ? bill.items.map(i => `${i.name} x${i.qty}`).join('; ') : '';
+      printContent += `
+        <tr>
+          <td>${bill.orderId || ''}</td>
+          <td>${bill.customerName || ''}</td>
+          <td>${bill.customerPhone || ''}</td>
+          <td>${bill.dateTime || ''}</td>
+          <td>${itemsStr}</td>
+          <td>₹${bill.subtotal || 0}</td>
+          <td>₹${bill.gst || 0}</td>
+          <td>₹${bill.discount || 0}</td>
+          <td>₹${bill.total || 0}</td>
+          <td>${bill.paymentMethod || ''}</td>
+        </tr>
+      `;
+    });
+    printContent += `
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+  }
+
+  function exportBillsGSTR1(billsToExport) {
+    // GSTR-1 compatible export (typical fields for B2C invoices)
+    const ws_data = [
+      ['Invoice Number', 'Invoice Date', 'Place of Supply', 'Supply Type', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Invoice Value', 'Customer Name', 'Customer Phone']
+    ];
+    // Filter out refund bills for GSTR-1
+    const taxableBills = billsToExport.filter(bill => bill.status !== 'refund');
+    taxableBills.forEach(bill => {
+      const taxableValue = bill.subtotal || 0;
+      const gstAmount = bill.gst || 0;
+      // Assume equal CGST and SGST for local supply (common scenario)
+      const cgst = gstAmount / 2;
+      const sgst = gstAmount / 2;
+      const igst = 0; // Assuming local supply, set IGST to 0
+      ws_data.push([
+        bill.orderId || '',
+        bill.dateTime ? bill.dateTime.split(',')[0] : '', // Extract date part
+        'Maharashtra', // Default place of supply (can be made configurable)
+        'B2C', // Default supply type
+        taxableValue,
+        cgst,
+        sgst,
+        igst,
+        bill.total || 0,
+        bill.customerName || 'Walk-in',
+        bill.customerPhone || ''
+      ]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, 'GSTR-1');
+    XLSX.writeFile(wb, `gstr1_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
+  // Get the currently filtered bills (same logic as renderBills)
+  function getFilteredBillsForExport() {
+    const fromVal = document.getElementById('bills-date-from') ? document.getElementById('bills-date-from').value : '';
+    const toVal = document.getElementById('bills-date-to') ? document.getElementById('bills-date-to').value : '';
+    let dateFrom = null;
+    if (fromVal) {
+      dateFrom = new Date(fromVal);
+      dateFrom.setHours(0, 0, 0, 0);
+    }
+    let dateTo = null;
+    if (toVal) {
+      dateTo = new Date(toVal);
+      dateTo.setHours(0, 0, 0, 0);
+    }
+    return bills.filter(bill => {
+      const q = billsSearchQuery.toLowerCase();
+      const matchesSearch = !q ||
+        (bill.customerName && bill.customerName.toLowerCase().includes(q)) ||
+        (bill.orderId && bill.orderId.toLowerCase().includes(q)) ||
+        (bill.customerPhone && bill.customerPhone.includes(q));
+      let matchesPreset = true;
+      if (activePresetDate !== 'all') {
+        const today = new Date().toLocaleDateString('en-IN');
+        if (activePresetDate === 'today') {
+          matchesPreset = bill.dateTime && bill.dateTime.includes(today);
+        } else if (activePresetDate === 'yesterday') {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toLocaleDateString('en-IN');
+          matchesPreset = bill.dateTime && bill.dateTime.includes(yesterdayStr);
+        } else if (activePresetDate === 'week') {
+          const billDate = parseBillDate(bill);
+          const diffTime = Math.abs(new Date() - billDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          matchesPreset = diffDays <= 7;
+        } else if (activePresetDate === 'month') {
+          const billDate = parseBillDate(bill);
+          const diffTime = Math.abs(new Date() - billDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          matchesPreset = diffDays <= 30;
+        }
+      }
+      let matchesCustomRange = true;
+      const billDate = parseBillDate(bill);
+      if (dateFrom && billDate < dateFrom) matchesCustomRange = false;
+      if (dateTo && billDate > dateTo) matchesCustomRange = false;
+      return matchesSearch && matchesPreset && matchesCustomRange;
+    });
+  }
+
+  // Add event listeners for export buttons
+  document.getElementById('export-bills-csv').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsCSV(filtered);
+  });
+  document.getElementById('export-bills-excel').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsExcel(filtered);
+  });
+  document.getElementById('export-bills-pdf').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsPDF(filtered);
+  });
+  document.getElementById('export-bills-gstr1').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsGSTR1(filtered);
+  });
 
   // Listeners for presets filter chips
   if (billsPresetContainer) {
@@ -3866,10 +4589,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else if (btn.classList.contains('delete')) {
         // Requires secure cashier validation PIN triggers
         showAdminPinModal(() => {
-          const bill = bills[idx];
+          const originalBill = bills[idx];
 
           // Revert Stock
-          bill.items.forEach(cartItem => {
+          originalBill.items.forEach(cartItem => {
             const specs = getDeductionSpecs(cartItem);
             Object.keys(specs).forEach(ing => {
               inventory[ing] = (inventory[ing] || 0) + (specs[ing] * cartItem.qty);
@@ -3877,11 +4600,44 @@ document.addEventListener('DOMContentLoaded', async () => {
           });
           localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
 
-          bills.splice(idx, 1);
+          // Mark original bill as refunded
+          bills[idx] = {
+            ...originalBill,
+            status: 'refunded',
+            refundedAt: new Date().toLocaleString('en-IN')
+          };
+
+          // Create reverse/refund bill entry
+          const refundBill = {
+            orderId: `${originalBill.orderId}_REFUND`,
+            customerName: originalBill.customerName,
+            customerPhone: originalBill.customerPhone,
+            dateTime: new Date().toLocaleString('en-IN'),
+            items: originalBill.items.map(item => ({ ...item, qty: -item.qty })),
+            subtotal: -originalBill.subtotal,
+            gst: -originalBill.gst,
+            discount: -originalBill.discount,
+            total: -originalBill.total,
+            paymentMethod: originalBill.paymentMethod,
+            orderType: 'Refund',
+            status: 'refund',
+            originalOrderId: originalBill.orderId
+          };
+          bills.push(refundBill);
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
 
+          // Sync with Supabase
           if (supabaseClient) {
-            supabaseClient.from('doppio_bills').delete().eq('orderId', orderId).then();
+            // Update original bill as refunded
+            supabaseClient.from('doppio_bills').upsert({
+              ...bills[idx],
+              tenant_id: activeTenantId
+            }).then();
+            // Insert refund bill
+            supabaseClient.from('doppio_bills').insert({
+              ...refundBill,
+              tenant_id: activeTenantId
+            }).then();
           }
 
           SoundEffects.playRemove();
@@ -4046,9 +4802,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     txt += borderSingle + '\n';
     txt += formatDouble32('Subtotal', bill.subtotal.toString()) + '\n';
 
-    // Print GST line only if GST is enabled in the business profile
+    // Print GST breakdown only if GST is enabled in the business profile
     if (businessProfile.gstEnabled !== false) {
-      txt += formatDouble32('GST', bill.gst.toString()) + '\n';
+      const gstRate = businessProfile.gstRate || 18;
+      const halfRate = gstRate / 2;
+      const cgst = bill.gst / 2;
+      const sgst = bill.gst / 2;
+      txt += formatDouble32(`CGST (${halfRate}%)`, cgst.toFixed(2)) + '\n';
+      txt += formatDouble32(`SGST (${halfRate}%)`, sgst.toFixed(2)) + '\n';
     }
 
     if (bill.discount && bill.discount > 0) {
@@ -4066,6 +4827,107 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     txt += centerText32('Thank you for visiting!') + '\n';
     txt += centerText32('Visit Again ☕') + '\n';
+
+    // Set inside printable area with a clean pre block
+    el.innerHTML = `
+      <pre style="font-family: 'Courier New', Courier, monospace; font-size: 10px; font-weight: 600; line-height: 1.35; margin: 0; white-space: pre; color: #000; background: #fff; text-shadow: none;">${txt}</pre>
+    `;
+
+    if (window.AndroidInterface) {
+      window.AndroidInterface.printReceipt(el.innerHTML);
+    } else {
+      window.print();
+    }
+  }
+
+  function triggerKOTPrint(cartOrBill) {
+    const el = document.createElement('div');
+    const items = Array.isArray(cartOrBill) ? cartOrBill : cartOrBill.items;
+
+    function centerText32(text) {
+      const width = 32;
+      if (text.length <= width) {
+        const leftPad = Math.floor((width - text.length) / 2);
+        return ' '.repeat(leftPad) + text;
+      }
+
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+
+      words.forEach(word => {
+        if ((currentLine + (currentLine ? ' ' : '') + word).length <= width) {
+          currentLine += (currentLine ? ' ' : '') + word;
+        } else {
+          if (currentLine) lines.push(currentLine);
+          currentLine = word;
+        }
+      });
+      if (currentLine) lines.push(currentLine);
+
+      return lines.map(line => {
+        const leftPad = Math.floor((width - line.length) / 2);
+        return ' '.repeat(leftPad) + line;
+      }).join('\n');
+    }
+
+    function formatRow32(col1, col2) {
+      const w1 = 24; // Item column width
+      const w2 = 8;  // Qty column width
+
+      let c1 = col1.slice(0, w1 - 1);
+      c1 = c1.padEnd(w1, ' ');
+      const c2 = col2.toString().padStart(w2, ' ');
+
+      return c1 + c2;
+    }
+
+    const borderDouble = '='.repeat(32);
+    const borderSingle = '-'.repeat(32);
+
+    let txt = '';
+    txt += borderDouble + '\n';
+    txt += centerText32('KITCHEN ORDER TICKET') + '\n';
+    txt += borderDouble + '\n\n';
+
+    if (cartOrBill.orderId) {
+      txt += `Order: ${cartOrBill.orderId}\n`;
+    }
+    if (cartOrBill.dateTime) {
+      txt += `Date: ${cartOrBill.dateTime}\n`;
+    } else {
+      txt += `Date: ${new Date().toLocaleString('en-IN')}\n`;
+    }
+    if (cartOrBill.customerName && cartOrBill.customerName !== 'Walk-in Guest') {
+      txt += `Guest: ${cartOrBill.customerName}\n`;
+    }
+    if (cartOrBill.orderType) {
+      txt += `Type: ${cartOrBill.orderType}\n`;
+    }
+    txt += '\n';
+
+    txt += borderSingle + '\n';
+    txt += formatRow32('Item', 'Qty') + '\n';
+    txt += borderSingle + '\n';
+
+    items.forEach(item => {
+      let displayName = `${item.name}`;
+      if (item.size && item.size !== 'Small') {
+        displayName += ` (${item.size})`;
+      }
+
+      txt += formatRow32(displayName, item.qty) + '\n';
+
+      if (item.toppings && item.toppings.length > 0) {
+        txt += `  + ${item.toppings.join(', ')}\n`;
+      }
+      if (item.notes) {
+        txt += `  * Note: ${item.notes}\n`;
+      }
+    });
+
+    txt += borderSingle + '\n\n';
+    txt += centerText32('PREPARE WITH CARE!') + '\n';
 
     // Set inside printable area with a clean pre block
     el.innerHTML = `
@@ -4759,6 +5621,316 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
+  // 9.5 INVENTORY SUB-TABS & ADVANCED FEATURES
+  // ==========================================
+  
+  // State variables for new features
+  let suppliers = JSON.parse(localStorage.getItem('doppio_suppliers') || '[]');
+  let purchaseOrders = JSON.parse(localStorage.getItem('doppio_purchase_orders') || '[]');
+  let grns = JSON.parse(localStorage.getItem('doppio_grns') || '[]');
+  let wasteLog = JSON.parse(localStorage.getItem('doppio_waste_log') || '[]');
+
+  // Function to switch between inventory sub-tabs
+  function switchInventorySubTab(tabName) {
+    // Hide all sub-tab contents
+    document.querySelectorAll('.inv-sub-tab-content').forEach(el => el.style.display = 'none');
+    // Remove active class from all buttons
+    document.querySelectorAll('.inv-sub-tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+      btn.style.background = 'white';
+      btn.style.color = 'var(--primary-brand)';
+      btn.style.borderColor = 'rgba(28, 28, 28,0.15)';
+    });
+    // Show selected sub-tab
+    document.getElementById(`sub-tab-${tabName}`).style.display = 'block';
+    // Mark button as active
+    const activeBtn = document.querySelector(`.inv-sub-tab-btn[data-sub-tab="${tabName}"]`);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+      activeBtn.style.background = 'var(--accent-caramel)';
+      activeBtn.style.color = 'white';
+      activeBtn.style.borderColor = 'var(--accent-caramel)';
+    }
+    // Render the selected sub-tab's content
+    switch(tabName) {
+      case 'suppliers': renderSuppliers(); break;
+      case 'purchase-orders': renderPurchaseOrders(); break;
+      case 'grns': renderGRNs(); break;
+      case 'waste-log': renderWasteLog(); break;
+    }
+  }
+
+  // Suppliers
+  function renderSuppliers() {
+    const grid = document.getElementById('suppliers-grid');
+    if (!grid) return;
+    if (suppliers.length === 0) {
+      grid.innerHTML = `
+        <div class="premium-empty-state" style="grid-column: 1 / -1; width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-truck-fast"></i>
+          <h3>No Suppliers Added</h3>
+          <p>Add your first supplier to start managing purchases.</p>
+        </div>
+      `;
+      return;
+    }
+    grid.innerHTML = suppliers.map(supplier => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">${supplier.name}</h4>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 10px;" onclick="deleteSupplier('${supplier.id}')">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;"><i class="fa-solid fa-phone"></i> ${supplier.phone || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;"><i class="fa-solid fa-envelope"></i> ${supplier.email || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;"><i class="fa-solid fa-location-dot"></i> ${supplier.address || 'N/A'}</p>
+      </div>
+    `).join('');
+  }
+
+  function addSupplier() {
+    const name = prompt('Supplier Name:');
+    if (!name) return;
+    const phone = prompt('Phone Number:');
+    const email = prompt('Email:');
+    const address = prompt('Address:');
+    const newSupplier = {
+      id: 'supplier_' + Date.now(),
+      name,
+      phone,
+      email,
+      address,
+      createdAt: new Date().toISOString()
+    };
+    suppliers.push(newSupplier);
+    localStorage.setItem('doppio_suppliers', JSON.stringify(suppliers));
+    renderSuppliers();
+    showNotificationToast('Supplier added successfully!');
+  }
+
+  function deleteSupplier(id) {
+    if (!confirm('Are you sure you want to delete this supplier?')) return;
+    suppliers = suppliers.filter(s => s.id !== id);
+    localStorage.setItem('doppio_suppliers', JSON.stringify(suppliers));
+    renderSuppliers();
+    showNotificationToast('Supplier deleted.');
+  }
+
+  // Purchase Orders
+  function renderPurchaseOrders() {
+    const list = document.getElementById('purchase-orders-list');
+    if (!list) return;
+    if (purchaseOrders.length === 0) {
+      list.innerHTML = `
+        <div class="premium-empty-state" style="width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <h3>No Purchase Orders</h3>
+          <p>Create your first purchase order to restock inventory.</p>
+        </div>
+      `;
+      return;
+    }
+    list.innerHTML = purchaseOrders.map(po => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">PO #${po.id.split('_')[1]}</h4>
+          <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 10px; background: ${po.status === 'Pending' ? 'rgba(243, 156, 18, 0.1)' : 'rgba(46, 204, 113, 0.1)'}; color: ${po.status === 'Pending' ? '#f39c12' : '#27ae60'};">${po.status}</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Supplier: ${po.supplierName || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Date: ${new Date(po.createdAt).toLocaleDateString('en-IN')}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Total: ₹${po.total || 0}</p>
+        ${po.status === 'Pending' ? `
+          <button class="btn btn-primary" style="padding: 6px 14px; font-size: 11px; margin-top: 8px;" onclick="receivePurchaseOrder('${po.id}')">
+            <i class="fa-solid fa-check"></i> Mark as Received
+          </button>
+        ` : ''}
+      </div>
+    `).join('');
+  }
+
+  function createPurchaseOrder() {
+    if (suppliers.length === 0) {
+      alert('Please add a supplier first!');
+      return;
+    }
+    const supplierSelect = suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    const supplierId = prompt(`Select Supplier ID:\n${suppliers.map(s => `${s.name}: ${s.id}`).join('\n')}`);
+    if (!supplierId) return;
+    const supplier = suppliers.find(s => s.id === supplierId);
+    const total = prompt('Total Amount:');
+    const newPO = {
+      id: 'po_' + Date.now(),
+      supplierId,
+      supplierName: supplier ? supplier.name : 'Unknown',
+      total: parseFloat(total) || 0,
+      status: 'Pending',
+      createdAt: new Date().toISOString()
+    };
+    purchaseOrders.push(newPO);
+    localStorage.setItem('doppio_purchase_orders', JSON.stringify(purchaseOrders));
+    renderPurchaseOrders();
+    showNotificationToast('Purchase Order created!');
+  }
+
+  function receivePurchaseOrder(id) {
+    const po = purchaseOrders.find(p => p.id === id);
+    if (!po) return;
+    po.status = 'Received';
+    localStorage.setItem('doppio_purchase_orders', JSON.stringify(purchaseOrders));
+    // Optionally, create a GRN automatically
+    const newGRN = {
+      id: 'grn_' + Date.now(),
+      poId: id,
+      supplierName: po.supplierName,
+      status: 'Completed',
+      createdAt: new Date().toISOString()
+    };
+    grns.push(newGRN);
+    localStorage.setItem('doppio_grns', JSON.stringify(grns));
+    renderPurchaseOrders();
+    renderGRNs();
+    showNotificationToast('Purchase Order marked as received and GRN created!');
+  }
+
+  // GRNs
+  function renderGRNs() {
+    const list = document.getElementById('grns-list');
+    if (!list) return;
+    if (grns.length === 0) {
+      list.innerHTML = `
+        <div class="premium-empty-state" style="width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-clipboard-list"></i>
+          <h3>No GRNs</h3>
+          <p>Goods Received Notes will appear here when you receive stock.</p>
+        </div>
+      `;
+      return;
+    }
+    list.innerHTML = grns.map(grn => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">GRN #${grn.id.split('_')[1]}</h4>
+          <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 10px; background: rgba(46, 204, 113, 0.1); color: #27ae60;">${grn.status}</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Supplier: ${grn.supplierName || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Date: ${new Date(grn.createdAt).toLocaleDateString('en-IN')}</p>
+      </div>
+    `).join('');
+  }
+
+  function createGRN() {
+    if (suppliers.length === 0) {
+      alert('Please add a supplier first!');
+      return;
+    }
+    const supplierId = prompt(`Select Supplier ID:\n${suppliers.map(s => `${s.name}: ${s.id}`).join('\n')}`);
+    if (!supplierId) return;
+    const supplier = suppliers.find(s => s.id === supplierId);
+    const newGRN = {
+      id: 'grn_' + Date.now(),
+      supplierId,
+      supplierName: supplier ? supplier.name : 'Unknown',
+      status: 'Completed',
+      createdAt: new Date().toISOString()
+    };
+    grns.push(newGRN);
+    localStorage.setItem('doppio_grns', JSON.stringify(grns));
+    renderGRNs();
+    showNotificationToast('GRN created!');
+  }
+
+  // Waste Log
+  function renderWasteLog() {
+    const list = document.getElementById('waste-log-list');
+    if (!list) return;
+    if (wasteLog.length === 0) {
+      list.innerHTML = `
+        <div class="premium-empty-state" style="width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-trash-can"></i>
+          <h3>No Waste Logged</h3>
+          <p>Log wastage (spoilage, over-prep, etc.) to track inventory loss.</p>
+        </div>
+      `;
+      return;
+    }
+    list.innerHTML = wasteLog.map(waste => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">${getLabelFromKey(waste.ingredientKey)}</h4>
+          <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 10px; background: rgba(231, 76, 60, 0.1); color: #e74c3c;">-${waste.qty} units</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Reason: ${waste.reason || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Date: ${new Date(waste.createdAt).toLocaleDateString('en-IN')}</p>
+      </div>
+    `).join('');
+  }
+
+  function logWaste() {
+    const ingredientKey = prompt(`Ingredient Key (e.g., milk, sugar_syrup):\nAvailable: ${Object.keys(inventory).join(', ')}`);
+    if (!ingredientKey || !inventory[ingredientKey]) {
+      alert('Invalid ingredient key!');
+      return;
+    }
+    const qty = prompt('Quantity Wasted:');
+    if (!qty) return;
+    const reason = prompt('Reason (e.g., Spoilage, Over-prep):');
+    const qtyNum = parseFloat(qty) || 0;
+    
+    // Deduct from inventory
+    inventory[ingredientKey] = Math.max(0, (inventory[ingredientKey] || 0) - qtyNum);
+    localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+    
+    // Log the waste
+    const newWaste = {
+      id: 'waste_' + Date.now(),
+      ingredientKey,
+      qty: qtyNum,
+      reason,
+      createdAt: new Date().toISOString()
+    };
+    wasteLog.push(newWaste);
+    localStorage.setItem('doppio_waste_log', JSON.stringify(wasteLog));
+    
+    renderWasteLog();
+    renderInventory();
+    checkLowStockAlerts();
+    showNotificationToast('Waste logged and inventory updated!');
+  }
+
+  // Make functions globally accessible for HTML buttons
+  window.switchInventorySubTab = switchInventorySubTab;
+  window.addSupplier = addSupplier;
+  window.deleteSupplier = deleteSupplier;
+  window.createPurchaseOrder = createPurchaseOrder;
+  window.receivePurchaseOrder = receivePurchaseOrder;
+  window.createGRN = createGRN;
+  window.logWaste = logWaste;
+
+  // Initialize inventory sub-tab event listeners (immediately, since script is at end of body)
+  setTimeout(() => {
+    // Sub-tab switchers
+    document.querySelectorAll('.inv-sub-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.getAttribute('data-sub-tab');
+        switchInventorySubTab(tabName);
+      });
+    });
+    // Supplier buttons
+    const addSupplierBtn = document.getElementById('add-supplier-btn');
+    if (addSupplierBtn) addSupplierBtn.addEventListener('click', addSupplier);
+    // Purchase Order buttons
+    const createPOBtn = document.getElementById('create-po-btn');
+    if (createPOBtn) createPOBtn.addEventListener('click', createPurchaseOrder);
+    // GRN buttons
+    const createGRNBtn = document.getElementById('create-grn-btn');
+    if (createGRNBtn) createGRNBtn.addEventListener('click', createGRN);
+    // Waste log buttons
+    const logWasteBtn = document.getElementById('log-waste-btn');
+    if (logWasteBtn) logWasteBtn.addEventListener('click', logWaste);
+  }, 100);
+
+  // ==========================================
   // 10. SALES REPORTS SVG CHARTS (TAB 4)
   // ==========================================
   const revenueChartBox = document.getElementById('reports-revenue-chart-box');
@@ -5116,6 +6288,122 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         </div>
       `;
+    }
+
+    // Render Item-wise Sales Analysis
+    const itemSalesTopEl = document.getElementById('item-wise-sales-top');
+    const itemSalesBottomEl = document.getElementById('item-wise-sales-bottom');
+    if (itemSalesTopEl && itemSalesBottomEl) {
+      const itemStats = {};
+      filteredBills.forEach(bill => {
+        if (!bill || !bill.items || !Array.isArray(bill.items)) return;
+        bill.items.forEach(item => {
+          if (!item.name) return;
+          if (!itemStats[item.name]) {
+            itemStats[item.name] = { quantity: 0, revenue: 0 };
+          }
+          const qty = item.qty || 1;
+          itemStats[item.name].quantity += qty;
+          itemStats[item.name].revenue += (item.price || 0) * qty;
+        });
+      });
+      const sortedItems = Object.entries(itemStats).sort((a, b) => b[1].quantity - a[1].quantity);
+      const topItems = sortedItems.slice(0, 5);
+      const bottomItems = sortedItems.slice(-5).reverse();
+
+      const renderItemList = (items) => items.map(([name, stats]) => `
+        <div class="bills-stat-card" style="padding: 12px; gap: 10px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 700; color: var(--primary-brand);">${escHtml(name)}</span>
+            <span style="font-weight: 800; color: var(--accent-caramel);">${stats.quantity} sold</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+            <span>Revenue</span>
+            <span>₹${stats.revenue.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      `).join('');
+
+      itemSalesTopEl.innerHTML = topItems.length ? renderItemList(topItems) : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
+      itemSalesBottomEl.innerHTML = bottomItems.length ? renderItemList(bottomItems) : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
+    }
+
+    // Render Cashier-wise Performance
+    const cashierPerformanceEl = document.getElementById('cashier-performance');
+    if (cashierPerformanceEl) {
+      const cashierStats = {};
+      filteredBills.forEach(bill => {
+        const cashier = bill.cashier || 'Unknown';
+        if (!cashierStats[cashier]) {
+          cashierStats[cashier] = { orders: 0, revenue: 0 };
+        }
+        cashierStats[cashier].orders++;
+        cashierStats[cashier].revenue += bill.total || 0;
+      });
+      const sortedCashiers = Object.entries(cashierStats).sort((a, b) => b[1].revenue - a[1].revenue);
+      cashierPerformanceEl.innerHTML = sortedCashiers.length ? sortedCashiers.map(([name, stats]) => `
+        <div class="bills-stat-card" style="padding: 12px; gap: 10px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user"></i> ${escHtml(name)}</span>
+            <span style="font-weight: 800; color: var(--success-color);">₹${stats.revenue.toLocaleString('en-IN')}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+            <span>Orders</span>
+            <span>${stats.orders}</span>
+          </div>
+        </div>
+      `).join('') : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
+    }
+
+    // Render Payment Method Trends
+    const paymentTrendsEl = document.getElementById('payment-trends-chart');
+    if (paymentTrendsEl) {
+      const weeklyData = {};
+      filteredBills.forEach(bill => {
+        const billDate = parseBillDate(bill);
+        if (!billDate) return;
+        // Get week start date (Monday)
+        const dateObj = new Date(billDate);
+        const day = dateObj.getDay();
+        const diff = dateObj.getDate() - day + (day === 0 ? -6 : 1);
+        const weekStart = new Date(dateObj.setDate(diff)).toDateString();
+        if (!weeklyData[weekStart]) {
+          weeklyData[weekStart] = { upi: 0, cash: 0, card: 0 };
+        }
+        const pm = (bill.paymentMethod || 'UPI').toUpperCase();
+        const total = bill.total || 0;
+        if (pm.includes('UPI')) weeklyData[weekStart].upi += total;
+        else if (pm.includes('CASH')) weeklyData[weekStart].cash += total;
+        else if (pm.includes('CARD')) weeklyData[weekStart].card += total;
+      });
+      const sortedWeeks = Object.keys(weeklyData).sort((a, b) => new Date(a) - new Date(b)).slice(-6);
+      paymentTrendsEl.innerHTML = sortedWeeks.length ? `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+          ${sortedWeeks.map(week => {
+            const data = weeklyData[week];
+            const total = data.upi + data.cash + data.card;
+            return `
+              <div class="bills-stat-card" style="padding: 12px; gap: 8px;">
+                <div style="font-size:11px; font-weight:700; color: var(--primary-brand);">${new Date(week).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</div>
+                <div style="display: flex; flex-direction: column; gap: 4px; font-size: 10px;">
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #27ae60;"><i class="fa-brands fa-google-pay"></i> UPI</span>
+                    <span>${total > 0 ? Math.round((data.upi / total) * 100) : 0}% (₹${data.upi})</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #d35400;"><i class="fa-solid fa-money-bill-wave"></i> Cash</span>
+                    <span>${total > 0 ? Math.round((data.cash / total) * 100) : 0}% (₹${data.cash})</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #2980b9;"><i class="fa-solid fa-credit-card"></i> Card</span>
+                    <span>${total > 0 ? Math.round((data.card / total) * 100) : 0}% (₹${data.card})</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
     }
   }
 
@@ -5713,9 +7001,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     menu.forEach((item, index) => {
       const card = document.createElement('div');
       card.className = 'menu-editor-card';
+      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : `<span style="font-size:40px; display:block; margin-bottom:8px; color:var(--accent-caramel);">${item.icon || '☕'}</span>`;
       card.innerHTML = `
         <div>
-          <span style="font-size:20px; display:block; margin-bottom:8px; color:var(--accent-caramel);"><i class="fa-solid fa-mug-hot"></i></span>
+          ${imageHTML}
           <h4 style="font-size:13px; font-weight:700; color:var(--primary-brand);">${item.name}</h4>
           <span style="font-size:11px; color:var(--accent-caramel); font-weight:600;">₹${item.price}</span>
         </div>
@@ -5734,8 +7023,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('item-price-input').value = item.price;
         document.getElementById('item-desc-input').value = item.description || '';
         document.getElementById('item-icon-input').value = item.icon || '☕';
+        document.getElementById('item-sku-input').value = item.sku || '';
         const selectEl = document.getElementById('item-icon-select');
         if (selectEl) selectEl.value = item.icon || '☕';
+        const availableCheckbox = document.getElementById('item-available-input');
+        if (availableCheckbox) availableCheckbox.checked = item.available !== false; // default true if not set
+        // Load image
+        if (item.image) {
+          currentItemImageData = item.image;
+          itemPreviewImg.src = currentItemImageData;
+          itemImagePreview.style.display = 'block';
+          clearItemImageBtn.style.display = 'inline-flex';
+        } else {
+          currentItemImageData = null;
+          itemPreviewImg.src = '';
+          itemImagePreview.style.display = 'none';
+          clearItemImageBtn.style.display = 'none';
+        }
+        // Load modifiers
+        modifiersContainer.innerHTML = '';
+        if (item.modifiers && Array.isArray(item.modifiers)) {
+          item.modifiers.forEach(modGroup => createModifierGroup(modGroup));
+        }
+        // Load scheduling
+        const schedulingEnabledCheckbox = document.getElementById('item-scheduling-enabled');
+        const schedulingFields = document.getElementById('scheduling-fields');
+        const startTimeInput = document.getElementById('item-start-time');
+        const endTimeInput = document.getElementById('item-end-time');
+        const dayCheckboxes = document.querySelectorAll('.day-checkbox');
+        
+        if (item.scheduling && item.scheduling.enabled) {
+          schedulingEnabledCheckbox.checked = true;
+          schedulingFields.style.display = 'block';
+          startTimeInput.value = item.scheduling.startTime || '';
+          endTimeInput.value = item.scheduling.endTime || '';
+          dayCheckboxes.forEach(cb => {
+            cb.checked = item.scheduling.days.includes(parseInt(cb.value));
+          });
+        } else {
+          schedulingEnabledCheckbox.checked = false;
+          schedulingFields.style.display = 'none';
+          startTimeInput.value = '';
+          endTimeInput.value = '';
+          dayCheckboxes.forEach(cb => cb.checked = true);
+        }
+        
         document.getElementById('form-panel-title').textContent = 'Edit Menu Item';
 
         // Load active recipe mappings inside Recipe Maker
@@ -5789,9 +7121,130 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Modifiers system
+  const modifiersContainer = document.getElementById('modifiers-container');
+  const addModifierGroupBtn = document.getElementById('add-modifier-group-btn');
+
+  function createModifierGroup(group = null) {
+    if (!modifiersContainer) return;
+    
+    const groupId = Date.now();
+    const groupEl = document.createElement('div');
+    groupEl.className = 'modifier-group';
+    groupEl.dataset.groupId = groupId;
+    groupEl.style.cssText = 'background: var(--bg-cream-light); border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid rgba(28,28,28,0.1);';
+    
+    groupEl.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div style="flex: 1; margin-right: 10px;">
+          <label style="font-weight: 600; font-size: 12px;">Group Name</label>
+          <input type="text" class="modifier-group-name" placeholder="e.g., Size, Extra Toppings" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); margin-top: 4px;" value="${group?.name || ''}">
+        </div>
+        <div style="width: 100px; margin-right: 10px;">
+          <label style="font-weight: 600; font-size: 12px;">Min Choices</label>
+          <input type="number" class="modifier-group-min" placeholder="0" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); margin-top: 4px;" min="0" value="${group?.min || 0}">
+        </div>
+        <div style="width: 100px; margin-right: 10px;">
+          <label style="font-weight: 600; font-size: 12px;">Max Choices</label>
+          <input type="number" class="modifier-group-max" placeholder="1" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); margin-top: 4px;" min="0" value="${group?.max || 1}">
+        </div>
+        <button type="button" class="remove-modifier-group-btn" style="background: transparent; border: none; color: #e74c3c; font-size: 20px; cursor: pointer; padding: 0;">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+      <div class="modifier-options-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
+        <!-- Options go here -->
+      </div>
+      <button type="button" class="add-modifier-option-btn btn btn-secondary" style="font-size: 11px; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;">
+        <i class="fa-solid fa-plus"></i> Add Option
+      </button>
+    `;
+    
+    modifiersContainer.appendChild(groupEl);
+    
+    // Add initial options if group exists
+    if (group?.options) {
+      group.options.forEach(opt => createModifierOption(groupEl, opt));
+    } else {
+      createModifierOption(groupEl);
+    }
+    
+    // Event listeners
+    groupEl.querySelector('.remove-modifier-group-btn').addEventListener('click', () => {
+      SoundEffects.playRemove();
+      groupEl.remove();
+    });
+    
+    groupEl.querySelector('.add-modifier-option-btn').addEventListener('click', () => {
+      SoundEffects.playClick();
+      createModifierOption(groupEl);
+    });
+  }
+
+  function createModifierOption(groupEl, option = null) {
+    const optionsList = groupEl.querySelector('.modifier-options-list');
+    const optionEl = document.createElement('div');
+    optionEl.className = 'modifier-option';
+    optionEl.style.cssText = 'display: flex; gap: 10px; align-items: center;';
+    
+    optionEl.innerHTML = `
+      <input type="text" class="modifier-option-name" placeholder="Option name" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15);" value="${option?.name || ''}">
+      <input type="number" class="modifier-option-price" placeholder="Price" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15);" min="0" step="0.01" value="${option?.price || 0}">
+      <button type="button" class="remove-modifier-option-btn" style="background: transparent; border: none; color: #e74c3c; font-size: 18px; cursor: pointer; padding: 0;">
+        <i class="fa-solid fa-circle-minus"></i>
+      </button>
+    `;
+    
+    optionsList.appendChild(optionEl);
+    
+    optionEl.querySelector('.remove-modifier-option-btn').addEventListener('click', () => {
+      SoundEffects.playRemove();
+      optionEl.remove();
+    });
+  }
+
+  if (addModifierGroupBtn) {
+    addModifierGroupBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      createModifierGroup();
+    });
+  }
+
   // Visual Recipe Mappings Link Builder Helper
   const recipeIngredientsList = document.getElementById('recipe-ingredients-list');
   const addRecipeIngredientBtn = document.getElementById('add-recipe-ingredient-btn');
+  const itemImageInput = document.getElementById('item-image-input');
+  const itemImagePreview = document.getElementById('item-image-preview');
+  const itemPreviewImg = document.getElementById('item-preview-img');
+  const clearItemImageBtn = document.getElementById('clear-item-image-btn');
+  let currentItemImageData = null; // Stores base64 image data
+
+  // Image input handler
+  if (itemImageInput) {
+    itemImageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          currentItemImageData = event.target.result;
+          itemPreviewImg.src = currentItemImageData;
+          itemImagePreview.style.display = 'block';
+          clearItemImageBtn.style.display = 'inline-flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+  // Clear image button
+  if (clearItemImageBtn) {
+    clearItemImageBtn.addEventListener('click', () => {
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+    });
+  }
 
   function createRecipeIngredientRow(ingKey = '', qtyValue = '') {
     if (!recipeIngredientsList) return;
@@ -5867,8 +7320,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       const price = parseInt(document.getElementById('item-price-input').value);
       const description = document.getElementById('item-desc-input').value.trim();
       const icon = document.getElementById('item-icon-input').value.trim();
+      const sku = document.getElementById('item-sku-input').value.trim();
+      const availableCheckbox = document.getElementById('item-available-input');
+      const available = availableCheckbox ? availableCheckbox.checked : true;
+      
+      // Collect modifiers
+      const modifiers = [];
+      document.querySelectorAll('.modifier-group').forEach(groupEl => {
+        const groupName = groupEl.querySelector('.modifier-group-name').value.trim();
+        const groupMin = parseInt(groupEl.querySelector('.modifier-group-min').value) || 0;
+        const groupMax = parseInt(groupEl.querySelector('.modifier-group-max').value) || 1;
+        const options = [];
+        groupEl.querySelectorAll('.modifier-option').forEach(optEl => {
+          const optName = optEl.querySelector('.modifier-option-name').value.trim();
+          const optPrice = parseFloat(optEl.querySelector('.modifier-option-price').value) || 0;
+          if (optName) {
+            options.push({ name: optName, price: optPrice });
+          }
+        });
+        if (groupName && options.length > 0) {
+          modifiers.push({ name: groupName, min: groupMin, max: groupMax, options });
+        }
+      });
+      
+      // Collect scheduling
+      const schedulingEnabled = document.getElementById('item-scheduling-enabled').checked;
+      const startTime = document.getElementById('item-start-time').value;
+      const endTime = document.getElementById('item-end-time').value;
+      const days = Array.from(document.querySelectorAll('.day-checkbox:checked')).map(cb => parseInt(cb.value));
+      
+      const scheduling = schedulingEnabled ? {
+        enabled: true,
+        startTime,
+        endTime,
+        days
+      } : { enabled: false };
 
-      const newItem = { name, category, price, description, icon };
+      const newItem = { name, category, price, description, icon, sku, available, image: currentItemImageData, modifiers, scheduling };
       const originalName = index !== '' && menu[Number(index)] ? menu[Number(index)].name : '';
 
       try {
@@ -5880,7 +7368,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             price: newItem.price,
             description: newItem.description,
             icon: newItem.icon,
-            category: newItem.category
+            category: newItem.category,
+            available: newItem.available,
+            sku: newItem.sku,
+            image: newItem.image
           }).eq('name', originalName), 'Menu item update failed');
       } else {
         menu.push(newItem);
@@ -5889,7 +7380,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             price: newItem.price,
             description: newItem.description,
             icon: newItem.icon,
-            category: newItem.category
+            category: newItem.category,
+            available: newItem.available,
+            sku: newItem.sku,
+            image: newItem.image
           }), 'Menu item creation failed');
       }
 
@@ -5937,6 +7431,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('edit-item-index').value = '';
       document.getElementById('form-panel-title').textContent = 'Add New Menu Item';
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
+      // Reset image
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+      // Reset modifiers
+      modifiersContainer.innerHTML = '';
+      // Reset scheduling
+      document.getElementById('item-scheduling-enabled').checked = false;
+      document.getElementById('scheduling-fields').style.display = 'none';
+      document.getElementById('item-start-time').value = '';
+      document.getElementById('item-end-time').value = '';
+      document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = true);
 
       // On mobile, close the editor drawer after save
       const savedFormPanel = document.getElementById('editor-form-panel');
@@ -5961,6 +7469,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('edit-item-index').value = '';
       document.getElementById('form-panel-title').textContent = 'Add New Menu Item';
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
+      // Reset image
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+      // Reset modifiers
+      modifiersContainer.innerHTML = '';
+      // Reset scheduling
+      document.getElementById('item-scheduling-enabled').checked = false;
+      document.getElementById('scheduling-fields').style.display = 'none';
+      document.getElementById('item-start-time').value = '';
+      document.getElementById('item-end-time').value = '';
+      document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = true);
       // On mobile, close the drawer
       const fp = document.getElementById('editor-form-panel');
       if (fp && window.innerWidth <= 600) fp.classList.remove('active');
@@ -5976,6 +7498,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('edit-item-index').value = '';
       document.getElementById('form-panel-title').textContent = 'Add New Menu Item';
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
+      // Reset image
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+      // Reset modifiers
+      modifiersContainer.innerHTML = '';
+      // Reset scheduling
+      document.getElementById('item-scheduling-enabled').checked = false;
+      document.getElementById('scheduling-fields').style.display = 'none';
+      document.getElementById('item-start-time').value = '';
+      document.getElementById('item-end-time').value = '';
+      document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = true);
       // On mobile, slide the form panel up as a drawer
       const formPanel = document.getElementById('editor-form-panel');
       if (formPanel && window.innerWidth <= 600) {
@@ -5983,6 +7519,336 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // Toggle scheduling fields visibility
+  const schedulingEnabledCheckbox = document.getElementById('item-scheduling-enabled');
+  const schedulingFields = document.getElementById('scheduling-fields');
+  if (schedulingEnabledCheckbox && schedulingFields) {
+    schedulingEnabledCheckbox.addEventListener('change', () => {
+      schedulingFields.style.display = schedulingEnabledCheckbox.checked ? 'block' : 'none';
+    });
+  }
+  
+  // Print menu button handler
+  const printMenuBtn = document.getElementById('print-menu-btn');
+  if (printMenuBtn) {
+    printMenuBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      printMenu();
+    });
+  }
+  
+  // Generate and print menu
+  function printMenu() {
+    // Group menu items by category
+    const categorizedMenu = {};
+    menu.forEach(item => {
+      if (!categorizedMenu[item.category]) {
+        categorizedMenu[item.category] = [];
+      }
+      categorizedMenu[item.category].push(item);
+    });
+    
+    // Create print window
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    // Build HTML for print
+    let html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Menu</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+            body {
+              font-family: 'Inter', sans-serif;
+              padding: 20px;
+              max-width: 800px;
+              margin: 0 auto;
+              color: #1c1c1c;
+            }
+            h1 {
+              text-align: center;
+              color: #8b4513;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #f5deb3;
+              padding-bottom: 10px;
+            }
+            .category {
+              margin-bottom: 25px;
+            }
+            .category h2 {
+              color: #8b4513;
+              border-bottom: 1px solid #f5deb3;
+              padding-bottom: 5px;
+              margin-bottom: 15px;
+              font-size: 20px;
+            }
+            .menu-item {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 15px;
+              padding-bottom: 10px;
+              border-bottom: 1px dashed #f5deb3;
+            }
+            .item-info {
+              flex: 1;
+            }
+            .item-name {
+              font-weight: 700;
+              font-size: 16px;
+              margin-bottom: 4px;
+            }
+            .item-desc {
+              font-size: 13px;
+              color: #666;
+              margin-bottom: 4px;
+            }
+            .item-modifiers {
+              font-size: 12px;
+              color: #888;
+            }
+            .item-price {
+              font-weight: 700;
+              color: #8b4513;
+              font-size: 16px;
+            }
+            .item-image {
+              width: 60px;
+              height: 60px;
+              object-fit: cover;
+              border-radius: 6px;
+              margin-right: 10px;
+            }
+            @media print {
+              body { 
+                padding: 10px; 
+              }
+              .no-print {
+                display: none !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Our Menu</h1>
+    `;
+    
+    // Add each category
+    Object.keys(categorizedMenu).sort().forEach(category => {
+      html += `<div class="category"><h2>${category}</h2>`;
+      categorizedMenu[category].forEach(item => {
+        html += `<div class="menu-item">`;
+        if (item.image) {
+          html += `<img src="${item.image}" class="item-image" alt="${item.name}">`;
+        }
+        html += `<div class="item-info">
+          <div class="item-name">${item.name}</div>
+          ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+          ${item.modifiers && item.modifiers.length > 0 ? `
+            <div class="item-modifiers">
+              Modifiers: ${item.modifiers.map(m => m.name).join(', ')}
+            </div>
+          ` : ''}
+        </div>`;
+        html += `<div class="item-price">₹${item.price}</div>`;
+        html += `</div>`;
+      });
+      html += `</div>`;
+    });
+    
+    html += `
+        <script>
+          window.onload = function() {
+            window.print();
+            window.onafterprint = function() {
+              window.close();
+            }
+          }
+        </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  // ==========================================
+  // 11.B GLOBAL MODIFIERS LIBRARY & SCHEDULING OVERVIEW
+  // ==========================================
+  let globalModifiers = JSON.parse(localStorage.getItem('doppio_global_modifiers') || '[]');
+
+  function renderGlobalModifiersList() {
+    const list    = document.getElementById('global-modifiers-list');
+    const emptyEl = document.getElementById('global-modifiers-empty');
+    if (!list) return;
+
+    if (globalModifiers.length === 0) {
+      list.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    list.innerHTML = globalModifiers.map((grp, idx) => {
+      const optLabels = (grp.options || []).map(o =>
+        `<span style="background:rgba(252,128,25,0.08); color:var(--primary-brand); border-radius:4px; padding:2px 7px; font-size:10px; font-weight:600;">${escHtml(o.name)}${o.price ? (o.price > 0 ? ` +₹${o.price}` : ` ₹${o.price}`) : ''}</span>`
+      ).join('');
+      return `
+        <div style="background:rgba(28,28,28,0.02); border:1px solid rgba(28,28,28,0.06); border-radius:10px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div>
+              <strong style="font-size:13px; color:var(--primary-brand);">${escHtml(grp.name)}</strong>
+              ${grp.required ? '<span style="font-size:10px; color:var(--accent-caramel); font-weight:700; margin-left:6px; background:rgba(252,128,25,0.1); padding:1px 6px; border-radius:4px;">REQUIRED</span>' : ''}
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-secondary edit-gmod-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px;"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-danger delete-gmod-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px; background:rgba(231,76,60,0.08); color:#e74c3c; border-color:rgba(231,76,60,0.2);"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div style="display:flex; gap:4px; flex-wrap:wrap;">${optLabels || '<span style="font-size:10px; color:var(--text-muted);">No options yet</span>'}</div>
+        </div>`;
+    }).join('');
+
+    list.querySelectorAll('.edit-gmod-btn').forEach(btn => {
+      btn.addEventListener('click', () => openGlobalModifierModal(parseInt(btn.dataset.idx)));
+    });
+    list.querySelectorAll('.delete-gmod-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        SoundEffects.playRemove();
+        globalModifiers.splice(parseInt(btn.dataset.idx), 1);
+        localStorage.setItem('doppio_global_modifiers', JSON.stringify(globalModifiers));
+        renderGlobalModifiersList();
+        showNotificationToast('Modifier group deleted.');
+      });
+    });
+  }
+
+  function renderSchedulingOverview() {
+    const tbody   = document.getElementById('scheduling-overview-body');
+    const emptyEl = document.getElementById('scheduling-overview-empty');
+    if (!tbody) return;
+
+    const scheduled = menu.filter(item => item.scheduling && item.scheduling.enabled);
+    if (scheduled.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
+    tbody.innerHTML = scheduled.map(item => {
+      const s = item.scheduling;
+      const daysStr = (s.days || []).map(d => dayNames[d]).join(', ');
+      const window  = `${s.startTime || '--'} – ${s.endTime || '--'}`;
+      const isActiveDay = (s.days || []).includes(currentDay);
+      const [sh, sm] = (s.startTime || '00:00').split(':').map(Number);
+      const [eh, em] = (s.endTime   || '23:59').split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin   = eh * 60 + em;
+      const isInWindow = currentTime >= startMin && currentTime <= endMin;
+      const isLive = isActiveDay && isInWindow;
+      const badge = isLive
+        ? `<span class="status-badge paid">Live</span>`
+        : `<span class="status-badge pending">Off-hours</span>`;
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:8px 6px; font-weight:600; color:var(--primary-brand);">${escHtml(item.name)}</td>
+        <td style="padding:8px 6px; text-align:center; font-size:10px; color:var(--text-muted);">${escHtml(daysStr)}</td>
+        <td style="padding:8px 6px; font-size:11px;">${escHtml(window)}</td>
+        <td style="padding:8px 6px; text-align:center;">${badge}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function openGlobalModifierModal(editIdx = -1) {
+    const modal = document.getElementById('global-modifier-modal');
+    if (!modal) return;
+    document.getElementById('global-modifier-edit-index').value = editIdx >= 0 ? editIdx : '';
+    document.getElementById('global-modifier-modal-title').textContent = editIdx >= 0 ? 'Edit Modifier Group' : 'Add Modifier Group';
+    document.getElementById('gmod-group-name').value = '';
+    document.getElementById('gmod-required').checked = false;
+    const optsList = document.getElementById('gmod-options-list');
+    if (optsList) optsList.innerHTML = '';
+
+    if (editIdx >= 0 && globalModifiers[editIdx]) {
+      const grp = globalModifiers[editIdx];
+      document.getElementById('gmod-group-name').value = grp.name || '';
+      document.getElementById('gmod-required').checked = !!grp.required;
+      (grp.options || []).forEach(opt => addGmodOptionRow(opt.name, opt.price));
+    } else {
+      addGmodOptionRow();
+    }
+    modal.classList.add('active');
+  }
+
+  function addGmodOptionRow(name = '', price = 0) {
+    const list = document.getElementById('gmod-options-list');
+    if (!list) return;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid; grid-template-columns:1fr 90px 32px; gap:6px; align-items:center;';
+    row.innerHTML = `
+      <input type="text" placeholder="Option name (e.g. Large)" value="${escHtml(name)}" maxlength="50"
+        style="padding:7px; border-radius:6px; border:1px solid rgba(28,28,28,0.15); font-size:12px;" class="gmod-opt-name">
+      <input type="number" placeholder="±₹ (0=free)" value="${price}"
+        style="padding:7px; border-radius:6px; border:1px solid rgba(28,28,28,0.15); font-size:12px;" class="gmod-opt-price">
+      <button type="button" style="padding:6px; border-radius:6px; background:rgba(231,76,60,0.08); color:#e74c3c; border:1px solid rgba(231,76,60,0.2); cursor:pointer; font-size:12px;" class="remove-gmod-opt-btn"><i class="fa-solid fa-times"></i></button>
+    `;
+    row.querySelector('.remove-gmod-opt-btn').addEventListener('click', () => row.remove());
+    list.appendChild(row);
+  }
+
+  const addGmodOptionBtn = document.getElementById('add-gmod-option-btn');
+  if (addGmodOptionBtn) addGmodOptionBtn.addEventListener('click', () => addGmodOptionRow());
+
+  const addGlobalModifierBtn = document.getElementById('add-global-modifier-btn');
+  if (addGlobalModifierBtn) addGlobalModifierBtn.addEventListener('click', () => openGlobalModifierModal());
+
+  const closeGlobalModifierModal = document.getElementById('close-global-modifier-modal');
+  if (closeGlobalModifierModal) closeGlobalModifierModal.addEventListener('click', () => {
+    document.getElementById('global-modifier-modal')?.classList.remove('active');
+  });
+  const cancelGlobalModifierBtn = document.getElementById('cancel-global-modifier-btn');
+  if (cancelGlobalModifierBtn) cancelGlobalModifierBtn.addEventListener('click', () => {
+    document.getElementById('global-modifier-modal')?.classList.remove('active');
+  });
+
+  const confirmGlobalModifierBtn = document.getElementById('confirm-global-modifier-btn');
+  if (confirmGlobalModifierBtn) confirmGlobalModifierBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const name     = document.getElementById('gmod-group-name')?.value.trim();
+    const required = document.getElementById('gmod-required')?.checked || false;
+    if (!name) { alert('Group name is required.'); return; }
+
+    const optRows = document.querySelectorAll('#gmod-options-list > div');
+    const options = [];
+    optRows.forEach(row => {
+      const optName = row.querySelector('.gmod-opt-name')?.value.trim();
+      const optPrice = parseFloat(row.querySelector('.gmod-opt-price')?.value) || 0;
+      if (optName) options.push({ name: optName, price: optPrice });
+    });
+
+    const editIdx = document.getElementById('global-modifier-edit-index')?.value;
+    const record = { name, required, options };
+    if (editIdx !== '' && globalModifiers[parseInt(editIdx)]) {
+      globalModifiers[parseInt(editIdx)] = record;
+    } else {
+      globalModifiers.push(record);
+    }
+    localStorage.setItem('doppio_global_modifiers', JSON.stringify(globalModifiers));
+    document.getElementById('global-modifier-modal')?.classList.remove('active');
+    renderGlobalModifiersList();
+    showNotificationToast('Modifier group saved.');
+  });
+
+  renderGlobalModifiersList();
 
   // ==========================================
   // 12. CRM LEDGER PROGRAM TIERING (TAB 6)
@@ -6233,6 +8099,280 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
+  // 12.A.2 LOYALTY RULES & CUSTOMER FEEDBACK
+  // ==========================================
+
+  // --- Loyalty Rules ---
+  let loyaltyRules = JSON.parse(localStorage.getItem('doppio_loyalty_rules') || 'null') || {
+    points_per_rupee: 0.01,
+    point_value_rupee: 1,
+    min_points_to_redeem: 100,
+    expiry_days: 0
+  };
+  let tierThresholds = JSON.parse(localStorage.getItem('doppio_tier_thresholds') || 'null') || {
+    bronze:   { min: 0,    benefit: 'Standard points' },
+    silver:   { min: 1000, benefit: '5% Discount + Free extra shot' },
+    gold:     { min: 2500, benefit: '10% Discount + Free cookies' },
+    platinum: { min: 5000, benefit: '15% Discount + Free beverages' }
+  };
+
+  function loadLoyaltyRulesUI() {
+    const ppr  = document.getElementById('loyalty-points-per-rupee');
+    const pvr  = document.getElementById('loyalty-point-value');
+    const mpr  = document.getElementById('loyalty-min-redeem');
+    const exp  = document.getElementById('loyalty-expiry-days');
+    if (ppr) ppr.value = loyaltyRules.points_per_rupee;
+    if (pvr) pvr.value = loyaltyRules.point_value_rupee;
+    if (mpr) mpr.value = loyaltyRules.min_points_to_redeem;
+    if (exp) exp.value = loyaltyRules.expiry_days;
+
+    const tiers = ['bronze', 'silver', 'gold', 'platinum'];
+    tiers.forEach(t => {
+      const minEl = document.getElementById(`tier-${t}-min`);
+      const benEl = document.getElementById(`tier-${t}-benefit`);
+      if (minEl) minEl.value = tierThresholds[t]?.min ?? 0;
+      if (benEl) benEl.value = tierThresholds[t]?.benefit ?? '';
+    });
+  }
+
+  const saveLoyaltyRulesBtn = document.getElementById('save-loyalty-rules-btn');
+  if (saveLoyaltyRulesBtn) {
+    saveLoyaltyRulesBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      loyaltyRules = {
+        points_per_rupee:    parseFloat(document.getElementById('loyalty-points-per-rupee')?.value) || 0.01,
+        point_value_rupee:   parseFloat(document.getElementById('loyalty-point-value')?.value) || 1,
+        min_points_to_redeem: parseInt(document.getElementById('loyalty-min-redeem')?.value) || 100,
+        expiry_days:         parseInt(document.getElementById('loyalty-expiry-days')?.value) || 0
+      };
+      localStorage.setItem('doppio_loyalty_rules', JSON.stringify(loyaltyRules));
+      if (supabaseClient) {
+        supabaseClient.from('doppio_settings').upsert({ tenant_id: activeTenantId, key: 'loyalty_rules', value: loyaltyRules }).then();
+      }
+      showNotificationToast('Loyalty rules saved.');
+    });
+  }
+
+  const saveTierThresholdsBtn = document.getElementById('save-tier-thresholds-btn');
+  if (saveTierThresholdsBtn) {
+    saveTierThresholdsBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      ['bronze', 'silver', 'gold', 'platinum'].forEach(t => {
+        tierThresholds[t] = {
+          min:     parseInt(document.getElementById(`tier-${t}-min`)?.value) || 0,
+          benefit: document.getElementById(`tier-${t}-benefit`)?.value.trim() || ''
+        };
+      });
+      localStorage.setItem('doppio_tier_thresholds', JSON.stringify(tierThresholds));
+      if (supabaseClient) {
+        supabaseClient.from('doppio_settings').upsert({ tenant_id: activeTenantId, key: 'tier_thresholds', value: tierThresholds }).then();
+      }
+      showNotificationToast('Tier thresholds saved.');
+    });
+  }
+
+  // --- Customer Feedback ---
+  let customerFeedback = JSON.parse(localStorage.getItem('doppio_customer_feedback') || '[]');
+
+  function renderFeedbackTable() {
+    const tbody   = document.getElementById('feedback-table-body');
+    const emptyEl = document.getElementById('feedback-empty');
+    if (!tbody) return;
+
+    const searchVal = (document.getElementById('feedback-search-input')?.value || '').trim().toLowerCase();
+    const ratingFilter = document.getElementById('feedback-rating-filter')?.value || '';
+
+    let data = customerFeedback.filter(f => {
+      const matchSearch = !searchVal ||
+        (f.name && f.name.toLowerCase().includes(searchVal)) ||
+        (f.phone && f.phone.includes(searchVal)) ||
+        (f.comment && f.comment.toLowerCase().includes(searchVal));
+      const matchRating = !ratingFilter || String(f.rating) === ratingFilter;
+      return matchSearch && matchRating;
+    });
+
+    data = [...data].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (data.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const stars = r => '⭐'.repeat(Math.max(0, Math.min(5, r))) || '-';
+    tbody.innerHTML = data.map((f, i) => {
+      const origIdx = customerFeedback.indexOf(f);
+      const dateStr = f.date ? new Date(f.date).toLocaleDateString('en-IN') : '-';
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:8px 6px; font-weight:600; color:var(--primary-brand);">${escHtml(f.name || '-')}<br><span style="font-size:10px; color:var(--text-muted);">${escHtml(f.phone || '')}</span></td>
+        <td style="padding:8px 6px; text-align:center; font-size:13px;">${stars(f.rating)}</td>
+        <td style="padding:8px 6px; font-size:11px; color:var(--text-dark); max-width:200px;">${escHtml(f.comment || '-')}</td>
+        <td style="padding:8px 6px; font-size:11px; color:var(--text-muted);">${dateStr}</td>
+        <td style="padding:8px 6px; text-align:right;">
+          <button class="btn btn-secondary edit-feedback-btn" data-idx="${origIdx}" style="padding:2px 7px; font-size:10px; border-radius:4px; margin-right:4px;"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-danger delete-feedback-btn" data-idx="${origIdx}" style="padding:2px 7px; font-size:10px; border-radius:4px; background:rgba(231,76,60,0.08); color:#e74c3c; border-color:rgba(231,76,60,0.2);"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.edit-feedback-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        openFeedbackModal(idx);
+      });
+    });
+    tbody.querySelectorAll('.delete-feedback-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        SoundEffects.playRemove();
+        const idx = parseInt(btn.dataset.idx);
+        customerFeedback.splice(idx, 1);
+        localStorage.setItem('doppio_customer_feedback', JSON.stringify(customerFeedback));
+        renderFeedbackTable();
+        showNotificationToast('Feedback deleted.');
+      });
+    });
+  }
+
+  function openFeedbackModal(editIdx = -1) {
+    const modal = document.getElementById('add-feedback-modal');
+    if (!modal) return;
+    document.getElementById('feedback-edit-id').value = editIdx >= 0 ? editIdx : '';
+    document.getElementById('feedback-cust-name').value = '';
+    document.getElementById('feedback-cust-phone').value = '';
+    document.getElementById('feedback-comment').value = '';
+    document.getElementById('feedback-rating-val').value = '0';
+    setFeedbackStars(0);
+    if (editIdx >= 0 && customerFeedback[editIdx]) {
+      const f = customerFeedback[editIdx];
+      document.getElementById('feedback-cust-name').value = f.name || '';
+      document.getElementById('feedback-cust-phone').value = f.phone || '';
+      document.getElementById('feedback-comment').value = f.comment || '';
+      document.getElementById('feedback-rating-val').value = f.rating || 0;
+      setFeedbackStars(f.rating || 0);
+    }
+    modal.classList.add('active');
+  }
+
+  function setFeedbackStars(val) {
+    document.querySelectorAll('.feedback-star').forEach(s => {
+      s.textContent = parseInt(s.dataset.val) <= val ? '★' : '☆';
+      s.style.color = parseInt(s.dataset.val) <= val ? '#ffc300' : 'var(--text-muted)';
+    });
+  }
+
+  document.querySelectorAll('.feedback-star').forEach(s => {
+    s.addEventListener('click', () => {
+      const val = parseInt(s.dataset.val);
+      document.getElementById('feedback-rating-val').value = val;
+      setFeedbackStars(val);
+    });
+  });
+
+  const addFeedbackBtn = document.getElementById('add-feedback-btn');
+  if (addFeedbackBtn) addFeedbackBtn.addEventListener('click', () => openFeedbackModal());
+
+  const closeFeedbackModal = document.getElementById('close-feedback-modal');
+  if (closeFeedbackModal) closeFeedbackModal.addEventListener('click', () => {
+    document.getElementById('add-feedback-modal')?.classList.remove('active');
+  });
+
+  const cancelFeedbackBtn = document.getElementById('cancel-feedback-btn');
+  if (cancelFeedbackBtn) cancelFeedbackBtn.addEventListener('click', () => {
+    document.getElementById('add-feedback-modal')?.classList.remove('active');
+  });
+
+  const confirmFeedbackBtn = document.getElementById('confirm-feedback-btn');
+  if (confirmFeedbackBtn) confirmFeedbackBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const name    = document.getElementById('feedback-cust-name')?.value.trim();
+    const phone   = document.getElementById('feedback-cust-phone')?.value.trim();
+    const comment = document.getElementById('feedback-comment')?.value.trim();
+    const rating  = parseInt(document.getElementById('feedback-rating-val')?.value) || 0;
+    const editIdx = document.getElementById('feedback-edit-id')?.value;
+
+    if (!name) { alert('Customer name is required.'); return; }
+    if (rating === 0) { alert('Please select a rating.'); return; }
+
+    const record = { name, phone, comment, rating, date: new Date().toISOString() };
+    if (editIdx !== '' && editIdx !== undefined && customerFeedback[parseInt(editIdx)]) {
+      customerFeedback[parseInt(editIdx)] = record;
+    } else {
+      customerFeedback.push(record);
+    }
+    localStorage.setItem('doppio_customer_feedback', JSON.stringify(customerFeedback));
+    document.getElementById('add-feedback-modal')?.classList.remove('active');
+    renderFeedbackTable();
+    showNotificationToast('Feedback saved.');
+  });
+
+  const feedbackSearchInput = document.getElementById('feedback-search-input');
+  const feedbackRatingFilter = document.getElementById('feedback-rating-filter');
+  if (feedbackSearchInput) feedbackSearchInput.addEventListener('input', renderFeedbackTable);
+  if (feedbackRatingFilter) feedbackRatingFilter.addEventListener('change', renderFeedbackTable);
+
+  // --- Visit History Timeline ---
+  const visitsLookupInput = document.getElementById('visits-lookup-input');
+  if (visitsLookupInput) {
+    visitsLookupInput.addEventListener('input', () => {
+      const q = visitsLookupInput.value.trim().toLowerCase();
+      const statsStrip = document.getElementById('visits-stats-strip');
+      const timelineList = document.getElementById('visits-timeline-list');
+      const emptyHint = document.getElementById('visits-empty-hint');
+
+      if (!q) {
+        if (statsStrip) statsStrip.style.display = 'none';
+        if (timelineList) timelineList.innerHTML = `<div id="visits-empty-hint" style="color:var(--text-muted); font-size:11px; text-align:center; padding:20px 0;">Search a customer to view their visit timeline.</div>`;
+        return;
+      }
+
+      const member = crmData.find(c =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q))
+      );
+
+      if (!member) {
+        if (statsStrip) statsStrip.style.display = 'none';
+        if (timelineList) timelineList.innerHTML = `<div style="color:var(--text-muted); font-size:11px; text-align:center; padding:20px 0;">No customer found matching "<strong>${escHtml(q)}</strong>".</div>`;
+        return;
+      }
+
+      const tier = getLoyaltyTier(member.total_spend);
+      if (statsStrip) {
+        statsStrip.style.display = 'block';
+        document.getElementById('visits-cust-name-display').textContent = member.name + (member.phone ? ` · ${member.phone}` : '');
+        document.getElementById('visits-count-val').textContent = member.visits || 0;
+        document.getElementById('visits-spend-val').textContent = `₹${Math.round(member.total_spend || 0).toLocaleString('en-IN')}`;
+        document.getElementById('visits-tier-val').textContent = tier;
+      }
+
+      // Build visit entries from bills matching this customer
+      const memberBills = bills.filter(b => b && (
+        (member.phone && b.customerPhone === member.phone) ||
+        (b.customerName && b.customerName.toLowerCase() === member.name.toLowerCase())
+      )).sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime)).slice(0, 20);
+
+      if (timelineList) {
+        if (memberBills.length === 0) {
+          timelineList.innerHTML = `<div style="color:var(--text-muted); font-size:11px; text-align:center; padding:20px 0;">No bill records found for this customer.</div>`;
+        } else {
+          timelineList.innerHTML = memberBills.map(b => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:rgba(28,28,28,0.02); border-radius:8px; border:1px solid rgba(28,28,28,0.05); font-size:11px;">
+              <div>
+                <div style="font-weight:700; color:var(--primary-brand);">${escHtml(b.orderId)}</div>
+                <div style="color:var(--text-muted); font-size:10px;">${escHtml(b.dateTime || '')}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:700; color:var(--accent-caramel);">₹${(b.total || 0).toFixed(2)}</div>
+                <div style="font-size:10px; color:var(--text-muted);">${escHtml(b.paymentMethod || '')}</div>
+              </div>
+            </div>`).join('');
+        }
+      }
+    });
+  }
+
+  // ==========================================
   // 12.B TAX MANAGEMENT LEDGER HUB (TAB 7)
   // ==========================================
   const taxSearchInput = document.getElementById('tax-search-input');
@@ -6385,6 +8525,154 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderTaxTab();
     });
   }
+
+  // ==========================================
+  // 12.B.2 TAX SLABS MANAGEMENT
+  // ==========================================
+  let taxSlabRules = JSON.parse(localStorage.getItem('doppio_tax_slab_rules') || '[]');
+
+  function renderTaxSlabsTable() {
+    const tbody   = document.getElementById('tax-slabs-table-body');
+    const emptyEl = document.getElementById('tax-slabs-empty');
+    if (!tbody) return;
+
+    if (taxSlabRules.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    tbody.innerHTML = taxSlabRules.map((rule, idx) => {
+      const cgst = (rule.rate / 2).toFixed(1);
+      const sgst = (rule.rate / 2).toFixed(1);
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:8px 6px; font-weight:600; color:var(--primary-brand);">${escHtml(rule.category)}<br><span style="font-size:10px; color:var(--text-muted);">${escHtml(rule.notes || '')}</span></td>
+        <td style="padding:8px 6px; text-align:center; font-weight:700; color:var(--accent-caramel);">${rule.rate}%</td>
+        <td style="padding:8px 6px; text-align:center; color:#27ae60;">${cgst}%</td>
+        <td style="padding:8px 6px; text-align:center; color:#2980b9;">${sgst}%</td>
+        <td style="padding:8px 6px; text-align:right;">
+          <button class="btn btn-secondary edit-slab-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px; margin-right:4px;"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-danger delete-slab-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px; background:rgba(231,76,60,0.08); color:#e74c3c; border-color:rgba(231,76,60,0.2);"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.edit-slab-btn').forEach(btn => {
+      btn.addEventListener('click', () => openTaxSlabRuleModal(parseInt(btn.dataset.idx)));
+    });
+    tbody.querySelectorAll('.delete-slab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        SoundEffects.playRemove();
+        taxSlabRules.splice(parseInt(btn.dataset.idx), 1);
+        localStorage.setItem('doppio_tax_slab_rules', JSON.stringify(taxSlabRules));
+        renderTaxSlabsTable();
+        showNotificationToast('Tax slab rule deleted.');
+      });
+    });
+  }
+
+  function openTaxSlabRuleModal(editIdx = -1) {
+    const modal = document.getElementById('tax-slab-rule-modal');
+    if (!modal) return;
+    document.getElementById('tax-slab-rule-edit-index').value = editIdx >= 0 ? editIdx : '';
+    document.getElementById('tax-slab-rule-modal-title').textContent = editIdx >= 0 ? 'Edit Tax Slab Rule' : 'Add Tax Slab Rule';
+    document.getElementById('slab-rule-category').value = '';
+    document.getElementById('slab-rule-rate').value = '';
+    document.getElementById('slab-rule-notes').value = '';
+    if (editIdx >= 0 && taxSlabRules[editIdx]) {
+      const r = taxSlabRules[editIdx];
+      document.getElementById('slab-rule-category').value = r.category || '';
+      document.getElementById('slab-rule-rate').value = r.rate || '';
+      document.getElementById('slab-rule-notes').value = r.notes || '';
+    }
+    modal.classList.add('active');
+  }
+
+  const addTaxSlabRuleBtn = document.getElementById('add-tax-slab-rule-btn');
+  if (addTaxSlabRuleBtn) addTaxSlabRuleBtn.addEventListener('click', () => openTaxSlabRuleModal());
+
+  const closeTaxSlabRuleModal = document.getElementById('close-tax-slab-rule-modal');
+  if (closeTaxSlabRuleModal) closeTaxSlabRuleModal.addEventListener('click', () => {
+    document.getElementById('tax-slab-rule-modal')?.classList.remove('active');
+  });
+  const cancelTaxSlabRuleBtn = document.getElementById('cancel-tax-slab-rule-btn');
+  if (cancelTaxSlabRuleBtn) cancelTaxSlabRuleBtn.addEventListener('click', () => {
+    document.getElementById('tax-slab-rule-modal')?.classList.remove('active');
+  });
+
+  const confirmTaxSlabRuleBtn = document.getElementById('confirm-tax-slab-rule-btn');
+  if (confirmTaxSlabRuleBtn) confirmTaxSlabRuleBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const category = document.getElementById('slab-rule-category')?.value.trim();
+    const rate     = parseFloat(document.getElementById('slab-rule-rate')?.value);
+    const notes    = document.getElementById('slab-rule-notes')?.value.trim();
+    if (!category) { alert('Category is required.'); return; }
+    if (isNaN(rate) || rate < 0 || rate > 28) { alert('Enter a valid GST rate (0–28%).'); return; }
+    const editIdx = document.getElementById('tax-slab-rule-edit-index')?.value;
+    const record = { category, rate, notes };
+    if (editIdx !== '' && taxSlabRules[parseInt(editIdx)]) {
+      taxSlabRules[parseInt(editIdx)] = record;
+    } else {
+      taxSlabRules.push(record);
+    }
+    localStorage.setItem('doppio_tax_slab_rules', JSON.stringify(taxSlabRules));
+    document.getElementById('tax-slab-rule-modal')?.classList.remove('active');
+    renderTaxSlabsTable();
+    showNotificationToast('Tax slab rule saved.');
+  });
+
+  // GST rate configurator
+  const taxSlabGstRate = document.getElementById('tax-slab-gst-rate');
+  const taxSlabCgstPreview = document.getElementById('tax-slab-cgst-preview');
+  const taxSlabSgstPreview = document.getElementById('tax-slab-sgst-preview');
+
+  function updateTaxSlabPreviews() {
+    const rate = parseFloat(taxSlabGstRate?.value) || 18;
+    if (taxSlabCgstPreview) taxSlabCgstPreview.textContent = (rate / 2).toFixed(1) + '%';
+    if (taxSlabSgstPreview) taxSlabSgstPreview.textContent = (rate / 2).toFixed(1) + '%';
+    document.querySelectorAll('.tax-preset-chip').forEach(chip => {
+      chip.classList.toggle('active', parseFloat(chip.dataset.rate) === rate);
+    });
+  }
+
+  if (taxSlabGstRate) taxSlabGstRate.addEventListener('input', updateTaxSlabPreviews);
+
+  document.querySelectorAll('.tax-preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (taxSlabGstRate) taxSlabGstRate.value = chip.dataset.rate;
+      updateTaxSlabPreviews();
+    });
+  });
+
+  const saveTaxSlabBtn = document.getElementById('save-tax-slab-btn');
+  if (saveTaxSlabBtn) saveTaxSlabBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const rate  = parseFloat(taxSlabGstRate?.value);
+    const label = document.getElementById('tax-slab-label')?.value.trim();
+    if (isNaN(rate) || rate < 0 || rate > 28) { alert('Enter a valid GST rate (0–28%).'); return; }
+    const config = { gstRate: rate, label: label || `GST ${rate}%` };
+    localStorage.setItem('doppio_tax_config', JSON.stringify(config));
+    // Apply to businessProfile so next bill uses this rate
+    if (businessProfile) businessProfile.gstRate = rate;
+    if (supabaseClient) {
+      supabaseClient.from('doppio_settings').upsert({ tenant_id: activeTenantId, key: 'tax_config', value: config }).then();
+    }
+    showNotificationToast(`Tax rate set to ${rate}% (CGST ${rate/2}% + SGST ${rate/2}%).`);
+  });
+
+  // Load saved tax config into UI
+  (function loadTaxSlabConfig() {
+    const saved = JSON.parse(localStorage.getItem('doppio_tax_config') || 'null');
+    if (saved && taxSlabGstRate) {
+      taxSlabGstRate.value = saved.gstRate ?? 18;
+      const labelEl = document.getElementById('tax-slab-label');
+      if (labelEl) labelEl.value = saved.label || '';
+      updateTaxSlabPreviews();
+    }
+    renderTaxSlabsTable();
+  })();
 
   // Export CSV generator
   const convertToCSV = billsDomain.convertToCSV;
@@ -7255,6 +9543,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     document.getElementById('profile-name-input').value = businessProfile.name;
     document.getElementById('profile-address-input').value = businessProfile.address;
     document.getElementById('profile-phone-input').value = businessProfile.phone;
+    document.getElementById('profile-number-of-tables').value = businessProfile.numberOfTables || 6;
 
     document.getElementById('profile-gst-enabled').checked = businessProfile.gstEnabled;
     document.getElementById('profile-gst-rate').value = businessProfile.gstRate || 18;
@@ -7967,6 +10256,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const name = document.getElementById('profile-name-input').value.trim();
       const address = document.getElementById('profile-address-input').value.trim();
       const phone = document.getElementById('profile-phone-input').value.trim();
+      const numberOfTables = parseInt(document.getElementById('profile-number-of-tables').value) || 6;
       const gstEnabled = document.getElementById('profile-gst-enabled').checked;
       const gstRate = parseFloat(document.getElementById('profile-gst-rate').value) || 0;
       const loyaltyEnabled = document.getElementById('profile-loyalty-enabled').checked;
@@ -8007,6 +10297,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
       businessProfile = {
         name, address, phone,
+        numberOfTables,
         gstEnabled, gstRate,
         loyaltyEnabled, loyaltyRate,
         passcodeLockEnabled,
@@ -8475,10 +10766,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       renderMenuEditor();
     } else if (tabId === 'crm-tab') {
       renderCRMTab();
+      renderFeedbackTable();
+      loadLoyaltyRulesUI();
     } else if (tabId === 'tax-tab') {
       renderTaxTab();
     } else if (tabId === 'employees-tab') {
       renderEmployeesTab();
+      renderBulkPayrollTable();
+      renderPayrollHistory();
     } else if (tabId === 'growth-hub-tab') {
       renderGrowthHub();
     } else if (tabId === 'online-tab') {
@@ -10274,6 +12569,38 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   if (shiftPillBtn) shiftPillBtn.addEventListener('click', handleShiftPillClick);
   if (shiftLockBtn) shiftLockBtn.addEventListener('click', handleShiftPillClick);
 
+  // Emergency shift lock bypass handler
+  const shiftBypassBtn = document.getElementById('shift-lock-bypass-btn');
+  if (shiftBypassBtn) {
+    shiftBypassBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (confirm('⚠️ Emergency Bypass: This will allow billing without a formal shift (local only). Continue?')) {
+        const tempShift = {
+          shiftId: `TEMP-SHIFT-${Date.now()}`,
+          cashierName: 'Emergency Mode',
+          openedAt: new Date().toISOString(),
+          closedAt: null,
+          openingFloat: 0,
+          expectedCash: 0,
+          actualCash: 0,
+          variance: 0,
+          totalSalesCash: 0,
+          totalSalesUpi: 0,
+          totalSalesCard: 0,
+          totalPayouts: 0,
+          totalSafeDrops: 0,
+          status: 'TEMP_OPEN',
+          notes: 'Emergency bypass mode (local-only)',
+          isEmergencyBypass: true
+        };
+        activeShift = tempShift;
+        localStorage.setItem('doppio_current_shift', JSON.stringify(activeShift));
+        evaluateShiftStatusUI();
+        showNotificationToast('⚠️ Emergency bypass mode active (local-only)');
+      }
+    });
+  }
+
   // Modals operations
   const shiftOpenModal = document.getElementById('shift-open-modal');
   const closeShiftOpenModal = document.getElementById('close-shift-open-modal');
@@ -10856,14 +13183,20 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     try {
       const parsed = JSON.parse(localStorage.getItem('doppio_tables_state'));
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        for (let i = 1; i <= 6; i++) {
+        for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
           if (!parsed[i]) parsed[i] = "EMPTY";
         }
         return parsed;
       }
-      const initial = activeTenantId
-        ? { 1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" }
-        : { 1: "EMPTY", 2: "EMPTY", 3: "ORDERING", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
+      const initial = {};
+      const numTables = businessProfile.numberOfTables || 6;
+      for (let i = 1; i <= numTables; i++) {
+        initial[i] = "EMPTY";
+      }
+      if (!activeTenantId && numTables >= 3) {
+        initial[3] = "ORDERING";
+      }
+      return initial;
       localStorage.setItem('doppio_tables_state', JSON.stringify(initial));
       return initial;
     } catch (e) {
@@ -11256,7 +13589,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     // Occupied tables count
     const occupiedCount = Object.values(tablesState).filter(val => val !== "EMPTY").length;
     if (activeTablesSummary) {
-      activeTablesSummary.textContent = `${occupiedCount} / 6 Tables Occupied`;
+      activeTablesSummary.textContent = `${occupiedCount} / ${businessProfile.numberOfTables || 6} Tables Occupied`;
     }
   }
 
@@ -11271,7 +13604,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     if (!tablesMapGrid) return;
     tablesMapGrid.innerHTML = '';
 
-    for (let tableId = 1; tableId <= 6; tableId++) {
+    for (let tableId = 1; tableId <= (businessProfile.numberOfTables || 6); tableId++) {
       const state = tablesState[tableId] || "EMPTY";
       const card = document.createElement('div');
       card.className = `table-card state-${state.toLowerCase()}`;
@@ -11326,7 +13659,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     tablesMapGrid.querySelectorAll('.simulate-scan').forEach(btn => {
       btn.addEventListener('click', () => {
         const tblNum = btn.getAttribute('data-table');
-        const simulateLink = `${window.location.origin}/index.html?table=${tblNum}`;
+        const simulateLink = `${window.location.origin}/home.html?table=${tblNum}`;
         SoundEffects.playClick();
         window.open(simulateLink, '_blank');
       });
@@ -11595,7 +13928,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       console.warn("Sound effects clicked play bypassed", e);
     }
 
-    const lockedLink = `${window.location.origin}/index.html?table=${tableNum}`;
+    const lockedLink = `${window.location.origin}/home.html?table=${tableNum}`;
     const formattedTitle = `Table 0${tableNum} QR Ordering Station`;
 
     if (qrViewerTitle) {
@@ -11769,24 +14102,16 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       const orderNum = document.getElementById('order-num').value;
       const billIdToSave = editingBillId || orderNum;
 
-      const isGstEnabled = businessProfile.gstEnabled !== false;
-      const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-      const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-      const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-
-      let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      let loyaltyDiscount = 0;
-      let matchedCustomer = null;
-      if (phoneNum || custName) {
-        matchedCustomer = crmData.find(c => (phoneNum && c.phone === phoneNum.slice(-10)) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
-      }
-      if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-        loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-      }
-
-      const taxableAmount = subtotal - loyaltyDiscount;
-      const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-      const total = taxableAmount + gst;
+      const totals = billingDomain.calculateCartTotals({
+        cart,
+        businessProfile,
+        customers: crmData,
+        customerName: custName,
+        customerPhone: phoneNum.slice(-10),
+        discountType,
+        discountValue
+      });
+      const { subtotal, totalDiscount, gst, total } = totals;
 
       const tempBill = {
         orderId: billIdToSave,
@@ -11795,7 +14120,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         dateTime: new Date().toLocaleString('en-IN'),
         items: [...cart],
         subtotal: subtotal,
-        discount: loyaltyDiscount,
+        discount: totalDiscount,
         gst: gst,
         total: total,
         paymentMethod: selectedPaymentMethod,
@@ -12588,7 +14913,19 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     if (kdsCountPreparing) kdsCountPreparing.textContent = `${preparingCount} Cooking`;
     if (kdsCountReady) kdsCountReady.textContent = `${readyCount} Ready to Serve`;
 
-    const cookingOrders = pendingQrOrders.filter(o => o.status === 'Accepted');
+    // Sort orders: urgent first, then by time (oldest first)
+    const cookingOrders = pendingQrOrders.filter(o => o.status === 'Accepted').sort((a, b) => {
+      const priorityOrder = { 'urgent': 0, 'normal': 1 };
+      const aPriority = a.priority || 'normal';
+      const bPriority = b.priority || 'normal';
+      if (priorityOrder[aPriority] !== priorityOrder[bPriority]) {
+        return priorityOrder[aPriority] - priorityOrder[bPriority];
+      }
+      // If same priority, sort by time (oldest first)
+      const aTime = Date.parse(a.dateTime) || 0;
+      const bTime = Date.parse(b.dateTime) || 0;
+      return aTime - bTime;
+    });
 
     if (cookingOrders.length === 0) {
       kdsGrid.innerHTML = `
@@ -12604,7 +14941,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     cookingOrders.forEach(order => {
       const card = document.createElement('div');
       const typeLower = (order.orderType || 'Takeaway').toLowerCase();
+      const priority = order.priority || 'normal';
       card.className = `kds-card type-${typeLower === 'dine-in' ? 'dine-in' : typeLower === 'swiggy' ? 'swiggy' : typeLower === 'zomato' ? 'zomato' : 'takeaway'}`;
+      
+      // Add priority border if urgent
+      if (priority === 'urgent') {
+        card.style.borderLeft = '6px solid #e74c3c';
+        card.style.boxShadow = '0 4px 12px rgba(231,76,60,0.2)';
+      }
 
       // Calculate elapsed minutes
       let elapsedMins = 0;
@@ -12643,17 +14987,21 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
       card.innerHTML = `
         <div class="kds-card-header">
-          <div class="kds-card-title">
+          <div class="kds-card-title" style="gap: 8px;">
             <i class="fa-solid fa-receipt"></i>
             <span>${order.orderId}</span>
             <span style="font-size: 10px; font-weight:600; color: var(--text-muted);">(${order.orderType || 'Takeaway'})</span>
+            ${priority === 'urgent' ? '<span style="font-size: 10px; font-weight:800; color: #e74c3c; background: rgba(231,76,60,0.1); padding: 2px 6px; border-radius: 6px;"><i class="fa-solid fa-bolt"></i> URGENT</span>' : ''}
           </div>
           <span class="kds-card-timer">${elapsedMins}m ago</span>
         </div>
         <div class="kds-items-list">
           ${itemsHtml}
         </div>
-        <div class="kds-card-footer">
+        <div class="kds-card-footer" style="gap: 8px;">
+          <button class="kds-priority-btn" data-order-id="${order.orderId}" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: ${priority === 'urgent' ? '2px solid #e74c3c' : '2px solid #f39c12'}; background: ${priority === 'urgent' ? 'rgba(231,76,60,0.1)' : 'rgba(243,156,18,0.1)'}; color: ${priority === 'urgent' ? '#e74c3c' : '#f39c12'}; font-size: 11px; font-weight: 800; cursor: pointer;">
+            <i class="fa-solid fa-${priority === 'urgent' ? 'bolt' : 'flag'}"></i> ${priority.toUpperCase()}
+          </button>
           <button class="kds-bump-btn" data-order-id="${order.orderId}">
             <i class="fa-solid fa-circle-check"></i> BUMP
           </button>
@@ -12680,6 +15028,19 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
               .eq('orderId', order.orderId).then();
           }
         });
+      });
+
+      // Priority button listener
+      const priorityBtn = card.querySelector('.kds-priority-btn');
+      priorityBtn.addEventListener('click', () => {
+        order.priority = order.priority === 'urgent' ? 'normal' : 'urgent';
+        localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+        if (supabaseClient) {
+          supabaseClient.from('doppio_pending_orders')
+            .update({ priority: order.priority })
+            .eq('orderId', order.orderId).then();
+        }
+        renderKDSTab();
       });
 
       // Bump button listener
@@ -12862,6 +15223,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       sendTableSessionToKDS();
     });
   }
+  const sendToKdsBtn = document.getElementById('send-to-kds-btn');
+  if (sendToKdsBtn) {
+    sendToKdsBtn.addEventListener('click', () => {
+      sendTakeawayToKDS();
+    });
+  }
 
   function openTableSessionModal(tableId) {
     const modal = document.getElementById('table-session-modal');
@@ -13014,7 +15381,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       paymentMethod: 'Cash',
       orderType: 'Dine-In',
       tableNumber: `0${tableId}`,
-      status: 'Accepted'
+      status: 'Accepted',
+      priority: 'normal'
     };
 
     const existingIdx = pendingQrOrders.findIndex(o => o.tableNumber === `0${tableId}` && o.status === 'Accepted');
@@ -13070,6 +15438,66 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
     renderCart();
     renderTablesMap();
+    if (typeof renderKDSTab === 'function') renderKDSTab();
+  }
+
+  function sendTakeawayToKDS() {
+    if (cart.length === 0) {
+      alert("Cannot send empty cart to KDS!");
+      return;
+    }
+
+    const orderId = `TAKE-${Date.now().toString().slice(-4)}`;
+    const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+    const orderType = activeOrderTypeBtn ? activeOrderTypeBtn.dataset.type : 'Takeaway';
+    const customerName = document.getElementById('cust-name').value || 'Walk-in Customer';
+    const customerPhone = document.getElementById('cust-phone').value || '';
+
+    const takeawayOrder = {
+      orderId: orderId,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      dateTime: new Date().toLocaleString('en-IN'),
+      items: [...cart],
+      subtotal: cart.reduce((sum, item) => sum + (item.price * item.qty), 0),
+      discount: 0,
+      gst: 0,
+      total: cart.reduce((sum, item) => sum + (item.price * item.qty), 0),
+      paymentMethod: document.querySelector('.pay-method-btn.active')?.dataset.method || 'Cash',
+      orderType: orderType,
+      tableNumber: '',
+      status: 'Accepted',
+      priority: activePriority
+    };
+
+    pendingQrOrders.push(takeawayOrder);
+
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders').insert({
+        orderId: takeawayOrder.orderId,
+        customerName: takeawayOrder.customerName,
+        customerPhone: takeawayOrder.customerPhone,
+        items: JSON.stringify(takeawayOrder.items),
+        subtotal: takeawayOrder.subtotal,
+        discount: takeawayOrder.discount,
+        gst: takeawayOrder.gst,
+        total: takeawayOrder.total,
+        paymentMethod: takeawayOrder.paymentMethod,
+        orderType: takeawayOrder.orderType,
+        tableNumber: takeawayOrder.tableNumber,
+        status: takeawayOrder.status,
+        dateTime: takeawayOrder.dateTime
+      }).then();
+    }
+
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+    SoundEffects.playSuccess();
+    showNotificationToast(`Sent ${orderType} order to KDS!`);
+
+    // Clear the cart after sending to KDS
+    cart = [];
+    localStorage.setItem('doppio_cart', JSON.stringify(cart));
+    renderCart();
     if (typeof renderKDSTab === 'function') renderKDSTab();
   }
 
@@ -13313,6 +15741,200 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const totalEstPayroll = validEmps.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
     if (empStatPayroll) empStatPayroll.textContent = `₹${totalEstPayroll.toLocaleString('en-IN')}`;
   }
+
+  // ==========================================
+  // PAYROLL MANAGEMENT
+  // ==========================================
+  let payrollHistory = JSON.parse(localStorage.getItem('doppio_payroll_history') || '[]');
+
+  function calcLopForEmployee(empId) {
+    const now = new Date();
+    const monthStr = now.toISOString().slice(0, 7); // "YYYY-MM"
+    const approved = leaveRequests.filter(r =>
+      r && r.employeeId === empId &&
+      r.status === 'Approved' &&
+      r.startDate && r.startDate.startsWith(monthStr)
+    );
+    return approved.reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+  }
+
+  function renderBulkPayrollTable() {
+    const tbody   = document.getElementById('bulk-payroll-table-body');
+    const totalEl = document.getElementById('bulk-payroll-total');
+    if (!tbody) return;
+
+    const validEmps = employees.filter(e => e && e.id && e.name);
+    if (validEmps.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:12px; text-align:center; font-size:11px; color:var(--text-muted);">No employees found.</td></tr>`;
+      if (totalEl) totalEl.textContent = '₹0';
+      return;
+    }
+
+    let grandTotal = 0;
+    tbody.innerHTML = validEmps.map(emp => {
+      const lop     = calcLopForEmployee(emp.id);
+      const result  = peopleDomain.calculatePayroll(emp.baseSalary || 0, lop);
+      grandTotal   += result.net;
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:6px 4px; font-weight:600; color:var(--primary-brand); font-size:11px;">${escHtml(emp.name)}</td>
+        <td style="padding:6px 4px; text-align:center; font-size:11px; color:${lop > 0 ? '#e74c3c' : 'var(--text-muted)'};">${lop}</td>
+        <td style="padding:6px 4px; text-align:right; font-size:11px;">₹${Math.round(result.gross).toLocaleString('en-IN')}</td>
+        <td style="padding:6px 4px; text-align:right; font-size:11px; color:#e74c3c;">-₹${Math.round(result.deductions).toLocaleString('en-IN')}</td>
+        <td style="padding:6px 4px; text-align:right; font-size:11px; font-weight:700; color:var(--primary-brand);">₹${Math.round(result.net).toLocaleString('en-IN')}</td>
+      </tr>`;
+    }).join('');
+
+    if (totalEl) totalEl.textContent = `₹${Math.round(grandTotal).toLocaleString('en-IN')}`;
+  }
+
+  function renderPayrollHistory() {
+    const tbody   = document.getElementById('payroll-history-table-body');
+    const emptyEl = document.getElementById('payroll-history-empty');
+    if (!tbody) return;
+
+    const sorted = [...payrollHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (sorted.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    tbody.innerHTML = sorted.map((run, idx) => {
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05); cursor:pointer;" class="payroll-history-row" data-idx="${idx}">
+        <td style="padding:8px 6px; font-weight:700; color:var(--primary-brand); font-size:11px;">${escHtml(run.month)}</td>
+        <td style="padding:8px 6px; text-align:center; font-size:11px;">${run.staffCount}</td>
+        <td style="padding:8px 6px; text-align:right; font-weight:700; font-size:11px; color:var(--accent-caramel);">₹${Math.round(run.totalNet).toLocaleString('en-IN')}</td>
+        <td style="padding:8px 6px; text-align:center; font-size:11px; color:var(--text-muted);">${escHtml(run.mode || '-')}</td>
+        <td style="padding:8px 6px; text-align:right;">
+          <button class="btn btn-secondary view-payroll-run-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px;"><i class="fa-solid fa-eye"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.view-payroll-run-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const run = sorted[parseInt(btn.dataset.idx)];
+        if (!run) return;
+        const lines = (run.entries || []).map(e =>
+          `${e.name.padEnd(18)} | LOP:${String(e.lop).padStart(2)} | Gross:₹${String(Math.round(e.gross)).padStart(7)} | Net:₹${String(Math.round(e.net)).padStart(7)}`
+        ).join('\n');
+        alert(`Payroll Run: ${run.month}\nMode: ${run.mode}\n\n${lines}\n\nTotal Net: ₹${Math.round(run.totalNet).toLocaleString('en-IN')}`);
+      });
+    });
+  }
+
+  function exportPayrollCSV() {
+    if (payrollHistory.length === 0) {
+      showNotificationToast('No payroll history to export.');
+      return;
+    }
+    const rows = [['Month', 'Employee', 'Base Salary', 'LOP Days', 'Gross', 'PF', 'PT', 'TDS', 'Deductions', 'Net Pay', 'Mode']];
+    payrollHistory.forEach(run => {
+      (run.entries || []).forEach(e => {
+        rows.push([run.month, e.name, e.baseSalary, e.lop,
+          Math.round(e.gross), Math.round(e.pf), Math.round(e.pt),
+          Math.round(e.tds), Math.round(e.deductions), Math.round(e.net), run.mode]);
+      });
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `payroll_history_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const recalcBulkPayrollBtn = document.getElementById('recalc-bulk-payroll-btn');
+  if (recalcBulkPayrollBtn) {
+    recalcBulkPayrollBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      renderBulkPayrollTable();
+      showNotificationToast('Payroll recalculated.');
+    });
+  }
+
+  const runBulkPayrollBtn = document.getElementById('run-bulk-payroll-btn');
+  if (runBulkPayrollBtn) {
+    runBulkPayrollBtn.addEventListener('click', () => {
+      const monthEl = document.getElementById('bulk-payroll-month');
+      const modeEl  = document.getElementById('bulk-payroll-mode');
+      const month   = monthEl?.value;
+      const mode    = modeEl?.value || 'Bank Transfer';
+
+      if (!month) { alert('Please select a payroll month before running.'); return; }
+      if (!confirm(`Run payroll for ${month} via ${mode}? This will be recorded in history.`)) return;
+
+      SoundEffects.playSuccess();
+      const validEmps = employees.filter(e => e && e.id && e.name);
+      const entries = validEmps.map(emp => {
+        const lop    = calcLopForEmployee(emp.id);
+        const result = peopleDomain.calculatePayroll(emp.baseSalary || 0, lop);
+        return {
+          name: emp.name,
+          baseSalary: emp.baseSalary || 0,
+          lop,
+          gross:       result.gross,
+          pf:          result.pf,
+          pt:          result.pt,
+          tds:         result.tds,
+          deductions:  result.deductions,
+          net:         result.net
+        };
+      });
+
+      const totalNet = entries.reduce((s, e) => s + e.net, 0);
+      const run = {
+        month,
+        mode,
+        staffCount: validEmps.length,
+        totalNet,
+        entries,
+        date: new Date().toISOString()
+      };
+
+      payrollHistory.unshift(run);
+      localStorage.setItem('doppio_payroll_history', JSON.stringify(payrollHistory));
+
+      if (supabaseClient) {
+        supabaseClient.from('doppio_payroll_history').insert({
+          tenant_id:   activeTenantId,
+          month,
+          mode,
+          staff_count: validEmps.length,
+          total_net:   totalNet,
+          entries:     entries,
+          created_at:  run.date
+        }).then();
+      }
+
+      renderPayrollHistory();
+      showNotificationToast(`Payroll for ${month} processed — ₹${Math.round(totalNet).toLocaleString('en-IN')} disbursed.`);
+    });
+  }
+
+  const exportPayrollCsvBtn = document.getElementById('export-payroll-csv-btn');
+  if (exportPayrollCsvBtn) exportPayrollCsvBtn.addEventListener('click', () => {
+    SoundEffects.playClick();
+    exportPayrollCSV();
+  });
+
+  // Set default payroll month to current month
+  (function initPayrollUI() {
+    const monthEl = document.getElementById('bulk-payroll-month');
+    if (monthEl && !monthEl.value) {
+      monthEl.value = new Date().toISOString().slice(0, 7);
+    }
+    renderBulkPayrollTable();
+    renderPayrollHistory();
+  })();
+
+  // Hook payroll render into employees tab activation
+  const _origRenderEmployeesTab = renderEmployeesTab;
+  // (renderBulkPayrollTable already called on init; sidebar click will also trigger it)
 
   // 4. Leave tracker submission form (Made by Antigravity)
   const leaveForm = document.getElementById('leave-request-form');
