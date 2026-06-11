@@ -1,4 +1,4 @@
-# RestoSuite Recommendation Buildout
+# RestroSuite Recommendation Buildout
 
 This repository now implements the product recommendations as a coherent zero-cost-first SaaS foundation.
 

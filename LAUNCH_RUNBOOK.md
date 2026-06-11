@@ -1,4 +1,4 @@
-# RestoSuite Production Launch Runbook
+# RestroSuite Production Launch Runbook
 
 Use this runbook before every production launch or major release. It assumes the zero-cost launch model: Vercel for hosting, Supabase for database and Edge Functions, and optional paid services only after revenue.
 

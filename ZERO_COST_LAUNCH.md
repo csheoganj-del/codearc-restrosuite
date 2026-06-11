@@ -1,6 +1,6 @@
 # Zero-Cost Launch Mode
 
-RestoSuite is configured to launch with no required paid infrastructure:
+RestroSuite is configured to launch with no required paid infrastructure:
 
 - Vercel serves the static web application.
 - Supabase provides Postgres, Realtime, authentication APIs, and Edge Functions.

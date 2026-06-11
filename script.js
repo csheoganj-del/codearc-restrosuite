@@ -1,5 +1,5 @@
 /**
- * RestoSuite — Interactive Customer Web Platform
+ * RestroSuite — Interactive Customer Web Platform
  * Contains the custom 2D Canvas Physics Engine and the Complete Rupee-Priced Interactive Menu Database
  */
 
@@ -230,7 +230,7 @@ window.addEventListener('DOMContentLoaded', () => {
         ? `<img src="${safeImage}" alt="${safeName}">`
         : `<div class="menu-item-placeholder">
              ${safeIcon}
-             <span>RestoSuite</span>
+             <span>RestroSuite</span>
            </div>`;
 
       card.innerHTML = `

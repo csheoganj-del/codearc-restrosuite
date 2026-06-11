@@ -1,4 +1,4 @@
-# RestoSuite Client Demo Script
+# RestroSuite Client Demo Script
 
 Use this flow for restaurant demos. Keep the demo practical and operations-focused.
 

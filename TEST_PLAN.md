@@ -1,7 +1,7 @@
-# CodeArc RestoSuite Test Plan
+# CodeArc RestroSuite Test Plan
 
 ## 1. Overview
-This document outlines the comprehensive test strategy for CodeArc RestoSuite - a restaurant POS and management SaaS platform.
+This document outlines the comprehensive test strategy for CodeArc RestroSuite - a restaurant POS and management SaaS platform.
 
 ## 2. Test Scope
 ### 2.1 Features to Test

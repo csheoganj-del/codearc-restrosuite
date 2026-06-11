@@ -46,7 +46,7 @@ const nodemailer = require('nodemailer');
 let emailConfig = {
     user: process.env.GMAIL_USER || '',
     pass: process.env.GMAIL_APP_PASSWORD || '',
-    fromName: process.env.FROM_NAME || 'CodeArc RestoSuite',
+    fromName: process.env.FROM_NAME || 'CodeArc RestroSuite',
     relayUrl: process.env.EMAIL_RELAY_URL || ''
 };
 const REGISTRATION_EMAILS_ENABLED = String(process.env.REGISTRATION_EMAILS_ENABLED || 'false').toLowerCase() === 'true';
@@ -249,14 +249,14 @@ async function sendAdminAlert(type, extraDetails = {}) {
     const dashboardUrl = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
 
     if (type === 'disconnected') {
-        subject = '⚠️ ALERT: RestoSuite WhatsApp Gateway Disconnected';
+        subject = '⚠️ ALERT: RestroSuite WhatsApp Gateway Disconnected';
         bodyHtml = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #ef4444;border-radius:8px;color:#333;">
           <div style="background:#fef2f2;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
             <h1 style="color:#dc2626;font-size:22px;margin:0;">⚠️ WhatsApp Gateway OFFLINE</h1>
             <p style="color:#64748b;font-size:13px;margin:6px 0 0;">Immediate Attention Required</p>
           </div>
-          <p>The <strong>RestoSuite WhatsApp notification gateway</strong> has gone <strong style="color:#dc2626;">OFFLINE</strong>.</p>
+          <p>The <strong>RestroSuite WhatsApp notification gateway</strong> has gone <strong style="color:#dc2626;">OFFLINE</strong>.</p>
           <div style="background:#f8fafc;padding:14px;border-radius:6px;margin:16px 0;border-left:4px solid #ef4444;">
             <table style="font-size:13px;width:100%;">
               <tr><td style="font-weight:bold;width:160px;padding:3px 0;">Status:</td><td style="color:#dc2626;font-weight:bold;">DISCONNECTED ❌</td></tr>
@@ -281,17 +281,17 @@ async function sendAdminAlert(type, extraDetails = {}) {
               <li>Or restart the HuggingFace Space to trigger auto-reconnect</li>
             </ol>
           </div>
-          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     } else if (type === 'online') {
-        subject = '✅ RESOLVED: RestoSuite WhatsApp Gateway is Back Online';
+        subject = '✅ RESOLVED: RestroSuite WhatsApp Gateway is Back Online';
         bodyHtml = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #22c55e;border-radius:8px;color:#333;">
           <div style="background:#f0fdf4;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
             <h1 style="color:#16a34a;font-size:22px;margin:0;">✅ WhatsApp Gateway ONLINE</h1>
             <p style="color:#64748b;font-size:13px;margin:6px 0 0;">All notifications are working normally</p>
           </div>
-          <p>The RestoSuite WhatsApp gateway has <strong style="color:#16a34a;">successfully reconnected</strong> and is fully operational.</p>
+          <p>The RestroSuite WhatsApp gateway has <strong style="color:#16a34a;">successfully reconnected</strong> and is fully operational.</p>
           <div style="background:#f8fafc;padding:14px;border-radius:6px;margin:16px 0;border-left:4px solid #22c55e;">
             <table style="font-size:13px;width:100%;">
               <tr><td style="font-weight:bold;width:160px;padding:3px 0;">Status:</td><td style="color:#16a34a;font-weight:bold;">READY ✅</td></tr>
@@ -301,10 +301,10 @@ async function sendAdminAlert(type, extraDetails = {}) {
             </table>
           </div>
           <p style="color:#16a34a;font-weight:bold;">WhatsApp confirmations and receipts are now being sent normally. No action needed.</p>
-          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     } else if (type === 'qr_needed') {
-        subject = '📱 ACTION REQUIRED: WhatsApp QR Scan Needed — RestoSuite Gateway';
+        subject = '📱 ACTION REQUIRED: WhatsApp QR Scan Needed — RestroSuite Gateway';
         bodyHtml = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #f59e0b;border-radius:8px;color:#333;">
           <div style="background:#fffbeb;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
@@ -326,16 +326,16 @@ async function sendAdminAlert(type, extraDetails = {}) {
           <div style="text-align:center;margin:20px 0;">
             <a href="${dashboardUrl}" style="background:#f59e0b;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:14px;">Open Gateway Dashboard →</a>
           </div>
-          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     } else if (type === 'startup') {
-        subject = '🚀 INFO: RestoSuite WhatsApp Gateway Started';
+        subject = '🚀 INFO: RestroSuite WhatsApp Gateway Started';
         bodyHtml = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;color:#333;">
           <h2 style="color:#0f172a;">🚀 Gateway Server Started</h2>
-          <p>The RestoSuite WhatsApp gateway server has started/restarted at <strong>${timeStr}</strong>.</p>
+          <p>The RestroSuite WhatsApp gateway server has started/restarted at <strong>${timeStr}</strong>.</p>
           <p>Session restore: <strong>${extraDetails.sessionRestored ? '✅ Success — WhatsApp reconnecting automatically' : '⚠️ No saved session — QR scan will be needed'}</strong></p>
-          <p style="font-size:11px;color:#999;margin-top:20px;">Automated alert from CodeArc RestoSuite Gateway Monitor.</p>
+          <p style="font-size:11px;color:#999;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     }
 
@@ -653,7 +653,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CodeArc RestoSuite - WhatsApp Master Gateway</title>
+    <title>CodeArc RestroSuite - WhatsApp Master Gateway</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -905,7 +905,7 @@ app.get('/', (req, res) => {
     <div class="container">
         <div class="logo-container">
             <i class="fa-solid fa-server logo-icon"></i>
-            <h1>CodeArc RestoSuite</h1>
+            <h1>CodeArc RestroSuite</h1>
             <p class="subtitle">Platform Master WhatsApp & Email Gateway</p>
         </div>
 
@@ -1575,7 +1575,7 @@ async function handleNewRegistrationNotification(record) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
         
-        const msgText = `🎉 *Welcome to CodeArc RestoSuite!*\n\nHi there 👋\n\nYour outlet registration has been received successfully.\n\n🏪 *Outlet:* ${name}\n🍽️ *Business Type:* ${displayType}\n\n📋 *Registration Details*\n• *Outlet ID:* ${slug}\n• *Admin Username:* ${username}\n• *Email:* ${email || 'N/A'}\n• *WhatsApp:* ${formattedPhone}\n\n⏳ *Current Status:* Pending Approval\n\nOur team is reviewing your registration.\nOnce approved, you'll receive another WhatsApp message with access details and next steps.\n\nNeed help?\n📧 hello@codearc.co.in\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestoSuite Team*`;
+        const msgText = `🎉 *Welcome to CodeArc RestroSuite!*\n\nHi there 👋\n\nYour outlet registration has been received successfully.\n\n🏪 *Outlet:* ${name}\n🍽️ *Business Type:* ${displayType}\n\n📋 *Registration Details*\n• *Outlet ID:* ${slug}\n• *Admin Username:* ${username}\n• *Email:* ${email || 'N/A'}\n• *WhatsApp:* ${formattedPhone}\n\n⏳ *Current Status:* Pending Approval\n\nOur team is reviewing your registration.\nOnce approved, you'll receive another WhatsApp message with access details and next steps.\n\nNeed help?\n📧 hello@codearc.co.in\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestroSuite Team*`;
         
         try {
             await client.sendMessage(chatId, msgText);
@@ -1596,7 +1596,7 @@ async function handleNewRegistrationNotification(record) {
     if (REGISTRATION_EMAILS_ENABLED && email && (transporter || emailConfig.relayUrl)) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
-        const emailSubject = `Registration Received - CodeArc RestoSuite (Outlet: ${name})`;
+        const emailSubject = `Registration Received - CodeArc RestroSuite (Outlet: ${name})`;
         const emailHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1620,7 +1620,7 @@ async function handleNewRegistrationNotification(record) {
             <td style="padding:35px 40px 20px 40px; text-align:center;">
 
               <div style="font-size:28px; font-weight:700; color:#111827; margin-bottom:8px;">
-                Welcome to CodeArc RestoSuite
+                Welcome to CodeArc RestroSuite
               </div>
 
               <div style="font-size:15px; color:#6b7280; line-height:24px;">
@@ -1648,7 +1648,7 @@ async function handleNewRegistrationNotification(record) {
               <div style="font-size:15px; color:#374151; line-height:28px; margin-top:10px;">
                 Thank you for registering your outlet
                 <strong>${name}</strong> (${displayType})
-                with <strong>CodeArc RestoSuite</strong>.
+                with <strong>CodeArc RestroSuite</strong>.
               </div>
 
             </td>
@@ -1857,7 +1857,7 @@ async function handleApprovalNotification(record) {
             targetPhone = "91" + targetPhone;
         }
         const chatId = `${targetPhone}@c.us`;
-        const msgText = `🎉 *Account Approved & Active - CodeArc RestoSuite*\n\nHello,\n\nGreat news! Your registration request for *${name}* has been reviewed and APPROVED by CodeArc RestoSuite.\n\nYour account is now fully active!\n\n🔑 *Login Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Admin Username:* ${username}\n\n*Portal Link:* https://codearc.co.in/portal (or your server login page)\n\nYou can now log in, configure your settings, menu, inventory, and staff to get started immediately!\n\nIf you need any support, feel free to contact us:\n• 📧 Email: hello@codearc.co.in\n• 📞 Call: +91 99837 21179\n\nWelcome to RestoSuite!\n\nBest regards,\nCodeArc Operations Team`;
+        const msgText = `🎉 *Account Approved & Active - CodeArc RestroSuite*\n\nHello,\n\nGreat news! Your registration request for *${name}* has been reviewed and APPROVED by CodeArc RestroSuite.\n\nYour account is now fully active!\n\n🔑 *Login Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Admin Username:* ${username}\n\n*Portal Link:* https://codearc.co.in/portal (or your server login page)\n\nYou can now log in, configure your settings, menu, inventory, and staff to get started immediately!\n\nIf you need any support, feel free to contact us:\n• 📧 Email: hello@codearc.co.in\n• 📞 Call: +91 99837 21179\n\nWelcome to RestroSuite!\n\nBest regards,\nCodeArc Operations Team`;
         
         try {
             await client.sendMessage(chatId, msgText);
@@ -1875,7 +1875,7 @@ async function handleApprovalNotification(record) {
 
     // Approval emails are owned by the Supabase notify-registration function.
     if (REGISTRATION_EMAILS_ENABLED && email && (transporter || emailConfig.relayUrl)) {
-        const emailSubject = `✅ Account Approved & Active - CodeArc RestoSuite (Outlet: ${name})`;
+        const emailSubject = `✅ Account Approved & Active - CodeArc RestroSuite (Outlet: ${name})`;
         const emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; color: #333;">
           <h2 style="color: #22c55e; border-bottom: 2px solid #22c55e; padding-bottom: 10px;">🎉 Account Approved & Active</h2>
@@ -1905,7 +1905,7 @@ async function handleApprovalNotification(record) {
             <li>📞 Call: +91 99837 21179</li>
           </ul>
           
-          <p style="font-size: 11px; color: #999; margin-top: 20px; text-align: center;">Welcome to the CodeArc RestoSuite platform!</p>
+          <p style="font-size: 11px; color: #999; margin-top: 20px; text-align: center;">Welcome to the CodeArc RestroSuite platform!</p>
         </div>
         `;
 
@@ -2475,7 +2475,7 @@ app.get('/health', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log('\n======================================================');
-    console.log(` RestoSuite WhatsApp Gateway running at:`);
+    console.log(` RestroSuite WhatsApp Gateway running at:`);
     console.log(` http://localhost:${PORT}`);
     console.log('======================================================');
 

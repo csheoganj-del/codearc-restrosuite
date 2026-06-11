@@ -1,4 +1,4 @@
-# RestoSuite — Full-System Audit & Hardening Report
+# RestroSuite — Full-System Audit & Hardening Report
 
 **Date:** 2026-06-11 · **Scope:** Web app, dashboard modules, Supabase edge functions & migrations, Android wrapper, WhatsApp gateway, deployment config, docs, tests.
 

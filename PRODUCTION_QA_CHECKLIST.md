@@ -1,4 +1,4 @@
-# RestoSuite Production QA Checklist
+# RestroSuite Production QA Checklist
 
 Run this checklist after every production deployment.
 

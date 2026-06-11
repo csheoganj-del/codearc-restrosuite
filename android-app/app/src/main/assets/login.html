@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#172033">
-  <meta name="description" content="Sign in to your CodeArc RestoSuite workspace or request registration for a new restaurant outlet.">
+  <meta name="description" content="Sign in to your CodeArc RestroSuite workspace or request registration for a new restaurant outlet.">
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" href="images/restrosuite-mark.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>RestoSuite Access | Sign In or Register Your Outlet</title>
+  <title>RestroSuite Access | Sign In or Register Your Outlet</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="/config.js"></script>
@@ -468,7 +468,7 @@
       }
     }
 
-    /* RestoSuite access experience */
+    /* RestroSuite access experience */
     :root {
       --bg-dark: #fffdfa;
       --bg-surface: #f7f8fa;
@@ -1222,9 +1222,9 @@
 <body>
 
   <header class="access-header">
-    <a class="access-brand" href="index.html" aria-label="CodeArc RestoSuite home">
+    <a class="access-brand" href="index.html" aria-label="CodeArc RestroSuite home">
       <span class="access-brand-mark" aria-hidden="true"></span>
-      <span>CodeArc <span class="brand-product">RestoSuite</span></span>
+      <span>CodeArc <span class="brand-product">RestroSuite</span></span>
     </a>
     <a class="back-home" href="index.html"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span>Back to product overview</span></a>
   </header>
@@ -1234,7 +1234,7 @@
       <span class="story-eyebrow">Secure outlet workspace</span>
       <h1 id="access-story-title">One login for your <span>whole operation.</span></h1>
       <p>Access the tools your role needs, from billing and kitchen queues to inventory, staff controls, and management reports.</p>
-      <div class="story-flow" aria-label="RestoSuite access benefits">
+      <div class="story-flow" aria-label="RestroSuite access benefits">
         <div class="story-step"><span class="story-step-no">01</span><div><strong>Outlet-specific access</strong><span>Each business has a unique workspace ID.</span></div></div>
         <div class="story-step"><span class="story-step-no">02</span><div><strong>Role-controlled tools</strong><span>Staff only see approved operational areas.</span></div></div>
         <div class="story-step"><span class="story-step-no">03</span><div><strong>Session protection</strong><span>Access is validated against active account state.</span></div></div>
@@ -1249,7 +1249,7 @@
       <div class="brand-logo">
         <div class="logo-container">
           <div class="logo-mark" style="width: 24px; height: 24px; border-radius: 6px; background: var(--primary-brand); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #FFF; font-weight: 800;"><i class="fa-solid fa-square-poll-horizontal"></i></div>
-          <span class="logo-text">CodeArc <span>RestoSuite</span></span>
+          <span class="logo-text">CodeArc <span>RestroSuite</span></span>
         </div>
         <h2 class="login-title" id="portal-title">Sign in to your workspace</h2>
         <p class="login-subtitle" id="portal-subtitle">Enter the outlet ID and staff credentials assigned to you.</p>
@@ -2063,7 +2063,7 @@
         updateTabState('login');
         document.getElementById('portal-title').textContent = "Sign in to your workspace";
         document.getElementById('portal-subtitle').textContent = "Enter the outlet ID and staff credentials assigned to you.";
-        document.title = "Sign In | CodeArc RestoSuite";
+        document.title = "Sign In | CodeArc RestroSuite";
         history.replaceState(null, '', 'login.html');
         errorBox.style.display = 'none';
         successBox.style.display = 'none';
@@ -2071,9 +2071,9 @@
 
       function activateRegisterTab() {
         updateTabState('register');
-        document.getElementById('portal-title').textContent = "Request a RestoSuite workspace";
+        document.getElementById('portal-title').textContent = "Request a RestroSuite workspace";
         document.getElementById('portal-subtitle').textContent = "Share your outlet and administrator details for account review.";
-        document.title = "Register Your Outlet | CodeArc RestoSuite";
+        document.title = "Register Your Outlet | CodeArc RestroSuite";
         history.replaceState(null, '', 'login.html?tab=register');
         errorBox.style.display = 'none';
         successBox.style.display = 'none';

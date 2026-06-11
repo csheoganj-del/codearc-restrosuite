@@ -1,4 +1,4 @@
-# CodeArc RestoSuite
+# CodeArc RestroSuite
 
 > Zero-cost restaurant SaaS — POS billing, KDS, inventory, CRM, WhatsApp receipts, and multi-tenant management on Vercel + Supabase.
 

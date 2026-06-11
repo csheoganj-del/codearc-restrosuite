@@ -1,5 +1,5 @@
 /**
- * RestoSuite — Multi-Tenant Cashier POS & Inventory Dashboard
+ * RestroSuite — Multi-Tenant Cashier POS & Inventory Dashboard
  * Redesigned for commercial-grade touchscreen tablets and desktop PCs.
  * Keeps existing brown-cream branding, Supabase sync, and synthesiser chimes.
  */
@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Mobile brand title
     const mobileBrand = document.getElementById('mobile-brand-text');
-    if (mobileBrand) mobileBrand.textContent = activeTenantName || 'RestoSuite';
+    if (mobileBrand) mobileBrand.textContent = activeTenantName || 'RestroSuite';
 
     // Sidebar avatar + user details
     const sidebarAvatarLetter = document.getElementById('sidebar-avatar-letter');
@@ -224,18 +224,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // QR viewer modal brand
     const qrModalBrand = document.getElementById('qr-modal-brand-name');
-    if (qrModalBrand) qrModalBrand.textContent = (activeTenantName || 'RestoSuite').toUpperCase().slice(0, 8);
+    if (qrModalBrand) qrModalBrand.textContent = (activeTenantName || 'RestroSuite').toUpperCase().slice(0, 8);
 
     // Window title
-    document.title = `${activeTenantName || 'RestoSuite'} — Dashboard`;
+    document.title = `${activeTenantName || 'RestroSuite'} — Dashboard`;
 
     // Payslip preview header
     const payslipHeaderName = document.getElementById('payslip-header-name');
-    if (payslipHeaderName) payslipHeaderName.textContent = (activeTenantName || 'RestoSuite').toUpperCase();
+    if (payslipHeaderName) payslipHeaderName.textContent = (activeTenantName || 'RestroSuite').toUpperCase();
 
     // Analytics studio title
     const analyticsTitle = document.getElementById('analytics-studio-title');
-    if (analyticsTitle) analyticsTitle.textContent = `${activeTenantName || 'RestoSuite'} — Analytics Studio`;
+    if (analyticsTitle) analyticsTitle.textContent = `${activeTenantName || 'RestroSuite'} — Analytics Studio`;
   })();
 
   staffAccessDomain.initialize({
@@ -457,7 +457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Global Exception Logger for POS Diagnostics
   window.onerror = function (msg, url, lineNo, columnNo, error) {
-    console.error(`[RestoSuite POS Crash Alert] Error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
+    console.error(`[RestroSuite POS Crash Alert] Error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
     const errIndicator = document.createElement('div');
     errIndicator.style.position = 'fixed';
     errIndicator.style.bottom = '10px';
@@ -936,7 +936,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return null;
     }
   })() || {
-    name: activeTenantName || 'RestoSuite',
+    name: activeTenantName || 'RestroSuite',
     address: '',
     phone: '',
     gstEnabled: false,
@@ -3898,8 +3898,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Android vocal announcement
     if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
       const engText = editingBillId
-        ? (activeTenantName || 'RestoSuite') + ". Bill " + billIdToSave + " updated!"
-        : (activeTenantName || 'RestoSuite') + ". Payment of Rupees " + total + " received!";
+        ? (activeTenantName || 'RestroSuite') + ". Bill " + billIdToSave + " updated!"
+        : (activeTenantName || 'RestroSuite') + ". Payment of Rupees " + total + " received!";
       window.AndroidInterface.speak(engText);
     }
 
@@ -6533,7 +6533,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       printWindow.document.write(`
         <html>
         <head>
-          <title>RestoSuite - Stock &amp; Inventory Report</title>
+          <title>RestroSuite - Stock &amp; Inventory Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
@@ -6552,7 +6552,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="header">
             <div>
               <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">${escHtml(activeTenantName || 'RestoSuite')} — POS &amp; Inventory Control</p>
+              <p class="meta">${escHtml(activeTenantName || 'RestroSuite')} — POS &amp; Inventory Control</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Stock Level Inventory Report</h2>
@@ -6574,7 +6574,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </tbody>
           </table>
           <div class="footer">
-            ${escHtml(activeTenantName || 'RestoSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
+            ${escHtml(activeTenantName || 'RestroSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
           </div>
           <script>
             window.onload = function() {
@@ -6694,7 +6694,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       printWindow.document.write(`
         <html>
         <head>
-          <title>RestoSuite - Low Stock Alert Report</title>
+          <title>RestroSuite - Low Stock Alert Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e74c3c; padding-bottom: 15px; margin-bottom: 20px; }
@@ -6713,7 +6713,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="header">
             <div>
               <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">${escHtml(activeTenantName || 'RestoSuite')} — POS &amp; Inventory Control</p>
+              <p class="meta">${escHtml(activeTenantName || 'RestroSuite')} — POS &amp; Inventory Control</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Low Stock Alert Report</h2>
@@ -6735,7 +6735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </tbody>
           </table>
           <div class="footer">
-            ${escHtml(activeTenantName || 'RestoSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
+            ${escHtml(activeTenantName || 'RestroSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
           </div>
           <script>
             window.onload = function() {
@@ -6887,7 +6887,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       printWindow.document.write(`
         <html>
         <head>
-          <title>RestoSuite - Sales &amp; Revenue Audit Report</title>
+          <title>RestroSuite - Sales &amp; Revenue Audit Report</title>
           <style>
             body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
@@ -6912,7 +6912,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="header">
             <div>
               <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">${escHtml(activeTenantName || 'RestoSuite')} — Analytics Studio</p>
+              <p class="meta">${escHtml(activeTenantName || 'RestroSuite')} — Analytics Studio</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Sales & Revenue Audit Report</h2>
@@ -6970,7 +6970,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </tbody>
           </table>
           <div class="footer">
-            ${escHtml(activeTenantName || 'RestoSuite')} - Authorized Financial Ledger Document
+            ${escHtml(activeTenantName || 'RestroSuite')} - Authorized Financial Ledger Document
           </div>
           <script>
             window.onload = function() {
@@ -9084,7 +9084,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const lockBrandNameEl = document.getElementById('lock-brand-name');
       const lockBrandDescEl = document.getElementById('lock-brand-desc');
       if (lockBrandNameEl) {
-        lockBrandNameEl.textContent = 'RESTOSUITE';
+        lockBrandNameEl.textContent = 'RestroSuite';
         if (lockBrandDescEl) lockBrandDescEl.textContent = 'CodeArc Staff Access';
       }
 
@@ -9193,7 +9193,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
     if (lockBrandNameEl) {
       if (activeTenantName === 'SaaS Platform Owner') {
-        lockBrandNameEl.textContent = 'RESTOSUITE';
+        lockBrandNameEl.textContent = 'RestroSuite';
         if (lockBrandDescEl) lockBrandDescEl.textContent = 'CodeArc Staff Access';
       } else {
         lockBrandNameEl.textContent = activeTenantName.toUpperCase();
@@ -9843,7 +9843,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         notifications: JSON.parse(localStorage.getItem('doppio_notifications')) || [],
         // Metadata
         timestamp: new Date().toISOString(),
-        branch: activeTenantName || "RestoSuite",
+        branch: activeTenantName || "RestroSuite",
         version: "2.0"
       };
 
@@ -14005,8 +14005,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         </head>
         <body>
           <div class="print-frame">
-            <div class="logo">${escHtml(activeTenantName || 'RestoSuite')}</div>
-            <div style="font-size:9px; text-transform:uppercase; letter-spacing:3px; font-weight:700; color:#C88A58; margin-bottom: 20px;">${escHtml(activeTenantName || 'RestoSuite')}</div>
+            <div class="logo">${escHtml(activeTenantName || 'RestroSuite')}</div>
+            <div style="font-size:9px; text-transform:uppercase; letter-spacing:3px; font-weight:700; color:#C88A58; margin-bottom: 20px;">${escHtml(activeTenantName || 'RestroSuite')}</div>
             <div class="table-num">TABLE ${table}</div>
             <div class="qr-box">
               <img src="${qrUrl}" style="width: 200px; height: 200px; object-fit: contain;">
@@ -16096,7 +16096,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         if (actionsSection) actionsSection.style.display = 'none';
 
         const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>' + (activeTenantName || 'RestoSuite') + ' - Salary Slip</title>');
+        printWindow.document.write('<html><head><title>' + (activeTenantName || 'RestroSuite') + ' - Salary Slip</title>');
         printWindow.document.write('<style>body{font-family:sans-serif;padding:20px;color:#000;}table{width:100%;border-collapse:collapse;margin:15px 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background:#f5f5f5;}hr{border:none;border-top:1px dashed #ddd;margin:15px 0;}.no-print{display:none;}</style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write(printArea.innerHTML);
@@ -16130,7 +16130,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       if (printArea) {
         printArea.innerHTML = `
           <div style="text-align: center; border-bottom: 2px solid var(--primary-brand); padding-bottom: 10px; margin-bottom: 15px;">
-            <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 18px; font-weight:800;">${escHtml((activeTenantName || 'RestoSuite').toUpperCase())}</h2>
+            <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 18px; font-weight:800;">${escHtml((activeTenantName || 'RestroSuite').toUpperCase())}</h2>
             <span style="font-size: 10px; color: var(--text-muted);">${escHtml(businessProfile.address || '')}</span>
             <h3 style="margin: 5px 0 0 0; font-size: 12px; font-weight:700;">SALARY SLIP / PAYSLIP</h3>
           </div>

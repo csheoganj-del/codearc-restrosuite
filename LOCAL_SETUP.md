@@ -1,6 +1,6 @@
-# Local Setup Guide for RestoSuite
+# Local Setup Guide for RestroSuite
 
-This guide will help you set up RestoSuite for local development and testing.
+This guide will help you set up RestroSuite for local development and testing.
 
 ## Prerequisites
 

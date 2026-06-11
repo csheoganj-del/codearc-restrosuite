@@ -2,7 +2,7 @@
   "name": "codearc-restrosuite",
   "version": "2.0.0",
   "private": true,
-  "description": "RestoSuite zero-cost restaurant SaaS on Vercel and Supabase, with an optional WhatsApp gateway add-on.",
+  "description": "RestroSuite zero-cost restaurant SaaS on Vercel and Supabase, with an optional WhatsApp gateway add-on.",
   "scripts": {
     "start:gateway": "node whatsapp-gateway.js",
     "check:free-tier": "node scripts/check-free-tier.cjs",

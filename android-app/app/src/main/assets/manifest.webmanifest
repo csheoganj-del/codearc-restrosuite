@@ -1,6 +1,6 @@
 {
-  "name": "CodeArc RestoSuite",
-  "short_name": "RestoSuite",
+  "name": "CodeArc RestroSuite",
+  "short_name": "RestroSuite",
   "description": "Restaurant POS, kitchen, inventory, billing, and customer ordering.",
   "start_url": "/login",
   "scope": "/",

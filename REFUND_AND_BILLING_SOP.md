@@ -1,4 +1,4 @@
-# RestoSuite Refund and Billing SOP
+# RestroSuite Refund and Billing SOP
 
 This SOP covers SaaS subscription refunds and future paid billing. Restaurant-to-customer food refunds are managed by each restaurant.
 

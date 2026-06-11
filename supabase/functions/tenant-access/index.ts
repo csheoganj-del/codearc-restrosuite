@@ -308,10 +308,10 @@ async function sendRecoveryEmail(email: string, tenant: Record<string, unknown>,
     },
     body: JSON.stringify({
       to: email,
-      subject: "RestoSuite credential recovery",
+      subject: "RestroSuite credential recovery",
       html: `
         <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#1f2937">
-          <h2>Reset your RestoSuite password</h2>
+          <h2>Reset your RestroSuite password</h2>
           <p>A credential recovery request was received for <strong>${escapeHtml(tenant.name || "your outlet")}</strong>.</p>
           <p><strong>Outlet ID:</strong> ${escapeHtml(tenant.slug)}<br><strong>Username:</strong> ${escapeHtml(tenant.username)}</p>
           <p><a href="${resetUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Set a new password</a></p>

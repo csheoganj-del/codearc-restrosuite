@@ -1,4 +1,4 @@
-# RestoSuite Support SOP
+# RestroSuite Support SOP
 
 This process keeps support fast, calm, and measurable while the SaaS is still operating lean.
 

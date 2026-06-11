@@ -117,7 +117,7 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
             <td style="padding:35px 40px 20px 40px; text-align:center;">
 
               <div style="font-size:28px; font-weight:700; color:#111827; margin-bottom:8px;">
-                Welcome to CodeArc RestoSuite
+                Welcome to CodeArc RestroSuite
               </div>
 
               <div style="font-size:15px; color:#6b7280; line-height:24px;">
@@ -145,7 +145,7 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
               <div style="font-size:15px; color:#374151; line-height:28px; margin-top:10px;">
                 Thank you for registering your outlet
                 <strong>${name}</strong> (${displayType})
-                with <strong>CodeArc RestoSuite</strong>.
+                with <strong>CodeArc RestroSuite</strong>.
               </div>
 
             </td>
@@ -331,7 +331,7 @@ function buildApprovalEmailHtml(record: Record<string, string>): string {
   <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;color:#333;">
     <div style="text-align:center;padding:20px 0;border-bottom:2px solid #22c55e;margin-bottom:24px;">
       <h1 style="color:#16a34a;font-size:22px;margin:0;">&#127881; Account Approved & Active!</h1>
-      <p style="color:#64748b;font-size:13px;margin:6px 0 0;">CodeArc RestoSuite Platform</p>
+      <p style="color:#64748b;font-size:13px;margin:6px 0 0;">CodeArc RestroSuite Platform</p>
     </div>
 
     <p>Hello,</p>
@@ -358,7 +358,7 @@ function buildApprovalEmailHtml(record: Record<string, string>): string {
       <li>&#128231; Email: <a href="mailto:hello@codearc.co.in" style="color:#22c55e;">hello@codearc.co.in</a></li>
       <li>&#128222; Call: +91 99837 21179</li>
     </ul>
-    <p style="font-size:11px;color:#999;margin-top:20px;text-align:center;">Welcome to the CodeArc RestoSuite platform!</p>
+    <p style="font-size:11px;color:#999;margin-top:20px;text-align:center;">Welcome to the CodeArc RestroSuite platform!</p>
   </div>`;
 }
 
@@ -372,7 +372,7 @@ function buildAdminNewRegistrationEmailHtml(record: Record<string, string>): str
       <h1 style="color:#1e40af;font-size:20px;margin:0;">&#128276; New Outlet Registration</h1>
       <p style="color:#64748b;font-size:12px;margin:4px 0 0;">Action Required — Review & Approve</p>
     </div>
-    <p>A new outlet has registered on the RestoSuite portal. Please review and approve it from the Super Admin dashboard.</p>
+    <p>A new outlet has registered on the RestroSuite portal. Please review and approve it from the Super Admin dashboard.</p>
 
     <div style="background:#eff6ff;padding:16px;border-radius:8px;margin:16px 0;border-left:4px solid #3b82f6;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -389,7 +389,7 @@ function buildAdminNewRegistrationEmailHtml(record: Record<string, string>): str
     <div style="text-align:center;margin:24px 0;">
       <a href="https://codearc-restrosuite.vercel.app/login" style="background:#3b82f6;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:13px;display:inline-block;">Open Super Admin Dashboard →</a>
     </div>
-    <p style="font-size:11px;color:#999;text-align:center;">Automated notification from CodeArc RestoSuite.</p>
+    <p style="font-size:11px;color:#999;text-align:center;">Automated notification from CodeArc RestroSuite.</p>
   </div>`;
 }
 
@@ -438,7 +438,7 @@ serve(async (req: Request) => {
         try {
           await sendEmail(
             customerEmail,
-            `Registration Received – CodeArc RestoSuite (${record.name})`,
+            `Registration Received – CodeArc RestroSuite (${record.name})`,
             buildRegistrationEmailHtml(record)
           );
           console.log(`[Edge Email] Registration confirmation sent to customer: ${customerEmail}`);
@@ -505,7 +505,7 @@ serve(async (req: Request) => {
           try {
             await sendEmail(
               customerEmail,
-              `✅ Account Approved & Active – CodeArc RestoSuite (${record.name})`,
+              `✅ Account Approved & Active – CodeArc RestroSuite (${record.name})`,
               buildApprovalEmailHtml(record)
             );
             console.log(`[Edge Email] Approval email sent to: ${customerEmail}`);

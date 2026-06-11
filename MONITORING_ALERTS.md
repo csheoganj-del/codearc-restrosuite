@@ -1,4 +1,4 @@
-# RestoSuite Monitoring and Alerts
+# RestroSuite Monitoring and Alerts
 
 Start with free monitoring and upgrade only when revenue or scale requires it.
 

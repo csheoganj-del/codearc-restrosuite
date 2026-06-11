@@ -1,4 +1,4 @@
-# RestoSuite Android POS Assets Synchronisation Script
+# RestroSuite Android POS Assets Synchronisation Script
 # Run this script whenever you update your web files to sync them with the Android App assets.
 
 $SourceDir = $PSScriptRoot

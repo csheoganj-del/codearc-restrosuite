@@ -112,7 +112,7 @@
     tabId: '',
     label: 'Getting Started',
     icon: 'fa-compass',
-    subtitle: 'Your enabled RestoSuite workspace',
+    subtitle: 'Your enabled RestroSuite workspace',
     description: 'This tour only covers features enabled for your plan and staff role. You can reopen Help & Setup from the sidebar at any time.',
     firstAction: 'Start with Business Profile, import your menu and inventory, configure tax and staff access, then run one complete test order.'
   };
@@ -244,7 +244,7 @@
         <header class="product-guide-header">
           <div>
             <span class="product-guide-eyebrow">HELP &amp; SETUP</span>
-            <h2 id="product-guide-title">RestoSuite Workspace Guide</h2>
+            <h2 id="product-guide-title">RestroSuite Workspace Guide</h2>
             <p>Instructions are filtered to your enabled plan features and staff permissions.</p>
           </div>
           <button type="button" class="product-guide-close" data-guide-close aria-label="Close help guide">&times;</button>

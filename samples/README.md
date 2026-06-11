@@ -1,4 +1,4 @@
-# RestoSuite Import Templates
+# RestroSuite Import Templates
 
 Use the CSV files as separate sheets in one Excel workbook. Keep these exact sheet names:
 

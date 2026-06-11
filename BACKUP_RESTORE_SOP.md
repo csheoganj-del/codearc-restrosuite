@@ -1,4 +1,4 @@
-# RestoSuite Backup and Restore SOP
+# RestroSuite Backup and Restore SOP
 
 Backups protect restaurant operations from mistakes, imports, and accidental data loss.
 

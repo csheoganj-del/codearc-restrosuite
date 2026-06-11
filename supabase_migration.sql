@@ -1,4 +1,4 @@
-﻿-- Multi-Tenant SaaS DB Migration Script
+-- Multi-Tenant SaaS DB Migration Script
 -- Run this in your Supabase SQL Editor to transform your tables.
 
 -- 1. Create the tenants table

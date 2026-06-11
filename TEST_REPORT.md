@@ -1,4 +1,4 @@
-# CodeArc RestoSuite Test Report
+# CodeArc RestroSuite Test Report
 
 ## Test Execution Date
 June 11, 2026

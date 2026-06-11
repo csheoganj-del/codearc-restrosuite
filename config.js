@@ -1,5 +1,5 @@
 /**
- * config.js — RestoSuite runtime configuration loader
+ * config.js — RestroSuite runtime configuration loader
  *
  * Loaded via <script src="/config.js"> BEFORE any inline scripts.
  * Performs a synchronous XHR to /api/config so that window.__SUPABASE_URL__
