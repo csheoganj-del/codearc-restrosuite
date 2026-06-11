@@ -9132,21 +9132,40 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (shiftPill) shiftPill.style.display = 'none';
 
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      const allSaTabs = document.querySelectorAll('#super-admin-tab');
+      console.log('📑 [applyFeatureToggles] Number of #super-admin-tab elements:', allSaTabs.length);
       const saTab = document.getElementById('super-admin-tab');
       console.log('📑 [applyFeatureToggles] super-admin-tab element:', saTab);
       if (saTab) {
         saTab.classList.add('active');
-        console.log('📑 [applyFeatureToggles] super-admin-tab computed style:', window.getComputedStyle(saTab));
-        console.log('📑 [applyFeatureToggles] super-admin-tab innerHTML preview:', saTab.innerHTML.substring(0, 300));
+        const style = window.getComputedStyle(saTab);
+        console.log('📑 [applyFeatureToggles] super-admin-tab display:', style.display, 'visibility:', style.visibility, 'opacity:', style.opacity, 'position:', style.position, 'top:', style.top, 'left:', style.left);
+        console.log('📑 [applyFeatureToggles] super-admin-tab parent:', saTab.parentElement?.tagName, saTab.parentElement?.id, saTab.parentElement?.className);
+        console.log('📑 [applyFeatureToggles] super-admin-tab innerHTML preview:', saTab.innerHTML.substring(0, 500));
         // Force show everything!
-        saTab.style.display = 'flex !important';
-        saTab.style.visibility = 'visible !important';
+        saTab.style.display = 'flex';
+        saTab.style.visibility = 'visible';
+        saTab.style.opacity = '1';
+        saTab.style.position = 'relative';
         const children = saTab.querySelectorAll('*');
         children.forEach(el => {
           el.style.display = '';
           el.style.visibility = 'visible';
+          el.style.opacity = '1';
         });
         console.log('📑 [applyFeatureToggles] Forced visibility applied!');
+        // Add test element to body
+        const testDiv = document.createElement('div');
+        testDiv.textContent = 'TEST - IF YOU SEE THIS, JS IS WORKING!';
+        testDiv.style.position = 'fixed';
+        testDiv.style.top = '100px';
+        testDiv.style.left = '100px';
+        testDiv.style.zIndex = '999999';
+        testDiv.style.backgroundColor = 'red';
+        testDiv.style.color = 'white';
+        testDiv.style.padding = '20px';
+        testDiv.style.fontSize = '24px';
+        document.body.appendChild(testDiv);
       }
 
       const tabTitle = document.getElementById('tab-title');
