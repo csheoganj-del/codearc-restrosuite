@@ -19,9 +19,126 @@ try {
             # Handle CORS OPTIONS preflight
             if ($request.HttpMethod -eq "OPTIONS") {
                 $response.Headers.Add("Access-Control-Allow-Origin", "*")
-                $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
-                $response.Headers.Add("Access-Control-Allow-Methods", "POST, OPTIONS, GET")
+                $response.Headers.Add("Access-Control-Allow-Headers", "*")
+                $response.Headers.Add("Access-Control-Allow-Methods", "*")
                 $response.StatusCode = 200
+                $response.Close()
+                continue
+            }
+
+            # Serve Supabase credentials for local development
+            if ($urlPath -eq "/api/config") {
+                $response.ContentType = "application/json"
+                $response.Headers.Add("Access-Control-Allow-Origin", "*")
+                $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                $response.Headers.Add("Access-Control-Allow-Methods", "GET")
+                $response.StatusCode = 200
+
+                $envKey = ""
+                $envPath = Join-Path $PSScriptRoot ".env.local"
+                if (Test-Path $envPath) {
+                    Get-Content $envPath | ForEach-Object {
+                        if ($_ -match "^\s*SUPABASE_ANON_KEY\s*=\s*(.+)$") {
+                            $envKey = $Matches[1].Trim().Trim('"').Trim("'")
+                        }
+                    }
+                }
+                if ([string]::IsNullOrEmpty($envKey)) { $envKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk" }
+
+                # Point frontend to localhost so that functions and rest requests are proxied locally to bypass CORS
+                $localUrl = "http://localhost:8001"
+                $configJson = '{"supabaseUrl":"' + $localUrl + '","supabaseAnonKey":"' + $envKey + '"}'
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($configJson)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+                $response.Close()
+                continue
+            }
+
+            # Intercept and proxy Supabase API calls (rest/v1 and functions/v1) to avoid CORS issues locally
+            if ($urlPath.StartsWith("/functions/v1/") -or $urlPath.StartsWith("/rest/v1/")) {
+                $targetUrlBase = ""
+                $envPath = Join-Path $PSScriptRoot ".env.local"
+                if (Test-Path $envPath) {
+                    Get-Content $envPath | ForEach-Object {
+                        if ($_ -match "^\s*SUPABASE_URL\s*=\s*(.+)$") {
+                            $targetUrlBase = $Matches[1].Trim().Trim('"').Trim("'")
+                        }
+                    }
+                }
+                if ([string]::IsNullOrEmpty($targetUrlBase)) {
+                    $targetUrlBase = "https://htkauiibuejetimfiavs.supabase.co"
+                }
+
+                $targetUrl = $targetUrlBase.TrimEnd('/') + $request.Url.PathAndQuery
+
+                # Prepare headers
+                $headers = @{}
+                foreach ($h in $request.Headers.AllKeys) {
+                    if ($h -eq "Host" -or $h -eq "Content-Length" -or $h -eq "Connection") { continue }
+                    $headers.Add($h, $request.Headers[$h])
+                }
+
+                # Prepare body
+                $reqBody = $null
+                if ($request.HasEntityBody) {
+                    $reader = New-Object System.IO.StreamReader($request.InputStream)
+                    $reqBody = $reader.ReadToEnd()
+                    $reader.Close()
+                }
+
+                # Make remote request
+                Write-Host "[Proxy] Request: $($request.HttpMethod) $urlPath -> Target: $targetUrl" -ForegroundColor Cyan
+                if ($null -ne $reqBody) {
+                    Write-Host "[Proxy] Body: $reqBody" -ForegroundColor Gray
+                }
+                try {
+                    $webParams = @{
+                        Uri = $targetUrl
+                        Method = $request.HttpMethod
+                        Headers = $headers
+                        UseBasicParsing = $true
+                    }
+                    if ($null -ne $reqBody) {
+                        $webParams.Add("Body", $reqBody)
+                    }
+
+                    $remoteResponse = Invoke-WebRequest @webParams -ErrorAction Stop
+                    $resString = $remoteResponse.Content
+                    if ($resString -is [System.Byte[]]) {
+                        $resBytes = $resString
+                    } else {
+                        $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resString)
+                    }
+                    $statusCode = $remoteResponse.StatusCode
+                    $contentType = $remoteResponse.Headers["Content-Type"]
+                    Write-Host "[Proxy] Remote response: $statusCode ($contentType)" -ForegroundColor Green
+                } catch {
+                    $statusCode = 500
+                    Write-Warning "[Proxy] Request to remote failed: $_"
+                    if ($null -ne $_.Exception.Response) {
+                        $statusCode = $_.Exception.Response.StatusCode
+                        $stream = $_.Exception.Response.GetResponseStream()
+                        $reader = New-Object System.IO.StreamReader($stream)
+                        $rawRes = $reader.ReadToEnd()
+                        Write-Warning "[Proxy] Remote error body: $rawRes"
+                        $resBytes = [System.Text.Encoding]::UTF8.GetBytes($rawRes)
+                        $reader.Close()
+                        $contentType = $_.Exception.Response.ContentType
+                    } else {
+                        $resBytes = [System.Text.Encoding]::UTF8.GetBytes($_.Exception.Message)
+                        $contentType = "text/plain"
+                    }
+                }
+
+                # Return response with wildcard CORS headers
+                $response.ContentType = $contentType
+                $response.StatusCode = $statusCode
+                $response.Headers.Add("Access-Control-Allow-Origin", "*")
+                $response.Headers.Add("Access-Control-Allow-Headers", "*")
+                $response.Headers.Add("Access-Control-Allow-Methods", "*")
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
                 $response.Close()
                 continue
             }
@@ -83,6 +200,11 @@ try {
         } catch {
             Write-Warning "Request error: $_"
             if ($null -ne $response) {
+                Write-Warning "Response ContentLength64: $($response.ContentLength64)"
+                Write-Warning "Response Headers:"
+                foreach ($k in $response.Headers.AllKeys) {
+                    Write-Warning "  $k : $($response.Headers[$k])"
+                }
                 try { $response.Close() } catch {}
             }
         }

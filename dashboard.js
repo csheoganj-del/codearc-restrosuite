@@ -9063,25 +9063,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     });
   }
 
-  // Fix super admin tab nesting issue
-  (function fixTabNesting() {
-    const superAdminTab = document.getElementById('super-admin-tab');
-    const gatewayMonitorTab = document.getElementById('gateway-monitor-tab');
-    const reportsTab = document.getElementById('reports-tab');
-    const workspaceArea = document.querySelector('.workspace-area');
-    
-    if (superAdminTab && reportsTab && workspaceArea) {
-      // Move super-admin-tab out of reports-tab
-      reportsTab.parentNode.insertBefore(superAdminTab, reportsTab.nextSibling);
-      console.log('✅ Moved super-admin-tab out of reports-tab');
-    }
-    
-    if (gatewayMonitorTab && reportsTab && workspaceArea) {
-      // Move gateway-monitor-tab out of reports-tab
-      reportsTab.parentNode.insertBefore(gatewayMonitorTab, superAdminTab?.nextSibling || null);
-      console.log('✅ Moved gateway-monitor-tab out of reports-tab');
-    }
-  })();
+
 
   // Sidebar Feature Navigation toggling implementation
   function applyFeatureToggles() {
@@ -9158,42 +9140,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         t.style.visibility = '';
         t.style.opacity = '';
       });
-      const allSaTabs = document.querySelectorAll('#super-admin-tab');
-      console.log('📑 [applyFeatureToggles] Number of #super-admin-tab elements:', allSaTabs.length);
       const saTab = document.getElementById('super-admin-tab');
-      console.log('📑 [applyFeatureToggles] super-admin-tab element:', saTab);
-      console.log('📑 [applyFeatureToggles] super-admin-tab parent:', saTab?.parentElement, 'id:', saTab?.parentElement?.id);
       if (saTab) {
         saTab.classList.add('active');
-        // Force styles to make sure it's visible
-        saTab.style.setProperty('display', 'flex', 'important');
-        saTab.style.setProperty('visibility', 'visible', 'important');
-        saTab.style.setProperty('opacity', '1', 'important');
-        saTab.style.setProperty('position', 'relative', 'important');
-        saTab.style.setProperty('background-color', 'lightblue', 'important');
-        saTab.style.setProperty('border', '5px solid red', 'important');
-        saTab.style.setProperty('z-index', '9999', 'important');
-        
-        // Also force the parent to be visible temporarily
-        const parent = saTab.parentElement;
-        if (parent) {
-          parent.style.setProperty('display', 'flex', 'important');
-          parent.style.setProperty('visibility', 'visible', 'important');
-          parent.style.setProperty('opacity', '1', 'important');
-          parent.style.setProperty('height', '100%', 'important');
-          parent.style.setProperty('overflow-y', 'auto', 'important');
-          parent.style.setProperty('background-color', 'lightyellow', 'important');
-        }
-        
-        // Force all children of saTab to be visible
-        const allChildren = saTab.querySelectorAll('*');
-        allChildren.forEach(child => {
-          child.style.setProperty('display', 'initial', 'important');
-          child.style.setProperty('visibility', 'visible', 'important');
-          child.style.setProperty('opacity', '1', 'important');
-        });
-        
-        console.log('📑 [applyFeatureToggles] Forced visibility applied!');
       }
 
       const tabTitle = document.getElementById('tab-title');
@@ -16856,6 +16805,21 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     ].join('');
   }
 
+  let pendingListTenantsPromise = null;
+  async function listTenantsDeduplicated() {
+    if (pendingListTenantsPromise) {
+      console.log('🔄 [listTenantsDeduplicated] Reusing existing pending callTenantAdmin(list_tenants) promise...');
+      return pendingListTenantsPromise;
+    }
+    pendingListTenantsPromise = callTenantAdmin('list_tenants');
+    try {
+      const result = await pendingListTenantsPromise;
+      return result;
+    } finally {
+      pendingListTenantsPromise = null;
+    }
+  }
+
   async function renderSuperAdminTab() {
     console.log('🔄 [renderSuperAdminTab] Starting...');
     const listContainer = document.getElementById('saas-tenants-list');
@@ -16866,7 +16830,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     let tenants = [];
     try {
       console.log('🔄 [renderSuperAdminTab] Calling callTenantAdmin(list_tenants)...');
-      const result = await callTenantAdmin('list_tenants');
+      const result = await listTenantsDeduplicated();
       console.log('🔄 [renderSuperAdminTab] callTenantAdmin result:', result);
       tenants = Array.isArray(result.tenants) ? result.tenants : [];
       renderPlatformSummary(tenants);
