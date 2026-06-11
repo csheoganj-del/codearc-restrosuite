@@ -3,6 +3,22 @@ $port = 8001
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
 
+# Project root is two directories up from scripts/local/
+$projectRoot = Join-Path $PSScriptRoot "..\.."
+$projectRoot = Resolve-Path $projectRoot
+Write-Host "Project root: $projectRoot" -ForegroundColor Cyan
+
+# Load .env.local if it exists
+$envLocalPath = Join-Path $projectRoot ".env.local"
+if (Test-Path $envLocalPath) {
+    Write-Host "Loading .env.local..." -ForegroundColor Cyan
+    Get-Content $envLocalPath | ForEach-Object {
+        if ($_ -match '^\s*([^#=]+)\s*=\s*(.*)\s*$') {
+            [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+        }
+    }
+}
+
 try {
     $listener.Start()
     Write-Host "RestoSuite dev server running at: http://localhost:$port/" -ForegroundColor Green
@@ -22,6 +38,29 @@ try {
                 $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
                 $response.Headers.Add("Access-Control-Allow-Methods", "POST, OPTIONS, GET")
                 $response.StatusCode = 200
+                $response.Close()
+                continue
+            }
+
+            # Handle /api/config
+            if ($urlPath -eq "/api/config") {
+                $response.Headers.Add("Access-Control-Allow-Origin", "*")
+                $response.ContentType = "application/json"
+                
+                $supabaseUrl = [Environment]::GetEnvironmentVariable("SUPABASE_URL")
+                $supabaseAnonKey = [Environment]::GetEnvironmentVariable("SUPABASE_ANON_KEY")
+                
+                if (-not $supabaseUrl -or -not $supabaseAnonKey) {
+                    $response.StatusCode = 503
+                    $resBody = '{"error":"Service configuration is incomplete. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env.local"}'
+                } else {
+                    $response.StatusCode = 200
+                    $resBody = [System.Text.Json.JsonSerializer]::Serialize(@{ supabaseUrl = $supabaseUrl; supabaseAnonKey = $supabaseAnonKey })
+                }
+                
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resBody)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
                 $response.Close()
                 continue
             }
@@ -55,8 +94,8 @@ try {
 
             if ($urlPath -eq "/") { $urlPath = "/index.html" }
             
-            # Resolve real file path on disk
-            $filePath = Join-Path $PSScriptRoot $urlPath.Replace("/", "\")
+            # Resolve real file path on disk (from project root)
+            $filePath = Join-Path $projectRoot $urlPath.Replace("/", "\")
             
             if (Test-Path $filePath -PathType Leaf) {
                 $bytes = [System.IO.File]::ReadAllBytes($filePath)
@@ -70,6 +109,7 @@ try {
                 elseif ($ext -eq ".png") { $mime = "image/png" }
                 elseif ($ext -eq ".jpg" -or $ext -eq ".jpeg") { $mime = "image/jpeg" }
                 elseif ($ext -eq ".json") { $mime = "application/json" }
+                elseif ($ext -eq ".webmanifest") { $mime = "application/manifest+json" }
                 
                 $response.ContentType = $mime
                 $response.ContentLength64 = $bytes.Length

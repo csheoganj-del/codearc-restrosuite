@@ -16,6 +16,11 @@ $FilesToCopy = @(
     "dashboard.html",
     "login.html",
     "home.html",
+    "kds.html",
+    "qr-order.html",
+    "tokens.html",
+    "404.html",
+    "config.js",
     "supabase_migration.sql",
     "styles.css",
     "dashboard-styles.css",
@@ -28,11 +33,14 @@ $FilesToCopy = @(
     "legal.css",
     "terms.html",
     "privacy.html",
-    "refund-policy.html"
+    "refund-policy.html",
+    "robots.txt",
+    "sitemap.xml"
 )
 
 $DirectoriesToCopy = @(
-    "src"
+    "src",
+    "api"
 )
 
 # Copy individual files
