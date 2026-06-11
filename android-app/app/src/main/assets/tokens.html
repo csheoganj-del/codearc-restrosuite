@@ -15,7 +15,7 @@
         window.location.replace('login.html');
         return;
       }
-      document.body.classList.add('role-' + (role || 'customer_display'));
+      document.documentElement.classList.add('role-' + (role || 'customer_display'));
       document.documentElement.classList.add('tokens-fullscreen');
     })();
   </script>

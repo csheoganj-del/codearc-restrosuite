@@ -3651,7 +3651,8 @@ input:checked + .slider:before {
 }
 
 /* Superadmin only has 3 items in bottom nav */
-.role-superadmin .mobile-bottom-nav {
+html.role-superadmin .mobile-bottom-nav,
+body.role-superadmin .mobile-bottom-nav {
   grid-template-columns: repeat(3, 1fr) !important;
 }
 

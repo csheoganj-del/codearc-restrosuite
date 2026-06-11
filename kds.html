@@ -15,7 +15,7 @@
         window.location.replace('login.html');
         return;
       }
-      document.body.classList.add('role-' + (role || 'kitchen'));
+      document.documentElement.classList.add('role-' + (role || 'kitchen'));
       document.documentElement.classList.add('kds-fullscreen');
     })();
   </script>

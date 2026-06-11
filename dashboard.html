@@ -19,7 +19,7 @@
         window.location.replace('login.html');
         return;
       }
-      document.body.classList.add('role-' + (role || 'cashier'));
+      document.documentElement.classList.add('role-' + (role || 'cashier'));
     })();
   </script>
   <style>
@@ -27,48 +27,65 @@
     .superadmin-only {
       display: none !important;
     }
-    .role-superadmin .client-only {
+    html.role-superadmin .client-only,
+    body.role-superadmin .client-only {
       display: none !important;
     }
-    .role-superadmin .superadmin-only {
+    html.role-superadmin .superadmin-only,
+    body.role-superadmin .superadmin-only {
       display: inline !important;
     }
-    .role-superadmin div.superadmin-only,
-    .role-superadmin a.superadmin-only {
+    html.role-superadmin div.superadmin-only,
+    html.role-superadmin a.superadmin-only,
+    body.role-superadmin div.superadmin-only,
+    body.role-superadmin a.superadmin-only {
       display: flex !important;
     }
-    .role-superadmin .sidebar-menu a:not(#sidebar-super-admin-link):not(#sidebar-gateway-monitor-link) {
+    html.role-superadmin .sidebar-menu a:not(#sidebar-super-admin-link):not(#sidebar-gateway-monitor-link),
+    body.role-superadmin .sidebar-menu a:not(#sidebar-super-admin-link):not(#sidebar-gateway-monitor-link) {
       display: none !important;
     }
-    .role-superadmin #sidebar-super-admin-link,
-    .role-superadmin #sidebar-gateway-monitor-link {
+    html.role-superadmin #sidebar-super-admin-link,
+    html.role-superadmin #sidebar-gateway-monitor-link,
+    body.role-superadmin #sidebar-super-admin-link,
+    body.role-superadmin #sidebar-gateway-monitor-link {
       display: flex !important;
     }
-    .role-superadmin .header-center-metrics,
-    .role-superadmin #notifications-bell,
-    .role-superadmin #open-profile-btn,
-    .role-superadmin #header-shift-pill {
+    html.role-superadmin .header-center-metrics,
+    html.role-superadmin #notifications-bell,
+    html.role-superadmin #open-profile-btn,
+    html.role-superadmin #header-shift-pill,
+    body.role-superadmin .header-center-metrics,
+    body.role-superadmin #notifications-bell,
+    body.role-superadmin #open-profile-btn,
+    body.role-superadmin #header-shift-pill {
       display: none !important;
     }
     /* Mobile nav: hide client tabs for superadmin */
-    .role-superadmin .mobile-bottom-nav .mobile-nav-client {
+    html.role-superadmin .mobile-bottom-nav .mobile-nav-client,
+    body.role-superadmin .mobile-bottom-nav .mobile-nav-client {
       display: none !important;
     }
     /* Mobile nav: show superadmin tabs */
-    .role-superadmin .mobile-bottom-nav .mobile-nav-superadmin {
+    html.role-superadmin .mobile-bottom-nav .mobile-nav-superadmin,
+    body.role-superadmin .mobile-bottom-nav .mobile-nav-superadmin {
       display: flex !important;
     }
     /* Mobile more sheet: hide client links for superadmin */
-    .role-superadmin .more-sheet-link.client-only {
+    html.role-superadmin .more-sheet-link.client-only,
+    body.role-superadmin .more-sheet-link.client-only {
       display: none !important;
     }
     /* Mobile more sheet: show superadmin links */
-    .role-superadmin .more-sheet-link.superadmin-only {
+    html.role-superadmin .more-sheet-link.superadmin-only,
+    body.role-superadmin .more-sheet-link.superadmin-only {
       display: flex !important;
     }
     /* Mobile top header: hide client-only controls for superadmin */
-    .role-superadmin #mobile-notifications-bell,
-    .role-superadmin #mobile-profile-btn {
+    html.role-superadmin #mobile-notifications-bell,
+    html.role-superadmin #mobile-profile-btn,
+    body.role-superadmin #mobile-notifications-bell,
+    body.role-superadmin #mobile-profile-btn {
       display: none !important;
     }
 
@@ -82,15 +99,21 @@
     }
     
     /* Default tab display before JS loaded */
-    body:not(.js-loaded) .role-cashier #pos-tab,
-    body:not(.js-loaded) .role-admin #pos-tab,
-    body:not(.js-loaded) .role-waiter #qr-orders-tab,
-    body:not(.js-loaded) .role-kitchen #kds-tab,
-    body:not(.js-loaded) .role-customer_display #tokens-tab {
+    html.role-cashier body:not(.js-loaded) #pos-tab,
+    html.role-admin body:not(.js-loaded) #pos-tab,
+    html.role-waiter body:not(.js-loaded) #qr-orders-tab,
+    html.role-kitchen body:not(.js-loaded) #kds-tab,
+    html.role-customer_display body:not(.js-loaded) #tokens-tab,
+    body.role-cashier:not(.js-loaded) #pos-tab,
+    body.role-admin:not(.js-loaded) #pos-tab,
+    body.role-waiter:not(.js-loaded) #qr-orders-tab,
+    body.role-kitchen:not(.js-loaded) #kds-tab,
+    body.role-customer_display:not(.js-loaded) #tokens-tab {
       display: flex !important;
       flex-direction: column;
     }
-    body:not(.js-loaded) .role-superadmin #super-admin-tab {
+    html.role-superadmin body:not(.js-loaded) #super-admin-tab,
+    body.role-superadmin:not(.js-loaded) #super-admin-tab {
       display: flex !important;
       flex-direction: column;
     }

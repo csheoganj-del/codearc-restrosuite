@@ -1154,7 +1154,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateNetworkStatus(true);
 
         // Disable shiftEnabled in Supabase cloud db once for migration v4
-        if (localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
+        const loggedInRole = sessionStorage.getItem('logged_in_role');
+        if (loggedInRole !== 'superadmin' && localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
           supabaseClient.from('doppio_business_profile').update({ shift_enabled: false }).eq('tenant_id', activeTenantId)
             .then(({ error }) => {
               if (!error) {
@@ -11096,7 +11097,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     // 2. Load from Supabase in real-time
-    if (supabaseClient) {
+    if (supabaseClient && sessionStorage.getItem('logged_in_role') !== 'superadmin') {
       try {
         const { data, error } = await supabaseClient
           .from('doppio_draft_orders')
