@@ -9134,7 +9134,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       const saTab = document.getElementById('super-admin-tab');
       console.log('📑 [applyFeatureToggles] super-admin-tab element:', saTab);
-      if (saTab) saTab.classList.add('active');
+      if (saTab) {
+        saTab.classList.add('active');
+        console.log('📑 [applyFeatureToggles] super-admin-tab computed style:', window.getComputedStyle(saTab));
+        console.log('📑 [applyFeatureToggles] super-admin-tab innerHTML preview:', saTab.innerHTML.substring(0, 300));
+      }
 
       const tabTitle = document.getElementById('tab-title');
       if (tabTitle) tabTitle.textContent = "SaaS Super-Admin Console";
