@@ -9138,44 +9138,18 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       console.log('📑 [applyFeatureToggles] super-admin-tab element:', saTab);
       if (saTab) {
         saTab.classList.add('active');
-        const style = window.getComputedStyle(saTab);
-        console.log('📑 [applyFeatureToggles] super-admin-tab display:', style.display, 'visibility:', style.visibility, 'opacity:', style.opacity, 'position:', style.position, 'top:', style.top, 'left:', style.left);
-        console.log('📑 [applyFeatureToggles] super-admin-tab parent:', saTab.parentElement?.tagName, saTab.parentElement?.id, saTab.parentElement?.className);
-        console.log('📑 [applyFeatureToggles] super-admin-tab innerHTML preview:', saTab.innerHTML.substring(0, 500));
-        // Force show this tab AND ITS PARENT!
-        saTab.style.setProperty('display', 'flex', 'important');
-        saTab.style.setProperty('visibility', 'visible', 'important');
-        saTab.style.setProperty('opacity', '1', 'important');
-        saTab.style.setProperty('position', 'relative', 'important');
-        
-        // Force show parent
-        const parentEl = saTab.parentElement;
-        if (parentEl) {
-          parentEl.style.setProperty('display', 'flex', 'important');
-          parentEl.style.setProperty('visibility', 'visible', 'important');
-          parentEl.style.setProperty('opacity', '1', 'important');
-          parentEl.classList.add('active'); // Add active class to parent too just in case
+        // Make sure all elements are visible
+        saTab.style.display = 'flex';
+        saTab.style.visibility = 'visible';
+        saTab.style.opacity = '1';
+        // Also make sure the parent is visible
+        const parent = saTab.parentElement;
+        if (parent) {
+          parent.classList.add('active');
+          parent.style.display = 'flex';
+          parent.style.visibility = 'visible';
+          parent.style.opacity = '1';
         }
-        
-        const children = saTab.querySelectorAll('*');
-        children.forEach(el => {
-          el.style.display = '';
-          el.style.setProperty('visibility', 'visible', 'important');
-          el.style.setProperty('opacity', '1', 'important');
-        });
-        console.log('📑 [applyFeatureToggles] Forced visibility applied!');
-        // Add test element to body
-        const testDiv = document.createElement('div');
-        testDiv.textContent = 'TEST - IF YOU SEE THIS, JS IS WORKING!';
-        testDiv.style.position = 'fixed';
-        testDiv.style.top = '100px';
-        testDiv.style.left = '100px';
-        testDiv.style.zIndex = '999999';
-        testDiv.style.backgroundColor = 'red';
-        testDiv.style.color = 'white';
-        testDiv.style.padding = '20px';
-        testDiv.style.fontSize = '24px';
-        document.body.appendChild(testDiv);
       }
 
       const tabTitle = document.getElementById('tab-title');
