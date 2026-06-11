@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
   });
   const validateStoredDashboardSession = sessionManager.validateStoredSession;
+  let pendingListTenantsPromise = null;
 
   // ==========================================
   // SESSION GUARD (Redirect if not logged in)
@@ -16805,7 +16806,6 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     ].join('');
   }
 
-  let pendingListTenantsPromise = null;
   async function listTenantsDeduplicated() {
     if (pendingListTenantsPromise) {
       console.log('🔄 [listTenantsDeduplicated] Reusing existing pending callTenantAdmin(list_tenants) promise...');
