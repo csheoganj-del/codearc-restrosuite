@@ -16797,21 +16797,27 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   }
 
   async function renderSuperAdminTab() {
+    console.log('🔄 [renderSuperAdminTab] Starting...');
     const listContainer = document.getElementById('saas-tenants-list');
+    console.log('🔄 [renderSuperAdminTab] listContainer:', listContainer);
     if (!listContainer) return;
     listContainer.innerHTML = '<div style="padding: 32px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);"><i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #FC8019;"></i> Loading client workspace registry...</div>';
 
     let tenants = [];
     try {
+      console.log('🔄 [renderSuperAdminTab] Calling callTenantAdmin(list_tenants)...');
       const result = await callTenantAdmin('list_tenants');
+      console.log('🔄 [renderSuperAdminTab] callTenantAdmin result:', result);
       tenants = Array.isArray(result.tenants) ? result.tenants : [];
       renderPlatformSummary(tenants);
     } catch (error) {
+      console.error('❌ [renderSuperAdminTab] Error:', error);
       renderPlatformSummary([]);
       listContainer.innerHTML = `<div style="padding: 32px; text-align: center; color: #ef4444; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(239,68,68,0.1);"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Error loading workspaces: ${escHtml(error.message)}</div>`;
       return;
     }
 
+    console.log('🔄 [renderSuperAdminTab] Tenants loaded:', tenants.length, 'tenants');
     if (!tenants || tenants.length === 0) {
       listContainer.innerHTML = '<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No registered client food outlets found.</div></div>';
       return;
