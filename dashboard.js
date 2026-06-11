@@ -9299,24 +9299,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     // First boot landing page redirect using just_logged_in flag (Made by Antigravity)
-    if (sessionStorage.getItem('just_logged_in') === 'true') {
-      sessionStorage.removeItem('just_logged_in');
-      const defaultLandingTab = {
-        admin: 'pos-tab',
-        cashier: 'pos-tab',
-        waiter: 'qr-orders-tab',
-        kitchen: 'kds-tab',
-        customer_display: 'tokens-tab'
-      }[loggedInRole] || 'pos-tab';
-
-      const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
-      if (fallbackLink) {
-        fallbackLink.click();
-      }
-    } else {
-      // Redirect active tab if it got hidden or if no tab is currently active
-      const activeTabLink = document.querySelector('.sidebar-link.active');
-      if (!activeTabLink || activeTabLink.style.display === 'none') {
+    if (loggedInRole !== 'superadmin') {
+      if (sessionStorage.getItem('just_logged_in') === 'true') {
+        sessionStorage.removeItem('just_logged_in');
         const defaultLandingTab = {
           admin: 'pos-tab',
           cashier: 'pos-tab',
@@ -9328,6 +9313,23 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
         if (fallbackLink) {
           fallbackLink.click();
+        }
+      } else {
+        // Redirect active tab if it got hidden or if no tab is currently active
+        const activeTabLink = document.querySelector('.sidebar-link.active');
+        if (!activeTabLink || activeTabLink.style.display === 'none') {
+          const defaultLandingTab = {
+            admin: 'pos-tab',
+            cashier: 'pos-tab',
+            waiter: 'qr-orders-tab',
+            kitchen: 'kds-tab',
+            customer_display: 'tokens-tab'
+          }[loggedInRole] || 'pos-tab';
+
+          const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
+          if (fallbackLink) {
+            fallbackLink.click();
+          }
         }
       }
     }
