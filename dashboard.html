@@ -19,6 +19,7 @@
         window.location.replace('login.html');
         return;
       }
+      console.log('🔑 [login check] Setting role class:', role, 'on document.documentElement');
       document.documentElement.classList.add('role-' + (role || 'cashier'));
     })();
   </script>

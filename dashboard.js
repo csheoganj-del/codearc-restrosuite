@@ -9067,8 +9067,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   function applyFeatureToggles() {
     const loggedInUser = sessionStorage.getItem('logged_in_user');
     const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
+    console.log('🔍 [applyFeatureToggles] Running! loggedInRole:', loggedInRole, 'loggedInUser:', loggedInUser);
 
     if (loggedInRole === 'superadmin') {
+      console.log('✅ [applyFeatureToggles] Superadmin detected! Applying superadmin UI...');
       // Dynamically update brand name to RESTO Suite for Super-Admin
       const brandNameEl = document.getElementById('sidebar-brand-name');
       const brandTypeEl = document.getElementById('sidebar-brand-type');
@@ -9098,11 +9100,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (avatarEl && loggedInUser) avatarEl.textContent = loggedInUser.charAt(0).toUpperCase();
 
       const saLink = document.getElementById('sidebar-super-admin-link');
+      console.log('🔗 [applyFeatureToggles] sidebar-super-admin-link element:', saLink);
       if (saLink) saLink.style.display = 'flex';
       const gmLink = document.getElementById('sidebar-gateway-monitor-link');
+      console.log('🔗 [applyFeatureToggles] sidebar-gateway-monitor-link element:', gmLink);
       if (gmLink) gmLink.style.display = 'flex';
 
       const sidebarLinks = document.querySelectorAll('.sidebar-link');
+      console.log('🔗 [applyFeatureToggles] Found', sidebarLinks.length, 'sidebar links');
       sidebarLinks.forEach(link => {
         const tabId = link.getAttribute('data-tab');
         if (tabId === 'super-admin-tab' || tabId === 'gateway-monitor-tab') {
@@ -9128,6 +9133,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       const saTab = document.getElementById('super-admin-tab');
+      console.log('📑 [applyFeatureToggles] super-admin-tab element:', saTab);
       if (saTab) saTab.classList.add('active');
 
       const tabTitle = document.getElementById('tab-title');
@@ -9136,6 +9142,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (tabSubtitle) tabSubtitle.textContent = "Manage client subscriptions, features, and system access";
 
       renderSuperAdminTab();
+      console.log('✅ [applyFeatureToggles] Superadmin UI applied!');
       return;
     }
 
