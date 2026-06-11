@@ -9142,6 +9142,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       console.log('📑 [applyFeatureToggles] Number of #super-admin-tab elements:', allSaTabs.length);
       const saTab = document.getElementById('super-admin-tab');
       console.log('📑 [applyFeatureToggles] super-admin-tab element:', saTab);
+      console.log('📑 [applyFeatureToggles] super-admin-tab parent:', saTab?.parentElement, 'id:', saTab?.parentElement?.id);
       if (saTab) {
         saTab.classList.add('active');
         // Force styles to make sure it's visible
@@ -9149,6 +9150,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         saTab.style.setProperty('visibility', 'visible', 'important');
         saTab.style.setProperty('opacity', '1', 'important');
         saTab.style.setProperty('position', 'relative', 'important');
+        
+        // Also force the parent to be visible temporarily
+        const parent = saTab.parentElement;
+        if (parent) {
+          parent.style.setProperty('display', 'flex', 'important');
+          parent.style.setProperty('visibility', 'visible', 'important');
+          parent.style.setProperty('opacity', '1', 'important');
+          parent.style.setProperty('height', '100%', 'important');
+          parent.style.setProperty('overflow-y', 'auto', 'important');
+        }
         console.log('📑 [applyFeatureToggles] Forced visibility applied!');
       }
 
