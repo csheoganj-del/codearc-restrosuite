@@ -9143,15 +9143,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         console.log('📑 [applyFeatureToggles] super-admin-tab parent:', saTab.parentElement?.tagName, saTab.parentElement?.id, saTab.parentElement?.className);
         console.log('📑 [applyFeatureToggles] super-admin-tab innerHTML preview:', saTab.innerHTML.substring(0, 500));
         // Force show everything!
-        saTab.style.display = 'flex';
-        saTab.style.visibility = 'visible';
-        saTab.style.opacity = '1';
-        saTab.style.position = 'relative';
+        saTab.style.setProperty('display', 'flex', 'important');
+        saTab.style.setProperty('visibility', 'visible', 'important');
+        saTab.style.setProperty('opacity', '1', 'important');
+        saTab.style.setProperty('position', 'relative', 'important');
         const children = saTab.querySelectorAll('*');
         children.forEach(el => {
           el.style.display = '';
-          el.style.visibility = 'visible';
-          el.style.opacity = '1';
+          el.style.setProperty('visibility', 'visible', 'important');
+          el.style.setProperty('opacity', '1', 'important');
         });
         console.log('📑 [applyFeatureToggles] Forced visibility applied!');
         // Add test element to body
