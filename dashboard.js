@@ -9150,6 +9150,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         saTab.style.setProperty('visibility', 'visible', 'important');
         saTab.style.setProperty('opacity', '1', 'important');
         saTab.style.setProperty('position', 'relative', 'important');
+        saTab.style.setProperty('background-color', 'lightblue', 'important');
+        saTab.style.setProperty('border', '5px solid red', 'important');
+        saTab.style.setProperty('z-index', '9999', 'important');
         
         // Also force the parent to be visible temporarily
         const parent = saTab.parentElement;
@@ -9159,7 +9162,17 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           parent.style.setProperty('opacity', '1', 'important');
           parent.style.setProperty('height', '100%', 'important');
           parent.style.setProperty('overflow-y', 'auto', 'important');
+          parent.style.setProperty('background-color', 'lightyellow', 'important');
         }
+        
+        // Force all children of saTab to be visible
+        const allChildren = saTab.querySelectorAll('*');
+        allChildren.forEach(child => {
+          child.style.setProperty('display', 'initial', 'important');
+          child.style.setProperty('visibility', 'visible', 'important');
+          child.style.setProperty('opacity', '1', 'important');
+        });
+        
         console.log('📑 [applyFeatureToggles] Forced visibility applied!');
       }
 
