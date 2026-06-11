@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // NEVER hardcode these values here — rotate via Supabase Dashboard + Vercel env update.
   const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
   const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
-  const ZERO_COST_LAUNCH_MODE = true;
+  const ZERO_COST_LAUNCH_MODE = false;
   const ENABLE_DEMO_TOOLS = false;
   const CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
   const FAST_INTERACTION_MODE = true;

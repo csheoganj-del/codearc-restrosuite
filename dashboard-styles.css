@@ -316,7 +316,7 @@ body::before {
 }
 
 .sidebar-link {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
