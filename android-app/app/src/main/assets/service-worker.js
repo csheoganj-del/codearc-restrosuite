@@ -1,4 +1,4 @@
-const CACHE_NAME = "restrosuite-shell-v1";
+const CACHE_NAME = "restrosuite-shell-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -44,6 +44,12 @@ self.addEventListener("fetch", (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/login.html")))
+      .catch(() => caches.match(request).then((cached) => {
+        if (cached) return cached;
+        // Only fall back to the login shell for page navigations.
+        // Returning HTML for failed image/script/style requests corrupts the page.
+        if (request.mode === "navigate") return caches.match("/login.html");
+        return new Response("", { status: 504, statusText: "Offline" });
+      }))
   );
 });

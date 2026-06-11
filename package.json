@@ -6,7 +6,7 @@
   "scripts": {
     "start:gateway": "node whatsapp-gateway.js",
     "check:free-tier": "node scripts/check-free-tier.cjs",
-    "test": "node --test --test-isolation=none tests/*.test.cjs",
+    "test": "node --test tests/*.test.cjs",
     "check": "node scripts/check-project.cjs && node scripts/check-free-tier.cjs",
     "check:launch": "node scripts/check-launch.cjs",
     "hash:superadmin": "node scripts/hash-superadmin-password.cjs",

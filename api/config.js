@@ -14,8 +14,15 @@ export default function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL || '';
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+  // Normalize: tolerate values pasted with trailing slashes or the REST path
+  // (e.g. "https://<ref>.supabase.co/rest/v1/"). The frontend appends
+  // "/functions/v1/..." to this value, so it MUST be the bare project URL.
+  const supabaseUrl = (process.env.SUPABASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/(rest|auth|storage|functions)\/v1$/, '')
+    .replace(/\/+$/, '');
+  const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('[api/config] SUPABASE_URL or SUPABASE_ANON_KEY env vars are not set.');

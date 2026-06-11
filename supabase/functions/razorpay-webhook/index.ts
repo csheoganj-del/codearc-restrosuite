@@ -57,7 +57,20 @@ async function verifySignature(
     new TextEncoder().encode(rawBody),
   );
   const computed = encodeHex(new Uint8Array(signature));
-  return computed === signatureHeader;
+  return timingSafeEqual(computed, signatureHeader);
+}
+
+// Constant-time string comparison — prevents timing side-channel attacks on
+// signature verification (a simple === short-circuits on first mismatch).
+function timingSafeEqual(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────

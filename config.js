@@ -14,16 +14,27 @@
 (function () {
   'use strict';
 
+  // Normalize a Supabase project URL: the app appends "/functions/v1/..." to it,
+  // so trailing slashes or an accidental "/rest/v1" suffix must be stripped.
+  function normalizeSupabaseUrl(value) {
+    return String(value || '')
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/(rest|auth|storage|functions)\/v1$/, '')
+      .replace(/\/+$/, '');
+  }
+
   // ── Android WebView path ─────────────────────────────────────────────────────
   // Values injected by the native app before page load take precedence.
   if (window.ENV_SUPABASE_URL && window.ENV_SUPABASE_ANON_KEY) {
-    window.__SUPABASE_URL__ = window.ENV_SUPABASE_URL;
+    var nativeUrl = normalizeSupabaseUrl(window.ENV_SUPABASE_URL);
+    window.__SUPABASE_URL__ = nativeUrl;
     window.__SUPABASE_ANON_KEY__ = window.ENV_SUPABASE_ANON_KEY;
     window.CONFIG = {
-      supabase: { url: window.ENV_SUPABASE_URL, anonKey: window.ENV_SUPABASE_ANON_KEY },
+      supabase: { url: nativeUrl, anonKey: window.ENV_SUPABASE_ANON_KEY },
       functions: {
-        tenantAccess: window.ENV_SUPABASE_URL + '/functions/v1/tenant-access',
-        tenantPublic: window.ENV_SUPABASE_URL + '/functions/v1/tenant-public',
+        tenantAccess: nativeUrl + '/functions/v1/tenant-access',
+        tenantPublic: nativeUrl + '/functions/v1/tenant-public',
       }
     };
     return;
@@ -41,7 +52,7 @@
 
     if (xhr.status === 200) {
       var cfg = JSON.parse(xhr.responseText);
-      url = cfg.supabaseUrl || '';
+      url = normalizeSupabaseUrl(cfg.supabaseUrl);
       key = cfg.supabaseAnonKey || '';
     } else {
       console.error('[config.js] /api/config returned HTTP ' + xhr.status + '. Set SUPABASE_URL and SUPABASE_ANON_KEY in Vercel environment variables.');

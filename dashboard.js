@@ -9184,9 +9184,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       } else {
         const words = activeTenantName.split(' ');
         if (words.length > 1) {
-          mobileBrandTitleEl.innerHTML = `${words[0].toUpperCase()} <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">${words.slice(1).join(' ')}</span>`;
+          mobileBrandTitleEl.innerHTML = `${escHtml(words[0].toUpperCase())} <span style="font-size:16px; font-weight:500; color:var(--accent-caramel); margin-left:2px;">${escHtml(words.slice(1).join(' '))}</span>`;
         } else {
-          mobileBrandTitleEl.innerHTML = `${activeTenantName.toUpperCase()}`;
+          mobileBrandTitleEl.textContent = activeTenantName.toUpperCase();
         }
       }
     }
@@ -14973,14 +14973,16 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         if (item.sugar && item.sugar !== 'Regular') customizations.push(item.sugar);
         if (item.ice && item.ice !== 'Regular') customizations.push(item.ice);
         if (item.toppings && item.toppings.length > 0) customizations.push(item.toppings.join(', '));
-        const descHtml = customizations.length > 0 ? `<span class="kds-item-desc">${customizations.join(' | ')}</span>` : '';
+        // Escape all order-derived fields: QR guest orders flow into the KDS,
+        // so unescaped values here would be a stored-XSS vector.
+        const descHtml = customizations.length > 0 ? `<span class="kds-item-desc">${escHtml(customizations.join(' | '))}</span>` : '';
 
         return `
           <div class="kds-item-row ${checkedClass}" data-item-idx="${idx}">
             <input type="checkbox" ${checkedAttr}>
-            <span class="kds-item-qty">${item.qty}x</span>
+            <span class="kds-item-qty">${escHtml(String(item.qty))}x</span>
             <div style="flex:1;">
-              <span>${item.name}</span>
+              <span>${escHtml(item.name || '')}</span>
               ${descHtml}
             </div>
           </div>
@@ -14991,8 +14993,8 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         <div class="kds-card-header">
           <div class="kds-card-title" style="gap: 8px;">
             <i class="fa-solid fa-receipt"></i>
-            <span>${order.orderId}</span>
-            <span style="font-size: 10px; font-weight:600; color: var(--text-muted);">(${order.orderType || 'Takeaway'})</span>
+            <span>${escHtml(String(order.orderId || ''))}</span>
+            <span style="font-size: 10px; font-weight:600; color: var(--text-muted);">(${escHtml(order.orderType || 'Takeaway')})</span>
             ${priority === 'urgent' ? '<span style="font-size: 10px; font-weight:800; color: #e74c3c; background: rgba(231,76,60,0.1); padding: 2px 6px; border-radius: 6px;"><i class="fa-solid fa-bolt"></i> URGENT</span>' : ''}
           </div>
           <span class="kds-card-timer">${elapsedMins}m ago</span>
@@ -15001,10 +15003,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           ${itemsHtml}
         </div>
         <div class="kds-card-footer" style="gap: 8px;">
-          <button class="kds-priority-btn" data-order-id="${order.orderId}" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: ${priority === 'urgent' ? '2px solid #e74c3c' : '2px solid #f39c12'}; background: ${priority === 'urgent' ? 'rgba(231,76,60,0.1)' : 'rgba(243,156,18,0.1)'}; color: ${priority === 'urgent' ? '#e74c3c' : '#f39c12'}; font-size: 11px; font-weight: 800; cursor: pointer;">
+          <button class="kds-priority-btn" data-order-id="${escHtml(String(order.orderId || ''))}" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: ${priority === 'urgent' ? '2px solid #e74c3c' : '2px solid #f39c12'}; background: ${priority === 'urgent' ? 'rgba(231,76,60,0.1)' : 'rgba(243,156,18,0.1)'}; color: ${priority === 'urgent' ? '#e74c3c' : '#f39c12'}; font-size: 11px; font-weight: 800; cursor: pointer;">
             <i class="fa-solid fa-${priority === 'urgent' ? 'bolt' : 'flag'}"></i> ${priority.toUpperCase()}
           </button>
-          <button class="kds-bump-btn" data-order-id="${order.orderId}">
+          <button class="kds-bump-btn" data-order-id="${escHtml(String(order.orderId || ''))}">
             <i class="fa-solid fa-circle-check"></i> BUMP
           </button>
         </div>
