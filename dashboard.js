@@ -9138,6 +9138,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         saTab.classList.add('active');
         console.log('📑 [applyFeatureToggles] super-admin-tab computed style:', window.getComputedStyle(saTab));
         console.log('📑 [applyFeatureToggles] super-admin-tab innerHTML preview:', saTab.innerHTML.substring(0, 300));
+        // Force show everything!
+        saTab.style.display = 'flex !important';
+        saTab.style.visibility = 'visible !important';
+        const children = saTab.querySelectorAll('*');
+        children.forEach(el => {
+          el.style.display = '';
+          el.style.visibility = 'visible';
+        });
+        console.log('📑 [applyFeatureToggles] Forced visibility applied!');
       }
 
       const tabTitle = document.getElementById('tab-title');
