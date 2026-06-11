@@ -1,15 +1,32 @@
-// ==========================================
-// Configuration File for CodeArc RestoSuite Configuration
-// Centralized config to avoid hardcoding
-// ==========================================
+/**
+ * config.js — Android WebView version
+ *
+ * The native Android wrapper injects window.ENV_SUPABASE_URL and
+ * window.ENV_SUPABASE_ANON_KEY before the WebView loads any page.
+ * See MainActivity.java / WebViewActivity.java where evaluateJavascript() is called.
+ *
+ * IMPORTANT: Credentials must NEVER be hardcoded here.
+ * Store them in the Android app's BuildConfig or encrypted SharedPreferences,
+ * then inject via evaluateJavascript("window.ENV_SUPABASE_URL='...'") before loadUrl().
+ */
+(function () {
+  'use strict';
 
-const CONFIG = {
-  supabase: {
-    url: window.ENV_SUPABASE_URL || 'https://htkauiibuejetimfiavs.supabase.co',
-    anonKey: window.ENV_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk'
-  },
-  functions: {
-    tenantAccess: 'https://htkauiibuejetimfiavs.supabase.co/functions/v1/tenant-access',
-    tenantPublic: 'https://htkauiibuejetimfiavs.supabase.co/functions/v1/tenant-public',
+  var url = window.ENV_SUPABASE_URL || '';
+  var key = window.ENV_SUPABASE_ANON_KEY || '';
+
+  if (!url || !key) {
+    console.error('[config.js] ENV_SUPABASE_URL or ENV_SUPABASE_ANON_KEY not injected by native wrapper.');
   }
-};
+
+  window.__SUPABASE_URL__      = url;
+  window.__SUPABASE_ANON_KEY__ = key;
+
+  window.CONFIG = {
+    supabase: { url: url, anonKey: key },
+    functions: {
+      tenantAccess: url + '/functions/v1/tenant-access',
+      tenantPublic: url + '/functions/v1/tenant-public',
+    }
+  };
+})();

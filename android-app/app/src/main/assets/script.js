@@ -19,11 +19,13 @@ window.addEventListener('DOMContentLoaded', () => {
     return /^(https:\/\/|\/|images\/)/i.test(url) ? escHtml(url) : '';
   }
 
-  // Initialize Supabase Client (Made by Antigravity)
+  // Credentials loaded at runtime by /config.js → /api/config (Vercel env vars).
   let supabaseClient = null;
-  const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
-  const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
-  const TENANT_PUBLIC_FUNCTION_URL = `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-public`;
+  const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
+  const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
+  const TENANT_PUBLIC_FUNCTION_URL = DEFAULT_SUPABASE_URL
+    ? `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-public`
+    : '';
 
   if (typeof supabase !== 'undefined') {
     try {
