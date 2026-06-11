@@ -9131,25 +9131,25 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const shiftPill = document.getElementById('header-shift-pill');
       if (shiftPill) shiftPill.style.display = 'none';
 
-      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => {
+        t.classList.remove('active');
+        // Reset styles we might have applied
+        t.style.display = '';
+        t.style.visibility = '';
+        t.style.opacity = '';
+      });
       const allSaTabs = document.querySelectorAll('#super-admin-tab');
       console.log('📑 [applyFeatureToggles] Number of #super-admin-tab elements:', allSaTabs.length);
       const saTab = document.getElementById('super-admin-tab');
       console.log('📑 [applyFeatureToggles] super-admin-tab element:', saTab);
       if (saTab) {
         saTab.classList.add('active');
-        // Make sure all elements are visible
-        saTab.style.display = 'flex';
-        saTab.style.visibility = 'visible';
-        saTab.style.opacity = '1';
-        // Also make sure the parent is visible
-        const parent = saTab.parentElement;
-        if (parent) {
-          parent.classList.add('active');
-          parent.style.display = 'flex';
-          parent.style.visibility = 'visible';
-          parent.style.opacity = '1';
-        }
+        // Force styles to make sure it's visible
+        saTab.style.setProperty('display', 'flex', 'important');
+        saTab.style.setProperty('visibility', 'visible', 'important');
+        saTab.style.setProperty('opacity', '1', 'important');
+        saTab.style.setProperty('position', 'relative', 'important');
+        console.log('📑 [applyFeatureToggles] Forced visibility applied!');
       }
 
       const tabTitle = document.getElementById('tab-title');
