@@ -9063,6 +9063,26 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     });
   }
 
+  // Fix super admin tab nesting issue
+  (function fixTabNesting() {
+    const superAdminTab = document.getElementById('super-admin-tab');
+    const gatewayMonitorTab = document.getElementById('gateway-monitor-tab');
+    const reportsTab = document.getElementById('reports-tab');
+    const workspaceArea = document.querySelector('.workspace-area');
+    
+    if (superAdminTab && reportsTab && workspaceArea) {
+      // Move super-admin-tab out of reports-tab
+      reportsTab.parentNode.insertBefore(superAdminTab, reportsTab.nextSibling);
+      console.log('✅ Moved super-admin-tab out of reports-tab');
+    }
+    
+    if (gatewayMonitorTab && reportsTab && workspaceArea) {
+      // Move gateway-monitor-tab out of reports-tab
+      reportsTab.parentNode.insertBefore(gatewayMonitorTab, superAdminTab?.nextSibling || null);
+      console.log('✅ Moved gateway-monitor-tab out of reports-tab');
+    }
+  })();
+
   // Sidebar Feature Navigation toggling implementation
   function applyFeatureToggles() {
     const loggedInUser = sessionStorage.getItem('logged_in_user');
