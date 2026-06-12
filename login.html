@@ -1528,13 +1528,7 @@
 
       function showError(msg) {
         successBox.style.display = 'none';
-        let displayMsg = msg;
-        if (msg === 'Failed to fetch') {
-          displayMsg = 'Failed to fetch. URL: ' + (typeof TENANT_ACCESS_FUNCTION_URL !== 'undefined' ? TENANT_ACCESS_FUNCTION_URL : 'undefined') + 
-                       ' | Config Error: ' + (window.__CONFIG_ERROR__ || 'None') + 
-                       ' | URL_Var: ' + (window.__SUPABASE_URL__ || 'Empty');
-        }
-        errorBox.textContent = displayMsg;
+        errorBox.textContent = msg;
         errorBox.style.display = 'block';
         loginCard.classList.remove('shake-anim');
         void loginCard.offsetWidth; // trigger reflow
@@ -1542,6 +1536,7 @@
         if (window.AndroidInterface) window.AndroidInterface.vibrate(300);
         errorBox.focus({ preventScroll: true });
       }
+
 
 
       function showSuccess(msg) {
