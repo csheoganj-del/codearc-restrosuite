@@ -508,23 +508,23 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
 
   if (error) {
     console.error("login lookup failed:", error);
-    return jsonResponse({ error: "Authentication service unavailable." }, 500);
+    return jsonResponse({ error: "Authentication service unavailable." }, 500, req);
   }
 
   if (!tenant) {
-    return jsonResponse({ error: "Authentication Failed: Invalid Outlet ID." }, 401);
+    return jsonResponse({ error: "Authentication Failed: Invalid Outlet ID." }, 401, req);
   }
 
   if (tenant.status === "pending") {
-    return jsonResponse({ error: "Access Denied: Your registration request is pending CodeArc approval." }, 403);
+    return jsonResponse({ error: "Access Denied: Your registration request is pending CodeArc approval." }, 403, req);
   }
 
   if (tenant.status === "suspended") {
-    return jsonResponse({ error: "Access Denied: Account suspended. Please contact CodeArc support." }, 403);
+    return jsonResponse({ error: "Access Denied: Account suspended. Please contact CodeArc support." }, 403, req);
   }
 
   if (!activeSubscription(tenant.subscription_status)) {
-    return jsonResponse({ error: "Access Denied: Subscription is not active. Please contact CodeArc support." }, 402);
+    return jsonResponse({ error: "Access Denied: Subscription is not active. Please contact CodeArc support." }, 402, req);
   }
 
   const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
@@ -540,15 +540,15 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
 
   if (staffError) {
     console.error("staff login lookup failed:", staffError);
-    return jsonResponse({ error: "Authentication service unavailable." }, 500);
+    return jsonResponse({ error: "Authentication service unavailable." }, 500, req);
   }
 
   if (staffUser) {
     if (staffUser.status !== "active") {
-      return jsonResponse({ error: "Access Denied: Staff account is suspended." }, 403);
+      return jsonResponse({ error: "Access Denied: Staff account is suspended." }, 403, req);
     }
     if (!await verifyPassword(password, staffUser.password_hash)) {
-      return jsonResponse({ error: "Access Denied: Invalid Username or Password for this Outlet." }, 401);
+      return jsonResponse({ error: "Access Denied: Invalid Username or Password for this Outlet." }, 401, req);
     }
 
     if (!staffUser.password_hash.startsWith("pbkdf2$")) {
@@ -569,7 +569,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
     });
 
     if (!sessionToken) {
-      return jsonResponse({ error: "Authentication service is misconfigured: session signing secret is missing. Please contact support." }, 500);
+      return jsonResponse({ error: "Authentication service is misconfigured: session signing secret is missing. Please contact support." }, 500, req);
     }
 
     await supabaseAdmin
@@ -615,7 +615,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
   const passwordMatches = await verifyPassword(password, tenant.password_hash);
 
   if (!usernameMatches || !passwordMatches) {
-    return jsonResponse({ error: "Access Denied: Invalid Username or Password for this Outlet." }, 401);
+    return jsonResponse({ error: "Access Denied: Invalid Username or Password for this Outlet." }, 401, req);
   }
 
   if (!tenant.password_hash.startsWith("pbkdf2$")) {
@@ -637,7 +637,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
   });
 
   if (!sessionToken) {
-    return jsonResponse({ error: "Authentication service is misconfigured: session signing secret is missing. Please contact support." }, 500);
+    return jsonResponse({ error: "Authentication service is misconfigured: session signing secret is missing. Please contact support." }, 500, req);
   }
 
   return jsonResponse({
@@ -665,7 +665,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
 async function handleValidateSession(payload: Record<string, unknown>, req: Request) {
   const token = String(payload.session_token || "");
   const verified = await verifySignedSessionToken(token);
-  if (!verified.ok) return jsonResponse({ error: verified.error }, 401);
+  if (!verified.ok) return jsonResponse({ error: verified.error }, 401, req);
 
   const sessionPayload = verified.payload as Record<string, unknown>;
   if (sessionPayload.role === "superadmin") {
@@ -682,7 +682,7 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
   }
 
   const tenantId = String(sessionPayload.tenant_id || "");
-  if (!tenantId) return jsonResponse({ error: "Invalid tenant session." }, 401);
+  if (!tenantId) return jsonResponse({ error: "Invalid tenant session." }, 401, req);
 
   const { data: tenant, error } = await supabaseAdmin
     .from("saas_tenants")
@@ -692,15 +692,15 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
 
   if (error) {
     console.error("validate_session lookup failed:", error);
-    return jsonResponse({ error: "Failed to validate session." }, 500);
+    return jsonResponse({ error: "Failed to validate session." }, 500, req);
   }
 
-  if (!tenant) return jsonResponse({ error: "Workspace no longer exists." }, 401);
-  if (tenant.status !== "approved") return jsonResponse({ error: "Workspace access is not active." }, 403);
-  if (!activeSubscription(tenant.subscription_status)) return jsonResponse({ error: "Workspace subscription is not active." }, 402);
+  if (!tenant) return jsonResponse({ error: "Workspace no longer exists." }, 401, req);
+  if (tenant.status !== "approved") return jsonResponse({ error: "Workspace access is not active." }, 403, req);
+  if (!activeSubscription(tenant.subscription_status)) return jsonResponse({ error: "Workspace subscription is not active." }, 402, req);
   const userId = String(sessionPayload.user_id || "");
   if (!userId && Number(sessionPayload.auth_version) !== Number(tenant.auth_version)) {
-    return jsonResponse({ error: "Session was revoked. Please log in again." }, 401);
+    return jsonResponse({ error: "Session was revoked. Please log in again." }, 401, req);
   }
 
   const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
@@ -716,13 +716,13 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
 
     if (staffError) {
       console.error("validate staff session lookup failed:", staffError);
-      return jsonResponse({ error: "Failed to validate staff session." }, 500);
+      return jsonResponse({ error: "Failed to validate staff session." }, 500, req);
     }
     if (!staffUser || staffUser.status !== "active") {
-      return jsonResponse({ error: "Staff account is no longer active." }, 401);
+      return jsonResponse({ error: "Staff account is no longer active." }, 401, req);
     }
     if (Number(sessionPayload.session_version) !== Number(staffUser.session_version)) {
-      return jsonResponse({ error: "Session was revoked. Please log in again." }, 401);
+      return jsonResponse({ error: "Session was revoked. Please log in again." }, 401, req);
     }
 
     return jsonResponse({
@@ -783,7 +783,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   }
 
   if (password.length < 10) {
-    return jsonResponse({ error: "Password must be at least 10 characters." }, 400);
+    return jsonResponse({ error: "Password must be at least 10 characters." }, 400, req);
   }
 
   if (!/^[a-z0-9-]+$/.test(slug)) {
@@ -798,11 +798,11 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
 
   if (slugErr) {
     console.error("register slug check failed:", slugErr);
-    return jsonResponse({ error: "Failed to validate unique slug." }, 500);
+    return jsonResponse({ error: "Failed to validate unique slug." }, 500, req);
   }
 
   if (existingSlug) {
-    return jsonResponse({ error: `The Outlet ID "${slug}" is already taken. Try another unique slug.` }, 409);
+    return jsonResponse({ error: `The Outlet ID "${slug}" is already taken. Try another unique slug.` }, 409, req);
   }
 
   const { data: existingUsername, error: userErr } = await supabaseAdmin
@@ -813,11 +813,11 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
 
   if (userErr) {
     console.error("register username check failed:", userErr);
-    return jsonResponse({ error: "Failed to validate username uniqueness." }, 500);
+    return jsonResponse({ error: "Failed to validate username uniqueness." }, 500, req);
   }
 
   if (existingUsername) {
-    return jsonResponse({ error: `The username "${username}" is already in use. Choose another username.` }, 409);
+    return jsonResponse({ error: `The username "${username}" is already in use. Choose another username.` }, 409, req);
   }
 
   const passwordHash = await hashPassword(password);
@@ -835,7 +835,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
 
   if (insertErr) {
     console.error("register insert failed:", insertErr);
-    return jsonResponse({ error: "Registration failed. Please try again." }, 500);
+    return jsonResponse({ error: "Registration failed. Please try again." }, 500, req);
   }
 
   return jsonResponse({

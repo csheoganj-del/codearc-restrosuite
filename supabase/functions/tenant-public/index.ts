@@ -133,7 +133,7 @@ serve(async (req) => {
 
       if (error) {
         console.error("tenant-public list_menu failed:", error);
-        return jsonResponse({ error: "Failed to load menu." }, 500);
+        return jsonResponse({ error: "Failed to load menu." }, 500, req);
       }
 
       const { data: profileData } = await supabaseAdmin
@@ -158,7 +158,7 @@ serve(async (req) => {
           ? JSON.parse(order.items)
           : order.items;
       } catch {
-        return jsonResponse({ error: "Invalid order items." }, 400);
+        return jsonResponse({ error: "Invalid order items." }, 400, req);
       }
       if (!Array.isArray(parsedItems) || parsedItems.length === 0 || parsedItems.length > 100) {
         return jsonResponse({ error: "Invalid order items." }, 400, req);
@@ -289,7 +289,7 @@ serve(async (req) => {
       };
 
       if (safeOrder.total <= 0) {
-        return jsonResponse({ error: "Invalid order payload." }, 400);
+        return jsonResponse({ error: "Invalid order payload." }, 400, req);
       }
 
       const { error } = await supabaseAdmin.from("doppio_pending_orders").insert(safeOrder);
