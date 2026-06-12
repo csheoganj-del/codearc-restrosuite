@@ -2872,27 +2872,22 @@
                 <h3 style="margin: 0; font-size: 16px; color: var(--primary-brand); font-family: var(--font-heading);"><i class="fa-solid fa-chart-line"></i> Platform Snapshot</h3>
                 <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">Live tenant registry analytics</span>
               </div>
-              <div id="saas-platform-summary" class="growth-metric-stack">
-                <div class="growth-item">
-                  <div>
-                    <strong>Loading platform health</strong>
-                    <span>Counting active, pending, paid, and at-risk client workspaces.</span>
+              <div id="saas-platform-summary" class="saas-snapshot-grid">
+                <div class="saas-snapshot-card">
+                  <div class="saas-snapshot-card-header">
+                    <span class="saas-snapshot-card-title">Loading stats</span>
+                    <i class="fa-solid fa-spinner fa-spin" style="color: #FC8019; font-size: 14px;"></i>
                   </div>
-                  <span class="growth-pill">live</span>
+                  <div>
+                    <div class="saas-snapshot-card-value">--</div>
+                    <div class="saas-snapshot-card-subtitle">Connecting to registry...</div>
+                  </div>
                 </div>
-              </div>
-              <div class="superadmin-demo-client">
-                <span class="demo-data-badge">SAMPLE DATA</span>
-                <div>
-                  <strong>Sunrise Bistro - illustrative client readiness</strong>
-                  <span>24 menu items · 38 stock items · 12 recipes · 128 bills · 6 staff accounts</span>
-                </div>
-                <span class="growth-pill">demo only</span>
               </div>
             </div>
 
             <!-- Tenants list panel (Restored to Full Width) -->
-            <div class="report-panel" style="padding: 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex-grow: 1; min-height: 500px; display: flex; flex-direction: column; width: 100%; margin-bottom: 24px;">
+            <div id="saas-client-registry-panel" class="report-panel" style="padding: 24px; border-radius: 16px; background: #FFFFFF; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm); flex-grow: 1; min-height: 500px; display: flex; flex-direction: column; width: 100%; margin-bottom: 24px;">
               <h3 style="font-family: var(--font-heading); color: #1C1C1C; font-size: 18px; font-weight: 800; margin: 0 0 16px 0; border-bottom: 1px dashed rgba(28, 28, 28,0.08); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
                 <span><i class="fa-solid fa-store" style="color: #FC8019; margin-right: 6px;"></i> Client Workspace Registry</span>
                 <button id="btn-delete-selected-tenants" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); font-size: 11px; padding: 6px 12px; cursor: pointer; display: none; align-items: center; gap: 6px; border-radius: 6px; font-family: var(--font-body);"><i class="fa-solid fa-trash"></i> Delete Selected</button>
@@ -4464,6 +4459,22 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
           onmouseover="this.style.background='#F59E0B'; this.style.color='#fff'; this.style.borderColor='#F59E0B'"
           onmouseout="this.style.background='rgba(245,158,11,0.07)'; this.style.color='#B45309'; this.style.borderColor='rgba(245,158,11,0.3)'">
           <i class="fa-solid fa-arrow-rotate-left" style="font-size: 10px;"></i> Reset data
+        </button>
+
+        <!-- Load Demo Data button -->
+        <button type="button" id="seed-tenant-data-btn"
+          style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.07); color: #166534; cursor: pointer; transition: all 0.14s ease;"
+          onmouseover="this.style.background='#22C55E'; this.style.color='#fff'; this.style.borderColor='#22C55E'"
+          onmouseout="this.style.background='rgba(34, 197, 94, 0.07)'; this.style.color='#166534'; this.style.borderColor='rgba(34, 197, 94, 0.3)'">
+          <i class="fa-solid fa-seedling" style="font-size: 10px;"></i> Load Demo Data
+        </button>
+
+        <!-- Remove Demo Data button -->
+        <button type="button" id="purge-tenant-data-btn"
+          style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.07); color: #991B1B; cursor: pointer; transition: all 0.14s ease;"
+          onmouseover="this.style.background='#EF4444'; this.style.color='#fff'; this.style.borderColor='#EF4444'"
+          onmouseout="this.style.background='rgba(239, 68, 68, 0.07)'; this.style.color='#991B1B'; this.style.borderColor='rgba(239, 68, 68, 0.3)'">
+          <i class="fa-solid fa-trash-can" style="font-size: 10px;"></i> Remove Demo Data
         </button>
 
         <div style="display: flex; gap: 8px; align-items: center;">

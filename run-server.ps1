@@ -58,14 +58,26 @@ try {
             # Intercept and proxy Supabase API calls (rest/v1 and functions/v1) to avoid CORS issues locally
             if ($urlPath.StartsWith("/functions/v1/") -or $urlPath.StartsWith("/rest/v1/")) {
                 $targetUrlBase = ""
-                $envPath = Join-Path $PSScriptRoot ".env.local"
-                if (Test-Path $envPath) {
-                    Get-Content $envPath | ForEach-Object {
-                        if ($_ -match "^\s*SUPABASE_URL\s*=\s*(.+)$") {
-                            $targetUrlBase = $Matches[1].Trim().Trim('"').Trim("'")
+                $serviceRoleKey = ""
+                $sessionSecret = ""
+                
+                $envFiles = @("$PSScriptRoot\.env.local", "$PSScriptRoot\.env")
+                foreach ($envPath in $envFiles) {
+                    if (Test-Path $envPath) {
+                        Get-Content $envPath | ForEach-Object {
+                            if ($_ -match "^\s*SUPABASE_URL\s*=\s*(.+)$" -and [string]::IsNullOrEmpty($targetUrlBase)) {
+                                $targetUrlBase = $Matches[1].Trim().Trim('"').Trim("'")
+                            }
+                            if ($_ -match "^\s*SUPABASE_SERVICE_ROLE_KEY\s*=\s*(.+)$" -and [string]::IsNullOrEmpty($serviceRoleKey)) {
+                                $serviceRoleKey = $Matches[1].Trim().Trim('"').Trim("'")
+                            }
+                            if ($_ -match "^\s*SUPERADMIN_SESSION_SECRET\s*=\s*(.+)$" -and [string]::IsNullOrEmpty($sessionSecret)) {
+                                $sessionSecret = $Matches[1].Trim().Trim('"').Trim("'")
+                            }
                         }
                     }
                 }
+                
                 if ([string]::IsNullOrEmpty($targetUrlBase)) {
                     $targetUrlBase = "https://htkauiibuejetimfiavs.supabase.co"
                 }
@@ -85,6 +97,60 @@ try {
                     $reader = New-Object System.IO.StreamReader($request.InputStream)
                     $reqBody = $reader.ReadToEnd()
                     $reader.Close()
+                }
+
+                # Intercept seed/reset actions to run locally if service role key is available
+                if ($urlPath -eq "/functions/v1/tenant-admin" -and ![string]::IsNullOrEmpty($serviceRoleKey) -and ![string]::IsNullOrEmpty($reqBody)) {
+                    try {
+                        $bodyObj = ConvertFrom-Json $reqBody
+                        $action = $bodyObj.action
+                        if ($action -eq "seed_tenant_data" -or $action -eq "reset_tenant_data" -or $action -eq "purge_demo_data") {
+                            Write-Host "[Local Dev Backend] Intercepted $action - running local script..." -ForegroundColor Green
+                            
+                            $env:SUPABASE_URL = $targetUrlBase
+                            $env:SUPABASE_SERVICE_ROLE_KEY = $serviceRoleKey
+                            $env:SUPERADMIN_SESSION_SECRET = $sessionSecret
+                            
+                            $authHeader = $request.Headers["Authorization"]
+                            $rand = Get-Random
+                            $outFile = "$PSScriptRoot\.tmp-node-out-$rand.log"
+                            $errFile = "$PSScriptRoot\.tmp-node-err-$rand.log"
+                            
+                            $nodeArgs = @("$PSScriptRoot\scripts\tenant-admin-local.cjs", $action, $reqBody, $authHeader)
+                            $nodeProcess = Start-Process -FilePath "node" -ArgumentList $nodeArgs -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait
+                            
+                            $resBytes = @()
+                            $statusCode = 200
+                            if (Test-Path $outFile) {
+                                $resString = Get-Content $outFile -Raw
+                                if ([string]::IsNullOrEmpty($resString)) {
+                                    if (Test-Path $errFile) {
+                                        $resString = Get-Content $errFile -Raw
+                                    }
+                                }
+                                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resString)
+                            }
+                            
+                            if ($nodeProcess.ExitCode -ne 0) {
+                                $statusCode = 500
+                            }
+                            
+                            Remove-Item $outFile -ErrorAction SilentlyContinue
+                            Remove-Item $errFile -ErrorAction SilentlyContinue
+                            
+                            $response.ContentType = "application/json; charset=utf-8"
+                            $response.StatusCode = $statusCode
+                            $response.Headers.Add("Access-Control-Allow-Origin", "*")
+                            $response.Headers.Add("Access-Control-Allow-Headers", "*")
+                            $response.Headers.Add("Access-Control-Allow-Methods", "*")
+                            $response.ContentLength64 = $resBytes.Length
+                            $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+                            $response.Close()
+                            continue
+                        }
+                    } catch {
+                        Write-Warning "[Local Dev Backend] Local execution failed: $_"
+                    }
                 }
 
                 # Make remote request
@@ -121,14 +187,27 @@ try {
                         $stream = $_.Exception.Response.GetResponseStream()
                         $reader = New-Object System.IO.StreamReader($stream)
                         $rawRes = $reader.ReadToEnd()
+                        $reader.Close()
+                        
+                        # Extract JSON from error message if stream was already read and empty
+                        if ([string]::IsNullOrEmpty($rawRes)) {
+                            if ($_.Exception.Message -match '({.*})') {
+                                $rawRes = $Matches[1]
+                            } elseif ($_.ToString() -match '({.*})') {
+                                $rawRes = $Matches[1]
+                            }
+                        }
+                        
                         Write-Warning "[Proxy] Remote error body: $rawRes"
                         $resBytes = [System.Text.Encoding]::UTF8.GetBytes($rawRes)
-                        $reader.Close()
                         $contentType = $_.Exception.Response.ContentType
                     } else {
-                        $resBytes = [System.Text.Encoding]::UTF8.GetBytes($_.Exception.Message)
+                        $rawRes = $_.Exception.Message
+                        if ([string]::IsNullOrEmpty($rawRes)) { $rawRes = $_.ToString() }
+                        $resBytes = [System.Text.Encoding]::UTF8.GetBytes($rawRes)
                         $contentType = "text/plain"
                     }
+                    if ([string]::IsNullOrEmpty($contentType)) { $contentType = "application/json" }
                 }
 
                 # Return response with wildcard CORS headers
@@ -199,6 +278,7 @@ try {
             $response.Close()
         } catch {
             Write-Warning "Request error: $_"
+            Write-Warning "Stack trace: $($_.ScriptStackTrace)"
             if ($null -ne $response) {
                 Write-Warning "Response ContentLength64: $($response.ContentLength64)"
                 Write-Warning "Response Headers:"

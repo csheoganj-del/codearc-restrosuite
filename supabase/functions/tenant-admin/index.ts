@@ -383,6 +383,308 @@ async function resetTenantData(payload: Record<string, unknown>, req: Request) {
   return jsonResponse({ success: true, errors, data_reset_at: resetAt }, 200, req);
 }
 
+async function seedTenantData(payload: Record<string, unknown>, req: Request) {
+  const tenantId = String(payload.tenant_id || "").trim();
+  if (!tenantId) return jsonResponse({ error: "Tenant ID is required." }, 400, req);
+
+  // 1. Check if tenant exists
+  const { data: tenant, error: tenantError } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("id, name")
+    .eq("id", tenantId)
+    .maybeSingle();
+
+  if (tenantError || !tenant) {
+    return jsonResponse({ error: "Client workspace was not found." }, 404, req);
+  }
+
+  // 2. Clear existing operational data first to prevent duplicate key conflicts
+  const errors: string[] = [];
+  for (const table of TABLES_TO_RESET) {
+    const { error } = await supabaseAdmin.from(table).delete().eq("tenant_id", tenantId);
+    if (error) {
+      console.warn(`Failed to clear table ${table} before seeding:`, error.message);
+      errors.push(table);
+    }
+  }
+
+  // 3. Seed doppio_business_profile
+  await supabaseAdmin.from("doppio_business_profile").insert({
+    tenant_id: tenantId,
+    business_name: tenant.name,
+    address: "12, Commercial Road, Nagpur",
+    phone: "919983721179",
+    gst_number: "27AAAAA1111A1Z1",
+    upi_id: "doppio@upi",
+    shift_enabled: true,
+    whatsapp_enabled: false,
+    table_count: 12,
+    feature_flags: JSON.stringify({ seeding_disabled: true, demo_loaded: true })
+  });
+
+  // 4. Seed doppio_menu
+  const menuItems = [
+    { name: "Doppio", price: 120, category: "Hot coffee", available: true, popularity: 45 },
+    { name: "Espresso", price: 100, category: "Hot coffee", available: true, popularity: 30 },
+    { name: "Cappuccino", price: 150, category: "Hot coffee", available: true, popularity: 85 },
+    { name: "Cafe Latte", price: 160, category: "Hot coffee", available: true, popularity: 70 },
+    { name: "Iced Americano", price: 140, category: "Iced coffee", available: true, popularity: 50 },
+    { name: "Chocolate Brownie", price: 180, category: "Dessert", available: true, popularity: 90 }
+  ];
+  
+  const { data: menuData, error: menuErr } = await supabaseAdmin
+    .from("doppio_menu")
+    .insert(menuItems.map(item => ({ ...item, tenant_id: tenantId })))
+    .select();
+
+  if (menuErr) {
+    console.error("Seeding menu failed:", menuErr);
+    return jsonResponse({ error: "Failed to seed menu items." }, 500, req);
+  }
+
+  // 5. Seed doppio_inventory
+  const stockItems = [
+    { item_name: "Espresso Coffee Beans", unit: "g", minimum_limit: 1000, current_stock: 5000 },
+    { item_name: "Fresh Milk", unit: "ml", minimum_limit: 2000, current_stock: 10000 },
+    { item_name: "Chocolate Syrup", unit: "ml", minimum_limit: 500, current_stock: 2000 },
+    { item_name: "Sugar Syrup", unit: "ml", minimum_limit: 500, current_stock: 3000 },
+    { item_name: "Paper Cups 250ml", unit: "pcs", minimum_limit: 100, current_stock: 500 }
+  ];
+
+  const { data: invData, error: invErr } = await supabaseAdmin
+    .from("doppio_inventory")
+    .insert(stockItems.map(item => ({ ...item, tenant_id: tenantId })))
+    .select();
+
+  if (invErr) {
+    console.error("Seeding inventory failed:", invErr);
+    return jsonResponse({ error: "Failed to seed inventory." }, 500, req);
+  }
+
+  // 6. Seed doppio_inventory_batches (for FEFO and batch costing)
+  let batchIds: any[] = [];
+  if (invData) {
+    const batchInserts = invData.map(item => ({
+      tenant_id: tenantId,
+      inventory_item_id: item.id,
+      batch_code: "BATCH-" + Math.floor(1000 + Math.random() * 9000),
+      quantity: item.current_stock,
+      unit_cost: Math.round(50 + Math.random() * 100),
+      expiry_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+    }));
+    const { data: batchData } = await supabaseAdmin.from("doppio_inventory_batches").insert(batchInserts).select();
+    batchIds = batchData ? batchData.map((r: any) => r.id) : [];
+  }
+
+  // 7. Seed doppio_custom_recipes
+  let recipeIds: any[] = [];
+  if (menuData && invData) {
+    const doppioItem = menuData.find(m => m.name === "Doppio");
+    const espressoItem = menuData.find(m => m.name === "Espresso");
+    const cappuccinoItem = menuData.find(m => m.name === "Cappuccino");
+    const latteItem = menuData.find(m => m.name === "Cafe Latte");
+
+    const beansItem = invData.find(i => i.item_name === "Espresso Coffee Beans");
+    const milkItem = invData.find(i => i.item_name === "Fresh Milk");
+    const cupItem = invData.find(i => i.item_name === "Paper Cups 250ml");
+
+    const recipes = [];
+    if (doppioItem && beansItem && cupItem) {
+      recipes.push({ menu_item_id: doppioItem.id, inventory_item_id: beansItem.id, quantity_required: 18 });
+      recipes.push({ menu_item_id: doppioItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
+    }
+    if (espressoItem && beansItem && cupItem) {
+      recipes.push({ menu_item_id: espressoItem.id, inventory_item_id: beansItem.id, quantity_required: 9 });
+      recipes.push({ menu_item_id: espressoItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
+    }
+    if (cappuccinoItem && beansItem && milkItem && cupItem) {
+      recipes.push({ menu_item_id: cappuccinoItem.id, inventory_item_id: beansItem.id, quantity_required: 9 });
+      recipes.push({ menu_item_id: cappuccinoItem.id, inventory_item_id: milkItem.id, quantity_required: 150 });
+      recipes.push({ menu_item_id: cappuccinoItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
+    }
+    if (latteItem && beansItem && milkItem && cupItem) {
+      recipes.push({ menu_item_id: latteItem.id, inventory_item_id: beansItem.id, quantity_required: 9 });
+      recipes.push({ menu_item_id: latteItem.id, inventory_item_id: milkItem.id, quantity_required: 200 });
+      recipes.push({ menu_item_id: latteItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
+    }
+
+    if (recipes.length > 0) {
+      const { data: recipeData } = await supabaseAdmin.from("doppio_custom_recipes").insert(recipes.map(r => ({ ...r, tenant_id: tenantId }))).select();
+      recipeIds = recipeData ? recipeData.map((r: any) => r.id) : [];
+    }
+  }
+
+  // 8. Seed doppio_employees
+  const employees = [
+    { name: "Amit Sharma", role: "cashier", salary: 15000, shift: "Morning Shift (09:00 - 17:00)", status: "active" },
+    { name: "Rajesh Verma", role: "kitchen", salary: 22000, shift: "Morning Shift (09:00 - 17:00)", status: "active" },
+    { name: "Pooja Patel", role: "waiter", salary: 12000, shift: "Evening Shift (17:00 - 01:00)", status: "active" }
+  ];
+  const { data: empData } = await supabaseAdmin.from("doppio_employees").insert(employees.map(e => ({ ...e, tenant_id: tenantId }))).select();
+  const employeeIds = empData ? empData.map((r: any) => r.id) : [];
+
+  // 9. Seed doppio_bills
+  let billIds: any[] = [];
+  if (menuData) {
+    const bills = [];
+    const paymentModes = ["Cash", "UPI", "Card"];
+    for (let i = 7; i >= 1; i--) {
+      const count = Math.floor(2 + Math.random() * 2);
+      for (let j = 0; j < count; j++) {
+        const item1 = menuData[Math.floor(Math.random() * menuData.length)];
+        const item2 = menuData[Math.floor(Math.random() * menuData.length)];
+        const qty1 = Math.floor(1 + Math.random() * 2);
+        const qty2 = Math.floor(1 + Math.random() * 2);
+
+        const itemsSold = [
+          { name: item1.name, price: item1.price, quantity: qty1, subtotal: item1.price * qty1 },
+          { name: item2.name, price: item2.price, quantity: qty2, subtotal: item2.price * qty2 }
+        ];
+        const subtotal = (item1.price * qty1) + (item2.price * qty2);
+        const gst = Math.round(subtotal * 0.05);
+        const grandTotal = subtotal + gst;
+
+        const billDate = new Date(Date.now() - i * 24 * 60 * 60 * 1000 + j * 2 * 60 * 60 * 1000);
+
+        bills.push({
+          tenant_id: tenantId,
+          bill_date: billDate.toISOString(),
+          items: JSON.stringify(itemsSold),
+          subtotal,
+          discount: 0,
+          gst,
+          grand_total: grandTotal,
+          payment_mode: paymentModes[Math.floor(Math.random() * paymentModes.length)],
+          table_number: String(Math.floor(1 + Math.random() * 10)),
+          order_type: Math.random() > 0.3 ? "dine-in" : "takeaway",
+          settled: true
+        });
+      }
+    }
+    const { data: billData } = await supabaseAdmin.from("doppio_bills").insert(bills).select();
+    billIds = billData ? billData.map((r: any) => r.id) : [];
+  }
+
+  // 10. Update doppio_business_profile feature_flags with the list of seeded record IDs
+  const demoDataIds = {
+    menu: menuData ? menuData.map((r: any) => r.id) : [],
+    inventory: invData ? invData.map((r: any) => r.id) : [],
+    inventory_batches: batchIds,
+    recipes: recipeIds,
+    employees: employeeIds,
+    bills: billIds
+  };
+
+  await supabaseAdmin
+    .from("doppio_business_profile")
+    .update({
+      feature_flags: JSON.stringify({
+        seeding_disabled: true,
+        demo_loaded: true,
+        demo_data_ids: demoDataIds
+      })
+    })
+    .eq("tenant_id", tenantId);
+
+  return jsonResponse({ success: true }, 200, req);
+}
+
+async function purgeTenantDemoData(payload: Record<string, unknown>, req: Request) {
+  const tenantId = String(payload.tenant_id || "").trim();
+  if (!tenantId) return jsonResponse({ error: "Tenant ID is required." }, 400, req);
+
+  // 1. Fetch feature flags from doppio_business_profile
+  const { data: profile, error: profileErr } = await supabaseAdmin
+    .from("doppio_business_profile")
+    .select("feature_flags")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (profileErr || !profile) {
+    return jsonResponse({ error: "Client business profile was not found." }, 404, req);
+  }
+
+  let flags: Record<string, any> = {};
+  try {
+    flags = typeof profile.feature_flags === "string"
+      ? JSON.parse(profile.feature_flags)
+      : profile.feature_flags || {};
+  } catch {
+    flags = {};
+  }
+
+  const demoDataIds = flags.demo_data_ids;
+  if (!demoDataIds) {
+    return jsonResponse({ error: "No recorded demo data found to remove. Use 'Reset data' to fully reset the workspace." }, 400, req);
+  }
+
+  const errors: string[] = [];
+
+  // Delete from all tables based on IDs
+  if (Array.isArray(demoDataIds.bills) && demoDataIds.bills.length > 0) {
+    const { error } = await supabaseAdmin.from("doppio_bills").delete().in("id", demoDataIds.bills);
+    if (error) {
+      console.warn("Failed to delete demo bills:", error.message);
+      errors.push("doppio_bills");
+    }
+  }
+  if (Array.isArray(demoDataIds.recipes) && demoDataIds.recipes.length > 0) {
+    const { error } = await supabaseAdmin.from("doppio_custom_recipes").delete().in("id", demoDataIds.recipes);
+    if (error) {
+      console.warn("Failed to delete demo recipes:", error.message);
+      errors.push("doppio_custom_recipes");
+    }
+  }
+  if (Array.isArray(demoDataIds.inventory_batches) && demoDataIds.inventory_batches.length > 0) {
+    const { error } = await supabaseAdmin.from("doppio_inventory_batches").delete().in("id", demoDataIds.inventory_batches);
+    if (error) {
+      console.warn("Failed to delete demo inventory batches:", error.message);
+      errors.push("doppio_inventory_batches");
+    }
+  }
+  if (Array.isArray(demoDataIds.inventory) && demoDataIds.inventory.length > 0) {
+    const { error } = await supabaseAdmin.from("doppio_inventory").delete().in("id", demoDataIds.inventory);
+    if (error) {
+      console.warn("Failed to delete demo inventory:", error.message);
+      errors.push("doppio_inventory");
+    }
+  }
+  if (Array.isArray(demoDataIds.employees) && demoDataIds.employees.length > 0) {
+    const { error } = await supabaseAdmin.from("doppio_employees").delete().in("id", demoDataIds.employees);
+    if (error) {
+      console.warn("Failed to delete demo employees:", error.message);
+      errors.push("doppio_employees");
+    }
+  }
+  if (Array.isArray(demoDataIds.menu) && demoDataIds.menu.length > 0) {
+    const { error } = await supabaseAdmin.from("doppio_menu").delete().in("id", demoDataIds.menu);
+    if (error) {
+      console.warn("Failed to delete demo menu items:", error.message);
+      errors.push("doppio_menu");
+    }
+  }
+
+  // Update profile feature flags
+  delete flags.demo_data_ids;
+  flags.demo_loaded = false;
+
+  const { error: updateProfileErr } = await supabaseAdmin
+    .from("doppio_business_profile")
+    .update({ feature_flags: JSON.stringify(flags) })
+    .eq("tenant_id", tenantId);
+
+  if (updateProfileErr) {
+    console.warn("Failed to update profile feature flags:", updateProfileErr.message);
+    errors.push("doppio_business_profile");
+  }
+
+  if (errors.length > 0) {
+    return jsonResponse({ error: "Failed to purge demo data from tables: " + errors.join(", ") }, 500, req);
+  }
+
+  return jsonResponse({ success: true }, 200, req);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: getCorsHeaders(req) });
@@ -412,6 +714,8 @@ serve(async (req) => {
     if (action === "delete_tenant") return await deleteTenant(payload, req);
     if (action === "update_tenant") return await updateTenant(payload, req);
     if (action === "reset_tenant_data") return await resetTenantData(payload, req);
+    if (action === "seed_tenant_data") return await seedTenantData(payload, req);
+    if (action === "purge_demo_data") return await purgeTenantDemoData(payload, req);
 
     return jsonResponse({ error: "Unsupported action." }, 400, req);
   } catch (error) {

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /dashboard.html
+Disallow: /login
+Disallow: /login.html
+
+Sitemap: https://codearc-restrosuite.vercel.app/sitemap.xml

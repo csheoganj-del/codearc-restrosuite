@@ -300,7 +300,7 @@ test("zero-cost launch mode keeps paid add-ons optional and caps free-tier usage
   const retention = read("supabase/migrations/20260608170000_zero_cost_retention.sql");
   const docs = read("ZERO_COST_LAUNCH.md");
 
-  assert.match(dashboard, /const ZERO_COST_LAUNCH_MODE = true/);
+  assert.match(dashboard, /const ZERO_COST_LAUNCH_MODE = false/);
   assert.match(dashboard, /CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE \? ''/);
   assert.doesNotMatch(vercel, /connect-src[^"]*hf\.space/);
   assert.match(packageJson, /check:free-tier/);

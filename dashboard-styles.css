@@ -6606,6 +6606,140 @@ button {
   text-transform: uppercase;
 }
 
+/* Clickable states for Super-Admin platform snapshot */
+.growth-item[data-filter] {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.growth-item[data-filter]:hover:not(.active-filter) {
+  border-color: rgba(252, 128, 25, 0.4) !important;
+  background: rgba(252, 128, 25, 0.03) !important;
+  transform: translateY(-1px);
+}
+.growth-item.active-filter {
+  border: 2px solid #FC8019 !important;
+  background: rgba(252, 128, 25, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(252, 128, 25, 0.15) !important;
+  transform: translateY(-1px);
+}
+/* Dark theme support for clickable states */
+body.dark-theme .growth-item[data-filter]:hover:not(.active-filter) {
+  border-color: rgba(252, 128, 25, 0.6) !important;
+  background: rgba(252, 128, 25, 0.06) !important;
+}
+body.dark-theme .growth-item.active-filter {
+  background: rgba(252, 128, 25, 0.12) !important;
+  box-shadow: 0 4px 12px rgba(252, 128, 25, 0.25) !important;
+}
+
+/* Super-Admin Snapshot Grid and Box Layout */
+.saas-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.saas-snapshot-card {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 115px;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.03);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.saas-snapshot-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(28, 28, 28, 0.05);
+  border-color: rgba(252, 128, 25, 0.3) !important;
+  background: #FFFFFF;
+}
+
+.saas-snapshot-card.active-filter {
+  border: 2px solid #FC8019 !important;
+  background: rgba(252, 128, 25, 0.06) !important;
+  box-shadow: 0 4px 14px rgba(252, 128, 25, 0.12) !important;
+}
+
+.saas-snapshot-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.saas-snapshot-card-title {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B7280;
+}
+
+.saas-snapshot-card-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1C1C1C;
+  margin-top: 8px;
+}
+
+.saas-snapshot-card-subtitle {
+  font-size: 11px;
+  color: #6B7280;
+  margin-top: 4px;
+}
+
+/* Dark Theme Support */
+body.dark-theme .saas-snapshot-card {
+  background: #1F2937;
+  border-color: #374151;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+body.dark-theme .saas-snapshot-card:hover {
+  background: #111827;
+  border-color: rgba(252, 128, 25, 0.5) !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme .saas-snapshot-card-title {
+  color: #9CA3AF;
+}
+
+body.dark-theme .saas-snapshot-card-value {
+  color: #F9FAFB;
+}
+
+body.dark-theme .saas-snapshot-card-subtitle {
+  color: #9CA3AF;
+}
+
+body.dark-theme .saas-snapshot-card.active-filter {
+  background: rgba(252, 128, 25, 0.12) !important;
+  box-shadow: 0 4px 14px rgba(252, 128, 25, 0.25) !important;
+}
+
+@media (max-width: 1024px) {
+  .saas-snapshot-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .saas-snapshot-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .growth-check {
   justify-content: flex-start;
 }

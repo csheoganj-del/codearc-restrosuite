@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // NEVER hardcode these values here — rotate via Supabase Dashboard + Vercel env update.
   const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
   const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
-  const ZERO_COST_LAUNCH_MODE = true;
+  const ZERO_COST_LAUNCH_MODE = false;
   const ENABLE_DEMO_TOOLS = false;
   const CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
   const FAST_INTERACTION_MODE = true;
@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
   });
   const validateStoredDashboardSession = sessionManager.validateStoredSession;
+  let pendingListTenantsPromise = null;
 
   // ==========================================
   // SESSION GUARD (Redirect if not logged in)
@@ -162,6 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
   let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
   let saasGatewayPollingInterval = null;
+  let superAdminFilter = 'all';
   let menuRealtimeChannel = null;
 
   function broadcastMenuUpdate() {
@@ -1154,7 +1156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateNetworkStatus(true);
 
         // Disable shiftEnabled in Supabase cloud db once for migration v4
-        if (localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
+        const loggedInRole = sessionStorage.getItem('logged_in_role');
+        if (loggedInRole !== 'superadmin' && localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
           supabaseClient.from('doppio_business_profile').update({ shift_enabled: false }).eq('tenant_id', activeTenantId)
             .then(({ error }) => {
               if (!error) {
@@ -9062,12 +9065,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     });
   }
 
+
+
   // Sidebar Feature Navigation toggling implementation
   function applyFeatureToggles() {
     const loggedInUser = sessionStorage.getItem('logged_in_user');
     const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
+    console.log('🔍 [applyFeatureToggles] Running! loggedInRole:', loggedInRole, 'loggedInUser:', loggedInUser);
 
     if (loggedInRole === 'superadmin') {
+      console.log('✅ [applyFeatureToggles] Superadmin detected! Applying superadmin UI...');
       // Dynamically update brand name to RESTO Suite for Super-Admin
       const brandNameEl = document.getElementById('sidebar-brand-name');
       const brandTypeEl = document.getElementById('sidebar-brand-type');
@@ -9097,11 +9104,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (avatarEl && loggedInUser) avatarEl.textContent = loggedInUser.charAt(0).toUpperCase();
 
       const saLink = document.getElementById('sidebar-super-admin-link');
+      console.log('🔗 [applyFeatureToggles] sidebar-super-admin-link element:', saLink);
       if (saLink) saLink.style.display = 'flex';
       const gmLink = document.getElementById('sidebar-gateway-monitor-link');
+      console.log('🔗 [applyFeatureToggles] sidebar-gateway-monitor-link element:', gmLink);
       if (gmLink) gmLink.style.display = 'flex';
 
       const sidebarLinks = document.querySelectorAll('.sidebar-link');
+      console.log('🔗 [applyFeatureToggles] Found', sidebarLinks.length, 'sidebar links');
       sidebarLinks.forEach(link => {
         const tabId = link.getAttribute('data-tab');
         if (tabId === 'super-admin-tab' || tabId === 'gateway-monitor-tab') {
@@ -9125,9 +9135,17 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const shiftPill = document.getElementById('header-shift-pill');
       if (shiftPill) shiftPill.style.display = 'none';
 
-      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => {
+        t.classList.remove('active');
+        // Reset styles we might have applied
+        t.style.display = '';
+        t.style.visibility = '';
+        t.style.opacity = '';
+      });
       const saTab = document.getElementById('super-admin-tab');
-      if (saTab) saTab.classList.add('active');
+      if (saTab) {
+        saTab.classList.add('active');
+      }
 
       const tabTitle = document.getElementById('tab-title');
       if (tabTitle) tabTitle.textContent = "SaaS Super-Admin Console";
@@ -9135,6 +9153,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       if (tabSubtitle) tabSubtitle.textContent = "Manage client subscriptions, features, and system access";
 
       renderSuperAdminTab();
+      console.log('✅ [applyFeatureToggles] Superadmin UI applied!');
       return;
     }
 
@@ -9299,24 +9318,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     // First boot landing page redirect using just_logged_in flag (Made by Antigravity)
-    if (sessionStorage.getItem('just_logged_in') === 'true') {
-      sessionStorage.removeItem('just_logged_in');
-      const defaultLandingTab = {
-        admin: 'pos-tab',
-        cashier: 'pos-tab',
-        waiter: 'qr-orders-tab',
-        kitchen: 'kds-tab',
-        customer_display: 'tokens-tab'
-      }[loggedInRole] || 'pos-tab';
-
-      const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
-      if (fallbackLink) {
-        fallbackLink.click();
-      }
-    } else {
-      // Redirect active tab if it got hidden or if no tab is currently active
-      const activeTabLink = document.querySelector('.sidebar-link.active');
-      if (!activeTabLink || activeTabLink.style.display === 'none') {
+    if (loggedInRole !== 'superadmin') {
+      if (sessionStorage.getItem('just_logged_in') === 'true') {
+        sessionStorage.removeItem('just_logged_in');
         const defaultLandingTab = {
           admin: 'pos-tab',
           cashier: 'pos-tab',
@@ -9328,6 +9332,23 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
         if (fallbackLink) {
           fallbackLink.click();
+        }
+      } else {
+        // Redirect active tab if it got hidden or if no tab is currently active
+        const activeTabLink = document.querySelector('.sidebar-link.active');
+        if (!activeTabLink || activeTabLink.style.display === 'none') {
+          const defaultLandingTab = {
+            admin: 'pos-tab',
+            cashier: 'pos-tab',
+            waiter: 'qr-orders-tab',
+            kitchen: 'kds-tab',
+            customer_display: 'tokens-tab'
+          }[loggedInRole] || 'pos-tab';
+
+          const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
+          if (fallbackLink) {
+            fallbackLink.click();
+          }
         }
       }
     }
@@ -11094,7 +11115,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     // 2. Load from Supabase in real-time
-    if (supabaseClient) {
+    if (supabaseClient && sessionStorage.getItem('logged_in_role') !== 'superadmin') {
       try {
         const { data, error } = await supabaseClient
           .from('doppio_draft_orders')
@@ -11671,9 +11692,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
   }
 
-  function growthItem(title, detail, pill) {
+  function growthItem(title, detail, pill, filterAttr = '', isActive = false) {
+    const filterData = filterAttr ? `data-filter="${filterAttr}"` : '';
+    const activeClass = isActive ? 'active-filter' : '';
     return `
-      <div class="growth-item">
+      <div class="growth-item ${activeClass}" ${filterData}>
         <div>
           <strong>${escHtml(title)}</strong>
           <span>${escHtml(detail || '')}</span>
@@ -16769,6 +16792,100 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  function saasSnapshotCard(title, value, subtitle, iconClass, filterAttr, isActive = false) {
+    const filterData = filterAttr ? `data-filter="${filterAttr}"` : '';
+    const activeClass = isActive ? 'active-filter' : '';
+    return `
+      <div class="saas-snapshot-card ${activeClass}" ${filterData}>
+        <div class="saas-snapshot-card-header">
+          <span class="saas-snapshot-card-title">${escHtml(title)}</span>
+          <i class="${iconClass}" style="color: #FC8019; font-size: 14px;"></i>
+        </div>
+        <div>
+          <div class="saas-snapshot-card-value">${escHtml(value)}</div>
+          <div class="saas-snapshot-card-subtitle">${escHtml(subtitle)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function showSampleDataInfoDialog() {
+    const modalHtml = `
+      <div id="saas-sample-data-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 16px; backdrop-filter: blur(4px);">
+        <div style="background: #FFFFFF; border-radius: 16px; max-width: 500px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.25); padding: 24px; position: relative; border: 1px solid rgba(28,28,28,0.08); font-family: var(--font-body); animation: modalFadeIn 0.25s ease-out; color: #1C1C1C;">
+          <button id="close-sample-modal-btn" style="position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; hover: {background: #F3F4F6}">&times;</button>
+          
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+            <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(252, 128, 25, 0.1); color: #FC8019; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              <i class="fa-solid fa-cubes"></i>
+            </div>
+            <div>
+              <h3 style="margin: 0; font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: #1C1C1C;">How Sample Data Works</h3>
+              <span style="font-size: 11px; color: #6B7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Interactive Seeding Guide</span>
+            </div>
+          </div>
+
+          <p style="font-size: 12.5px; line-height: 1.6; color: #4B5563; margin: 0 0 16px 0;">
+            RestroSuite includes pre-configured sample spreadsheet templates located in the project's <code style="background: #F3F4F6; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11.5px; color: #1C1C1C;">/samples</code> folder:
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Menu.csv</span>
+              <span style="color: #4B5563;">24 pre-built drink and food items divided into clean categories.</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Inventory.csv</span>
+              <span style="color: #4B5563;">38 raw materials and stock items (Milk, Espresso beans, etc.).</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Recipes.csv</span>
+              <span style="color: #4B5563;">12 raw ingredient deduction recipes for automatic stock management.</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Employees.csv</span>
+              <span style="color: #4B5563;">6 staff roles (Cashier, Waiter, Kitchen, etc.) to test payroll/shifts.</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(252, 128, 25, 0.05); border: 1px dashed rgba(252, 128, 25, 0.2); border-radius: 8px; padding: 12px; font-size: 11.5px; line-height: 1.5; color: #7C2D12; margin-bottom: 20px;">
+            <strong>Step-by-step instructions to load this data:</strong>
+            <ol style="margin: 6px 0 0 0; padding-left: 18px;">
+              <li>Select any active client workspace below and click <strong>Manage</strong>.</li>
+              <li>Note down the <strong>Admin User</strong> username.</li>
+              <li>Logout of the Super-Admin view.</li>
+              <li>Log in using the client credentials.</li>
+              <li>Go to the client dashboard's tabs and upload these CSV files using the built-in <strong>Spreadsheet Import</strong> wizards.</li>
+            </ol>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end;">
+            <button id="close-sample-modal-btn-confirm" class="btn btn-primary" style="padding: 10px 20px; font-size: 12px; font-weight: 700; border-radius: 8px; background: #FC8019; border: none; color: white; cursor: pointer;">Got it, thanks!</button>
+          </div>
+        </div>
+      </div>
+      <style>
+        @keyframes modalFadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      </style>
+    `;
+
+    const div = document.createElement('div');
+    div.id = 'saas-sample-data-modal-container';
+    div.innerHTML = modalHtml;
+    document.body.appendChild(div);
+
+    const closeModal = () => {
+      const el = document.getElementById('saas-sample-data-modal-container');
+      if (el) el.remove();
+    };
+
+    document.getElementById('close-sample-modal-btn').addEventListener('click', closeModal);
+    document.getElementById('close-sample-modal-btn-confirm').addEventListener('click', closeModal);
+  }
+
   function renderPlatformSummary(tenants = []) {
     const target = document.getElementById('saas-platform-summary');
     if (!target) return;
@@ -16779,31 +16896,89 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const risk = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status)).length;
     const conversion = total ? Math.round((paidTier / total) * 100) : 0;
     target.innerHTML = [
-      growthItem('Client workspaces', `${total} total - ${active} active`, total ? 'registry' : 'empty'),
-      growthItem('Approvals queue', `${pending} pending workspace requests`, pending ? 'review' : 'clear'),
-      growthItem('Paid-tier mix', `${paidTier} paid-tier tenants - ${conversion}% conversion`, 'growth'),
-      growthItem('Subscription risk', `${risk} past-due or canceled tenants`, risk ? 'attention' : 'healthy')
+      saasSnapshotCard('Workspaces', total, `${active} active outlets`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
+      saasSnapshotCard('Pending Approvals', pending, pending ? 'Requires review' : 'Queue is clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
+      saasSnapshotCard('Conversion Rate', `${conversion}%`, `${paidTier} paid / ${total} total`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
+      saasSnapshotCard('At-Risk Accounts', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk')
     ].join('');
+
+    // Attach click listeners to the items to filter the list and scroll
+    target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
+      item.addEventListener('click', async () => {
+        const newFilter = item.getAttribute('data-filter');
+        console.log('SuperAdmin filter changed to:', newFilter);
+        superAdminFilter = newFilter;
+        await renderSuperAdminTab();
+        
+        // Scroll down to the client workspace registry panel smoothly
+        const registryPanel = document.getElementById('saas-client-registry-panel');
+        if (registryPanel) {
+          registryPanel.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+  }
+
+  async function listTenantsDeduplicated() {
+    if (pendingListTenantsPromise) {
+      console.log('🔄 [listTenantsDeduplicated] Reusing existing pending callTenantAdmin(list_tenants) promise...');
+      return pendingListTenantsPromise;
+    }
+    pendingListTenantsPromise = callTenantAdmin('list_tenants');
+    try {
+      const result = await pendingListTenantsPromise;
+      return result;
+    } finally {
+      pendingListTenantsPromise = null;
+    }
   }
 
   async function renderSuperAdminTab() {
+    console.log('🔄 [renderSuperAdminTab] Starting...');
     const listContainer = document.getElementById('saas-tenants-list');
+    console.log('🔄 [renderSuperAdminTab] listContainer:', listContainer);
     if (!listContainer) return;
     listContainer.innerHTML = '<div style="padding: 32px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);"><i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #FC8019;"></i> Loading client workspace registry...</div>';
 
     let tenants = [];
     try {
-      const result = await callTenantAdmin('list_tenants');
+      console.log('🔄 [renderSuperAdminTab] Calling callTenantAdmin(list_tenants)...');
+      const result = await listTenantsDeduplicated();
+      console.log('🔄 [renderSuperAdminTab] callTenantAdmin result:', result);
       tenants = Array.isArray(result.tenants) ? result.tenants : [];
       renderPlatformSummary(tenants);
     } catch (error) {
+      console.error('❌ [renderSuperAdminTab] Error:', error);
       renderPlatformSummary([]);
       listContainer.innerHTML = `<div style="padding: 32px; text-align: center; color: #ef4444; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(239,68,68,0.1);"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Error loading workspaces: ${escHtml(error.message)}</div>`;
       return;
     }
 
+    console.log('🔄 [renderSuperAdminTab] Tenants loaded:', tenants.length, 'tenants');
     if (!tenants || tenants.length === 0) {
       listContainer.innerHTML = '<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No registered client food outlets found.</div></div>';
+      return;
+    }
+
+    // Filter tenants based on active superAdminFilter
+    let filteredTenants = tenants;
+    if (superAdminFilter === 'pending') {
+      filteredTenants = tenants.filter(t => t.status === 'pending');
+    } else if (superAdminFilter === 'paid') {
+      filteredTenants = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code));
+    } else if (superAdminFilter === 'risk') {
+      filteredTenants = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status));
+    }
+
+    if (filteredTenants.length === 0) {
+      const filterLabels = {
+        all: 'registered client food outlets',
+        pending: 'pending workspace requests',
+        paid: 'paid-tier tenants',
+        risk: 'past-due or canceled tenants'
+      };
+      const label = filterLabels[superAdminFilter] || 'matching client food outlets';
+      listContainer.innerHTML = `<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No ${label} found.</div></div>`;
       return;
     }
 
@@ -16818,7 +16993,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       deleteSelectedBtn.style.display = 'none';
     }
 
-    listContainer.innerHTML = tenants.map(t => {
+    listContainer.innerHTML = filteredTenants.map(t => {
       const statusPresentation = superadminDomain.getTenantStatusPresentation(t.status);
       const statusText = statusPresentation.text;
       const outletLabel = (t.outlet_type || 'cafe').toUpperCase();
@@ -16992,6 +17167,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         }
       });
     });
+
+    // Add click handler for sample data card
+    const demoCard = document.getElementById('superadmin-demo-client-card');
+    if (demoCard && !demoCard.dataset.listenerBound) {
+      demoCard.dataset.listenerBound = 'true';
+      demoCard.addEventListener('click', () => {
+        showSampleDataInfoDialog();
+      });
+    }
   }
 
   function openTenantManageModal(tenant) {
@@ -17303,6 +17487,113 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         } finally {
           resetTenantDataBtn.disabled = false;
           resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left" style="font-size:10px;"></i> Reset data';
+        }
+      });
+    }
+
+    const seedTenantDataBtn = document.getElementById('seed-tenant-data-btn');
+    if (seedTenantDataBtn && !seedTenantDataBtn.dataset.listenerBound) {
+      seedTenantDataBtn.dataset.listenerBound = 'true';
+      seedTenantDataBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (!confirm(`⚠️ LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of:\n• 6 Menu items\n• 5 Inventory items & BATCHES\n• 4 Custom recipe mappings\n• 3 Employees\n• 7 Days of mock sales history/bills\n\nAny existing operational data in this workspace will be cleared first. Proceed?`)) return;
+
+          console.log("Seeding data for tenant ID:", tenantId);
+
+          // Show progress in button
+          seedTenantDataBtn.disabled = true;
+          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Seeding...';
+
+          const result = await callTenantAdmin('seed_tenant_data', { tenant_id: tenantId });
+          
+          if (result.error) {
+            alert("Failed to seed demo data: " + result.error);
+          } else {
+            // Broadcast the reset event so client active sessions reload automatically
+            try {
+              const resetChannel = supabaseClient.channel('tenant-data-reset-realtime');
+              resetChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                  await resetChannel.send({
+                    type: 'broadcast',
+                    event: 'data-reset',
+                    payload: { tenantId: tenantId }
+                  });
+                  console.log("Sent real-time seed broadcast event for tenant ID:", tenantId);
+                }
+              });
+            } catch (broadcastingErr) {
+              console.warn("Failed to send live seed broadcast:", broadcastingErr);
+            }
+
+            closeTenantModal();
+            showNotificationToast(`✅ ${tenantName.split('(')[0].trim()} — demo records loaded successfully!`);
+          }
+
+          await renderSuperAdminTab();
+
+        } catch (err) {
+          console.error("Error in seedTenantDataBtn handler:", err);
+          alert("System error seeding demo data: " + err.message);
+        } finally {
+          seedTenantDataBtn.disabled = false;
+          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-seedling" style="font-size:10px;"></i> Load Demo Data';
+        }
+      });
+    }
+
+    const purgeTenantDataBtn = document.getElementById('purge-tenant-data-btn');
+    if (purgeTenantDataBtn && !purgeTenantDataBtn.dataset.listenerBound) {
+      purgeTenantDataBtn.dataset.listenerBound = 'true';
+      purgeTenantDataBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (!confirm(`⚠️ REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records seeded by the platform owner (menu items, stock, batches, recipes, employees, and bills).\n\nAny data added by the client will be preserved. Proceed?`)) return;
+
+          console.log("Purging demo data for tenant ID:", tenantId);
+
+          purgeTenantDataBtn.disabled = true;
+          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Purging...';
+
+          const result = await callTenantAdmin('purge_demo_data', { tenant_id: tenantId });
+          
+          if (result.error) {
+            alert("Failed to remove demo data: " + result.error);
+          } else {
+            // Broadcast the reset event so client active sessions reload automatically
+            try {
+              const resetChannel = supabaseClient.channel('tenant-data-reset-realtime');
+              resetChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                  await resetChannel.send({
+                    type: 'broadcast',
+                    event: 'data-reset',
+                    payload: { tenantId: tenantId }
+                  });
+                  console.log("Sent real-time purge broadcast event for tenant ID:", tenantId);
+                }
+              });
+            } catch (broadcastingErr) {
+              console.warn("Failed to send live purge broadcast:", broadcastingErr);
+            }
+
+            closeTenantModal();
+            showNotificationToast(`✅ ${tenantName.split('(')[0].trim()} — demo records removed successfully!`);
+          }
+
+          await renderSuperAdminTab();
+
+        } catch (err) {
+          console.error("Error in purgeTenantDataBtn handler:", err);
+          alert("System error removing demo data: " + err.message);
+        } finally {
+          purgeTenantDataBtn.disabled = false;
+          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="font-size:10px;"></i> Remove Demo Data';
         }
       });
     }

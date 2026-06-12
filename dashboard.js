@@ -163,6 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
   let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
   let saasGatewayPollingInterval = null;
+  let superAdminFilter = 'all';
   let menuRealtimeChannel = null;
 
   function broadcastMenuUpdate() {
@@ -11691,9 +11692,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
   }
 
-  function growthItem(title, detail, pill) {
+  function growthItem(title, detail, pill, filterAttr = '', isActive = false) {
+    const filterData = filterAttr ? `data-filter="${filterAttr}"` : '';
+    const activeClass = isActive ? 'active-filter' : '';
     return `
-      <div class="growth-item">
+      <div class="growth-item ${activeClass}" ${filterData}>
         <div>
           <strong>${escHtml(title)}</strong>
           <span>${escHtml(detail || '')}</span>
@@ -16789,6 +16792,100 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  function saasSnapshotCard(title, value, subtitle, iconClass, filterAttr, isActive = false) {
+    const filterData = filterAttr ? `data-filter="${filterAttr}"` : '';
+    const activeClass = isActive ? 'active-filter' : '';
+    return `
+      <div class="saas-snapshot-card ${activeClass}" ${filterData}>
+        <div class="saas-snapshot-card-header">
+          <span class="saas-snapshot-card-title">${escHtml(title)}</span>
+          <i class="${iconClass}" style="color: #FC8019; font-size: 14px;"></i>
+        </div>
+        <div>
+          <div class="saas-snapshot-card-value">${escHtml(value)}</div>
+          <div class="saas-snapshot-card-subtitle">${escHtml(subtitle)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function showSampleDataInfoDialog() {
+    const modalHtml = `
+      <div id="saas-sample-data-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 16px; backdrop-filter: blur(4px);">
+        <div style="background: #FFFFFF; border-radius: 16px; max-width: 500px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.25); padding: 24px; position: relative; border: 1px solid rgba(28,28,28,0.08); font-family: var(--font-body); animation: modalFadeIn 0.25s ease-out; color: #1C1C1C;">
+          <button id="close-sample-modal-btn" style="position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; hover: {background: #F3F4F6}">&times;</button>
+          
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+            <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(252, 128, 25, 0.1); color: #FC8019; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              <i class="fa-solid fa-cubes"></i>
+            </div>
+            <div>
+              <h3 style="margin: 0; font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: #1C1C1C;">How Sample Data Works</h3>
+              <span style="font-size: 11px; color: #6B7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Interactive Seeding Guide</span>
+            </div>
+          </div>
+
+          <p style="font-size: 12.5px; line-height: 1.6; color: #4B5563; margin: 0 0 16px 0;">
+            RestroSuite includes pre-configured sample spreadsheet templates located in the project's <code style="background: #F3F4F6; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11.5px; color: #1C1C1C;">/samples</code> folder:
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Menu.csv</span>
+              <span style="color: #4B5563;">24 pre-built drink and food items divided into clean categories.</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Inventory.csv</span>
+              <span style="color: #4B5563;">38 raw materials and stock items (Milk, Espresso beans, etc.).</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Recipes.csv</span>
+              <span style="color: #4B5563;">12 raw ingredient deduction recipes for automatic stock management.</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Employees.csv</span>
+              <span style="color: #4B5563;">6 staff roles (Cashier, Waiter, Kitchen, etc.) to test payroll/shifts.</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(252, 128, 25, 0.05); border: 1px dashed rgba(252, 128, 25, 0.2); border-radius: 8px; padding: 12px; font-size: 11.5px; line-height: 1.5; color: #7C2D12; margin-bottom: 20px;">
+            <strong>Step-by-step instructions to load this data:</strong>
+            <ol style="margin: 6px 0 0 0; padding-left: 18px;">
+              <li>Select any active client workspace below and click <strong>Manage</strong>.</li>
+              <li>Note down the <strong>Admin User</strong> username.</li>
+              <li>Logout of the Super-Admin view.</li>
+              <li>Log in using the client credentials.</li>
+              <li>Go to the client dashboard's tabs and upload these CSV files using the built-in <strong>Spreadsheet Import</strong> wizards.</li>
+            </ol>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end;">
+            <button id="close-sample-modal-btn-confirm" class="btn btn-primary" style="padding: 10px 20px; font-size: 12px; font-weight: 700; border-radius: 8px; background: #FC8019; border: none; color: white; cursor: pointer;">Got it, thanks!</button>
+          </div>
+        </div>
+      </div>
+      <style>
+        @keyframes modalFadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      </style>
+    `;
+
+    const div = document.createElement('div');
+    div.id = 'saas-sample-data-modal-container';
+    div.innerHTML = modalHtml;
+    document.body.appendChild(div);
+
+    const closeModal = () => {
+      const el = document.getElementById('saas-sample-data-modal-container');
+      if (el) el.remove();
+    };
+
+    document.getElementById('close-sample-modal-btn').addEventListener('click', closeModal);
+    document.getElementById('close-sample-modal-btn-confirm').addEventListener('click', closeModal);
+  }
+
   function renderPlatformSummary(tenants = []) {
     const target = document.getElementById('saas-platform-summary');
     if (!target) return;
@@ -16799,11 +16896,27 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     const risk = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status)).length;
     const conversion = total ? Math.round((paidTier / total) * 100) : 0;
     target.innerHTML = [
-      growthItem('Client workspaces', `${total} total - ${active} active`, total ? 'registry' : 'empty'),
-      growthItem('Approvals queue', `${pending} pending workspace requests`, pending ? 'review' : 'clear'),
-      growthItem('Paid-tier mix', `${paidTier} paid-tier tenants - ${conversion}% conversion`, 'growth'),
-      growthItem('Subscription risk', `${risk} past-due or canceled tenants`, risk ? 'attention' : 'healthy')
+      saasSnapshotCard('Workspaces', total, `${active} active outlets`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
+      saasSnapshotCard('Pending Approvals', pending, pending ? 'Requires review' : 'Queue is clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
+      saasSnapshotCard('Conversion Rate', `${conversion}%`, `${paidTier} paid / ${total} total`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
+      saasSnapshotCard('At-Risk Accounts', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk')
     ].join('');
+
+    // Attach click listeners to the items to filter the list and scroll
+    target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
+      item.addEventListener('click', async () => {
+        const newFilter = item.getAttribute('data-filter');
+        console.log('SuperAdmin filter changed to:', newFilter);
+        superAdminFilter = newFilter;
+        await renderSuperAdminTab();
+        
+        // Scroll down to the client workspace registry panel smoothly
+        const registryPanel = document.getElementById('saas-client-registry-panel');
+        if (registryPanel) {
+          registryPanel.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
   }
 
   async function listTenantsDeduplicated() {
@@ -16847,6 +16960,28 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       return;
     }
 
+    // Filter tenants based on active superAdminFilter
+    let filteredTenants = tenants;
+    if (superAdminFilter === 'pending') {
+      filteredTenants = tenants.filter(t => t.status === 'pending');
+    } else if (superAdminFilter === 'paid') {
+      filteredTenants = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code));
+    } else if (superAdminFilter === 'risk') {
+      filteredTenants = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status));
+    }
+
+    if (filteredTenants.length === 0) {
+      const filterLabels = {
+        all: 'registered client food outlets',
+        pending: 'pending workspace requests',
+        paid: 'paid-tier tenants',
+        risk: 'past-due or canceled tenants'
+      };
+      const label = filterLabels[superAdminFilter] || 'matching client food outlets';
+      listContainer.innerHTML = `<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No ${label} found.</div></div>`;
+      return;
+    }
+
     // Reset selection state
     const selectAllCheckbox = document.getElementById('select-all-tenants');
     if (selectAllCheckbox) {
@@ -16858,7 +16993,7 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       deleteSelectedBtn.style.display = 'none';
     }
 
-    listContainer.innerHTML = tenants.map(t => {
+    listContainer.innerHTML = filteredTenants.map(t => {
       const statusPresentation = superadminDomain.getTenantStatusPresentation(t.status);
       const statusText = statusPresentation.text;
       const outletLabel = (t.outlet_type || 'cafe').toUpperCase();
@@ -17032,6 +17167,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         }
       });
     });
+
+    // Add click handler for sample data card
+    const demoCard = document.getElementById('superadmin-demo-client-card');
+    if (demoCard && !demoCard.dataset.listenerBound) {
+      demoCard.dataset.listenerBound = 'true';
+      demoCard.addEventListener('click', () => {
+        showSampleDataInfoDialog();
+      });
+    }
   }
 
   function openTenantManageModal(tenant) {
@@ -17343,6 +17487,113 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         } finally {
           resetTenantDataBtn.disabled = false;
           resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left" style="font-size:10px;"></i> Reset data';
+        }
+      });
+    }
+
+    const seedTenantDataBtn = document.getElementById('seed-tenant-data-btn');
+    if (seedTenantDataBtn && !seedTenantDataBtn.dataset.listenerBound) {
+      seedTenantDataBtn.dataset.listenerBound = 'true';
+      seedTenantDataBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (!confirm(`⚠️ LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of:\n• 6 Menu items\n• 5 Inventory items & BATCHES\n• 4 Custom recipe mappings\n• 3 Employees\n• 7 Days of mock sales history/bills\n\nAny existing operational data in this workspace will be cleared first. Proceed?`)) return;
+
+          console.log("Seeding data for tenant ID:", tenantId);
+
+          // Show progress in button
+          seedTenantDataBtn.disabled = true;
+          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Seeding...';
+
+          const result = await callTenantAdmin('seed_tenant_data', { tenant_id: tenantId });
+          
+          if (result.error) {
+            alert("Failed to seed demo data: " + result.error);
+          } else {
+            // Broadcast the reset event so client active sessions reload automatically
+            try {
+              const resetChannel = supabaseClient.channel('tenant-data-reset-realtime');
+              resetChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                  await resetChannel.send({
+                    type: 'broadcast',
+                    event: 'data-reset',
+                    payload: { tenantId: tenantId }
+                  });
+                  console.log("Sent real-time seed broadcast event for tenant ID:", tenantId);
+                }
+              });
+            } catch (broadcastingErr) {
+              console.warn("Failed to send live seed broadcast:", broadcastingErr);
+            }
+
+            closeTenantModal();
+            showNotificationToast(`✅ ${tenantName.split('(')[0].trim()} — demo records loaded successfully!`);
+          }
+
+          await renderSuperAdminTab();
+
+        } catch (err) {
+          console.error("Error in seedTenantDataBtn handler:", err);
+          alert("System error seeding demo data: " + err.message);
+        } finally {
+          seedTenantDataBtn.disabled = false;
+          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-seedling" style="font-size:10px;"></i> Load Demo Data';
+        }
+      });
+    }
+
+    const purgeTenantDataBtn = document.getElementById('purge-tenant-data-btn');
+    if (purgeTenantDataBtn && !purgeTenantDataBtn.dataset.listenerBound) {
+      purgeTenantDataBtn.dataset.listenerBound = 'true';
+      purgeTenantDataBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (!confirm(`⚠️ REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records seeded by the platform owner (menu items, stock, batches, recipes, employees, and bills).\n\nAny data added by the client will be preserved. Proceed?`)) return;
+
+          console.log("Purging demo data for tenant ID:", tenantId);
+
+          purgeTenantDataBtn.disabled = true;
+          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Purging...';
+
+          const result = await callTenantAdmin('purge_demo_data', { tenant_id: tenantId });
+          
+          if (result.error) {
+            alert("Failed to remove demo data: " + result.error);
+          } else {
+            // Broadcast the reset event so client active sessions reload automatically
+            try {
+              const resetChannel = supabaseClient.channel('tenant-data-reset-realtime');
+              resetChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                  await resetChannel.send({
+                    type: 'broadcast',
+                    event: 'data-reset',
+                    payload: { tenantId: tenantId }
+                  });
+                  console.log("Sent real-time purge broadcast event for tenant ID:", tenantId);
+                }
+              });
+            } catch (broadcastingErr) {
+              console.warn("Failed to send live purge broadcast:", broadcastingErr);
+            }
+
+            closeTenantModal();
+            showNotificationToast(`✅ ${tenantName.split('(')[0].trim()} — demo records removed successfully!`);
+          }
+
+          await renderSuperAdminTab();
+
+        } catch (err) {
+          console.error("Error in purgeTenantDataBtn handler:", err);
+          alert("System error removing demo data: " + err.message);
+        } finally {
+          purgeTenantDataBtn.disabled = false;
+          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="font-size:10px;"></i> Remove Demo Data';
         }
       });
     }
