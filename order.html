@@ -699,7 +699,7 @@
     if(!cart.length) return;
     localStorage.setItem('rs_name',name);
     if(phone) localStorage.setItem('rs_phone',phone);
-    var rid = (slug||'RS').toUpperCase().slice(0,4)+'-'+Date.now().toString(36).toUpperCase()+'-'+crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
+    var rid = 'DO-QR-' + Date.now().toString(36).toUpperCase() + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
     var tv  = tNum||'Takeaway';
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);

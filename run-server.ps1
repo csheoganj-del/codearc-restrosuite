@@ -34,10 +34,14 @@ try {
                 $response.Headers.Add("Access-Control-Allow-Methods", "GET")
                 $response.StatusCode = 200
 
+                $envUrl = ""
                 $envKey = ""
                 $envPath = Join-Path $PSScriptRoot ".env.local"
                 if (Test-Path $envPath) {
                     Get-Content $envPath | ForEach-Object {
+                        if ($_ -match "^\s*SUPABASE_URL\s*=\s*(.+)$") {
+                            $envUrl = $Matches[1].Trim().Trim('"').Trim("'")
+                        }
                         if ($_ -match "^\s*SUPABASE_ANON_KEY\s*=\s*(.+)$") {
                             $val = $Matches[1].Trim().Trim('"').Trim("'")
                             if ($val.StartsWith("eyJ")) {
@@ -46,11 +50,11 @@ try {
                         }
                     }
                 }
+                if ([string]::IsNullOrEmpty($envUrl)) { $envUrl = "https://htkauiibuejetimfiavs.supabase.co" }
                 if ([string]::IsNullOrEmpty($envKey)) { $envKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk" }
 
-                # Point frontend to localhost so that functions and rest requests are proxied locally to bypass CORS
-                $localUrl = "http://localhost:8001"
-                $configJson = '{"supabaseUrl":"' + $localUrl + '","supabaseAnonKey":"' + $envKey + '"}'
+                # Point frontend directly to the remote Supabase URL so that WebSockets / Realtime channels connect directly and work locally
+                $configJson = '{"supabaseUrl":"' + $envUrl + '","supabaseAnonKey":"' + $envKey + '"}'
                 $resBytes = [System.Text.Encoding]::UTF8.GetBytes($configJson)
                 $response.ContentLength64 = $resBytes.Length
                 $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
