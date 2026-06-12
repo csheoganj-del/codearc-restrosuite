@@ -7,6 +7,9 @@
   <meta name="robots" content="noindex">
   <title>Order Online</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Shadows+Into+Light&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -481,24 +484,65 @@
 
   // ── LOAD ──
   function loadMenu(){
+    var cacheKey = 'doppio_menu_cache_' + slug;
+    var cachedData = null;
+    try {
+      cachedData = JSON.parse(localStorage.getItem(cacheKey));
+    } catch(e) {}
+
+    if (cachedData && Array.isArray(cachedData.menu) && cachedData.menu.length > 0) {
+      items = cachedData.menu;
+      if (cachedData.tenantName) {
+        applyLogoBranding(cachedData.tenantName);
+      }
+      buildUI();
+    }
+
     if(sc){
       apiCall('list_menu').then(function(res){
         var data = Array.isArray(res.menu) ? res.menu : [];
+        var newItems = [];
         if(data.length>0){
-          items = data.map(function(i){
+          newItems = data.map(function(i){
             return {name:i.name,price:parseInt(i.price)||0,category:i.category||'Other',description:i.description||'',image:i.image||'',bestseller:!!i.bestseller};
           });
         } else {
+          newItems = DEFAULT;
+        }
+
+        var menuChanged = JSON.stringify(items) !== JSON.stringify(newItems);
+        var nameChanged = res.tenantName && res.tenantName !== 'Doppio Cafe' && (!cachedData || cachedData.tenantName !== res.tenantName);
+
+        if (menuChanged || nameChanged || !cachedData) {
+          items = newItems;
+          if(res.tenantName && res.tenantName !== 'Doppio Cafe'){
+            applyLogoBranding(res.tenantName);
+          }
+          
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+              menu: items,
+              tenantName: res.tenantName || restName
+            }));
+          } catch(e) {}
+
+          if (!cachedData) {
+            buildUI();
+          } else {
+            renderGrid();
+          }
+        }
+      }).catch(function(){
+        if (!cachedData) {
           items = DEFAULT;
+          buildUI();
         }
-        if(res.tenantName && res.tenantName !== 'Doppio Cafe'){
-          applyLogoBranding(res.tenantName);
-        }
-        buildUI();
-      }).catch(function(){ items = DEFAULT; buildUI(); });
+      });
     } else {
-      items = DEFAULT;
-      buildUI();
+      if (!cachedData) {
+        items = DEFAULT;
+        buildUI();
+      }
     }
   }
 
