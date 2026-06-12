@@ -469,7 +469,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
   const password = String(payload.password || "");
 
   if (!slug || !username || !password) {
-    return jsonResponse({ error: "Outlet ID, username, and password are required." }, 400);
+    return jsonResponse({ error: "Outlet ID, username, and password are required." }, 400, req);
   }
 
   const superadminUsername = Deno.env.get("SUPERADMIN_USERNAME") || "";
@@ -496,7 +496,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
           allowed_tabs: ["super-admin-tab", "gateway-monitor-tab"],
           admin_token: adminToken,
         },
-      });
+      }, 200, req);
     }
   }
 
@@ -608,7 +608,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
         },
         session_token: sessionToken,
       },
-    });
+    }, 200, req);
   }
 
   const usernameMatches = username === tenant.username;
@@ -659,7 +659,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
       },
       session_token: sessionToken,
     },
-  });
+  }, 200, req);
 }
 
 async function handleValidateSession(payload: Record<string, unknown>, req: Request) {
@@ -678,7 +678,7 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
         tenant_name: "SaaS Platform Owner",
         allowed_tabs: ["super-admin-tab", "gateway-monitor-tab"],
       },
-    });
+    }, 200, req);
   }
 
   const tenantId = String(sessionPayload.tenant_id || "");
@@ -745,7 +745,7 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
           monthly_order_limit: plan.monthlyOrderLimit,
         },
       },
-    });
+    }, 200, req);
   }
 
   return jsonResponse({
@@ -766,7 +766,7 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
         monthly_order_limit: plan.monthlyOrderLimit,
       },
     },
-  });
+  }, 200, req);
 }
 
 async function handleRegister(payload: Record<string, unknown>, req: Request) {
@@ -779,7 +779,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   const password = String(payload.password || "");
 
   if (!name || !slug || !username || !password) {
-    return jsonResponse({ error: "Outlet name, outlet ID, username, and password are required." }, 400);
+    return jsonResponse({ error: "Outlet name, outlet ID, username, and password are required." }, 400, req);
   }
 
   if (password.length < 10) {
@@ -787,7 +787,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   }
 
   if (!/^[a-z0-9-]+$/.test(slug)) {
-    return jsonResponse({ error: "Slug can only contain lowercase letters, numbers, and hyphens." }, 400);
+    return jsonResponse({ error: "Slug can only contain lowercase letters, numbers, and hyphens." }, 400, req);
   }
 
   const { data: existingSlug, error: slugErr } = await supabaseAdmin
@@ -841,7 +841,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   return jsonResponse({
     success: true,
     message: "Registration submitted successfully! Please wait for CodeArc to approve your account.",
-  });
+  }, 200, req);
 }
 
 serve(async (req) => {
@@ -870,6 +870,7 @@ serve(async (req) => {
     }
 
     if (action === "check_slug") {
+
       return await handleCheckSlug(normalizeSlug(String(payload.slug || "")), req);
     }
 
