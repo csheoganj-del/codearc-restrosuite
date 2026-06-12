@@ -140,10 +140,9 @@ function activeSubscription(status: unknown) {
 
 function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
   const planTabs = (PLAN_ENTITLEMENTS[String(planCode || "starter")] || PLAN_ENTITLEMENTS.starter).allowedTabs;
-  const requestedTabs = Array.isArray(tenantTabs) && tenantTabs.length > 0
+  return Array.isArray(tenantTabs) && tenantTabs.length > 0
     ? tenantTabs.map(String)
     : planTabs;
-  return requestedTabs.filter((tab) => planTabs.includes(tab));
 }
 
 function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {
@@ -359,9 +358,9 @@ serve(async (req) => {
         const order = payload.order as Record<string, unknown>;
         query = query.order(String(order.column || "id"), { ascending: order.ascending !== false });
       }
-      const requestedLimit = Number(payload.limit);
-      const safeLimit = Number.isFinite(requestedLimit)
-        ? Math.min(Math.max(requestedLimit, 1), ZERO_COST_MAX_LIMIT)
+      const requestedLimit = payload.limit !== null && payload.limit !== undefined ? Number(payload.limit) : NaN;
+      const safeLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, ZERO_COST_MAX_LIMIT)
         : ZERO_COST_DEFAULT_LIMIT;
       query = query.limit(safeLimit);
       if (payload.single === true) query = query.single();

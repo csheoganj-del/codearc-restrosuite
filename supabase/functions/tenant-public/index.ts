@@ -86,7 +86,7 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
 async function getApprovedTenant(slug: string) {
   const { data, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, status, plan_code, subscription_status")
+    .select("id, name, status, plan_code, subscription_status")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -136,7 +136,18 @@ serve(async (req) => {
         return jsonResponse({ error: "Failed to load menu." }, 500);
       }
 
-      return jsonResponse({ menu: data || [] }, 200, req);
+      const { data: profileData } = await supabaseAdmin
+        .from("doppio_business_profile")
+        .select("name, address, phone")
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+
+      return jsonResponse({
+        menu: data || [],
+        tenantName: profileData?.name || tenant.name || "Doppio Cafe",
+        tenantAddress: profileData?.address || "",
+        tenantPhone: profileData?.phone || ""
+      }, 200, req);
     }
 
     if (action === "create_order") {

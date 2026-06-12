@@ -16,45 +16,42 @@
   
   <style>
     :root {
-      /* ——— Warm restaurant luxe palette ——— */
-      --espresso: #1b130e;
-      --espresso-soft: #241a13;
-      --saffron: #e8a23d;
-      --saffron-deep: #c97f1f;
-      --saffron-bright: #f4bc62;
-      --ember: #b4543a;
-      --cream: #faf4e8;
-      --paper: #fffdf8;
-      --ink: #241a13;
-      --line: #e7dcc8;
-      --line-strong: #d9caaf;
-      --gold-grad: linear-gradient(135deg, #f4bc62 0%, #e8a23d 45%, #c97f1f 100%);
+      /* ——— Premium white glassmorphism palette ——— */
+      --espresso: #101010;
+      --espresso-soft: #1e1e24;
+      --saffron: #ff6b00;
+      --saffron-deep: #e05e00;
+      --saffron-bright: #ff6b00;
+      --ember: #e74c3c;
+      --cream: #fafaf7;
+      --paper: rgba(255, 255, 255, 0.55);
+      --ink: #101010;
+      --line: rgba(0, 0, 0, 0.08);
+      --line-strong: rgba(0, 0, 0, 0.12);
+      --gold-grad: linear-gradient(135deg, #ff8e3c 0%, #ff6b00 100%);
 
       /* Vars referenced by existing JS / inline styles — do not remove */
-      --primary-brand: #c97f1f;
-      --primary-hover: #e8a23d;
-      --accent-red: #b4543a;
-      --text-main: #241a13;
-      --text-secondary: #4d3f33;
-      --text-muted: #7d6e5e;
-      --success: #2e7d4f;
-      --error: #c0392b;
+      --primary-brand: #ff6b00;
+      --primary-hover: #e05e00;
+      --accent-red: #e74c3c;
+      --text-main: #101010;
+      --text-secondary: #2a2a2a;
+      --text-muted: #666666;
+      --success: #27ae60;
+      --error: #e74c3c;
       --transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 
-      --serif: "Fraunces", "Georgia", serif;
+      --serif: "Plus Jakarta Sans", "Inter", sans-serif;
       --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       --ease: cubic-bezier(0.22, 1, 0.36, 1);
-      --shadow-card: 0 36px 80px -32px rgba(27, 19, 14, 0.45);
+      --shadow-card: 0 15px 35px -10px rgba(0, 0, 0, 0.04), 0 5px 15px -5px rgba(0, 0, 0, 0.02);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: var(--sans);
-      background:
-        radial-gradient(1000px 540px at 85% -10%, rgba(232, 162, 61, 0.16), transparent 60%),
-        radial-gradient(700px 460px at -10% 80%, rgba(180, 84, 58, 0.12), transparent 55%),
-        linear-gradient(165deg, #1b130e 0%, #221911 55%, #241a13 100%);
+      background: #fafaf7;
       color: var(--text-secondary);
       min-height: 100vh;
       display: flex;
@@ -67,7 +64,7 @@
       content: "";
       position: fixed;
       inset: 0;
-      background-image: radial-gradient(rgba(244, 188, 98, 0.1) 1px, transparent 1px);
+      background-image: radial-gradient(rgba(255, 107, 0, 0.05) 1px, transparent 1px);
       background-size: 28px 28px;
       mask-image: radial-gradient(800px 600px at 75% 20%, black, transparent 75%);
       -webkit-mask-image: radial-gradient(800px 600px at 75% 20%, black, transparent 75%);
@@ -75,7 +72,7 @@
       z-index: 0;
     }
 
-    h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.18; letter-spacing: -0.01em; }
+    h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.18; letter-spacing: -0.02em; }
 
     /* ——— Header ——— */
     .access-header {
@@ -92,53 +89,44 @@
       align-items: center;
       gap: 11px;
       text-decoration: none;
-      color: #f6ead2;
+      color: #101010;
       font-weight: 700;
       font-size: 17px;
     }
     .brand-product {
       font-family: var(--serif);
-      font-style: italic;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--saffron-bright);
     }
     .access-brand-mark {
       width: 34px;
       height: 34px;
-      border-radius: 11px;
-      background:
-        radial-gradient(circle at 30% 25%, rgba(255, 235, 200, 0.55), transparent 55%),
-        var(--gold-grad);
-      box-shadow: 0 6px 18px -6px rgba(201, 127, 31, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+      border-radius: 8px;
+      background: url('images/restrosuite_logo.png') center/cover no-repeat;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       position: relative;
       flex: none;
     }
     .access-brand-mark::after {
-      content: "";
-      position: absolute;
-      inset: 9px;
-      border-radius: 50%;
-      border: 2px solid rgba(39, 26, 11, 0.85);
-      border-bottom-color: transparent;
-      transform: rotate(45deg);
+      display: none;
     }
     .back-home {
       display: inline-flex;
       align-items: center;
       gap: 9px;
-      color: rgba(246, 234, 210, 0.7);
+      color: var(--text-muted);
       text-decoration: none;
       font-size: 13.5px;
       font-weight: 600;
       padding: 9px 16px;
-      border: 1px solid rgba(232, 162, 61, 0.3);
+      border: 1px solid var(--line);
       border-radius: 999px;
       transition: var(--transition);
     }
     .back-home:hover {
       color: var(--saffron-bright);
-      border-color: rgba(232, 162, 61, 0.6);
-      background: rgba(232, 162, 61, 0.08);
+      border-color: var(--saffron-bright);
+      background: rgba(255, 107, 0, 0.05);
     }
 
     /* ——— Layout ——— */
@@ -156,7 +144,7 @@
     }
 
     /* ——— Story panel ——— */
-    .access-story { color: rgba(246, 234, 210, 0.75); }
+    .access-story { color: var(--text-muted); }
     .story-eyebrow {
       display: inline-flex;
       align-items: center;
@@ -176,13 +164,12 @@
     }
     .access-story h1 {
       font-size: clamp(32px, 3.6vw, 48px);
-      color: #fdf6e9;
+      color: var(--ink);
       margin-bottom: 18px;
-      font-weight: 560;
+      font-weight: 700;
     }
     .access-story h1 span {
-      font-style: italic;
-      background: linear-gradient(120deg, #f7c875, #e8a23d 55%, #d98a2b);
+      background: var(--gold-grad);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -191,45 +178,47 @@
       font-size: 16px;
       max-width: 440px;
       margin-bottom: 34px;
-      color: rgba(246, 234, 210, 0.65);
+      color: var(--text-muted);
     }
     .story-flow { display: grid; gap: 14px; margin-bottom: 34px; }
     .story-step {
       display: flex;
       align-items: flex-start;
       gap: 16px;
-      background: rgba(232, 162, 61, 0.06);
-      border: 1px solid rgba(232, 162, 61, 0.18);
+      background: rgba(255, 255, 255, 0.55);
+      border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 14px;
       padding: 15px 18px;
       transition: var(--transition);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
     .story-step:hover {
-      border-color: rgba(232, 162, 61, 0.45);
-      background: rgba(232, 162, 61, 0.1);
+      border-color: var(--saffron);
+      background: rgba(255, 255, 255, 0.85);
       transform: translateX(5px);
     }
     .story-step-no {
       font-family: var(--serif);
-      font-style: italic;
       font-size: 19px;
+      font-weight: 700;
       color: var(--saffron-bright);
       flex: none;
       margin-top: 1px;
     }
     .story-step strong {
       display: block;
-      color: #fdf3df;
+      color: var(--ink);
       font-size: 14.5px;
       margin-bottom: 1px;
     }
-    .story-step span { font-size: 13px; color: rgba(246, 234, 210, 0.58); }
-    .story-support { font-size: 13.5px; color: rgba(246, 234, 210, 0.55); }
+    .story-step span { font-size: 13px; color: var(--text-muted); }
+    .story-support { font-size: 13.5px; color: var(--text-muted); }
     .story-support a {
       color: var(--saffron-bright);
       font-weight: 600;
       text-decoration: none;
-      border-bottom: 1px solid rgba(244, 188, 98, 0.4);
+      border-bottom: 1px solid rgba(255, 107, 0, 0.4);
       transition: var(--transition);
     }
     .story-support a:hover { border-bottom-color: var(--saffron-bright); }
@@ -245,13 +234,15 @@
       width: 100%;
       max-width: 480px;
       background: var(--paper);
-      border: 1px solid rgba(232, 162, 61, 0.35);
+      border: 1px solid var(--line);
       border-radius: 26px;
       padding: 38px 38px 34px;
       box-shadow:
-        var(--shadow-card),
-        0 0 0 6px rgba(232, 162, 61, 0.07),
-        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        0 15px 35px -10px rgba(0, 0, 0, 0.04),
+        0 5px 15px -5px rgba(0, 0, 0, 0.02),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
       position: relative;
       overflow: hidden;
       animation: cardIn 0.7s var(--ease);
@@ -714,13 +705,13 @@
       flex-wrap: wrap;
       gap: 12px;
       padding: 20px clamp(20px, 4.5vw, 56px);
-      border-top: 1px solid rgba(232, 162, 61, 0.14);
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
       font-size: 12.5px;
-      color: rgba(246, 234, 210, 0.5);
+      color: var(--text-muted);
     }
     .access-footer-links { display: flex; gap: 20px; }
     .access-footer-links a {
-      color: rgba(246, 234, 210, 0.62);
+      color: var(--text-muted);
       text-decoration: none;
       transition: var(--transition);
     }
@@ -786,7 +777,7 @@
       <!-- Brand Logo -->
       <div class="brand-logo">
         <div class="logo-container">
-          <div class="logo-mark" style="width: 24px; height: 24px; border-radius: 6px; background: var(--primary-brand); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #FFF; font-weight: 800;"><i class="fa-solid fa-square-poll-horizontal"></i></div>
+          <div class="logo-mark" style="width: 28px; height: 28px; border-radius: 6px; background: url('images/restrosuite_logo.png') center/cover no-repeat; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center;"></div>
           <span class="logo-text">CodeArc <span>RestroSuite</span></span>
         </div>
         <h2 class="login-title" id="portal-title">Sign in to your workspace</h2>

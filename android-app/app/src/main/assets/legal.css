@@ -5,7 +5,7 @@
   --line: #dfe3e8;
   --surface: #ffffff;
   --canvas: #f6f7f9;
-  --accent: #f97316;
+  --accent: #FF6B00;
 }
 
 * { box-sizing: border-box; }
@@ -72,7 +72,7 @@ body {
   font-weight: 700;
 }
 
-.legal-page a { color: #c4510a; }
+.legal-page a { color: #E05E00; }
 
 @media (max-width: 640px) {
   .legal-nav {

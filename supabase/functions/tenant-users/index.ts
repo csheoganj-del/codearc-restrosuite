@@ -163,8 +163,7 @@ async function verifyAdminSession(req: Request) {
       return { ok: false, error: "Workspace access is not active." };
     }
     const plan = planFor(tenant.plan_code);
-    const tenantTabs = (Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs.map(String) : plan.allowedTabs)
-      .filter((tab) => plan.allowedTabs.includes(tab));
+    const tenantTabs = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs.map(String) : plan.allowedTabs;
 
     const userId = String(payload.user_id || "");
     if (!userId) {

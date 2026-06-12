@@ -3,8 +3,8 @@
 :root {
   --primary-dark: #111827;
   --primary-brand: #111827;
-  --accent-caramel: #F97316;
-  --accent-caramel-hover: #EA580C;
+  --accent-caramel: #FF6B00;
+  --accent-caramel-hover: #E05E00;
   --accent-gold: #2563EB;
   --bg-cream-light: #F6F7F9;
   --bg-tan-warm: #EEF2F7;
@@ -1268,7 +1268,7 @@ nav a:hover {
   background: var(--accent-caramel);
   border-color: var(--accent-caramel);
   color: #FFFFFF;
-  box-shadow: 0 1px 2px rgba(249, 115, 22, 0.18);
+  box-shadow: 0 1px 2px rgba(255, 107, 0, 0.18);
 }
 
 .nav-cta:hover,
@@ -1279,7 +1279,7 @@ nav a:hover {
   background: var(--accent-caramel-hover);
   color: #FFFFFF;
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.18);
+  box-shadow: 0 6px 16px rgba(255, 107, 0, 0.18);
 }
 
 .btn-dark,
@@ -1299,7 +1299,7 @@ nav a:hover {
 }
 
 .hero-tag {
-  color: #F97316;
+  color: #FF6B00;
   letter-spacing: 0.06em;
 }
 
@@ -1341,7 +1341,7 @@ footer h4 {
 
 .feature-card:hover .feature-icon-wrapper {
   transform: none;
-  background: rgba(249, 115, 22, 0.12);
+  background: rgba(255, 107, 0, 0.12);
   color: var(--accent-caramel);
 }
 
@@ -1375,7 +1375,7 @@ footer {
 .cart-form select:focus,
 .cart-form textarea:focus {
   border-color: var(--accent-caramel);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.12);
 }
 
 /* ==========================================================

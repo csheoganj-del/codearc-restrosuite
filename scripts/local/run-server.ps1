@@ -14,7 +14,12 @@ if (Test-Path $envLocalPath) {
     Write-Host "Loading .env.local..." -ForegroundColor Cyan
     Get-Content $envLocalPath | ForEach-Object {
         if ($_ -match '^\s*([^#=]+)\s*=\s*(.*)\s*$') {
-            [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+            $key = $matches[1].Trim()
+            $val = $matches[2].Trim().Trim('"').Trim("'")
+            if ($val -like "<*>" -or $val -eq "<same-as-above>" -or [string]::IsNullOrEmpty($val)) {
+                return
+            }
+            [Environment]::SetEnvironmentVariable($key, $val)
         }
     }
 }

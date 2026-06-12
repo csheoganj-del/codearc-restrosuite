@@ -631,7 +631,7 @@
               </div>
             </div>
             <div style="display: flex; gap: 10px;">
-              <button type="button" class="btn btn-secondary" id="table-session-cancel-btn" style="padding: 6px 12px; font-size: 11px; background: rgba(255,255,255,0.15); border: none; color: white; font-weight: 700; border-radius: 12px; cursor: pointer;">Cancel Edit</button>
+              <button type="button" class="btn btn-secondary" id="table-session-cancel-btn" style="padding: 6px 12px; font-size: 11px; background: rgba(255,255,255,0.15); border: none; color: white; font-weight: 700; border-radius: 12px; cursor: pointer;"><i class="fa-solid fa-circle-chevron-left"></i> Back to Tables</button>
               <button type="button" class="btn btn-primary" id="table-session-kds-btn" style="padding: 6px 16px; font-size: 11px; background: var(--accent-gold); border: none; color: var(--primary-brand); font-weight: 800; border-radius: 12px; cursor: pointer;"><i class="fa-solid fa-paper-plane"></i> Send to KDS</button>
             </div>
           </div>
@@ -677,7 +677,7 @@
               <div class="cart-header">
                 <div class="cart-header-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                   <div style="display:flex; align-items:baseline; gap:8px;">
-                    <h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--primary-brand);">Takeaway Cart</h2>
+                    <h2 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--primary-brand);" id="cart-title">Takeaway Cart</h2>
                     <span style="font-size: 10px; font-weight: 700; color: var(--accent-caramel); background: rgba(252, 128, 25, 0.06); border: 1px solid rgba(252, 128, 25, 0.12); padding: 2px 6px; border-radius: 12px;" id="cart-order-badge">Order: DO-1001</span>
                   </div>
                   <div style="display:flex; align-items:center; gap:8px;">
@@ -692,16 +692,6 @@
                 <button class="order-type-btn active" data-type="Takeaway" id="order-takeaway-btn"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
                 <button class="order-type-btn" data-type="DineIn" id="order-dinein-btn"><i class="fa-solid fa-chair"></i> Dine-in</button>
                 <button class="order-type-btn" data-type="Delivery" id="order-delivery-btn"><i class="fa-solid fa-truck"></i> Delivery</button>
-              </div>
-
-              <!-- Priority Toggle -->
-              <div class="order-type-picker" style="margin-top: 8px;">
-                <button class="priority-btn active" data-priority="normal" id="priority-normal-btn" style="flex:1; padding: 10px 12px; border-radius: 10px; border: 2px solid #f39c12; background: rgba(243,156,18,0.1); color: #f39c12; font-size: 12px; font-weight: 800; cursor: pointer; transition: all 0.2s ease;">
-                  <i class="fa-solid fa-flag"></i> Normal
-                </button>
-                <button class="priority-btn" data-priority="urgent" id="priority-urgent-btn" style="flex:1; padding: 10px 12px; border-radius: 10px; border: 2px solid rgba(231,76,60,0.3); background: rgba(231,76,60,0.05); color: rgba(231,76,60,0.7); font-size: 12px; font-weight: 800; cursor: pointer; transition: all 0.2s ease;">
-                  <i class="fa-solid fa-bolt"></i> Urgent
-                </button>
               </div>
 
               <!-- Guest Info Toggle Banner -->
@@ -4101,7 +4091,7 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
       
       <div style="display: flex; gap: 12px; width: 100%; margin-top: 10px;">
         <button type="button" class="btn btn-primary" id="btn-print-table-qr" style="flex: 1; padding: 10px; font-size: 13px;"><i class="fa-solid fa-print"></i> Print Template</button>
-        <button type="button" class="btn btn-secondary" id="btn-simulate-qr-scan" style="flex: 1; padding: 10px; font-size: 13px; color: var(--primary-brand); border-color: rgba(28, 28, 28,0.15);"><i class="fa-solid fa-laptop-code"></i> Simulate Scan</button>
+        <button type="button" class="btn btn-secondary" id="btn-simulate-qr-scan" style="flex: 1; padding: 10px; font-size: 13px; color: var(--primary-brand); border-color: rgba(28, 28, 28,0.15);"><i class="fa-solid fa-arrow-up-right-from-square"></i> Test Scan Link</button>
       </div>
     </div>
   </div>

@@ -36,10 +36,79 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // ==========================================
+  // 0. IMMEDIATE TENANT BRANDING FROM URL
+  // Applied synchronously — no API call needed.
+  // When a customer scans a QR (home.html?tenant=bloom-cafe&table=3)
+  // the page instantly shows the right restaurant name.
+  // ==========================================
+  (function applyUrlTenantBranding() {
+    const p = new URLSearchParams(window.location.search);
+    const slug = p.get('tenant') || p.get('outlet') || '';
+    if (!slug) return; // No tenant in URL → show default Doppio page
+
+    // Convert slug like "bloom-cafe" → "Bloom Cafe"
+    const slugName = slug
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase())
+      .trim();
+
+    // Store for downstream use
+    window.__tenantSlugName = slugName;
+    window.__tenantSlug = slug;
+
+    // Update page title
+    document.title = `${slugName} | Order Online`;
+
+    // Update header logo text
+    document.querySelectorAll('.logo-doppio').forEach(el => {
+      el.textContent = slugName.split(' ')[0].toUpperCase();
+    });
+    document.querySelectorAll('.logo-cafe').forEach(el => {
+      // Keep 'Café' or set to rest of name if multi-word
+      const parts = slugName.split(' ');
+      if (parts.length > 1) {
+        el.textContent = parts.slice(1).join(' ');
+      }
+    });
+
+    // Update hero tag & title
+    const heroTag = document.querySelector('.hero-tag');
+    if (heroTag) heroTag.textContent = `Welcome to ${slugName}`;
+
+    // Update hero desc
+    const heroDesc = document.querySelector('.hero-content p');
+    if (heroDesc) {
+      heroDesc.innerHTML = `Browse our full menu and place your order directly from your table at <strong>${slugName}</strong>. Fast, fresh, and made just for you!`;
+    }
+
+    // Update interactive menu section title
+    const sectionTitles = document.querySelectorAll('.section-title');
+    if (sectionTitles.length > 0) {
+      sectionTitles[0].textContent = `${slugName} Menu`;
+    }
+
+    // Update footer
+    const footerTitle = document.querySelector('.footer-col h4');
+    if (footerTitle) footerTitle.textContent = slugName;
+
+    const footerCopyright = document.querySelector('.footer-bottom span');
+    if (footerCopyright) {
+      footerCopyright.textContent = `© ${new Date().getFullYear()} ${slugName}. All rights reserved. Powered by RestroSuite.`;
+    }
+
+    // Update UPI merchant name if present
+    const merchantNameEl = document.querySelector('.merchant-name');
+    if (merchantNameEl) {
+      merchantNameEl.innerHTML = `${slugName} <i class="fa-solid fa-circle-check" style="color:#c98a4a;"></i>`;
+    }
+  })();
+
   async function callTenantPublic(action, payload = {}) {
     // tenant_slug is read dynamically from page URL params or defaults to a generic value
     const urlParams = new URLSearchParams(window.location.search);
     const tenantSlug = urlParams.get('outlet') || urlParams.get('tenant') || '';
+    if (!TENANT_PUBLIC_FUNCTION_URL) throw new Error('No Supabase URL configured');
     const response = await fetch(TENANT_PUBLIC_FUNCTION_URL, {
       method: 'POST',
       headers: {
@@ -161,6 +230,70 @@ window.addEventListener('DOMContentLoaded', () => {
     callTenantPublic('list_menu')
       .then((result) => {
         const data = Array.isArray(result.menu) ? result.menu : [];
+        
+        // Use tenant name from API only if we don't already have a URL-based name.
+        // If a ?tenant= slug is in the URL, the IIFE already set the branding correctly.
+        // The API may return Doppio's default data if the slug isn't registered yet.
+        const urlSlugAlreadySet = !!window.__tenantSlugName;
+        const tenantName = urlSlugAlreadySet
+          ? window.__tenantSlugName          // trust what IIFE derived from URL
+          : (result.tenantName || 'Doppio Cafe'); // only use API if no URL slug
+        const tenantAddress = result.tenantAddress || '';
+        const tenantPhone = result.tenantPhone || '';
+
+        // Only update title/logo/desc if NOT already branded from URL slug
+        if (!urlSlugAlreadySet) {
+          document.title = `${tenantName} | Savor the Perfect Brew`;
+          
+          // Update all logo elements
+          document.querySelectorAll('.logo-doppio').forEach(el => {
+            el.textContent = tenantName.split(' ')[0].toUpperCase();
+          });
+          
+          // Update hero description text
+          const heroDesc = document.querySelector('.hero-content p');
+          if (heroDesc) {
+            heroDesc.innerHTML = `Experience the bold richness of authentic double-shot espresso crafted with passion at <strong>${escHtml(tenantName)}</strong>. Every cup is an art, roasted locally and poured to perfection ${tenantAddress ? 'at ' + escHtml(tenantAddress) : 'on London Street, Nagpur'}.`;
+          }
+
+          // Update section titles
+          const sectionTitle = document.querySelector('.section-title');
+          if (sectionTitle) {
+            sectionTitle.textContent = `${tenantName} Interactive Menu`;
+          }
+
+          // Update footer texts
+          const footerTitle = document.querySelector('.footer-col h4');
+          if (footerTitle) footerTitle.textContent = tenantName;
+
+          const footerCopyright = document.querySelector('.footer-bottom span');
+          if (footerCopyright) {
+            footerCopyright.textContent = `© 2026 ${tenantName}. All rights reserved. Crafted for premium coffee enthusiasts.`;
+          }
+        }
+
+        // Always update address/phone/UPI enrichment from API (these aren't set by IIFE)
+        const footerAddress = document.querySelector('.footer-col p');
+        if (footerAddress && tenantAddress) {
+          footerAddress.innerHTML = `<i class="fa-solid fa-location-dot"></i> ${escHtml(tenantAddress)}`;
+        }
+        
+        const footerPhone = document.querySelector('.footer-col:nth-child(2) p:nth-child(2)');
+        if (footerPhone && tenantPhone) {
+          footerPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${escHtml(tenantPhone)}`;
+        }
+
+        // Always update merchant checkout info with correct name
+        const merchantNameEl = document.querySelector('.merchant-name');
+        if (merchantNameEl) {
+          merchantNameEl.innerHTML = `${escHtml(tenantName)} <i class="fa-solid fa-circle-check" style="color: #c98a4a;"></i>`;
+        }
+
+        const merchantVpa = document.querySelector('.merchant-vpa');
+        if (merchantVpa && tenantPhone) {
+          merchantVpa.textContent = `${tenantPhone.replace(/\s+/g, '')}@upi`;
+        }
+
         if (data.length > 0) {
           console.log("Dynamically loaded menu from backend:", data);
           const dbMenuMapped = data.map(item => ({
@@ -186,6 +319,7 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log("Backend menu fetch failed. Using local fallback.", err);
       });
   }
+
 
   // Render Menu Function
   const menuGrid = document.getElementById('menu-grid');
@@ -224,12 +358,10 @@ window.addEventListener('DOMContentLoaded', () => {
       const safeDescription = escHtml(item.description);
       const safePrice = escHtml(item.price);
       const safeCategory = escHtml(item.category);
-      const safeIcon = escHtml(item.icon);
       const safeImage = safeImageUrl(item.image);
       const imageHTML = safeImage
         ? `<img src="${safeImage}" alt="${safeName}">`
         : `<div class="menu-item-placeholder">
-             ${safeIcon}
              <span>RestroSuite</span>
            </div>`;
 
@@ -638,7 +770,9 @@ window.addEventListener('DOMContentLoaded', () => {
   // 5. CUSTOMER QR SELF-ORDER ENGINE & BROADCAST SYNC
   // ==========================================================
   let custCart = [];
-  const broadcastChannel = new BroadcastChannel('doppio_qr_orders');
+  // Scope the BroadcastChannel per-tenant so orders never leak between restaurants
+  const _tenantChannelKey = (window.__tenantSlug || 'shared') + '_qr_orders';
+  const broadcastChannel = new BroadcastChannel(_tenantChannelKey);
 
   // DOM Elements for Customer Cart Drawer
   const floatCartBtn = document.getElementById('customer-floating-cart');
@@ -1275,7 +1409,9 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // Listen for Live Table Reject status changes from the cashier dashboard
-  const tableRejectChannel = new BroadcastChannel('doppio_qr_order_status');
+  const _rejectChannelKey = (window.__tenantSlug || 'shared') + '_qr_order_status';
+  const tableRejectChannel = new BroadcastChannel(_rejectChannelKey);
+
   tableRejectChannel.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'QR_ORDER_REJECTED') {
       const order = e.data.order;

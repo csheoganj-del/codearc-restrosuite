@@ -1643,7 +1643,7 @@ body::before {
 .demo-data-badge {
   padding: 4px 7px;
   border-radius: 999px;
-  background: #f97316;
+  background: #FF6B00;
   color: #fff;
   font-size: 9px;
   font-weight: 800;
@@ -5318,31 +5318,32 @@ body.dark-theme #shift-details-modal .glass-modal {
 
 /* 2. Active Ordering / Carting */
 .table-card.state-ordering {
-  border-color: rgba(226, 147, 55, 0.35);
-  animation: tablePulseGold 2s infinite alternate;
+  border-color: rgba(231, 76, 60, 0.35);
+  animation: tablePulseRed 2s infinite alternate;
 }
 .table-card.state-ordering .table-status-pill {
-  background: rgba(226, 147, 55, 0.08);
-  color: var(--warning-color);
+  background: rgba(231, 76, 60, 0.08);
+  color: var(--danger-color);
 }
 
 /* 3. Pending Cashier Approval (Checkout) */
 .table-card.state-pending {
-  border-color: rgba(210, 94, 86, 0.35);
+  border-color: rgba(231, 76, 60, 0.35);
   animation: tablePulseRed 1.5s infinite alternate;
 }
 .table-card.state-pending .table-status-pill {
-  background: rgba(210, 94, 86, 0.08);
+  background: rgba(231, 76, 60, 0.08);
   color: var(--danger-color);
 }
 
 /* 4. Served / Active dining */
 .table-card.state-served {
-  border-color: rgba(85, 142, 185, 0.25);
+  border-color: rgba(231, 76, 60, 0.35);
+  animation: tablePulseRed 2.5s infinite alternate;
 }
 .table-card.state-served .table-status-pill {
-  background: rgba(85, 142, 185, 0.08);
-  color: var(--info-color);
+  background: rgba(231, 76, 60, 0.08);
+  color: var(--danger-color);
 }
 
 @keyframes tablePulseGold {
@@ -5996,7 +5997,7 @@ body::before {
 }
 
 .sidebar-link.active {
-  background: rgba(249, 115, 22, 0.10);
+  background: rgba(255, 107, 0, 0.10);
   color: #111827;
   letter-spacing: 0;
 }
@@ -6097,7 +6098,7 @@ textarea,
   background: var(--accent-caramel) !important;
   border-color: var(--accent-caramel) !important;
   color: #FFFFFF !important;
-  box-shadow: 0 1px 2px rgba(249, 115, 22, 0.20) !important;
+  box-shadow: 0 1px 2px rgba(255, 107, 0, 0.20) !important;
 }
 
 .btn-primary:hover,
@@ -6107,7 +6108,7 @@ textarea,
 .checkout-submit-btn:hover {
   background: var(--accent-caramel-hover) !important;
   border-color: var(--accent-caramel-hover) !important;
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.18) !important;
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.18) !important;
 }
 
 .btn-secondary,
@@ -6270,7 +6271,7 @@ textarea,
   }
 
   .mobile-nav-link.active i {
-    background: #F97316;
+    background: #FF6B00;
     color: #FFFFFF;
   }
 
@@ -6395,7 +6396,7 @@ textarea,
   }
 
   .more-sheet-link i {
-    color: #F97316 !important;
+    color: #FF6B00 !important;
   }
 
   .floating-cart-bar {
@@ -6405,8 +6406,8 @@ textarea,
     bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 22px) !important;
     min-height: 52px !important;
     border-radius: 8px !important;
-    background: #F97316 !important;
-    box-shadow: 0 10px 22px rgba(249, 115, 22, 0.28) !important;
+    background: #FF6B00 !important;
+    box-shadow: 0 10px 22px rgba(255, 107, 0, 0.28) !important;
   }
 
   body.dark-theme .mobile-top-header,
@@ -6546,7 +6547,7 @@ button {
 }
 
 .growth-panel-title i {
-  color: #F97316;
+  color: #FF6B00;
 }
 
 .growth-mini-form {
@@ -6747,7 +6748,7 @@ body.dark-theme .saas-snapshot-card.active-filter {
 .growth-check input {
   width: 18px;
   height: 18px;
-  accent-color: #F97316;
+  accent-color: #FF6B00;
 }
 
 .growth-compliance-grid {

@@ -265,7 +265,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
               <tr><td style="font-weight:bold;padding:3px 0;">Reason:</td><td>${extraDetails.reason || 'Unknown'}</td></tr>
             </table>
           </div>
-          <div style="background:#fff7ed;padding:14px;border-radius:6px;border-left:4px solid #f97316;margin:16px 0;">
+          <div style="background:#fff7ed;padding:14px;border-radius:6px;border-left:4px solid #FF6B00;margin:16px 0;">
             <strong style="color:#c2410c;">⚡ Impact:</strong>
             <ul style="font-size:13px;margin:8px 0;padding-left:20px;">
               <li>New registrations will <strong>NOT</strong> receive WhatsApp confirmation</li>
@@ -660,8 +660,8 @@ app.get('/', (req, res) => {
         :root {
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
-            --accent: #C98A4A;
-            --accent-hover: #b0733a;
+            --accent: #FF6B00;
+            --accent-hover: #E05E00;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --success: #22c55e;
@@ -1373,7 +1373,7 @@ async function performReset(req, res, format = 'json') {
                             The gateway is re-initializing right now! A fresh QR code will display on the dashboard in a few seconds.
                         </p>
                         <hr style="border: 0; border-top: 1px solid #334155; margin-bottom: 20px;">
-                        <a href="/" style="background-color: #C98A4A; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+                        <a href="/" style="background-color: #FF6B00; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
                             Go to Dashboard &rarr;
                         </a>
                     </div>
@@ -1633,7 +1633,7 @@ async function handleNewRegistrationNotification(record) {
           <!-- Orange Divider -->
           <tr>
             <td>
-              <div style="height:4px; background:#f97316;"></div>
+              <div style="height:4px; background:#FF6B00;"></div>
             </td>
           </tr>
 
@@ -1745,7 +1745,7 @@ async function handleNewRegistrationNotification(record) {
                     <span style="
                       display:inline-block;
                       background:#fff7ed;
-                      color:#ea580c;
+                      color:#E05E00;
                       padding:7px 14px;
                       border-radius:999px;
                       font-size:13px;
@@ -1780,7 +1780,7 @@ async function handleNewRegistrationNotification(record) {
 
               <a href="https://codearc.co.in"
                 style="
-                  background:#f97316;
+                  background:#FF6B00;
                   color:#ffffff;
                   text-decoration:none;
                   padding:14px 28px;

@@ -39,7 +39,10 @@ try {
                 if (Test-Path $envPath) {
                     Get-Content $envPath | ForEach-Object {
                         if ($_ -match "^\s*SUPABASE_ANON_KEY\s*=\s*(.+)$") {
-                            $envKey = $Matches[1].Trim().Trim('"').Trim("'")
+                            $val = $Matches[1].Trim().Trim('"').Trim("'")
+                            if ($val.StartsWith("eyJ")) {
+                                $envKey = $val
+                            }
                         }
                     }
                 }
@@ -100,7 +103,7 @@ try {
                 }
 
                 # Intercept seed/reset actions to run locally if service role key is available
-                if ($urlPath -eq "/functions/v1/tenant-admin" -and ![string]::IsNullOrEmpty($serviceRoleKey) -and ![string]::IsNullOrEmpty($reqBody)) {
+                if ($urlPath -eq "/functions/v1/tenant-admin" -and ![string]::IsNullOrEmpty($serviceRoleKey) -and $serviceRoleKey -like "eyJ*" -and ![string]::IsNullOrEmpty($reqBody)) {
                     try {
                         $bodyObj = ConvertFrom-Json $reqBody
                         $action = $bodyObj.action
@@ -179,6 +182,12 @@ try {
                     $statusCode = $remoteResponse.StatusCode
                     $contentType = $remoteResponse.Headers["Content-Type"]
                     Write-Host "[Proxy] Remote response: $statusCode ($contentType)" -ForegroundColor Green
+                    if ($urlPath -eq "/functions/v1/tenant-data" -and $reqBody -match "doppio_menu") {
+                        Write-Host "[Proxy DEBUG] doppio_menu response: $resString" -ForegroundColor Yellow
+                    }
+                    if ($urlPath -eq "/functions/v1/tenant-data" -and $reqBody -match "doppio_inventory") {
+                        Write-Host "[Proxy DEBUG] doppio_inventory response: $resString" -ForegroundColor Yellow
+                    }
                 } catch {
                     $statusCode = 500
                     Write-Warning "[Proxy] Request to remote failed: $_"

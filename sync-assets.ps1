@@ -18,6 +18,7 @@ $FilesToCopy = @(
     "home.html",
     "kds.html",
     "qr-order.html",
+    "order.html",
     "tokens.html",
     "404.html",
     "config.js",

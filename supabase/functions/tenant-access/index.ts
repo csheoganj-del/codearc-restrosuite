@@ -100,10 +100,9 @@ function planFor(code: unknown) {
 
 function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
   const planTabs = planFor(planCode).allowedTabs;
-  const requestedTabs = Array.isArray(tenantTabs) && tenantTabs.length > 0
+  return Array.isArray(tenantTabs) && tenantTabs.length > 0
     ? tenantTabs.map(String)
     : planTabs;
-  return requestedTabs.filter((tab) => planTabs.includes(tab));
 }
 
 function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {

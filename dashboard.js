@@ -2626,7 +2626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.setAttribute('aria-disabled', !isAvailable);
 
       const descText = item.description ? `<div class="pos-item-desc">${escHtml(item.description)}</div>` : '';
-      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : `<div style="font-size:40px; color:var(--accent-caramel); margin-bottom:8px;">${item.icon || '☕'}</div>`;
+      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : ``;
       card.innerHTML = `
         <div class="pos-item-info">
           ${imageHTML}
@@ -2905,11 +2905,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const orderTypeBtns = document.querySelectorAll('.order-type-btn');
   orderTypeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
+      const targetType = btn.getAttribute('data-type');
+      if (activeTableSession !== null && targetType !== 'DineIn') {
+        const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
+        cart = backup ? JSON.parse(backup) : [];
+        activeTableSession = null;
+        const banner = document.getElementById('table-session-banner');
+        if (banner) banner.style.display = 'none';
+      }
+
       orderTypeBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      activeOrderType = btn.getAttribute('data-type');
+      activeOrderType = targetType;
       SoundEffects.playClick();
       renderCart();
+      renderTablesMap();
     });
   });
 
@@ -3001,6 +3011,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderCart() {
     if (!cartList) return;
+
+    // Update cart title dynamically based on order type and active session
+    const cartTitle = document.getElementById('cart-title');
+    if (cartTitle) {
+      if (activeOrderType === 'DineIn') {
+        cartTitle.textContent = activeTableSession ? `Table 0${activeTableSession} Cart` : 'Dine-in Cart';
+      } else if (activeOrderType === 'Delivery') {
+        cartTitle.textContent = 'Delivery Cart';
+      } else {
+        cartTitle.textContent = 'Takeaway Cart';
+      }
+    }
 
     // Restore customer details on initial load
     const nameInput = document.getElementById('cust-name');
@@ -5273,7 +5295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.className = `inventory-card ${cardClass}`;
       card.innerHTML = `
         <div class="inventory-card-title">
-          <h3>${icon} ${getLabelFromKey(key)} ${expiryBadge}</h3>
+          <h3>${getLabelFromKey(key)} ${expiryBadge}</h3>
           <span style="font-size:10px; font-weight:700;" class="text-${statusClass}">${percent}%</span>
         </div>
         
@@ -7006,7 +7028,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     menu.forEach((item, index) => {
       const card = document.createElement('div');
       card.className = 'menu-editor-card';
-      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : `<span style="font-size:40px; display:block; margin-bottom:8px; color:var(--accent-caramel);">${item.icon || '☕'}</span>`;
+      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : ``;
       card.innerHTML = `
         <div>
           ${imageHTML}
@@ -12152,6 +12174,62 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const active = document.activeElement;
     const isCard = active && active.classList.contains('pos-item-card');
 
+    // Escape closes modals or cancels edits
+    if (e.key === 'Escape') {
+      let actionTaken = false;
+
+      // 1. Close CRM suggestions if open
+      const crmSugs = document.getElementById('crm-suggestions');
+      if (crmSugs && crmSugs.style.display !== 'none') {
+        crmSugs.style.display = 'none';
+        crmSugs.innerHTML = '';
+        actionTaken = true;
+      }
+
+      // 2. Close receipt preview modal if open
+      const receiptModal = document.getElementById('receipt-preview-modal');
+      if (receiptModal && (receiptModal.style.display === 'flex' || receiptModal.style.display === 'block' || receiptModal.classList.contains('active'))) {
+        if (typeof window.closeReceiptPreview === 'function') {
+          window.closeReceiptPreview();
+        } else {
+          receiptModal.classList.remove('active');
+          receiptModal.style.display = 'none';
+        }
+        actionTaken = true;
+      }
+
+      // 3. Close other visible modal backdrops
+      const modBackdrops = document.querySelectorAll('.modal-backdrop');
+      modBackdrops.forEach(modal => {
+        if (modal !== receiptModal) {
+          const isVisible = modal.classList.contains('active') || modal.style.display === 'flex' || modal.style.display === 'block';
+          if (isVisible) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+            actionTaken = true;
+          }
+        }
+      });
+
+      // 4. Cancel active bill edit if editing a bill
+      if (!actionTaken && typeof editingBillId !== 'undefined' && editingBillId !== null) {
+        const cancelBillBtn = document.getElementById('cancel-edit-bill-btn');
+        if (cancelBillBtn) {
+          cancelBillBtn.click();
+          actionTaken = true;
+        }
+      }
+
+      // 5. Cancel active table session if editing a table
+      if (!actionTaken && typeof activeTableSession !== 'undefined' && activeTableSession !== null) {
+        const cancelBtn = document.getElementById('table-session-cancel-btn');
+        if (cancelBtn) {
+          cancelBtn.click();
+          actionTaken = true;
+        }
+      }
+    }
+
     // Alt+D Toggle theme
     if (e.altKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
@@ -13231,9 +13309,11 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     }
   })();
 
-  // Broadcast Channels
-  const qrOrdersChannel = new BroadcastChannel('doppio_qr_orders');
-  const qrStatusChannel = new BroadcastChannel('doppio_qr_order_status');
+  // Broadcast Channels — scoped per tenant to prevent cross-tenant order leakage
+  const _dashTenantKey = (sessionStorage.getItem('tenant_slug') || activeTenantSlug || 'shared');
+  const qrOrdersChannel = new BroadcastChannel(_dashTenantKey + '_qr_orders');
+  const qrStatusChannel = new BroadcastChannel(_dashTenantKey + '_qr_order_status');
+
 
   // DOM Elements for QR Tab
   const activeTablesSummary = document.getElementById('active-tables-summary');
@@ -13635,18 +13715,17 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       card.className = `table-card state-${state.toLowerCase()}`;
 
       let stateLabel = "Clean & Empty";
-      let statusClass = "state-empty";
       let iconColor = "var(--text-muted)";
 
       if (state === "ORDERING") {
-        stateLabel = "Selecting Items...";
-        iconColor = "var(--accent-gold)";
+        stateLabel = "Occupied (Ordering)";
+        iconColor = "var(--danger-color)";
       } else if (state === "PENDING") {
-        stateLabel = "Checkout Pending!";
+        stateLabel = "Occupied (Pending Pay)";
         iconColor = "var(--danger-color)";
       } else if (state === "SERVED") {
-        stateLabel = "Eating / Served";
-        iconColor = "#3498db";
+        stateLabel = "Occupied (Served)";
+        iconColor = "var(--danger-color)";
       }
 
       card.innerHTML = `
@@ -13658,16 +13737,16 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         
         <div class="table-card-actions">
           <button class="table-card-btn generate-qr" data-table="${tableId}" title="Generate Scannable Table QR"><i class="fa-solid fa-qrcode"></i> QR Link</button>
-          ${state === 'SERVED' ?
-          `<button class="table-card-btn clear-table" data-table="${tableId}" style="background: rgba(46,204,113,0.06); border-color: rgba(46,204,113,0.15); color: #27ae60;" title="Served & Clean Table"><i class="fa-solid fa-broom"></i> Clean</button>` :
-          `<button class="table-card-btn simulate-scan" data-table="${tableId}" title="Simulate mobile scan link"><i class="fa-solid fa-mobile-screen"></i> Scan</button>`
+          ${state !== 'EMPTY' ?
+          `<button class="table-card-btn clear-table" data-table="${tableId}" style="background: rgba(231,76,60,0.06); border-color: rgba(231,76,60,0.15); color: var(--danger-color);" title="Served & Clean Table"><i class="fa-solid fa-broom"></i> Clean</button>` :
+          ''
         }
         </div>
       `;
 
       card.addEventListener('click', (e) => {
         if (e.target.closest('.table-card-actions')) return;
-        openTableSessionModal(tableId);
+        startTableSessionEdit(tableId);
       });
 
       tablesMapGrid.appendChild(card);
@@ -13681,19 +13760,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       });
     });
 
-    tablesMapGrid.querySelectorAll('.simulate-scan').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tblNum = btn.getAttribute('data-table');
-        const simulateLink = `${window.location.origin}/home.html?table=${tblNum}`;
-        SoundEffects.playClick();
-        window.open(simulateLink, '_blank');
-      });
-    });
-
     tablesMapGrid.querySelectorAll('.clear-table').forEach(btn => {
       btn.addEventListener('click', () => {
         const tblNum = btn.getAttribute('data-table');
         tablesState[tblNum] = "EMPTY";
+        tableCarts[tblNum] = [];
+        localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
         localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
         SoundEffects.playRemove();
         updateQrOrdersDashboardUI();
@@ -13953,7 +14025,9 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       console.warn("Sound effects clicked play bypassed", e);
     }
 
-    const lockedLink = `${window.location.origin}/home.html?table=${tableNum}`;
+    const tenantSlug = sessionStorage.getItem('tenant_slug') || activeTenantSlug || 'primary';
+    const lockedLink = `${window.location.origin}/order.html?tenant=${tenantSlug}&table=${tableNum}`;
+
     const formattedTitle = `Table 0${tableNum} QR Ordering Station`;
 
     if (qrViewerTitle) {
@@ -15226,11 +15300,25 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   if (sessionCancelBtn) {
     sessionCancelBtn.addEventListener('click', () => {
       SoundEffects.playClick();
-      const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
-      cart = backup ? JSON.parse(backup) : [];
       if (activeTableSession !== null) {
         const tableId = activeTableSession;
-        if ((tableCarts[tableId] || []).length === 0 && tablesState[tableId] === 'ORDERING') {
+
+        if (cart.length > 0) {
+          // Save the current cart to the table session so it's not discarded
+          tableCarts[tableId] = [...cart];
+          localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+
+          // Keep the table state as ORDERING (occupied)
+          tablesState[tableId] = 'ORDERING';
+          localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+
+          // Sync the occupied table session to Supabase
+          syncActiveTableSessionToSupabase(tableId);
+        } else {
+          // Clear the table session
+          tableCarts[tableId] = [];
+          localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+
           tablesState[tableId] = 'EMPTY';
           localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
           if (supabaseClient) {
@@ -15238,9 +15326,33 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           }
         }
       }
+
+      // Restore the takeaway cart backup
+      const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
+      cart = backup ? JSON.parse(backup) : [];
+
+      activeOrderType = 'Takeaway';
+      const typeBtns = document.querySelectorAll('.order-type-btn');
+      typeBtns.forEach(b => {
+        if (b.getAttribute('data-type') === 'Takeaway') {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+
       activeTableSession = null;
+
+      // Hide the session banner
       const banner = document.getElementById('table-session-banner');
       if (banner) banner.style.display = 'none';
+
+      // Navigate back to the Live Table Orders tab
+      const qrTabLink = document.getElementById('sidebar-qr-link') || document.getElementById('mobile-qr-link') || document.querySelector('[data-tab="qr-orders-tab"]');
+      if (qrTabLink) {
+        qrTabLink.click();
+      }
+
       renderCart();
       renderTablesMap();
     });
@@ -15273,17 +15385,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
     let stateLabel = "Clean & Empty";
     if (state === "ORDERING") stateLabel = "Occupied (Ordering)";
-    else if (state === "PENDING") stateLabel = "Checkout Pending!";
-    else if (state === "SERVED") stateLabel = "Eating / Served";
+    else if (state === "PENDING") stateLabel = "Occupied (Pending Pay)";
+    else if (state === "SERVED") stateLabel = "Occupied (Served)";
     status.textContent = stateLabel;
 
     status.className = "status-indicator-badge";
     if (state === "EMPTY") {
       status.style.background = "rgba(46, 204, 113, 0.08)";
       status.style.color = "var(--success-color)";
-    } else if (state === "ORDERING") {
-      status.style.background = "rgba(241, 196, 15, 0.08)";
-      status.style.color = "var(--accent-gold)";
     } else {
       status.style.background = "rgba(231, 76, 60, 0.08)";
       status.style.color = "var(--danger-color)";
@@ -15345,6 +15454,17 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
       syncActiveTableSessionToSupabase(tableId);
     }
+
+    // Explicitly set active order type to DineIn and update picker buttons
+    activeOrderType = 'DineIn';
+    const typeBtns = document.querySelectorAll('.order-type-btn');
+    typeBtns.forEach(b => {
+      if (b.getAttribute('data-type') === 'DineIn') {
+        b.classList.add('active');
+      } else {
+        b.classList.remove('active');
+      }
+    });
 
     const banner = document.getElementById('table-session-banner');
     const bannerTitle = document.getElementById('table-session-title');

@@ -209,7 +209,7 @@ async function seedTenantData(supabaseAdmin, tenantId) {
   
   const { data: menuData, error: menuErr } = await supabaseAdmin
     .from("doppio_menu")
-    .insert(menuItems.map(item => ({ ...item, tenant_id: tenantId })))
+    .insert(menuItems.map(({ popularity, ...item }) => ({ ...item, tenant_id: tenantId })))
     .select();
 
   if (menuErr) {
@@ -219,11 +219,11 @@ async function seedTenantData(supabaseAdmin, tenantId) {
 
   // 5. Seed doppio_inventory
   const stockItems = [
-    { item_name: "Espresso Coffee Beans", unit: "g", minimum_limit: 1000, current_stock: 5000 },
-    { item_name: "Fresh Milk", unit: "ml", minimum_limit: 2000, current_stock: 10000 },
-    { item_name: "Chocolate Syrup", unit: "ml", minimum_limit: 500, current_stock: 2000 },
-    { item_name: "Sugar Syrup", unit: "ml", minimum_limit: 500, current_stock: 3000 },
-    { item_name: "Paper Cups 250ml", unit: "pcs", minimum_limit: 100, current_stock: 500 }
+    { key: "espresso_coffee_beans", label: "Espresso Coffee Beans", unit: "g", current: 5000, max_stock: 10000, category: "food" },
+    { key: "fresh_milk", label: "Fresh Milk", unit: "ml", current: 10000, max_stock: 20000, category: "food" },
+    { key: "chocolate_syrup", label: "Chocolate Syrup", unit: "ml", current: 2000, max_stock: 5000, category: "food" },
+    { key: "sugar_syrup", label: "Sugar Syrup", unit: "ml", current: 3000, max_stock: 5000, category: "food" },
+    { key: "paper_cups_250ml", label: "Paper Cups 250ml", unit: "pcs", current: 500, max_stock: 1000, category: "packaging" }
   ];
 
   const { data: invData, error: invErr } = await supabaseAdmin
@@ -236,58 +236,61 @@ async function seedTenantData(supabaseAdmin, tenantId) {
     return { error: "Failed to seed inventory: " + invErr.message };
   }
 
-  // 6. Seed doppio_inventory_batches
+  // Seed doppio_inventory_thresholds
+  const thresholds = [
+    { ingredient_key: "espresso_coffee_beans", threshold: 1000 },
+    { ingredient_key: "fresh_milk", threshold: 2000 },
+    { ingredient_key: "chocolate_syrup", threshold: 500 },
+    { ingredient_key: "sugar_syrup", threshold: 500 },
+    { ingredient_key: "paper_cups_250ml", threshold: 100 }
+  ];
+  await supabaseAdmin.from("doppio_inventory_thresholds").insert(thresholds.map(t => ({ ...t, tenant_id: tenantId })));
+
+  // 6. Seed doppio_inventory_batches (for FEFO and batch costing)
   let batchIds = [];
-  if (invData) {
-    const batchInserts = invData.map(item => ({
-      tenant_id: tenantId,
-      inventory_item_id: item.id,
-      batch_code: "BATCH-" + Math.floor(1000 + Math.random() * 9000),
-      quantity: item.current_stock,
-      unit_cost: Math.round(50 + Math.random() * 100),
-      expiry_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
-    }));
-    const { data: batchData } = await supabaseAdmin.from("doppio_inventory_batches").insert(batchInserts).select();
-    batchIds = batchData ? batchData.map(r => r.id) : [];
+  const batchInserts = stockItems.map(item => ({
+    id: "batch_" + item.key + "_" + Math.floor(1000 + Math.random() * 9000),
+    tenant_id: tenantId,
+    ingredient_key: item.key,
+    qty: item.current,
+    expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    receivedDate: new Date().toISOString().split('T')[0]
+  }));
+  const { data: batchData, error: batchErr } = await supabaseAdmin.from("doppio_inventory_batches").insert(batchInserts).select();
+  if (batchErr) {
+    console.warn("Seeding inventory batches failed:", batchErr);
   }
+  batchIds = batchData ? batchData.map(r => r.id) : [];
 
   // 7. Seed doppio_custom_recipes
   let recipeIds = [];
-  if (menuData && invData) {
-    const doppioItem = menuData.find(m => m.name === "Doppio");
-    const espressoItem = menuData.find(m => m.name === "Espresso");
-    const cappuccinoItem = menuData.find(m => m.name === "Cappuccino");
-    const latteItem = menuData.find(m => m.name === "Cafe Latte");
-
-    const beansItem = invData.find(i => i.item_name === "Espresso Coffee Beans");
-    const milkItem = invData.find(i => i.item_name === "Fresh Milk");
-    const cupItem = invData.find(i => i.item_name === "Paper Cups 250ml");
-
-    const recipes = [];
-    if (doppioItem && beansItem && cupItem) {
-      recipes.push({ menu_item_id: doppioItem.id, inventory_item_id: beansItem.id, quantity_required: 18 });
-      recipes.push({ menu_item_id: doppioItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
+  const recipes = [
+    {
+      item_name: "Doppio",
+      ingredients: { espresso_coffee_beans: 18, paper_cups_250ml: 1 }
+    },
+    {
+      item_name: "Espresso",
+      ingredients: { espresso_coffee_beans: 9, paper_cups_250ml: 1 }
+    },
+    {
+      item_name: "Cappuccino",
+      ingredients: { espresso_coffee_beans: 9, fresh_milk: 150, paper_cups_250ml: 1 }
+    },
+    {
+      item_name: "Cafe Latte",
+      ingredients: { espresso_coffee_beans: 9, fresh_milk: 200, paper_cups_250ml: 1 }
     }
-    if (espressoItem && beansItem && cupItem) {
-      recipes.push({ menu_item_id: espressoItem.id, inventory_item_id: beansItem.id, quantity_required: 9 });
-      recipes.push({ menu_item_id: espressoItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
-    }
-    if (cappuccinoItem && beansItem && milkItem && cupItem) {
-      recipes.push({ menu_item_id: cappuccinoItem.id, inventory_item_id: beansItem.id, quantity_required: 9 });
-      recipes.push({ menu_item_id: cappuccinoItem.id, inventory_item_id: milkItem.id, quantity_required: 150 });
-      recipes.push({ menu_item_id: cappuccinoItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
-    }
-    if (latteItem && beansItem && milkItem && cupItem) {
-      recipes.push({ menu_item_id: latteItem.id, inventory_item_id: beansItem.id, quantity_required: 9 });
-      recipes.push({ menu_item_id: latteItem.id, inventory_item_id: milkItem.id, quantity_required: 200 });
-      recipes.push({ menu_item_id: latteItem.id, inventory_item_id: cupItem.id, quantity_required: 1 });
-    }
-
-    if (recipes.length > 0) {
-      const { data: recipeData } = await supabaseAdmin.from("doppio_custom_recipes").insert(recipes.map(r => ({ ...r, tenant_id: tenantId }))).select();
-      recipeIds = recipeData ? recipeData.map(r => r.id) : [];
-    }
+  ];
+  const { data: recipeData, error: recipeErr } = await supabaseAdmin.from("doppio_custom_recipes").insert(recipes.map(r => ({
+    tenant_id: tenantId,
+    item_name: r.item_name,
+    ingredients: r.ingredients
+  }))).select();
+  if (recipeErr) {
+    console.warn("Seeding custom recipes failed:", recipeErr);
   }
+  recipeIds = recipeData ? recipeData.map(r => r.id) : [];
 
   // 8. Seed doppio_employees
   const employees = [
