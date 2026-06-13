@@ -910,6 +910,80 @@
     .btn-login:hover {
       color: var(--accent-cta);
     }
+    
+    /* Sandbox Real WhatsApp Custom Styles */
+    .sandbox-actions-container {
+      margin-top: 20px;
+      border-top: 2px dashed var(--border-color);
+      padding-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .sandbox-phone-row {
+      display: flex;
+      gap: 8px;
+    }
+    .sandbox-prefix {
+      background: #F1F5F9;
+      border: 2px solid var(--border-color);
+      border-radius: 4px;
+      padding: 12px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+    }
+    .sandbox-phone-input {
+      flex: 1;
+      border: 2px solid var(--border-color);
+      border-radius: 4px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
+      background: #FFFFFF;
+      outline: none;
+      transition: var(--transition);
+      width: 100%;
+    }
+    .sandbox-phone-input:focus {
+      border-color: var(--accent-cta);
+      box-shadow: 2px 2px 0px var(--accent-cta);
+    }
+    .btn-real-wa {
+      background: #25D366 !important; /* WhatsApp Green */
+      color: #FFFFFF !important;
+      border: 2px solid var(--border-color) !important;
+      box-shadow: 4px 4px 0px var(--border-color) !important;
+    }
+    .btn-real-wa:hover:not(:disabled) {
+      background: #128C7E !important;
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px var(--border-color);
+    }
+    .btn-local-sim {
+      background: #F1F5F9 !important;
+      color: var(--text-main) !important;
+      border: 2px solid var(--border-color) !important;
+      box-shadow: 4px 4px 0px var(--border-color) !important;
+    }
+    .btn-local-sim:hover:not(:disabled) {
+      background: #E2E8F0 !important;
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px var(--border-color);
+    }
+    .sandbox-label {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
@@ -1047,9 +1121,19 @@
               Your simulated receipt is empty.<br>Tap menu items on the left to start.
             </div>
             
-            <button class="btn-simulate-wa" id="btn-trigger-sim" onclick="triggerSimulatedReceipt()" disabled>
-              Simulate WhatsApp Receipt
-            </button>
+            <div id="sandbox-actions" style="display: none; flex-direction: column; gap: 10px; margin-top: 15px; border-top: 2px dashed var(--border-color); padding-top: 15px;">
+              <div class="sandbox-label">Test Real WhatsApp Invoice</div>
+              <div class="sandbox-phone-row">
+                <span class="sandbox-prefix">+91</span>
+                <input type="tel" id="sandbox-phone" placeholder="Enter 10-digit WhatsApp number" class="sandbox-phone-input" oninput="validateSandboxPhone()" />
+              </div>
+              <button class="btn-simulate-wa btn-real-wa" id="btn-send-real" onclick="sendRealWhatsAppReceipt()" disabled>
+                Send Real WhatsApp Invoice
+              </button>
+              <button class="btn-simulate-wa btn-local-sim" id="btn-trigger-sim" onclick="triggerSimulatedReceipt()">
+                Just Show Local Simulation
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1271,8 +1355,8 @@
   <!-- Success Modal for Simulator -->
   <div class="modal-overlay" id="sim-modal">
     <div class="modal-card">
-      <h3>WhatsApp Bill Dispatched</h3>
-      <p>Simulated invoice for ₹<span id="sim-modal-total">0</span> was sent successfully to +91 99837 21179 via the RestroSuite messaging gateway.</p>
+      <h3 id="sim-modal-title">WhatsApp Bill Dispatched</h3>
+      <p id="sim-modal-desc">Simulated invoice for ₹<span id="sim-modal-total">0</span> was sent successfully to +91 99837 21179 via the RestroSuite messaging gateway.</p>
       <button class="btn-close-modal" onclick="closeSimModal()">Done</button>
     </div>
   </div>
@@ -1301,7 +1385,9 @@
 
     function renderSimCart() {
       const container = document.getElementById("sim-cart-content");
-      const btn = document.getElementById("btn-trigger-sim");
+      const actions = document.getElementById("sandbox-actions");
+      const btnReal = document.getElementById("btn-send-real");
+      const btnSim = document.getElementById("btn-trigger-sim");
       
       let itemsHtml = "";
       let subtotal = 0;
@@ -1331,7 +1417,7 @@
       if (totalItems === 0) {
         container.className = "empty-cart-msg";
         container.innerHTML = "Your simulated receipt is empty.<br>Tap menu items on the left to start.";
-        btn.disabled = true;
+        if (actions) actions.style.display = "none";
       } else {
         const tax = Math.round(subtotal * 0.05);
         const finalTotal = subtotal + tax;
@@ -1354,15 +1440,92 @@
             </div>
           </div>
         `;
-        btn.disabled = false;
-        btn.dataset.total = finalTotal;
+        if (actions) {
+          actions.style.display = "flex";
+        }
+        if (btnReal) {
+          btnReal.dataset.total = finalTotal;
+        }
+        if (btnSim) {
+          btnSim.dataset.total = finalTotal;
+        }
+        validateSandboxPhone();
+      }
+    }
+
+    function validateSandboxPhone() {
+      const phoneInput = document.getElementById("sandbox-phone");
+      const sendBtn = document.getElementById("btn-send-real");
+      if (!phoneInput || !sendBtn) return;
+      const cleanPhone = phoneInput.value.replace(/\D/g, "");
+      sendBtn.disabled = (cleanPhone.length !== 10);
+    }
+
+    async function sendRealWhatsAppReceipt() {
+      const phoneInput = document.getElementById("sandbox-phone");
+      const sendBtn = document.getElementById("btn-send-real");
+      if (!phoneInput || !sendBtn) return;
+      
+      const originalText = sendBtn.innerText;
+      const phone = phoneInput.value.trim();
+      
+      const itemsList = [];
+      for (const name in simCart) {
+        itemsList.push({
+          name: name,
+          price: simCart[name].price,
+          qty: simCart[name].qty
+        });
+      }
+
+      if (itemsList.length === 0) return;
+
+      try {
+        sendBtn.disabled = true;
+        sendBtn.innerText = "Delivering Invoice...";
+
+        const response = await fetch('/api/sandbox-send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            phone: phone,
+            items: itemsList
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to deliver WhatsApp message");
+        }
+
+        // Display Success Modal
+        document.getElementById("sim-modal-title").innerText = "WhatsApp Bill Dispatched!";
+        document.getElementById("sim-modal-desc").innerHTML = `A real-time invoice has been successfully sent to <strong>+91 ${phone.replace(/\D/g, '')}</strong> from our WhatsApp Gateway. Check your phone!`;
+        document.getElementById("sim-modal").style.display = "flex";
+
+        // Reset cart and phone input
+        simCart = {};
+        phoneInput.value = "";
+        renderSimCart();
+
+      } catch (err) {
+        alert("WhatsApp Sandbox Error: " + err.message);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerText = originalText;
+        validateSandboxPhone();
       }
     }
 
     function triggerSimulatedReceipt() {
       const btn = document.getElementById("btn-trigger-sim");
       const total = btn.dataset.total || "0";
-      document.getElementById("sim-modal-total").innerText = total;
+      
+      document.getElementById("sim-modal-title").innerText = "WhatsApp Bill Dispatched (Simulated)";
+      document.getElementById("sim-modal-desc").innerHTML = `Simulated invoice for ₹<strong>${total}</strong> was successfully sent to the mock logs via the RestroSuite messaging gateway.`;
       
       // Open Modal
       document.getElementById("sim-modal").style.display = "flex";

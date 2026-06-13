@@ -1851,7 +1851,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           } else {
             const localMap = new Map(notifications.filter(n => n && n.id).map(n => [n.id, n]));
             dbNotifs.forEach(dbN => {
-              if (!localMap.has(dbN.id)) {
+              const localNotif = localMap.get(dbN.id);
+              if (localNotif) {
+                localNotif.isRead = localNotif.isRead || dbN.isRead || false;
+              } else {
                 localMap.set(dbN.id, {
                   id: dbN.id,
                   title: dbN.title,
@@ -13523,6 +13526,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
           n.isRead = true;
           localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
           renderNotifications();
+          if (supabaseClient && activeTenantId) {
+            supabaseClient.from('doppio_notifications')
+              .update({ isRead: true })
+              .eq('id', n.id)
+              .eq('tenant_id', activeTenantId)
+              .then(({ error }) => {
+                if (error) console.warn('Supabase notification update failed:', error.message);
+              });
+          }
         });
       }
 
@@ -13530,6 +13542,15 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         n.isRead = true;
         localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
         renderNotifications();
+        if (supabaseClient && activeTenantId) {
+          supabaseClient.from('doppio_notifications')
+            .update({ isRead: true })
+            .eq('id', n.id)
+            .eq('tenant_id', activeTenantId)
+            .then(({ error }) => {
+              if (error) console.warn('Supabase notification update failed:', error.message);
+            });
+        }
       });
 
       listContainer.appendChild(item);
@@ -13564,13 +13585,26 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     clearNotifBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
+      const idsToMarkRead = [];
       notifications.forEach(n => {
         if (loggedInRole === 'admin' || n.role === 'all' || n.role === loggedInRole) {
-          n.isRead = true;
+          if (!n.isRead) {
+            n.isRead = true;
+            idsToMarkRead.push(n.id);
+          }
         }
       });
       localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
       renderNotifications();
+      if (supabaseClient && activeTenantId && idsToMarkRead.length > 0) {
+        supabaseClient.from('doppio_notifications')
+          .update({ isRead: true })
+          .eq('tenant_id', activeTenantId)
+          .in('id', idsToMarkRead)
+          .then(({ error }) => {
+            if (error) console.warn('Supabase bulk notification update failed:', error.message);
+          });
+      }
     });
   }
 
