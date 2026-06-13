@@ -744,6 +744,7 @@ body::before {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
 }
 
 /* Employee access control */
@@ -2361,7 +2362,7 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: 100%;
+  min-height: 100%;
 }
 
 .bills-analytics-header {
@@ -3001,7 +3002,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: 24px;
-  height: 100%;
+  min-height: 100%;
 }
 
 .menu-editor-form-panel,

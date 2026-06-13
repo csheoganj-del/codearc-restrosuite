@@ -23,9 +23,9 @@ window.addEventListener('DOMContentLoaded', () => {
   let supabaseClient = null;
   const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
   const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
-  const TENANT_PUBLIC_FUNCTION_URL = DEFAULT_SUPABASE_URL
-    ? `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-public`
-    : '';
+  const TENANT_PUBLIC_FUNCTION_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? '/functions/v1/tenant-public'
+    : (DEFAULT_SUPABASE_URL ? `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-public` : '');
 
   if (typeof supabase !== 'undefined') {
     try {

@@ -3,70 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#FAFAF7">
-  <meta name="description" content="CodeArc RestroSuite unifies restaurant POS billing, kitchen orders, inventory, customer loyalty, reports, and WhatsApp receipts in one reliable platform.">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="description" content="RestroSuite: The premium offline-first restaurant POS and billing software. Save 4.5 hours daily, eliminate order errors, and send WhatsApp receipts instantly. Plans starting at just ₹749/month.">
   <meta name="robots" content="index, follow">
   <meta name="color-scheme" content="light">
+  
+  <!-- OG / Social Media (YouTube Thumbnail style metadata) -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="CodeArc RestroSuite | Run every restaurant operation from one place">
-  <meta property="og:description" content="Faster billing, calmer kitchens, accurate stock, and clearer decisions for restaurants, cafes, dhabas, and food chains.">
+  <meta property="og:title" content="Run Your Restaurant Billing From Your Phone. Starting at ₹749/Month.">
+  <meta property="og:description" content="Stop overpaying for POS systems. Save 4.5 hours of manual checkout daily at half the price of normal subscriptions.">
   <meta property="og:image" content="images/restrosuite-social.png">
-  <meta property="og:site_name" content="CodeArc RestroSuite">
+  <meta property="og:site_name" content="RestroSuite">
+  
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="CodeArc RestroSuite">
-  <meta name="twitter:description" content="One connected platform for restaurant billing, kitchen, inventory, loyalty, and reporting.">
+  <meta name="twitter:title" content="Restaurant POS Billed Monthly. Half The Competitor Cost.">
+  <meta name="twitter:description" content="Offline billing and instant WhatsApp receipts. Starting at just ₹749/month.">
+  
   <link rel="canonical" href="https://codearc-restrosuite.vercel.app/">
   <link rel="icon" href="images/restrosuite-mark.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>CodeArc RestroSuite | Premium Restaurant POS & Operations Platform</title>
+  <title>RestroSuite | Offline-First Restaurant POS & Billing Software</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   
   <style>
     :root {
-      /* --- White Glassmorphism Design Tokens --- */
-      --bg-pure: #FFFFFF;
-      --bg-off: #FAFAF7;
-      --bg-warm: #F6F4EF;
-      --text-main: #101010;
-      --text-soft: #2A2A2A;
-      --text-muted: #666666;
-      --border-subtle: rgba(0, 0, 0, 0.08);
-      --border-light: rgba(0, 0, 0, 0.04);
+      /* --- Strict Three-Color System --- */
+      --bg-color: #FFFFFF;
+      --text-main: #111111;
+      --text-body: #334155;
+      --accent-cta: #FF4F00; /* Sunset Orange - Only for Buy buttons/Active states */
+      --accent-cta-hover: #E04300;
       
-      /* Pure White Glassmorphism Styling */
-      --glass-bg: rgba(255, 255, 255, 0.55);
-      --glass-border: rgba(255, 255, 255, 0.65);
-      --glass-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.04), 
-                      0 5px 15px -5px rgba(0, 0, 0, 0.02),
-                      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      --border-color: #111111;
+      --border-light: #E2E8F0;
       
-      /* Accent Colors (Pure Orange color theme used for CTAs and highlights) */
-      --accent: #FF6B00;
-      --accent-hover: #E05E00;
-      --accent-light: rgba(255, 107, 0, 0.08);
-      --accent-gradient: linear-gradient(135deg, #FF8E3C 0%, #FF6B00 100%);
-      --accent-rgb: 255, 107, 0;
-      
-      /* Trust Elements */
-      --charcoal: #1A1A1A;
-      --success: #27AE60;
-      --success-light: rgba(39, 174, 96, 0.08);
-      
-      /* Corner Radii */
-      --radius-lg: 28px;
-      --radius-md: 20px;
-      --radius-sm: 12px;
-      
-      /* Typography */
       --sans-heading: "Plus Jakarta Sans", sans-serif;
       --sans-body: "Inter", sans-serif;
       
-      /* Motion */
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
-      --transition: all 0.5s var(--ease);
+      --transition: all 0.3s var(--ease);
     }
 
     * {
@@ -81,38 +59,19 @@
 
     body {
       font-family: var(--sans-body);
-      background: var(--bg-off);
-      color: var(--text-soft);
-      line-height: 1.65;
+      background: var(--bg-color);
+      color: var(--text-body);
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
-    }
-
-    body.menu-open {
-      overflow: hidden;
     }
 
     h1, h2, h3, h4 {
       font-family: var(--sans-heading);
       color: var(--text-main);
       font-weight: 800;
-      line-height: 1.2;
+      line-height: 1.15;
       letter-spacing: -0.03em;
-    }
-
-    img, svg {
-      display: block;
-    }
-
-    .icon {
-      width: 20px;
-      height: 20px;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      flex: none;
     }
 
     .container {
@@ -120,3108 +79,1304 @@
       margin: 0 auto;
     }
 
-    /* --- Skip Link --- */
-    .skip-link {
-      position: absolute;
-      top: -100px;
-      left: 16px;
-      z-index: 2000;
-      background: var(--charcoal);
-      color: var(--bg-pure);
-      padding: 12px 24px;
-      border-radius: var(--radius-sm);
-      text-decoration: none;
-      font-weight: 600;
-      transition: top 0.3s var(--ease);
-    }
-    .skip-link:focus {
-      top: 16px;
-    }
-
-    /* --- Buttons --- */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 15px 30px;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 15px;
-      text-decoration: none;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: var(--transition);
-      position: relative;
-    }
-    .btn .icon {
-      transition: transform 0.3s var(--ease);
-    }
-    .btn:hover .icon {
-      transform: translateX(4px);
-    }
-
-    .btn-primary {
-      background: var(--accent-gradient);
-      color: var(--bg-pure);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 10px 25px -5px rgba(255, 107, 0, 0.4),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.2);
-      text-shadow: 0 1px 1px rgba(0,0,0,0.1);
-    }
-    .btn-primary:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 20px 35px -5px rgba(255, 107, 0, 0.5),
-                  0 4px 12px rgba(255, 107, 0, 0.2),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.6);
-      color: var(--text-main);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      box-shadow: 0 10px 25px -8px rgba(0,0,0,0.03),
-                  inset 0 1px 0 rgba(255,255,255,0.8);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
-    .btn-secondary:hover {
-      border-color: var(--accent);
-      background: rgba(255, 255, 255, 0.95);
-      transform: translateY(-3px);
-      box-shadow: 0 15px 30px -10px rgba(255, 107, 0, 0.15);
-    }
-
-    .btn-dark {
-      background: var(--charcoal);
-      color: var(--bg-pure);
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    }
-    .btn-dark:hover {
-      transform: translateY(-3px);
-      background: #000000;
-      box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.18);
-    }
-
-    .btn-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--accent-hover);
-      font-weight: 700;
-      text-decoration: none;
-      transition: var(--transition);
-    }
-    .btn-link:hover {
-      gap: 12px;
-      color: var(--accent);
-    }
-
-    /* --- Glassmorphism UI Cards --- */
-    .glass-card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--glass-shadow);
-      transition: var(--transition);
-    }
-    .glass-card:hover {
-      transform: translateY(-8px);
-      background: rgba(255, 255, 255, 0.68);
-      border-color: rgba(255, 107, 0, 0.35);
-      box-shadow: 0 24px 50px -15px rgba(0, 0, 0, 0.08), 
-                  0 8px 20px -8px rgba(0, 0, 0, 0.03),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.85);
-    }
-
-    /* Premium reflection shimmer effect */
-    .glass-shine {
-      position: relative;
-      overflow: hidden;
-    }
-    .glass-shine::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -150%;
-      width: 50%;
-      height: 100%;
-      background: linear-gradient(
-        to right,
-        rgba(255, 255, 255, 0) 0%,
-        rgba(255, 255, 255, 0.35) 30%,
-        rgba(255, 255, 255, 0) 100%
-      );
-      transform: skewX(-25deg);
-      transition: 0.8s var(--ease);
-      pointer-events: none;
-    }
-    .glass-shine:hover::before {
-      left: 150%;
-    }
-
-    /* --- Background Ambient Gradient Blobs --- */
-    .bg-blob {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(140px);
-      z-index: -1;
-      pointer-events: none;
-      opacity: 0.45;
-    }
-    .blob-orange-1 {
-      background: rgba(255, 107, 0, 0.1);
-      width: 450px;
-      height: 450px;
-      top: 10%;
-      right: 5%;
-    }
-    .blob-orange-2 {
-      background: rgba(255, 107, 0, 0.08);
-      width: 500px;
-      height: 500px;
-      bottom: 15%;
-      left: -5%;
-    }
-    .blob-green-1 {
-      background: rgba(39, 174, 96, 0.07);
-      width: 400px;
-      height: 400px;
-      top: 45%;
-      right: -10%;
-    }
-    .blob-green-2 {
-      background: rgba(39, 174, 96, 0.06);
-      width: 380px;
-      height: 380px;
-      top: 5%;
-      left: 10%;
-    }
-
-    /* --- Fixed Pill Header / Floating Glass Navbar --- */
+    /* --- Navigation --- */
     .site-header {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
+      background: rgba(255, 255, 255, 0.95);
+      border-bottom: 2px solid var(--border-color);
       z-index: 1000;
-      padding: 24px 0 0;
-      pointer-events: none;
     }
 
-    .navbar-container {
-      pointer-events: auto;
+    .navbar {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      height: 72px;
-      padding: 0 32px;
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border: 1px solid rgba(255, 255, 255, 0.5);
-      border-radius: 999px;
-      box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04),
-                  inset 0 1px 0 rgba(255,255,255,0.7);
-      transition: all 0.4s var(--ease);
-      position: relative;
-    }
-
-    .site-header.scrolled {
-      padding: 12px 0 0;
-    }
-    .site-header.scrolled .navbar-container {
-      background: rgba(255, 255, 255, 0.85);
-      box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.08);
-      height: 64px;
+      align-items: center;
+      min-height: 84px;
+      height: auto;
+      padding: 6px 0;
     }
 
     .brand {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
+      font-size: 22px;
+      font-weight: 800;
       text-decoration: none;
       color: var(--text-main);
-      font-weight: 800;
-      font-size: 19px;
-      font-family: var(--sans-heading);
-      letter-spacing: -0.04em;
-    }
-    .brand-product {
-      color: var(--accent);
-      font-weight: 500;
-    }
-    .brand-mark {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: url('images/restrosuite_logo.png') center/cover no-repeat;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      position: relative;
-      flex: none;
-    }
-    .brand-mark::after {
-      display: none;
+      letter-spacing: -0.02em;
     }
 
-    .desktop-nav {
+    .brand-accent {
+      color: var(--accent-cta);
+    }
+
+    .nav-links {
       display: flex;
       gap: 32px;
     }
-    .desktop-nav a {
-      color: var(--text-soft);
+
+    .nav-links a {
       text-decoration: none;
-      font-size: 15px;
+      color: var(--text-body);
       font-weight: 600;
-      position: relative;
-      padding: 6px 0;
-      transition: var(--transition);
-    }
-    .desktop-nav a::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      right: 50%;
-      bottom: 0;
-      height: 2px;
-      background: var(--accent);
-      border-radius: 2px;
-      transition: var(--transition);
-    }
-    .desktop-nav a:hover {
-      color: var(--accent-hover);
-    }
-    .desktop-nav a:hover::after,
-    .desktop-nav a[aria-current="true"]::after {
-      left: 0;
-      right: 0;
-    }
-
-    .nav-actions {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    .nav-signin {
-      color: var(--text-soft);
-      text-decoration: none;
-      font-weight: 700;
       font-size: 15px;
       transition: var(--transition);
     }
-    .nav-signin:hover {
-      color: var(--accent-hover);
-    }
-    .nav-register {
-      padding: 11px 24px;
-      font-size: 14.5px;
+
+    .nav-links a:hover {
+      color: var(--text-main);
     }
 
-    .menu-toggle {
-      display: none;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 1px solid var(--border-subtle);
-      background: rgba(255, 255, 255, 0.8);
-      cursor: pointer;
-      position: relative;
+    /* --- Buttons --- */
+    .btn-buy {
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-    }
-    .menu-toggle span,
-    .menu-toggle span::before,
-    .menu-toggle span::after {
-      content: "";
-      position: absolute;
-      left: 13px;
-      width: 18px;
-      height: 2px;
-      background: var(--text-main);
-      border-radius: 2px;
-      transition: var(--transition);
-    }
-    .menu-toggle span {
-      top: 20px;
-    }
-    .menu-toggle span::before {
-      top: -6px;
-      left: 0;
-    }
-    .menu-toggle span::after {
-      top: 6px;
-      left: 0;
-    }
-    .menu-toggle[aria-expanded="true"] span {
-      background: transparent;
-    }
-    .menu-toggle[aria-expanded="true"] span::before {
-      top: 0;
-      transform: rotate(45deg);
-    }
-    .menu-toggle[aria-expanded="true"] span::after {
-      top: 0;
-      transform: rotate(-45deg);
-    }
-
-    .mobile-nav-panel {
-      position: absolute;
-      top: 80px;
-      left: 0;
-      right: 0;
-      background: rgba(255, 255, 255, 0.96);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      border-radius: 24px;
-      padding: 24px;
-      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.08);
-      display: none;
-      flex-direction: column;
-      gap: 14px;
-      opacity: 0;
-      transform: translateY(-10px);
-      transition: var(--transition);
-    }
-    .mobile-nav-panel.open {
-      display: flex;
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .mobile-nav-panel a {
-      color: var(--text-soft);
-      text-decoration: none;
-      font-weight: 700;
+      gap: 8px;
+      background: var(--accent-cta);
+      color: #FFFFFF;
+      font-weight: 800;
       font-size: 16px;
-      padding: 10px 4px;
-      border-bottom: 1px solid var(--border-light);
-    }
-    .mobile-nav-panel a:hover {
-      color: var(--accent);
-      padding-left: 6px;
-    }
-
-    /* --- Sections General --- */
-    section {
-      padding: 130px 0;
-      position: relative;
+      text-decoration: none;
+      padding: 16px 32px;
+      border: 2px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0px var(--border-color);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
     }
 
-    .section-header {
-      max-width: 720px;
-      margin-bottom: 72px;
+    .btn-buy:hover {
+      background: var(--accent-cta-hover);
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0px var(--border-color);
     }
-    .section-header.center {
-      margin-left: auto;
-      margin-right: auto;
-      text-align: center;
+
+    .btn-buy:active {
+      transform: translate(2px, 2px);
+      box-shadow: 0px 0px 0px var(--border-color);
     }
-    .eyebrow {
+
+    .btn-secondary {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent-hover);
-      margin-bottom: 18px;
-    }
-    .eyebrow::before {
-      content: "";
-      width: 20px;
-      height: 2px;
-      background: var(--accent);
-    }
-    .section-header.center .eyebrow::after {
-      content: "";
-      width: 20px;
-      height: 2px;
-      background: var(--accent);
-    }
-    .section-header h2 {
-      font-size: clamp(34px, 4.2vw, 48px);
-      margin-bottom: 20px;
-      letter-spacing: -0.03em;
-    }
-    .section-header p {
-      font-size: 18px;
-      color: var(--text-muted);
+      justify-content: center;
+      background: #FFFFFF;
+      color: var(--text-main);
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      padding: 16px 32px;
+      border: 2px solid var(--border-color);
+      border-radius: 4px;
+      box-shadow: 4px 4px 0px var(--border-color);
+      transition: var(--transition);
     }
 
-    /* --- Hero Section --- */
-    .hero-sec {
-      padding-top: 200px;
-      padding-bottom: 140px;
-      background: radial-gradient(1100px 650px at 75% 25%, rgba(255, 107, 0, 0.07), transparent 60%),
-                  radial-gradient(800px 500px at 15% 75%, rgba(39, 174, 96, 0.06), transparent 50%),
-                  var(--bg-off);
-      overflow: visible;
-    }
-    .hero-sec::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(rgba(255, 107, 0, 0.1) 1.2px, transparent 1.2px);
-      background-size: 36px 36px;
-      mask-image: radial-gradient(900px 600px at 70% 30%, black, transparent 75%);
-      -webkit-mask-image: radial-gradient(900px 600px at 70% 30%, black, transparent 75%);
-      pointer-events: none;
+    .btn-secondary:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0px var(--border-color);
     }
 
+    /* --- One Screen per Section Layout --- */
+    .screen-sec {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 120px 0 80px 0;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .screen-sec:nth-child(even) {
+      background: #FAFAFA;
+    }
+
+    /* --- Screen 1: Hero --- */
     .hero-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 60px;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 48px;
       align-items: center;
-    }
-
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 7px 16px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 107, 0, 0.28);
-      background: rgba(255, 107, 0, 0.06);
-      color: var(--accent-hover);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      margin-bottom: 26px;
-    }
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.55);
-      animation: pulse 2.2s infinite;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.6); }
-      70% { box-shadow: 0 0 0 8px rgba(255, 107, 0, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0); }
     }
 
     .hero-content h1 {
-      font-size: clamp(44px, 5.5vw, 68px);
-      letter-spacing: -0.04em;
-      margin-bottom: 24px;
-      line-height: 1.12;
-    }
-    .hero-content h1 span {
-      background: var(--accent-gradient);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      font-size: 48px;
+      margin-bottom: 20px;
     }
 
     .hero-content p {
-      font-size: 19px;
-      color: var(--text-muted);
-      margin-bottom: 40px;
-      max-width: 560px;
+      font-size: 18px;
+      color: var(--text-body);
+      margin-bottom: 32px;
+      max-width: 540px;
+    }
+
+    .hero-price-tag {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .hero-actions {
       display: flex;
-      flex-wrap: wrap;
-      gap: 18px;
-      margin-bottom: 44px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
     }
 
-    .hero-assurances {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px 32px;
+    .hero-subtext {
       font-size: 14px;
       font-weight: 600;
-      color: var(--text-muted);
-    }
-    .hero-assurances span {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .hero-assurances .icon {
-      width: 17px;
-      height: 17px;
-      color: var(--success);
+      color: var(--text-body);
     }
 
-    /* --- Hero Visual: 3D Scene --- */
-    .hero-3d-scene {
-      perspective: 1800px;
-      width: 100%;
-      height: 520px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-    .hero-mockup-wrapper {
-      transform: rotateY(-16deg) rotateX(12deg) rotateZ(-2deg);
-      transform-style: preserve-3d;
-      transition: transform 0.8s var(--ease);
-      width: 100%;
-      max-width: 500px;
-      position: relative;
-    }
-    .hero-3d-scene:hover .hero-mockup-wrapper {
-      transform: rotateY(-4deg) rotateX(6deg) rotateZ(-1deg);
-    }
-
-    /* Central Mockup Window */
-    .mockup-main {
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      border: 1px solid rgba(255, 255, 255, 0.65);
-      border-radius: var(--radius-lg);
-      box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.08), 
-                  0 8px 25px -10px rgba(0,0,0,0.03),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    /* Hero Mockup Panel */
+    .hero-mockup {
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      background: #FFFFFF;
+      box-shadow: 8px 8px 0px var(--border-color);
       overflow: hidden;
-      padding: 20px;
-      transform-style: preserve-3d;
-      width: 100%;
     }
+
     .mockup-header {
+      background: #FAFAFA;
+      border-bottom: 2px solid var(--border-color);
+      padding: 12px 16px;
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-      padding-bottom: 14px;
-      margin-bottom: 16px;
+      align-items: center;
     }
+
     .mockup-dots {
       display: flex;
       gap: 6px;
     }
-    .mockup-dots span {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.15);
-    }
-    .mockup-dots span:first-child { background: #FF5F56; }
-    .mockup-dots span:nth-child(2) { background: #FFBD2E; }
-    .mockup-dots span:nth-child(3) { background: #27C93F; }
-    .mockup-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--text-muted);
-      letter-spacing: -0.01em;
-    }
-    .mockup-indicator {
-      font-size: 11px;
-      font-weight: 800;
-      color: var(--success);
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .mockup-body {
-      display: grid;
-      grid-template-columns: 88px 1fr;
-      gap: 20px;
-    }
-    .mockup-sidebar {
-      border-right: 1px solid rgba(0,0,0,0.05);
-      padding-right: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .mockup-nav-item {
-      height: 7px;
-      background: rgba(0, 0, 0, 0.06);
-      border-radius: 3px;
-      width: 100%;
-    }
-    .mockup-nav-item.active {
-      background: var(--accent);
-      height: 9px;
-      width: 80%;
-    }
-    .mockup-nav-item:nth-child(2) { width: 90%; }
-    .mockup-nav-item:nth-child(3) { width: 70%; }
-    .mockup-nav-item:nth-child(4) { width: 85%; }
 
-    .mockup-content {
+    .mockup-dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      background: #FFFFFF;
+    }
+
+    .mockup-title {
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .mockup-body {
+      padding: 24px;
+    }
+
+    .mockup-stat {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-light);
+      padding: 12px 0;
+    }
+
+    .mockup-stat:last-child {
+      border: none;
+    }
+
+    .mockup-stat label {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .mockup-stat value {
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    /* --- Screen 2: Empathy & Pain --- */
+    .empathy-layout {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .section-eyebrow {
+      text-transform: uppercase;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+      color: var(--text-main);
+    }
+
+    .empathy-layout h2 {
+      font-size: 38px;
+      margin-bottom: 40px;
+    }
+
+    .pain-point {
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .pain-point:last-child {
+      border: none;
+    }
+
+    .pain-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .pain-desc {
+      font-size: 16px;
+      color: var(--text-body);
+    }
+
+    /* --- Screen 3: Try Before Buy (POS Simulator) --- */
+    .simulator-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: stretch;
+    }
+
+    .sim-left {
       display: flex;
       flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .sim-left h2 {
+      font-size: 36px;
+      margin-bottom: 16px;
+    }
+
+    .sim-left p {
+      font-size: 16px;
+      margin-bottom: 24px;
+    }
+
+    .menu-selector {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: 16px;
     }
-    .mockup-stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-    .mockup-stat-card {
-      background: rgba(255, 255, 255, 0.65);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: var(--radius-sm);
-      padding: 9px;
-      text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.01);
-    }
-    .mockup-stat-card span {
-      display: block;
-      font-size: 8.5px;
-      color: var(--text-muted);
-      font-weight: 700;
-      text-transform: uppercase;
-      margin-bottom: 3px;
-    }
-    .mockup-stat-card strong {
-      font-size: 13px;
-      color: var(--text-main);
-      font-weight: 800;
-    }
-    
-    .mockup-visual-card {
-      background: rgba(255, 255, 255, 0.65);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: var(--radius-md);
-      padding: 14px;
-      box-shadow: 0 6px 15 rgba(0,0,0,0.015);
-    }
-    .mockup-chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      font-size: 9.5px;
-      font-weight: 800;
-      color: var(--text-muted);
-    }
-    .mockup-chart-svg {
-      width: 100%;
-      height: 60px;
-    }
 
-    /* Floating UI Cards in 3D scene */
-    .floating-card {
-      position: absolute;
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.85);
-      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.08), 
-                  0 5px 15px -5px rgba(0, 0, 0, 0.02),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.9);
-      border-radius: var(--radius-md);
-      padding: 15px 20px;
-      z-index: 10;
-      transition: transform 0.6s var(--ease), box-shadow 0.6s var(--ease);
-      width: max-content;
-    }
-    .floating-card:hover {
-      transform: translate3d(0, -8px, 35px) !important;
-      box-shadow: 0 30px 60px -15px rgba(255, 107, 0, 0.22),
-                  0 10px 25px -10px rgba(0, 0, 0, 0.08);
-      border-color: rgba(255, 107, 0, 0.4);
-    }
-    
-    @keyframes floatY {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-14px); }
-    }
-
-    .sales-card {
-      top: 10%;
-      left: -14%;
-      animation: floatY 6s ease-in-out infinite;
-    }
-    .sales-card .card-label {
-      font-size: 9.5px;
-      font-weight: 800;
-      color: var(--text-muted);
-      letter-spacing: 0.06em;
-      margin-bottom: 5px;
-    }
-    .sales-card .card-value-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .sales-card .card-val {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--text-main);
-      letter-spacing: -0.01em;
-    }
-    .sales-card .trend-badge {
-      font-size: 10.5px;
-      font-weight: 800;
-      color: var(--success);
-      background: var(--success-light);
-      padding: 3px 8px;
-      border-radius: 99px;
-    }
-
-    .tables-card {
-      bottom: 10%;
-      left: -18%;
-      animation: floatY 6s ease-in-out infinite 1.5s;
-    }
-    .tables-card .card-label {
-      font-size: 9.5px;
-      font-weight: 800;
-      color: var(--text-muted);
-      letter-spacing: 0.06em;
-      margin-bottom: 5px;
-    }
-    .tables-card .card-value-wrap {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .tables-card .card-val {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--text-main);
-    }
-    .tables-card .status-dot {
-      width: 9px;
-      height: 9px;
-      background: var(--accent);
-      border-radius: 50%;
-      box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.4);
-      animation: pulse 2.2s infinite;
-    }
-
-    .ticket-card {
-      top: -8%;
-      right: -6%;
-      width: 200px;
-      animation: floatY 5.5s ease-in-out infinite 0.5s;
-    }
-    .ticket-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      border-bottom: 1px dashed rgba(0,0,0,0.08);
-      padding-bottom: 8px;
-    }
-    .ticket-header strong {
-      font-size: 11px;
-      color: var(--text-main);
-      font-weight: 800;
-    }
-    .ticket-status-pill {
-      font-size: 8.5px;
-      font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 99px;
-      background: rgba(255, 107, 0, 0.1);
-      color: var(--accent-hover);
-    }
-    .ticket-items {
-      list-style: none;
-      font-size: 11px;
-      color: var(--text-soft);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .ticket-items li {
-      font-weight: 600;
-    }
-
-    .alert-card {
-      bottom: 2%;
-      left: 15%;
-      animation: floatY 7s ease-in-out infinite 2s;
-      padding: 12px 18px;
-    }
-    .alert-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .alert-icon {
-      font-size: 20px;
-    }
-    .alert-text strong {
-      display: block;
-      font-size: 11px;
-      color: #A43C3C;
-      font-weight: 800;
-    }
-    .alert-text span {
-      display: block;
-      font-size: 9.5px;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .whatsapp-card {
-      top: 36%;
-      right: -26%;
-      animation: floatY 6.5s ease-in-out infinite 1s;
-      padding: 12px 16px;
-    }
-    .whatsapp-content, .payment-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .wa-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: rgba(39, 174, 96, 0.1);
-      color: var(--success);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .wa-icon .icon {
-      width: 15px;
-      height: 15px;
-    }
-    .wa-text strong, .pay-text strong {
-      display: block;
-      font-size: 11px;
-      color: var(--text-main);
-      font-weight: 800;
-    }
-    .wa-text span, .pay-text span {
-      display: block;
-      font-size: 9.5px;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .payment-card {
-      bottom: 12%;
-      right: -16%;
-      animation: floatY 5.8s ease-in-out infinite 2.5s;
-      padding: 12px 16px;
-    }
-    .pay-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--success-light);
-      color: var(--success);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 13px;
-    }
-
-    /* --- Quick Benefits Strip --- */
-    .benefits-strip-sec {
-      padding: 44px 0;
-      background: var(--bg-pure);
-      border-top: 1px solid var(--border-light);
-      border-bottom: 1px solid var(--border-light);
-      position: relative;
-      z-index: 10;
-    }
-    .benefits-strip {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 18px;
-    }
-    .benefit-capsule {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 24px;
-      background: var(--bg-off);
-      border: 1px solid var(--border-subtle);
-      border-radius: 999px;
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text-soft);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.015);
+    .menu-item-btn {
+      background: #FFFFFF;
+      border: 2px solid var(--border-color);
+      padding: 16px;
+      border-radius: 4px;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 2px 2px 0px var(--border-color);
       transition: var(--transition);
     }
-    .benefit-capsule:hover {
-      transform: translateY(-4px);
-      background: var(--bg-pure);
-      border-color: var(--accent);
-      box-shadow: 0 12px 25px -5px rgba(255, 107, 0, 0.18);
-    }
-    .benefit-capsule .icon {
-      width: 17px;
-      height: 17px;
-      color: var(--accent);
+
+    .menu-item-btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0px var(--border-color);
+      border-color: var(--accent-cta);
     }
 
-    /* --- Product Features Section --- */
-    .features-sec {
-      background: var(--bg-off);
-    }
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 28px;
-    }
-    .feature-card {
-      padding: 40px 34px;
-    }
-    .feature-icon-box {
-      width: 52px;
-      height: 52px;
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--accent-light);
-      color: var(--accent-hover);
-      margin-bottom: 26px;
-      transition: var(--transition);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
-    }
-    .feature-card:hover .feature-icon-box {
-      background: var(--accent-gradient);
-      color: var(--bg-pure);
-      transform: scale(1.1) rotate(-3deg);
-      box-shadow: 0 6px 15px -4px rgba(255, 107, 0, 0.4);
-    }
-    .feature-icon-box .icon {
-      width: 24px;
-      height: 24px;
-    }
-    .feature-card h3 {
-      font-size: 20px;
-      margin-bottom: 14px;
-      letter-spacing: -0.02em;
-    }
-    .feature-card p {
-      font-size: 15px;
-      color: var(--text-muted);
-      line-height: 1.65;
-    }
-
-    /* --- Workflow Section --- */
-    .workflow-sec {
-      background: var(--bg-pure);
-      overflow: hidden;
-    }
-    .workflow-flow {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 24px;
-      position: relative;
-      padding: 20px 0;
-    }
-    .workflow-flow::before {
-      content: "";
-      position: absolute;
-      top: 52px;
-      left: 10%;
-      right: 10%;
-      height: 2px;
-      background: repeating-linear-gradient(90deg, var(--border-subtle) 0, var(--border-subtle) 8px, transparent 8px, transparent 16px);
-      z-index: 1;
-    }
-    .workflow-step-card {
-      position: relative;
-      z-index: 2;
-      padding: 28px 22px;
-      text-align: center;
-      background: var(--bg-pure);
-      border-radius: var(--radius-md);
-      box-shadow: 0 6px 24px rgba(0,0,0,0.015);
-      transition: var(--transition);
-      border: 1px solid var(--border-subtle);
-    }
-    .workflow-step-card:hover {
-      transform: translateY(-8px);
-      border-color: var(--accent);
-      box-shadow: 0 20px 40px -10px rgba(255, 107, 0, 0.12);
-    }
-    .workflow-num {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: var(--bg-off);
-      border: 2px solid var(--border-subtle);
-      color: var(--text-muted);
+    .menu-item-name {
       font-weight: 800;
       font-size: 16px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      font-family: var(--sans-heading);
-      transition: var(--transition);
-    }
-    .workflow-step-card:hover .workflow-num {
-      background: var(--accent-gradient);
-      border-color: transparent;
-      color: var(--bg-pure);
-      box-shadow: 0 6px 15px -4px rgba(255, 107, 0, 0.45);
-    }
-    .workflow-step-card h3 {
-      font-size: 17px;
-      margin-bottom: 10px;
-    }
-    .workflow-step-card p {
-      font-size: 13.5px;
-      color: var(--text-muted);
-      line-height: 1.55;
+      color: var(--text-main);
+      margin-bottom: 4px;
     }
 
-    /* --- Product Preview Section (Tabs UI) --- */
-    .preview-sec {
-      background: var(--bg-off);
-      position: relative;
+    .menu-item-price {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-body);
     }
-    .preview-tabs {
+
+    .sim-right {
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      background: #FFFFFF;
+      box-shadow: 8px 8px 0px var(--border-color);
       display: flex;
-      justify-content: center;
-      gap: 14px;
-      margin-bottom: 50px;
-      background: rgba(0,0,0,0.035);
-      padding: 7px;
-      border-radius: 99px;
-      width: max-content;
-      margin-left: auto;
-      margin-right: auto;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(0,0,0,0.02);
-    }
-    .preview-tab {
-      border: none;
-      background: transparent;
-      padding: 11px 26px;
-      border-radius: 99px;
-      font-family: var(--sans-heading);
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: var(--transition);
-    }
-    .preview-tab.active {
-      background: var(--bg-pure);
-      color: var(--accent-hover);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-    }
-    
-    .preview-display {
-      position: relative;
-      width: 100%;
-      min-height: 520px;
-    }
-    .preview-panel {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(20px);
-      transition: all 0.5s var(--ease);
-      display: none;
-    }
-    .preview-panel.active {
-      display: block;
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
-      position: relative;
+      flex-direction: column;
+      min-height: 480px;
     }
 
-    /* Large High-Fidelity Mockup Window */
-    .preview-mockup-window {
-      background: rgba(255, 255, 255, 0.82);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: var(--radius-lg);
-      box-shadow: 0 40px 90px -25px rgba(0, 0, 0, 0.09),
-                  inset 0 1px 0 rgba(255,255,255,0.9);
-      overflow: hidden;
-      width: 100%;
-    }
-    .window-topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(0,0,0,0.015);
-      border-bottom: 1px solid rgba(0,0,0,0.05);
-      padding: 16px 28px;
-    }
-    .window-address {
-      background: var(--bg-pure);
-      border: 1px solid var(--border-light);
-      font-size: 12.5px;
-      color: var(--text-muted);
-      padding: 5px 24px;
-      border-radius: 99px;
-      width: 45%;
-      text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.01);
-    }
-    .window-content {
-      padding: 32px;
-      min-height: 420px;
-    }
-
-    /* POS preview layout */
-    .preview-pos {
-      display: grid;
-      grid-template-columns: 1.45fr 1fr;
-      gap: 28px;
-    }
-    .pos-menu-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-    }
-    .pos-item-card {
-      background: rgba(255, 255, 255, 0.55);
-      border: 1px solid rgba(0,0,0,0.03);
-      border-radius: var(--radius-sm);
+    .terminal-header {
+      background: #FAFAFA;
+      border-bottom: 2px solid var(--border-color);
       padding: 16px;
+      font-weight: 800;
+      font-size: 14px;
       text-align: center;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.01);
-      transition: var(--transition);
     }
-    .pos-item-card:hover {
-      background: var(--bg-pure);
-      transform: translateY(-4px);
-      box-shadow: 0 12px 24px rgba(0,0,0,0.03);
-      border-color: rgba(255, 107, 0, 0.25);
-    }
-    .pos-item-card .item-emoji {
-      font-size: 24px;
-      margin-bottom: 8px;
-      display: block;
-    }
-    .pos-item-card .item-name {
-      display: block;
-      font-size: 13.5px;
-      font-weight: 800;
-      color: var(--text-main);
-      margin-bottom: 2px;
-    }
-    .pos-item-card .item-price {
-      font-size: 12.5px;
-      color: var(--accent-hover);
-      font-weight: 700;
-    }
-    .pos-cart-panel {
-      border: 1px solid rgba(0,0,0,0.06);
-      border-radius: var(--radius-md);
-      padding: 20px;
-      background: rgba(255,255,255,0.4);
+
+    .terminal-body {
+      padding: 24px;
+      flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 320px;
     }
-    .pos-cart-title {
+
+    .receipt-list {
+      max-height: 220px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
       font-size: 15px;
-      font-weight: 800;
-      margin-bottom: 14px;
-      border-bottom: 1px solid rgba(0,0,0,0.05);
-      padding-bottom: 10px;
-    }
-    .pos-cart-items {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-    .pos-cart-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .pos-cart-total {
-      border-top: 1px dashed rgba(0,0,0,0.08);
-      padding-top: 12px;
-      display: flex;
-      justify-content: space-between;
-      font-weight: 800;
-      font-size: 15.5px;
-      color: var(--accent-hover);
-      margin-bottom: 16px;
     }
 
-    /* KDS preview layout */
-    .preview-kds {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-    }
-    .kds-ticket {
-      border: 1px solid rgba(0,0,0,0.05);
-      border-radius: var(--radius-md);
-      background: rgba(255,255,255,0.45);
-      padding: 18px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.01);
-    }
-    .kds-ticket-head {
+    .receipt-row-total {
       display: flex;
       justify-content: space-between;
-      font-size: 11.5px;
-      font-weight: 700;
-      color: var(--text-muted);
-      border-bottom: 1px solid rgba(0,0,0,0.04);
-      padding-bottom: 10px;
-      margin-bottom: 14px;
-    }
-    .kds-ticket-head strong {
+      border-top: 2px dashed var(--border-color);
+      padding-top: 12px;
+      margin-top: 12px;
+      font-weight: 800;
+      font-size: 17px;
       color: var(--text-main);
     }
-    .kds-ticket-items {
-      list-style: none;
-      font-size: 13.5px;
-      color: var(--text-soft);
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-      margin-bottom: 18px;
-    }
-    .kds-ticket-items li {
-      font-weight: 600;
-    }
-    .kds-btn {
-      width: 100%;
-      background: var(--bg-pure);
-      border: 1px solid rgba(39, 174, 96, 0.2);
-      padding: 10px;
-      border-radius: var(--radius-sm);
-      font-size: 12.5px;
-      font-weight: 800;
-      cursor: pointer;
-      color: var(--success);
-      transition: var(--transition);
-    }
-    .kds-btn:hover {
-      background: var(--success-light);
-      border-color: var(--success);
+
+    .empty-cart-msg {
+      text-align: center;
+      color: var(--text-body);
+      margin: auto;
+      font-size: 15px;
     }
 
-    /* Inventory preview layout */
-    .preview-inv {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
+    .btn-simulate-wa {
+      width: 100%;
+      text-align: center;
+      justify-content: center;
+      background: var(--accent-cta);
+      color: #FFFFFF;
+      border: 2px solid var(--border-color);
+      padding: 16px;
+      border-radius: 4px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 4px 4px 0px var(--border-color);
+      transition: var(--transition);
     }
-    .inv-stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
+
+    .btn-simulate-wa:hover:not(:disabled) {
+      background: var(--accent-cta-hover);
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px var(--border-color);
     }
-    .inv-table-wrap {
-      border: 1px solid rgba(0,0,0,0.05);
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      font-size: 13.5px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.015);
+
+    .btn-simulate-wa:disabled {
+      background: #E2E8F0;
+      color: #94A3B8;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
     }
-    .inv-table {
+
+    /* --- Screen 4: Competitor Comparison --- */
+    .compare-layout {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .compare-layout h2 {
+      font-size: 38px;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+
+    .compare-table {
       width: 100%;
       border-collapse: collapse;
+      border: 2px solid var(--border-color);
+      box-shadow: 6px 6px 0px var(--border-color);
+    }
+
+    .compare-table th, .compare-table td {
+      padding: 20px;
+      border: 1px solid var(--border-color);
       text-align: left;
     }
-    .inv-table th, .inv-table td {
-      padding: 14px 20px;
-      border-bottom: 1px solid rgba(0,0,0,0.03);
+
+    .compare-table th {
+      background: #FAFAFA;
+      font-weight: 800;
+      font-size: 16px;
     }
-    .inv-table th {
-      background: rgba(0,0,0,0.015);
+
+    .compare-table td {
+      font-size: 15px;
+    }
+
+    .val-restrosuite {
       font-weight: 800;
       color: var(--text-main);
     }
-    .inv-table tr:last-child td {
-      border-bottom: none;
-    }
-    .inv-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      font-weight: 700;
-      font-size: 12px;
-    }
-    .inv-status.ok { color: var(--success); }
-    .inv-status.low { color: #D48037; }
 
-    /* Reports preview layout */
-    .preview-rep {
+    .compare-check {
+      color: var(--accent-cta);
+      font-weight: 800;
+    }
+
+    /* --- Screen 5: Popcorn Pricing --- */
+    .pricing-layout {
+      text-align: center;
+    }
+
+    .pricing-layout h2 {
+      font-size: 38px;
+      margin-bottom: 12px;
+    }
+
+    .pricing-desc {
+      font-size: 16px;
+      margin-bottom: 48px;
+      color: var(--text-body);
+    }
+
+    .pricing-grid {
       display: grid;
-      grid-template-columns: 1fr 1.25fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 32px;
-    }
-    .rep-summary-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .rep-summary-card {
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: var(--radius-md);
-      padding: 18px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.01);
-    }
-    .rep-summary-card small {
-      display: block;
-      font-size: 10px;
-      font-weight: 800;
-      color: var(--text-muted);
-      letter-spacing: 0.06em;
-      margin-bottom: 5px;
-      text-transform: uppercase;
-    }
-    .rep-summary-card strong {
-      font-size: 22px;
-      color: var(--text-main);
-      font-weight: 800;
-    }
-    .rep-chart-box {
-      border: 1px solid rgba(0,0,0,0.05);
-      border-radius: var(--radius-lg);
-      padding: 28px;
-      background: rgba(255,255,255,0.4);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.015);
-    }
-
-    /* CRM preview layout */
-    .preview-crm {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
-    }
-    .crm-search-bar {
-      grid-column: 1 / -1;
-      background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(0,0,0,0.05);
-      border-radius: 99px;
-      padding: 14px 24px;
-      font-size: 14px;
-      width: 100%;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-    .crm-profile-card {
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: var(--radius-md);
-      padding: 22px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.01);
-    }
-    .crm-profile-header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 16px;
-      border-bottom: 1px solid rgba(0,0,0,0.04);
-      padding-bottom: 14px;
-    }
-    .crm-avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: var(--accent-light);
-      color: var(--accent-hover);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 17px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
-    }
-    .crm-profile-details {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      font-size: 13px;
-    }
-    .crm-profile-details span {
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-    .crm-profile-details strong {
-      display: block;
-      color: var(--text-main);
-      font-weight: 800;
-    }
-
-    /* --- Use Cases Section --- */
-    .use-cases-sec {
-      background: var(--bg-pure);
-    }
-    .use-cases-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 24px;
-    }
-    .use-case-card {
-      padding: 32px 26px;
-    }
-    .use-case-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 18px;
-    }
-    .use-case-header .icon {
-      color: var(--accent-hover);
-      width: 22px;
-      height: 22px;
-    }
-    .use-case-card h3 {
-      font-size: 18.5px;
-      margin-bottom: 10px;
-    }
-    .use-case-card p {
-      font-size: 14px;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* --- Reliability Section --- */
-    .reliability-sec {
-      background: var(--bg-off);
-    }
-    .reliability-grid {
-      display: grid;
-      grid-template-columns: 1.05fr 0.95fr;
-      gap: 68px;
-      align-items: center;
-    }
-    .reliability-list {
-      display: grid;
-      gap: 18px;
-      margin-top: 36px;
-    }
-    .reliability-item {
-      display: flex;
-      gap: 18px;
-      padding: 18px 24px;
-    }
-    .reliability-item-icon {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: var(--success-light);
-      color: var(--success);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 800;
-      flex: none;
-    }
-    .reliability-item-text strong {
-      display: block;
-      font-size: 16.5px;
-      color: var(--text-main);
-      margin-bottom: 4px;
-      font-weight: 800;
-    }
-    .reliability-item-text p {
-      font-size: 14px;
-      color: var(--text-muted);
-      line-height: 1.55;
-    }
-
-    /* Reliability Visual Sync Map */
-    .sync-map-visual {
-      position: relative;
-      height: 420px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .sync-circle-bg {
-      position: absolute;
-      width: 340px;
-      height: 340px;
-      border-radius: 50%;
-      border: 1px dashed rgba(255, 107, 0, 0.25);
-      animation: spin 50s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .sync-center-hub {
-      position: absolute;
-      z-index: 5;
-      width: 96px;
-      height: 96px;
-      border-radius: 26px;
-      background: rgba(255, 255, 255, 0.85);
-      border: 1px solid rgba(255, 107, 0, 0.3);
-      box-shadow: 0 15px 45px -10px rgba(255, 107, 0, 0.25);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .sync-center-hub .brand-mark {
-      width: 46px;
-      height: 46px;
-      border-radius: 14px;
-    }
-    
-    .sync-node-pill {
-      position: absolute;
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid var(--border-subtle);
-      box-shadow: 0 12px 30px -5px rgba(0,0,0,0.04),
-                  inset 0 1px 0 rgba(255,255,255,0.9);
-      padding: 12px 18px;
-      border-radius: var(--radius-md);
-      z-index: 4;
-      width: max-content;
-      animation: floatY 5.5s ease-in-out infinite;
-    }
-    .sync-node-pill strong {
-      display: block;
-      font-size: 13px;
-      color: var(--text-main);
-      font-weight: 800;
-    }
-    .sync-node-pill span {
-      display: block;
-      font-size: 11px;
-      color: var(--success);
-      font-weight: 700;
-    }
-    .sync-node-pos { top: 8%; left: 3%; animation-delay: 0s; }
-    .sync-node-kds { top: 12%; right: 3%; animation-delay: 1.2s; }
-    .sync-node-man { bottom: 12%; left: -2%; animation-delay: 2.4s; }
-    .sync-node-wa { bottom: 8%; right: 0%; animation-delay: 3.6s; }
-
-    /* --- Pricing / Quote Configurator Section --- */
-    .pricing-sec {
-      background: var(--bg-pure);
-    }
-    .quote-configurator {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 40px;
-      padding: 52px;
-      max-width: 960px;
+      max-width: 1100px;
       margin: 0 auto;
+    }
+
+    .pricing-card {
+      background: #FFFFFF;
+      border: 2px solid var(--border-color);
+      border-radius: 6px;
+      padding: 40px 24px;
       text-align: left;
-    }
-    .quote-info h3 {
-      font-size: 26px;
-      margin-bottom: 16px;
-      letter-spacing: -0.03em;
-    }
-    .quote-info p {
-      font-size: 15.5px;
-      color: var(--text-muted);
-      margin-bottom: 28px;
-      line-height: 1.6;
-    }
-    .quote-benefits-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 13px;
-    }
-    .quote-benefits-list li {
-      display: flex;
-      align-items: center;
-      gap: 11px;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text-soft);
-    }
-    .quote-benefits-list .check-icon {
-      color: var(--success);
-      font-weight: 800;
-    }
-    .quote-form-sim {
-      background: rgba(255, 255, 255, 0.45);
-      border: 1px solid rgba(255,255,255,0.7);
-      border-radius: var(--radius-md);
-      padding: 26px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 24px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.01);
+      box-shadow: 4px 4px 0px var(--border-color);
+      transition: var(--transition);
     }
-    .form-title {
-      font-size: 12.5px;
+
+    .pricing-card:hover {
+      transform: translate(-3px, -3px);
+      box-shadow: 8px 8px 0px var(--border-color);
+    }
+
+    .pricing-card.premium-tier {
+      transform: scale(1.03);
+      box-shadow: 8px 8px 0px var(--border-color);
+      border-width: 3px;
+    }
+
+    .pricing-card.premium-tier:hover {
+      box-shadow: 12px 12px 0px var(--border-color);
+    }
+
+    .tier-badge {
+      display: inline-block;
+      align-self: flex-start;
+      border: 2px solid var(--border-color);
+      font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-    .form-options-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .option-pill {
-      background: rgba(255, 255, 255, 0.65);
-      border: 1px solid var(--border-subtle);
-      padding: 8px 16px;
-      border-radius: 99px;
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text-soft);
-      cursor: pointer;
-      transition: var(--transition);
-      user-select: none;
-    }
-    .option-pill.active {
-      background: var(--accent-gradient);
-      color: var(--bg-pure);
-      border-color: transparent;
-      box-shadow: 0 4px 12px rgba(255, 107, 0, 0.25);
-    }
-    .quote-action-wrap .btn {
-      width: 100%;
-    }
-    .pricing-note {
-      text-align: center;
-      font-size: 13.5px;
-      color: var(--text-muted);
-      margin-top: 40px;
-      max-width: 620px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    /* --- FAQ Section --- */
-    .faq-sec {
-      background: var(--bg-off);
-    }
-    .faq-layout {
-      display: grid;
-      grid-template-columns: 0.8fr 1.2fr;
-      gap: 60px;
-      align-items: start;
-    }
-    .faq-intro h2 {
-      margin-bottom: 18px;
-    }
-    .faq-intro p {
-      color: var(--text-muted);
-      margin-bottom: 30px;
-    }
-    .faq-list {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .faq-item {
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      transition: var(--transition);
-    }
-    .faq-item[open] {
-      border-color: rgba(255, 107, 0, 0.4);
-      box-shadow: 0 18px 35px -10px rgba(0,0,0,0.04);
-    }
-    .faq-summary {
-      list-style: none;
-      cursor: pointer;
-      padding: 22px 26px;
-      font-weight: 700;
-      font-size: 16.5px;
-      color: var(--text-main);
-      position: relative;
-      user-select: none;
-    }
-    .faq-summary::-webkit-details-marker {
-      display: none;
-    }
-    .faq-summary::after {
-      content: "+";
-      position: absolute;
-      right: 26px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      border: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      color: var(--accent-hover);
-      transition: var(--transition);
-    }
-    .faq-item[open] .faq-summary::after {
-      content: "−";
-      transform: translateY(-50%) rotate(180deg);
-      background: var(--accent-gradient);
-      color: var(--bg-pure);
-      border-color: transparent;
-    }
-    .faq-summary:hover {
-      color: var(--accent-hover);
-    }
-    .faq-content {
-      padding: 0 26px 22px;
-      font-size: 15px;
-      color: var(--text-muted);
-      line-height: 1.65;
-    }
-
-    /* --- Final CTA Section --- */
-    .final-cta-sec {
-      padding: 110px 0;
-      background: radial-gradient(900px 450px at 50% -10%, rgba(255, 107, 0, 0.12), transparent 60%),
-                  var(--bg-pure);
-      border-top: 1px solid var(--border-light);
-      text-align: center;
-    }
-    .cta-card {
-      max-width: 840px;
-      margin: 0 auto;
-      padding: 64px 48px;
-      border-radius: var(--radius-lg);
-    }
-    .final-cta-sec h2 {
-      font-size: clamp(32px, 4.5vw, 44px);
+      padding: 4px 8px;
+      border-radius: 4px;
       margin-bottom: 16px;
-      letter-spacing: -0.03em;
-    }
-    .final-cta-sec p {
-      font-size: 18.5px;
-      color: var(--text-muted);
-      max-width: 600px;
-      margin: 0 auto 40px;
-    }
-    .final-cta-actions {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 18px;
     }
 
-    /* --- Footer --- */
-    .site-footer {
-      background: var(--bg-off);
-      padding: 90px 0 44px;
-      border-top: 1px solid var(--border-light);
-      color: var(--text-soft);
+    .tier-badge-highlight {
+      background: var(--accent-cta);
+      color: #FFFFFF;
+      border-color: var(--border-color);
     }
-    .footer-grid {
-      display: grid;
-      grid-template-columns: 1.55fr repeat(3, 0.85fr);
-      gap: 52px;
-      padding-bottom: 52px;
-      border-bottom: 1px solid var(--border-light);
+
+    .pricing-card h3 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .tier-desc {
+      font-size: 14px;
+      color: var(--text-body);
+      margin-bottom: 24px;
+    }
+
+    .price-wrap {
       margin-bottom: 32px;
     }
-    .footer-brand p {
-      font-size: 14.5px;
-      color: var(--text-muted);
-      margin: 18px 0 22px;
-      max-width: 340px;
-    }
-    .footer-heading {
-      font-size: 13.5px;
+
+    .price-value {
+      font-size: 36px;
       font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
       color: var(--text-main);
-      margin-bottom: 22px;
     }
-    .footer-links {
+
+    .price-period {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-body);
+    }
+
+    .pricing-card ul {
+      list-style: none;
+      margin-bottom: 32px;
+    }
+
+    .pricing-card li {
+      margin-bottom: 12px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pricing-card li::before {
+      content: "✓";
+      color: var(--accent-cta);
+      font-weight: 800;
+    }
+
+    /* --- Screen 6: Testimonials & Founder --- */
+    .social-layout {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .social-layout h2 {
+      font-size: 38px;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-bottom: 60px;
+    }
+
+    .testimonial-card {
+      border: 2px solid var(--border-color);
+      padding: 24px;
+      border-radius: 4px;
+      background: #FFFFFF;
+      box-shadow: 4px 4px 0px var(--border-color);
+    }
+
+    .testimonial-text {
+      font-size: 15px;
+      font-style: italic;
+      color: var(--text-main);
+      margin-bottom: 16px;
+    }
+
+    .testimonial-author {
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    /* Founder Message Block */
+    .founder-block {
+      border: 2px solid var(--border-color);
+      padding: 40px;
+      border-radius: 4px;
+      background: #FFFFFF;
+      box-shadow: 6px 6px 0px var(--border-color);
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .founder-pic {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      border: 2px solid var(--border-color);
+      object-fit: cover;
+      background: #E2E8F0;
+    }
+
+    .founder-message h3 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    .founder-message p {
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+
+    .founder-sig {
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    /* --- Screen 7: Shareable Footer --- */
+    .footer-layout {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .footer-layout h2 {
+      font-size: 36px;
+      margin-bottom: 16px;
+    }
+
+    .footer-layout p {
+      font-size: 16px;
+      margin-bottom: 32px;
+      color: var(--text-body);
+    }
+
+    .share-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 60px;
+    }
+
+    .btn-share {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 24px;
+      background: #FFFFFF;
+      border: 2px solid var(--border-color);
+      font-weight: 800;
+      font-size: 14px;
+      text-decoration: none;
+      color: var(--text-main);
+      box-shadow: 4px 4px 0px var(--border-color);
+      transition: var(--transition);
+      cursor: pointer;
+    }
+
+    .btn-share:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px var(--border-color);
+    }
+
+    .site-footer-nav {
+      border-top: 1px solid var(--border-light);
+      padding-top: 32px;
       display: flex;
       flex-direction: column;
-      gap: 13px;
-    }
-    .footer-links a {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 14.5px;
-      transition: var(--transition);
-    }
-    .footer-links a:hover {
-      color: var(--accent-hover);
-      padding-left: 5px;
-    }
-    .footer-contact-item {
-      font-size: 14px;
-      color: var(--text-muted);
-      margin-bottom: 18px;
-      line-height: 1.55;
-    }
-    .footer-contact-item strong {
-      display: block;
-      color: var(--text-main);
-      font-size: 11.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 4px;
-    }
-    .footer-contact-item a {
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: var(--transition);
-    }
-    .footer-contact-item a:hover {
-      color: var(--accent);
-    }
-    .footer-bottom {
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 18px;
-      font-size: 13.5px;
-      color: var(--text-muted);
+      align-items: center;
+      gap: 16px;
     }
 
-    /* --- Mobile Sticky CTA Strip --- */
-    .mobile-sticky-cta {
-      display: none;
+    .footer-legal-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-legal-links a {
+      text-decoration: none;
+      color: var(--text-body);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .footer-legal-links a:hover {
+      color: var(--text-main);
+    }
+
+    .copyright {
+      font-size: 12px;
+      color: var(--text-body);
+    }
+
+    /* Modal for Simulate Success */
+    .modal-overlay {
       position: fixed;
-      bottom: 0;
+      top: 0;
       left: 0;
       right: 0;
-      z-index: 900;
-      padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
-      background: rgba(255, 255, 255, 0.92);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      border-top: 1px solid var(--border-subtle);
-      gap: 14px;
-    }
-    .mobile-sticky-cta .btn {
-      flex: 1;
-      padding: 13px 12px;
-      font-size: 14.5px;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
     }
 
-    /* --- Reveal Animation System --- */
-    .reveal {
-      opacity: 0;
-      transform: translateY(28px);
-      transition: opacity 0.85s var(--ease), transform 0.85s var(--ease);
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
-      .reveal {
-        opacity: 1;
-        transform: none;
-      }
+    .modal-card {
+      background: #FFFFFF;
+      border: 2px solid var(--border-color);
+      padding: 32px;
+      border-radius: 6px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 8px 8px 0px var(--border-color);
+      text-align: center;
     }
 
-    /* --- Responsive Breakpoints --- */
-    @media (max-width: 1024px) {
-      .features-grid { grid-template-columns: repeat(2, 1fr); }
-      .use-cases-grid { grid-template-columns: repeat(3, 1fr); }
-      .quote-configurator { grid-template-columns: 1fr; max-width: 500px; padding: 32px; }
-      .workflow-flow { grid-template-columns: repeat(3, 1fr); gap: 18px; }
-      .workflow-flow::before { display: none; }
-      .footer-grid { grid-template-columns: 1.3fr 1.1fr; }
+    .modal-card h3 {
+      font-size: 22px;
+      margin-bottom: 12px;
     }
 
-    @media (max-width: 900px) {
-      .hero-grid { grid-template-columns: 1fr; gap: 70px; text-align: center; }
-      .hero-content p { margin-left: auto; margin-right: auto; }
-      .hero-actions { justify-content: center; }
-      .hero-assurances { justify-content: center; }
-      .hero-3d-scene { max-width: 450px; margin: 0 auto; }
-      .workflow-flow { grid-template-columns: repeat(2, 1fr); }
-      .preview-pos, .preview-rep, .preview-crm { grid-template-columns: 1fr; }
-      .pos-menu-grid { grid-template-columns: repeat(2, 1fr); }
-      .reliability-grid { grid-template-columns: 1fr; gap: 52px; }
-      .sync-map-visual { max-width: 380px; margin: 0 auto; }
-      .faq-layout { grid-template-columns: 1fr; gap: 44px; }
+    .modal-card p {
+      font-size: 15px;
+      margin-bottom: 24px;
     }
 
+    .btn-close-modal {
+      background: var(--accent-cta);
+      color: #FFFFFF;
+      border: 2px solid var(--border-color);
+      font-weight: 800;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0px var(--border-color);
+      transition: var(--transition);
+    }
+
+    .btn-close-modal:hover {
+      background: var(--accent-cta-hover);
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px var(--border-color);
+    }
+
+    /* Mobile Responsive */
     @media (max-width: 768px) {
-      .desktop-nav, .nav-signin, .nav-register { display: none; }
-      .menu-toggle { display: inline-flex; }
-      .use-cases-grid { grid-template-columns: repeat(2, 1fr); }
-    }
+      .hero-grid, .simulator-grid, .testimonials-grid {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+      
+      .pricing-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
 
-    @media (max-width: 600px) {
-      section { padding: 90px 0; }
-      .hero-sec { padding-top: 150px; padding-bottom: 90px; }
-      .features-grid, .workflow-flow, .use-cases-grid { grid-template-columns: 1fr; }
-      .floating-card { display: none; }
-      .hero-mockup-wrapper { transform: none !important; }
-      .hero-3d-scene { height: 340px; }
-      .preview-tabs { flex-wrap: wrap; width: 100%; border-radius: 18px; }
-      .preview-tab { flex: 1 1 30%; font-size: 13.5px; padding: 9px 14px; }
-      .mobile-sticky-cta { display: flex; }
-      body { padding-bottom: 74px; }
-      .footer-grid { grid-template-columns: 1fr; gap: 36px; }
-      .cta-card { padding: 40px 24px; }
-      .pos-menu-grid { grid-template-columns: 1fr; }
-      .preview-kds { grid-template-columns: 1fr; }
-      .inv-stats { grid-template-columns: 1fr; }
+      .founder-block {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+
+      .founder-pic {
+        margin: 0 auto;
+      }
+
+      .hero-content h1 {
+        font-size: 34px;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .site-header {
+        position: relative;
+      }
+
+      .screen-sec {
+        padding: 80px 0 40px 0;
+        min-height: auto;
+      }
+    }
+    
+    .btn-login {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-main);
+      font-weight: 800;
+      font-size: 14px;
+      text-decoration: none;
+      padding: 10px 20px;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-login:hover {
+      color: var(--accent-cta);
     }
   </style>
-  
-  <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "CodeArc RestroSuite",
-      "applicationCategory": "BusinessApplication",
-      "operatingSystem": "Web, Android",
-      "description": "Restaurant POS, kitchen display, inventory, billing, loyalty, and reporting platform.",
-      "offers": {
-        "@type": "AggregateOffer",
-        "lowPrice": "999",
-        "highPrice": "4999",
-        "priceCurrency": "INR",
-        "offerCount": "3"
-      },
-      "provider": {
-        "@type": "Organization",
-        "name": "CodeArc Tech Labs Private Limited",
-        "url": "https://codearc.co.in"
-      }
-    }
-  </script>
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to main content</a>
 
-  <!-- Ambient Background Blobs -->
-  <div class="bg-blob blob-orange-1" aria-hidden="true"></div>
-  <div class="bg-blob blob-orange-2" aria-hidden="true"></div>
-  <div class="bg-blob blob-green-1" aria-hidden="true"></div>
-  <div class="bg-blob blob-green-2" aria-hidden="true"></div>
-
-  <!-- Floating Glass Navbar -->
-  <header class="site-header" id="site-header">
-    <div class="container">
-      <div class="navbar-container" id="navbar">
-        <a class="brand" href="#top" aria-label="CodeArc RestroSuite home">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <span>CodeArc <span class="brand-product">RestroSuite</span></span>
+  <!-- Minimal Header -->
+  <header class="site-header">
+    <div class="container navbar">
+      <a class="brand" href="#top">
+        <img src="images/restrosuite-mark.png" alt="RestroSuite Logo" style="width: 72px; height: 72px; border-radius: 12px; object-fit: cover;">
+        <span>Restro<span class="brand-accent">Suite</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#empathy">The Pain</a>
+        <a href="#demo">Live Demo</a>
+        <a href="#compare">Compare</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#testimonials">Testimonials</a>
+        <a href="#share">Share</a>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <a class="btn-login" href="login.html">Sign In</a>
+        <a class="btn-buy" href="#pricing" id="nav-cta-pricing" style="padding: 10px 20px; font-size: 14px;">
+          Get Started
         </a>
-
-        <nav class="desktop-nav" aria-label="Primary navigation">
-          <a href="#workflow">Product</a>
-          <a href="#features">Features</a>
-          <a href="#use-cases">Use Cases</a>
-          <a href="#pricing">Contact</a>
-          <a href="#faq">FAQ</a>
-        </nav>
-
-        <div class="nav-actions">
-          <a class="nav-signin" href="login.html">Sign in</a>
-          <a class="btn btn-primary nav-register glass-shine" href="login.html?tab=register">Book Free Demo</a>
-          <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation" aria-controls="mobile-menu" aria-expanded="false">
-            <span></span>
-          </button>
-        </div>
-
-        <nav class="mobile-nav-panel" id="mobile-menu" aria-label="Mobile navigation">
-          <a href="#workflow">Product</a>
-          <a href="#features">Features</a>
-          <a href="#use-cases">Use Cases</a>
-          <a href="#pricing">Contact</a>
-          <a href="login.html">Sign in</a>
-          <a href="login.html?tab=register">Book Free Demo</a>
-        </nav>
       </div>
     </div>
   </header>
 
-  <main id="main-content">
+  <main>
     
-    <!-- Hero Section -->
-    <section class="hero-sec" id="top">
+    <!-- Screen 1: Hero -->
+    <section class="screen-sec" id="top">
       <div class="container hero-grid">
-        <div class="hero-content reveal">
-          <div class="hero-badge">
-            <span class="live-dot" aria-hidden="true"></span>
-            Built for modern Indian food businesses
-          </div>
-          <h1>Run your restaurant operations from <span>one elegant system.</span></h1>
-          <p>RestroSuite helps restaurants, dhabas, cafes, bakeries, bars, and food chains manage billing, kitchen, inventory, reports, staff, and customer updates from one powerful platform.</p>
+        <div class="hero-content">
+          <h1>Stop letting monthly software bills and waiter typos bleed your restaurant dry.</h1>
+          <p>RestroSuite is the premium offline-first billing & KOT system for restaurants, cafes, and food outlets. Run your entire operations from your phone with no installation.</p>
           
           <div class="hero-actions">
-            <a class="btn btn-primary glass-shine" href="login.html?tab=register">
-              Book Free Demo
-              <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <div class="hero-price-tag">
+              <span>Plans starting at just ₹749/month. Cancel anytime.</span>
+            </div>
+            <a class="btn-buy" href="#pricing" id="hero-cta-buy">
+              Subscribe Now
             </a>
-            <a class="btn btn-secondary" href="#preview">
-              See Product
-              <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
-            </a>
-          </div>
-
-          <div class="hero-assurances" aria-label="Product assurances">
-            <span>
-              <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
-              No installation needed
-            </span>
-            <span>
-              <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
-              Works offline
-            </span>
-            <span>
-              <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
-              24/7 dedicated support
-            </span>
+            <span class="hero-subtext">Save 4.5 hours of checkout stress every day.</span>
           </div>
         </div>
 
-        <!-- Hero 3D Mockup Visual -->
-        <div class="hero-3d-scene reveal">
-          <div class="hero-mockup-wrapper">
+        <div class="hero-mockup">
+          <div class="mockup-header">
+            <div class="mockup-dots"><span></span><span></span><span></span></div>
+            <div class="mockup-title">RestroSuite Hub</div>
+          </div>
+          <div class="mockup-body">
+            <div class="mockup-stat">
+              <label>Daily checkout time saved</label>
+              <value>4.5 Hours</value>
+            </div>
+            <div class="mockup-stat">
+              <label>Order entry error rate</label>
+              <value>0%</value>
+            </div>
+            <div class="mockup-stat">
+              <label>Monthly cost</label>
+              <value>₹749/mo (Save 50%)</value>
+            </div>
+            <div class="mockup-stat">
+              <label>Bill receipt sync time</label>
+              <value>0.8 Seconds</value>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 2: Empathy & Pain -->
+    <section class="screen-sec" id="empathy">
+      <div class="container empathy-layout">
+        <span class="section-eyebrow">The Brutal Reality</span>
+        <h2>Running a restaurant is hard. Your POS software shouldn't make it harder.</h2>
+        
+        <div class="pain-point">
+          <div class="pain-title">1. The Internet Drops, Your Sales Stop</div>
+          <div class="pain-desc">Legacy systems stop printing orders and verifying checkouts when Wi-Fi fluctuates. RestroSuite is local-first: it works 100% offline without losing data.</div>
+        </div>
+        
+        <div class="pain-point">
+          <div class="pain-title">2. Waiter Typos Eat Your Margin</div>
+          <div class="pain-desc">Typing wrong orders leads to kitchen delays and discarded plates. With our rapid-action touch grid, cashiers log tickets in 2 taps.</div>
+        </div>
+        
+        <div class="pain-point">
+          <div class="pain-title">3. The Expensive Software Rent</div>
+          <div class="pain-desc">POS companies lock you into expensive ₹3,000/mo plans with high margins. We charge exactly half: starting at ₹749/month with no locked contracts.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 3: Show, Don't Tell (POS Simulator) -->
+    <section class="screen-sec" id="demo">
+      <div class="container simulator-grid">
+        <div class="sim-left">
+          <div>
+            <span class="section-eyebrow">Interactive Sandbox</span>
+            <h2>Try before you buy. Add items to see the speed.</h2>
+            <p>Click the menu buttons below to simulate a real checkout. RestroSuite runs at sub-millisecond local speed. No cloud loading spinners.</p>
+          </div>
+          
+          <div class="menu-selector">
+            <button class="menu-item-btn" onclick="addToSimCart('Paneer Tikka', 249)" id="sim-item-paneer">
+              <div class="menu-item-name">Paneer Tikka</div>
+              <div class="menu-item-price">₹249</div>
+            </button>
+            <button class="menu-item-btn" onclick="addToSimCart('Mango Lassi', 120)" id="sim-item-mango">
+              <div class="menu-item-name">Mango Lassi</div>
+              <div class="menu-item-price">₹120</div>
+            </button>
+            <button class="menu-item-btn" onclick="addToSimCart('Veg Biryani', 299)" id="sim-item-biryani">
+              <div class="menu-item-name">Veg Biryani</div>
+              <div class="menu-item-price">₹299</div>
+            </button>
+            <button class="menu-item-btn" onclick="addToSimCart('Garlic Naan', 60)" id="sim-item-naan">
+              <div class="menu-item-name">Garlic Naan</div>
+              <div class="menu-item-price">₹60</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="sim-right">
+          <div class="terminal-header">
+            RestroSuite POS Terminal Emulator
+          </div>
+          <div class="terminal-body">
+            <div id="sim-cart-content" class="empty-cart-msg">
+              Your simulated receipt is empty.<br>Tap menu items on the left to start.
+            </div>
             
-            <!-- Floating Cards -->
-            <div class="floating-card sales-card">
-              <div class="card-label">SALES TODAY</div>
-              <div class="card-value-wrap">
-                <span class="card-val">₹48,250</span>
-                <span class="trend-badge" aria-label="up 14.2%">+14.2%</span>
+            <button class="btn-simulate-wa" id="btn-trigger-sim" onclick="triggerSimulatedReceipt()" disabled>
+              Simulate WhatsApp Receipt
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 4: Competitor Comparison -->
+    <section class="screen-sec" id="compare">
+      <div class="container compare-layout">
+        <span class="section-eyebrow" style="display: block; text-align: center;">Direct Comparison</span>
+        <h2>Why 1,420 restaurants left subscription POS networks</h2>
+        
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th class="val-restrosuite">RestroSuite</th>
+              <th>Other POS Competitors</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Monthly Cost</strong></td>
+              <td class="val-restrosuite">₹749/month (Save 50%)</td>
+              <td>₹1,500 - ₹7,000 every month</td>
+            </tr>
+            <tr>
+              <td><strong>Offline Operations</strong></td>
+              <td class="val-restrosuite"><span class="compare-check">✓</span> 100% full local billing</td>
+              <td>Stops if the server goes down</td>
+            </tr>
+            <tr>
+              <td><strong>Onboarding Time</strong></td>
+              <td class="val-restrosuite">5 Minutes (Immediate)</td>
+              <td>Awaiting sales calls & manual setup</td>
+            </tr>
+            <tr>
+              <td><strong>WhatsApp Invoice</strong></td>
+              <td class="val-restrosuite"><span class="compare-check">✓</span> Free & fully integrated</td>
+              <td>Extra third-party billing costs</td>
+            </tr>
+            <tr>
+              <td><strong>Ownership</strong></td>
+              <td class="val-restrosuite"><span class="compare-check">✓</span> Self-hosted option available</td>
+              <td>Locked in competitor clouds</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Screen 5: Popcorn Pricing -->
+    <section class="screen-sec" id="pricing">
+      <div class="container pricing-layout">
+        <span class="section-eyebrow">Popcorn Pricing</span>
+        <h2>Three premium choices. Billed monthly. Cancel anytime.</h2>
+        <p class="pricing-desc">We cost exactly half of what competitors (like SlickPOS at ₹1,500/mo or Petpooja at ₹2,500/mo) charge.</p>
+        
+        <div class="pricing-grid">
+          <!-- Good Tier -->
+          <div class="pricing-card">
+            <div>
+              <span class="tier-badge">Good</span>
+              <h3>Single Outlet Starter</h3>
+              <p class="tier-desc">Ideal for small cafes, kiosks, or single-outlet dhabas starting offline checkout.</p>
+              <div class="price-wrap">
+                <span class="price-value">₹749</span>
+                <span class="price-period">/ month</span>
               </div>
             </div>
-
-            <div class="floating-card tables-card">
-              <div class="card-label">ACTIVE TABLES</div>
-              <div class="card-value-wrap">
-                <span class="card-val">18 / 24</span>
-                <span class="status-dot" aria-hidden="true"></span>
-              </div>
-            </div>
-
-            <div class="floating-card ticket-card">
-              <div class="ticket-header">
-                <strong>Table 4 · KOT #1042</strong>
-                <span class="ticket-status-pill">Preparing</span>
-              </div>
-              <ul class="ticket-items">
-                <li>2× Paneer Tikka</li>
-                <li>1× Veg Fried Rice</li>
-                <li>2× Mango Lassi</li>
+            <div>
+              <ul>
+                <li>1 POS device checkout terminal</li>
+                <li>Offline local database</li>
+                <li>Instant thermal printing</li>
+                <li>Lifetime updates</li>
               </ul>
-            </div>
-
-            <div class="floating-card alert-card">
-              <div class="alert-content">
-                <span class="alert-icon" aria-hidden="true">⚠️</span>
-                <div class="alert-text">
-                  <strong>Inventory Alert</strong>
-                  <span>Paneer low stock (1.2 kg remaining)</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="floating-card whatsapp-card">
-              <div class="whatsapp-content">
-                <span class="wa-icon" aria-hidden="true">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 12.5 3h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
-                </span>
-                <div class="wa-text">
-                  <strong>WhatsApp Receipt</strong>
-                  <span>Sent to +91 998... ✓</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="floating-card payment-card">
-              <div class="payment-content">
-                <span class="pay-icon" aria-hidden="true">✓</span>
-                <div class="pay-text">
-                  <strong>Payment Complete</strong>
-                  <span>₹1,450 paid via UPI</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Central Mockup Window -->
-            <div class="mockup-main">
-              <div class="mockup-header">
-                <div class="mockup-dots" aria-hidden="true">
-                  <span></span><span></span><span></span>
-                </div>
-                <div class="mockup-title">RestroSuite Dashboard</div>
-                <div class="mockup-indicator">
-                  <span class="live-dot" aria-hidden="true"></span>
-                  Live Sync
-                </div>
-              </div>
-              <div class="mockup-body">
-                <aside class="mockup-sidebar" aria-hidden="true">
-                  <div class="mockup-nav-item active"></div>
-                  <div class="mockup-nav-item"></div>
-                  <div class="mockup-nav-item"></div>
-                  <div class="mockup-nav-item"></div>
-                </aside>
-                <div class="mockup-content">
-                  <div class="mockup-stats-grid">
-                    <div class="mockup-stat-card">
-                      <span>Bills</span>
-                      <strong>142</strong>
-                    </div>
-                    <div class="mockup-stat-card">
-                      <span>Dine-In</span>
-                      <strong>₹24.8K</strong>
-                    </div>
-                    <div class="mockup-stat-card">
-                      <span>Delivery</span>
-                      <strong>₹23.4K</strong>
-                    </div>
-                  </div>
-                  <div class="mockup-visual-card">
-                    <div class="mockup-chart-header">
-                      <span>SALES TRANSITIONS</span>
-                      <span style="color: var(--accent);">+18.5%</span>
-                    </div>
-                    <!-- Mockup SVG Sparkline -->
-                    <svg class="mockup-chart-svg" viewBox="0 0 100 40" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/>
-                          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
-                        </linearGradient>
-                      </defs>
-                      <path d="M0 35 Q10 20 20 28 T40 18 T60 25 T80 12 T100 8" fill="none" stroke="var(--accent)" stroke-width="2"/>
-                      <path d="M0 35 Q10 20 20 28 T40 18 T60 25 T80 12 T100 8 L100 40 L0 40 Z" fill="url(#chartGrad)"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Quick Benefits Strip -->
-    <section class="benefits-strip-sec" aria-label="Key Benefits Summary">
-      <div class="container">
-        <div class="benefits-strip reveal">
-          <div class="benefit-capsule">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8M8 12h3M8 16h8"/></svg>
-            <span>Fast POS Billing</span>
-          </div>
-          <div class="benefit-capsule">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M4 5h16v12H4zM8 21h8M12 17v4"/></svg>
-            <span>Kitchen Sync</span>
-          </div>
-          <div class="benefit-capsule">
-            <svg class="icon" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 5 8 4 8-4M4 17l8 4 8-4"/></svg>
-            <span>Inventory Tracking</span>
-          </div>
-          <div class="benefit-capsule">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 12.5 3h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
-            <span>WhatsApp Receipts</span>
-          </div>
-          <div class="benefit-capsule">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            <span>Offline Ready</span>
-          </div>
-          <div class="benefit-capsule">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>Multi-Outlet Support</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Product Features Section -->
-    <section class="features-sec" id="features">
-      <div class="container">
-        <div class="section-header center reveal">
-          <span class="eyebrow">All-in-one platform</span>
-          <h2>Everything your team needs, in one connected workspace.</h2>
-          <p>Unify front-of-house operations, back-of-house kitchens, and back-office management under a single source of truth.</p>
-        </div>
-
-        <div class="features-grid">
-          
-          <article class="glass-card feature-card glass-shine reveal">
-            <div class="feature-icon-box">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8M8 12h3M8 16h8"/></svg>
-            </div>
-            <h3>POS Billing</h3>
-            <p>Supercharge transactions with fast search, custom menu modifiers, layout table mapping, and immediate bill settlement.</p>
-          </article>
-
-          <article class="glass-card feature-card glass-shine reveal">
-            <div class="feature-icon-box">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M4 5h16v12H4zM8 21h8M12 17v4"/></svg>
-            </div>
-            <h3>Kitchen Display System</h3>
-            <p>Digitize orders with live tickets and preparation timers. Route orders instantly to stop delays and communication errors.</p>
-          </article>
-
-          <article class="glass-card feature-card glass-shine reveal">
-            <div class="feature-icon-box">
-              <svg class="icon" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 5 8 4 8-4M4 17l8 4 8-4"/></svg>
-            </div>
-            <h3>Inventory Management</h3>
-            <p>Track stock down to ingredients. Auto-deplete items via recipes, monitor waste, and get alerts before items run out.</p>
-          </article>
-
-          <article class="glass-card feature-card glass-shine reveal">
-            <div class="feature-icon-box">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </div>
-            <h3>Customer CRM</h3>
-            <p>Build guest profiles automatically. Review spending habits, manage visits history, and run structured loyalty points.</p>
-          </article>
-
-          <article class="glass-card feature-card glass-shine reveal">
-            <div class="feature-icon-box">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z"/></svg>
-            </div>
-            <h3>Reports & Analytics</h3>
-            <p>Track cash, card, and UPI splits. Reconcile cash draws, monitor shifts, and review live performance summaries remotely.</p>
-          </article>
-
-          <article class="glass-card feature-card glass-shine reveal">
-            <div class="feature-icon-box">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 12.5 3h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
-            </div>
-            <h3>WhatsApp Receipts</h3>
-            <p>Eliminate paper bills. Send elegant digital receipts, orders, and payment updates directly to your customer's WhatsApp.</p>
-          </article>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- Workflow Section -->
-    <section class="workflow-sec" id="workflow">
-      <div class="container">
-        <div class="section-header center reveal">
-          <span class="eyebrow">How it works</span>
-          <h2>From order to kitchen to billing — perfectly connected.</h2>
-          <p>See how RestroSuite connects actions across your business in real-time, removing manual checks.</p>
-        </div>
-
-        <div class="workflow-flow reveal">
-          
-          <div class="workflow-step-card">
-            <div class="workflow-num">01</div>
-            <h3>Order Captured</h3>
-            <p>Staff records an order via POS counter, tablet, or guest QR scan.</p>
-          </div>
-
-          <div class="workflow-step-card">
-            <div class="workflow-num">02</div>
-            <h3>Kitchen Updated</h3>
-            <p>The ticket details display instantly in the kitchen display queue.</p>
-          </div>
-
-          <div class="workflow-step-card">
-            <div class="workflow-num">03</div>
-            <h3>Inventory Adjusted</h3>
-            <p>Recipe counts subtract ingredients from stock records dynamically.</p>
-          </div>
-
-          <div class="workflow-step-card">
-            <div class="workflow-num">04</div>
-            <h3>Bill Settled</h3>
-            <p>Secure payment processed via cash, cards, or custom UPI QR codes.</p>
-          </div>
-
-          <div class="workflow-step-card">
-            <div class="workflow-num">05</div>
-            <h3>Receipt Sent</h3>
-            <p>A structured digital receipt triggers to the guest's WhatsApp.</p>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- Product Preview Section (Tabs & Live Interactive Mockups) -->
-    <section class="preview-sec" id="preview">
-      <div class="container">
-        <div class="section-header center reveal">
-          <span class="eyebrow">SaaS Demonstration</span>
-          <h2>See RestroSuite in action.</h2>
-          <p>Explore the clean, intuitive software interfaces designed for speed and clarity in busy settings.</p>
-        </div>
-
-        <!-- Tab Controls -->
-        <div class="preview-tabs reveal" role="tablist" aria-label="Product preview tabs">
-          <button class="preview-tab active" role="tab" aria-selected="true" aria-controls="preview-pos-panel" id="tab-pos" data-tab="pos">POS</button>
-          <button class="preview-tab" role="tab" aria-selected="false" aria-controls="preview-kds-panel" id="tab-kds" data-tab="kds">Kitchen</button>
-          <button class="preview-tab" role="tab" aria-selected="false" aria-controls="preview-inv-panel" id="tab-inv" data-tab="inv">Inventory</button>
-          <button class="preview-tab" role="tab" aria-selected="false" aria-controls="preview-rep-panel" id="tab-rep" data-tab="rep">Reports</button>
-          <button class="preview-tab" role="tab" aria-selected="false" aria-controls="preview-crm-panel" id="tab-crm" data-tab="crm">CRM</button>
-        </div>
-
-        <!-- Live Mockup Display Panel -->
-        <div class="preview-display reveal">
-          
-          <!-- POS Tab Panel -->
-          <div class="preview-panel active" id="preview-pos-panel" role="tabpanel" aria-labelledby="tab-pos">
-            <div class="preview-mockup-window">
-              <div class="window-topbar">
-                <div class="mockup-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-                <div class="window-address">https://hub.restrosuite.in/pos/register-1</div>
-                <div class="mockup-indicator"><span class="live-dot"></span> POS Active</div>
-              </div>
-              <div class="window-content preview-pos">
-                <div class="pos-menu-grid">
-                  <div class="pos-item-card">
-                    <span class="item-name">Paneer Tikka</span>
-                    <span class="item-price">₹240</span>
-                  </div>
-                  <div class="pos-item-card">
-                    <span class="item-name">Veg Fried Rice</span>
-                    <span class="item-price">₹180</span>
-                  </div>
-                  <div class="pos-item-card">
-                    <span class="item-name">Butter Naan</span>
-                    <span class="item-price">₹50</span>
-                  </div>
-                  <div class="pos-item-card">
-                    <span class="item-name">Mango Lassi</span>
-                    <span class="item-price">₹90</span>
-                  </div>
-                  <div class="pos-item-card">
-                    <span class="item-name">Cold Brew</span>
-                    <span class="item-price">₹120</span>
-                  </div>
-                  <div class="pos-item-card">
-                    <span class="item-name">Red Velvet Cake</span>
-                    <span class="item-price">₹150</span>
-                  </div>
-                </div>
-                <!-- POS Cart side -->
-                <div class="pos-cart-panel">
-                  <div>
-                    <div class="pos-cart-title">Active Order · Table 12</div>
-                    <div class="pos-cart-items">
-                      <div class="pos-cart-row">
-                        <span>2 × Paneer Tikka</span>
-                        <strong>₹480</strong>
-                      </div>
-                      <div class="pos-cart-row">
-                        <span>1 × Veg Fried Rice</span>
-                        <strong>₹180</strong>
-                      </div>
-                      <div class="pos-cart-row">
-                        <span>2 × Mango Lassi</span>
-                        <strong>₹180</strong>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div class="pos-cart-total">
-                      <span>Total (incl. GST)</span>
-                      <span>₹840</span>
-                    </div>
-                    <button class="btn btn-primary" style="width: 100%; padding: 10px 14px; font-size: 13.5px;" disabled>Complete Payment</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Kitchen (KDS) Tab Panel -->
-          <div class="preview-panel" id="preview-kds-panel" role="tabpanel" aria-labelledby="tab-kds">
-            <div class="preview-mockup-window">
-              <div class="window-topbar">
-                <div class="mockup-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-                <div class="window-address">https://hub.restrosuite.in/kds/kitchen-screen-1</div>
-                <div class="mockup-indicator"><span class="live-dot"></span> KDS Connected</div>
-              </div>
-              <div class="window-content preview-kds">
-                
-                <div class="kds-ticket">
-                  <div class="kds-ticket-head">
-                    <strong>Table 12</strong>
-                    <span>04:12 min ago</span>
-                  </div>
-                  <ul class="kds-ticket-items">
-                    <li>2 × Paneer Tikka</li>
-                    <li>1 × Veg Fried Rice</li>
-                    <li>2 × Mango Lassi</li>
-                  </ul>
-                  <button class="kds-btn">Mark Prepared</button>
-                </div>
-
-                <div class="kds-ticket">
-                  <div class="kds-ticket-head">
-                    <strong>T4 (Takeaway)</strong>
-                    <span>01:45 min ago</span>
-                  </div>
-                  <ul class="kds-ticket-items">
-                    <li>1 × Cold Brew</li>
-                    <li>1 × Red Velvet Cake</li>
-                  </ul>
-                  <button class="kds-btn">Mark Prepared</button>
-                </div>
-
-                <div class="kds-ticket">
-                  <div class="kds-ticket-head">
-                    <strong>Table 8</strong>
-                    <span>Just Now</span>
-                  </div>
-                  <ul class="kds-ticket-items">
-                    <li>2 × Butter Naan</li>
-                    <li>1 × Paneer Tikka</li>
-                  </ul>
-                  <button class="kds-btn">Mark Prepared</button>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-          <!-- Inventory Tab Panel -->
-          <div class="preview-panel" id="preview-inv-panel" role="tabpanel" aria-labelledby="tab-inv">
-            <div class="preview-mockup-window">
-              <div class="window-topbar">
-                <div class="mockup-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-                <div class="window-address">https://hub.restrosuite.in/inventory/dashboard</div>
-                <div class="mockup-indicator"><span class="live-dot"></span> Live Stock</div>
-              </div>
-              <div class="window-content preview-inv">
-                <div class="inv-stats">
-                  <div class="rep-summary-card">
-                    <small>Items Monitored</small>
-                    <strong>142</strong>
-                  </div>
-                  <div class="rep-summary-card">
-                    <small>Low Stock Alerts</small>
-                    <strong style="color: #D48037;">2</strong>
-                  </div>
-                  <div class="rep-summary-card">
-                    <small>Reorders Today</small>
-                    <strong>1</strong>
-                  </div>
-                </div>
-                <div class="inv-table-wrap">
-                  <table class="inv-table">
-                    <thead>
-                      <tr>
-                        <th>Ingredient</th>
-                        <th>Standard Stock</th>
-                        <th>Current Stock</th>
-                        <th>Unit</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>Basmati Rice</td>
-                        <td>50.0</td>
-                        <td>42.5</td>
-                        <td>kg</td>
-                        <td><span class="inv-status ok">● OK</span></td>
-                      </tr>
-                      <tr>
-                        <td>Paneer (Fresh)</td>
-                        <td>10.0</td>
-                        <td>1.2</td>
-                        <td>kg</td>
-                        <td><span class="inv-status low">● Low Stock</span></td>
-                      </tr>
-                      <tr>
-                        <td>Milk (Pasteurized)</td>
-                        <td>20.0</td>
-                        <td>18.0</td>
-                        <td>L</td>
-                        <td><span class="inv-status ok">● OK</span></td>
-                      </tr>
-                      <tr>
-                        <td>Coffee Beans (Arabica)</td>
-                        <td>15.0</td>
-                        <td>2.4</td>
-                        <td>kg</td>
-                        <td><span class="inv-status low">● Low Stock</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Reports Tab Panel -->
-          <div class="preview-panel" id="preview-rep-panel" role="tabpanel" aria-labelledby="tab-rep">
-            <div class="preview-mockup-window">
-              <div class="window-topbar">
-                <div class="mockup-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-                <div class="window-address">https://hub.restrosuite.in/analytics/reports</div>
-                <div class="mockup-indicator"><span class="live-dot"></span> Analytics Sync</div>
-              </div>
-              <div class="window-content preview-rep">
-                <div class="rep-summary-cards">
-                  <div class="rep-summary-card">
-                    <small>Total Sales Today</small>
-                    <strong>₹43,890</strong>
-                  </div>
-                  <div class="rep-summary-card">
-                    <small>Shift Net Margin</small>
-                    <strong>34.2%</strong>
-                  </div>
-                  <div class="rep-summary-card">
-                    <small>Average Ticket Value</small>
-                    <strong>₹522</strong>
-                  </div>
-                </div>
-                <div class="rep-chart-box">
-                  <div class="mockup-chart-header">
-                    <span>PAYMENT SPLITS (DAILY)</span>
-                  </div>
-                  <div style="font-size: 13.5px; color: var(--text-soft); display: flex; flex-direction: column; gap: 8px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--accent);"></span>
-                      <span>UPI: <strong>68% (₹29,845)</strong></span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--charcoal);"></span>
-                      <span>Cash: <strong>22% (₹9,655)</strong></span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#82ca9d;"></span>
-                      <span>Cards: <strong>10% (₹4,390)</strong></span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- CRM Tab Panel -->
-          <div class="preview-panel" id="preview-crm-panel" role="tabpanel" aria-labelledby="tab-crm">
-            <div class="preview-mockup-window">
-              <div class="window-topbar">
-                <div class="mockup-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-                <div class="window-address">https://hub.restrosuite.in/crm/guests</div>
-                <div class="mockup-indicator"><span class="live-dot"></span> CRM Loaded</div>
-              </div>
-              <div class="window-content preview-crm">
-                <div class="crm-search-bar" aria-hidden="true">🔍 Search customers by name or phone...</div>
-                
-                <div class="crm-profile-card">
-                  <div class="crm-profile-header">
-                    <div class="crm-avatar">AS</div>
-                    <div>
-                      <h4 style="font-size: 15px; font-weight: 700;">Aarav Sharma</h4>
-                      <p style="font-size: 11.5px; color: var(--text-muted);">Loyal Customer Since 2025</p>
-                    </div>
-                  </div>
-                  <div class="crm-profile-details">
-                    <div>
-                      <span>Total Visits</span>
-                      <strong>24</strong>
-                    </div>
-                    <div>
-                      <span>Spend Total</span>
-                      <strong>₹12,480</strong>
-                    </div>
-                    <div>
-                      <span>Loyalty Tier</span>
-                      <strong style="color: var(--accent);">Gold Member</strong>
-                    </div>
-                    <div>
-                      <span>Last Visited</span>
-                      <strong>2 days ago</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="crm-profile-card">
-                  <div class="crm-profile-header">
-                    <div class="crm-avatar" style="background: var(--border-subtle); color: var(--text-main);">DP</div>
-                    <div>
-                      <h4 style="font-size: 15px; font-weight: 700;">Divya Patel</h4>
-                      <p style="font-size: 11.5px; color: var(--text-muted);">Regular Dine-In</p>
-                    </div>
-                  </div>
-                  <div class="crm-profile-details">
-                    <div>
-                      <span>Total Visits</span>
-                      <strong>14</strong>
-                    </div>
-                    <div>
-                      <span>Spend Total</span>
-                      <strong>₹6,890</strong>
-                    </div>
-                    <div>
-                      <span>Loyalty Tier</span>
-                      <strong>Silver Member</strong>
-                    </div>
-                    <div>
-                      <span>Last Visited</span>
-                      <strong>Yesterday</strong>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- Use Cases Section -->
-    <section class="use-cases-sec" id="use-cases">
-      <div class="container">
-        <div class="section-header center reveal">
-          <span class="eyebrow">Versatile deployment</span>
-          <h2>Built for the outlet you actually run.</h2>
-          <p>RestroSuite optimizes its interface layouts depending on your service format. No generic templates.</p>
-        </div>
-
-        <div class="use-cases-grid">
-          
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3 style="font-size: 19px;">Restaurants</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-            <p>Complete dine-in table status control, custom split billing flows, detailed kitchen routing, and guest order history.</p>
-          </article>
-
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3>Dhabas</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-            </div>
-            <p>Designed for high-speed counter ordering. Fast cash splits, custom combos, kitchen notifications, and simplified staff setups.</p>
-          </article>
-
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3>Cafes</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-            </div>
-            <p>Seamless support for takeaway orders, quick modifier prompts (milk splits, size upgrades), and instant digital loyalty points.</p>
-          </article>
-
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3>Bakeries</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2"/></svg>
-            </div>
-            <p>Track advanced batches, pre-orders, custom cake schedules, daily counter sales, and raw ingredient stock tracking.</p>
-          </article>
-
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3>Bars</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v10M12 12l-8 8h16l-8-8z"/></svg>
-            </div>
-            <p>Optimized for open tabs. Reassign tickets between seats/stools, split rounds, track premium liquor units, and calculate taxes.</p>
-          </article>
-
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3>QSRs</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            </div>
-            <p>Built for raw speed. Simple order screens, automated token counters, kitchen screens sync, and instant UPI checkout QR codes.</p>
-          </article>
-
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3>Cloud Kitchens</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            </div>
-            <p>Consolidated ticket feeds. Handle orders from multiple brands, coordinate prep times, and integrate delivery dispatching.</p>
-          </article>
-
-          <article class="glass-card use-case-card reveal">
-            <div class="use-case-header">
-              <h3>Multi-Outlet Chain</h3>
-              <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            </div>
-            <p>Consolidate management. Control menus globally, monitor individual store levels, sync user access, and pull group analytics.</p>
-          </article>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- Reliability Section -->
-    <section class="reliability-sec" id="reliability">
-      <div class="container reliability-grid">
-        <div class="reliability-content reveal">
-          <span class="eyebrow">Enterprise Resilience</span>
-          <h2>Reliable when your operations can’t stop.</h2>
-          <p>RestroSuite combines local continuity with cloud synchronization, controlled access, and operational logs designed for real restaurant conditions.</p>
-          
-          <div class="reliability-list">
-            
-            <div class="reliability-item glass-card">
-              <div class="reliability-item-icon" aria-hidden="true">✓</div>
-              <div class="reliability-item-text">
-                <strong>Offline-ready billing</strong>
-                <p>Ring up items, send tickets, and print physical invoices locally even if the internet drops during rush hours.</p>
-              </div>
-            </div>
-
-            <div class="reliability-item glass-card">
-              <div class="reliability-item-icon" aria-hidden="true">✓</div>
-              <div class="reliability-item-text">
-                <strong>Cloud sync after reconnection</strong>
-                <p>RestroSuite automatically pushes local changes and reconciles ledger logs when connection resumes.</p>
-              </div>
-            </div>
-
-            <div class="reliability-item glass-card">
-              <div class="reliability-item-icon" aria-hidden="true">✓</div>
-              <div class="reliability-item-text">
-                <strong>Role-based access</strong>
-                <p>Prevent database errors and fraud. Set clear permissions for cashiers, kitchen staff, and outlet managers.</p>
-              </div>
-            </div>
-
-            <div class="reliability-item glass-card">
-              <div class="reliability-item-icon" aria-hidden="true">✓</div>
-              <div class="reliability-item-text">
-                <strong>Audit logs</strong>
-                <p>Keep track of every action. Key edits, price overrides, ticket modifications, and cancellations are tracked.</p>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Reliability Visual Sync Map -->
-        <div class="sync-map-visual reveal">
-          <div class="sync-circle-bg" aria-hidden="true"></div>
-          <div class="sync-center-hub">
-            <div class="brand-mark" aria-hidden="true"></div>
-          </div>
-          
-          <div class="sync-node-pill sync-node-pos">
-            <strong>POS Terminal</strong>
-            <span>Online · Syncing</span>
-          </div>
-
-          <div class="sync-node-pill sync-node-kds">
-            <strong>Kitchen Display</strong>
-            <span>Online · Syncing</span>
-          </div>
-
-          <div class="sync-node-pill sync-node-man">
-            <strong>Management App</strong>
-            <span>Online · Syncing</span>
-          </div>
-
-          <div class="sync-node-pill sync-node-wa">
-            <strong>Receipt Gateway</strong>
-            <span>Online · Syncing</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Contact & Onboarding Section (No Plans - Direct Contact) -->
-    <section class="pricing-sec" id="pricing">
-      <div class="container">
-        <div class="section-header center reveal">
-          <span class="eyebrow">Get Started</span>
-          <h2>Tailored setup. No rigid plans.</h2>
-          <p>We configure RestroSuite around the way your outlet actually operates. Contact us directly to request pricing or schedule a free live demo for your team.</p>
-        </div>
-
-        <div class="glass-card quote-configurator reveal">
-          <div class="quote-info">
-            <h3>Contact Our Operations Team</h3>
-            <p>Every food business is unique. Rather than box you into rigid pricing tiers with feature caps, our team works with you to deploy exactly what you need.</p>
-            <ul class="quote-benefits-list">
-              <li><span class="check-icon" aria-hidden="true">✓</span> Tailored configuration based on outlet type</li>
-              <li><span class="check-icon" aria-hidden="true">✓</span> Full menu import & kitchen routing setup</li>
-              <li><span class="check-icon" aria-hidden="true">✓</span> In-person or remote training for your staff</li>
-              <li><span class="check-icon" aria-hidden="true">✓</span> Hardware integration with printers & weighing scales</li>
-            </ul>
-          </div>
-          <div class="quote-form-sim" style="justify-content: center; gap: 20px;">
-            <div class="form-title" style="text-align: center; margin-bottom: 5px;">Choose your channel</div>
-            
-            <a class="btn btn-primary glass-shine" href="https://wa.me/919983721179?text=Hello%20CodeArc!%20I%20would%20like%20to%20request%20information%20and%20pricing%20for%20RestroSuite." target="_blank" rel="noopener noreferrer" style="text-align: center; justify-content: center; display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px;">
-              <svg class="icon" viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 12.5 3h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
-              Chat on WhatsApp
-            </a>
-
-            <div style="display: flex; gap: 12px;">
-              <a class="btn btn-secondary" href="tel:+919983721179" style="flex: 1; text-align: center; justify-content: center; display: inline-flex; align-items: center; padding: 12px 0; font-size: 14px; font-weight: 700;">
-                Call Sales
-              </a>
-              <a class="btn btn-secondary" href="mailto:hello@codearc.co.in" style="flex: 1; text-align: center; justify-content: center; display: inline-flex; align-items: center; padding: 12px 0; font-size: 14px; font-weight: 700;">
-                Email Us
+              <a class="btn-buy" href="login.html?tab=register&tier=single&billing=monthly" id="buy-tier-single" style="width:100%;">
+                Subscribe Single Outlet
               </a>
             </div>
-            
-            <p style="font-size: 12px; color: var(--text-muted); text-align: center; line-height: 1.5; margin: 0;">
-              Our team typically replies in under 15 minutes to configure your custom workspace.
-            </p>
+          </div>
+
+          <!-- Better Tier -->
+          <div class="pricing-card premium-tier">
+            <div>
+              <span class="tier-badge tier-badge-highlight">Better (Most Popular)</span>
+              <h3>Multi-Outlet Pro</h3>
+              <p class="tier-desc">For growing food brands needing sync, inventory alerts, and instant updates.</p>
+              <div class="price-wrap">
+                <span class="price-value">₹1,499</span>
+                <span class="price-period">/ month</span>
+              </div>
+            </div>
+            <div>
+              <ul>
+                <li>Up to 5 devices connected</li>
+                <li>Multi-outlet real-time sync</li>
+                <li>WhatsApp receipt gateway</li>
+                <li>Automated daily cloud backups</li>
+                <li>Advanced recipe inventory</li>
+              </ul>
+              <a class="btn-buy" href="login.html?tab=register&tier=pro&billing=monthly" id="buy-tier-pro" style="width:100%;">
+                Subscribe Multi-Outlet Pro
+              </a>
+            </div>
+          </div>
+
+          <!-- Best Tier -->
+          <div class="pricing-card">
+            <div>
+              <span class="tier-badge">Best</span>
+              <h3>Enterprise Franchise</h3>
+              <p class="tier-desc">Complete support coverage for franchises and large commercial food chains.</p>
+              <div class="price-wrap">
+                <span class="price-value">₹2,999</span>
+                <span class="price-period">/ month</span>
+              </div>
+            </div>
+            <div>
+              <ul>
+                <li>Unlimited outlets & terminals</li>
+                <li>Priority database migration</li>
+                <li>Dedicated support engineer</li>
+                <li>Custom API integrations</li>
+                <li>On-site staff training</li>
+              </ul>
+              <a class="btn-buy" href="login.html?tab=register&tier=enterprise&billing=monthly" id="buy-tier-enterprise" style="width:100%;">
+                Subscribe Enterprise
+              </a>
+            </div>
           </div>
         </div>
 
-        <p class="pricing-note">Onboarding assistance, custom database migrations (from Legacy POS), and training are fully handled by our support engineers.</p>
+        <!-- Pricing Defense Section -->
+        <div style="margin-top: 60px; padding: 40px; border: 2px solid var(--border-color); border-radius: 6px; text-align: left; background: #FFFFFF; box-shadow: 6px 6px 0px var(--border-color);">
+          <h3 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin-bottom: 16px;">How can we afford to charge exactly half?</h3>
+          <p style="font-size: 15px; color: var(--text-body); margin-bottom: 24px; line-height: 1.6;">
+            We don't spend money on high-rise offices, bloated sales teams, or venture capitalist margins. We are a lean engineering lab. But the real secret is technical:
+          </p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+            <div>
+              <strong style="display: block; font-size: 16px; color: var(--text-main); margin-bottom: 8px; font-weight: 800;">1. Offline-First Architecture</strong>
+              <span style="font-size: 14px; color: var(--text-body); line-height: 1.6; display: block;">
+                Competitors process every single checkout and KOT ticket on expensive cloud databases, forcing them to pay huge server computing bills. RestroSuite runs directly on your local device. We only sync minimal metadata. Our cloud overhead is 90% lower, and we pass these savings directly to you.
+              </span>
+            </div>
+            <div>
+              <strong style="display: block; font-size: 16px; color: var(--text-main); margin-bottom: 8px; font-weight: 800;">2. Zero Sales Bloat</strong>
+              <span style="font-size: 14px; color: var(--text-body); line-height: 1.6; display: block;">
+                SaaS companies employ armies of cold callers and account managers. We sell self-serve, direct-to-owner software. No middleman markup. Just code that works.
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- FAQ Section -->
-    <section class="faq-sec" id="faq">
-      <div class="container faq-layout">
-        <div class="faq-intro reveal">
-          <span class="eyebrow">Onboarding Support</span>
-          <h2>Questions, answered simply.</h2>
-          <p>Find quick answers to common setup and operational questions. If you need custom answers, click below to chat.</p>
-          <a class="btn-link" href="https://wa.me/919983721179" target="_blank" rel="noopener noreferrer">
-            Talk to an Expert
-            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    <!-- Screen 6: Testimonials & Founder Message -->
+    <section class="screen-sec" id="testimonials">
+      <div class="container social-layout">
+        <span class="section-eyebrow" style="display: block; text-align: center;">Verified Customer Proof</span>
+        <h2>What restaurant owners say about us</h2>
+        
+        <div class="testimonials-grid">
+          <div class="testimonial-card">
+            <p class="testimonial-text">"We lost ₹14,000 in wrong orders during last year's Diwali rush. After switching to RestroSuite, order errors dropped to zero."</p>
+            <div class="testimonial-author">Aarav Mehta · Owner, The Spice Bistro</div>
+          </div>
+          <div class="testimonial-card">
+            <p class="testimonial-text">"I got tired of paying ₹4,500 every single month to our old billing software. Switched to RestroSuite Pro at just ₹1,499/month. That's a direct savings of ₹36,000 every year for doing the exact same work."</p>
+            <div class="testimonial-author">Priya Sharma · Cafe Boho</div>
+          </div>
+        </div>
+
+        <!-- Founder Block -->
+        <div class="founder-block">
+          <img src="images/restrosuite-mark.png" alt="Founder Portrait Placeholder" class="founder-pic">
+          <div class="founder-message">
+            <h3>A personal note from the team</h3>
+            <p>We believe restaurant billing software should be fair. Why do companies charge ₹3,000 to ₹5,000 a month for basic checkout? We priced RestroSuite Standard at ₹749/month to make it accessible to every local outlet. High-quality code shouldn't cost a fortune.</p>
+            <p>If you have questions about custom integrations or imports, email me directly at hello@codearc.co.in. We reply to all inquiries.</p>
+            <div class="founder-sig">Kalpesh Deora, Founder, CodeArc Labs</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 7: Shareable Footer -->
+    <section class="screen-sec" id="share">
+      <div class="container footer-layout">
+        <span class="section-eyebrow">Spread the word</span>
+        <h2>Help another restaurant owner save ₹40,000/year</h2>
+        <p>Most local outlets spend a massive chunk of their net profit on recurring POS billing software. Share this page and help them keep their hard-earned money.</p>
+        
+        <div class="share-buttons">
+          <a class="btn-share" href="https://twitter.com/intent/tweet?text=POS%20companies%20are%20charging%20you%20every%20month.%20Check%20out%20RestroSuite%20-%20offline-first%20restaurant%20POS%20at%20exactly%20half%20the%20competitor%20price:%20https://codearc-restrosuite.vercel.app/" target="_blank" rel="noopener noreferrer" id="share-twitter">
+            Share on X (Twitter)
+          </a>
+          <a class="btn-share" href="https://api.whatsapp.com/send?text=Hey!%20Check%20out%20RestroSuite%20-%20restaurant%20billing%20paid%20monthly%20at%20half%20the%20cost%20of%20normal%20systems:%20https://codearc-restrosuite.vercel.app/" target="_blank" rel="noopener noreferrer" id="share-whatsapp">
+            Share on WhatsApp
           </a>
         </div>
 
-        <div class="faq-list reveal">
-          
-          <details class="faq-item">
-            <summary class="faq-summary">Can RestroSuite work with my existing devices?</summary>
-            <p class="faq-content">Yes. RestroSuite is fully web-based and runs on normal browsers. It is compatible with Windows PCs, Android tablets, iPads, smartphones, and standard thermal invoice printers.</p>
-          </details>
-
-          <details class="faq-item">
-            <summary class="faq-summary">How does the offline billing mode work?</summary>
-            <p class="faq-content">RestroSuite retains transaction logs inside your browser's secure local cache if internet fails. Cashiers can continue to check out tables and print bills. The system pushes local logs to the cloud once you reconnect.</p>
-          </details>
-
-          <details class="faq-item">
-            <summary class="faq-summary">What happens after I sign up for a demo?</summary>
-            <p class="faq-content">One of our specialists will schedule a 15-minute onboarding call. We'll set up your digital menu, configure tax categories, hook up printers, and train your staff on POS usage before you go live.</p>
-          </details>
-
-          <details class="faq-item">
-            <summary class="faq-summary">Is the WhatsApp gateway integration automatic?</summary>
-            <p class="faq-content">WhatsApp billing utilizes our pre-integrated messaging gateway, included in standard setups. You can also connect your own custom WhatsApp Business API settings if you have specific brand guidelines.</p>
-          </details>
-
-          <details class="faq-item">
-            <summary class="faq-summary">Does RestroSuite support multi-outlet inventory?</summary>
-            <p class="faq-content">Yes. Under our Enterprise configurations, you can link multiple outlets. Managers can monitor ingredients across locations, handle stock transfers between kitchens, and review centralized purchase records.</p>
-          </details>
-
-          <details class="faq-item">
-            <summary class="faq-summary">Are there any hidden setup fees?</summary>
-            <p class="faq-content">No. Our subscription pricing is completely transparent. Onboarding support, basic menu import, and cashier training sessions are included in all subscription setups without extra charge.</p>
-          </details>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- Final CTA Section -->
-    <section class="final-cta-sec" id="book-demo">
-      <div class="container">
-        <div class="cta-card glass-card reveal">
-          <h2>Give your team a calmer way to run the outlet.</h2>
-          <p>Book a demo and see how RestroSuite can simplify billing, kitchen, inventory, and reporting for your business.</p>
-          <div class="final-cta-actions">
-            <a class="btn btn-primary glass-shine" href="login.html?tab=register">Book Free Demo</a>
-            <a class="btn btn-secondary" href="https://wa.me/919983721179" target="_blank" rel="noopener noreferrer">Talk on WhatsApp</a>
+        <div class="site-footer-nav">
+          <div class="footer-legal-links">
+            <a href="login.html">Sign In</a>
+            <a href="terms.html">Terms of Service</a>
+            <a href="privacy.html">Privacy Policy</a>
+            <a href="refund-policy.html">Refund Policy</a>
+            <a href="#top">Back to top</a>
           </div>
+          <span class="copyright">© 2026 CodeArc Tech Labs Private Limited. All rights reserved. Premium local-first software.</span>
         </div>
       </div>
     </section>
 
   </main>
 
-  <!-- Minimal Footer -->
-  <footer class="site-footer" id="contact">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a class="brand" href="#top">
-            <span class="brand-mark" aria-hidden="true"></span>
-            <span>CodeArc <span class="brand-product">RestroSuite</span></span>
-          </a>
-          <p>Connected restaurant billing, kitchen display, inventory, and analytics software from CodeArc Tech Labs.</p>
-          <a class="btn-link" href="login.html">Client sign in →</a>
-        </div>
-        
-        <div>
-          <div class="footer-heading">Product</div>
-          <nav class="footer-links" aria-label="Footer Product links">
-            <a href="#workflow">How it works</a>
-            <a href="#features">Features</a>
-            <a href="#use-cases">Use Cases</a>
-            <a href="#pricing">Contact</a>
-          </nav>
-        </div>
-
-        <div>
-          <div class="footer-heading">Policies</div>
-          <nav class="footer-links" aria-label="Footer Policies links">
-            <a href="terms.html">Terms</a>
-            <a href="privacy.html">Privacy</a>
-            <a href="refund-policy.html">Refund policy</a>
-            <a href="#faq">FAQ</a>
-          </nav>
-        </div>
-
-        <div>
-          <div class="footer-heading">Contact</div>
-          <div class="footer-contact-item">
-            <strong>Phone</strong>
-            <a href="tel:+919983721179">+91 99837 21179</a>
-          </div>
-          <div class="footer-contact-item">
-            <strong>Email</strong>
-            <a href="mailto:hello@codearc.co.in">hello@codearc.co.in</a>
-          </div>
-          <div class="footer-contact-item">
-            <strong>Company</strong>
-            <a href="https://codearc.co.in" target="_blank" rel="noopener noreferrer">CodeArc Tech Labs Private Limited</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer-bottom">
-        <span>© 2026 CodeArc Tech Labs. All rights reserved.</span>
-        <span>Premium Restaurant Operations Software · Made in India</span>
-      </div>
+  <!-- Success Modal for Simulator -->
+  <div class="modal-overlay" id="sim-modal">
+    <div class="modal-card">
+      <h3>WhatsApp Bill Dispatched</h3>
+      <p>Simulated invoice for ₹<span id="sim-modal-total">0</span> was sent successfully to +91 99837 21179 via the RestroSuite messaging gateway.</p>
+      <button class="btn-close-modal" onclick="closeSimModal()">Done</button>
     </div>
-  </footer>
-
-  <!-- Mobile Sticky CTA Strip -->
-  <div class="mobile-sticky-cta" aria-label="Quick actions">
-    <a class="btn btn-secondary" href="https://wa.me/919983721179" target="_blank" rel="noopener noreferrer">WhatsApp</a>
-    <a class="btn btn-primary" href="login.html?tab=register">Book Free Demo</a>
   </div>
 
+  <!-- Interactive POS Simulator Code -->
   <script>
-    (function () {
-      "use strict";
+    let simCart = {};
 
-      const header = document.getElementById("site-header");
-      const menuToggle = document.getElementById("menu-toggle");
-      const mobileMenu = document.getElementById("mobile-menu");
-      const previewTabs = Array.from(document.querySelectorAll(".preview-tab"));
-      const previewPanels = Array.from(document.querySelectorAll(".preview-panel"));
-      const navLinks = Array.from(document.querySelectorAll(".desktop-nav a"));
-      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      // Mobile Menu Handling
-      function closeMenu() {
-        menuToggle.setAttribute("aria-expanded", "false");
-        menuToggle.setAttribute("aria-label", "Open navigation");
-        mobileMenu.classList.remove("open");
-        document.body.classList.remove("menu-open");
-      }
-
-      menuToggle.addEventListener("click", function () {
-        const open = menuToggle.getAttribute("aria-expanded") === "true";
-        menuToggle.setAttribute("aria-expanded", String(!open));
-        menuToggle.setAttribute("aria-label", open ? "Open navigation" : "Close navigation");
-        mobileMenu.classList.toggle("open", !open);
-        document.body.classList.toggle("menu-open", !open);
-      });
-
-      mobileMenu.addEventListener("click", function (event) {
-        if (event.target.closest("a")) closeMenu();
-      });
-
-      window.addEventListener("resize", function () {
-        if (window.innerWidth > 768) closeMenu();
-      });
-
-      // Header Scroll Styling
-      function updateHeader() {
-        header.classList.toggle("scrolled", window.scrollY > 10);
-      }
-      window.addEventListener("scroll", updateHeader, { passive: true });
-      updateHeader();
-
-      // Product Preview Interactive Tab Switching
-      previewTabs.forEach(function (tab) {
-        tab.addEventListener("click", function () {
-          previewTabs.forEach(function (item) {
-            item.classList.remove("active");
-            item.setAttribute("aria-selected", "false");
-          });
-          previewPanels.forEach(function (panel) {
-            panel.classList.remove("active");
-          });
-
-          const activePanelId = "preview-" + tab.dataset.tab + "-panel";
-          const activePanel = document.getElementById(activePanelId);
-          
-          tab.classList.add("active");
-          tab.setAttribute("aria-selected", "true");
-          activePanel.classList.add("active");
-        });
-      });
-
-      // Direct contact channel logic (no pills)
-
-      // Scroll Reveal Logic
-      if (!reducedMotion && "IntersectionObserver" in window) {
-        const revealObserver = new IntersectionObserver(function (entries, observer) {
-          entries.forEach(function (entry) {
-            if (!entry.isIntersecting) return;
-            entry.target.classList.add("visible");
-            observer.unobserve(entry.target);
-          });
-        }, { threshold: 0.1 });
-
-        document.querySelectorAll(".reveal").forEach(function (element) {
-          revealObserver.observe(element);
-        });
+    function addToSimCart(name, price) {
+      if (simCart[name]) {
+        simCart[name].qty++;
       } else {
-        document.querySelectorAll(".reveal").forEach(function (element) {
-          element.classList.add("visible");
-        });
+        simCart[name] = { price: price, qty: 1 };
+      }
+      renderSimCart();
+    }
+
+    function changeQty(name, amount) {
+      if (!simCart[name]) return;
+      simCart[name].qty += amount;
+      if (simCart[name].qty <= 0) {
+        delete simCart[name];
+      }
+      renderSimCart();
+    }
+
+    function renderSimCart() {
+      const container = document.getElementById("sim-cart-content");
+      const btn = document.getElementById("btn-trigger-sim");
+      
+      let itemsHtml = "";
+      let subtotal = 0;
+      let totalItems = 0;
+
+      for (const name in simCart) {
+        const item = simCart[name];
+        const itemTotal = item.price * item.qty;
+        subtotal += itemTotal;
+        totalItems += item.qty;
+
+        itemsHtml += `
+          <div class="receipt-row">
+            <div>
+              <strong>${name}</strong>
+              <div style="font-size:12px;color:#666;">
+                <span style="cursor:pointer;font-weight:bold;margin-right:6px;" onclick="changeQty('${name}', -1)">-</span>
+                ${item.qty} × ₹${item.price}
+                <span style="cursor:pointer;font-weight:bold;margin-left:6px;" onclick="changeQty('${name}', 1)">+</span>
+              </div>
+            </div>
+            <div>₹${itemTotal}</div>
+          </div>
+        `;
       }
 
-      // Highlight Current Navbar Link
-      if ("IntersectionObserver" in window) {
-        const sectionObserver = new IntersectionObserver(function (entries) {
-          entries.forEach(function (entry) {
-            if (!entry.isIntersecting) return;
-            navLinks.forEach(function (link) {
-              const active = link.getAttribute("href") === "#" + entry.target.id;
-              if (active) link.setAttribute("aria-current", "true");
-              else link.removeAttribute("aria-current");
-            });
-          });
-        }, { rootMargin: "-30% 0px -60% 0px" });
-
-        document.querySelectorAll("main section[id]").forEach(function (section) {
-          sectionObserver.observe(section);
-        });
+      if (totalItems === 0) {
+        container.className = "empty-cart-msg";
+        container.innerHTML = "Your simulated receipt is empty.<br>Tap menu items on the left to start.";
+        btn.disabled = true;
+      } else {
+        const tax = Math.round(subtotal * 0.05);
+        const finalTotal = subtotal + tax;
+        
+        container.className = "";
+        container.innerHTML = `
+          <div class="receipt-list">${itemsHtml}</div>
+          <div>
+            <div class="receipt-row" style="font-size:14px;color:#555;margin-bottom:4px;">
+              <span>Subtotal</span>
+              <span>₹${subtotal}</span>
+            </div>
+            <div class="receipt-row" style="font-size:14px;color:#555;margin-bottom:4px;">
+              <span>Tax (GST 5%)</span>
+              <span>₹${tax}</span>
+            </div>
+            <div class="receipt-row-total">
+              <span>Total</span>
+              <span>₹${finalTotal}</span>
+            </div>
+          </div>
+        `;
+        btn.disabled = false;
+        btn.dataset.total = finalTotal;
       }
-    })();
+    }
+
+    function triggerSimulatedReceipt() {
+      const btn = document.getElementById("btn-trigger-sim");
+      const total = btn.dataset.total || "0";
+      document.getElementById("sim-modal-total").innerText = total;
+      
+      // Open Modal
+      document.getElementById("sim-modal").style.display = "flex";
+      
+      // Clear cart
+      simCart = {};
+      renderSimCart();
+    }
+
+    function closeSimModal() {
+      document.getElementById("sim-modal").style.display = "none";
+    }
   </script>
+
   <script src="pwa.js"></script>
 </body>
 </html>

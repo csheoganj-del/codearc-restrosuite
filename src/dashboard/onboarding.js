@@ -143,8 +143,7 @@
   function tourStorageKey() {
     const tenant = sessionStorage.getItem('tenant_id') || 'default';
     const user = sessionStorage.getItem('tenant_user_id') || sessionStorage.getItem('logged_in_user') || 'user';
-    const signature = enabledFeatures().map(feature => feature.tabId).sort().join(',');
-    return `restrosuite_tour_done:${tenant}:${user}:${signature}`;
+    return `restrosuite_tour_done:${tenant}:${user}`;
   }
 
   function readJson(key, fallback) {

@@ -444,7 +444,9 @@
   var sc = null;
   var SU = window.__SUPABASE_URL__||'';
   var SK = window.__SUPABASE_ANON_KEY__||'';
-  var FN = SU ? SU+'/functions/v1/tenant-public' : '';
+  var FN = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? '/functions/v1/tenant-public'
+    : (SU ? SU+'/functions/v1/tenant-public' : '');
   if(typeof supabase!=='undefined' && SU){
     try{ sc = supabase.createClient(SU,SK); }catch(e){}
   }

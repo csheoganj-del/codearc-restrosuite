@@ -107,8 +107,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     throw new Error('Dashboard domain modules failed to load.');
   }
 
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const tenantApi = apiDomain.createTenantApi({
-    baseUrl: DEFAULT_SUPABASE_URL,
+    baseUrl: isLocalhost ? '' : DEFAULT_SUPABASE_URL,
     anonKey: DEFAULT_SUPABASE_KEY,
     fetchImpl: window.fetch.bind(window),
     getAdminToken: () => sessionStorage.getItem('superadmin_admin_token'),
@@ -118,7 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const callTenantAccess = tenantApi.access;
   const callTenantStaff = tenantApi.staff;
   const appReporter = observabilityDomain.createReporter({
-    baseUrl: DEFAULT_SUPABASE_URL,
+    baseUrl: isLocalhost ? '' : DEFAULT_SUPABASE_URL,
     anonKey: DEFAULT_SUPABASE_KEY,
     fetchImpl: window.fetch.bind(window),
     source: 'dashboard',
@@ -1509,7 +1510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Reset tables 1-N to vacant default carts
             for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
               tableCarts[i] = [];
-              tablesState[i] = "VACANT";
+              tablesState[i] = "EMPTY";
             }
             localStorage.setItem('doppio_pending_qr_orders', JSON.stringify([]));
             localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
@@ -1544,7 +1545,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // First reset table status to Vacant, then let database state overwrite
             for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
-              tablesState[i] = "VACANT";
+              tablesState[i] = "EMPTY";
               tableCarts[i] = [];
             }
 
@@ -13767,6 +13768,13 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
         tableCarts[tblNum] = [];
         localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
         localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+        
+        // Sync the clear operation to Supabase so it persists everywhere
+        if (supabaseClient) {
+          supabaseClient.from('doppio_pending_orders').delete().eq('orderId', `TABLE-${tblNum}`).then();
+          supabaseClient.from('doppio_pending_orders').delete().eq('tableNumber', `0${tblNum}`).then();
+        }
+
         SoundEffects.playRemove();
         updateQrOrdersDashboardUI();
       });
