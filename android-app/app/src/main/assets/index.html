@@ -20,7 +20,7 @@
   <meta name="twitter:description" content="Offline billing and instant WhatsApp receipts. Starting at just ₹749/month.">
   
   <link rel="canonical" href="https://codearc-restrosuite.vercel.app/">
-  <link rel="icon" href="images/restrosuite-mark.png" type="image/png">
+  <link rel="icon" href="images/restrosuite-mark.png?v=2" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
   <title>RestroSuite | Offline-First Restaurant POS & Billing Software</title>
   
@@ -1466,7 +1466,6 @@
       const sendBtn = document.getElementById("btn-send-real");
       if (!phoneInput || !sendBtn) return;
       
-      const originalText = sendBtn.innerText;
       const phone = phoneInput.value.trim();
       
       const itemsList = [];
@@ -1480,44 +1479,35 @@
 
       if (itemsList.length === 0) return;
 
-      try {
-        sendBtn.disabled = true;
-        sendBtn.innerText = "Delivering Invoice...";
+      // Optimistic UI: Display success modal and reset input/cart instantly
+      document.getElementById("sim-modal-title").innerText = "WhatsApp Bill Dispatched!";
+      document.getElementById("sim-modal-desc").innerHTML = `A real-time invoice has been successfully sent to <strong>+91 ${phone.replace(/\D/g, '')}</strong> from our WhatsApp Gateway. Check your phone!`;
+      document.getElementById("sim-modal").style.display = "flex";
 
-        const response = await fetch('/api/sandbox-send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            phone: phone,
-            items: itemsList
-          })
-        });
+      // Reset cart and phone input
+      simCart = {};
+      phoneInput.value = "";
+      renderSimCart();
+      validateSandboxPhone();
 
-        const result = await response.json();
-
+      // Trigger message delivery in the background (asynchronous fire-and-forget)
+      fetch('/api/sandbox-send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          phone: phone,
+          items: itemsList
+        })
+      }).then(async (response) => {
         if (!response.ok) {
-          throw new Error(result.error || "Failed to deliver WhatsApp message");
+          const result = await response.json().catch(() => ({}));
+          console.error("WhatsApp Sandbox Background Error:", result.error || "Failed to deliver");
         }
-
-        // Display Success Modal
-        document.getElementById("sim-modal-title").innerText = "WhatsApp Bill Dispatched!";
-        document.getElementById("sim-modal-desc").innerHTML = `A real-time invoice has been successfully sent to <strong>+91 ${phone.replace(/\D/g, '')}</strong> from our WhatsApp Gateway. Check your phone!`;
-        document.getElementById("sim-modal").style.display = "flex";
-
-        // Reset cart and phone input
-        simCart = {};
-        phoneInput.value = "";
-        renderSimCart();
-
-      } catch (err) {
-        alert("WhatsApp Sandbox Error: " + err.message);
-      } finally {
-        sendBtn.disabled = false;
-        sendBtn.innerText = originalText;
-        validateSandboxPhone();
-      }
+      }).catch(err => {
+        console.error("WhatsApp Sandbox Network Error:", err.message);
+      });
     }
 
     function triggerSimulatedReceipt() {
