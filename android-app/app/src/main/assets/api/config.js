@@ -8,6 +8,10 @@
  * Required Vercel environment variables:
  *   SUPABASE_URL          — e.g. https://<ref>.supabase.co
  *   SUPABASE_ANON_KEY     — the public anon/service key from Supabase → Settings → API
+ *
+ * Optional Vercel environment variables (default to false/off):
+ *   ENABLE_DEMO_TOOLS     — set to "true" to show demo/seed tools in the dashboard (dev only)
+ *   ZERO_COST_LAUNCH_MODE — set to "true" to disable the cloud WhatsApp gateway
  */
 export default function handler(req, res) {
   if (req.method !== 'GET') {
@@ -29,10 +33,14 @@ export default function handler(req, res) {
     return res.status(503).json({ error: 'Service configuration is incomplete. Contact support.' });
   }
 
+  // Feature flags — read from env vars so they can be toggled without a code deploy.
+  const enableDemoTools = process.env.ENABLE_DEMO_TOOLS === 'true';
+  const zeroCostLaunchMode = process.env.ZERO_COST_LAUNCH_MODE === 'true';
+
   // Short cache — safe to cache briefly since these values rarely change.
   // No-store would also be acceptable if you prefer freshness.
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
   res.setHeader('Content-Type', 'application/json');
 
-  return res.status(200).json({ supabaseUrl, supabaseAnonKey });
+  return res.status(200).json({ supabaseUrl, supabaseAnonKey, enableDemoTools, zeroCostLaunchMode });
 }

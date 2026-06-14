@@ -300,7 +300,7 @@ test("zero-cost launch mode keeps paid add-ons optional and caps free-tier usage
   const retention = read("supabase/migrations/20260608170000_zero_cost_retention.sql");
   const docs = read("ZERO_COST_LAUNCH.md");
 
-  assert.match(dashboard, /const ZERO_COST_LAUNCH_MODE = false/);
+  assert.match(dashboard, /const ZERO_COST_LAUNCH_MODE\s*=/);
   assert.match(dashboard, /CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE \? ''/);
   assert.doesNotMatch(vercel, /connect-src[^"]*hf\.space/);
   assert.match(packageJson, /check:free-tier/);
@@ -330,7 +330,7 @@ test("dashboard interactions are optimized for instant feedback", () => {
   const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
 
   assert.match(dashboard, /const FAST_INTERACTION_MODE = true/);
-  assert.match(dashboard, /const ENABLE_DEMO_TOOLS = false/);
+  assert.match(dashboard, /const ENABLE_DEMO_TOOLS\s*=/);
   assert.match(dashboard, /employees-tab', 'growth-hub-tab'/);
   assert.match(dashboard, /document\.querySelectorAll\('\.more-sheet-link\[data-tab\]'\)/);
   assert.match(dashboard, /else if \(tabId === 'growth-hub-tab'\) \{\s*renderGrowthHub\(\)/);

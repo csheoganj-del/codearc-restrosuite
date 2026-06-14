@@ -20,6 +20,7 @@
   <meta name="twitter:description" content="Offline billing and instant WhatsApp receipts. Starting at just ₹749/month.">
   
   <link rel="canonical" href="https://codearc-restrosuite.vercel.app/">
+  <link rel="icon" href="images/restrosuite-mark.svg" type="image/svg+xml">
   <link rel="icon" href="images/restrosuite-mark.png?v=2" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
   <title>RestroSuite | Offline-First Restaurant POS & Billing Software</title>
@@ -239,65 +240,26 @@
       color: var(--text-body);
     }
 
-    /* Hero Mockup Panel */
+    /* Hero Mockup Panel — SVG product screenshot */
     .hero-mockup {
-      border: 2px solid var(--border-color);
-      border-radius: 8px;
-      background: #FFFFFF;
-      box-shadow: 8px 8px 0px var(--border-color);
-      overflow: hidden;
-    }
-
-    .mockup-header {
+      border: 1.5px solid var(--border-light);
+      border-radius: 10px;
       background: #FAFAFA;
-      border-bottom: 2px solid var(--border-color);
-      padding: 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06), 0 24px 48px -8px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04);
+      overflow: hidden;
+      position: relative;
+      /* Subtle depth: second ring */
+      outline: 4px solid rgba(255, 79, 0, 0.06);
+      outline-offset: 4px;
     }
 
-    .mockup-dots {
-      display: flex;
-      gap: 6px;
-    }
-
-    .mockup-dots span {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      border: 1px solid var(--border-color);
-      background: #FFFFFF;
-    }
-
-    .mockup-title {
-      font-weight: 700;
-      font-size: 13px;
-    }
-
-    .mockup-body {
-      padding: 24px;
-    }
-
-    .mockup-stat {
-      display: flex;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border-light);
-      padding: 12px 0;
-    }
-
-    .mockup-stat:last-child {
-      border: none;
-    }
-
-    .mockup-stat label {
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    .mockup-stat value {
-      font-weight: 800;
-      color: var(--text-main);
+    .hero-mockup::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+      pointer-events: none;
     }
 
     /* --- Screen 2: Empathy & Pain --- */
@@ -854,13 +816,81 @@
       box-shadow: 5px 5px 0px var(--border-color);
     }
 
+    /* ── Mobile hamburger nav ── */
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      padding: 8px;
+      background: none;
+      border: none;
+    }
+    .nav-hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text-main);
+      border-radius: 2px;
+      transition: var(--transition);
+    }
+    .nav-hamburger.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+    .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+    .mobile-nav-drawer {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #FFFFFF;
+      border-bottom: 2px solid var(--border-color);
+      padding: 80px 24px 24px;
+      z-index: 999;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mobile-nav-drawer.open { display: flex; }
+    .mobile-nav-drawer a {
+      text-decoration: none;
+      color: var(--text-body);
+      font-weight: 600;
+      font-size: 16px;
+      padding: 12px 8px;
+      border-bottom: 1px solid var(--border-light);
+      transition: var(--transition);
+    }
+    .mobile-nav-drawer a:hover { color: var(--accent-cta); }
+    .mobile-nav-drawer .btn-buy { margin-top: 12px; text-align: center; justify-content: center; }
+
+    /* ── Scroll-reveal animation ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+
+    /* ── Single CTA hero — remove competing secondary button ── */
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
     /* Mobile Responsive */
     @media (max-width: 768px) {
       .hero-grid, .simulator-grid, .testimonials-grid {
         grid-template-columns: 1fr;
         gap: 32px;
       }
-      
+
       .pricing-grid {
         grid-template-columns: 1fr;
         gap: 24px;
@@ -876,15 +906,20 @@
       }
 
       .hero-content h1 {
-        font-size: 34px;
+        font-size: 32px;
       }
 
-      .nav-links {
-        display: none;
+      .hero-content p {
+        font-size: 16px;
       }
+
+      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
 
       .site-header {
-        position: relative;
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 1000;
       }
 
       .screen-sec {
@@ -992,7 +1027,7 @@
   <header class="site-header">
     <div class="container navbar">
       <a class="brand" href="#top">
-        <img src="images/restrosuite-mark.png" alt="RestroSuite Logo" style="width: 72px; height: 72px; border-radius: 12px; object-fit: cover;">
+        <img src="images/restrosuite-mark.svg" alt="RestroSuite Logo" width="44" height="44" style="border-radius: 10px;" onerror="this.src='images/restrosuite-mark.png'">
         <span>Restro<span class="brand-accent">Suite</span></span>
       </a>
       <nav class="nav-links">
@@ -1008,9 +1043,23 @@
         <a class="btn-buy" href="#pricing" id="nav-cta-pricing" style="padding: 10px 20px; font-size: 14px;">
           Get Started
         </a>
+        <button class="nav-hamburger" id="nav-hamburger" aria-label="Open navigation" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
   </header>
+
+  <!-- Mobile nav drawer -->
+  <nav class="mobile-nav-drawer" id="mobile-nav-drawer" aria-label="Mobile navigation">
+    <a href="#empathy" onclick="closeMobileNav()">The Pain</a>
+    <a href="#demo" onclick="closeMobileNav()">Live Demo</a>
+    <a href="#compare" onclick="closeMobileNav()">Compare</a>
+    <a href="#pricing" onclick="closeMobileNav()">Pricing</a>
+    <a href="#testimonials" onclick="closeMobileNav()">Testimonials</a>
+    <a href="login.html">Sign In →</a>
+    <a class="btn-buy" href="#pricing" onclick="closeMobileNav()">Get Started</a>
+  </nav>
 
   <main>
     
@@ -1032,29 +1081,153 @@
           </div>
         </div>
 
-        <div class="hero-mockup">
-          <div class="mockup-header">
-            <div class="mockup-dots"><span></span><span></span><span></span></div>
-            <div class="mockup-title">RestroSuite Hub</div>
-          </div>
-          <div class="mockup-body">
-            <div class="mockup-stat">
-              <label>Daily checkout time saved</label>
-              <value>4.5 Hours</value>
-            </div>
-            <div class="mockup-stat">
-              <label>Order entry error rate</label>
-              <value>0%</value>
-            </div>
-            <div class="mockup-stat">
-              <label>Monthly cost</label>
-              <value>₹749/mo (Save 50%)</value>
-            </div>
-            <div class="mockup-stat">
-              <label>Bill receipt sync time</label>
-              <value>0.8 Seconds</value>
-            </div>
-          </div>
+        <!-- SVG Product Screenshot Mockup -->
+        <div class="hero-mockup" aria-hidden="true">
+          <svg viewBox="0 0 460 340" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto;border-radius:6px;" role="img" aria-label="RestroSuite POS dashboard preview">
+            <!-- Window chrome -->
+            <rect width="460" height="340" rx="6" fill="#FAFAFA"/>
+            <rect width="460" height="36" rx="6" fill="#F1F5F9"/>
+            <rect width="460" height="30" y="6" fill="#F1F5F9"/>
+            <circle cx="16" cy="18" r="5" fill="#FCA5A5"/>
+            <circle cx="30" cy="18" r="5" fill="#FDE68A"/>
+            <circle cx="44" cy="18" r="5" fill="#86EFAC"/>
+            <text x="174" y="22" font-family="Inter,sans-serif" font-size="10" fill="#64748B" text-anchor="middle" font-weight="500">RestroSuite — POS &amp; Billing</text>
+
+            <!-- Sidebar -->
+            <rect x="0" y="36" width="72" height="304" fill="#111827"/>
+            <!-- Sidebar logo mark -->
+            <rect x="16" y="50" width="40" height="40" rx="8" fill="#FF4F00"/>
+            <text x="36" y="76" font-family="Inter,sans-serif" font-size="13" fill="white" text-anchor="middle" font-weight="700">RS</text>
+            <!-- Nav items -->
+            <rect x="8" y="104" width="56" height="28" rx="6" fill="#FF4F00" opacity="0.18"/>
+            <text x="36" y="122" font-family="Inter,sans-serif" font-size="9" fill="#FF4F00" text-anchor="middle" font-weight="600">POS</text>
+            <text x="36" y="152" font-family="Inter,sans-serif" font-size="9" fill="#64748B" text-anchor="middle">Bills</text>
+            <text x="36" y="174" font-family="Inter,sans-serif" font-size="9" fill="#64748B" text-anchor="middle">Menu</text>
+            <text x="36" y="196" font-family="Inter,sans-serif" font-size="9" fill="#64748B" text-anchor="middle">Inventory</text>
+            <text x="36" y="218" font-family="Inter,sans-serif" font-size="9" fill="#64748B" text-anchor="middle">Reports</text>
+            <text x="36" y="240" font-family="Inter,sans-serif" font-size="9" fill="#64748B" text-anchor="middle">CRM</text>
+            <text x="36" y="262" font-family="Inter,sans-serif" font-size="9" fill="#64748B" text-anchor="middle">Staff</text>
+
+            <!-- Top bar -->
+            <rect x="72" y="36" width="388" height="36" fill="white" stroke="#E2E8F0" stroke-width="0.5"/>
+            <text x="84" y="58" font-family="Inter,sans-serif" font-size="10" fill="#111827" font-weight="600">Point of Sale</text>
+            <rect x="312" y="45" width="68" height="18" rx="4" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="0.5"/>
+            <text x="346" y="58" font-family="Inter,sans-serif" font-size="8.5" fill="#64748B" text-anchor="middle">🔍 Search</text>
+            <rect x="388" y="45" width="60" height="18" rx="4" fill="#FF4F00"/>
+            <text x="418" y="58" font-family="Inter,sans-serif" font-size="8.5" fill="white" text-anchor="middle" font-weight="600">New Order</text>
+
+            <!-- Category tabs -->
+            <rect x="72" y="72" width="388" height="28" fill="#FAFAFA" stroke="#E2E8F0" stroke-width="0.5"/>
+            <rect x="80" y="79" width="36" height="14" rx="3" fill="#FF4F00"/>
+            <text x="98" y="90" font-family="Inter,sans-serif" font-size="7.5" fill="white" text-anchor="middle" font-weight="600">All</text>
+            <text x="138" y="90" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B" text-anchor="middle">Starters</text>
+            <text x="178" y="90" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B" text-anchor="middle">Main</text>
+            <text x="216" y="90" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B" text-anchor="middle">Beverages</text>
+            <text x="258" y="90" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B" text-anchor="middle">Desserts</text>
+            <text x="298" y="90" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B" text-anchor="middle">Combos</text>
+
+            <!-- Menu item cards 2x3 grid -->
+            <!-- Card 1 -->
+            <rect x="80" y="108" width="86" height="62" rx="6" fill="white" stroke="#E2E8F0" stroke-width="0.8"/>
+            <rect x="80" y="108" width="86" height="30" rx="6" fill="#FFF7ED"/>
+            <rect x="80" y="130" width="86" height="8" fill="#FFF7ED"/>
+            <text x="93" y="123" font-family="Inter,sans-serif" font-size="13">🍛</text>
+            <text x="123" y="148" font-family="Inter,sans-serif" font-size="8.5" fill="#111827" text-anchor="middle" font-weight="600">Paneer Tikka</text>
+            <text x="123" y="160" font-family="Inter,sans-serif" font-size="8" fill="#64748B" text-anchor="middle">₹249</text>
+            <rect x="139" y="153" width="20" height="12" rx="3" fill="#FF4F00"/>
+            <text x="149" y="162" font-family="Inter,sans-serif" font-size="9" fill="white" text-anchor="middle" font-weight="700">+</text>
+
+            <!-- Card 2 -->
+            <rect x="174" y="108" width="86" height="62" rx="6" fill="white" stroke="#E2E8F0" stroke-width="0.8"/>
+            <rect x="174" y="108" width="86" height="30" rx="6" fill="#F0FDF4"/>
+            <rect x="174" y="130" width="86" height="8" fill="#F0FDF4"/>
+            <text x="187" y="123" font-family="Inter,sans-serif" font-size="13">🥗</text>
+            <text x="217" y="148" font-family="Inter,sans-serif" font-size="8.5" fill="#111827" text-anchor="middle" font-weight="600">Veg Thali</text>
+            <text x="217" y="160" font-family="Inter,sans-serif" font-size="8" fill="#64748B" text-anchor="middle">₹180</text>
+            <rect x="233" y="153" width="20" height="12" rx="3" fill="#FF4F00"/>
+            <text x="243" y="162" font-family="Inter,sans-serif" font-size="9" fill="white" text-anchor="middle" font-weight="700">+</text>
+
+            <!-- Card 3 -->
+            <rect x="268" y="108" width="86" height="62" rx="6" fill="white" stroke="#FF4F00" stroke-width="1.2"/>
+            <rect x="268" y="108" width="86" height="30" rx="6" fill="#FFF7F3"/>
+            <rect x="268" y="130" width="86" height="8" fill="#FFF7F3"/>
+            <text x="281" y="123" font-family="Inter,sans-serif" font-size="13">🍗</text>
+            <rect x="326" y="112" width="24" height="12" rx="2" fill="#FF4F00"/>
+            <text x="338" y="121" font-family="Inter,sans-serif" font-size="7" fill="white" text-anchor="middle" font-weight="700">⭐ HIT</text>
+            <text x="311" y="148" font-family="Inter,sans-serif" font-size="8.5" fill="#111827" text-anchor="middle" font-weight="600">Chicken Biryani</text>
+            <text x="311" y="160" font-family="Inter,sans-serif" font-size="8" fill="#64748B" text-anchor="middle">₹320</text>
+            <rect x="327" y="153" width="20" height="12" rx="3" fill="#FF4F00"/>
+            <text x="337" y="162" font-family="Inter,sans-serif" font-size="9" fill="white" text-anchor="middle" font-weight="700">+</text>
+
+            <!-- Card 4 -->
+            <rect x="80" y="178" width="86" height="62" rx="6" fill="white" stroke="#E2E8F0" stroke-width="0.8"/>
+            <rect x="80" y="178" width="86" height="30" rx="6" fill="#EFF6FF"/>
+            <rect x="80" y="200" width="86" height="8" fill="#EFF6FF"/>
+            <text x="93" y="193" font-family="Inter,sans-serif" font-size="13">🥤</text>
+            <text x="123" y="218" font-family="Inter,sans-serif" font-size="8.5" fill="#111827" text-anchor="middle" font-weight="600">Mango Lassi</text>
+            <text x="123" y="230" font-family="Inter,sans-serif" font-size="8" fill="#64748B" text-anchor="middle">₹99</text>
+            <rect x="139" y="223" width="20" height="12" rx="3" fill="#FF4F00"/>
+            <text x="149" y="232" font-family="Inter,sans-serif" font-size="9" fill="white" text-anchor="middle" font-weight="700">+</text>
+
+            <!-- Card 5 -->
+            <rect x="174" y="178" width="86" height="62" rx="6" fill="white" stroke="#E2E8F0" stroke-width="0.8"/>
+            <rect x="174" y="178" width="86" height="30" rx="6" fill="#FEF9C3"/>
+            <rect x="174" y="200" width="86" height="8" fill="#FEF9C3"/>
+            <text x="187" y="193" font-family="Inter,sans-serif" font-size="13">🍮</text>
+            <text x="217" y="218" font-family="Inter,sans-serif" font-size="8.5" fill="#111827" text-anchor="middle" font-weight="600">Gulab Jamun</text>
+            <text x="217" y="230" font-family="Inter,sans-serif" font-size="8" fill="#64748B" text-anchor="middle">₹80</text>
+            <rect x="233" y="223" width="20" height="12" rx="3" fill="#FF4F00"/>
+            <text x="243" y="232" font-family="Inter,sans-serif" font-size="9" fill="white" text-anchor="middle" font-weight="700">+</text>
+
+            <!-- Card 6 -->
+            <rect x="268" y="178" width="86" height="62" rx="6" fill="white" stroke="#E2E8F0" stroke-width="0.8"/>
+            <rect x="268" y="178" width="86" height="30" rx="6" fill="#F5F3FF"/>
+            <rect x="268" y="200" width="86" height="8" fill="#F5F3FF"/>
+            <text x="281" y="193" font-family="Inter,sans-serif" font-size="13">🍝</text>
+            <text x="311" y="218" font-family="Inter,sans-serif" font-size="8.5" fill="#111827" text-anchor="middle" font-weight="600">Pasta Arrabbiata</text>
+            <text x="311" y="230" font-family="Inter,sans-serif" font-size="8" fill="#64748B" text-anchor="middle">₹260</text>
+            <rect x="327" y="223" width="20" height="12" rx="3" fill="#FF4F00"/>
+            <text x="337" y="232" font-family="Inter,sans-serif" font-size="9" fill="white" text-anchor="middle" font-weight="700">+</text>
+
+            <!-- Cart / Bill panel -->
+            <rect x="362" y="72" width="98" height="268" fill="white" stroke="#E2E8F0" stroke-width="0.8"/>
+            <rect x="362" y="72" width="98" height="24" fill="#111827"/>
+            <text x="411" y="87" font-family="Inter,sans-serif" font-size="8.5" fill="white" text-anchor="middle" font-weight="600">Order #047</text>
+            <!-- Cart items -->
+            <text x="372" y="112" font-family="Inter,sans-serif" font-size="7.5" fill="#111827" font-weight="600">Paneer Tikka × 2</text>
+            <text x="450" y="112" font-family="Inter,sans-serif" font-size="7.5" fill="#111827" text-anchor="end" font-weight="600">₹498</text>
+            <text x="372" y="128" font-family="Inter,sans-serif" font-size="7.5" fill="#111827" font-weight="600">Chicken Biryani × 1</text>
+            <text x="450" y="128" font-family="Inter,sans-serif" font-size="7.5" fill="#111827" text-anchor="end" font-weight="600">₹320</text>
+            <text x="372" y="144" font-family="Inter,sans-serif" font-size="7.5" fill="#111827" font-weight="600">Mango Lassi × 2</text>
+            <text x="450" y="144" font-family="Inter,sans-serif" font-size="7.5" fill="#111827" text-anchor="end" font-weight="600">₹198</text>
+            <!-- Divider -->
+            <line x1="372" y1="155" x2="450" y2="155" stroke="#E2E8F0" stroke-width="0.8" stroke-dasharray="3,2"/>
+            <!-- Subtotal / GST / Total -->
+            <text x="372" y="168" font-family="Inter,sans-serif" font-size="7" fill="#64748B">Subtotal</text>
+            <text x="450" y="168" font-family="Inter,sans-serif" font-size="7" fill="#64748B" text-anchor="end">₹1,016</text>
+            <text x="372" y="181" font-family="Inter,sans-serif" font-size="7" fill="#64748B">GST (18%)</text>
+            <text x="450" y="181" font-family="Inter,sans-serif" font-size="7" fill="#64748B" text-anchor="end">₹182.88</text>
+            <line x1="372" y1="190" x2="450" y2="190" stroke="#E2E8F0" stroke-width="0.8"/>
+            <text x="372" y="202" font-family="Inter,sans-serif" font-size="9" fill="#111827" font-weight="700">Total</text>
+            <text x="450" y="202" font-family="Inter,sans-serif" font-size="9" fill="#FF4F00" text-anchor="end" font-weight="700">₹1,198.88</text>
+            <!-- WhatsApp badge -->
+            <rect x="372" y="210" width="78" height="12" rx="3" fill="#F0FDF4"/>
+            <text x="411" y="219" font-family="Inter,sans-serif" font-size="7" fill="#22C55E" text-anchor="middle" font-weight="600">📱 WhatsApp receipt ready</text>
+            <!-- Payment buttons -->
+            <rect x="372" y="228" width="78" height="18" rx="4" fill="#111827"/>
+            <text x="411" y="240" font-family="Inter,sans-serif" font-size="8" fill="white" text-anchor="middle" font-weight="600">Cash</text>
+            <rect x="372" y="252" width="36" height="16" rx="4" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="0.8"/>
+            <text x="390" y="263" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B" text-anchor="middle">UPI</text>
+            <rect x="414" y="252" width="36" height="16" rx="4" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="0.8"/>
+            <text x="432" y="263" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B" text-anchor="middle">Card</text>
+            <!-- Print & Save -->
+            <rect x="372" y="274" width="78" height="18" rx="4" fill="#FF4F00"/>
+            <text x="411" y="286" font-family="Inter,sans-serif" font-size="8" fill="white" text-anchor="middle" font-weight="700">🖨 Print &amp; Save</text>
+
+            <!-- Live indicator -->
+            <circle cx="82" cy="293" r="4" fill="#22C55E"/>
+            <text x="90" y="296" font-family="Inter,sans-serif" font-size="7.5" fill="#64748B">Live · Offline-Ready · KDS Active</text>
+          </svg>
         </div>
       </div>
     </section>
@@ -1531,5 +1704,68 @@
   </script>
 
   <script src="pwa.js"></script>
+
+  <script>
+    // ── Mobile nav hamburger ──────────────────────────────────────────
+    const hamburger = document.getElementById('nav-hamburger');
+    const mobileDrawer = document.getElementById('mobile-nav-drawer');
+
+    function closeMobileNav() {
+      hamburger.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+      mobileDrawer.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    hamburger.addEventListener('click', () => {
+      const isOpen = hamburger.classList.toggle('open');
+      hamburger.setAttribute('aria-expanded', String(isOpen));
+      mobileDrawer.classList.toggle('open', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+    });
+
+    // Close drawer on outside click
+    document.addEventListener('click', (e) => {
+      if (!hamburger.contains(e.target) && !mobileDrawer.contains(e.target)) {
+        closeMobileNav();
+      }
+    });
+
+    // ── Scroll-reveal animation ───────────────────────────────────────
+    // Add .reveal class to major section children
+    document.querySelectorAll('.screen-sec').forEach((section, si) => {
+      Array.from(section.children).forEach((child, ci) => {
+        child.classList.add('reveal');
+        if (ci > 0) child.classList.add(`reveal-delay-${Math.min(ci, 3)}`);
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // ── Active nav link on scroll ─────────────────────────────────────
+    const sections = document.querySelectorAll('[id]');
+    const navLinks = document.querySelectorAll('.nav-links a');
+
+    const navObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(link => {
+            link.style.color = link.getAttribute('href') === `#${entry.target.id}` ? 'var(--accent-cta)' : '';
+          });
+        }
+      });
+    }, { threshold: 0.4 });
+
+    sections.forEach(section => navObserver.observe(section));
+  </script>
 </body>
 </html>

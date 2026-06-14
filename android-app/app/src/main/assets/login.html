@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#1b130e">
   <meta name="description" content="Sign in to your CodeArc RestroSuite workspace or request registration for a new restaurant outlet.">
   <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="images/restrosuite-mark.svg" type="image/svg+xml">
   <link rel="icon" href="images/restrosuite-mark.png?v=2" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
   <title>RestroSuite Access | Sign In or Register Your Outlet</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   <script src="/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
   
@@ -49,7 +50,7 @@
       --error: #FF4F00;
       --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       --sans: "Inter", sans-serif;
-      --serif: "Plus Jakarta Sans", sans-serif;
+      --serif: "Plus Jakarta Sans", "Inter", sans-serif;
     }
 
     * {
@@ -78,8 +79,10 @@
       align-items: center;
       justify-content: space-between;
       padding: 10px clamp(20px, 4.5vw, 56px);
-      border-bottom: 2px solid var(--border-color);
-      background: #FFFFFF;
+      border-bottom: 1px solid var(--border-light);
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
 
     .access-brand {
@@ -99,10 +102,11 @@
 
     .access-brand-mark {
       display: inline-block;
-      width: 60px;
-      height: 60px;
+      width: 44px;
+      height: 44px;
       border-radius: 10px;
-      background: url('images/restrosuite-mark.png') center/cover no-repeat;
+      background: url('images/restrosuite-mark.svg') center/cover no-repeat,
+                  url('images/restrosuite-mark.png') center/cover no-repeat;
     }
 
     .back-home {
@@ -112,19 +116,18 @@
       color: var(--text-body);
       text-decoration: none;
       font-size: 14px;
-      font-weight: 700;
-      padding: 10px 20px;
-      border: 2px solid var(--border-color);
-      border-radius: 4px;
-      box-shadow: 3px 3px 0px var(--border-color);
+      font-weight: 600;
+      padding: 9px 18px;
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
       transition: var(--transition);
       background: #FFFFFF;
     }
 
     .back-home:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: 4px 4px 0px var(--border-color);
-      border-color: var(--accent-cta);
+      background: #F8FAFC;
+      border-color: #CBD5E1;
+      color: var(--text-main);
     }
 
     /* ——— Layout ——— */
@@ -184,17 +187,17 @@
       align-items: flex-start;
       gap: 16px;
       background: #FFFFFF;
-      border: 2px solid var(--border-color);
-      border-radius: 6px;
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
       padding: 16px 20px;
-      box-shadow: 4px 4px 0px var(--border-color);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
       transition: var(--transition);
     }
 
     .story-step:hover {
-      transform: translate(-2px, -2px);
-      box-shadow: 6px 6px 0px var(--border-color);
-      border-color: var(--accent-cta);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+      border-color: rgba(255, 79, 0, 0.25);
     }
 
     .story-step-no {
@@ -240,10 +243,10 @@
       width: 100%;
       max-width: 480px;
       background: #FFFFFF;
-      border: 2px solid var(--border-color);
-      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 20px;
       padding: 40px;
-      box-shadow: 8px 8px 0px var(--border-color);
+      box-shadow: 0 4px 6px -2px rgba(0,0,0,0.05), 0 12px 40px -8px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,79,0,0.04);
       position: relative;
       transition: var(--transition);
     }
@@ -267,8 +270,9 @@
     .logo-mark {
       width: 24px;
       height: 24px;
-      border-radius: 4px;
-      background: url('images/restrosuite-mark.png') center/cover no-repeat;
+      border-radius: 5px;
+      background: url('images/restrosuite-mark.svg') center/cover no-repeat,
+                  url('images/restrosuite-mark.png') center/cover no-repeat;
     }
 
     .logo-text {
@@ -296,31 +300,32 @@
     /* Tab Switcher */
     .tab-header {
       display: flex;
-      border: 2px solid var(--border-color);
-      border-radius: 4px;
+      background: #F1F5F9;
+      border-radius: 10px;
       overflow: hidden;
       margin-bottom: 32px;
+      padding: 4px;
+      gap: 4px;
     }
 
     .tab-btn {
       flex: 1;
-      background: #FFFFFF;
+      background: transparent;
       border: none;
       color: var(--text-body);
-      font-weight: 700;
+      font-weight: 600;
       font-size: 14px;
-      padding: 12px;
+      padding: 10px;
       cursor: pointer;
+      border-radius: 7px;
       transition: var(--transition);
     }
 
-    .tab-btn:not(:last-child) {
-      border-right: 2px solid var(--border-color);
-    }
-
     .tab-btn.active {
-      background: var(--accent-cta);
-      color: #FFFFFF;
+      background: #FFFFFF;
+      color: var(--text-main);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      font-weight: 700;
     }
 
     /* Form Styles */
@@ -381,13 +386,13 @@
 
     .form-input {
       width: 100%;
-      border: 2px solid var(--border-color);
-      border-radius: 4px;
-      padding: 12px 12px 12px 40px;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 11px 12px 11px 40px;
       font-family: var(--sans);
       font-size: 14px;
       color: var(--text-main);
-      background: #FFFFFF;
+      background: #F8FAFC;
       transition: var(--transition);
     }
 
@@ -398,6 +403,8 @@
     .form-input:focus {
       outline: none;
       border-color: var(--accent-cta);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(255, 79, 0, 0.1);
     }
 
     .input-icon {
@@ -482,13 +489,13 @@
       width: 100%;
       background: var(--accent-cta);
       color: #FFFFFF;
-      font-weight: 800;
+      font-weight: 700;
       font-size: 15px;
       padding: 14px;
-      border: 2px solid var(--border-color);
-      border-radius: 4px;
+      border: none;
+      border-radius: 12px;
       cursor: pointer;
-      box-shadow: 4px 4px 0px var(--border-color);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 4px 12px rgba(255,79,0,0.3);
       transition: var(--transition);
       display: inline-flex;
       align-items: center;
@@ -498,8 +505,13 @@
 
     .submit-btn:hover {
       background: var(--accent-cta-hover);
-      transform: translate(-1px, -1px);
-      box-shadow: 5px 5px 0px var(--border-color);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.12), 0 8px 20px rgba(255,79,0,0.35);
+      transform: translateY(-1px);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
 
     .login-note, .registration-note {
@@ -1059,16 +1071,26 @@
   <script>
     // Credentials are loaded at runtime by /config.js → /api/config (Vercel env vars).
     // NEVER hardcode these values here — rotate via Supabase Dashboard + Vercel env update.
-    const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
-    const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
-    const TENANT_ACCESS_FUNCTION_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      ? '/functions/v1/tenant-access'
-      : (DEFAULT_SUPABASE_URL ? `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-access` : '');
-
+    let DEFAULT_SUPABASE_URL = '';
+    let DEFAULT_SUPABASE_KEY = '';
+    let TENANT_ACCESS_FUNCTION_URL = '';
     let supabaseClient = null;
-    if (typeof supabase !== 'undefined') {
-      supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
-    }
+
+    const configPromise = (window.__configReady || Promise.resolve()).then(() => {
+      DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
+      DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
+      TENANT_ACCESS_FUNCTION_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? '/functions/v1/tenant-access'
+        : (DEFAULT_SUPABASE_URL ? `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-access` : '');
+
+      if (typeof supabase !== 'undefined' && DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_KEY) {
+        try {
+          supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+        } catch (err) {
+          console.error("Failed to initialize Supabase client:", err);
+        }
+      }
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
       const loginCard = document.getElementById('login-card');
@@ -1611,6 +1633,8 @@
       async function runAvailabilityQuery(slug) {
         if (!slugStatus) return;
         
+        await configPromise;
+        
         if (!supabaseClient) {
           slugStatus.style.color = '#ef4444';
           slugStatus.textContent = "Backend connection is offline.";
@@ -1668,6 +1692,7 @@
       sanitizeSlugInput(document.getElementById('tenant-id'));
 
       async function callTenantAccess(action, payload) {
+        await configPromise;
         const response = await fetch(TENANT_ACCESS_FUNCTION_URL, {
           method: 'POST',
           headers: {
@@ -1768,6 +1793,8 @@
           errorBox.style.display = 'none';
           setFormBusy(loginForm, true, 'Verifying access...');
           
+          await configPromise;
+          
           const slugVal = document.getElementById('tenant-id').value.trim().toLowerCase();
           const userVal = document.getElementById('username').value.trim();
           const pwdVal = document.getElementById('password').value.trim();
@@ -1827,6 +1854,8 @@
           e.preventDefault();
           errorBox.style.display = 'none';
           setFormBusy(registerForm, true, 'Submitting request...');
+          
+          await configPromise;
           
           const name = document.getElementById('reg-name').value.trim();
           const slug = document.getElementById('reg-slug').value.trim().toLowerCase();

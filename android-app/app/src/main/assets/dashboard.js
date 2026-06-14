@@ -52,12 +52,22 @@
 document.addEventListener('DOMContentLoaded', async () => {
   document.body.classList.add('js-loaded');
 
+  // Wait for config.js to finish its async /api/config fetch before we read
+  // window.__SUPABASE_URL__ or window.CONFIG. This replaces the old synchronous XHR.
+  if (window.__configReady) {
+    try { await window.__configReady; } catch (_) { /* error already logged by config.js */ }
+  }
+
   // Credentials are loaded at runtime by /config.js → /api/config (Vercel env vars).
   // NEVER hardcode these values here — rotate via Supabase Dashboard + Vercel env update.
   const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
   const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
-  const ZERO_COST_LAUNCH_MODE = false;
-  const ENABLE_DEMO_TOOLS = false;
+  // Read feature flags from window.CONFIG (set by /api/config via config.js).
+  // Defaults: demo tools OFF, zero-cost mode OFF. Override via Vercel env vars:
+  //   ENABLE_DEMO_TOOLS=true  → exposes demo/seed tools in the UI (dev only)
+  //   ZERO_COST_LAUNCH_MODE=true → disables cloud WhatsApp gateway (saves cost)
+  const ZERO_COST_LAUNCH_MODE = !!(window.CONFIG && window.CONFIG.zeroCostLaunchMode);
+  const ENABLE_DEMO_TOOLS = !!(window.CONFIG && window.CONFIG.enableDemoTools);
   const CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
   const FAST_INTERACTION_MODE = true;
   const runWhenIdle = window.requestIdleCallback
@@ -432,14 +442,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (localStorage.length === 0 || !localStorage.getItem('doppio_bills')) {
     console.log("[Resilience Vault] LocalStorage empty or bills missing! Attempting IndexedDB vault restoration...");
     try {
-      const restoredBills = await getVaultData("doppio_bills");
-      const restoredMenu = await getVaultData("doppio_menu");
-      const restoredInv = await getVaultData("doppio_inventory");
-      const restoredProfile = await getVaultData("doppio_business_profile");
-      const restoredShift = await getVaultData("doppio_current_shift");
-      const restoredShiftsLocal = await getVaultData("doppio_shifts_local");
-      const restoredShiftEventsLocal = await getVaultData("doppio_shift_events_local");
+      // Vault keys are stored with the tenant suffix (written by the Storage.prototype.setItem hook).
+      // We must read with the same namespaced key — otherwise the lookup always misses.
+      const vaultSuffix = activeTenantId ? `_${activeTenantId}` : '';
+      const restoredBills = await getVaultData(`doppio_bills${vaultSuffix}`);
+      const restoredMenu = await getVaultData(`doppio_menu${vaultSuffix}`);
+      const restoredInv = await getVaultData(`doppio_inventory${vaultSuffix}`);
+      const restoredProfile = await getVaultData(`doppio_business_profile${vaultSuffix}`);
+      const restoredShift = await getVaultData(`doppio_current_shift${vaultSuffix}`);
+      const restoredShiftsLocal = await getVaultData(`doppio_shifts_local${vaultSuffix}`);
+      const restoredShiftEventsLocal = await getVaultData(`doppio_shift_events_local${vaultSuffix}`);
 
+      // localStorage.setItem is intercepted by the Storage.prototype override and automatically
+      // appends the tenant suffix, so we write using the raw doppio_ key names here.
       if (restoredBills) localStorage.setItem('doppio_bills', JSON.stringify(restoredBills));
       if (restoredMenu) localStorage.setItem('doppio_menu', JSON.stringify(restoredMenu));
       if (restoredInv) localStorage.setItem('doppio_inventory', JSON.stringify(restoredInv));
@@ -1174,6 +1189,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           syncWithSupabase();
         }
+
+        // Expose DB client for feature modules (aggregators, tables, analytics)
+        window._tenantDb = supabaseClient;
+        window._tenantId = activeTenantId;
 
         syncOfflineBills();
         setupSupabaseRealtime();
@@ -4872,20 +4891,51 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function triggerKOTPrint(cartOrBill) {
-    const el = document.createElement('div');
     const items = Array.isArray(cartOrBill) ? cartOrBill : cartOrBill.items;
+    if (!items || items.length === 0) return;
 
+    const printers = getSavedPrinters();
+
+    if (printers.length === 0) {
+      // Original single-ticket print
+      printKOTSubTicket(cartOrBill, items, "DEFAULT");
+      return;
+    }
+
+    // Split items by printer zones
+    const printedItemNames = new Set();
+    
+    printers.forEach(pr => {
+      const zoneItems = items.filter(item => {
+        const itemCat = String(item.category || "").trim().toLowerCase();
+        return pr.categories.includes(itemCat);
+      });
+
+      if (zoneItems.length > 0) {
+        zoneItems.forEach(i => printedItemNames.add(i.name));
+        printKOTSubTicket(cartOrBill, zoneItems, pr.name);
+      }
+    });
+
+    // Handle unmapped items (print on default)
+    const unmappedItems = items.filter(item => !printedItemNames.has(item.name));
+    if (unmappedItems.length > 0) {
+      printKOTSubTicket(cartOrBill, unmappedItems, "DEFAULT / COUNTER");
+    }
+  }
+
+  function printKOTSubTicket(cartOrBill, subItems, zoneName) {
+    const el = document.createElement('div');
+    
     function centerText32(text) {
       const width = 32;
       if (text.length <= width) {
         const leftPad = Math.floor((width - text.length) / 2);
         return ' '.repeat(leftPad) + text;
       }
-
       const words = text.split(' ');
       const lines = [];
       let currentLine = '';
-
       words.forEach(word => {
         if ((currentLine + (currentLine ? ' ' : '') + word).length <= width) {
           currentLine += (currentLine ? ' ' : '') + word;
@@ -4895,7 +4945,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
       if (currentLine) lines.push(currentLine);
-
       return lines.map(line => {
         const leftPad = Math.floor((width - line.length) / 2);
         return ' '.repeat(leftPad) + line;
@@ -4903,13 +4952,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function formatRow32(col1, col2) {
-      const w1 = 24; // Item column width
-      const w2 = 8;  // Qty column width
-
+      const w1 = 24;
+      const w2 = 8;
       let c1 = col1.slice(0, w1 - 1);
       c1 = c1.padEnd(w1, ' ');
       const c2 = col2.toString().padStart(w2, ' ');
-
       return c1 + c2;
     }
 
@@ -4919,10 +4966,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     let txt = '';
     txt += borderDouble + '\n';
     txt += centerText32('KITCHEN ORDER TICKET') + '\n';
+    txt += centerText32(`ZONE: ${zoneName.toUpperCase()}`) + '\n';
     txt += borderDouble + '\n\n';
 
     if (cartOrBill.orderId) {
       txt += `Order: ${cartOrBill.orderId}\n`;
+    }
+    if (cartOrBill.tableNumber) {
+      txt += `Table: ${cartOrBill.tableNumber}\n`;
     }
     if (cartOrBill.dateTime) {
       txt += `Date: ${cartOrBill.dateTime}\n`;
@@ -4932,23 +4983,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cartOrBill.customerName && cartOrBill.customerName !== 'Walk-in Guest') {
       txt += `Guest: ${cartOrBill.customerName}\n`;
     }
-    if (cartOrBill.orderType) {
-      txt += `Type: ${cartOrBill.orderType}\n`;
-    }
     txt += '\n';
 
     txt += borderSingle + '\n';
     txt += formatRow32('Item', 'Qty') + '\n';
     txt += borderSingle + '\n';
 
-    items.forEach(item => {
+    subItems.forEach(item => {
       let displayName = `${item.name}`;
       if (item.size && item.size !== 'Small') {
         displayName += ` (${item.size})`;
       }
-
       txt += formatRow32(displayName, item.qty) + '\n';
-
       if (item.toppings && item.toppings.length > 0) {
         txt += `  + ${item.toppings.join(', ')}\n`;
       }
@@ -4960,7 +5006,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     txt += borderSingle + '\n\n';
     txt += centerText32('PREPARE WITH CARE!') + '\n';
 
-    // Set inside printable area with a clean pre block
     el.innerHTML = `
       <pre style="font-family: 'Courier New', Courier, monospace; font-size: 10px; font-weight: 600; line-height: 1.35; margin: 0; white-space: pre; color: #000; background: #fff; text-shadow: none;">${txt}</pre>
     `;
@@ -5175,40 +5220,57 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       let dispatchUrl = businessProfile.whatsappGatewayUrl.trim();
 
-      // Auto-failover recursive sender
-      function trySend(targetUrl, isFallback = false) {
-        const actualUrl = whatsappDomain.resolveGatewaySendUrl(targetUrl);
+      // Auto-failover sender with retry + exponential backoff.
+      // Hugging Face Spaces (free tier) cold-start can take 20-30s on first request.
+      // We retry up to MAX_RETRIES times with increasing delays before giving up or
+      // failing over to the backup gateway.
+      const MAX_RETRIES = 3;
+      const RETRY_BASE_DELAY_MS = 2000; // 2s → 4s → 8s
 
-        return fetch(actualUrl, {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(payload)
-        })
-          .then(response => {
-            if (!response.ok) {
-              throw new Error("HTTP status " + response.status);
-            }
-            return response.json().catch(() => ({}));
-          })
-          .then(data => {
-            showNotificationToast(isFallback ? "WhatsApp Sent via Backup Gateway!" : "WhatsApp Bill Sent Successfully!");
-          })
-          .catch(err => {
-            console.error("Failed to send WhatsApp bill via: " + targetUrl, err);
-            if (!isFallback) {
-              const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
-              const fallbackUrl = isLocal && CLOUD_WHATSAPP_GATEWAY_URL ? CLOUD_WHATSAPP_GATEWAY_URL : 'http://localhost:3000';
-
-              showNotificationToast("Primary Gateway Offline. Trying Backup...");
-              console.log("Triggering auto-failover to backup: " + fallbackUrl);
-              return trySend(fallbackUrl, true);
-            } else {
-              showNotificationToast("All WhatsApp Gateways Offline!");
-            }
-          });
+      function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
       }
 
-      trySend(dispatchUrl);
+      async function trySendWithRetry(targetUrl, isFallback = false) {
+        const actualUrl = whatsappDomain.resolveGatewaySendUrl(targetUrl);
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const response = await fetch(actualUrl, {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error("HTTP status " + response.status);
+            await response.json().catch(() => ({}));
+            showNotificationToast(isFallback ? "WhatsApp Sent via Backup Gateway!" : "WhatsApp Bill Sent Successfully!");
+            return; // success — done
+          } catch (err) {
+            lastError = err;
+            console.warn(`[WhatsApp] Attempt ${attempt}/${MAX_RETRIES} failed for ${targetUrl}:`, err.message);
+            if (attempt < MAX_RETRIES) {
+              const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+              if (attempt === 1) showNotificationToast("WhatsApp gateway waking up, retrying…");
+              await sleep(delay);
+            }
+          }
+        }
+
+        // All retries exhausted for this URL
+        console.error("Failed to send WhatsApp bill via: " + targetUrl, lastError);
+        if (!isFallback) {
+          const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
+          const fallbackUrl = isLocal && CLOUD_WHATSAPP_GATEWAY_URL ? CLOUD_WHATSAPP_GATEWAY_URL : 'http://localhost:3000';
+          showNotificationToast("Primary Gateway Offline. Trying Backup…");
+          return trySendWithRetry(fallbackUrl, true);
+        } else {
+          showNotificationToast("WhatsApp delivery failed. Opening manually…");
+          openManualWhatsApp(phoneNum, encodedMsg);
+        }
+      }
+
+      trySendWithRetry(dispatchUrl);
     } else {
       // Gateway unavailable (not configured or zero-cost mode active).
       // Notify the user and fall back to manual WhatsApp share.
@@ -8705,6 +8767,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderTaxSlabsTable();
   })();
 
+  // --- MULTI-KOT PRINTER ROUTING CONFIGURATOR ---
+  const kotPrinterName = document.getElementById('kot-printer-name');
+  const kotPrinterCategories = document.getElementById('kot-printer-categories');
+  const btnSaveKotPrinter = document.getElementById('btn-save-kot-printer');
+  const kotPrintersList = document.getElementById('kot-printers-list');
+
+  function getSavedPrinters() {
+    try {
+      return JSON.parse(localStorage.getItem('doppio_kot_printers') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function savePrinters(list) {
+    localStorage.setItem('doppio_kot_printers', JSON.stringify(list));
+    renderKotPrinters();
+  }
+
+  function renderKotPrinters() {
+    if (!kotPrintersList) return;
+    const list = getSavedPrinters();
+    if (list.length === 0) {
+      kotPrintersList.innerHTML = `<p style="color:var(--text-muted); font-size:10px; font-style:italic;">No printer zones configured. All items print on default printer.</p>`;
+      return;
+    }
+    kotPrintersList.innerHTML = list.map((pr, idx) => `
+      <div style="background:var(--bg-card); border:1px solid var(--border); padding:8px 10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; box-sizing: border-box; width:100%;">
+        <div style="text-align:left;">
+          <strong style="color:var(--primary-brand); font-size:11px;">${escHtml(pr.name)}</strong>
+          <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Cats: ${escHtml(pr.categories.join(', '))}</div>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="deletePrinterZone(${idx})" style="padding:4px 8px; font-size:10px; border-color:var(--border); color:var(--text); margin-left: 10px;"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    `).join('');
+  }
+
+  window.deletePrinterZone = function(idx) {
+    SoundEffects.playClick();
+    const list = getSavedPrinters();
+    list.splice(idx, 1);
+    savePrinters(list);
+    showNotificationToast("Printer zone removed.");
+  };
+
+  if (btnSaveKotPrinter) {
+    btnSaveKotPrinter.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+      const name = kotPrinterName?.value.trim();
+      const catsRaw = kotPrinterCategories?.value.trim();
+      if (!name) { alert("Please enter a zone name."); return; }
+      if (!catsRaw) { alert("Please map at least one category."); return; }
+
+      const categories = catsRaw.split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+      const list = getSavedPrinters();
+      list.push({ name, categories });
+      savePrinters(list);
+
+      if (kotPrinterName) kotPrinterName.value = '';
+      if (kotPrinterCategories) kotPrinterCategories.value = '';
+      showNotificationToast(`Printer zone "${name}" saved.`);
+    });
+  }
+
+  renderKotPrinters();
+
   // Export CSV generator
   const convertToCSV = billsDomain.convertToCSV;
 
@@ -11593,8 +11721,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const isDark = theme === 'dark';
     if (isDark) {
       document.body.classList.add('dark-theme');
+      // When user explicitly picks dark, remove the "force light" override so the
+      // CSS @media (prefers-color-scheme: dark) also activates on page reload.
+      document.body.classList.remove('light-theme-forced');
     } else {
       document.body.classList.remove('dark-theme');
+      // When user explicitly picks light, add the sentinel class that prevents the
+      // OS-level @media (prefers-color-scheme: dark) auto-applying dark tokens.
+      document.body.classList.add('light-theme-forced');
     }
 
     // Update icons
@@ -11628,9 +11762,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
   if (mobileThemeToggleBtn) mobileThemeToggleBtn.addEventListener('click', toggleTheme);
 
-  // Initialize theme from storage
-  const savedTheme = localStorage.getItem('doppio_theme') || 'light';
-  updateThemeUI(savedTheme);
+  // Initialize theme from storage.
+  // If no preference is saved, let the OS @media query decide — don't force 'light'.
+  const savedTheme = localStorage.getItem('doppio_theme');
+  if (savedTheme) {
+    updateThemeUI(savedTheme);
+  }
+  // else: no class is added → the CSS @media (prefers-color-scheme: dark) auto-activates
+  // if the OS is set to dark mode, giving users automatic dark mode on first visit.
 
   // ==========================================
   // GROWTH HUB: SaaS launch and restaurant expansion modules

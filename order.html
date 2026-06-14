@@ -442,19 +442,28 @@
 
   // ── SUPABASE ──
   var sc = null;
-  var SU = window.__SUPABASE_URL__||'';
-  var SK = window.__SUPABASE_ANON_KEY__||'';
-  var FN = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? '/functions/v1/tenant-public'
-    : (SU ? SU+'/functions/v1/tenant-public' : '');
-  if(typeof supabase!=='undefined' && SU){
-    try{ sc = supabase.createClient(SU,SK); }catch(e){}
-  }
+  var SU = '';
+  var SK = '';
+  var FN = '';
+
+  var configPromise = (window.__configReady || Promise.resolve()).then(function(){
+    SU = window.__SUPABASE_URL__||'';
+    SK = window.__SUPABASE_ANON_KEY__||'';
+    FN = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? '/functions/v1/tenant-public'
+      : (SU ? SU+'/functions/v1/tenant-public' : '');
+    if(typeof supabase!=='undefined' && SU){
+      try{ sc = supabase.createClient(SU,SK); }catch(e){}
+    }
+  });
+
   function apiCall(action,extra){
-    if(!FN) return Promise.reject(new Error('no backend'));
-    return fetch(FN,{method:'POST',headers:{'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK},
-      body:JSON.stringify(Object.assign({action,tenant_slug:slug},extra||{}))})
-      .then(function(r){ return r.json().catch(function(){return{};}); });
+    return configPromise.then(function(){
+      if(!FN) return Promise.reject(new Error('no backend'));
+      return fetch(FN,{method:'POST',headers:{'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK},
+        body:JSON.stringify(Object.assign({action,tenant_slug:slug},extra||{}))})
+        .then(function(r){ return r.json().catch(function(){return{};}); });
+    });
   }
 
   // ── DEFAULT MENU ──
@@ -780,7 +789,9 @@
 
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeCart(); });
 
-  loadMenu();
+  configPromise.then(function(){
+    loadMenu();
+  });
 })();
 </script>
 </body>

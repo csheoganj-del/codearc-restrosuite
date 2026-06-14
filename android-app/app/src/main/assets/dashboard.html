@@ -512,6 +512,8 @@
         <a href="#" class="sidebar-link" data-tab="crm-tab"><i class="fa-solid fa-users-rectangle"></i> CRM & Loyalty</a>
         <a href="#" class="sidebar-link" data-tab="tax-tab" id="sidebar-tax-link"><i class="fa-solid fa-calculator"></i> Tax Management</a>
         <a href="#" class="sidebar-link" data-tab="employees-tab" id="sidebar-employees-link"><i class="fa-solid fa-users"></i> Employee Ledger</a>
+        <a href="#" class="sidebar-link" data-tab="tables-tab" id="sidebar-tables-link"><i class="fa-solid fa-chair"></i> Table Management</a>
+        <a href="#" class="sidebar-link" data-tab="analytics-tab" id="sidebar-analytics-link"><i class="fa-solid fa-chart-mixed"></i> Advanced Analytics</a>
         <a href="#" class="sidebar-link" data-tab="growth-hub-tab" id="sidebar-growth-hub-link"><i class="fa-solid fa-rocket"></i> Growth Hub</a>
         <a href="#" class="sidebar-link" data-tab="super-admin-tab" id="sidebar-super-admin-link" style="display:none;"><i class="fa-solid fa-user-shield"></i> SaaS Super-Admin</a>
         <a href="#" class="sidebar-link" data-tab="gateway-monitor-tab" id="sidebar-gateway-monitor-link" style="display:none;"><i class="fa-solid fa-server"></i> Gateway Monitor</a>
@@ -2206,6 +2208,38 @@
               </div>
             </div>
 
+            <!-- Multi-KOT Printer Configurator Section -->
+            <div class="bills-stat-card" style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 20px; background: var(--bg-card); padding: 20px; border-radius: 12px; box-shadow: var(--shadow-sm); width: 100%; box-sizing: border-box;">
+              <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); display: flex; align-items: center; gap: 8px; margin: 0;">
+                <i class="fa-solid fa-print" style="color: var(--accent-caramel);"></i> Multi-KOT Thermal Printer Routing
+              </h4>
+              <p style="font-size: 11px; color: var(--text-muted); margin: 0;">Map menu item categories to different thermal printers. KOT tickets will split automatically.</p>
+              
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; width: 100%; font-size: 12px; margin-top: 10px;">
+                <!-- Left: Create Printer -->
+                <div style="background: var(--bg-cream-light); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; border: 1px solid rgba(28,28,28,0.05);">
+                  <h5 style="font-weight: 700; color: var(--primary-brand); font-size: 12px;">Add Printer Zone</h5>
+                  <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 4px;">Zone Name</label>
+                    <input type="text" id="kot-printer-name" placeholder="e.g. Kitchen Printer" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); box-sizing: border-box;">
+                  </div>
+                  <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 4px;">Mapped Categories (comma separated)</label>
+                    <input type="text" id="kot-printer-categories" placeholder="e.g. Pasta, Fries, Appetizers" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); box-sizing: border-box;">
+                  </div>
+                  <button type="button" class="btn btn-primary" id="btn-save-kot-printer" style="font-size: 11px; padding: 8px 12px; margin-top: 4px; font-weight:700;"><i class="fa-solid fa-plus"></i> Save Printer Zone</button>
+                </div>
+                
+                <!-- Right: Active Printer List -->
+                <div style="background: var(--bg-cream-light); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; border: 1px solid rgba(28,28,28,0.05);">
+                  <h5 style="font-weight: 700; color: var(--primary-brand); font-size: 12px;">Active Routing Rules</h5>
+                  <div id="kot-printers-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto;">
+                    <!-- Rendered dynamically -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Add Tax Slab Rule Modal -->
             <div class="modal-backdrop" id="tax-slab-rule-modal">
               <div class="glass-modal" style="max-width: 460px;">
@@ -2351,13 +2385,61 @@
 
                 <hr style="border: 0; border-top: 1px solid rgba(28, 28, 28,0.05); margin: 5px 0;">
 
-                <!-- Direct Aggregators (Note) -->
-                <div style="background: rgba(59, 130, 246, 0.05); padding: 10px; border-radius: 8px; border: 1px dashed rgba(59, 130, 246, 0.2);">
-                  <p style="font-size: 10px; color: var(--text-muted); margin: 0;">
-                    <i class="fa-solid fa-info-circle" style="color: #3b82f6; margin-right: 4px;"></i>
-                    Zomato/Swiggy don't offer public APIs. Use middleware (OrderEasy/Thrive/UrbanPiper) to integrate with these platforms.
-                  </p>
+                <!-- Direct Aggregators: Swiggy -->
+                <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; margin-top: 8px;">Direct Partner APIs</h4>
+                <p style="font-size: 9px; color: var(--text-muted); margin-bottom: 10px;">Requires approved partner account from each platform.</p>
+
+                <div style="background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(252, 128, 25, 0.15);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 32px; height: 32px; border-radius: 8px; background: #fc8019; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 800;">SW</div>
+                      <div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--primary-brand);">Swiggy Partner</div>
+                        <div style="font-size: 10px; color: var(--text-muted);" id="swiggy-status-text">Not Configured</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <label style="font-size: 10px; color: var(--text-muted); font-weight: 600;">API Key (Bearer Token)</label>
+                      <input type="password" id="swiggy-api-key" placeholder="From Swiggy Partner Dashboard" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px; width: 100%; box-sizing: border-box;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <label style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Store ID</label>
+                      <input type="text" id="swiggy-store-id" placeholder="Your Swiggy Store ID" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px; width: 100%; box-sizing: border-box;">
+                    </div>
+                    <button class="btn btn-primary" id="save-swiggy-config" style="font-size: 11px; padding: 8px 12px; width: 100%; background: #fc8019; border-color: #fc8019;">Save &amp; Enable Swiggy</button>
+                  </div>
                 </div>
+
+                <!-- Direct Aggregators: Zomato -->
+                <div style="background: var(--bg-cream-light); padding: 12px; border-radius: 12px; border: 1px solid rgba(226, 55, 68, 0.15); margin-top: 10px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 32px; height: 32px; border-radius: 8px; background: #e23744; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 800;">ZO</div>
+                      <div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--primary-brand);">Zomato Partner</div>
+                        <div style="font-size: 10px; color: var(--text-muted);" id="zomato-status-text">Not Configured</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <label style="font-size: 10px; color: var(--text-muted); font-weight: 600;">API Key (Bearer Token)</label>
+                      <input type="password" id="zomato-api-key" placeholder="From Zomato Partner Dashboard" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px; width: 100%; box-sizing: border-box;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <label style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Restaurant ID</label>
+                      <input type="text" id="zomato-store-id" placeholder="Your Zomato Restaurant ID" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px; width: 100%; box-sizing: border-box;">
+                    </div>
+                    <button class="btn btn-primary" id="save-zomato-config" style="font-size: 11px; padding: 8px 12px; width: 100%; background: #e23744; border-color: #e23744;">Save &amp; Enable Zomato</button>
+                  </div>
+                </div>
+
+                <!-- Poll now button -->
+                <button type="button" class="btn btn-secondary" id="btn-poll-aggregators" style="width: 100%; font-size: 11px; padding: 10px; margin-top: 6px;">
+                  <i class="fa-solid fa-rotate"></i> Fetch New Orders Now
+                </button>
 
                 <!-- Webhook Simulators -->
                 <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Test Simulators</h4>
@@ -3134,6 +3216,214 @@
           </section>
         </div>
 
+        <!-- TAB: TABLE MANAGEMENT -->
+        <div class="tab-content" id="tables-tab">
+          <div class="menu-editor-layout">
+
+            <!-- Left Panel: Add Table / Reservation / Waitlist forms -->
+            <div class="online-control-panel glassmorphic-panel" style="position: sticky; top: 0; overflow-y: auto; max-height: 100vh;">
+              <h3 style="font-family: var(--font-heading); color: var(--primary-brand); font-size: 18px; margin-bottom: 4px;"><i class="fa-solid fa-chair"></i> Table Management</h3>
+              <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 20px;">Floor plan, reservations, and walk-in waitlist.</p>
+
+              <!-- Status Summary -->
+              <div id="table-status-summary" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px;">
+                <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 10px; padding: 10px; text-align: center;">
+                  <div style="font-size: 22px; font-weight: 800; color: #10b981;" id="tables-count-available">-</div>
+                  <div style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Available</div>
+                </div>
+                <div style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 10px; padding: 10px; text-align: center;">
+                  <div style="font-size: 22px; font-weight: 800; color: #ef4444;" id="tables-count-occupied">-</div>
+                  <div style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Occupied</div>
+                </div>
+                <div style="background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; padding: 10px; text-align: center;">
+                  <div style="font-size: 22px; font-weight: 800; color: #f59e0b;" id="tables-count-reserved">-</div>
+                  <div style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Reserved</div>
+                </div>
+                <div style="background: rgba(107,114,128,0.08); border: 1px solid rgba(107,114,128,0.2); border-radius: 10px; padding: 10px; text-align: center;">
+                  <div style="font-size: 22px; font-weight: 800; color: #6b7280;" id="tables-count-blocked">-</div>
+                  <div style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Blocked</div>
+                </div>
+              </div>
+
+              <!-- Add Reservation Form -->
+              <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;"><i class="fa-solid fa-calendar-check"></i> New Reservation</h4>
+              <form id="add-reservation-form" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                <input type="text" id="res-customer-name" placeholder="Guest name *" required style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                <input type="tel" id="res-customer-phone" placeholder="Phone number" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <input type="number" id="res-party-size" placeholder="Party size" min="1" value="2" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                  <input type="datetime-local" id="res-datetime" required style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                </div>
+                <input type="text" id="res-notes" placeholder="Notes (optional)" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                <button type="submit" class="btn btn-primary" style="font-size: 11px; padding: 9px;"><i class="fa-solid fa-calendar-plus"></i> Book Reservation</button>
+              </form>
+
+              <!-- Add to Waitlist Form -->
+              <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;"><i class="fa-solid fa-list-ol"></i> Add to Waitlist</h4>
+              <form id="add-waitlist-form" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                <input type="text" id="wait-customer-name" placeholder="Guest name *" required style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                <input type="tel" id="wait-customer-phone" placeholder="Phone number" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                <input type="number" id="wait-party-size" placeholder="Party size" min="1" value="2" style="padding: 8px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px;">
+                <button type="submit" class="btn btn-secondary" style="font-size: 11px; padding: 9px;"><i class="fa-solid fa-user-plus"></i> Join Waitlist</button>
+              </form>
+
+              <button type="button" class="btn btn-secondary" id="tables-refresh-btn" style="width: 100%; font-size: 11px;"><i class="fa-solid fa-rotate"></i> Refresh All</button>
+            </div>
+
+            <!-- Right Panel: Floor Plan + Reservations + Waitlist -->
+            <div class="menu-editor-list-panel" style="display: flex; flex-direction: column; gap: 20px;">
+
+              <!-- Floor Plan -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <h4 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0 0 16px 0; font-size: 15px;"><i class="fa-solid fa-map"></i> Floor Plan</h4>
+                <div id="tables-floor-plan" style="min-height: 120px;">
+                  <!-- Rendered by tables.js renderFloorPlan() -->
+                </div>
+              </div>
+
+              <!-- Today's Reservations -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h4 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 15px;"><i class="fa-solid fa-calendar-check"></i> Today's Reservations</h4>
+                  <span style="font-size: 11px; color: var(--text-muted);" id="reservations-count-label">0 booked</span>
+                </div>
+                <div id="reservations-list" style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px;"><i class="fa-solid fa-calendar" style="font-size: 24px; opacity: 0.3; display: block; margin-bottom: 8px;"></i>No reservations today.</div>
+                </div>
+              </div>
+
+              <!-- Waitlist -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h4 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 15px;"><i class="fa-solid fa-list-ol"></i> Walk-in Waitlist</h4>
+                  <span style="font-size: 11px; color: var(--text-muted);" id="waitlist-count-label">0 waiting</span>
+                </div>
+                <div id="waitlist-list" style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px;"><i class="fa-solid fa-users" style="font-size: 24px; opacity: 0.3; display: block; margin-bottom: 8px;"></i>No guests waiting.</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: ADVANCED ANALYTICS -->
+        <div class="tab-content" id="analytics-tab">
+          <div style="display: flex; flex-direction: column; gap: 20px; padding-bottom: 24px;">
+
+            <!-- Header controls -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h2 style="font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--primary-brand); margin: 0;"><i class="fa-solid fa-chart-mixed"></i> Advanced Analytics</h2>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">Revenue trends, item performance, staff activity &amp; platform breakdown.</p>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="analytics-period-select" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(28,28,28,0.1); font-size: 12px; font-weight: 600; color: var(--primary-brand);">
+                  <option value="7">Last 7 Days</option>
+                  <option value="30" selected>Last 30 Days</option>
+                  <option value="90">Last 90 Days</option>
+                </select>
+                <button type="button" class="btn btn-secondary" id="analytics-refresh-btn" style="font-size: 11px; padding: 8px 14px;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+              </div>
+            </div>
+
+            <!-- KPI Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px;">
+              <div class="glassmorphic-panel" style="padding: 16px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Total Revenue</div>
+                <div style="font-size: 24px; font-weight: 800; color: var(--primary-brand);" id="analytics-kpi-revenue">₹—</div>
+                <div style="font-size: 10px; color: var(--text-muted);" id="analytics-kpi-period">30 days</div>
+              </div>
+              <div class="glassmorphic-panel" style="padding: 16px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Total Orders</div>
+                <div style="font-size: 24px; font-weight: 800; color: #6366f1;" id="analytics-kpi-orders">—</div>
+                <div style="font-size: 10px; color: var(--text-muted);">bills generated</div>
+              </div>
+              <div class="glassmorphic-panel" style="padding: 16px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Avg Order Value</div>
+                <div style="font-size: 24px; font-weight: 800; color: #10b981;" id="analytics-kpi-aov">₹—</div>
+                <div style="font-size: 10px; color: var(--text-muted);">per transaction</div>
+              </div>
+              <div class="glassmorphic-panel" style="padding: 16px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Today's Revenue</div>
+                <div style="font-size: 24px; font-weight: 800; color: #f59e0b;" id="analytics-kpi-today">₹—</div>
+                <div style="font-size: 10px; color: var(--text-muted);" id="analytics-kpi-today-orders">— orders today</div>
+              </div>
+              <div class="glassmorphic-panel" style="padding: 16px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Peak Hour</div>
+                <div style="font-size: 24px; font-weight: 800; color: #ef4444;" id="analytics-kpi-peak-hour">—</div>
+                <div style="font-size: 10px; color: var(--text-muted);" id="analytics-kpi-peak-day">Busiest day: —</div>
+              </div>
+            </div>
+
+            <!-- Charts row -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start;">
+              <!-- Daily Revenue Bar Chart -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <h4 style="color: var(--primary-brand); margin: 0 0 12px 0; font-size: 14px; font-weight: 700;"><i class="fa-solid fa-chart-column"></i> Daily Revenue Trend</h4>
+                <canvas id="analytics-daily-chart" width="600" height="260" style="width: 100%; border-radius: 8px;"></canvas>
+              </div>
+              <!-- Payment Breakdown Donut -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <h4 style="color: var(--primary-brand); margin: 0 0 12px 0; font-size: 14px; font-weight: 700;"><i class="fa-solid fa-chart-pie"></i> Payment Methods</h4>
+                <canvas id="analytics-payment-chart" width="260" height="260" style="width: 100%; border-radius: 8px;"></canvas>
+              </div>
+            </div>
+
+            <!-- Hourly heatmap + Top items -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <!-- Hourly Revenue -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <h4 style="color: var(--primary-brand); margin: 0 0 12px 0; font-size: 14px; font-weight: 700;"><i class="fa-solid fa-clock"></i> Hourly Breakdown (Avg Orders)</h4>
+                <canvas id="analytics-hourly-chart" width="400" height="200" style="width: 100%; border-radius: 8px;"></canvas>
+              </div>
+              <!-- Top Items -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <h4 style="color: var(--primary-brand); margin: 0 0 12px 0; font-size: 14px; font-weight: 700;"><i class="fa-solid fa-fire"></i> Top Selling Items</h4>
+                <div id="analytics-top-items" style="display: flex; flex-direction: column; gap: 8px;">
+                  <!-- Rendered by JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Staff Activity + Online Revenue -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <!-- Staff Activity Table -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <h4 style="color: var(--primary-brand); margin: 0 0 12px 0; font-size: 14px; font-weight: 700;"><i class="fa-solid fa-users"></i> Staff Activity (This Month)</h4>
+                <div id="analytics-staff-table" style="overflow-x: auto;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                    <thead>
+                      <tr style="background: rgba(28,28,28,0.04); text-align: left;">
+                        <th style="padding: 8px; font-weight: 700; color: var(--text-muted);">Name</th>
+                        <th style="padding: 8px; font-weight: 700; color: var(--text-muted);">Role</th>
+                        <th style="padding: 8px; font-weight: 700; color: var(--text-muted);">Days Present</th>
+                        <th style="padding: 8px; font-weight: 700; color: var(--text-muted);">Hours</th>
+                        <th style="padding: 8px; font-weight: 700; color: var(--text-muted);">Attendance %</th>
+                      </tr>
+                    </thead>
+                    <tbody id="analytics-staff-tbody">
+                      <tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--text-muted);">Loading...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Online Orders Revenue -->
+              <div class="glassmorphic-panel" style="padding: 20px;">
+                <h4 style="color: var(--primary-brand); margin: 0 0 12px 0; font-size: 14px; font-weight: 700;"><i class="fa-solid fa-cloud-arrow-down"></i> Online Platform Revenue</h4>
+                <div id="analytics-online-revenue" style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px;">No online order data yet.</div>
+                </div>
+                <!-- Day-of-week bar chart -->
+                <h4 style="color: var(--primary-brand); margin: 16px 0 8px 0; font-size: 14px; font-weight: 700;"><i class="fa-solid fa-calendar-week"></i> Busiest Days</h4>
+                <canvas id="analytics-dow-chart" width="300" height="160" style="width: 100%; border-radius: 8px;"></canvas>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </main>
   </div>
@@ -3863,6 +4153,14 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
         <i class="fa-solid fa-users"></i>
         <span>Employees</span>
       </a>
+      <a href="#" class="more-sheet-link client-only" data-tab="tables-tab">
+        <i class="fa-solid fa-chair"></i>
+        <span>Tables</span>
+      </a>
+      <a href="#" class="more-sheet-link client-only" data-tab="analytics-tab">
+        <i class="fa-solid fa-chart-mixed"></i>
+        <span>Analytics</span>
+      </a>
       <a href="#" class="more-sheet-link client-only" data-tab="growth-hub-tab">
         <i class="fa-solid fa-rocket"></i>
         <span>Growth Hub</span>
@@ -4495,6 +4793,9 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
 
   <script src="/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+  <script src="src/dashboard/aggregators.js?v=1.0"></script>
+  <script src="src/dashboard/tables.js?v=1.0"></script>
+  <script src="src/dashboard/analytics.js?v=1.0"></script>
   <script src="src/dashboard/api.js?v=2.0"></script>
   <script src="src/dashboard/auth.js?v=2.0"></script>
   <script src="src/dashboard/billing.js?v=2.0"></script>
@@ -4510,6 +4811,384 @@ CREATE INDEX IF NOT EXISTS idx_doppio_shift_events_shift ON public.doppio_shift_
   <script src="src/dashboard/whatsapp.js?v=2.0"></script>
   <script src="dashboard.js?v=2.5"></script>
   <script src="src/dashboard/onboarding.js?v=2.0"></script>
+
+  <!-- ── Feature Integration: Aggregators, Tables, Analytics ──────────────── -->
+  <script>
+  (function () {
+    "use strict";
+
+    // ── Wait for dashboard.js to initialise the tenant DB client ─────────────
+    function waitForDb(cb, tries) {
+      tries = tries || 0;
+      if (tries > 40) return console.warn("[features] db not available — skipping feature init");
+      if (window._tenantDb && window._tenantId) return cb(window._tenantDb, window._tenantId);
+      setTimeout(function () { waitForDb(cb, tries + 1); }, 300);
+    }
+
+    // ─── Helper: format currency ──────────────────────────────────────────────
+    function fmtRs(n) { return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 }); }
+
+    // ─── Aggregators ──────────────────────────────────────────────────────────
+    function initAggregators(db, tenantId) {
+      var ag = RestroSuite.aggregators.create({ db: db, tenantId: tenantId, pollIntervalMs: 90000 });
+
+      // Save Swiggy config
+      var swiggyBtn = document.getElementById("save-swiggy-config");
+      if (swiggyBtn) swiggyBtn.addEventListener("click", async function () {
+        var key   = document.getElementById("swiggy-api-key").value.trim();
+        var store = document.getElementById("swiggy-store-id").value.trim();
+        if (!key || !store) return alert("Please enter both API Key and Store ID.");
+        try {
+          await ag.saveConfig("swiggy", store, key);
+          document.getElementById("swiggy-status-text").textContent = "Configured ✓";
+          alert("Swiggy configuration saved!");
+        } catch (e) { alert("Error: " + e.message); }
+      });
+
+      // Save Zomato config
+      var zomatoBtn = document.getElementById("save-zomato-config");
+      if (zomatoBtn) zomatoBtn.addEventListener("click", async function () {
+        var key   = document.getElementById("zomato-api-key").value.trim();
+        var store = document.getElementById("zomato-store-id").value.trim();
+        if (!key || !store) return alert("Please enter both API Key and Restaurant ID.");
+        try {
+          await ag.saveConfig("zomato", store, key);
+          document.getElementById("zomato-status-text").textContent = "Configured ✓";
+          alert("Zomato configuration saved!");
+        } catch (e) { alert("Error: " + e.message); }
+      });
+
+      // Poll now button
+      var pollBtn = document.getElementById("btn-poll-aggregators");
+      if (pollBtn) pollBtn.addEventListener("click", async function () {
+        pollBtn.disabled = true;
+        pollBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching...';
+        try {
+          var result = await ag.poll();
+          var total = (result.swiggy || 0) + (result.zomato || 0);
+          pollBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + total + ' orders fetched';
+          renderOnlineOrdersQueue(ag);
+        } catch (e) {
+          pollBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Error';
+          console.error(e);
+        }
+        setTimeout(function () {
+          pollBtn.disabled = false;
+          pollBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Fetch New Orders Now';
+        }, 3000);
+      });
+
+      // Render live order queue
+      async function renderOnlineOrdersQueue(agInstance) {
+        var queue = document.getElementById("online-orders-queue");
+        if (!queue) return;
+        try {
+          var orders = await agInstance.listOrders();
+          var pending = orders.filter(function (o) { return ["new","accepted","preparing","ready"].includes(o.status); });
+          document.getElementById("online-orders-summary-label").textContent = pending.length + " Online Orders Pending Review";
+          if (!pending.length) {
+            queue.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px;"><i class="fa-solid fa-inbox" style="font-size:32px;opacity:0.3;display:block;margin-bottom:8px;"></i>No pending online orders.</div>';
+            return;
+          }
+          queue.innerHTML = pending.map(function (o) { return RestroSuite.aggregators.renderOrderCard(o); }).join("");
+        } catch (e) { console.warn("[aggregators] renderQueue:", e.message); }
+      }
+
+      // Wire action buttons via delegation on the queue container
+      var queueContainer = document.getElementById("online-orders-queue");
+      if (queueContainer) {
+        // Expose action helpers for inline onclick used in renderOrderCard
+        RestroSuite.aggregators._ui = {
+          accept:       function (id) { ag.accept(id).then(function() { renderOnlineOrdersQueue(ag); }); },
+          reject:       function (id) { var r = prompt("Rejection reason (optional):"); ag.reject(id, r).then(function() { renderOnlineOrdersQueue(ag); }); },
+          markPreparing: function (id) { ag.markPreparing(id).then(function() { renderOnlineOrdersQueue(ag); }); },
+          markReady:    function (id) { ag.markReady(id).then(function() { renderOnlineOrdersQueue(ag); }); },
+          markPickedUp: function (id) { ag.markPickedUp(id).then(function() { renderOnlineOrdersQueue(ag); }); }
+        };
+      }
+
+      // Auto-render when online-tab is shown
+      document.addEventListener("click", function (e) {
+        var link = e.target.closest("[data-tab='online-tab']");
+        if (link) setTimeout(function () { renderOnlineOrdersQueue(ag); }, 100);
+      });
+
+      // Start background polling
+      ag.startPolling();
+    }
+
+    // ─── Tables ───────────────────────────────────────────────────────────────
+    function initTables(db, tenantId) {
+      var tm = RestroSuite.tables.create({ db: db, tenantId: tenantId });
+
+      async function renderAll() {
+        var tables = await tm.listTables().catch(function () { return []; });
+        var summary = await tm.getStatusSummary().catch(function () { return {}; });
+        var reservations = await tm.listReservations(new Date().toISOString().slice(0, 10)).catch(function () { return []; });
+        var waitlist = await tm.listWaitlist().catch(function () { return []; });
+
+        // Status counts
+        ["available", "occupied", "reserved", "blocked"].forEach(function (s) {
+          var el = document.getElementById("tables-count-" + s);
+          if (el) el.textContent = summary[s] || 0;
+        });
+
+        // Floor plan
+        var floorEl = document.getElementById("tables-floor-plan");
+        if (floorEl) {
+          RestroSuite.tables.renderFloorPlan(floorEl, tables, async function (table) {
+            var next = {
+              available: "occupied",
+              occupied:  "available",
+              reserved:  "available",
+              blocked:   "available"
+            }[table.status] || "available";
+            await tm.setStatus(table.id, next).catch(console.warn);
+            renderAll();
+          });
+        }
+
+        // Reservations
+        var resList = document.getElementById("reservations-list");
+        var resCount = document.getElementById("reservations-count-label");
+        if (resCount) resCount.textContent = reservations.length + " booked";
+        if (resList) {
+          if (!reservations.length) {
+            resList.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;"><i class="fa-solid fa-calendar" style="font-size:24px;opacity:0.3;display:block;margin-bottom:8px;"></i>No reservations today.</div>';
+          } else {
+            resList.innerHTML = reservations.map(function (r) {
+              var time = new Date(r.reserved_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+              var statusColor = { confirmed: "#f59e0b", arrived: "#10b981", cancelled: "#6b7280", no_show: "#ef4444" }[r.status] || "#6b7280";
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(28,28,28,0.03);border-radius:10px;border:1px solid rgba(28,28,28,0.06);">'
+                + '<div><div style="font-size:13px;font-weight:700;color:var(--primary-brand);">' + (r.customer_name || "Guest") + ' · ' + (r.party_size || 1) + ' pax</div>'
+                + '<div style="font-size:11px;color:var(--text-muted);">' + time + (r.customer_phone ? ' · ' + r.customer_phone : '') + '</div></div>'
+                + '<span style="font-size:10px;font-weight:700;color:' + statusColor + ';text-transform:uppercase;background:rgba(0,0,0,0.04);padding:3px 8px;border-radius:20px;">' + (r.status || "confirmed") + '</span></div>';
+            }).join("");
+          }
+        }
+
+        // Waitlist
+        var waitEl = document.getElementById("waitlist-list");
+        var waitCount = document.getElementById("waitlist-count-label");
+        var estWait = tm.estimatedWaitMinutes(waitlist);
+        if (waitCount) waitCount.textContent = waitlist.length + " waiting" + (estWait ? " (~" + estWait + " min)" : "");
+        if (waitEl) {
+          if (!waitlist.length) {
+            waitEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;"><i class="fa-solid fa-users" style="font-size:24px;opacity:0.3;display:block;margin-bottom:8px;"></i>No guests waiting.</div>';
+          } else {
+            waitEl.innerHTML = waitlist.map(function (w, i) {
+              var waited = Math.round((Date.now() - new Date(w.joined_at)) / 60000);
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(28,28,28,0.03);border-radius:10px;border:1px solid rgba(28,28,28,0.06);">'
+                + '<div style="display:flex;align-items:center;gap:10px;">'
+                + '<div style="width:28px;height:28px;border-radius:50%;background:var(--accent-caramel);color:white;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</div>'
+                + '<div><div style="font-size:13px;font-weight:700;color:var(--primary-brand);">' + (w.customer_name || "Guest") + ' · ' + (w.party_size || 1) + ' pax</div>'
+                + '<div style="font-size:11px;color:var(--text-muted);">Waiting ' + waited + ' min' + (w.customer_phone ? ' · ' + w.customer_phone : '') + '</div></div></div>'
+                + '<button onclick="window._seatWaitlist(\'' + w.id + '\')" style="font-size:10px;padding:5px 10px;border-radius:8px;background:var(--accent-caramel);color:white;border:none;cursor:pointer;font-weight:700;">Seat</button></div>';
+            }).join("");
+          }
+        }
+      }
+
+      // Add reservation
+      var resForm = document.getElementById("add-reservation-form");
+      if (resForm) resForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var name  = document.getElementById("res-customer-name").value.trim();
+        var phone = document.getElementById("res-customer-phone").value.trim();
+        var party = document.getElementById("res-party-size").value;
+        var dt    = document.getElementById("res-datetime").value;
+        var notes = document.getElementById("res-notes").value.trim();
+        try {
+          await tm.addReservation({ customer_name: name, customer_phone: phone, party_size: party, reserved_at: dt, notes: notes });
+          resForm.reset();
+          renderAll();
+        } catch (e) { alert("Error: " + e.message); }
+      });
+
+      // Add waitlist
+      var waitForm = document.getElementById("add-waitlist-form");
+      if (waitForm) waitForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var name  = document.getElementById("wait-customer-name").value.trim();
+        var phone = document.getElementById("wait-customer-phone").value.trim();
+        var party = document.getElementById("wait-party-size").value;
+        try {
+          await tm.addToWaitlist({ customer_name: name, customer_phone: phone, party_size: party });
+          waitForm.reset();
+          renderAll();
+        } catch (e) { alert("Error: " + e.message); }
+      });
+
+      // Seat from waitlist (called from inline onclick)
+      window._seatWaitlist = async function (waitlistId) {
+        var tables = await tm.listTables().catch(function () { return []; });
+        var available = tables.filter(function (t) { return t.status === "available"; });
+        if (!available.length) return alert("No available tables right now.");
+        var opts = available.map(function (t, i) { return (i + 1) + ". " + (t.label || t.table_number) + " (Cap. " + t.capacity + ")"; }).join("\n");
+        var idx = parseInt(prompt("Select a table:\n" + opts)) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= available.length) return;
+        await tm.seatFromWaitlist(waitlistId, available[idx].id).catch(function (err) { alert(err.message); });
+        renderAll();
+      };
+
+      // Refresh button
+      var refreshBtn = document.getElementById("tables-refresh-btn");
+      if (refreshBtn) refreshBtn.addEventListener("click", renderAll);
+
+      // Auto-render when tables-tab is shown
+      document.addEventListener("click", function (e) {
+        if (e.target.closest("[data-tab='tables-tab']")) setTimeout(renderAll, 100);
+      });
+    }
+
+    // ─── Analytics ───────────────────────────────────────────────────────────
+    function initAnalytics(db, tenantId) {
+      var an = RestroSuite.analytics.create({ db: db, tenantId: tenantId });
+
+      function getPeriod() {
+        var sel = document.getElementById("analytics-period-select");
+        return sel ? parseInt(sel.value) || 30 : 30;
+      }
+
+      async function renderAnalytics() {
+        var days = getPeriod();
+        try {
+          var summary = await an.revenueSummary({ days: days });
+
+          // KPI cards
+          document.getElementById("analytics-kpi-revenue").textContent = fmtRs(summary.total_revenue);
+          document.getElementById("analytics-kpi-period").textContent = days + " days";
+          document.getElementById("analytics-kpi-orders").textContent = summary.total_orders;
+          document.getElementById("analytics-kpi-aov").textContent = fmtRs(summary.avg_order_value);
+          document.getElementById("analytics-kpi-today").textContent = fmtRs(summary.today_revenue);
+          document.getElementById("analytics-kpi-today-orders").textContent = summary.today_orders + " orders today";
+
+          if (summary.peak) {
+            var ph = summary.peak.peakHour;
+            document.getElementById("analytics-kpi-peak-hour").textContent = ph ? (ph.hour + ":00") : "—";
+            var pd = summary.peak.peakDay;
+            document.getElementById("analytics-kpi-peak-day").textContent = "Busiest day: " + (pd ? pd.day : "—");
+          }
+
+          // Daily Revenue chart
+          var daily = summary.daily_trend || [];
+          RestroSuite.analytics.renderBarChart(
+            document.getElementById("analytics-daily-chart"),
+            { labels: daily.map(function (d) { return d.date.slice(5); }),
+              values: daily.map(function (d) { return d.revenue; }),
+              color: "#6366f1", title: "Daily Revenue (₹)" }
+          );
+
+          // Payment breakdown donut
+          var payments = summary.payment_breakdown || [];
+          if (payments.length) {
+            RestroSuite.analytics.renderDonutChart(
+              document.getElementById("analytics-payment-chart"),
+              { labels: payments.map(function (p) { return p.method; }),
+                values: payments.map(function (p) { return p.revenue; }) }
+            );
+          }
+
+          // Hourly chart
+          var hourly = await an.hourlyRevenue({ days: days });
+          RestroSuite.analytics.renderBarChart(
+            document.getElementById("analytics-hourly-chart"),
+            { labels: hourly.map(function (h) { return h.hour + "h"; }),
+              values: hourly.map(function (h) { return h.orders; }),
+              color: "#f59e0b", title: "Avg Orders by Hour" }
+          );
+
+          // Day-of-week chart
+          if (summary.peak && summary.peak.byDayOfWeek) {
+            var dow = summary.peak.byDayOfWeek;
+            RestroSuite.analytics.renderBarChart(
+              document.getElementById("analytics-dow-chart"),
+              { labels: dow.map(function (d) { return d.day; }),
+                values: dow.map(function (d) { return d.orders; }),
+                color: "#10b981", title: "Orders by Day of Week" }
+            );
+          }
+
+          // Top items
+          var topEl = document.getElementById("analytics-top-items");
+          var items = summary.top_items || [];
+          if (topEl) {
+            if (!items.length) {
+              topEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:12px;">No sales data yet.</div>';
+            } else {
+              var maxQty = items[0].qty_sold || 1;
+              topEl.innerHTML = items.map(function (item, i) {
+                var pct = Math.round((item.qty_sold / maxQty) * 100);
+                return '<div style="display:flex;flex-direction:column;gap:4px;">'
+                  + '<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;font-weight:700;color:var(--primary-brand);">' + (i + 1) + '. ' + item.name + '</span>'
+                  + '<span style="font-size:11px;color:var(--text-muted);">' + item.qty_sold + ' sold · ' + fmtRs(item.revenue) + '</span></div>'
+                  + '<div style="background:rgba(28,28,28,0.06);border-radius:4px;height:6px;"><div style="background:var(--accent-caramel);height:6px;border-radius:4px;width:' + pct + '%;"></div></div>'
+                  + '</div>';
+              }).join("");
+            }
+          }
+
+          // Staff activity
+          var staffRows = await an.staffActivity().catch(function () { return []; });
+          var tbody = document.getElementById("analytics-staff-tbody");
+          if (tbody) {
+            if (!staffRows.length) {
+              tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted);">No staff data for this month.</td></tr>';
+            } else {
+              tbody.innerHTML = staffRows.map(function (s) {
+                return '<tr style="border-top:1px solid rgba(28,28,28,0.05);">'
+                  + '<td style="padding:8px;font-weight:600;">' + (s.name || "—") + '</td>'
+                  + '<td style="padding:8px;color:var(--text-muted);">' + (s.role || "—") + '</td>'
+                  + '<td style="padding:8px;">' + s.days_present + '</td>'
+                  + '<td style="padding:8px;">' + s.hours_worked + 'h</td>'
+                  + '<td style="padding:8px;"><span style="font-weight:700;color:' + (s.attendance_pct >= 80 ? "#10b981" : s.attendance_pct >= 60 ? "#f59e0b" : "#ef4444") + ';">' + s.attendance_pct + '%</span></td>'
+                  + '</tr>';
+              }).join("");
+            }
+          }
+
+          // Online revenue breakdown
+          var onlineEl = document.getElementById("analytics-online-revenue");
+          var onlineData = summary.online_breakdown || [];
+          if (onlineEl) {
+            if (!onlineData.length) {
+              onlineEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:12px;">No online order data yet.</div>';
+            } else {
+              onlineEl.innerHTML = onlineData.map(function (p) {
+                var icon = p.platform === "swiggy" ? "🧡" : p.platform === "zomato" ? "❤️" : "📦";
+                return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(28,28,28,0.03);border-radius:10px;">'
+                  + '<span style="font-size:13px;font-weight:700;color:var(--primary-brand);">' + icon + ' ' + p.platform + '</span>'
+                  + '<div style="text-align:right;"><div style="font-size:13px;font-weight:800;">' + fmtRs(p.revenue) + '</div>'
+                  + '<div style="font-size:10px;color:var(--text-muted);">' + p.orders + ' orders · ' + p.cancelled + ' cancelled</div></div></div>';
+              }).join("");
+            }
+          }
+
+        } catch (err) {
+          console.warn("[analytics] render error:", err.message);
+        }
+      }
+
+      var refreshBtn = document.getElementById("analytics-refresh-btn");
+      if (refreshBtn) refreshBtn.addEventListener("click", renderAnalytics);
+
+      var periodSel = document.getElementById("analytics-period-select");
+      if (periodSel) periodSel.addEventListener("change", renderAnalytics);
+
+      // Auto-render when analytics-tab is shown
+      document.addEventListener("click", function (e) {
+        if (e.target.closest("[data-tab='analytics-tab']")) setTimeout(renderAnalytics, 100);
+      });
+    }
+
+    // ─── Bootstrap all features after DB is ready ────────────────────────────
+    waitForDb(function (db, tenantId) {
+      try { initAggregators(db, tenantId); } catch (e) { console.warn("[aggregators init]", e); }
+      try { initTables(db, tenantId); }      catch (e) { console.warn("[tables init]", e); }
+      try { initAnalytics(db, tenantId); }   catch (e) { console.warn("[analytics init]", e); }
+    });
+  })();
+  </script>
   <script src="pwa.js"></script>
 </body>
 </html>

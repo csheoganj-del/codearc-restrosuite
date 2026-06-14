@@ -138,7 +138,7 @@ serve(async (req) => {
 
       const { data: profileData } = await supabaseAdmin
         .from("doppio_business_profile")
-        .select("name, address, phone")
+        .select("name, address, phone, upi_vpa")
         .eq("tenant_id", tenant.id)
         .maybeSingle();
 
@@ -146,7 +146,8 @@ serve(async (req) => {
         menu: data || [],
         tenantName: profileData?.name || tenant.name || "Doppio Cafe",
         tenantAddress: profileData?.address || "",
-        tenantPhone: profileData?.phone || ""
+        tenantPhone: profileData?.phone || "",
+        upiVpa: profileData?.upi_vpa || ""
       }, 200, req);
     }
 
@@ -296,6 +297,69 @@ serve(async (req) => {
       if (error) {
         console.error("tenant-public create_order failed:", error);
         return jsonResponse({ error: "Failed to submit order." }, 500, req);
+      }
+
+      return jsonResponse({ success: true }, 200, req);
+    }
+
+    if (action === "get_order_status") {
+      const orderId = String(payload.order_id || payload.orderId || "").trim();
+      if (!orderId) {
+        return jsonResponse({ error: "Invalid order ID." }, 400, req);
+      }
+      const { data, error } = await supabaseAdmin
+        .from("doppio_pending_orders")
+        .select("status, items, total, tableNumber, paymentMethod")
+        .eq("tenant_id", tenant.id)
+        .eq("orderId", orderId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("tenant-public get_order_status failed:", error);
+        return jsonResponse({ error: "Failed to fetch order status." }, 500, req);
+      }
+      if (!data) {
+        // Check if it has moved to bills (completed/paid)
+        const { data: billData, error: billError } = await supabaseAdmin
+          .from("doppio_bills")
+          .select("total, tableNumber, paymentMethod")
+          .eq("tenant_id", tenant.id)
+          .eq("orderId", orderId)
+          .maybeSingle();
+        if (billError) {
+          console.error("tenant-public get_order_status bill search failed:", billError);
+        }
+        if (billData) {
+          return jsonResponse({ order: { status: "Paid", items: "[]", total: billData.total, tableNumber: billData.tableNumber, paymentMethod: billData.paymentMethod } }, 200, req);
+        }
+        return jsonResponse({ error: "Order not found." }, 404, req);
+      }
+
+      return jsonResponse({ order: data }, 200, req);
+    }
+
+    if (action === "create_notification") {
+      const title = String(payload.title || "Service Alert").trim().slice(0, 120);
+      const message = String(payload.message || "").trim().slice(0, 240);
+      const type = String(payload.type || "info").trim().slice(0, 40);
+      const notifId = "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+
+      const { error } = await supabaseAdmin
+        .from("doppio_notifications")
+        .insert({
+          id: notifId,
+          tenant_id: tenant.id,
+          title,
+          message,
+          type,
+          role: "staff",
+          isRead: false,
+          timestamp: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error("tenant-public create_notification failed:", error);
+        return jsonResponse({ error: "Failed to send notification." }, 500, req);
       }
 
       return jsonResponse({ success: true }, 200, req);

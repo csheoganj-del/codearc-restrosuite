@@ -62,9 +62,17 @@ const TENANT_TABLES = new Set([
   "doppio_outlets",
   "doppio_migration_status",
   "doppio_saas_invoices",
+  "doppio_aggregator_config",
+  "doppio_online_orders",
+  "doppio_table_layout",
+  "doppio_waitlist",
 ]);
 
 const TABLE_TAB_ACCESS: Record<string, string[]> = {
+  doppio_aggregator_config: ["pos-tab", "editor-tab", "online-tab", "growth-hub-tab"],
+  doppio_online_orders: ["pos-tab", "online-tab", "growth-hub-tab"],
+  doppio_table_layout: ["pos-tab", "growth-hub-tab"],
+  doppio_waitlist: ["pos-tab", "crm-tab", "growth-hub-tab"],
   doppio_menu: ["pos-tab", "editor-tab", "online-tab"],
   doppio_inventory: ["pos-tab", "inventory-tab", "editor-tab"],
   doppio_inventory_batches: ["pos-tab", "inventory-tab"],

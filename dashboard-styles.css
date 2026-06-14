@@ -5527,6 +5527,189 @@ body.dark-theme #shift-details-modal .glass-modal {
   box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
 }
 
+/* ==========================================================
+   AUTO DARK MODE — respects OS preference when no manual
+   override class (body.dark-theme) is set by the user.
+   The JS toggle adds/removes .dark-theme; if neither class
+   nor localStorage preference is set, this media query
+   activates the dark palette automatically.
+   ========================================================== */
+@media (prefers-color-scheme: dark) {
+  body:not(.light-theme-forced) {
+    --primary-brand: #F8FAFC;
+    --primary-brand-rgb: 248, 250, 252;
+    --bg-cream-light: #0F172A;
+    --bg-tan-warm: #0B0F19;
+    --bg-card: #1E293B;
+    --white: #1E293B;
+    --text-dark: #F8FAFC;
+    --text-light: #0F172A;
+    --text-muted: #94A3B8;
+    --coffee-gradient: #0B0F19;
+    --cream-gradient: #1E293B;
+    --gold-glow-gradient: rgba(252, 128, 25, 0.16);
+    --shadow-sm: 0 4px 6px -1px rgba(0,0,0,0.35), 0 2px 4px -1px rgba(0,0,0,0.25);
+    --shadow-md: 0 10px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.4);
+    --shadow-lg: 0 20px 40px -15px rgba(0,0,0,0.65), 0 15px 20px -20px rgba(0,0,0,0.55);
+    --border-subtle: rgba(148, 163, 184, 0.14);
+    --bg-sidebar: rgba(15, 23, 42, 0.75);
+    --border-sidebar: rgba(148, 163, 184, 0.12);
+  }
+
+  body:not(.light-theme-forced) input,
+  body:not(.light-theme-forced) select,
+  body:not(.light-theme-forced) textarea {
+    background-color: #1E293B !important;
+    border-color: rgba(148, 163, 184, 0.2) !important;
+    color: #F8FAFC !important;
+  }
+
+  body:not(.light-theme-forced) input::placeholder {
+    color: rgba(248, 250, 252, 0.4) !important;
+  }
+
+  body:not(.light-theme-forced) .glass-modal,
+  body:not(.light-theme-forced) .more-nav-sheet {
+    background: rgba(15, 23, 42, 0.9) !important;
+    border-color: rgba(148, 163, 184, 0.15) !important;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6) !important;
+  }
+
+  body:not(.light-theme-forced) .dashboard-header,
+  body:not(.light-theme-forced) .sidebar-brand {
+    border-color: rgba(148, 163, 184, 0.12) !important;
+  }
+
+  body:not(.light-theme-forced) .dashboard-table th {
+    background: #0B0F19 !important;
+    color: var(--accent-caramel) !important;
+  }
+
+  body:not(.light-theme-forced) .dashboard-table td {
+    border-bottom-color: rgba(148, 163, 184, 0.1) !important;
+  }
+
+  body:not(.light-theme-forced) .mobile-top-header {
+    background: rgba(15, 23, 42, 0.95) !important;
+    border-bottom-color: rgba(148, 163, 184, 0.1) !important;
+  }
+
+  body:not(.light-theme-forced) .mobile-bottom-nav {
+    background: rgba(15, 23, 42, 0.95) !important;
+    border-top-color: rgba(148, 163, 184, 0.1) !important;
+  }
+}
+
+/* ==========================================================
+   DARK MODE — MISSING OVERRIDES (added to body.dark-theme
+   and auto-dark both, to close coverage gaps)
+   ========================================================== */
+
+/* Stat / KPI cards */
+body.dark-theme .stat-card,
+body.dark-theme .kpi-card,
+body.dark-theme .report-panel,
+body.dark-theme .dashboard-card {
+  background: #1E293B !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-theme .stat-card h3,
+body.dark-theme .kpi-card h3,
+body.dark-theme .report-panel h3 {
+  color: #94A3B8 !important;
+}
+
+body.dark-theme .stat-card .stat-value,
+body.dark-theme .kpi-card .kpi-value {
+  color: #F8FAFC !important;
+}
+
+/* Notification badges */
+body.dark-theme .notification-badge,
+body.dark-theme .badge-count {
+  background: var(--accent-caramel) !important;
+  color: #0B0F19 !important;
+}
+
+/* Status pills */
+body.dark-theme .status-pill,
+body.dark-theme .badge-status {
+  opacity: 0.9;
+}
+
+/* Dashboard nav tab active state */
+body.dark-theme .sidebar-nav-item.active,
+body.dark-theme .sidebar-link.active {
+  background: rgba(249, 115, 22, 0.12) !important;
+  color: var(--accent-caramel) !important;
+}
+
+body.dark-theme .sidebar-nav-item:not(.active):hover,
+body.dark-theme .sidebar-link:not(.active):hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Dashboard tab sub-header labels */
+body.dark-theme .tab-label,
+body.dark-theme .section-label {
+  color: #94A3B8 !important;
+}
+
+/* Pagination controls */
+body.dark-theme .pagination-btn {
+  background: #1E293B !important;
+  border-color: rgba(148, 163, 184, 0.15) !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-theme .pagination-btn.active,
+body.dark-theme .pagination-btn:hover:not(:disabled) {
+  background: var(--accent-caramel) !important;
+  border-color: var(--accent-caramel) !important;
+  color: #0B0F19 !important;
+}
+
+/* Table cards (QR orders, table map) */
+body.dark-theme .table-card {
+  background: #1E293B !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+body.dark-theme .qr-order-card {
+  background: #1E293B !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+body.dark-theme .qr-card-total-box {
+  border-top-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+/* Offline banner stays visible in dark mode */
+body.dark-theme .offline-banner-strip {
+  background: linear-gradient(135deg, #92400e 0%, #b45309 100%) !important;
+}
+
+/* Receipt / thermal print — always white paper */
+body.dark-theme .live-receipt-simulator,
+body.dark-theme #receipt-preview-container,
+body.dark-theme .thermal-print-area {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}
+
+/* Tooltips */
+body.dark-theme [data-tooltip]::after {
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+/* Page lock overlay */
+body.dark-theme #page-lock-overlay {
+  background: rgba(11, 15, 25, 0.97) !important;
+}
+
 .online-badge {
   box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
 }

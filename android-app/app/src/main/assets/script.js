@@ -21,20 +21,26 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Credentials loaded at runtime by /config.js → /api/config (Vercel env vars).
   let supabaseClient = null;
-  const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
-  const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
-  const TENANT_PUBLIC_FUNCTION_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? '/functions/v1/tenant-public'
-    : (DEFAULT_SUPABASE_URL ? `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-public` : '');
+  let DEFAULT_SUPABASE_URL = '';
+  let DEFAULT_SUPABASE_KEY = '';
+  let TENANT_PUBLIC_FUNCTION_URL = '';
 
-  if (typeof supabase !== 'undefined') {
-    try {
-      supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
-      console.log("Supabase initialized successfully on Customer side");
-    } catch (err) {
-      console.error("Supabase fail to initialize on Customer side:", err);
+  const configPromise = (window.__configReady || Promise.resolve()).then(() => {
+    DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
+    DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
+    TENANT_PUBLIC_FUNCTION_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? '/functions/v1/tenant-public'
+      : (DEFAULT_SUPABASE_URL ? `${DEFAULT_SUPABASE_URL}/functions/v1/tenant-public` : '');
+
+    if (typeof supabase !== 'undefined') {
+      try {
+        supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+        console.log("Supabase initialized successfully on Customer side");
+      } catch (err) {
+        console.error("Supabase fail to initialize on Customer side:", err);
+      }
     }
-  }
+  });
 
   // ==========================================
   // 0. IMMEDIATE TENANT BRANDING FROM URL
@@ -105,6 +111,7 @@ window.addEventListener('DOMContentLoaded', () => {
   })();
 
   async function callTenantPublic(action, payload = {}) {
+    await configPromise;
     // tenant_slug is read dynamically from page URL params or defaults to a generic value
     const urlParams = new URLSearchParams(window.location.search);
     const tenantSlug = urlParams.get('outlet') || urlParams.get('tenant') || '';
@@ -297,102 +304,104 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // Fetch menuData dynamically through backend tenant boundary
-  if (supabaseClient) {
-    callTenantPublic('list_menu')
-      .then((result) => {
-        const data = Array.isArray(result.menu) ? result.menu : [];
-        
-        const urlSlugAlreadySet = !!window.__tenantSlugName;
-        const tenantName = urlSlugAlreadySet
-          ? window.__tenantSlugName
-          : (result.tenantName || 'Doppio Cafe');
-        const tenantAddress = result.tenantAddress || '';
-        const tenantPhone = result.tenantPhone || '';
-
-        // Only update branding if it changed or wasn't already set
-        const brandingChanged = !cachedData || 
-          cachedData.tenantName !== tenantName || 
-          cachedData.tenantAddress !== tenantAddress || 
-          cachedData.tenantPhone !== tenantPhone;
-
-        if (brandingChanged) {
-          if (!urlSlugAlreadySet) {
-            document.title = `${tenantName} | Savor the Perfect Brew`;
-            document.querySelectorAll('.logo-doppio').forEach(el => {
-              el.textContent = tenantName.split(' ')[0].toUpperCase();
-            });
-            const heroDesc = document.querySelector('.hero-content p');
-            if (heroDesc) {
-              heroDesc.innerHTML = `Experience the bold richness of authentic double-shot espresso crafted with passion at <strong>${escHtml(tenantName)}</strong>. Every cup is an art, roasted locally and poured to perfection ${tenantAddress ? 'at ' + escHtml(tenantAddress) : 'on London Street, Nagpur'}.`;
+  configPromise.then(() => {
+    if (supabaseClient) {
+      callTenantPublic('list_menu')
+        .then((result) => {
+          const data = Array.isArray(result.menu) ? result.menu : [];
+          
+          const urlSlugAlreadySet = !!window.__tenantSlugName;
+          const tenantName = urlSlugAlreadySet
+            ? window.__tenantSlugName
+            : (result.tenantName || 'Doppio Cafe');
+          const tenantAddress = result.tenantAddress || '';
+          const tenantPhone = result.tenantPhone || '';
+  
+          // Only update branding if it changed or wasn't already set
+          const brandingChanged = !cachedData || 
+            cachedData.tenantName !== tenantName || 
+            cachedData.tenantAddress !== tenantAddress || 
+            cachedData.tenantPhone !== tenantPhone;
+  
+          if (brandingChanged) {
+            if (!urlSlugAlreadySet) {
+              document.title = `${tenantName} | Savor the Perfect Brew`;
+              document.querySelectorAll('.logo-doppio').forEach(el => {
+                el.textContent = tenantName.split(' ')[0].toUpperCase();
+              });
+              const heroDesc = document.querySelector('.hero-content p');
+              if (heroDesc) {
+                heroDesc.innerHTML = `Experience the bold richness of authentic double-shot espresso crafted with passion at <strong>${escHtml(tenantName)}</strong>. Every cup is an art, roasted locally and poured to perfection ${tenantAddress ? 'at ' + escHtml(tenantAddress) : 'on London Street, Nagpur'}.`;
+              }
+              const sectionTitle = document.querySelector('.section-title');
+              if (sectionTitle) {
+                sectionTitle.textContent = `${tenantName} Interactive Menu`;
+              }
+              const footerTitle = document.querySelector('.footer-col h4');
+              if (footerTitle) footerTitle.textContent = tenantName;
+              const footerCopyright = document.querySelector('.footer-bottom span');
+              if (footerCopyright) {
+                footerCopyright.textContent = `© 2026 ${tenantName}. All rights reserved. Crafted for premium coffee enthusiasts.`;
+              }
             }
-            const sectionTitle = document.querySelector('.section-title');
-            if (sectionTitle) {
-              sectionTitle.textContent = `${tenantName} Interactive Menu`;
+  
+            const footerAddress = document.querySelector('.footer-col p');
+            if (footerAddress && tenantAddress) {
+              footerAddress.innerHTML = `<i class="fa-solid fa-location-dot"></i> ${escHtml(tenantAddress)}`;
             }
-            const footerTitle = document.querySelector('.footer-col h4');
-            if (footerTitle) footerTitle.textContent = tenantName;
-            const footerCopyright = document.querySelector('.footer-bottom span');
-            if (footerCopyright) {
-              footerCopyright.textContent = `© 2026 ${tenantName}. All rights reserved. Crafted for premium coffee enthusiasts.`;
+            const footerPhone = document.querySelector('.footer-col:nth-child(2) p:nth-child(2)');
+            if (footerPhone && tenantPhone) {
+              footerPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${escHtml(tenantPhone)}`;
             }
-          }
-
-          const footerAddress = document.querySelector('.footer-col p');
-          if (footerAddress && tenantAddress) {
-            footerAddress.innerHTML = `<i class="fa-solid fa-location-dot"></i> ${escHtml(tenantAddress)}`;
-          }
-          const footerPhone = document.querySelector('.footer-col:nth-child(2) p:nth-child(2)');
-          if (footerPhone && tenantPhone) {
-            footerPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${escHtml(tenantPhone)}`;
-          }
-          const merchantNameEl = document.querySelector('.merchant-name');
-          if (merchantNameEl) {
-            merchantNameEl.innerHTML = `${escHtml(tenantName)} <i class="fa-solid fa-circle-check" style="color: #c98a4a;"></i>`;
-          }
-          const merchantVpa = document.querySelector('.merchant-vpa');
-          if (merchantVpa && tenantPhone) {
-            merchantVpa.textContent = `${tenantPhone.replace(/\s+/g, '')}@upi`;
-          }
-        }
-
-        if (data.length > 0) {
-          const dbMenuMapped = data.map(item => ({
-            name: item.name,
-            description: item.description || '',
-            price: `₹${item.price}`,
-            category: item.category,
-            icon: item.icon || '☕',
-            bestseller: item.bestseller || false
-          }));
-
-          const menuChanged = JSON.stringify(menuData) !== JSON.stringify(dbMenuMapped);
-
-          if (menuChanged || brandingChanged) {
-            // Replace static/cached array contents with cloud values
-            menuData.length = 0;
-            dbMenuMapped.forEach(i => menuData.push(i));
-            renderMenu();
-
-            // Save to cache
-            if (cacheTenantSlug) {
-              try {
-                localStorage.setItem(cacheKey, JSON.stringify({
-                  menu: data,
-                  tenantName,
-                  tenantAddress,
-                  tenantPhone
-                }));
-              } catch (e) {}
+            const merchantNameEl = document.querySelector('.merchant-name');
+            if (merchantNameEl) {
+              merchantNameEl.innerHTML = `${escHtml(tenantName)} <i class="fa-solid fa-circle-check" style="color: #c98a4a;"></i>`;
+            }
+            const merchantVpa = document.querySelector('.merchant-vpa');
+            if (merchantVpa && tenantPhone) {
+              merchantVpa.textContent = `${tenantPhone.replace(/\s+/g, '')}@upi`;
             }
           }
-        } else {
-          console.log("Backend menu fetch empty. Using local fallback.");
-        }
-      })
-      .catch((err) => {
-        console.log("Backend menu fetch failed. Using local fallback.", err);
-      });
-  }
+  
+          if (data.length > 0) {
+            const dbMenuMapped = data.map(item => ({
+              name: item.name,
+              description: item.description || '',
+              price: `₹${item.price}`,
+              category: item.category,
+              icon: item.icon || '☕',
+              bestseller: item.bestseller || false
+            }));
+  
+            const menuChanged = JSON.stringify(menuData) !== JSON.stringify(dbMenuMapped);
+  
+            if (menuChanged || brandingChanged) {
+              // Replace static/cached array contents with cloud values
+              menuData.length = 0;
+              dbMenuMapped.forEach(i => menuData.push(i));
+              renderMenu();
+  
+              // Save to cache
+              if (cacheTenantSlug) {
+                try {
+                  localStorage.setItem(cacheKey, JSON.stringify({
+                    menu: data,
+                    tenantName,
+                    tenantAddress,
+                    tenantPhone
+                  }));
+                } catch (e) {}
+              }
+            }
+          } else {
+            console.log("Backend menu fetch empty. Using local fallback.");
+          }
+        })
+        .catch((err) => {
+          console.log("Backend menu fetch failed. Using local fallback.", err);
+        });
+    }
+  });
 
 
   // Render Menu Function

@@ -38,7 +38,12 @@
     "doppio_backup_snapshots",
     "doppio_outlets",
     "doppio_migration_status",
-    "doppio_saas_invoices"
+    "doppio_saas_invoices",
+    // Feature additions (aggregators, table management, analytics)
+    "doppio_aggregator_config",
+    "doppio_online_orders",
+    "doppio_table_layout",
+    "doppio_waitlist"
   ]);
 
   function createTenantApi(options) {
