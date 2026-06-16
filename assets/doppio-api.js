@@ -39,14 +39,23 @@
   const supabaseClient = (window.supabase && CONFIGURED) ? window.supabase.createClient(BASE, ANON) : null;
 
   async function post(fn, body, token, fallbackMsg){
-    const res = await fetch(`${BASE}/functions/v1/${fn}`, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':`Bearer ${token}` },
-      body: JSON.stringify(body)
-    });
-    const out = await res.json().catch(()=>({}));
-    if(!res.ok){ const e=new Error(out.error||fallbackMsg||'Request failed'); e.status=res.status; throw e; }
-    return out;
+    try {
+      const res = await fetch(`${BASE}/functions/v1/${fn}`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':`Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+      const out = await res.json().catch(()=>({}));
+      if(!res.ok){ const e=new Error(out.error||fallbackMsg||'Request failed'); e.status=res.status; throw e; }
+      return out;
+    } catch(err) {
+      if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
+        const e = new Error('Connection failed: Failed to fetch. Ensure Vercel environment variables are correct, the Supabase project is active, and ALLOWED_ORIGINS includes https://restrosuite.codearc.co.in');
+        e.status = 0;
+        throw e;
+      }
+      throw err;
+    }
   }
 
   /* ---------------- AUTH ---------------- */
