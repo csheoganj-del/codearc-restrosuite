@@ -439,7 +439,9 @@ async function saveSessionToSupabase() {
         await logHealthEvent('session_saved', 'ok', { path: SESSION_FILE_NAME, size: zipBuffer.length });
     } catch (err) {
         console.error('[Session Save Error]', err.message);
-        await logHealthEvent('session_save_failed', 'error', { error: err.message });
+        const size = fs.existsSync(zipPath) ? fs.statSync(zipPath).size : 0;
+        const sizeMb = (size / (1024 * 1024)).toFixed(2) + ' MB';
+        await logHealthEvent('session_save_failed', 'error', { error: err.message, zipSize: sizeMb });
     } finally {
         try { fs.unlinkSync(zipPath); } catch (_) {}
     }
