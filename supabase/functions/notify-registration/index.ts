@@ -116,12 +116,12 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
           <tr>
             <td style="padding:35px 40px 20px 40px; text-align:center;">
 
-              <div style="font-size:28px; font-weight:700; color:#111827; margin-bottom:8px;">
-                Welcome to CodeArc RestroSuite
+              <div style="font-size:24px; font-weight:700; color:#111827; margin-bottom:8px;">
+                Registration Received
               </div>
 
               <div style="font-size:15px; color:#6b7280; line-height:24px;">
-                Your restaurant onboarding request has been received successfully.
+                We have successfully received your request to register on the CodeArc RestroSuite platform.
               </div>
 
             </td>
@@ -139,13 +139,11 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
             <td style="padding:35px 40px 10px 40px;">
 
               <div style="font-size:15px; color:#374151; line-height:28px;">
-                Hello,
+                Dear Customer,
               </div>
 
               <div style="font-size:15px; color:#374151; line-height:28px; margin-top:10px;">
-                Thank you for registering your outlet
-                <strong>${name}</strong> (${displayType})
-                with <strong>CodeArc RestroSuite</strong>.
+                Thank you for submitting a registration request for your outlet, <strong>${name}</strong> (${displayType}), with <strong>CodeArc RestroSuite</strong>.
               </div>
 
             </td>
@@ -263,9 +261,8 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
             <td style="padding:10px 40px 20px 40px;">
 
               <div style="font-size:15px; color:#4b5563; line-height:28px;">
-                Our team is currently reviewing your registration request.
-                Once approved, you will receive another email and WhatsApp
-                notification with your login access and onboarding details.
+                Our operations team is currently reviewing your registration details.
+                Once the review process is complete and your account is approved, you will receive a confirmation email and WhatsApp notification containing your login access credentials.
               </div>
 
             </td>
@@ -299,7 +296,7 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
               background:#fcfcfc;">
 
               <div style="font-size:15px; font-weight:600; color:#111827; margin-bottom:12px;">
-                Need help?
+                Support and Inquiries:
               </div>
 
               <div style="font-size:14px; color:#6b7280; line-height:28px;">
@@ -328,37 +325,37 @@ function buildRegistrationEmailHtml(record: Record<string, string>): string {
 function buildApprovalEmailHtml(record: Record<string, string>): string {
   const { name, slug, username } = record;
   return `
-  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;color:#333;">
-    <div style="text-align:center;padding:20px 0;border-bottom:2px solid #22c55e;margin-bottom:24px;">
-      <h1 style="color:#16a34a;font-size:22px;margin:0;">&#127881; Account Approved & Active!</h1>
-      <p style="color:#64748b;font-size:13px;margin:6px 0 0;">CodeArc RestroSuite Platform</p>
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; background: #ffffff;">
+    <div style="border-bottom: 2px solid #22c55e; padding-bottom: 12px; margin-bottom: 20px; text-align: center;">
+      <h2 style="color: #16a34a; margin: 0; font-size: 20px; font-weight: 700;">Account Approved & Active</h2>
+      <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">CodeArc RestroSuite Platform</p>
     </div>
 
-    <p>Hello,</p>
-    <p>Great news! Your registration for <strong>${name}</strong> has been <strong style="color:#16a34a;">APPROVED</strong> by the CodeArc Operations Team.</p>
-    <p>Your account is now <strong>fully active</strong> and ready to use!</p>
+    <p style="font-size: 14px; line-height: 1.6;">Dear Partner,</p>
+    <p style="font-size: 14px; line-height: 1.6;">We are pleased to inform you that your registration request for <strong>${name}</strong> has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active and ready for configuration.</p>
 
-    <div style="background:#f0fdf4;padding:16px;border-radius:8px;margin:20px 0;border-left:4px solid #22c55e;">
-      <h3 style="margin-top:0;color:#0f172a;font-size:14px;">&#128273; Your Login Credentials:</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <tr><td style="padding:5px 0;font-weight:bold;width:150px;">Outlet ID (Slug):</td>
-          <td><code style="background:#dcfce7;padding:2px 6px;border-radius:4px;">${slug}</code></td></tr>
-        <tr><td style="padding:5px 0;font-weight:bold;">Admin Username:</td><td>${username}</td></tr>
+    <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #22c55e;">
+      <h3 style="margin-top: 0; color: #1e293b; font-size: 14px; font-weight: 600;">🔑 Access Credentials:</h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px;">
+        <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px 0; font-weight: 600; width: 180px; color: #475569;">Outlet ID (Slug):</td><td style="color: #1e293b; font-family: monospace;">${slug}</td></tr>
+        <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px 0; font-weight: 600; color: #475569;">Admin Username:</td><td style="color: #1e293b; font-family: monospace;">${username}</td></tr>
       </table>
     </div>
 
-    <div style="text-align:center;margin:28px 0;">
-      <a href="https://codearc-restrosuite.vercel.app/login" style="background:#22c55e;color:white;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:14px;display:inline-block;">Access Login Portal →</a>
+    <p style="font-size: 14px; line-height: 1.6;">You can access your store management dashboard portal using the link below:</p>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="https://codearc-restrosuite.vercel.app/login" style="background: #22c55e; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Login Portal</a>
     </div>
 
-    <p style="font-size:13px;color:#555;">Please log in and configure your menu, inventory, tax settings, and staff to begin operations immediately.</p>
+    <p style="font-size: 14px; line-height: 1.6;">Please log in to review your outlet configuration, tax parameters, menu settings, and employee rosters to commence operations.</p>
 
-    <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-    <ul style="font-size:12px;color:#666;padding-left:20px;">
-      <li>&#128231; Email: <a href="mailto:hello@codearc.co.in" style="color:#22c55e;">hello@codearc.co.in</a></li>
-      <li>&#128222; Call: +91 99837 21179</li>
+    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+    <p style="font-size: 13px; color: #475569; margin-bottom: 8px;">For any inquiries or onboarding support, please contact our department:</p>
+    <ul style="font-size: 13px; color: #475569; padding-left: 20px; margin-top: 0; line-height: 1.6;">
+      <li>Email: hello@codearc.co.in</li>
+      <li>Phone: +91 99837 21179</li>
     </ul>
-    <p style="font-size:11px;color:#999;margin-top:20px;text-align:center;">Welcome to the CodeArc RestroSuite platform!</p>
+    <p style="font-size: 11px; color: #94a3b8; margin-top: 24px; text-align: center;">Welcome to the CodeArc RestroSuite platform.</p>
   </div>`;
 }
 

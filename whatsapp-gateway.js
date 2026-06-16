@@ -249,93 +249,109 @@ async function sendAdminAlert(type, extraDetails = {}) {
     const dashboardUrl = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
 
     if (type === 'disconnected') {
-        subject = '⚠️ ALERT: RestroSuite WhatsApp Gateway Disconnected';
+        subject = '[Alert] RestroSuite WhatsApp Gateway Offline';
         bodyHtml = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #ef4444;border-radius:8px;color:#333;">
-          <div style="background:#fef2f2;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
-            <h1 style="color:#dc2626;font-size:22px;margin:0;">⚠️ WhatsApp Gateway OFFLINE</h1>
-            <p style="color:#64748b;font-size:13px;margin:6px 0 0;">Immediate Attention Required</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; background: #ffffff;">
+          <div style="border-bottom: 2px solid #ef4444; padding-bottom: 12px; margin-bottom: 20px;">
+            <h2 style="color: #dc2626; margin: 0; font-size: 20px; font-weight: 700;">System Alert: WhatsApp Gateway Offline</h2>
+            <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">Automated health monitor report</p>
           </div>
-          <p>The <strong>RestroSuite WhatsApp notification gateway</strong> has gone <strong style="color:#dc2626;">OFFLINE</strong>.</p>
-          <div style="background:#f8fafc;padding:14px;border-radius:6px;margin:16px 0;border-left:4px solid #ef4444;">
-            <table style="font-size:13px;width:100%;">
-              <tr><td style="font-weight:bold;width:160px;padding:3px 0;">Status:</td><td style="color:#dc2626;font-weight:bold;">DISCONNECTED ❌</td></tr>
-              <tr><td style="font-weight:bold;padding:3px 0;">Time:</td><td>${timeStr}</td></tr>
-              <tr><td style="font-weight:bold;padding:3px 0;">Reconnect Attempts:</td><td>${extraDetails.attempts || 0}/${MAX_RECONNECT_ATTEMPTS}</td></tr>
-              <tr><td style="font-weight:bold;padding:3px 0;">Reason:</td><td>${extraDetails.reason || 'Unknown'}</td></tr>
-            </table>
-          </div>
-          <div style="background:#fff7ed;padding:14px;border-radius:6px;border-left:4px solid #FF6B00;margin:16px 0;">
-            <strong style="color:#c2410c;">⚡ Impact:</strong>
-            <ul style="font-size:13px;margin:8px 0;padding-left:20px;">
-              <li>New registrations will <strong>NOT</strong> receive WhatsApp confirmation</li>
-              <li>Billing receipts via WhatsApp are <strong>PAUSED</strong></li>
-              <li style="color:#16a34a;">✅ Email notifications are still working normally</li>
+          <p style="font-size: 14px; line-height: 1.6;">Please be advised that the RestroSuite WhatsApp notification gateway has disconnected. System operations are currently affected.</p>
+          
+          <table style="font-size: 13px; width: 100%; margin: 20px 0; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; width: 180px; padding: 8px 0; color: #475569;">Connection Status:</td><td style="color: #dc2626; font-weight: 600; padding: 8px 0;">OFFLINE</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Timestamp:</td><td style="padding: 8px 0; color: #334155;">${timeStr}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Reconnect Attempts:</td><td style="padding: 8px 0; color: #334155;">${extraDetails.attempts || 0}/${MAX_RECONNECT_ATTEMPTS}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Reported Reason:</td><td style="padding: 8px 0; color: #334155; font-family: monospace;">${extraDetails.reason || 'Unknown'}</td></tr>
+          </table>
+
+          <div style="background: #f8fafc; border-left: 4px solid #ef4444; padding: 16px; border-radius: 6px; margin-bottom: 20px;">
+            <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 14px; font-weight: 600;">System Impact</h4>
+            <ul style="font-size: 13px; margin: 0; padding-left: 20px; color: #475569; line-height: 1.6;">
+              <li>New customer/outlet registration confirmations are suspended.</li>
+              <li>Automated billing receipts dispatch via WhatsApp is paused.</li>
+              <li>Email relays continue to operate normally.</li>
             </ul>
           </div>
-          <div style="background:#eff6ff;padding:14px;border-radius:6px;border-left:4px solid #3b82f6;margin:16px 0;">
-            <strong style="color:#1d4ed8;">🔧 Action Required:</strong>
-            <ol style="font-size:13px;margin:8px 0;padding-left:20px;">
-              <li>Open the gateway dashboard: <a href="${dashboardUrl}" style="color:#1d4ed8;">${dashboardUrl}</a></li>
-              <li>If a QR code is showing, scan it with CodeArc's WhatsApp</li>
-              <li>Or restart the HuggingFace Space to trigger auto-reconnect</li>
+
+          <div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
+            <h4 style="margin: 0 0 8px 0; color: #0369a1; font-size: 14px; font-weight: 600;">Recommended Action</h4>
+            <ol style="font-size: 13px; margin: 0; padding-left: 20px; color: #0369a1; line-height: 1.6;">
+              <li>Access the system console at <a href="${dashboardUrl}" style="color: #0284c7; text-decoration: underline;">${dashboardUrl}</a></li>
+              <li>Verify the connection state; if a linking QR is displayed, perform a fresh scan.</li>
+              <li>If the service fails to reconnect, perform a gateway reset from the console.</li>
             </ol>
           </div>
-          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
+
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 16px;">
+          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated system message from the CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     } else if (type === 'online') {
-        subject = '✅ RESOLVED: RestroSuite WhatsApp Gateway is Back Online';
+        subject = '[Resolved] RestroSuite WhatsApp Gateway Back Online';
         bodyHtml = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #22c55e;border-radius:8px;color:#333;">
-          <div style="background:#f0fdf4;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
-            <h1 style="color:#16a34a;font-size:22px;margin:0;">✅ WhatsApp Gateway ONLINE</h1>
-            <p style="color:#64748b;font-size:13px;margin:6px 0 0;">All notifications are working normally</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; background: #ffffff;">
+          <div style="border-bottom: 2px solid #22c55e; padding-bottom: 12px; margin-bottom: 20px;">
+            <h2 style="color: #16a34a; margin: 0; font-size: 20px; font-weight: 700;">System Restored: WhatsApp Gateway Online</h2>
+            <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">Automated health monitor report</p>
           </div>
-          <p>The RestroSuite WhatsApp gateway has <strong style="color:#16a34a;">successfully reconnected</strong> and is fully operational.</p>
-          <div style="background:#f8fafc;padding:14px;border-radius:6px;margin:16px 0;border-left:4px solid #22c55e;">
-            <table style="font-size:13px;width:100%;">
-              <tr><td style="font-weight:bold;width:160px;padding:3px 0;">Status:</td><td style="color:#16a34a;font-weight:bold;">READY ✅</td></tr>
-              <tr><td style="font-weight:bold;padding:3px 0;">Time:</td><td>${timeStr}</td></tr>
-              <tr><td style="font-weight:bold;padding:3px 0;">Connected Number:</td><td>+${extraDetails.number || linkedNumber || 'Unknown'}</td></tr>
-              <tr><td style="font-weight:bold;padding:3px 0;">Session Saved:</td><td>${extraDetails.sessionSaved ? '✅ Backed up to Supabase Storage' : '⚠️ Save in progress'}</td></tr>
-            </table>
-          </div>
-          <p style="color:#16a34a;font-weight:bold;">WhatsApp confirmations and receipts are now being sent normally. No action needed.</p>
-          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
+          <p style="font-size: 14px; line-height: 1.6;">This email is to confirm that the RestroSuite WhatsApp notification gateway has successfully re-established a connection and is now fully operational.</p>
+          
+          <table style="font-size: 13px; width: 100%; margin: 20px 0; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; width: 180px; padding: 8px 0; color: #475569;">Connection Status:</td><td style="color: #16a34a; font-weight: 600; padding: 8px 0;">ONLINE / READY</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Timestamp:</td><td style="padding: 8px 0; color: #334155;">${timeStr}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Connected Line:</td><td style="padding: 8px 0; color: #334155; font-family: monospace;">+${extraDetails.number || linkedNumber || 'Unknown'}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Cloud Session Backup:</td><td style="padding: 8px 0; color: #334155;">${extraDetails.sessionSaved ? 'Verified and Saved' : 'Pending'}</td></tr>
+          </table>
+
+          <p style="font-size: 14px; color: #16a34a; font-weight: 600; margin-bottom: 24px;">All automated dispatches, registrations, and billing receipts have resumed. No further action is required.</p>
+
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 16px;">
+          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated system message from the CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     } else if (type === 'qr_needed') {
-        subject = '📱 ACTION REQUIRED: WhatsApp QR Scan Needed — RestroSuite Gateway';
+        subject = '[Action Required] WhatsApp Device Link Required';
         bodyHtml = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:2px solid #f59e0b;border-radius:8px;color:#333;">
-          <div style="background:#fffbeb;padding:16px;border-radius:6px;margin-bottom:20px;text-align:center;">
-            <h1 style="color:#d97706;font-size:22px;margin:0;">📱 QR Code Scan Required</h1>
-            <p style="color:#64748b;font-size:13px;margin:6px 0 0;">WhatsApp session expired — rescan needed</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; background: #ffffff;">
+          <div style="border-bottom: 2px solid #eab308; padding-bottom: 12px; margin-bottom: 20px;">
+            <h2 style="color: #ca8a04; margin: 0; font-size: 20px; font-weight: 700;">Action Required: Device Link Required</h2>
+            <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">Authentication session expired</p>
           </div>
-          <p>The WhatsApp gateway could not restore the previous session. A new QR code scan is required to re-link WhatsApp.</p>
-          <div style="background:#fffbeb;padding:14px;border-radius:6px;border-left:4px solid #f59e0b;margin:16px 0;">
-            <strong style="color:#92400e;">🔧 Steps to fix:</strong>
-            <ol style="font-size:13px;margin:8px 0;padding-left:20px;">
-              <li>Go to: <a href="${dashboardUrl}" style="color:#d97706;">${dashboardUrl}</a></li>
-              <li>A QR code should be visible on the page</li>
-              <li>Open <strong>WhatsApp</strong> on CodeArc's linked phone</li>
-              <li>Go to <strong>Settings → Linked Devices → Link a Device</strong></li>
-              <li>Scan the QR code</li>
-              <li>Done! Session will be auto-saved to cloud ✅</li>
+          <p style="font-size: 14px; line-height: 1.6;">The WhatsApp gateway was unable to restore the cached session credentials. Manual authentication is required to re-establish the connection.</p>
+          
+          <div style="background: #fef9c3; border-left: 4px solid #eab308; padding: 16px; border-radius: 6px; margin: 20px 0; color: #713f12;">
+            <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600;">Authentication Steps:</h4>
+            <ol style="font-size: 13px; margin: 0; padding-left: 20px; line-height: 1.6;">
+              <li>Open the admin console at <a href="${dashboardUrl}" style="color: #ca8a04; text-decoration: underline;">${dashboardUrl}</a></li>
+              <li>Wait for the gateway to render the authentication QR code.</li>
+              <li>Open <strong>WhatsApp</strong> on your dedicated system device.</li>
+              <li>Navigate to <strong>Linked Devices &gt; Link a Device</strong> and scan the displayed QR code.</li>
             </ol>
           </div>
-          <div style="text-align:center;margin:20px 0;">
-            <a href="${dashboardUrl}" style="background:#f59e0b;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:14px;">Open Gateway Dashboard →</a>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${dashboardUrl}" style="background: #ca8a04; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Open Console Dashboard</a>
           </div>
-          <p style="font-size:11px;color:#999;text-align:center;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
+
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 16px;">
+          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated system message from the CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     } else if (type === 'startup') {
-        subject = '🚀 INFO: RestroSuite WhatsApp Gateway Started';
+        subject = '[System] RestroSuite WhatsApp Gateway Initialized';
         bodyHtml = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;color:#333;">
-          <h2 style="color:#0f172a;">🚀 Gateway Server Started</h2>
-          <p>The RestroSuite WhatsApp gateway server has started/restarted at <strong>${timeStr}</strong>.</p>
-          <p>Session restore: <strong>${extraDetails.sessionRestored ? '✅ Success — WhatsApp reconnecting automatically' : '⚠️ No saved session — QR scan will be needed'}</strong></p>
-          <p style="font-size:11px;color:#999;margin-top:20px;">Automated alert from CodeArc RestroSuite Gateway Monitor.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; background: #ffffff;">
+          <div style="border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px;">
+            <h2 style="color: #0f172a; margin: 0; font-size: 20px; font-weight: 700;">System Notice: Gateway Server Started</h2>
+            <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">System initialization report</p>
+          </div>
+          <p style="font-size: 14px; line-height: 1.6;">This is an automated notification confirming that the WhatsApp gateway server has successfully initialized.</p>
+          
+          <table style="font-size: 13px; width: 100%; margin: 20px 0; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; width: 180px; padding: 8px 0; color: #475569;">Startup Timestamp:</td><td style="padding: 8px 0; color: #334155;">${timeStr}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Session Restoration:</td><td style="padding: 8px 0; color: #334155;">${extraDetails.sessionRestored ? 'Success (Auto-reconnecting)' : 'Failed (QR scan required)'}</td></tr>
+          </table>
+
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 16px;">
+          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated system message from the CodeArc RestroSuite Gateway Monitor.</p>
         </div>`;
     }
 
@@ -1643,7 +1659,7 @@ async function handleNewRegistrationNotification(record) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
         
-        const msgText = `🎉 *Welcome to CodeArc RestroSuite!*\n\nHi there 👋\n\nYour outlet registration has been received successfully.\n\n🏪 *Outlet:* ${name}\n🍽️ *Business Type:* ${displayType}\n\n📋 *Registration Details*\n• *Outlet ID:* ${slug}\n• *Admin Username:* ${username}\n• *Email:* ${email || 'N/A'}\n• *WhatsApp:* ${formattedPhone}\n\n⏳ *Current Status:* Pending Approval\n\nOur team is reviewing your registration.\nOnce approved, you'll receive another WhatsApp message with access details and next steps.\n\nNeed help?\n📧 hello@codearc.co.in\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestroSuite Team*`;
+        const msgText = `Dear Customer,\n\nWe are pleased to inform you that your registration request for *CodeArc RestroSuite* has been successfully received.\n\n*Registration Details:*\n• *Outlet Name:* ${name}\n• *Business Type:* ${displayType}\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n• *Registered Email:* ${email || 'N/A'}\n• *Registered Contact:* ${formattedPhone}\n\n*Current Status:* Under Review\n\nOur operations team is currently reviewing your registration details. Upon approval, you will receive a confirmation message containing your access credentials and onboarding instructions.\n\nShould you require any assistance, please contact our support department at hello@codearc.co.in or call +91 99837 21179.\n\nSincerely,\n*CodeArc RestroSuite Team*`;
         
         try {
             await client.sendMessage(chatId, msgText);
@@ -1687,12 +1703,12 @@ async function handleNewRegistrationNotification(record) {
           <tr>
             <td style="padding:35px 40px 20px 40px; text-align:center;">
 
-              <div style="font-size:28px; font-weight:700; color:#111827; margin-bottom:8px;">
-                Welcome to CodeArc RestroSuite
+              <div style="font-size:24px; font-weight:700; color:#111827; margin-bottom:8px;">
+                Registration Received
               </div>
 
               <div style="font-size:15px; color:#6b7280; line-height:24px;">
-                Your restaurant onboarding request has been received successfully.
+                We have successfully received your request to register on the CodeArc RestroSuite platform.
               </div>
 
             </td>
@@ -1710,13 +1726,11 @@ async function handleNewRegistrationNotification(record) {
             <td style="padding:35px 40px 10px 40px;">
 
               <div style="font-size:15px; color:#374151; line-height:28px;">
-                Hello,
+                Dear Customer,
               </div>
 
               <div style="font-size:15px; color:#374151; line-height:28px; margin-top:10px;">
-                Thank you for registering your outlet
-                <strong>${name}</strong> (${displayType})
-                with <strong>CodeArc RestroSuite</strong>.
+                Thank you for submitting a registration request for your outlet, <strong>${name}</strong> (${displayType}), with <strong>CodeArc RestroSuite</strong>.
               </div>
 
             </td>
@@ -1925,7 +1939,7 @@ async function handleApprovalNotification(record) {
             targetPhone = "91" + targetPhone;
         }
         const chatId = `${targetPhone}@c.us`;
-        const msgText = `🎉 *Account Approved & Active - CodeArc RestroSuite*\n\nHello,\n\nGreat news! Your registration request for *${name}* has been reviewed and APPROVED by CodeArc RestroSuite.\n\nYour account is now fully active!\n\n🔑 *Login Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Admin Username:* ${username}\n\n*Portal Link:* https://codearc.co.in/portal (or your server login page)\n\nYou can now log in, configure your settings, menu, inventory, and staff to get started immediately!\n\nIf you need any support, feel free to contact us:\n• 📧 Email: hello@codearc.co.in\n• 📞 Call: +91 99837 21179\n\nWelcome to RestroSuite!\n\nBest regards,\nCodeArc Operations Team`;
+        const msgText = `Dear Partner,\n\nWe are pleased to inform you that your registration request for *${name}* has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active.\n\n*Access Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n\n*Management Portal Link:* https://codearc.co.in/portal\n\nYou may now log in to the portal to configure your outlet settings, menu inventory, and employee rosters.\n\nShould you require any assistance or launch support, please contact our support desk at hello@codearc.co.in.\n\nSincerely,\n*CodeArc Operations Team*`;
         
         try {
             await client.sendMessage(chatId, msgText);
@@ -1943,37 +1957,39 @@ async function handleApprovalNotification(record) {
 
     // Approval emails are owned by the Supabase notify-registration function.
     if (REGISTRATION_EMAILS_ENABLED && email && (transporter || emailConfig.relayUrl)) {
-        const emailSubject = `✅ Account Approved & Active - CodeArc RestroSuite (Outlet: ${name})`;
+        const emailSubject = `Account Approved & Active - CodeArc RestroSuite (Outlet: ${name})`;
         const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; color: #333;">
-          <h2 style="color: #22c55e; border-bottom: 2px solid #22c55e; padding-bottom: 10px;">🎉 Account Approved & Active</h2>
-          <p>Hello,</p>
-          <p>Great news! Your registration request for <strong>${name}</strong> has been reviewed and <strong>APPROVED</strong> by the CodeArc Operations Team.</p>
-          <p>Your account is now fully active and ready to use!</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; background: #ffffff;">
+          <div style="border-bottom: 2px solid #22c55e; padding-bottom: 12px; margin-bottom: 20px;">
+            <h2 style="color: #16a34a; margin: 0; font-size: 20px; font-weight: 700;">Account Approved & Active</h2>
+            <p style="color: #64748b; font-size: 13px; margin: 4px 0 0;">CodeArc RestroSuite Platform</p>
+          </div>
+          <p style="font-size: 14px; line-height: 1.6;">Dear Partner,</p>
+          <p style="font-size: 14px; line-height: 1.6;">We are pleased to inform you that your registration request for <strong>${name}</strong> has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active and ready for configuration.</p>
 
-          <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #22c55e;">
-            <h3 style="margin-top: 0; color: #0f172a; font-size: 14px;">🔑 Your Login Credentials:</h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-              <tr><td style="padding: 4px 0; font-weight: bold; width: 150px;">Outlet ID (Slug):</td><td>${slug}</td></tr>
-              <tr><td style="padding: 4px 0; font-weight: bold;">Admin Username:</td><td>${username}</td></tr>
+          <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #22c55e;">
+            <h3 style="margin-top: 0; color: #1e293b; font-size: 14px; font-weight: 600;">🔑 Access Credentials:</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px;">
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px 0; font-weight: 600; width: 180px; color: #475569;">Outlet ID (Slug):</td><td style="color: #1e293b; font-family: monospace;">${slug}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px 0; font-weight: 600; color: #475569;">Admin Username:</td><td style="color: #1e293b; font-family: monospace;">${username}</td></tr>
             </table>
           </div>
 
-          <p>You can access your store dashboard portal here:</p>
-          <div style="text-align: center; margin: 25px 0;">
-            <a href="https://codearc.co.in/portal" style="background: #22c55e; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">Access Login Portal</a>
+          <p style="font-size: 14px; line-height: 1.6;">You can access your store management dashboard portal using the link below:</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="https://codearc.co.in/portal" style="background: #22c55e; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Login Portal</a>
           </div>
 
-          <p>Please log in, review your settings, tax tables, custom menu configuration, and employee ledger to begin operations.</p>
+          <p style="font-size: 14px; line-height: 1.6;">Please log in to review your outlet configuration, tax parameters, menu settings, and employee rosters to commence operations.</p>
           
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 12px; color: #666; margin-bottom: 5px;">If you have any questions or require launch support, contact us:</p>
-          <ul style="font-size: 12px; color: #666; padding-left: 20px; margin-top: 0;">
-            <li>📧 Email: <a href="mailto:hello@codearc.co.in" style="color: #22c55e; text-decoration: none;">hello@codearc.co.in</a></li>
-            <li>📞 Call: +91 99837 21179</li>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+          <p style="font-size: 13px; color: #475569; margin-bottom: 8px;">For any inquiries or onboarding support, please contact our department:</p>
+          <ul style="font-size: 13px; color: #475569; padding-left: 20px; margin-top: 0; line-height: 1.6;">
+            <li>Email: hello@codearc.co.in</li>
+            <li>Phone: +91 99837 21179</li>
           </ul>
           
-          <p style="font-size: 11px; color: #999; margin-top: 20px; text-align: center;">Welcome to the CodeArc RestroSuite platform!</p>
+          <p style="font-size: 11px; color: #94a3b8; margin-top: 24px; text-align: center;">Welcome to the CodeArc RestroSuite platform.</p>
         </div>
         `;
 
@@ -2259,27 +2275,25 @@ function getRandomGoodVibeQuote(record) {
     let quotes = [];
     if (hasFood && !hasDrinks) {
         quotes = [
-            "🍔 Made fresh to make you smile! ✨",
-            "🍟 Hot, crispy & made with love!",
-            "🥪 Your perfect bite is here! ✨",
-            "✨ Hot snacks, warm smiles! 🥪",
-            "🔥 Delicious food, great mood!"
+            "Prepared with fresh, premium ingredients",
+            "Freshly prepared for your satisfaction",
+            "Quality dining, crafted with care",
+            "Thank you for choosing our kitchen"
         ];
     } else if (hasDrinks && !hasFood) {
         quotes = [
-            "✨ Brewing happiness for you! ☕",
-            "☕ Good coffee, great day ahead!",
-            "💖 Espresso yourself and smile! ☕",
-            "✨ Freshly roasted joy in a cup! ☕",
-            "☕ Sip back, relax & enjoy!"
+            "Freshly prepared for your satisfaction",
+            "Crafted to elevate your day",
+            "Quality beverage, freshly prepared",
+            "Thank you for choosing our service"
         ];
     } else {
         quotes = [
-            "✨ Today is a beautiful day! 🌟",
-            "🍀 Thank you for being awesome! 💖",
-            "✨ Spread kindness like confetti! 🎉",
-            "💖 You made our day brighter! ✨",
-            "🍪 You're the cookie to our cup! ☕"
+            "We appreciate your patronage",
+            "Thank you for your valued business",
+            "Committed to quality and service",
+            "We look forward to serving you again",
+            "Your satisfaction is our priority"
         ];
     }
 

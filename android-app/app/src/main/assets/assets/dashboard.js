@@ -917,7 +917,7 @@
     try {
       const data = await RS_API.admin({ action: 'gateway_logs' });
       if (data && !data.error) {
-        const logs = (data.logs || []).slice().reverse();
+        const logs = (data.logs || []).slice(0, 15);
         if (logsContainer) {
           if (logs.length === 0) {
             logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent dispatch logs found.</div>';
@@ -928,7 +928,7 @@
               const cls = log.status === 'ok' ? 'ti' : (log.status === 'warning' ? 'tw' : 'te');
               return `<div class="tl"><span class="tt">${timeStr}</span><span class="${cls}">[${log.event.toUpperCase()}] ${escHtml(log.details?.message || log.details?.error || 'System event')}</span></div>`;
             }).join('');
-            logsContainer.scrollTop = logsContainer.scrollHeight;
+            logsContainer.scrollTop = 0;
           }
         }
       } else {
@@ -943,9 +943,15 @@
         const row = document.createElement('div');
         row.className = 'tl';
         row.innerHTML = `<span class="tt">${ts}</span><span class="${l[0]}">${l[1]}</span>`;
-        logsContainer.appendChild(row);
-        logsContainer.scrollTop = logsContainer.scrollHeight;
-        while (logsContainer.children.length > 30) logsContainer.removeChild(logsContainer.firstChild);
+        
+        // Prepend new mock logs at the top
+        logsContainer.insertBefore(row, logsContainer.firstChild);
+        logsContainer.scrollTop = 0;
+        
+        // Maintain a maximum of 15 logs visible at a time
+        while (logsContainer.children.length > 15) {
+          logsContainer.removeChild(logsContainer.lastChild);
+        }
       }
     }
   }
