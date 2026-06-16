@@ -381,6 +381,13 @@ async function saveSessionToSupabase() {
                     '**/Crashpad/**',
                     '**/*.pma',
                     '**/LOCK',
+                    '**/SingletonLock',
+                    '**/SingletonCookie',
+                    '**/SingletonSocket',
+                    '**/*LOCK*',
+                    '**/*lock*',
+                    '**/*singleton*',
+                    '**/*Singleton*',
                     '**/LOG',
                     '**/LOG.old',
                     // Ignore all extra Chrome cache/download/telemetry folders to keep session zip small
@@ -447,6 +454,41 @@ async function saveSessionToSupabase() {
     }
 }
 
+function cleanupStaleLockFiles(dir) {
+    if (!fs.existsSync(dir)) return;
+    try {
+        const items = fs.readdirSync(dir);
+        for (const item of items) {
+            const fullPath = path.join(dir, item);
+            let stat;
+            try {
+                stat = fs.lstatSync(fullPath);
+            } catch (e) {
+                // Skip files we cannot lstat (e.g. permission issues or deleted dynamically)
+                continue;
+            }
+            if (stat.isDirectory()) {
+                cleanupStaleLockFiles(fullPath);
+            } else {
+                const lowerItem = item.toLowerCase();
+                const isLockFile = item === 'LOCK' ||
+                                   lowerItem.includes('lock') ||
+                                   lowerItem.includes('singleton');
+                if (isLockFile) {
+                    try {
+                        fs.unlinkSync(fullPath);
+                        console.log(`[Session Cleanup] Removed stale browser lock/socket/cookie file: ${fullPath}`);
+                    } catch (e) {
+                        console.warn(`[Session Cleanup Warning] Could not delete file ${fullPath}: ${e.message}`);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Session Cleanup Error]', err.message);
+    }
+}
+
 async function restoreSessionFromSupabase() {
     if (!supabaseService) {
         console.warn('[Session Restore] SUPABASE_SERVICE_KEY not set. Skipping restore.');
@@ -476,6 +518,8 @@ async function restoreSessionFromSupabase() {
         await fs.createReadStream(zipPath)
             .pipe(unzipper.Extract({ path: authDataPath }))
             .promise();
+
+        cleanupStaleLockFiles(authDataPath);
 
         sessionRestoredAt = new Date().toISOString();
         console.log(`[Session Restore] ✅ WhatsApp session restored from Supabase Storage at ${sessionRestoredAt}`);
@@ -560,6 +604,18 @@ const client = new Client({
         ]
     }
 });
+
+// Intercept client.initialize to run cleanupStaleLockFiles before starting Chromium
+const originalInitialize = client.initialize;
+client.initialize = function() {
+    try {
+        console.log('[Puppeteer Init Shield] Cleaning up stale browser lock/socket/cookie files before launch...');
+        cleanupStaleLockFiles(authDataPath);
+    } catch (err) {
+        console.error('[Puppeteer Init Shield Error]', err.message);
+    }
+    return originalInitialize.apply(this, arguments);
+};
 
 // Display QR code in terminal and save base64 data URI for POS Web UI
 client.on('qr', async (qr) => {
@@ -2506,6 +2562,10 @@ app.listen(PORT, async () => {
     }
 
     await logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() });
+
+    // Clean up any stale lock/socket/cookie files from a previous run first
+    console.log('[Startup] Cleaning up any stale browser lock/socket/cookie files...');
+    cleanupStaleLockFiles(authDataPath);
 
     // Attempt to restore WhatsApp session from Supabase Storage
     console.log('[Startup] Attempting to restore WhatsApp session from Supabase Storage...');
