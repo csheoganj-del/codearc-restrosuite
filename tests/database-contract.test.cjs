@@ -4,7 +4,25 @@ const path = require("node:path");
 const test = require("node:test");
 
 const root = path.resolve(__dirname, "..");
-const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+function read(relativePath) {
+  if (relativePath === "dashboard.js") {
+    const files = [
+      "assets/supabase-config.js",
+      "assets/doppio-api.js",
+      "assets/db.js",
+      "src/dashboard/observability.js",
+      "assets/features-shell.js",
+      "assets/features-editor.js",
+      "assets/features-manage.js",
+      "assets/features-extra.js",
+      "assets/features-pos.js",
+      "assets/features-growth.js",
+      "assets/dashboard.js"
+    ];
+    return files.map(f => fs.readFileSync(path.join(root, f), "utf8")).join("\n");
+  }
+  return fs.readFileSync(path.join(root, relativePath), "utf8");
+}
 
 function extractQuotedSet(source, declaration) {
   const match = source.match(new RegExp(`${declaration}\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)`));

@@ -159,6 +159,66 @@ async function verifySuperadminToken(req: Request) {
   }
 }
 
+function getGatewayUrlAndToken() {
+  let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || "";
+  const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
+
+  if (!url) {
+    const relayUrl = Deno.env.get("EMAIL_RELAY_URL") || "";
+    if (relayUrl) {
+      try {
+        const parsed = new URL(relayUrl);
+        url = parsed.origin;
+      } catch (_) {
+        // Ignored
+      }
+    }
+  }
+
+  if (!url) {
+    url = "https://kalpeshdeora1006-whatsapp-gateway.hf.space";
+  }
+
+  url = url.trim().replace(/\/+$/, "");
+  return { url, token: token.trim() };
+}
+
+async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Request) {
+  const { url, token } = getGatewayUrlAndToken();
+  const targetUrl = `${url}${path}`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    const response = await fetch(targetUrl, {
+      method,
+      headers,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const text = await response.text();
+      return jsonResponse({ error: `Gateway returned status ${response.status}: ${text}` }, response.status, req);
+    }
+
+    const json = await response.json();
+    return jsonResponse(json, 200, req);
+  } catch (err: any) {
+    console.error(`Gateway proxy error for ${targetUrl}:`, err);
+    return jsonResponse({ error: `Failed to connect to gateway: ${err.message || err}` }, 502, req);
+  }
+}
+
 async function listTenants(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("saas_tenants")
@@ -718,6 +778,9 @@ serve(async (req) => {
     if (action === "reset_tenant_data") return await resetTenantData(payload, req);
     if (action === "seed_tenant_data") return await seedTenantData(payload, req);
     if (action === "purge_demo_data") return await purgeTenantDemoData(payload, req);
+    if (action === "gateway_status") return await proxyGatewayRequest("/status", "GET", req);
+    if (action === "gateway_logs") return await proxyGatewayRequest("/debug-logs", "GET", req);
+    if (action === "gateway_reset") return await proxyGatewayRequest("/reset", "POST", req);
 
     return jsonResponse({ error: "Unsupported action." }, 400, req);
   } catch (error) {

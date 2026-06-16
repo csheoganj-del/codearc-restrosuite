@@ -74,7 +74,8 @@ export default async function handler(req, res) {
   msg += `👉 Visit: https://restrosuite.codearc.co.in`;
 
   // Call the WhatsApp Gateway
-  const gatewayUrl = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space/send';
+  const baseGatewayUrl = process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+  const gatewayUrl = baseGatewayUrl.replace(/\/$/, '') + '/send';
   const token = process.env.WHATSAPP_GATEWAY_TOKEN || '';
 
   const headers = {

@@ -24,10 +24,7 @@ $FilesToCopy = @(
     "config.js",
     "supabase_migration.sql",
     "styles.css",
-    "dashboard-styles.css",
-    "theme-luxe.css",
     "script.js",
-    "dashboard.js",
     "recipes.json",
     "pwa.js",
     "service-worker.js",
@@ -42,7 +39,8 @@ $FilesToCopy = @(
 
 $DirectoriesToCopy = @(
     "src",
-    "api"
+    "api",
+    "assets"
 )
 
 # Copy individual files

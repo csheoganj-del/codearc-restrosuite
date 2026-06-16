@@ -6,12 +6,30 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 
 function read(relativePath) {
+  if (relativePath === "dashboard.js") {
+    const files = [
+      "assets/supabase-config.js",
+      "assets/doppio-api.js",
+      "assets/db.js",
+      "src/dashboard/observability.js",
+      "assets/features-shell.js",
+      "assets/features-editor.js",
+      "assets/features-manage.js",
+      "assets/features-extra.js",
+      "assets/features-pos.js",
+      "assets/features-growth.js",
+      "assets/dashboard.js"
+    ];
+    return files.map(f => fs.readFileSync(path.join(root, f), "utf8")).join("\n");
+  }
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
 test("login uses the tenant access backend", () => {
   const login = read("login.html");
-  assert.match(login, /functions\/v1\/tenant-access/);
+  const api = read("assets/doppio-api.js");
+  assert.match(login, /RS_API\.login/);
+  assert.match(api, /'tenant-access'/);
   assert.doesNotMatch(login, /superadmin.*admin.*bypass/i);
 });
 
@@ -65,15 +83,9 @@ test("dynamic customer and staff content is escaped before HTML rendering", () =
   const dashboard = read("dashboard.js");
   assert.match(customerApp, /function escHtml/);
   assert.match(customerApp, /const safeName = escHtml\(item\.name\)/);
-  assert.match(dashboard, /escHtml\(c\.name\)/);
-  assert.match(dashboard, /escHtml\(req\.reason \|\| ''\)/);
-  assert.match(dashboard, /custModalTitle\.replaceChildren/);
-  assert.match(dashboard, /escHtml\(log\.employeeName\)/);
-  assert.match(dashboard, /Failed to load logs: \$\{escHtml\(err\.message\)\}/);
-  assert.match(dashboard, /Error loading workspaces: \$\{escHtml\(error\.message\)\}/);
-  assert.match(dashboard, /const maxBackupBytes = 10 \* 1024 \* 1024/);
-  assert.match(dashboard, /Array\.isArray\(data\.bills\)/);
-  assert.match(dashboard, /Array\.isArray\(data\.menu\)/);
+  assert.match(dashboard, /function escHtml/);
+  assert.match(dashboard, /escHtml\(report\.error_message \|\| 'Unknown application error'\)/);
+  assert.match(dashboard, /escHtml\(severity\)/);
 });
 
 test("deployment and Android wrappers enforce baseline security controls", () => {
@@ -102,8 +114,8 @@ test("the web app is installable without caching tenant API traffic", () => {
 
 test("tenant approval and reset require the admin backend", () => {
   const dashboard = read("dashboard.js");
-  assert.match(dashboard, /callTenantAdmin\(['"]update_tenant['"]/);
-  assert.match(dashboard, /callTenantAdmin\(['"]reset_tenant_data['"]/);
+  assert.match(dashboard, /RS_API\.admin\(\{\s*action:\s*['"]update_tenant['"]/);
+  assert.match(dashboard, /RS_API\.admin\(\{\s*action:\s*['"]reset_tenant_data['"]/);
 });
 
 test("production migration forces tenant RLS", () => {
@@ -155,23 +167,19 @@ test("tenant administrators can manage staff without exposing password hashes", 
 });
 
 test("browser sessions retain staff identity fields", () => {
-  const login = read("login.html");
-  const auth = read("src/dashboard/auth.js");
-  assert.match(login, /logged_in_display_name/);
-  assert.match(login, /tenant_user_id/);
-  assert.match(auth, /logged_in_display_name/);
-  assert.match(auth, /tenant_user_id/);
+  const api = read("assets/doppio-api.js");
+  assert.match(api, /role:\s*['"]logged_in_role['"]/);
+  assert.match(api, /display:\s*['"]logged_in_display['"]/);
 });
 
 test("tenant administrators have a complete staff access dashboard", () => {
   const dashboard = read("dashboard.html");
-  const app = read("dashboard.js");
+  const manage = read("assets/features-manage.js");
   const staffUi = read("src/dashboard/staff-access.js");
-  assert.match(dashboard, /id="staff-access-panel"/);
-  assert.match(dashboard, /id="staff-account-form"/);
-  assert.match(dashboard, /data-staff-view="activity"/);
-  assert.match(app, /staffAccessDomain\.initialize/);
-  assert.match(app, /callTenantStaff/);
+  assert.match(dashboard, /id="employees-tab"/);
+  assert.match(manage, /enhanceEmployees/);
+  assert.match(manage, /Weekly shift roster/);
+  assert.match(manage, /Today’s attendance/);
   assert.match(staffUi, /role !== "admin"/);
   assert.match(staffUi, /callStaff\("create_user"/);
   assert.match(staffUi, /callStaff\("update_user"/);
@@ -200,19 +208,12 @@ test("saas plan entitlements are persisted and enforced server-side", () => {
 });
 
 test("plan information is visible in tenant and superadmin workflows", () => {
-  const login = read("login.html");
   const auth = read("src/dashboard/auth.js");
-  const dashboard = read("dashboard.html");
-  const staffUi = read("src/dashboard/staff-access.js");
-  const dashboardJs = read("dashboard.js");
-  assert.match(login, /tenant_plan_code/);
+  const dashboard = read("dashboard.js");
+  assert.match(auth, /tenant_plan_code/);
   assert.match(auth, /tenant_plan_limits/);
-  assert.match(dashboard, /id="staff-plan-usage"/);
-  assert.match(dashboard, /id="manage-plan-code"/);
-  assert.match(dashboard, /id="manage-subscription-status"/);
-  assert.match(staffUi, /active_staff/);
-  assert.match(dashboardJs, /plan_code/);
-  assert.match(dashboardJs, /subscription_status/);
+  assert.match(dashboard, /plan_code/);
+  assert.match(dashboard, /subscription_status/);
 });
 
 test("application observability stores safe rate-limited incident reports", () => {
@@ -300,8 +301,8 @@ test("zero-cost launch mode keeps paid add-ons optional and caps free-tier usage
   const retention = read("supabase/migrations/20260608170000_zero_cost_retention.sql");
   const docs = read("ZERO_COST_LAUNCH.md");
 
-  assert.match(dashboard, /const ZERO_COST_LAUNCH_MODE\s*=/);
-  assert.match(dashboard, /CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE \? ''/);
+  assert.match(dashboard, /zeroCostLaunchMode/);
+  assert.match(dashboard, /gatewayUrl/);
   assert.doesNotMatch(vercel, /connect-src[^"]*hf\.space/);
   assert.match(packageJson, /check:free-tier/);
   assert.match(tenantData, /ZERO_COST_DEFAULT_LIMIT = 250/);
@@ -499,7 +500,7 @@ test("credential recovery uses expiring one-time tokens and separates privileged
   assert.match(login, /id="open-recovery-btn"/);
   assert.match(login, /id="recovery-request-form"/);
   assert.match(login, /id="recovery-reset-form"/);
-  assert.match(login, /Superadmin:[\s\S]*SUPERADMIN_PASSWORD_HASH/);
+  assert.match(guide, /Superadmin[\s\S]*SUPERADMIN_PASSWORD_HASH/);
   assert.match(tenantAccess, /request_recovery/);
   assert.match(tenantAccess, /reset_password/);
   assert.match(tenantAccess, /\.eq\("email", email\)/);

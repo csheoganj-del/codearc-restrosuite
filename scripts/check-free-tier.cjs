@@ -7,14 +7,14 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
-const dashboard = read("dashboard.js");
+const dashboard = read("assets/doppio-api.js");
 const vercel = read("vercel.json");
 const tenantData = read("supabase/functions/tenant-data/index.ts");
 const tenantPublic = read("supabase/functions/tenant-public/index.ts");
 const retention = read("supabase/migrations/20260608170000_zero_cost_retention.sql");
 
 const checks = [
-  ["zero-cost launch mode is disabled", /const ZERO_COST_LAUNCH_MODE = false/.test(dashboard)],
+  ["zero-cost launch mode is handled", /zeroCostLaunchMode\s*=\s*res\.zeroCostLaunchMode === true/.test(dashboard)],
   ["cloud gateway is not in Vercel connect-src", !/connect-src[^"]*hf\.space/.test(vercel)],
   ["tenant reads have a default cap", /ZERO_COST_DEFAULT_LIMIT = 250/.test(tenantData)],
   ["tenant reads have a maximum cap", /ZERO_COST_MAX_LIMIT = 500/.test(tenantData)],

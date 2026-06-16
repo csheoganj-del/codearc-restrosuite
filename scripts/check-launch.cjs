@@ -41,7 +41,7 @@ function normalizeSupabaseUrl(value) {
 }
 
 // ── 1. Frontend must use runtime config, never hardcoded credentials ─────────
-const frontendFiles = ["login.html", "dashboard.js", "script.js", "home.html", "dashboard.html"];
+const frontendFiles = ["login.html", "assets/dashboard.js", "script.js", "home.html", "dashboard.html"];
 const jwtPattern = /eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}/;
 const projectUrlPattern = /https:\/\/[a-z0-9]{16,}\.supabase\.co/;
 
@@ -59,11 +59,16 @@ for (const file of frontendFiles) {
   }
 }
 
-for (const file of ["login.html", "dashboard.js", "script.js"]) {
+for (const file of ["login.html", "script.js"]) {
   const source = read(file);
   if (!source.includes("window.__SUPABASE_URL__") || !source.includes("window.__SUPABASE_ANON_KEY__")) {
     fail(`${file} does not read runtime config (window.__SUPABASE_URL__ / window.__SUPABASE_ANON_KEY__).`);
   }
+}
+
+const apiSource = read("assets/doppio-api.js");
+if (!apiSource.includes("/api/config")) {
+  fail("assets/doppio-api.js does not fetch /api/config.");
 }
 
 // ── 2. Runtime config plumbing must exist ─────────────────────────────────────

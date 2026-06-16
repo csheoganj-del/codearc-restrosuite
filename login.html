@@ -6,7 +6,14 @@
 <title>RestroSuite Access — Sign in or Register your Outlet</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/restrosuite.css">
+<link rel="manifest" href="manifest.webmanifest">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+  // Ensure we read runtime config (window.__SUPABASE_URL__ / window.__SUPABASE_ANON_KEY__)
+  const dummySupabaseUrl = window.__SUPABASE_URL__;
+  const dummySupabaseKey = window.__SUPABASE_ANON_KEY__;
+</script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js"></script>

@@ -1,6 +1,59 @@
 .vercel
+.gradle/
+.android-home/
+.tmp-gradle-build/
+.idea/
+build/
+app/build/
+**/build/
+*.apk
+*.aar
+dashboard-phase2-restore.zip
+local.properties
+.DS_Store
+
+# Android release signing — NEVER commit keystores or signing credentials
+*.jks
+*.keystore
+android-app/gradle.properties
+
+
+# Node
+node_modules/
+node_modules_old/
+.npm-cache/
+node-portable/
+node.zip
+
+# WhatsApp session files (never commit these)
+.wwebjs_auth/
+.wwebjs_auth (1)/
+.wwebjs_cache/
+
+# Sensitive config (contains passwords)
+email-config.json
+.env
+.env.*
+!*.env.example
+
+# Sample/dev files
+sample_dashboard.css
+sample_dashboard.html
+
+# Kombai tool files
+.kombai/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local Supabase CLI executables and test results
+supabase.exe
+supabase-go.exe
+res.txt
+.aider*
+
+# Logs and temporary files
+*.log
 .thumbnail
 uploads/
-.DS_Store
-Thumbs.db
-node_modules/

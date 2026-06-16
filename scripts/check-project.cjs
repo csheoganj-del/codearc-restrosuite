@@ -2,12 +2,22 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
+// Compatibility check for dashboard-styles.css
 const root = path.resolve(__dirname, "..");
 const javascriptFiles = [
-  "dashboard.js",
   "script.js",
   "pwa.js",
   "service-worker.js",
+  "assets/dashboard.js",
+  "assets/db.js",
+  "assets/doppio-api.js",
+  "assets/features-editor.js",
+  "assets/features-extra.js",
+  "assets/features-growth.js",
+  "assets/features-manage.js",
+  "assets/features-pos.js",
+  "assets/features-shell.js",
+  "assets/supabase-config.js",
   "src/dashboard/api.js",
   "src/dashboard/auth.js",
   "src/dashboard/billing.js",
@@ -21,9 +31,18 @@ const javascriptFiles = [
   "src/dashboard/pos.js",
   "src/dashboard/superadmin.js",
   "src/dashboard/whatsapp.js",
-  "android-app/app/src/main/assets/dashboard.js",
   "android-app/app/src/main/assets/script.js",
   "android-app/app/src/main/assets/pwa.js",
+  "android-app/app/src/main/assets/assets/dashboard.js",
+  "android-app/app/src/main/assets/assets/db.js",
+  "android-app/app/src/main/assets/assets/doppio-api.js",
+  "android-app/app/src/main/assets/assets/features-editor.js",
+  "android-app/app/src/main/assets/assets/features-extra.js",
+  "android-app/app/src/main/assets/assets/features-growth.js",
+  "android-app/app/src/main/assets/assets/features-manage.js",
+  "android-app/app/src/main/assets/assets/features-pos.js",
+  "android-app/app/src/main/assets/assets/features-shell.js",
+  "android-app/app/src/main/assets/assets/supabase-config.js",
   "android-app/app/src/main/assets/src/dashboard/api.js",
   "android-app/app/src/main/assets/src/dashboard/auth.js",
   "android-app/app/src/main/assets/src/dashboard/billing.js",
@@ -52,9 +71,7 @@ for (const relativePath of javascriptFiles) {
 }
 
 const mirroredFiles = [
-  "dashboard.js",
   "dashboard.html",
-  "dashboard-styles.css",
   "login.html",
   "script.js",
   "styles.css",
@@ -77,7 +94,20 @@ const mirroredFiles = [
   "src/dashboard/staff-access.js",
   "src/dashboard/pos.js",
   "src/dashboard/superadmin.js",
-  "src/dashboard/whatsapp.js"
+  "src/dashboard/whatsapp.js",
+  "assets/dashboard.js",
+  "assets/db.js",
+  "assets/doppio-api.js",
+  "assets/features-editor.js",
+  "assets/features-extra.js",
+  "assets/features-growth.js",
+  "assets/features-manage.js",
+  "assets/features-pos.js",
+  "assets/features-shell.js",
+  "assets/supabase-config.js",
+  "assets/dashboard.css",
+  "assets/features.css",
+  "assets/restrosuite.css"
 ];
 
 for (const relativePath of mirroredFiles) {

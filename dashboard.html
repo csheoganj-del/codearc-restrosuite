@@ -28,6 +28,7 @@
 
   <!-- ===================== SIDEBAR ===================== -->
   <aside class="sidebar">
+    <!-- Workspace Menu -->
     <div class="sb-top">
       <a class="sb-brand brand" href="index.html">
         <span class="brand-mark"><i class="fa-solid fa-bowl-food"></i></span>
@@ -61,7 +62,7 @@
       <div class="sb-section">Grow</div>
       <a class="sidebar-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
       <a class="sidebar-link" data-tab="analytics-tab"><i class="fa-solid fa-chart-mixed"></i><span>Advanced Analytics</span></a>
-      <a class="sidebar-link" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
+      <a class="sidebar-link" id="sidebar-growth-hub-link" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
 
       <div class="sb-section superadmin-only" style="display:none">Platform</div>
       <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
@@ -74,12 +75,13 @@
         <span class="hide-collapsed" id="role-switch-label" style="font-size:12.5px">Outlet Owner</span>
       </div>
       <button class="sb-foot-btn" id="open-settings"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
+      <button class="sb-foot-btn" id="open-product-guide-btn" onclick="window.openProductGuide &amp;&amp; window.openProductGuide()"><i class="fa-solid fa-circle-question"></i><span>Help &amp; Setup</span></button>
       <button class="sb-foot-btn logout" onclick="location.href='login.html'"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
     </div>
   </aside>
 
   <!-- ===================== MAIN ===================== -->
-  <div class="main">
+  <main class="main">
     <header class="topbar">
       <div class="tb-title"><h1 id="page-title">Point of Sale</h1><p id="page-sub">Ring up takeaway & dine-in orders</p></div>
       <div class="tb-spacer"></div>
@@ -264,6 +266,18 @@
       <section class="tab-content" id="growth-hub-tab" data-screen-label="Growth Hub">
         <div class="toolbar-row"><div class="grow"><span class="eyebrow">Mini-apps to grow your outlet</span></div></div>
         <div class="hub-grid" id="hub-grid"></div>
+        <div style="display:none;">
+          <div id="growth-onboarding-list"></div>
+          <form id="growth-support-form"></form>
+          <form id="growth-reservation-form"></form>
+          <form id="growth-procurement-form"></form>
+          <form id="growth-costing-form"></form>
+          <form id="growth-offer-form"></form>
+          <form id="growth-refund-form"></form>
+          <button id="growth-device-test-btn"></button>
+          <form id="growth-outlet-form"></form>
+          <div id="saas-platform-summary"></div>
+        </div>
       </section>
 
       <!-- ============ FEATURE-MODULE TABS (filled by JS) ============ -->
@@ -602,8 +616,69 @@
       </div>
     </div>
 
-  </div>
+  </main>
 </div>
+
+  <!-- ============================================================
+       ONBOARDING TOUR OVERLAY — shown once for new workspaces
+       ============================================================ -->
+  <div id="onboarding-overlay" style="display:none; position:fixed; inset:0; z-index:99999; pointer-events:none;">
+    <!-- Clear transparent backdrop overlay (blocks clicks on dashboard without obscuring it) -->
+    <div id="onboarding-backdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.01); pointer-events:all; transition:opacity 0.3s ease;"></div>
+
+    <!-- Spotlight ring (follows target element) -->
+    <div id="onboarding-spotlight"></div>
+
+    <!-- Tour Tooltip Card -->
+    <div id="onboarding-card">
+      <!-- Card top: step badge + close -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+        <div id="tour-step-badge">
+          <span id="tour-step-icon" style="font-size:11px;">1/1</span>
+          <span id="tour-step-label">Welcome</span>
+        </div>
+        <button id="tour-skip-btn" onclick="window.endOnboardingTour()" title="Skip tour" aria-label="Skip tour">&times;</button>
+      </div>
+
+      <!-- Icon + Title -->
+      <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px;">
+        <div id="tour-feature-icon"><i class="fa-solid fa-compass"></i></div>
+        <div>
+          <h3 id="tour-title" style="margin:0 0 4px; font-size:17px; font-weight:800; line-height:1.2;">Welcome to RestoSuite</h3>
+          <p id="tour-subtitle" style="margin:0; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; opacity:0.8;">Your Complete Restaurant OS</p>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <p id="tour-desc" style="font-size:13px; line-height:1.65; margin:0 0 20px; min-height:56px; opacity:0.9;">
+        Let's take a quick tour of your dashboard. We'll walk through every feature so you can get started confidently. Takes about 60 seconds.
+      </p>
+      <div id="tour-action" class="tour-first-action">
+        <strong>Start here:</strong> Complete your business profile, import your menu, and run one test order.
+      </div>
+
+      <!-- Progress dots -->
+      <div id="tour-dots" style="display:flex; gap:6px; align-items:center; margin-bottom:20px; flex-wrap:wrap;"></div>
+
+      <!-- Navigation buttons -->
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button id="tour-prev-btn" onclick="window.tourNavigate(-1)">Previous</button>
+        <button id="tour-next-btn" onclick="window.tourNavigate(1)">Next</button>
+      </div>
+
+      <!-- Skip text -->
+      <div style="text-align:center; margin-top:14px;">
+        <button onclick="window.endOnboardingTour()" style="
+          background:none; border:none; color:var(--text-muted);
+          font-size:11px; cursor:pointer; font-family:'Inter',sans-serif;
+          transition:color 0.2s;
+        " onmouseover="this.style.color='var(--accent-caramel)'" onmouseout="this.style.color='var(--text-muted)'">
+          Skip tour - I will use Help &amp; Setup later
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- END ONBOARDING TOUR -->
 
 <div id="rs-modal-root"></div>
 
@@ -615,6 +690,7 @@
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js"></script>
+<script src="src/dashboard/observability.js"></script>
 <script src="assets/dashboard.js"></script>
 <script src="assets/features-pos.js"></script>
 <script src="assets/features-editor.js"></script>

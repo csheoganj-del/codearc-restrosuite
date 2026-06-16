@@ -1,0 +1,243 @@
+/* ============================================================
+   CodeArc RestroSuite — Premium Glassmorphic Design System
+   Dark mode is the hero; warm-slate light mode via [data-theme="light"].
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;450;500;600;700&display=swap');
+
+:root {
+  /* —— Brand —— */
+  --orange: #FF4F00;
+  --orange-soft: #FF6A2A;
+  --orange-deep: #E04300;
+  --violet: oklch(0.66 0.17 285);
+  --violet-soft: oklch(0.74 0.13 285);
+  --teal: oklch(0.74 0.12 200);
+  --green: oklch(0.74 0.15 158);
+  --amber: oklch(0.80 0.15 78);
+  --red: oklch(0.66 0.20 25);
+
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 30px;
+  --r-pill: 999px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --t: 0.32s var(--ease);
+
+  --maxw: 1240px;
+}
+
+/* ============================ DARK (default) ============================ */
+:root, :root[data-theme="dark"] {
+  --bg-0: #08080B;
+  --bg-1: #0D0D12;
+  --bg-2: #121219;
+  --bg-grad: radial-gradient(1200px 700px at 78% -8%, rgba(255,79,0,0.16), transparent 60%),
+             radial-gradient(1000px 680px at 6% 4%, oklch(0.66 0.17 285 / 0.16), transparent 58%),
+             linear-gradient(180deg, #0A0A0E 0%, #08080B 100%);
+
+  --text: #F4F3F7;
+  --text-soft: #B7B6C4;
+  --text-mute: #807F92;
+  --text-faint: #56556A;
+
+  --glass: rgba(255,255,255,0.045);
+  --glass-2: rgba(255,255,255,0.07);
+  --glass-3: rgba(255,255,255,0.10);
+  --glass-hi: rgba(255,255,255,0.14);
+  --stroke: rgba(255,255,255,0.09);
+  --stroke-2: rgba(255,255,255,0.14);
+  --stroke-hi: rgba(255,255,255,0.22);
+
+  --panel: rgba(25,25,33,0.86);
+  --panel-solid: #15151C;
+  --elevate: rgba(255,255,255,0.05);
+
+  --shadow-sm: 0 2px 10px rgba(0,0,0,0.4);
+  --shadow-md: 0 14px 40px rgba(0,0,0,0.5);
+  --shadow-lg: 0 30px 80px rgba(0,0,0,0.62);
+  --glow-orange: 0 8px 34px rgba(255,79,0,0.42);
+  --glow-violet: 0 8px 34px oklch(0.66 0.17 285 / 0.4);
+
+  --orange-tint: rgba(255,79,0,0.13);
+  --violet-tint: oklch(0.66 0.17 285 / 0.14);
+  --green-tint: oklch(0.74 0.15 158 / 0.16);
+  --amber-tint: oklch(0.80 0.15 78 / 0.16);
+  --red-tint: oklch(0.66 0.20 25 / 0.16);
+
+  color-scheme: dark;
+}
+
+/* ============================ LIGHT (warm slate) ============================ */
+:root[data-theme="light"] {
+  --bg-0: #EFEBE6;
+  --bg-1: #F4F1EC;
+  --bg-2: #FBF9F6;
+  --bg-grad: radial-gradient(1200px 700px at 80% -10%, rgba(255,79,0,0.12), transparent 58%),
+             radial-gradient(1000px 680px at 4% 2%, oklch(0.66 0.17 285 / 0.10), transparent 56%),
+             linear-gradient(180deg, #F2EEE8 0%, #EAE5DE 100%);
+
+  --text: #1C1A20;
+  --text-soft: #4B4856;
+  --text-mute: #6F6B7A;
+  --text-faint: #9C97A6;
+
+  --glass: rgba(255,255,255,0.58);
+  --glass-2: rgba(255,255,255,0.72);
+  --glass-3: rgba(255,255,255,0.85);
+  --glass-hi: rgba(255,255,255,0.95);
+  --stroke: rgba(28,24,40,0.08);
+  --stroke-2: rgba(28,24,40,0.13);
+  --stroke-hi: rgba(28,24,40,0.20);
+
+  --panel: rgba(255,255,255,0.74);
+  --panel-solid: #FFFFFF;
+  --elevate: rgba(255,255,255,0.7);
+
+  --shadow-sm: 0 2px 10px rgba(60,40,20,0.08);
+  --shadow-md: 0 16px 40px rgba(60,40,20,0.12);
+  --shadow-lg: 0 30px 70px rgba(60,40,20,0.16);
+  --glow-orange: 0 10px 30px rgba(255,79,0,0.28);
+  --glow-violet: 0 10px 30px oklch(0.66 0.17 285 / 0.28);
+
+  --orange-tint: rgba(255,79,0,0.10);
+  --violet-tint: oklch(0.66 0.17 285 / 0.12);
+  --green-tint: oklch(0.74 0.15 158 / 0.14);
+  --amber-tint: oklch(0.80 0.15 78 / 0.18);
+  --red-tint: oklch(0.66 0.20 25 / 0.12);
+
+  color-scheme: light;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-0);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv05","ss01";
+}
+
+h1, h2, h3, h4, h5 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.025em; line-height: 1.05; color: var(--text); }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+::selection { background: rgba(255,79,0,0.28); color: #fff; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+img { max-width: 100%; display: block; }
+
+/* —— Scrollbars —— */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--stroke-2); border-radius: 99px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--stroke-hi); background-clip: padding-box; }
+
+/* ============================ Glass primitives ============================ */
+.glass {
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+}
+.glass-soft {
+  background: var(--glass);
+  border: 1px solid var(--stroke);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* ============================ Brand lockup ============================ */
+.brand { display: inline-flex; align-items: center; gap: 11px; }
+.brand-mark {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: linear-gradient(150deg, var(--orange) 0%, var(--orange-deep) 100%);
+  display: grid; place-items: center; color: #fff; font-size: 17px;
+  box-shadow: var(--glow-orange), inset 0 1px 0 rgba(255,255,255,0.4);
+  flex: none;
+}
+.brand-name { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.02em; color: var(--text); }
+.brand-name b { color: var(--orange); font-weight: 800; }
+.brand-name .codearc { color: var(--text-mute); font-weight: 600; font-size: 0.78em; letter-spacing: 0.04em; text-transform: uppercase; display: block; line-height: 1; margin-bottom: 2px; }
+
+/* ============================ Buttons ============================ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  font-family: var(--font-body); font-weight: 600; font-size: 14.5px;
+  padding: 12px 22px; border-radius: var(--r-pill); border: 1px solid transparent;
+  cursor: pointer; transition: transform .28s var(--ease), box-shadow .28s var(--ease), background .2s, border-color .2s, color .2s;
+  white-space: nowrap; letter-spacing: -0.01em;
+}
+.btn i { font-size: 0.95em; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--orange-soft), var(--orange-deep));
+  color: #fff; box-shadow: var(--glow-orange), inset 0 1px 0 rgba(255,255,255,0.32);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(255,79,0,0.55), inset 0 1px 0 rgba(255,255,255,0.32); }
+.btn-primary:active { transform: translateY(0); }
+.btn-ghost {
+  background: var(--glass-2); color: var(--text); border-color: var(--stroke-2);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.btn-ghost:hover { background: var(--glass-3); border-color: var(--stroke-hi); transform: translateY(-2px); }
+.btn-violet {
+  background: linear-gradient(135deg, var(--violet-soft), var(--violet));
+  color: #fff; box-shadow: var(--glow-violet), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.btn-violet:hover { transform: translateY(-2px); }
+.btn-lg { padding: 15px 28px; font-size: 16px; }
+.btn-sm { padding: 8px 14px; font-size: 13px; }
+.btn-block { width: 100%; }
+
+/* ============================ Pills / chips / badges ============================ */
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px; border-radius: var(--r-pill);
+  font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em;
+  background: var(--glass-2); border: 1px solid var(--stroke-2); color: var(--text-soft);
+}
+.pill-orange { background: var(--orange-tint); border-color: rgba(255,79,0,0.3); color: var(--orange); }
+.pill-violet { background: var(--violet-tint); border-color: oklch(0.66 0.17 285 / 0.3); color: var(--violet-soft); }
+.pill-green { background: var(--green-tint); border-color: oklch(0.74 0.15 158 / 0.3); color: var(--green); }
+.pill-amber { background: var(--amber-tint); border-color: oklch(0.80 0.15 78 / 0.35); color: var(--amber); }
+.pill-red { background: var(--red-tint); border-color: oklch(0.66 0.20 25 / 0.32); color: var(--red); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; box-shadow: 0 0 0 0 currentColor; }
+.dot-live { animation: pulse 1.8s var(--ease) infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.5);} 70%{ box-shadow: 0 0 0 7px rgba(52,211,153,0);} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0);} }
+
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.16em; font-size: 11.5px; font-weight: 700; color: var(--text-mute); }
+.eyebrow::before { content: ""; width: 22px; height: 1.5px; background: var(--orange); border-radius: 2px; }
+
+/* utility */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1 !important; transform: none !important; } * { scroll-behavior: auto !important; } }
+
+.noise::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+/* placeholder image block */
+.ph {
+  position: relative; overflow: hidden; border-radius: var(--r-md);
+  background:
+    repeating-linear-gradient(135deg, var(--glass) 0 14px, transparent 14px 28px),
+    var(--glass-soft, var(--glass));
+  border: 1px dashed var(--stroke-2);
+  display: grid; place-items: center;
+}
+.ph span { font-family: var(--font-body); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-mute); background: var(--panel-solid); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--stroke); }
