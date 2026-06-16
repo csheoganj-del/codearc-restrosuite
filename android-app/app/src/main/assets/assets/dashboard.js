@@ -917,7 +917,7 @@
     try {
       const data = await RS_API.admin({ action: 'gateway_logs' });
       if (data && !data.error) {
-        const logs = data.logs || [];
+        const logs = (data.logs || []).slice().reverse();
         if (logsContainer) {
           if (logs.length === 0) {
             logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent dispatch logs found.</div>';
