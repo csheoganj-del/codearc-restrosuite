@@ -367,7 +367,7 @@ async function saveSessionToSupabase() {
         // Zip the auth folder excluding Chrome cache files to keep size under 3MB and avoid corruption
         await new Promise((resolve, reject) => {
             const output = fs.createWriteStream(zipPath);
-            const archive = archiver('zip', { zlib: { level: 6 } });
+            const archive = archiver('zip', { zlib: { level: 9 } });
             output.on('close', resolve);
             archive.on('error', reject);
             archive.pipe(output);
@@ -407,7 +407,17 @@ async function saveSessionToSupabase() {
                     '**/FileTypePolicies/**',
                     '**/ZxcvbnData/**',
                     '**/*.log',
-                    '**/*.txt'
+                    '**/*.txt',
+                    // Extra optimization: exclude heavy IndexedDB blobs, network sessions, extensions and storage logs
+                    '**/*.blob',
+                    '**/*.blob/**',
+                    '**/IndexedDB/**/*.blob/**',
+                    '**/Network/**',
+                    '**/databases/**',
+                    '**/Session Storage/**',
+                    '**/Extension State/**',
+                    '**/Local Extension Settings/**',
+                    '**/Sync Data/**'
                 ]
             });
             
