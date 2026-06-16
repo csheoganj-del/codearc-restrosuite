@@ -165,7 +165,7 @@ function getGatewayUrlAndToken() {
 
   if (!url) {
     const relayUrl = Deno.env.get("EMAIL_RELAY_URL") || "";
-    if (relayUrl) {
+    if (relayUrl && !relayUrl.includes("script.google.com")) {
       try {
         const parsed = new URL(relayUrl);
         url = parsed.origin;
