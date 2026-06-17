@@ -33,9 +33,19 @@
     RS.addRenderer('tokens-tab', renderTokens);
 
     /* ===================== TAX & GST ===================== */
-    const TAX_LEDGER = [];
     function renderTax(){
       const sec = $('#tax-tab');
+      const TAX_LEDGER = (RS.BILLS || []).filter(b => b.status === 'paid').map(b => {
+        const total = b.amount || 0;
+        const taxable = Math.round(total / 1.05 * 100) / 100;
+        return {
+          no: b.no,
+          cust: b.customerName || 'Walk-in Guest',
+          time: b.time,
+          taxable: taxable,
+          pay: b.pay || 'UPI'
+        };
+      });
       const taxable = TAX_LEDGER.reduce((a,r)=>a+r.taxable,0);
       const cgst = Math.round(taxable*0.025), sgst = cgst, total = cgst+sgst;
       sec.innerHTML = `
@@ -95,9 +105,90 @@
           </div>
         </div>`;
       const note = (msg)=> RS.toast(msg,'fa-file-invoice');
-      ['tax-gstr1','tax-json','tax-csv','tax-sql'].forEach(id=>{const b=$('#'+id);if(b)b.onclick=()=>note('Exporting… file will download');});
+      ['tax-gstr1','tax-json','tax-csv','tax-sql'].forEach(id=>{
+        const b=$('#'+id);
+        if(b) {
+          b.onclick=()=>{
+            if(!TAX_LEDGER.length) return RS.toast('No invoices to export', 'fa-circle-exclamation');
+            if(id === 'tax-json') {
+              const json = JSON.stringify(TAX_LEDGER, null, 2);
+              RS.downloadFile(json, 'application/json', `tax-ledger-${Date.now()}.json`);
+              RS.toast('Ledger exported as JSON', 'fa-circle-check');
+            } else if(id === 'tax-csv' || id === 'tax-gstr1') {
+              const headers = ['Invoice Number', 'Customer', 'Date & Time', 'Taxable Amount', 'CGST (2.5%)', 'SGST (2.5%)', 'Total GST', 'Total Amount', 'Payment Method'];
+              const csv = [
+                headers.join(','),
+                ...TAX_LEDGER.map(r => {
+                  const cgst = Math.round(r.taxable * 0.025 * 100) / 100;
+                  const sgst = cgst;
+                  const gst = cgst + sgst;
+                  const tot = r.taxable + gst;
+                  return `"${r.no}","${r.cust}","${r.time}",${r.taxable},${cgst},${sgst},${gst},${tot},"${r.pay}"`;
+                })
+              ].join('\n');
+              RS.downloadFile(csv, 'text/csv;charset=utf-8;', `${id === 'tax-gstr1' ? 'gstr1-report' : 'tax-ledger'}-${Date.now()}.csv`);
+              RS.toast('Ledger exported as CSV', 'fa-circle-check');
+            } else if(id === 'tax-sql') {
+              const sql = TAX_LEDGER.map(r => {
+                const cgst = Math.round(r.taxable * 0.025 * 100) / 100;
+                const sgst = cgst;
+                const gst = cgst + sgst;
+                const tot = r.taxable + gst;
+                return `INSERT INTO public.doppio_bills (orderId, customerName, dateTime, subtotal, gst, cgst, sgst, total, paymentMethod) VALUES ('${r.no}', '${r.cust.replace(/'/g, "''")}', '${r.time}', ${r.taxable}, ${gst}, ${cgst}, ${sgst}, ${tot}, '${r.pay}');`;
+              }).join('\n');
+              RS.downloadFile(sql, 'text/plain', `tax-ledger-${Date.now()}.sql`);
+              RS.toast('Ledger exported as SQL', 'fa-circle-check');
+            }
+          };
+        }
+      });
       const fileBtn=$('#tax-file'); if(fileBtn) fileBtn.onclick=()=>note('GSTR-3B draft prepared for filing');
-      ['tax-rates','tax-import'].forEach(id=>{const b=$('#'+id);if(b)b.onclick=()=>RS.toast('Opening editor…','fa-pen');});
+      const rateBtn = $('#tax-rates'); if(rateBtn) rateBtn.onclick=()=>RS.toast('Opening editor…','fa-pen');
+      const importBtn = $('#tax-import');
+      if(importBtn) {
+        importBtn.onclick = () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = e => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async evt => {
+              try {
+                const data = JSON.parse(evt.target.result);
+                const list = Array.isArray(data) ? data : [data];
+                let count = 0;
+                for(const item of list) {
+                  if(item.no && item.taxable) {
+                    const bill = {
+                      id: 'bill_' + item.no,
+                      no: item.no,
+                      customerName: item.cust || 'Walk-in Guest',
+                      time: item.time || new Date().toISOString(),
+                      amount: item.taxable * 1.05,
+                      pay: item.pay || 'UPI',
+                      status: 'paid'
+                    };
+                    await RS.saveOne('bills', bill);
+                    count++;
+                  } else if (item.no && item.amount) {
+                    await RS.saveOne('bills', item);
+                    count++;
+                  }
+                }
+                RS.toast(`${count} invoices imported successfully`, 'fa-circle-check');
+                setTimeout(() => window.location.reload(), 1200);
+              } catch(err) {
+                console.error(err);
+                RS.toast('Import failed: ' + err.message, 'fa-circle-exclamation');
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        };
+      }
     }
     RS.titles['tax-tab']=['Tax & GST','GST returns, ledger & compliance'];
     RS.addRenderer('tax-tab', renderTax);

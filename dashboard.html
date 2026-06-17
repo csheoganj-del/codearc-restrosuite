@@ -173,7 +173,7 @@
           <div class="toolbar-row">
             <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill no. or table…"></div>
             <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-filter"></i> Filter</button>
-            <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
+            <button class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
             <button class="btn btn-primary btn-sm"><i class="fa-solid fa-print"></i> Print day report</button>
           </div>
           <div class="table-scroll"><table class="data-table">
@@ -193,7 +193,7 @@
         <div class="toolbar-row">
           <div class="seg"><button class="active">Stock levels</button><button>Suppliers</button><button>Purchase orders</button><button>Waste log</button></div>
           <div class="grow"></div>
-          <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
+          <button class="btn btn-ghost btn-sm" id="btn-import-inventory"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
           <button class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Add ingredient</button>
         </div>
         <div class="panel panel-pad"><div class="table-scroll"><table class="data-table">
@@ -257,7 +257,7 @@
               <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">₹3,11,600</td></tr>
               <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">₹16,400</b></td></tr>
             </tbody></table>
-            <button class="btn btn-ghost btn-block" style="margin-top:14px"><i class="fa-solid fa-file-arrow-down"></i> Download GSTR-ready report</button>
+            <button class="btn btn-ghost btn-block" id="btn-download-gstr" style="margin-top:14px"><i class="fa-solid fa-file-arrow-down"></i> Download GSTR-ready report</button>
           </div>
         </div>
       </section>
@@ -311,7 +311,7 @@
           <!-- Dynamic snapshot cards will go here -->
         </div>
         <div class="panel panel-pad">
-          <div class="panel-head"><h3>Tenant directory</h3><button class="btn btn-ghost btn-sm"><i class="fa-solid fa-download"></i> Export</button></div>
+          <div class="panel-head"><h3>Tenant directory</h3><button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button></div>
           <div class="table-scroll"><table class="data-table">
             <thead><tr><th>Outlet</th><th>Plan</th><th>MRR</th><th>Outlets</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="tenant-table-body"></tbody>
