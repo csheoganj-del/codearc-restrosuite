@@ -308,7 +308,7 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
   if (typeof payload.username === "string") updates.username = payload.username.trim();
   if (typeof payload.status === "string") updates.status = payload.status.trim();
   if (Array.isArray(payload.allowed_tabs)) updates.allowed_tabs = payload.allowed_tabs.map(String);
-  if (typeof payload.plan_code === "string" && ["starter", "growth", "enterprise"].includes(payload.plan_code)) {
+  if (typeof payload.plan_code === "string" && ["free", "starter", "growth", "enterprise"].includes(payload.plan_code)) {
     updates.plan_code = payload.plan_code;
   }
   if (

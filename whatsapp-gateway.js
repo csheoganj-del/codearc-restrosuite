@@ -1639,6 +1639,14 @@ app.post('/supabase-webhook', async (req, res) => {
     }
 });
 
+// Utility to insert zero-width spaces into email addresses and support links
+// to prevent WhatsApp from generating generic link previews (like gmail.com)
+function escapeLinks(text) {
+    if (!text) return text;
+    return text.replace(/([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})/g, '$1@$2\u200B.$3')
+               .replace(/(?<!https?:\/\/[^\s]*)(?<!www\.)(codearc|gmail)\.(co\.in|com)/gi, '$1\u200B.$2');
+}
+
 // Helper to send registration notification (WhatsApp + Email) (Made by Antigravity)
 async function handleNewRegistrationNotification(record) {
     const { name, slug, outlet_type, email, phone, username } = record;
@@ -1659,10 +1667,10 @@ async function handleNewRegistrationNotification(record) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
         
-        const msgText = `Dear Customer,\n\nWe are pleased to inform you that your registration request for *CodeArc RestroSuite* has been successfully received.\n\n*Registration Details:*\n• *Outlet Name:* ${name}\n• *Business Type:* ${displayType}\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n• *Registered Email:* ${email || 'N/A'}\n• *Registered Contact:* ${formattedPhone}\n\n*Current Status:* Under Review\n\nOur operations team is currently reviewing your registration details. Upon approval, you will receive a confirmation message containing your access credentials and onboarding instructions.\n\nShould you require any assistance, please contact our support department at hello@codearc.co.in or call +91 99837 21179.\n\nSincerely,\n*CodeArc RestroSuite Team*`;
+        const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestroSuite*`;
         
         try {
-            await client.sendMessage(chatId, msgText);
+            await client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
             console.log(`[Realtime WhatsApp] Registration confirmation sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('registration_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -1939,10 +1947,10 @@ async function handleApprovalNotification(record) {
             targetPhone = "91" + targetPhone;
         }
         const chatId = `${targetPhone}@c.us`;
-        const msgText = `Dear Partner,\n\nWe are pleased to inform you that your registration request for *${name}* has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active.\n\n*Access Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n\n*Management Portal Link:* https://codearc.co.in/portal\n\nYou may now log in to the portal to configure your outlet settings, menu inventory, and employee rosters.\n\nShould you require any assistance or launch support, please contact our support desk at hello@codearc.co.in.\n\nSincerely,\n*CodeArc Operations Team*`;
+        const msgText = `Dear Partner,\n\nWe are pleased to inform you that your registration request for *${name}* has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active.\n\n*Access Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n\n*Management Portal Link:* https://restrosuite.codearc.co.in/login.html\n\nYou may now log in to the portal to configure your outlet settings, menu inventory, and employee rosters.\n\nShould you require any assistance or launch support, please contact our support desk at hello@codearc.co.in.\n\nSincerely,\n*CodeArc Operations Team*`;
         
         try {
-            await client.sendMessage(chatId, msgText);
+            await client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
             console.log(`[Realtime WhatsApp] Account approval alert sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('approval_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -1977,7 +1985,7 @@ async function handleApprovalNotification(record) {
 
           <p style="font-size: 14px; line-height: 1.6;">You can access your store management dashboard portal using the link below:</p>
           <div style="text-align: center; margin: 24px 0;">
-            <a href="https://codearc.co.in/portal" style="background: #22c55e; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Login Portal</a>
+            <a href="https://restrosuite.codearc.co.in/login.html" style="background: #22c55e; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Login Portal</a>
           </div>
 
           <p style="font-size: 14px; line-height: 1.6;">Please log in to review your outlet configuration, tax parameters, menu settings, and employee rosters to commence operations.</p>

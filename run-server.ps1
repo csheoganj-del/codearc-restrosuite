@@ -176,7 +176,28 @@ try {
                         $webParams.Add("Body", $reqBody)
                     }
 
-                    $remoteResponse = Invoke-WebRequest @webParams -ErrorAction Stop
+                    $maxRetries = 3
+                    $retryCount = 0
+                    $remoteResponse = $null
+                    $success = $false
+                    while (-not $success -and $retryCount -lt $maxRetries) {
+                        try {
+                            $remoteResponse = Invoke-WebRequest @webParams -ErrorAction Stop
+                            $success = $true
+                        } catch {
+                            $retryCount++
+                            $errMsg = ""
+                            if ($_.Exception) { $errMsg += $_.Exception.ToString() }
+                            if ($_.ToString()) { $errMsg += $_.ToString() }
+                            
+                            if ($retryCount -lt $maxRetries -and ($errMsg -like "*The remote name could not be resolved*" -or $errMsg -like "*NameResolutionFailure*")) {
+                                Write-Warning "[Proxy] DNS resolution failed. Retrying in 1.5s... (Attempt $retryCount of $maxRetries)"
+                                Start-Sleep -Milliseconds 1500
+                            } else {
+                                throw $_
+                            }
+                        }
+                    }
                     $resString = $remoteResponse.Content
                     if ($resString -is [System.Byte[]]) {
                         $resBytes = $resString

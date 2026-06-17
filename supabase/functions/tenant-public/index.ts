@@ -23,6 +23,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 const PLAN_LIMITS: Record<string, { monthlyOrderLimit: number }> = {
+  free: { monthlyOrderLimit: 50 },
   starter: { monthlyOrderLimit: 300 },
   growth: { monthlyOrderLimit: 8000 },
   enterprise: { monthlyOrderLimit: 100000 },

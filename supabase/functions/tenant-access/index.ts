@@ -70,6 +70,12 @@ const ROLE_DEFAULT_TABS: Record<string, string[]> = {
 };
 
 const PLAN_ENTITLEMENTS: Record<string, { name: string; maxStaff: number; monthlyOrderLimit: number; allowedTabs: string[] }> = {
+  free: {
+    name: "Free / Demo",
+    maxStaff: 2,
+    monthlyOrderLimit: 50,
+    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab"],
+  },
   starter: {
     name: "Starter",
     maxStaff: 5,
@@ -777,6 +783,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   const phone = String(payload.phone || "").trim();
   const username = normalizeUsername(String(payload.username || ""));
   const password = String(payload.password || "");
+  const planCode = String(payload.plan_code || "starter").trim().toLowerCase();
 
   if (!name || !slug || !username || !password) {
     return jsonResponse({ error: "Outlet name, outlet ID, username, and password are required." }, 400, req);
@@ -830,7 +837,8 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
     username,
     password_hash: passwordHash,
     status: "pending",
-    allowed_tabs: planFor("starter").allowedTabs,
+    plan_code: planCode,
+    allowed_tabs: planFor(planCode).allowedTabs,
   });
 
   if (insertErr) {

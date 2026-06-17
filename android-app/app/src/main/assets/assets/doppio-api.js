@@ -28,15 +28,16 @@
     }
   }
   // Normalise: accept either the bare project URL or one with a /rest/v1 or /functions/v1 suffix.
-  const BASE = String(cfg.url || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');
+  const REMOTE_BASE = String(cfg.url || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');
+  const BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '' : REMOTE_BASE;
   const ANON = String(cfg.anonKey || '').trim();
-  const CONFIGURED = !!(BASE && ANON);
+  const CONFIGURED = !!(REMOTE_BASE && ANON);
 
   const SS = window.sessionStorage;
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',
               tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display' };
 
-  const supabaseClient = (window.supabase && CONFIGURED) ? window.supabase.createClient(BASE, ANON) : null;
+  const supabaseClient = (window.supabase && CONFIGURED) ? window.supabase.createClient(REMOTE_BASE, ANON) : null;
 
   async function post(fn, body, token, fallbackMsg){
     try {
@@ -183,8 +184,8 @@
           let list = JSON.parse(sessionStorage.getItem('mock_tenants_v2') || '[]');
           const idx = list.findIndex(t => String(t.id) === String(payload.tenant_id));
           if (idx !== -1) {
-            const planNames = { starter: 'Starter', growth: 'Growth', enterprise: 'Enterprise' };
-            const mrrValues = { starter: 1499, growth: 2999, enterprise: 9999 };
+            const planNames = { free: 'Free / Demo', starter: 'Starter', growth: 'Growth', enterprise: 'Enterprise' };
+            const mrrValues = { free: 0, starter: 1499, growth: 2999, enterprise: 9999 };
             list[idx] = {
               ...list[idx],
               username: payload.username,
