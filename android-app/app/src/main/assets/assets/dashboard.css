@@ -117,7 +117,7 @@
 .pos-size-control button:hover { color: var(--text); transform: scale(1.15); }
 .pos-size-control button:active { transform: scale(0.9); }
 .pos-size-control input[type="range"] { width: 80px; accent-color: var(--orange); cursor: pointer; height: 4px; outline: none; }
-.pos-item { border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--stroke); padding: 14px 15px 13px; cursor: pointer; transition: transform .22s var(--ease), border-color .2s, box-shadow .3s, background .2s; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 11px; min-height: 122px; }
+.pos-item { border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--stroke); padding: 14px 15px 13px; cursor: pointer; transition: transform .22s var(--ease), border-color .2s, box-shadow .3s, background .2s; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 11px; min-height: calc(var(--pos-grid-size, 158px) * 0.772); }
 .pos-item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cc, var(--orange)); opacity: .9; }
 .pos-item::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(130% 100% at 0% 0%, color-mix(in srgb, var(--cc, var(--orange)) 10%, transparent), transparent 58%); }
 .pos-item:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--cc, var(--orange)) 55%, transparent); box-shadow: var(--shadow-md); }
