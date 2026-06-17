@@ -1364,11 +1364,13 @@ app.get('/status', (req, res) => {
             recentHealthEvents
         });
     } else {
-        // Return only the bare minimum needed for public health checks —
-        // no QR code, no phone number, no session metadata.
+        // Return the real status so the dashboard can show QR or connecting states.
+        // The QR image is only included when status is 'qr' (it's a one-time-use code and expires automatically).
+        // Sensitive data (phone number, session metadata, health events) is always withheld.
         res.json({
-            status: connectionStatus === 'ready' ? 'ready' : 'unavailable',
+            status: connectionStatus === 'ready' ? 'ready' : connectionStatus,
             authenticated: connectionStatus === 'ready',
+            qr: connectionStatus === 'qr' ? qrCodeDataUrl : null,
         });
     }
 });
