@@ -167,11 +167,42 @@
     /* ===================== MOBILE "MORE" SHEET ===================== */
     const moreBtn = $('#mnav-more');
     if(moreBtn){
-      const MORE = [['floor-tab','Floor & Tables','chair'],['aggregator-tab','Online Orders','bowl-rice'],['tokens-tab','Token Display','bullhorn'],['inventory-tab','Inventory','boxes-stacked'],['editor-tab','Menu Editor','pen-to-square'],['customers-tab','Customers','address-book'],['tax-tab','Tax & GST','file-invoice'],['employees-tab','Employees','users'],['analytics-tab','Advanced Analytics','chart-mixed'],['growth-hub-tab','Growth Hub','rocket'],['settings-tab','Settings','gear']];
+      const MORE = [
+        ['floor-tab','Floor & Tables','chair'],
+        ['aggregator-tab','Online Orders','bowl-rice'],
+        ['tokens-tab','Token Display','bullhorn'],
+        ['inventory-tab','Inventory','boxes-stacked'],
+        ['editor-tab','Menu Editor','pen-to-square'],
+        ['customers-tab','Customers','address-book'],
+        ['tax-tab','Tax & GST','file-invoice'],
+        ['employees-tab','Employees','users'],
+        ['analytics-tab','Advanced Analytics','chart-mixed'],
+        ['growth-hub-tab','Growth Hub','rocket'],
+        ['settings-tab','Settings','gear'],
+        ['logout','Sign Out','right-from-bracket']
+      ];
       moreBtn.addEventListener('click', ()=>{
         RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
-          body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${MORE.map(m=>`<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic bg-o" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`).join('')}</div>`,
-          onMount(modal, close){ $$('[data-go]',modal).forEach(b=> b.onclick=()=>{ RS.activateTab(b.dataset.go); close(); }); }});
+          body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${MORE.map(m=>{
+            const bgClass = m[0] === 'logout' ? 'bg-r' : 'bg-o';
+            return `<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic ${bgClass}" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`;
+          }).join('')}</div>`,
+          onMount(modal, close){
+            $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
+              if(b.dataset.go === 'logout') {
+                close();
+                if(window.RS_DB) {
+                  RS_DB.signOut().then(()=>{ location.href='login.html'; });
+                } else {
+                  location.href='login.html';
+                }
+              } else {
+                RS.activateTab(b.dataset.go);
+                close();
+              }
+            });
+          }
+        });
       });
     }
   }

@@ -14,10 +14,10 @@
       appVersion: '2.0'
     });
     appReporter.installGlobalHandlers(() => ({
-      tenant_id: sessionStorage.getItem('tenant_id') || '',
-      tenant_slug: sessionStorage.getItem('tenant_slug') || '',
+      tenant_id: (window.RS_API ? RS_API.session()?.tenant_id : null) || sessionStorage.getItem('tenant_id') || '',
+      tenant_slug: (window.RS_API ? RS_API.session()?.tenant_slug : null) || sessionStorage.getItem('tenant_slug') || '',
       metadata: {
-        role: sessionStorage.getItem('logged_in_role') || '',
+        role: (window.RS_API ? RS_API.session()?.role : null) || sessionStorage.getItem('logged_in_role') || '',
         active_tab: document.querySelector('.tab-content.active')?.id || ''
       }
     }));
@@ -276,7 +276,7 @@
   function setupSupabaseRealtime() {
     const api = window.RS_API;
     if (api && api.supabaseClient && window.RS_DB && RS_DB.isCloud) {
-      const activeTenantId = sessionStorage.getItem('tenant_id');
+      const activeTenantId = api.session()?.tenant_id || sessionStorage.getItem('tenant_id');
       if (activeTenantId) {
         api.supabaseClient.channel('doppio-pending-orders-realtime')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}` }, () => {

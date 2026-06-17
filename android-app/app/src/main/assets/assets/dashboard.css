@@ -93,6 +93,7 @@
 .bg-g { background: var(--green-tint); color: var(--green); }
 .bg-t { background: oklch(0.74 0.12 200 / 0.16); color: var(--teal); }
 .bg-a { background: var(--amber-tint); color: var(--amber); }
+.bg-r { background: var(--red-tint); color: var(--red); }
 @media (max-width: 980px){ .stat-row{grid-template-columns:repeat(2,1fr);} }
 
 /* ===================== POS ===================== */
@@ -345,8 +346,13 @@
   .mnav-link.active { color: var(--orange); }
 
   .stat-row { grid-template-columns: 1fr 1fr; }
+  .topbar { padding: calc(10px + env(safe-area-inset-top)) 12px 10px !important; }
   .topbar .tb-title h1 { font-size: 17px; }
   .table-scroll { overflow-x: auto; }
+  /* Prevent iOS input auto-zooming on focus by forcing 16px font-size */
+  .form-input, .pos-search input, .tb-search input, input[type="text"], input[type="number"], input[type="password"], input[type="email"], select {
+    font-size: 16px !important;
+  }
 }
 
 /* modal (generic dashboard) */

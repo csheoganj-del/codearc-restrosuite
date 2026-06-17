@@ -152,6 +152,10 @@
       if(!token) return null;
       const r = await post('tenant-access', { action:'validate_session', session_token: token }, ANON, 'Session validation failed');
       if(r.session) {
+        // Preserve session_token if validate response doesn't return it
+        if(!r.session.session_token) {
+          r.session.session_token = token;
+        }
         // Preserve admin_token for superadmin: the validate response doesn't echo it back
         const existingAdminToken = ssGet('superadmin_admin_token');
         if(r.session.role === 'superadmin' && existingAdminToken) {
