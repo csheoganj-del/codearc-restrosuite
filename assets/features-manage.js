@@ -29,8 +29,107 @@
 
       document.addEventListener('rs:render-inventory', drawPanes);
 
+      function openRecipeEditModal(m) {
+        let draft = (m.ingredients || []).map(g => ({ ...g }));
+        
+        function drawDraft(modalBody) {
+          const listEl = modalBody.querySelector('#rec-modal-list');
+          listEl.innerHTML = draft.map((g, i) => `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span style="flex:1;font-weight:600;font-size:14px">${g.name}</span>
+              <input class="form-input" type="number" step="any" min="0" value="${g.qty}" data-qty-i="${i}" style="width:80px;padding:5px 8px;font-size:13px;text-align:right">
+              <span style="width:40px;color:var(--text-mute);font-size:12.5px">${g.unit}</span>
+              <button class="icon-act danger" data-del-i="${i}" style="width:30px;height:30px"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          `).join('') || `<div style="text-align:center;padding:20px 0;color:var(--text-mute);font-style:italic">No ingredients in recipe. Click Add to link.</div>`;
+          
+          listEl.querySelectorAll('[data-qty-i]').forEach(inp => {
+            inp.oninput = () => {
+              const idx = +inp.dataset.qtyI;
+              draft[idx].qty = Number(inp.value) || 0;
+            };
+          });
+          
+          listEl.querySelectorAll('[data-del-i]').forEach(btn => {
+            btn.onclick = () => {
+              const idx = +btn.dataset.delI;
+              draft.splice(idx, 1);
+              drawDraft(modalBody);
+            };
+          });
+        }
+
+        RSModal.open({
+          title: `Recipe: ${m.name}`,
+          sub: 'Define raw materials and quantities',
+          icon: 'fa-flask',
+          size: 'md',
+          body: `
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div id="rec-modal-list" style="max-height:260px;overflow:auto"></div>
+              <button class="btn btn-ghost btn-block" id="rec-modal-add" style="border-style:dashed"><i class="fa-solid fa-plus"></i> Add Ingredient</button>
+            </div>
+          `,
+          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Save Recipe</button>`,
+          onMount(modal, close) {
+            modal.querySelector('[data-x]').onclick = close;
+            modal.querySelector('#rec-modal-add').onclick = () => {
+              const list = RS.INVENTORY || [];
+              RSModal.open({
+                title: 'Add ingredient',
+                sub: 'Link a raw material to this recipe',
+                icon: 'fa-flask',
+                size: 'sm',
+                body: `<input class="form-input" id="ing-q" placeholder="Search ingredient…" style="margin-bottom:12px">
+                      <div id="ing-pick" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto"></div>`,
+                onMount(subModal, subClose) {
+                  const q = subModal.querySelector('#ing-q'), box = subModal.querySelector('#ing-pick');
+                  function draw() {
+                    const t = (q.value || '').toLowerCase();
+                    box.innerHTML = list.filter(i => i.name.toLowerCase().includes(t)).map(i => `<div class="sr-item" data-n="${i.name}" data-u="${i.unit}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${i.name}</div><div class="si-s">${i.cat} · ${rs(i.cost)}/${i.unit}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
+                    box.querySelectorAll('[data-n]').forEach(el => {
+                      el.onclick = () => {
+                        const exists = draft.find(g => g.name === el.dataset.n);
+                        if (!exists) {
+                          draft.push({ name: el.dataset.n, qty: 0.1, unit: el.dataset.u });
+                        }
+                        subClose();
+                        drawDraft(modal);
+                      };
+                    });
+                  }
+                  q.addEventListener('input', draw);
+                  draw();
+                  q.focus();
+                }
+              });
+            };
+            
+            modal.querySelector('[data-ok]').onclick = async () => {
+              m.ingredients = draft;
+              if (RS.saveOne) await RS.saveOne('menu', m);
+              close();
+              drawPanes();
+              RS.toast(`Recipe for "${m.name}" updated`, 'fa-circle-check');
+            };
+            
+            drawDraft(modal);
+          }
+        });
+      }
+
       function drawPanes() {
         panes.innerHTML = `
+          <div class="panel panel-pad subtab-pane" data-pane="recipes">
+            <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+              <h3>Menu Recipes</h3>
+              <div style="font-size:12.5px;color:var(--text-soft)">Link raw ingredients to menu items for stock deduction</div>
+            </div>
+            <div class="table-scroll"><table class="data-table">
+              <thead><tr><th>Menu Item</th><th>Category</th><th>Plate Cost</th><th>Linked Ingredients</th><th>Actions</th></tr></thead>
+              <tbody id="recipe-list-body"></tbody>
+            </table></div>
+          </div>
           <div class="panel panel-pad subtab-pane" data-pane="suppliers">
             <div class="panel-head"><h3>Suppliers</h3><button class="btn btn-primary btn-sm" id="add-sup"><i class="fa-solid fa-plus"></i> Add supplier</button></div>
             <div class="crm-grid">${SUPPLIERS.map(s=>`<div class="crm-card"><div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[s.name.length%RS.avatarColors.length]}"><i class="fa-solid fa-truck-field" style="font-size:15px"></i></div><div><div class="crm-name">${s.name}</div><div class="crm-phone">${s.cat}</div></div></div><div style="font-size:12.5px;color:var(--text-soft);line-height:1.9"><div><i class="fa-solid fa-phone" style="width:16px;color:var(--text-mute)"></i> ${s.contact}</div><div><i class="fa-solid fa-file-contract" style="width:16px;color:var(--text-mute)"></i> ${s.terms} · ${s.items} items</div><div><i class="fa-solid fa-star" style="width:16px;color:var(--amber)"></i> ${s.rating} rating</div></div></div>`).join('')}</div>
@@ -47,10 +146,46 @@
             ${WASTE.map(w=>`<tr><td><b>${w.item}</b></td><td>${w.qty}</td><td><span class="pill" style="padding:3px 9px">${w.reason}</span></td><td class="td-strong" style="color:var(--red)">${rs(w.cost)}</td><td>${w.date}</td></tr>`).join('')}
             </tbody></table></div>
           </div>`;
+
+        const recipeListBody = $('#recipe-list-body', panes);
+        if (recipeListBody) {
+          recipeListBody.innerHTML = (RS.MENU || []).map(m => {
+            const ings = m.ingredients || [];
+            const cost = ings.reduce((sum, g) => {
+              const inv = (RS.INVENTORY || []).find(i => i.name === g.name);
+              return sum + (g.qty * (inv ? inv.cost : 0));
+            }, 0);
+            return `
+              <tr data-id="${m.id}">
+                <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${m.name}</b></div></td>
+                <td>${m.cat}</td>
+                <td class="td-strong">${rs(cost)}</td>
+                <td>
+                  ${ings.length 
+                    ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${ings.map(g => `<span class="pill" style="font-size:11.5px;padding:2px 7px;background:var(--hover);border-color:var(--border)">${g.name} (${g.qty} ${g.unit})</span>`).join('')}</div>`
+                    : `<span style="color:var(--text-mute);font-style:italic">No ingredients linked</span>`
+                  }
+                </td>
+                <td>
+                  <button class="btn btn-ghost btn-sm" data-edit-rec="${m.id}" style="padding:4px 10px;font-size:12px;gap:4px;"><i class="fa-solid fa-flask"></i> Edit Recipe</button>
+                </td>
+              </tr>`;
+          }).join('');
+
+          recipeListBody.querySelectorAll('[data-edit-rec]').forEach(b => {
+            b.onclick = () => {
+              const m = RS.MENU.find(x => x.id === +b.dataset.editRec);
+              if (m) {
+                openRecipeEditModal(m);
+              }
+            };
+          });
+        }
+
         const activeBtn = sec.querySelector('.seg button.active');
         if (activeBtn) {
           const tabName = activeBtn.textContent.trim().toLowerCase();
-          const paneMap = { stock: 'stock', suppliers: 'suppliers', 'purchase orders': 'pos', 'waste log': 'waste' };
+          const paneMap = { stock: 'stock', recipes: 'recipes', suppliers: 'suppliers', 'purchase orders': 'pos', 'waste log': 'waste' };
           const activePane = paneMap[tabName] || 'stock';
           $$('.subtab-pane', sec).forEach(p => p.classList.toggle('active', p.dataset.pane === activePane));
         }
@@ -96,7 +231,7 @@
         drawPanes();
       }
 
-      wireSeg('#inventory-tab', ['stock','suppliers','pos','waste']);
+      wireSeg('#inventory-tab', ['stock','recipes','suppliers','pos','waste']);
     }
 
     /* ============== EMPLOYEES ============== */
