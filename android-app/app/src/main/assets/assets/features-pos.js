@@ -110,11 +110,11 @@
       const totals = RS.getTotals();
       const cust = RS.getCustomer();
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
-      let tenders = [];
+      let tenders = [{ method: 'Cash', amount: totals.grand, isDefault: true }];
       let method = 'Cash';
       let buffer = '';
       const methods = [['Cash','fa-money-bill-wave'],['UPI','fa-mobile-screen'],['Card','fa-credit-card']];
-
+ 
       RSModal.open({
         title:'Take payment', sub: totals.count+' items · '+cust.table, icon:'fa-indian-rupee-sign', size:'lg', bare:true,
         body:`<div class="pay-grid">
@@ -144,17 +144,27 @@
           const chWrap = modal.querySelector('#change-wrap');
           const addBtn = modal.querySelector('[data-k="add"]');
           const completeBtn = modal.querySelector('#pay-complete');
-          const paid = ()=> tenders.reduce((a,t)=>a+t.amount,0);
-          const remaining = ()=> Math.max(0, totals.grand - paid());
-
+          const paid = (excludeDefault)=> tenders.reduce((a,t)=>a + (excludeDefault && t.isDefault ? 0 : t.amount), 0);
+          const remaining = (excludeDefault)=> Math.max(0, totals.grand - paid(excludeDefault));
+ 
+          function clearDefaultIfPresent() {
+            if (tenders.length === 1 && tenders[0].isDefault) {
+              tenders = [];
+            }
+          }
+ 
           function quicks(){
-            const r = remaining();
+            const r = remaining(true);
             const rounds = [r, Math.ceil(r/100)*100, Math.ceil(r/500)*500, 500, 1000, 2000].filter((v,i,a)=>v>0 && a.indexOf(v)===i).slice(0,4);
             modal.querySelector('#quick-tenders').innerHTML = rounds.map((v,i)=>`<button data-q="${v}">${i===0?'Exact ':''}${rs(v)}</button>`).join('');
-            modal.querySelectorAll('#quick-tenders button').forEach(b=> b.onclick=()=>{ buffer=String(b.dataset.q); render(); });
+            modal.querySelectorAll('#quick-tenders button').forEach(b=> b.onclick=()=>{
+              clearDefaultIfPresent();
+              buffer=String(b.dataset.q);
+              render();
+            });
           }
           function render(){
-            amtEl.value = buffer===''? remaining() : buffer;
+            amtEl.value = buffer===''? remaining(true) : buffer;
             remEl.textContent = rs(remaining());
             remEl.classList.toggle('done', remaining()===0);
             addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> Add ${method} payment`;
@@ -165,16 +175,34 @@
             completeBtn.disabled = paid() < totals.grand;
             modal.querySelectorAll('.pay-m').forEach(m=> m.classList.toggle('active', m.dataset.m===method));
           }
-          modal.querySelector('#pay-methods').onclick = e=>{ const m=e.target.closest('.pay-m'); if(!m)return; method=m.dataset.m; render(); };
+          modal.querySelector('#pay-methods').onclick = e=>{
+            const m=e.target.closest('.pay-m'); if(!m)return;
+            method=m.dataset.m;
+            if (tenders.length === 1 && tenders[0].isDefault) {
+              tenders[0].method = method;
+            }
+            render();
+          };
           modal.querySelector('#numpad').onclick = e=>{
             const b=e.target.closest('button'); if(!b)return; const k=b.dataset.k;
-            if(k==='del') buffer = buffer.slice(0,-1);
-            else if(k==='clr'){ buffer=''; }
+            if(k==='del') {
+              clearDefaultIfPresent();
+              buffer = buffer.slice(0,-1);
+            }
+            else if(k==='clr'){ tenders = []; buffer=''; }
             else if(k==='add'){
               const amt = buffer===''? remaining() : +buffer;
-              if(amt>0){ tenders.push({method, amount:amt}); buffer=''; quicks(); }
+              if(amt>0){
+                tenders = tenders.filter(t => !t.isDefault);
+                tenders.push({method, amount:amt});
+                buffer='';
+                quicks();
+              }
             }
-            else buffer = (buffer + k).replace(/^0+(?=\d)/,'').slice(0,7);
+            else {
+              clearDefaultIfPresent();
+              buffer = (buffer + k).replace(/^0+(?=\d)/,'').slice(0,7);
+            }
             render();
           };
           completeBtn.onclick = async ()=>{

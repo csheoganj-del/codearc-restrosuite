@@ -495,6 +495,12 @@
 
   window.addEventListener('load', () => {
     injectGuide();
+    const backdrop = document.getElementById('onboarding-backdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', () => {
+        endTour();
+      });
+    }
     setTimeout(() => {
       if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
       try {
