@@ -218,7 +218,13 @@
             </div>
           </div>
           <div class="panel panel-pad">
-            <div class="panel-head"><h3>Menu items</h3><span class="ph-sub">20 items · 5 categories</span></div>
+            <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+              <h3>Menu items</h3>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-ghost btn-sm" id="btn-download-menu-template" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
+                <button class="btn btn-ghost btn-sm" id="btn-import-menu" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
+              </div>
+            </div>
             <div class="table-scroll"><table class="data-table">
               <thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Stock</th><th>Available</th><th>Actions</th></tr></thead>
               <tbody id="editor-list"></tbody>

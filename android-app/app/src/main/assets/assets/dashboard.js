@@ -1352,7 +1352,83 @@
         });
       }
     },
-    'editor-tab':renderEditor,
+    'editor-tab':()=>{
+      renderEditor();
+      const btnDownloadMenu = $('#btn-download-menu-template');
+      if (btnDownloadMenu && !btnDownloadMenu.dataset.listenerBound) {
+        btnDownloadMenu.dataset.listenerBound = 'true';
+        btnDownloadMenu.addEventListener('click', () => {
+          const headers = ['Name', 'Category', 'Price', 'Description', 'PrepTimeMinutes', 'Available', 'Bestseller'];
+          const sampleRows = [
+            ['Cappuccino', 'HOT COFFEE', '180', 'Espresso with steamed milk and foam', '4', 'YES', 'YES'],
+            ['Veg Grilled Sandwich', 'SANDWICHES', '220', 'Grilled vegetable and cheese sandwich', '8', 'YES', 'NO']
+          ];
+          const csv = [
+            headers.join(','),
+            ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+          ].join('\n');
+          RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'menu-template.csv');
+          toast('Menu CSV template downloaded', 'fa-circle-check');
+        });
+      }
+      const btnImportMenu = $('#btn-import-menu');
+      if (btnImportMenu && !btnImportMenu.dataset.listenerBound) {
+        btnImportMenu.dataset.listenerBound = 'true';
+        btnImportMenu.addEventListener('click', () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.csv';
+          input.onchange = e => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async evt => {
+              try {
+                const text = evt.target.result;
+                const rows = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.parseCsv
+                  ? window.RestroSuite.imports.parseCsv(text)
+                  : [];
+                if(!rows || !rows.length) throw new Error('No rows found in CSV');
+                let count = 0;
+                for(const row of rows) {
+                  const name = row.Name || row.name || row.ItemName || row.MenuItem;
+                  if(!name) continue;
+                  const cat = row.Category || row.category || row.cat || 'Mains';
+                  const price = Number(row.Price || row.price || row.SellingPrice || 0);
+                  const desc = row.Description || row.description || '';
+                  const available = String(row.Available || row.available || 'YES').toUpperCase() !== 'NO';
+                  
+                  const item = {
+                    id: 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                    name: String(name),
+                    cat: String(cat),
+                    price: Number.isFinite(price) ? price : 0,
+                    veg: !String(name + ' ' + cat).toLowerCase().includes('chicken') && !String(name + ' ' + cat).toLowerCase().includes('mutton') && !String(name + ' ' + cat).toLowerCase().includes('fish') && !String(name + ' ' + cat).toLowerCase().includes('egg'),
+                    stock: available ? 'ok' : 'out'
+                  };
+                  await RS.saveOne('menu', item);
+                  count++;
+                }
+                toast(`${count} menu items imported successfully`, 'fa-circle-check');
+                if(window.RS_DB) {
+                  const items = await RS_DB.list('menu');
+                  if(items) {
+                    MENU.length = 0;
+                    items.forEach(i => MENU.push(i));
+                    renderEditor();
+                  }
+                }
+              } catch(err) {
+                console.error(err);
+                toast('Import failed: ' + err.message, 'fa-circle-exclamation');
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        });
+      }
+    },
     'reports-tab':()=>{
       renderReports();
       const btnGSTR = $('#btn-download-gstr');
