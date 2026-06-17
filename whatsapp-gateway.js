@@ -2570,6 +2570,12 @@ app.listen(PORT, async () => {
     console.log(` RestroSuite WhatsApp Gateway running at:`);
     console.log(` http://localhost:${PORT}`);
     console.log('======================================================');
+    try {
+        const commitHash = require('child_process').execSync('git rev-parse HEAD').toString().trim();
+        console.log(`[Startup] Code version commit: ${commitHash}`);
+    } catch (err) {
+        console.log(`[Startup] Code version commit lookup failed: ${err.message}`);
+    }
 
     // Ensure storage bucket file size limit is set correctly (150MB) to allow session backup
     if (supabaseService) {
