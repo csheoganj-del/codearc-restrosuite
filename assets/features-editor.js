@@ -105,6 +105,33 @@
       body.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=> confirmDelete(+b.dataset.del));
       body.querySelectorAll('[data-recipe]').forEach(b=> b.onclick=()=> recipeModal(+b.dataset.recipe));
       body.querySelectorAll('[data-av]').forEach(c=> c.onchange=()=>{ const m=RS.MENU.find(x=>x.id===+c.dataset.av); m.stock = c.checked?'ok':'out'; RS.saveOne&&RS.saveOne('menu',m); renderList(); try{RS.renderPOS();}catch(e){} RS.toast(m.name+(c.checked?' available':' marked sold out'), c.checked?'fa-circle-check':'fa-ban'); });
+      
+      const btnAll = $('#btn-enable-all-menu');
+      if (btnAll) {
+        btnAll.onclick = async () => {
+          const changed = [];
+          for (const m of RS.MENU) {
+            if (m.stock === 'out') {
+              m.stock = 'ok';
+              changed.push(m);
+            }
+          }
+          if (changed.length > 0) {
+            if (window.RS_DB) {
+              await RS_DB.bulkPut('menu', changed);
+            } else if (RS.saveOne) {
+              for (const m of changed) {
+                await RS.saveOne('menu', m);
+              }
+            }
+            renderList();
+            try { RS.renderPOS(); } catch (e) {}
+            RS.toast(`${changed.length} items marked available`, 'fa-circle-check');
+          } else {
+            RS.toast('All items are already available', 'fa-circle-info');
+          }
+        };
+      }
     }
 
     function confirmDelete(id){

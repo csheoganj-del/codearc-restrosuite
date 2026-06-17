@@ -1419,8 +1419,9 @@
                 const desc = crow.description || '';
                 const available = String(crow.available || 'YES').toUpperCase() !== 'NO';
                 
+                const existing = MENU.find(x => String(x.name).toLowerCase() === String(name).toLowerCase());
                 const item = {
-                  id: 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                  id: existing ? existing.id : 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                   name: String(name),
                   cat: String(cat),
                   price: Number.isFinite(price) ? price : 0,
@@ -1511,8 +1512,9 @@
                 const cost = Number(crow.unitcost || crow.cost || crow.price || 0);
                 const unit = crow.unit || 'unit';
                 
+                const existing = INVENTORY.find(x => String(x.name).toLowerCase() === String(name).toLowerCase() || String(x.key).toLowerCase() === String(name).toLowerCase());
                 const item = {
-                  id: 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                  id: existing ? existing.id : 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                   name: String(name),
                   cat: String(cat),
                   stock: Number.isFinite(stock) ? stock : 0,
