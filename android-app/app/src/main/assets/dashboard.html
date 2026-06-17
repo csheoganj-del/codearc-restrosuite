@@ -730,11 +730,20 @@
     </div>
   </div><!-- /#onboarding-overlay -->
 
-  <!-- Mobile Floating Cart Button -->
-  <button id="pos-m-cart-btn" class="pos-m-cart-btn" title="View Order">
-    <i class="fa-solid fa-shopping-basket"></i>
-    <span class="pos-m-cart-badge" id="pos-m-cart-badge">0</span>
-  </button>
+  <!-- Mobile Floating Cart Bar -->
+  <div id="pos-m-cart-bar" class="pos-m-cart-bar hidden">
+    <div class="mcb-left">
+      <i class="fa-solid fa-cart-shopping"></i>
+      <div>
+        <span id="pos-m-cart-bar-count">0 items</span>
+        <span class="mcb-sep">·</span>
+        <span id="pos-m-cart-bar-total" style="font-family: var(--font-display); font-weight: 800; color: #fff;">₹0</span>
+      </div>
+    </div>
+    <button class="mcb-btn">
+      View Cart <i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i>
+    </button>
+  </div>
 
   <!-- Mobile More Bottom Sheet -->
   <div id="mobile-more-sheet" style="display:none;position:fixed;inset:0;z-index:500;">

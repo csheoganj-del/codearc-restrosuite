@@ -91,12 +91,16 @@
     const grid = $('#pos-grid');
     const q = ($('#pos-search-input')?.value||'').toLowerCase();
     const items = MENU.filter(m=>(activeCat==='All'||m.cat===activeCat) && m.name.toLowerCase().includes(q));
-    grid.innerHTML = items.map(m=>`
-      <div class="pos-item ${m.stock==='out'?'out':''}" data-id="${m.id}" style="--cc:${catColor(m.cat)}">
+    grid.innerHTML = items.map(m=>{
+      const inCart = cart.find(c=>String(c.id)===String(m.id));
+      return `
+      <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${m.id}" style="--cc:${catColor(m.cat)}">
+        ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
         <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${m.cat}</span></div>
         <div class="pname">${m.name}</div>
         <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
   };
   function addToCart(id){ const m=MENU.find(x=>String(x.id)===String(id)); const line=cart.find(c=>String(c.id)===String(id)); if(line) line.qty++; else cart.push({...m,qty:1}); renderCart(); toast(`${m.name} added`,'fa-plus'); }
@@ -105,12 +109,24 @@
     const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
     $('#cart-count').textContent = count+(count===1?' item':' items');
 
-    const badge = $('#pos-m-cart-badge');
-    if (badge) {
-      badge.textContent = count;
-      badge.classList.remove('bounce-scale');
-      void badge.offsetWidth;
-      badge.classList.add('bounce-scale');
+    const sub=cart.reduce((a,c)=>a+c.price*c.qty,0);
+    const disc=Math.round(sub*discountPct/100);
+    const taxed=sub-disc; const gst=Math.round(taxed*0.05);
+    const grand=taxed+gst;
+    $('#t-sub').textContent=rs(sub); $('#t-disc').textContent='– '+rs(disc); $('#t-gst').textContent=rs(gst); $('#t-grand').textContent=rs(grand);
+
+    // Update Mobile Cart Bar
+    const barCount = $('#pos-m-cart-bar-count');
+    const barTotal = $('#pos-m-cart-bar-total');
+    const cartBar = $('#pos-m-cart-bar');
+    if (barCount && barTotal && cartBar) {
+      barCount.textContent = count + (count === 1 ? ' item' : ' items');
+      barTotal.textContent = rs(grand);
+      if (count > 0 && window.innerWidth <= 1024) {
+        cartBar.classList.remove('hidden');
+      } else {
+        cartBar.classList.add('hidden');
+      }
     }
 
     if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
@@ -123,10 +139,9 @@
       </div>`).join('');
       $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
     }
-    const sub=cart.reduce((a,c)=>a+c.price*c.qty,0);
-    const disc=Math.round(sub*discountPct/100);
-    const taxed=sub-disc; const gst=Math.round(taxed*0.05);
-    $('#t-sub').textContent=rs(sub); $('#t-disc').textContent='– '+rs(disc); $('#t-gst').textContent=rs(gst); $('#t-grand').textContent=rs(taxed+gst);
+
+    // Refresh POS Grid to update card badges
+    try { renderPOS(); } catch (e) {}
   }
   function getTotals(){ const sub=cart.reduce((a,c)=>a+c.price*c.qty,0); const disc=Math.round(sub*discountPct/100); const taxed=sub-disc; const gst=Math.round(taxed*0.05); return {sub,disc,gst,grand:taxed+gst,count:cart.reduce((a,c)=>a+c.qty,0),discountPct,items:cart.map(c=>({...c}))}; }
   function clearCart(){
@@ -134,11 +149,11 @@
     if (window.innerWidth <= 1024) {
       const posLeft = $('.pos-left');
       const posCart = $('.pos-cart');
-      const cartBtn = $('#pos-m-cart-btn');
-      if (posLeft && posCart && cartBtn) {
+      const cartBar = $('#pos-m-cart-bar');
+      if (posLeft && posCart && cartBar) {
         posLeft.classList.remove('hidden');
         posCart.classList.remove('active');
-        cartBtn.style.display = 'flex';
+        cartBar.classList.add('hidden');
       }
     }
   }
@@ -177,25 +192,27 @@
     }
 
     // Mobile view toggles
-    const cartBtn = $('#pos-m-cart-btn');
+    const cartBar = $('#pos-m-cart-bar');
     const backBtn = $('#btn-pos-back-menu');
     const posLeft = $('.pos-left');
     const posCart = $('.pos-cart');
-    if (cartBtn && posLeft && posCart) {
-      cartBtn.onclick = () => {
+    if (cartBar && posLeft && posCart) {
+      cartBar.onclick = () => {
         if (window.innerWidth <= 1024) {
           posLeft.classList.add('hidden');
           posCart.classList.add('active');
-          cartBtn.style.display = 'none';
+          cartBar.classList.add('hidden');
         }
       };
     }
-    if (backBtn && posLeft && posCart && cartBtn) {
+    if (backBtn && posLeft && posCart && cartBar) {
       backBtn.onclick = () => {
         if (window.innerWidth <= 1024) {
           posLeft.classList.remove('hidden');
           posCart.classList.remove('active');
-          cartBtn.style.display = 'flex';
+          if (cart.length > 0) {
+            cartBar.classList.remove('hidden');
+          }
         }
       };
     }
