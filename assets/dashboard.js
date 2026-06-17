@@ -1255,236 +1255,9 @@
 
   /* ---------- renderers map ---------- */
   const renderers = {
-    'pos-tab':initPOS,'qr-orders-tab':renderQR,
-    'bills-tab':()=>{
-      renderBills();
-      $('#bills-search')?.addEventListener('input',renderBills);
-      const btnExport = $('#btn-export-bills');
-      if (btnExport && !btnExport.dataset.listenerBound) {
-        btnExport.dataset.listenerBound = 'true';
-        btnExport.addEventListener('click', () => {
-          if (!BILLS || !BILLS.length) return toast('No bills to export', 'fa-circle-exclamation');
-          const csv = window.RestroSuite && window.RestroSuite.bills && window.RestroSuite.bills.convertToCSV
-            ? window.RestroSuite.bills.convertToCSV(BILLS)
-            : BILLS.map(b => `${b.no},${b.time},${b.table},${b.amount},${b.pay},${b.status}`).join('\n');
-          RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-export-${Date.now()}.csv`);
-          toast('Bills exported successfully', 'fa-circle-check');
-        });
-      }
-    },
-    'inventory-tab':()=>{
-      renderInventory();
-      const btnDownloadTemplate = $('#btn-download-inventory-template');
-      if (btnDownloadTemplate && !btnDownloadTemplate.dataset.listenerBound) {
-        btnDownloadTemplate.dataset.listenerBound = 'true';
-        btnDownloadTemplate.addEventListener('click', () => {
-          const headers = ['IngredientKey', 'IngredientName', 'Category', 'CurrentStock', 'MaxStock', 'Unit', 'ReorderLevelPercent', 'ExpiryDate'];
-          const sampleRows = [
-            ['espresso_shot', 'Espresso Shot', 'drinks', '3000', '6000', 'ml', '20', ''],
-            ['milk', 'Milk', 'drinks', '6000', '10000', 'ml', '25', '2026-06-16'],
-            ['bread', 'Bread', 'food', '60', '100', 'slices', '20', '2026-06-13']
-          ];
-          const csv = [
-            headers.join(','),
-            ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-          ].join('\n');
-          RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'inventory-template.csv');
-          toast('Inventory CSV template downloaded', 'fa-circle-check');
-        });
-      }
-      const btnImport = $('#btn-import-inventory');
-      if (btnImport && !btnImport.dataset.listenerBound) {
-        btnImport.dataset.listenerBound = 'true';
-        btnImport.addEventListener('click', () => {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.csv';
-          input.onchange = e => {
-            const file = e.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = async evt => {
-              try {
-                const text = evt.target.result;
-                const rows = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.parseCsv
-                  ? window.RestroSuite.imports.parseCsv(text)
-                  : [];
-                if(!rows || !rows.length) throw new Error('No rows found in CSV');
-                let count = 0;
-                for(const row of rows) {
-                  const name = row.Ingredient || row.IngredientName || row.Name || row.name || row.item || row.IngredientKey;
-                  if(!name) continue;
-                  const cat = row.Category || row.category || row.cat || 'General';
-                  const stock = Number(row.InStock || row.Stock || row.CurrentStock || row.stock || row.current || 0);
-                  const min = Number(row.MinLevel || row.min || row.threshold || 10);
-                  const cost = Number(row.UnitCost || row.cost || row.price || 0);
-                  const unit = row.Unit || row.unit || 'unit';
-                  
-                  const item = {
-                    id: 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
-                    name: String(name),
-                    cat: String(cat),
-                    stock: Number.isFinite(stock) ? stock : 0,
-                    min: Number.isFinite(min) ? min : 10,
-                    cost: Number.isFinite(cost) ? cost : 0,
-                    unit: String(unit)
-                  };
-                  await RS.saveOne('inventory', item);
-                  count++;
-                }
-                toast(`${count} ingredients imported successfully`, 'fa-circle-check');
-                if(window.RS_DB) {
-                  const invs = await RS_DB.list('inventory');
-                  if(invs) {
-                    INVENTORY.length = 0;
-                    invs.forEach(i => INVENTORY.push(i));
-                    renderInventory();
-                  }
-                }
-              } catch(err) {
-                console.error(err);
-                toast('Import failed: ' + err.message, 'fa-circle-exclamation');
-              }
-            };
-            reader.readAsText(file);
-          };
-          input.click();
-        });
-      }
-    },
-    'editor-tab':()=>{
-      renderEditor();
-      const btnDownloadMenu = $('#btn-download-menu-template');
-      if (btnDownloadMenu && !btnDownloadMenu.dataset.listenerBound) {
-        btnDownloadMenu.dataset.listenerBound = 'true';
-        btnDownloadMenu.addEventListener('click', () => {
-          const headers = ['Name', 'Category', 'Price', 'Description', 'PrepTimeMinutes', 'Available', 'Bestseller'];
-          const sampleRows = [
-            ['Cappuccino', 'HOT COFFEE', '180', 'Espresso with steamed milk and foam', '4', 'YES', 'YES'],
-            ['Veg Grilled Sandwich', 'SANDWICHES', '220', 'Grilled vegetable and cheese sandwich', '8', 'YES', 'NO']
-          ];
-          const csv = [
-            headers.join(','),
-            ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-          ].join('\n');
-          RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'menu-template.csv');
-          toast('Menu CSV template downloaded', 'fa-circle-check');
-        });
-      }
-      const btnImportMenu = $('#btn-import-menu');
-      if (btnImportMenu && !btnImportMenu.dataset.listenerBound) {
-        btnImportMenu.dataset.listenerBound = 'true';
-        btnImportMenu.addEventListener('click', () => {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.csv';
-          input.onchange = e => {
-            const file = e.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = async evt => {
-              try {
-                const text = evt.target.result;
-                const rows = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.parseCsv
-                  ? window.RestroSuite.imports.parseCsv(text)
-                  : [];
-                if(!rows || !rows.length) throw new Error('No rows found in CSV');
-                let count = 0;
-                for(const row of rows) {
-                  const name = row.Name || row.name || row.ItemName || row.MenuItem;
-                  if(!name) continue;
-                  const cat = row.Category || row.category || row.cat || 'Mains';
-                  const price = Number(row.Price || row.price || row.SellingPrice || 0);
-                  const desc = row.Description || row.description || '';
-                  const available = String(row.Available || row.available || 'YES').toUpperCase() !== 'NO';
-                  
-                  const item = {
-                    id: 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
-                    name: String(name),
-                    cat: String(cat),
-                    price: Number.isFinite(price) ? price : 0,
-                    veg: !String(name + ' ' + cat).toLowerCase().includes('chicken') && !String(name + ' ' + cat).toLowerCase().includes('mutton') && !String(name + ' ' + cat).toLowerCase().includes('fish') && !String(name + ' ' + cat).toLowerCase().includes('egg'),
-                    stock: available ? 'ok' : 'out'
-                  };
-                  await RS.saveOne('menu', item);
-                  count++;
-                }
-                toast(`${count} menu items imported successfully`, 'fa-circle-check');
-                if(window.RS_DB) {
-                  const items = await RS_DB.list('menu');
-                  if(items) {
-                    MENU.length = 0;
-                    items.forEach(i => MENU.push(i));
-                    renderEditor();
-                  }
-                }
-              } catch(err) {
-                console.error(err);
-                toast('Import failed: ' + err.message, 'fa-circle-exclamation');
-              }
-            };
-            reader.readAsText(file);
-          };
-          input.click();
-        });
-      }
-    },
-    'reports-tab':()=>{
-      renderReports();
-      const btnGSTR = $('#btn-download-gstr');
-      if (btnGSTR && !btnGSTR.dataset.listenerBound) {
-        btnGSTR.dataset.listenerBound = 'true';
-        btnGSTR.addEventListener('click', () => {
-          const paidBills = BILLS.filter(b => b.status === 'paid');
-          if(!paidBills.length) return toast('No sales data for GSTR report', 'fa-circle-exclamation');
-          const headers = ['Invoice Number', 'Invoice Date', 'Invoice Value', 'Taxable Value', 'CGST (2.5%)', 'SGST (2.5%)', 'Total Tax', 'Payment Method'];
-          const csv = [
-            headers.join(','),
-            ...paidBills.map(b => {
-              const total = b.amount || 0;
-              const taxable = Math.round(total / 1.05 * 100) / 100;
-              const tax = Math.round((total - taxable) * 100) / 100;
-              const halfTax = Math.round(tax / 2 * 100) / 100;
-              return `"${b.no}","${b.time}",${total},${taxable},${halfTax},${halfTax},${tax},"${b.pay}"`;
-            })
-          ].join('\n');
-          RS.downloadFile(csv, 'text/csv;charset=utf-8;', `gstr1-report-${Date.now()}.csv`);
-          toast('GSTR CSV downloaded successfully', 'fa-circle-check');
-        });
-      }
-    },
-    'kds-tab':renderKDS,
-    'growth-hub-tab':renderHub,'employees-tab':renderEmployees,
-    'super-admin-tab':async ()=>{
-      await renderSuper();
-      const btnExport = $('#btn-export-tenants');
-      if (btnExport && !btnExport.dataset.listenerBound) {
-        btnExport.dataset.listenerBound = 'true';
-        btnExport.addEventListener('click', async () => {
-          try {
-            let tenants = [];
-            if(window.RS_API) {
-              const out = await RS_API.admin({ action: 'list_tenants' }).catch(()=>({}));
-              if(out && out.tenants) tenants = out.tenants;
-            }
-            if (!tenants || !tenants.length) return toast('No tenants to export', 'fa-circle-exclamation');
-            const headers = ['ID', 'Name', 'Slug', 'Outlet Type', 'Email', 'Phone', 'Username', 'Status', 'Plan Code', 'Subscription Status', 'MRR', 'Created At'];
-            const csv = [
-              headers.join(','),
-              ...tenants.map(t => {
-                return `"${t.id || ''}","${(t.name || t.tenant_name || '').replace(/"/g, '""')}","${t.slug || ''}","${t.outlet_type || ''}","${t.email || ''}","${t.phone || ''}","${t.username || ''}","${t.status || ''}","${t.plan_code || ''}","${t.subscription_status || ''}",${t.mrr || 0},"${t.created_at || ''}"`;
-              })
-            ].join('\n');
-            RS.downloadFile(csv, 'text/csv;charset=utf-8;', `tenants-export-${Date.now()}.csv`);
-            toast('Tenants exported successfully', 'fa-circle-check');
-          } catch (e) {
-            console.error(e);
-            toast('Export failed: ' + e.message, 'fa-circle-exclamation');
-          }
-        });
-      }
-    },
-    'gateway-monitor-tab':renderGateway
+    'pos-tab':initPOS,'qr-orders-tab':renderQR,'bills-tab':()=>{renderBills(); $('#bills-search')?.addEventListener('input',renderBills);},
+    'inventory-tab':renderInventory,'editor-tab':renderEditor,'reports-tab':renderReports,'kds-tab':renderKDS,
+    'growth-hub-tab':renderHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'gateway-monitor-tab':renderGateway
   };
 
   /* ---------- public API for feature modules ---------- */
@@ -1585,6 +1358,228 @@
       if(label) label.textContent = 'Super-Admin';
     }
   }
+
+  function bindGlobalImportExportEvents() {
+    // 1. Menu Download Template
+    const btnDownloadMenu = document.getElementById('btn-download-menu-template');
+    if (btnDownloadMenu) {
+      btnDownloadMenu.onclick = () => {
+        const headers = ['Name', 'Category', 'Price', 'Description', 'PrepTimeMinutes', 'Available', 'Bestseller'];
+        const sampleRows = [
+          ['Cappuccino', 'HOT COFFEE', '180', 'Espresso with steamed milk and foam', '4', 'YES', 'YES'],
+          ['Veg Grilled Sandwich', 'SANDWICHES', '220', 'Grilled vegetable and cheese sandwich', '8', 'YES', 'NO']
+        ];
+        const csv = [
+          headers.join(','),
+          ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'menu-template.csv');
+        toast('Menu CSV template downloaded', 'fa-circle-check');
+      };
+    }
+
+    // 2. Menu Import CSV
+    const btnImportMenu = document.getElementById('btn-import-menu');
+    if (btnImportMenu) {
+      btnImportMenu.onclick = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = e => {
+          const file = e.target.files[0];
+          if(!file) return;
+          const reader = new FileReader();
+          reader.onload = async evt => {
+            try {
+              const text = evt.target.result;
+              const rows = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.parseCsv
+                ? window.RestroSuite.imports.parseCsv(text)
+                : [];
+              if(!rows || !rows.length) throw new Error('No rows found in CSV');
+              let count = 0;
+              for(const row of rows) {
+                const name = row.Name || row.name || row.ItemName || row.MenuItem;
+                if(!name) continue;
+                const cat = row.Category || row.category || row.cat || 'Mains';
+                const price = Number(row.Price || row.price || row.SellingPrice || 0);
+                const desc = row.Description || row.description || '';
+                const available = String(row.Available || row.available || 'YES').toUpperCase() !== 'NO';
+                
+                const item = {
+                  id: 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                  name: String(name),
+                  cat: String(cat),
+                  price: Number.isFinite(price) ? price : 0,
+                  veg: !String(name + ' ' + cat).toLowerCase().includes('chicken') && !String(name + ' ' + cat).toLowerCase().includes('mutton') && !String(name + ' ' + cat).toLowerCase().includes('fish') && !String(name + ' ' + cat).toLowerCase().includes('egg'),
+                  stock: available ? 'ok' : 'out'
+                };
+                await RS.saveOne('menu', item);
+                count++;
+              }
+              toast(`${count} menu items imported successfully`, 'fa-circle-check');
+              if(window.RS_DB) {
+                const items = await RS_DB.list('menu');
+                if(items) {
+                  MENU.length = 0;
+                  items.forEach(i => MENU.push(i));
+                  renderEditor();
+                }
+              }
+            } catch(err) {
+              console.error(err);
+              toast('Import failed: ' + err.message, 'fa-circle-exclamation');
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      };
+    }
+
+    // 3. Inventory Download Template
+    const btnDownloadInventory = document.getElementById('btn-download-inventory-template');
+    if (btnDownloadInventory) {
+      btnDownloadInventory.onclick = () => {
+        const headers = ['IngredientKey', 'IngredientName', 'Category', 'CurrentStock', 'MaxStock', 'Unit', 'ReorderLevelPercent', 'ExpiryDate'];
+        const sampleRows = [
+          ['espresso_shot', 'Espresso Shot', 'drinks', '3000', '6000', 'ml', '20', ''],
+          ['milk', 'Milk', 'drinks', '6000', '10000', 'ml', '25', '2026-06-16'],
+          ['bread', 'Bread', 'food', '60', '100', 'slices', '20', '2026-06-13']
+        ];
+        const csv = [
+          headers.join(','),
+          ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'inventory-template.csv');
+        toast('Inventory CSV template downloaded', 'fa-circle-check');
+      };
+    }
+
+    // 4. Inventory Import CSV
+    const btnImportInventory = document.getElementById('btn-import-inventory');
+    if (btnImportInventory) {
+      btnImportInventory.onclick = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = e => {
+          const file = e.target.files[0];
+          if(!file) return;
+          const reader = new FileReader();
+          reader.onload = async evt => {
+            try {
+              const text = evt.target.result;
+              const rows = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.parseCsv
+                ? window.RestroSuite.imports.parseCsv(text)
+                : [];
+              if(!rows || !rows.length) throw new Error('No rows found in CSV');
+              let count = 0;
+              for(const row of rows) {
+                const name = row.Ingredient || row.IngredientName || row.Name || row.name || row.item || row.IngredientKey;
+                if(!name) continue;
+                const cat = row.Category || row.category || row.cat || 'General';
+                const stock = Number(row.InStock || row.Stock || row.CurrentStock || row.stock || row.current || 0);
+                const min = Number(row.MinLevel || row.min || row.threshold || 10);
+                const cost = Number(row.UnitCost || row.cost || row.price || 0);
+                const unit = row.Unit || row.unit || 'unit';
+                
+                const item = {
+                  id: 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                  name: String(name),
+                  cat: String(cat),
+                  stock: Number.isFinite(stock) ? stock : 0,
+                  min: Number.isFinite(min) ? min : 10,
+                  cost: Number.isFinite(cost) ? cost : 0,
+                  unit: String(unit)
+                };
+                await RS.saveOne('inventory', item);
+                count++;
+              }
+              toast(`${count} ingredients imported successfully`, 'fa-circle-check');
+              if(window.RS_DB) {
+                const invs = await RS_DB.list('inventory');
+                if(invs) {
+                  INVENTORY.length = 0;
+                  invs.forEach(i => INVENTORY.push(i));
+                  renderInventory();
+                }
+              }
+            } catch(err) {
+              console.error(err);
+              toast('Import failed: ' + err.message, 'fa-circle-exclamation');
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      };
+    }
+
+    // 5. Bills Export Excel
+    const btnExportBills = document.getElementById('btn-export-bills');
+    if (btnExportBills) {
+      btnExportBills.onclick = () => {
+        if (!BILLS || !BILLS.length) return toast('No bills to export', 'fa-circle-exclamation');
+        const csv = window.RestroSuite && window.RestroSuite.bills && window.RestroSuite.bills.convertToCSV
+          ? window.RestroSuite.bills.convertToCSV(BILLS)
+          : BILLS.map(b => `${b.no},${b.time},${b.table},${b.amount},${b.pay},${b.status}`).join('\n');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-export-${Date.now()}.csv`);
+        toast('Bills exported successfully', 'fa-circle-check');
+      };
+    }
+
+    // 6. GSTR Download
+    const btnGSTR = document.getElementById('btn-download-gstr');
+    if (btnGSTR) {
+      btnGSTR.onclick = () => {
+        const paidBills = BILLS.filter(b => b.status === 'paid');
+        if(!paidBills.length) return toast('No sales data for GSTR report', 'fa-circle-exclamation');
+        const headers = ['Invoice Number', 'Invoice Date', 'Invoice Value', 'Taxable Value', 'CGST (2.5%)', 'SGST (2.5%)', 'Total Tax', 'Payment Method'];
+        const csv = [
+          headers.join(','),
+          ...paidBills.map(b => {
+            const total = b.amount || 0;
+            const taxable = Math.round(total / 1.05 * 100) / 100;
+            const tax = Math.round((total - taxable) * 100) / 100;
+            const halfTax = Math.round(tax / 2 * 100) / 100;
+            return `"${b.no}","${b.time}",${total},${taxable},${halfTax},${halfTax},${tax},"${b.pay}"`;
+          })
+        ].join('\n');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `gstr1-report-${Date.now()}.csv`);
+        toast('GSTR CSV downloaded successfully', 'fa-circle-check');
+      };
+    }
+
+    // 7. Super-Admin Tenants Export
+    const btnExportTenants = document.getElementById('btn-export-tenants');
+    if (btnExportTenants) {
+      btnExportTenants.onclick = async () => {
+        try {
+          let tenants = [];
+          if(window.RS_API) {
+            const out = await RS_API.admin({ action: 'list_tenants' }).catch(()=>({}));
+            if(out && out.tenants) tenants = out.tenants;
+          }
+          if (!tenants || !tenants.length) return toast('No tenants to export', 'fa-circle-exclamation');
+          const headers = ['ID', 'Name', 'Slug', 'Outlet Type', 'Email', 'Phone', 'Username', 'Status', 'Plan Code', 'Subscription Status', 'MRR', 'Created At'];
+          const csv = [
+            headers.join(','),
+            ...tenants.map(t => {
+              return `"${t.id || ''}","${(t.name || t.tenant_name || '').replace(/"/g, '""')}","${t.slug || ''}","${t.outlet_type || ''}","${t.email || ''}","${t.phone || ''}","${t.username || ''}","${t.status || ''}","${t.plan_code || ''}","${t.subscription_status || ''}",${t.mrr || 0},"${t.created_at || ''}"`;
+            })
+          ].join('\n');
+          RS.downloadFile(csv, 'text/csv;charset=utf-8;', `tenants-export-${Date.now()}.csv`);
+          toast('Tenants exported successfully', 'fa-circle-check');
+        } catch (e) {
+          console.error(e);
+          toast('Export failed: ' + e.message, 'fa-circle-exclamation');
+        }
+      };
+    }
+  }
+
+  // Bind globally when document loads
+  bindGlobalImportExportEvents();
 
   // Set default landing tab
   const defaultTab = isSuper ? 'super-admin-tab' : 'pos-tab';
