@@ -171,7 +171,9 @@
 .cart-actions .btn { padding: 13px; }
 @media (max-width: 1024px){
   .pos-wrap { grid-template-columns: 1fr; }
-  .pos-cart { display: none; }
+  /* Keep the cart panel (and the Print & Pay button) visible on narrow screens
+     by stacking it under the menu instead of hiding it behind the mobile cart bar. */
+  .pos-cart { display: flex; position: static; max-height: none; margin-bottom: 20px; }
   .pos-cart.active { display: flex !important; position: static; max-height: none; margin-bottom: 20px; }
   .pos-left.hidden { display: none !important; }
   .pos-m-cart-btn { display: flex; }
