@@ -2604,6 +2604,12 @@ app.listen(PORT, async () => {
 
     console.log('[Startup] Initializing WhatsApp driver...');
     startWatchdog(); // Start watchdog — auto-resets if stuck at connecting
+    try {
+        console.log('[Startup Init Shield] Cleaning up stale browser lock/socket/cookie files immediately before launch...');
+        cleanupStaleLockFiles(authDataPath);
+    } catch (err) {
+        console.error('[Startup Init Shield Error]', err.message);
+    }
     client.initialize().catch(err => console.error('Failed to initialize client:', err));
 
     // Start database notification polling fallback (every 60 seconds)
