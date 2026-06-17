@@ -32,7 +32,7 @@
   /* ---------- THEME ---------- */
   const root = document.documentElement;
   function setTheme(t){ root.setAttribute('data-theme', t); const i = $('#theme-toggle-i'); if(i) i.className = t==='dark'?'fa-solid fa-moon':'fa-solid fa-sun'; try{localStorage.setItem('rs-theme',t)}catch(e){} }
-  setTheme((()=>{try{return localStorage.getItem('rs-theme')||'dark'}catch(e){return 'dark'}})());
+  setTheme((()=>{try{return localStorage.getItem('rs-theme')||'light'}catch(e){return 'light'}})());
   $('#theme-toggle')?.addEventListener('click', ()=> setTheme(root.getAttribute('data-theme')==='dark'?'light':'dark'));
 
   /* ---------- SIDEBAR COLLAPSE ---------- */
@@ -157,7 +157,7 @@
       }
     }
   }
-  function getCustomer(){ return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') }; }
+  function getCustomer(){ return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), gst:($('#cust-gst')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') }; }
   // POS init (static parts present in HTML, wire them)
   function initPOS(){
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
@@ -1521,19 +1521,42 @@
   async function hydrate(){
     if(!window.RS_DB) return;
     const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES};
+    
+    // 1. Instantly load from local storage cache
     for(const coll in map){
-      try{
-        const rows = await RS_DB.list(coll);
-        if(rows && rows.length){ replaceArr(map[coll], rows); }
-        else { replaceArr(map[coll], []); } // Do not seed mock data, keep empty
-      }catch(e){ console.warn('hydrate '+coll+' failed', e); }
+      try {
+        const cached = await RS_DB.listLocal(coll);
+        if(cached && cached.length){ replaceArr(map[coll], cached); }
+      } catch(e){}
     }
+    try{ renderPOS(); }catch(e){}
+    const curTab=document.querySelector('.tab-content.active'); if(curTab && renderers[curTab.id]) { try{ renderers[curTab.id](); }catch(e){} }
+    
+    // 2. Fetch fresh data from the cloud in parallel (non-blocking)
+    const dbMode = (window.RS_DB && window.RS_DB.mode) || 'local';
+    const signedIn = window.RS_API && !!window.RS_API.session();
+    if (dbMode === 'cloud' && signedIn) {
+      const fetchPromises = Object.keys(map).map(async (coll) => {
+        try {
+          const fresh = await RS_DB.listCloud(coll);
+          if (fresh) {
+            await RS_DB.writeLocal(coll, fresh);
+            replaceArr(map[coll], fresh);
+          }
+        } catch(e) {
+          console.warn('Background hydrate '+coll+' failed', e);
+        }
+      });
+      Promise.all(fetchPromises).then(() => {
+        try{ renderPOS(); }catch(e){}
+        const cur=document.querySelector('.tab-content.active'); if(cur && renderers[cur.id]) { try{ renderers[cur.id](); }catch(e){} }
+      });
+    }
+
     try{
       await syncPendingOrders();
       setupSupabaseRealtime();
     }catch(e){ console.warn('sync pending orders/realtime failed', e); }
-    try{ renderPOS(); }catch(e){}
-    const cur=document.querySelector('.tab-content.active'); if(cur && renderers[cur.id]) renderers[cur.id]();
     document.dispatchEvent(new CustomEvent('rs:hydrated'));
   }
 

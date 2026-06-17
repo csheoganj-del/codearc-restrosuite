@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -190,7 +190,7 @@
 
 <div class="access-top">
   <a class="back-home" href="index.html"><i class="fa-solid fa-arrow-left"></i> Back to overview</a>
-  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"><i class="fa-solid fa-sun"></i></button>
 </div>
 
 <main class="access-main">
@@ -440,7 +440,7 @@
 <script>
   const root = document.documentElement, tt = document.getElementById('theme-toggle');
   const setTheme = t => { root.setAttribute('data-theme', t); tt.innerHTML = t==='dark'?'<i class="fa-solid fa-moon"></i>':'<i class="fa-solid fa-sun"></i>'; try{localStorage.setItem('rs-theme',t)}catch(e){} };
-  setTheme((()=>{try{return localStorage.getItem('rs-theme')||'dark'}catch(e){return 'dark'}})());
+  setTheme((()=>{try{return localStorage.getItem('rs-theme')||'light'}catch(e){return 'light'}})());
   tt.onclick = () => setTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');
 
   // Populate country codes dropdown dynamically

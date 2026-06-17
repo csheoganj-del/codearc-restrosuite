@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -371,7 +371,7 @@
         <a href="#testimonials">Testimonials</a>
       </nav>
       <div class="nav-cta-group">
-        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"><i class="fa-solid fa-sun"></i></button>
         <a class="link-signin" href="login.html">Sign In</a>
         <a class="btn btn-primary btn-sm" href="#pricing" id="nav-cta-pricing">Get Started</a>
       </div>
@@ -795,7 +795,7 @@
       const btn = document.getElementById('theme-toggle');
       const icon = btn ? btn.querySelector('i') : null;
       function apply(t){ root.setAttribute('data-theme', t); if(icon) icon.className = t==='dark'?'fa-solid fa-moon':'fa-solid fa-sun'; try{ localStorage.setItem('rs-theme', t); }catch(e){} }
-      apply((()=>{ try{ return localStorage.getItem('rs-theme')||'dark'; }catch(e){ return 'dark'; } })());
+      apply((()=>{ try{ return localStorage.getItem('rs-theme')||'light'; }catch(e){ return 'light'; } })());
       btn && btn.addEventListener('click', ()=> apply(root.getAttribute('data-theme')==='dark'?'light':'dark'));
     })();
   </script>

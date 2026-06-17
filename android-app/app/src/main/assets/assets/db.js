@@ -263,8 +263,26 @@
   // Resilient wrapper: if a cloud call throws, log + fall back to local cache so the UI still works.
   async function guard(method, c, ...args){
     if(!signedIn()) return LS[method](c, ...args);
-    try { return await CLOUD[method](c, ...args); }
-    catch(e){ console.warn(`[RS_DB] cloud ${method} ${c} failed, using local cache:`, e.message); return LS[method](c, ...args); }
+    if(method === 'put' || method === 'bulkPut' || method === 'del') {
+      try { await LS[method](c, ...args); } catch(e){}
+    }
+    try {
+      const res = await CLOUD[method](c, ...args);
+      if (res && (method === 'put' || method === 'bulkPut')) {
+        try {
+          if (Array.isArray(res)) {
+            await LS.bulkPut(c, res);
+          } else {
+            await LS.put(c, res.id, res);
+          }
+        } catch(e){}
+      }
+      return res;
+    }
+    catch(e){
+      console.warn(`[RS_DB] cloud ${method} ${c} failed, using local cache:`, e.message);
+      return LS[method](c, ...args);
+    }
   }
 
   /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */
@@ -282,6 +300,9 @@
     get isCloud(){ return signedIn(); },
     cloudConfigured,
     list:(c)=>guard('list',c),
+    listLocal:(c)=>LS.list(c),
+    listCloud:(c)=>CLOUD.list(c),
+    writeLocal:(c,arr)=>LS.write(c,arr),
     put:(c,id,obj)=>guard('put',c,id,obj),
     bulkPut:(c,arr)=>guard('bulkPut',c,arr),
     del:(c,id)=>guard('del',c,id),

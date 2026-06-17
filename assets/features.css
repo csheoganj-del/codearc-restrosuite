@@ -27,7 +27,7 @@
 .rs-mfoot { padding: 16px 24px; border-top: 1px solid var(--stroke); display: flex; gap: 12px; align-items: center; flex: none; }
 
 /* ---------------- PAYMENT MODAL ---------------- */
-.pay-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0; }
+.pay-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0; flex: 1; min-height: 0; overflow-y: auto; }
 .pay-left { padding: 22px 24px; border-right: 1px solid var(--stroke); }
 .pay-right { padding: 22px 24px; display: flex; flex-direction: column; }
 .pay-due { text-align: center; padding: 8px 0 18px; }

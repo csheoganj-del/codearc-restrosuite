@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -96,7 +96,7 @@
       <span class="tb-pill sync txt" id="db-mode-pill"><span class="dot dot-live"></span> Local</span>
       <span class="tb-pill txt"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
       <button class="tb-icon-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
-      <button class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme"><i id="theme-toggle-i" class="fa-solid fa-moon"></i></button>
+      <button class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
     </header>
 
     <div class="content">
@@ -131,9 +131,12 @@
             <div class="cart-table-sel">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
             </div>
-            <div class="cust-row">
-              <input class="form-input" id="cust-name" placeholder="Customer name">
-              <input class="form-input" id="cust-phone" placeholder="Phone" style="max-width:130px">
+            <div class="cust-row" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 16px 0;">
+              <div style="display: flex; gap: 8px; width: 100%;">
+                <input class="form-input" id="cust-name" placeholder="Customer name" style="flex: 1;">
+                <input class="form-input" id="cust-phone" placeholder="Phone" style="max-width:120px">
+              </div>
+              <input class="form-input" id="cust-gst" placeholder="Customer GSTIN (Optional)">
             </div>
             <div class="cart-items" id="cart-items"></div>
             <div class="cart-foot">

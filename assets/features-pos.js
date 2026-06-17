@@ -74,10 +74,23 @@
     /* ---------------- receipt builder ---------------- */
     let billSeq = 2042;
     function receiptHTML(bill){
+      const custName = bill.customer || 'Walk-in';
+      let custSection = '';
+      if(custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
+        custSection = `
+          <div class="rcp-meta"><span>Customer:</span><span>${custName}</span></div>
+          ${bill.customerPhone ? `<div class="rcp-meta"><span>Phone:</span><span>${bill.customerPhone}</span></div>` : ''}
+          ${bill.customerGst ? `<div class="rcp-meta"><span>GSTIN:</span><span>${bill.customerGst}</span></div>` : ''}
+        `;
+      } else {
+        custSection = `<div class="rcp-meta"><span>Customer:</span><span>Walk-in</span></div>`;
+      }
+
       return `<div class="rcp-center"><div class="rcp-logo">Royal Dhaba</div><div class="rcp-sub">CodeArc RestroSuite · GSTIN 27AABCR1234M1Z5</div></div>
         <hr class="rcp-hr">
         <div class="rcp-meta"><span>${bill.no}</span><span>${bill.time}</span></div>
-        <div class="rcp-meta"><span>${bill.table}</span><span>${bill.customer||'Walk-in'}</span></div>
+        <div class="rcp-meta"><span>Table:</span><span>${bill.table}</span></div>
+        ${custSection}
         <hr class="rcp-hr">
         ${bill.items.map(i=>`<div class="rcp-line"><span><span class="q">${i.qty}× </span>${i.name}</span><span>${rs(i.price*i.qty)}</span></div>`).join('')}
         <hr class="rcp-hr">
@@ -210,7 +223,7 @@
           completeBtn.onclick = async ()=>{
             const bill = {
               no:'INV-'+(billSeq++), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
-              table: cust.table, customer: cust.name||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
+              table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
               tenders: tenders.slice(), change: Math.max(0, paid()-totals.grand)
             };
             // push to Bills data (+ persist to doppio_bills in cloud mode)
@@ -243,7 +256,7 @@
 
             close();
             RS.clearCart();
-            const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'); if(cn)cn.value=''; if(cp)cp.value='';
+            const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'), cg=document.getElementById('cust-gst'); if(cn)cn.value=''; if(cp)cp.value=''; if(cg)cg.value='';
             RS.toast('Payment received · '+rs(bill.grand),'fa-circle-check');
 
             // Auto-print receipt if enabled in settings
@@ -338,7 +351,7 @@
       const cust = RS.getCustomer();
       held.push({ id:Date.now(), items:RS.getCart(), table:cust.table, name:cust.name, count:totals.count, total:totals.grand, time:new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}) });
       RS.clearCart();
-      const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'); if(cn)cn.value=''; if(cp)cp.value='';
+      const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'), cg=document.getElementById('cust-gst'); if(cn)cn.value=''; if(cp)cp.value=''; if(cg)cg.value='';
       updateHeldCount();
       RS.toast('Order held · '+held.length+' parked','fa-pause');
     }
