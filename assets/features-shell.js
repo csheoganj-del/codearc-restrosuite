@@ -58,7 +58,7 @@
     }
 
     /* ===================== SETTINGS ===================== */
-    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-whatsapp'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown']];
+    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-whatsapp'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
@@ -91,7 +91,13 @@
           <div style="flex:1;min-width:200px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)"><div style="font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Growth plan</div><div style="font-family:var(--font-display);font-weight:800;font-size:30px;margin:6px 0">₹749<span style="font-size:14px;color:var(--text-mute)">/mo</span></div><div style="font-size:12.5px;color:var(--text-soft)">Renews 1 Jul 2026</div></div>
           <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">1 / 5</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">1</div><div class="csl">Outlet</div></div><div class="cs"><div class="csv">∞</div><div class="csl">Bills/mo</div></div></div>
         </div>
-        <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Upgrade to Chain (₹1,999/mo)</button>`
+        <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Upgrade to Chain (₹1,999/mo)</button>`,
+      danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
+        <div style="border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);border-radius:var(--r-md);padding:20px;margin-bottom:18px">
+          <h4 style="color:#ef4444;margin-bottom:8px;font-family:var(--font-display);font-weight:800;font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> Reset Operational Data</h4>
+          <p style="font-size:12.5px;color:var(--text-soft);margin-bottom:16px;line-height:1.5">This will permanently delete all operational data for this outlet including all bills, transactions, customer profiles, custom menu items, staff, and inventory records. Account credentials and settings will be preserved.</p>
+          <button class="btn" id="btn-client-reset-data" style="background:#EF4444;color:#fff;border:none;padding:10px 16px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;"><i class="fa-solid fa-trash-can"></i> Reset Outlet Data</button>
+        </div>`
     };
     function renderSettings(){
       const sec = $('#settings-tab');
@@ -106,7 +112,37 @@
       function applyStore(){ $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; }); }
       function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
       function show(key){ if(body.querySelector('[data-skey]')) collect(); body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`; applyStore(); $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
-        const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab'); }
+        const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
+        const btnReset = $('#btn-client-reset-data');
+        if(btnReset) {
+          btnReset.onclick = async () => {
+            if(!confirm("⚠️ RESET OUTLET DATA?\n\nThis will PERMANENTLY DELETE all of your operational data (bills, menu, inventory, employees, customers, drafts, etc.).\n\nThis action cannot be undone! Proceed?")) return;
+            btnReset.disabled = true;
+            btnReset.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+            try {
+              const collections = ['bills', 'menu', 'inventory', 'customers', 'employees', 'drafts', 'pending_orders', 'shifts', 'shift_events', 'attendance', 'leave_requests', 'reservations', 'offers', 'vendors', 'purchase_orders', 'support_tickets'];
+              for (const c of collections) {
+                const list = await RS_DB.list(c);
+                for (const item of list) {
+                  const id = (c === 'shifts') ? item.shiftId : (c === 'shift_events') ? item.eventId : item.id;
+                  if (id != null) {
+                    await RS_DB.del(c, id);
+                  }
+                }
+              }
+              RS.toast('All operational data reset successfully!', 'fa-circle-check');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1200);
+            } catch(err) {
+              console.error(err);
+              RS.toast('Error resetting data: ' + err.message, 'fa-circle-exclamation');
+              btnReset.disabled = false;
+              btnReset.innerHTML = '<i class="fa-solid fa-trash-can"></i> Reset Outlet Data';
+            }
+          };
+        }
+      }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
       $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check')); };
       $('#set-cancel').onclick=()=>show('profile');
