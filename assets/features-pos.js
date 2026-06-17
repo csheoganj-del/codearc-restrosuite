@@ -25,7 +25,9 @@
         ov.querySelector('.rs-mclose')?.addEventListener('click', close);
         ov.addEventListener('click', e=>{ if(e.target===ov && opts.dismissable!==false) close(); });
         document.addEventListener('keydown', esc);
-        requestAnimationFrame(()=> ov.classList.add('show'));
+        setTimeout(()=> {
+          ov.classList.add('show');
+        }, 20);
         if(opts.onMount) opts.onMount(ov.querySelector('.rs-modal'), close);
         return { el: ov, modal: ov.querySelector('.rs-modal'), close };
       }
