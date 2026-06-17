@@ -13,7 +13,7 @@ const unzipper = require('unzipper');
 // SUPABASE CLIENTS
 // ============================================================
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://htkauiibuejetimfiavs.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
 
 // Service-role key for Supabase Storage access (set as env variable in HuggingFace Secrets)
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
