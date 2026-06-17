@@ -46,3 +46,12 @@ test('recipe warnings identify missing menu and inventory references', () => {
   assert.equal(parsed.errors.length, 0);
   assert.equal(parsed.warnings.length, 2);
 });
+
+test('cleanKey normalizes various header formats', () => {
+  assert.equal(imports.cleanKey('IngredientName'), 'ingredientname');
+  assert.equal(imports.cleanKey('Ingredient Name'), 'ingredient_name');
+  assert.equal(imports.cleanKey('IngredientName\r'), 'ingredientname');
+  assert.equal(imports.cleanKey('  CurrentStock  '), 'currentstock');
+  assert.equal(imports.cleanKey('UnitCost($)'), 'unitcost');
+});
+

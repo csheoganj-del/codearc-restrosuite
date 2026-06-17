@@ -1396,14 +1396,28 @@
                 ? window.RestroSuite.imports.parseCsv(text)
                 : [];
               if(!rows || !rows.length) throw new Error('No rows found in CSV');
+
+              const cleanKey = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.cleanKey
+                ? window.RestroSuite.imports.cleanKey
+                : (k) => String(k || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+              const cleanRow = (r) => {
+                const res = {};
+                for(const [k, v] of Object.entries(r || {})) {
+                  res[cleanKey(k)] = typeof v === 'string' ? v.trim() : v;
+                }
+                return res;
+              };
+
               let count = 0;
               for(const row of rows) {
-                const name = row.Name || row.name || row.ItemName || row.MenuItem;
+                const crow = cleanRow(row);
+                const name = crow.name || crow.itemname || crow.menuitem || crow.item || crow.ingredientname || crow.ingredient;
                 if(!name) continue;
-                const cat = row.Category || row.category || row.cat || 'Mains';
-                const price = Number(row.Price || row.price || row.SellingPrice || 0);
-                const desc = row.Description || row.description || '';
-                const available = String(row.Available || row.available || 'YES').toUpperCase() !== 'NO';
+                const cat = crow.category || crow.cat || 'Mains';
+                const price = Number(crow.price || crow.sellingprice || 0);
+                const desc = crow.description || '';
+                const available = String(crow.available || 'YES').toUpperCase() !== 'NO';
                 
                 const item = {
                   id: 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
@@ -1473,15 +1487,29 @@
                 ? window.RestroSuite.imports.parseCsv(text)
                 : [];
               if(!rows || !rows.length) throw new Error('No rows found in CSV');
+
+              const cleanKey = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.cleanKey
+                ? window.RestroSuite.imports.cleanKey
+                : (k) => String(k || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+              const cleanRow = (r) => {
+                const res = {};
+                for(const [k, v] of Object.entries(r || {})) {
+                  res[cleanKey(k)] = typeof v === 'string' ? v.trim() : v;
+                }
+                return res;
+              };
+
               let count = 0;
               for(const row of rows) {
-                const name = row.Ingredient || row.IngredientName || row.Name || row.name || row.item || row.IngredientKey;
+                const crow = cleanRow(row);
+                const name = crow.ingredientname || crow.ingredient || crow.name || crow.item || crow.ingredientkey;
                 if(!name) continue;
-                const cat = row.Category || row.category || row.cat || 'General';
-                const stock = Number(row.InStock || row.Stock || row.CurrentStock || row.stock || row.current || 0);
-                const min = Number(row.MinLevel || row.min || row.threshold || 10);
-                const cost = Number(row.UnitCost || row.cost || row.price || 0);
-                const unit = row.Unit || row.unit || 'unit';
+                const cat = crow.category || crow.cat || 'General';
+                const stock = Number(crow.instock || crow.stock || crow.currentstock || crow.current || 0);
+                const min = Number(crow.minlevel || crow.min || crow.threshold || 10);
+                const cost = Number(crow.unitcost || crow.cost || crow.price || 0);
+                const unit = crow.unit || 'unit';
                 
                 const item = {
                   id: 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),

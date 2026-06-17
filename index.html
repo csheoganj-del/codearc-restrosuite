@@ -315,7 +315,21 @@
       .footer-grid { grid-template-columns: 1fr 1fr; gap: 30px; }
     }
     @media (max-width: 640px) {
-      .nav-links, .link-signin { display: none; }
+      .nav-links { display: none; }
+      .link-signin {
+        padding: 8px 10px;
+        font-size: 13.5px;
+      }
+      .theme-toggle {
+        width: 36px;
+        height: 36px;
+      }
+      .nav-cta-group {
+        gap: 8px;
+      }
+      .container {
+        width: min(1240px, calc(100% - 32px));
+      }
       .features-grid { grid-template-columns: 1fr; }
       .menu-selector { grid-template-columns: 1fr 1fr; }
       .hero { padding: 120px 0 60px; }
