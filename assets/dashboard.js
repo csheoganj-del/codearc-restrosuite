@@ -797,20 +797,6 @@
   /* ============================================================
      GATEWAY MONITOR & INCIDENTS CONSOLE
      ============================================================ */
-  const MOCK_LOGS = [
-    ['ti','Gateway connected · session restored'],
-    ['tm','Listening for outbound receipts on queue rs-wa-out'],
-    ['ti','Sent INV-2041 → +91·····4821 · delivered'],
-    ['ti','Sent INV-2040 → +91·····7390 · delivered'],
-    ['tw','Rate limit 80% · throttling to 12 msg/s'],
-    ['ti','Sent campaign batch [Diwali Offer] · 312 recipients'],
-    ['tm','Heartbeat ok · latency 142ms'],
-    ['ti','Sent INV-2039 → +91·····1102 · delivered'],
-    ['te','Retry INV-2037 · recipient opted out · skipped'],
-    ['ti','Webhook ack received · status synced']
-  ];
-  let mockLogIndex = 0;
-
   async function pollSuperAdminGateway() {
     const isZeroCost = RS_API.zeroCostLaunchMode;
     const gatewayUrl = isZeroCost ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
@@ -935,23 +921,8 @@
         throw new Error(data?.error || 'Failed to fetch logs');
       }
     } catch(err) {
-      // Fallback log simulator for demo mode
       if (logsContainer) {
-        const ts = new Date().toTimeString().slice(0, 8);
-        const l = MOCK_LOGS[mockLogIndex % MOCK_LOGS.length];
-        mockLogIndex++;
-        const row = document.createElement('div');
-        row.className = 'tl';
-        row.innerHTML = `<span class="tt">${ts}</span><span class="${l[0]}">${l[1]}</span>`;
-        
-        // Prepend new mock logs at the top
-        logsContainer.insertBefore(row, logsContainer.firstChild);
-        logsContainer.scrollTop = 0;
-        
-        // Maintain a maximum of 15 logs visible at a time
-        while (logsContainer.children.length > 15) {
-          logsContainer.removeChild(logsContainer.lastChild);
-        }
+        logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent dispatch logs found.</div>';
       }
     }
   }

@@ -518,7 +518,7 @@
             return {name:i.name,price:parseInt(i.price)||0,category:i.category||'Other',description:i.description||'',image:i.image||'',bestseller:!!i.bestseller};
           });
         } else {
-          newItems = DEFAULT;
+          newItems = [];
         }
 
         var menuChanged = JSON.stringify(items) !== JSON.stringify(newItems);
@@ -545,19 +545,28 @@
         }
       }).catch(function(){
         if (!cachedData) {
-          items = DEFAULT;
+          items = [];
           buildUI();
         }
       });
     } else {
       if (!cachedData) {
-        items = DEFAULT;
+        items = [];
         buildUI();
       }
     }
   }
 
   function buildUI(){
+    if (items.length === 0) {
+      document.getElementById('main').innerHTML =
+        '<div class="empty" style="padding: 64px 24px; text-align: center; color: var(--text-mute);">' +
+          '<i class="fa-solid fa-mug-hot" style="font-size: 32px; margin-bottom: 12px; opacity: 0.5;"></i>' +
+          '<p style="font-size: 14px; font-weight: 500; margin: 0 0 4px 0;">No menu items available</p>' +
+          '<span style="font-size: 11px; opacity: 0.7;">Check back later once the outlet has published their menu!</span>' +
+        '</div>';
+      return;
+    }
     var cats = ['ALL'];
     items.forEach(function(i){ if(cats.indexOf(i.category)===-1) cats.push(i.category); });
     var chipsHtml = cats.map(function(c){
