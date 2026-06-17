@@ -165,8 +165,27 @@
     $('#pos-search-input').addEventListener('input', renderPOS);
     $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{ $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }));
     $('#disc-input').addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
-    $('#btn-kot').addEventListener('click',()=>{ if(!cart.length)return toast('Cart is empty','fa-circle-exclamation'); if(window.RSPOS&&window.RSPOS.kot) return window.RSPOS.kot(); toast('KOT sent to kitchen','fa-fire'); });
-    $('#btn-checkout').addEventListener('click',()=>{ if(!cart.length)return toast('Cart is empty','fa-circle-exclamation'); if(window.RSPOS&&window.RSPOS.checkout) return window.RSPOS.checkout(); toast('Bill printed & WhatsApp sent','fa-print'); clearCart(); });
+    $('#btn-kot').onclick = () => {
+      if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+      try {
+        if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
+      } catch (err) {
+        console.error('[KOT Error]', err);
+        return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
+      }
+      toast('KOT sent to kitchen','fa-fire');
+    };
+    $('#btn-checkout').onclick = () => {
+      if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+      try {
+        if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
+      } catch (err) {
+        console.error('[Checkout Error]', err);
+        return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
+      }
+      toast('Bill printed & WhatsApp sent','fa-print');
+      clearCart();
+    };
 
     // Grid size slider controls
     const slider = $('#pos-grid-slider');
