@@ -292,7 +292,13 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     final PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
                     if (pm != null) {
+                        final android.view.ViewGroup rootView = (android.view.ViewGroup) findViewById(android.R.id.content);
                         final WebView tempWebView = new WebView(MainActivity.this);
+                        tempWebView.setVisibility(View.INVISIBLE);
+                        if (rootView != null) {
+                            rootView.addView(tempWebView);
+                        }
+                        
                         tempWebView.setWebViewClient(new WebViewClient() {
                             @Override
                             public void onPageFinished(WebView view, String url) {
@@ -312,6 +318,17 @@ public class MainActivity extends AppCompatActivity {
                                 printBuilder.setMediaSize(custom58mm);
                                 
                                 pm.print(jobName, printAdapter, printBuilder.build());
+                                
+                                // Schedule cleanup of temporary WebView
+                                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (rootView != null) {
+                                            rootView.removeView(tempWebView);
+                                        }
+                                        tempWebView.destroy();
+                                    }
+                                }, 5000);
                             }
                         });
                         // Load receipt HTML content
