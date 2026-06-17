@@ -616,6 +616,8 @@ const client = new Client({
             '--disk-cache-size=0',
             '--media-cache-size=0',
             '--aggressive-cache-discard',
+            '--disable-async-dns',
+            '--disable-extensions',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
     }
