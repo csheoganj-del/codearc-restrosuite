@@ -2209,8 +2209,7 @@ textarea:focus {
   color: var(--text-muted) !important;
   border-color: rgba(28, 28, 28, 0.05) !important;
   box-shadow: none !important;
-  cursor: not-allowed;
-  pointer-events: none;
+  cursor: pointer;
 }
 
 .checkout-btn.btn-save-only {
