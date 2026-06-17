@@ -139,7 +139,7 @@
             btnAll.innerHTML = '<i class="fa-solid fa-ban"></i> Disable All';
             btnAll.title = 'Disable all items at once';
           }
-          btnAll.onclick = async () => {
+          btnAll.onclick = () => {
             const actionEnable = RS.MENU.some(m => m.stock === 'out');
             const changed = [];
             for (const m of RS.MENU) {
@@ -156,32 +156,33 @@
               }
             }
             if (changed.length > 0) {
-              const btnOrig = btnAll.innerHTML;
-              btnAll.disabled = true;
-              btnAll.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
-              try {
-                if (window.RS_DB) {
-                  await RS_DB.bulkPut('menu', changed);
-                } else if (RS.saveOne) {
-                  for (const m of changed) {
-                    await RS.saveOne('menu', m);
+              // 1. Instantly update UI and POS screen
+              renderList();
+              try { RS.renderPOS(); } catch (e) {}
+
+              // 2. Instantly show toast notification
+              RS.toast(
+                actionEnable 
+                  ? `${changed.length} items marked available` 
+                  : `${changed.length} items marked sold out`, 
+                actionEnable ? 'fa-circle-check' : 'fa-ban'
+              );
+
+              // 3. Sync to IndexedDB / Cloud in the background
+              (async () => {
+                try {
+                  if (window.RS_DB) {
+                    await RS_DB.bulkPut('menu', changed);
+                  } else if (RS.saveOne) {
+                    for (const m of changed) {
+                      await RS.saveOne('menu', m);
+                    }
                   }
+                } catch (err) {
+                  console.error('[Menu Toggle Sync Error]', err);
+                  RS.toast('Database sync failed: ' + err.message, 'fa-circle-exclamation');
                 }
-                renderList();
-                try { RS.renderPOS(); } catch (e) {}
-                RS.toast(
-                  actionEnable 
-                    ? `${changed.length} items marked available` 
-                    : `${changed.length} items marked sold out`, 
-                  actionEnable ? 'fa-circle-check' : 'fa-ban'
-                );
-              } catch (err) {
-                console.error(err);
-                RS.toast('Update failed: ' + err.message, 'fa-circle-exclamation');
-                btnAll.innerHTML = btnOrig;
-              } finally {
-                btnAll.disabled = false;
-              }
+              })();
             }
           };
         }
