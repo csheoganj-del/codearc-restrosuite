@@ -551,7 +551,7 @@ async function restoreSessionFromSupabase() {
 }
 
 // Read secret token from environment variable (configured as a secret in HuggingFace Space)
-const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || '';
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || process.env.WHATSAPP_GATEWAY_TOKEN || '';
 
 // Utility to mask phone numbers in logs to prevent customer data leaks
 function maskPhone(phoneStr) {
