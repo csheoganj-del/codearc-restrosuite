@@ -45,11 +45,11 @@
     <nav class="sb-nav">
       <div class="sb-section">Operations</div>
       <a class="sidebar-link" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i><span>Point of Sale</span></a>
-      <a class="sidebar-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count">4</span></a>
+      <a class="sidebar-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i><span>Kitchen Display</span></a>
-      <a class="sidebar-link" data-tab="tokens-tab"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
+      <a class="sidebar-link" data-tab="tokens-tab" class="superadmin-only" style="display:none;"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
       <a class="sidebar-link" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Floor &amp; Tables</span></a>
-      <a class="sidebar-link" data-tab="aggregator-tab"><i class="fa-solid fa-bowl-rice"></i><span>Online Orders</span><span class="badge-count">5</span></a>
+      <a class="sidebar-link" data-tab="aggregator-tab"><i class="fa-solid fa-bowl-rice"></i><span>Online Orders</span><span class="badge-count" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
@@ -144,10 +144,10 @@
       <!-- ============ QR ORDERS ============ -->
       <section class="tab-content" id="qr-orders-tab" data-screen-label="QR Orders">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-hourglass-half"></i></div><div><div class="sv">2</div><div class="sl">Pending accept</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-fire-burner"></i></div><div><div class="sv">2</div><div class="sl">Preparing</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-circle-check"></i></div><div><div class="sv">2</div><div class="sl">Served</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-table"></i></div><div><div class="sv">6 / 12</div><div class="sl">Tables occupied</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-hourglass-half"></i></div><div><div class="sv">0</div><div class="sl">Pending accept</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-fire-burner"></i></div><div><div class="sv">0</div><div class="sl">Preparing</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-circle-check"></i></div><div><div class="sv">0</div><div class="sl">Served</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-table"></i></div><div><div class="sv">0 / 12</div><div class="sl">Tables occupied</div></div></div>
         </div>
         <div class="qr-grid" id="qr-grid"></div>
       </section>
@@ -155,7 +155,7 @@
       <!-- ============ KDS ============ -->
       <section class="tab-content" id="kds-tab" data-screen-label="KDS">
         <div class="toolbar-row">
-          <div class="grow"><span class="pill pill-green"><span class="dot dot-live"></span> Live kitchen queue</span> <span class="pill" style="margin-left:6px">Avg prep 6:20</span></div>
+          <div class="grow"><span class="pill pill-green"><span class="dot dot-live"></span> Live kitchen queue</span> <span class="pill" style="margin-left:6px" id="kds-avg-prep">Avg prep --:--</span></div>
           <div class="seg"><button class="active">All stations</button><button>Tandoor</button><button>Curry</button><button>Beverages</button></div>
         </div>
         <div class="kds-grid" id="kds-grid"></div>
@@ -164,10 +164,10 @@
       <!-- ============ BILLS ============ -->
       <section class="tab-content" id="bills-tab" data-screen-label="Bills">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹42,380</div><div class="sl">Today's sales</div><div class="sd up"><i class="fa-solid fa-arrow-up"></i> 12% vs yesterday</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">128</div><div class="sl">Bills generated</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">₹331</div><div class="sl">Avg order value</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv">1</div><div class="sl">Refunds today</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">₹0</div><div class="sl">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="bills-stat-count">0</div><div class="sl">Bills generated</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv" id="bills-stat-aov">₹0</div><div class="sl">Avg order value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv" id="bills-stat-refunds">0</div><div class="sl">Refunds today</div></div></div>
         </div>
         <div class="panel panel-pad">
           <div class="toolbar-row">
@@ -229,10 +229,10 @@
       <!-- ============ REPORTS ============ -->
       <section class="tab-content" id="reports-tab" data-screen-label="Reports">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹3.28L</div><div class="sl">Revenue this week</div><div class="sd up"><i class="fa-solid fa-arrow-up"></i> 18%</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">842</div><div class="sl">Orders this week</div><div class="sd up"><i class="fa-solid fa-arrow-up"></i> 9%</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">₹389</div><div class="sl">Avg order value</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">₹16,400</div><div class="sl">GST collected</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹0</div><div class="sl">Revenue this week</div><div class="sd" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">0</div><div class="sl">Orders this week</div><div class="sd" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">₹0</div><div class="sl">Avg order value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">₹0</div><div class="sl">GST collected</div></div></div>
         </div>
         <div class="report-grid">
           <div class="panel panel-pad">
@@ -292,10 +292,10 @@
       <!-- ============ EMPLOYEES ============ -->
       <section class="tab-content" id="employees-tab" data-screen-label="Employees">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">6</div><div class="sl">Team members</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-user-clock"></i></div><div><div class="sv">4</div><div class="sl">On shift now</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹1.8L</div><div class="sl">Payroll (month)</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-calendar-day"></i></div><div><div class="sv">98%</div><div class="sl">Attendance</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">0</div><div class="sl">Team members</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-user-clock"></i></div><div><div class="sv">0</div><div class="sl">On shift now</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹0</div><div class="sl">Payroll (month)</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-calendar-day"></i></div><div><div class="sv">0%</div><div class="sl">Attendance</div></div></div>
         </div>
         <div class="toolbar-row">
           <div class="seg"><button class="active">Directory</button><button>Shift roster</button><button>Attendance</button><button>Payroll</button></div>
@@ -350,9 +350,9 @@
             </div>
 
             <div class="stat-row" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0;">
-              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;">12,408</div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
-              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-o" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-check-double"></i></div><div><div class="sv" id="gw-delivery-rate" style="font-size: 15px;">99.2%</div><div class="sl" style="font-size: 10px;">Delivery rate</div></div></div>
-              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-v" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-gauge-high"></i></div><div><div class="sv" id="gw-latency" style="font-size: 15px;">142ms</div><div class="sl" style="font-size: 10px;">Avg latency</div></div></div>
+              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;">0</div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
+              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-o" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-check-double"></i></div><div><div class="sv" id="gw-delivery-rate" style="font-size: 15px;">-</div><div class="sl" style="font-size: 10px;">Delivery rate</div></div></div>
+              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-v" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-gauge-high"></i></div><div><div class="sv" id="gw-latency" style="font-size: 15px;">-</div><div class="sl" style="font-size: 10px;">Avg latency</div></div></div>
               <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-a" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-layer-group"></i></div><div><div class="sv" id="gw-queued" style="font-size: 15px;">0</div><div class="sl" style="font-size: 10px;">Queued</div></div></div>
             </div>
 

@@ -207,6 +207,31 @@
   const statusPill = {pending:'pill-amber',preparing:'pill-orange',served:'pill-green'};
   const statusTxt = {pending:'Pending',preparing:'Preparing',served:'Served'};
   const renderQR = () => {
+    // Dynamically calculate QR Orders statistics
+    const pendingCount = QR_ORDERS.filter(o => o.status === 'pending').length;
+    const preparingCount = QR_ORDERS.filter(o => o.status === 'preparing').length;
+    const servedCount = QR_ORDERS.filter(o => o.status === 'served').length;
+    const activeTables = new Set(QR_ORDERS.filter(o => o.status !== 'served').map(o => o.table)).size;
+
+    const qrTab = document.getElementById('qr-orders-tab');
+    if (qrTab) {
+      const svElements = qrTab.querySelectorAll('.stat-row .stat-card .sv');
+      if (svElements.length >= 4) {
+        svElements[0].textContent = pendingCount;
+        svElements[1].textContent = preparingCount;
+        svElements[2].textContent = servedCount;
+        svElements[3].textContent = `${activeTables} / 12`;
+      }
+    }
+
+    // Update the sidebar badge count for QR Orders
+    const qrBadge = document.querySelector('.sidebar-link[data-tab="qr-orders-tab"] .badge-count');
+    if (qrBadge) {
+      const activeCount = pendingCount + preparingCount;
+      qrBadge.textContent = activeCount;
+      qrBadge.style.display = activeCount > 0 ? '' : 'none';
+    }
+
     $('#qr-grid').innerHTML = QR_ORDERS.map((o,i)=>`
       <div class="qr-card s-${o.status}">
         <div class="qr-ch"><div><span class="tnum">Table ${o.table.split('-')[1]||o.table}</span><div class="qtime">${o.time}</div></div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
@@ -246,6 +271,22 @@
   const BILLS = [];
   const payPill = {UPI:'pill-violet',Cash:'pill-green',Card:'pill-orange'};
   const renderBills = () => {
+    // Dynamically compute stats from BILLS
+    const paidBills = BILLS.filter(b => b.status === 'paid');
+    const totalSales = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const count = BILLS.length;
+    const aov = paidBills.length > 0 ? Math.round(totalSales / paidBills.length) : 0;
+    const refunds = BILLS.filter(b => b.status === 'refunded').length;
+
+    const salesEl = document.getElementById('bills-stat-sales');
+    if (salesEl) salesEl.textContent = rs(totalSales);
+    const countEl = document.getElementById('bills-stat-count');
+    if (countEl) countEl.textContent = count;
+    const aovEl = document.getElementById('bills-stat-aov');
+    if (aovEl) aovEl.textContent = rs(aov);
+    const refundsEl = document.getElementById('bills-stat-refunds');
+    if (refundsEl) refundsEl.textContent = refunds;
+
     const q=($('#bills-search')?.value||'').toLowerCase();
     $('#bills-table-body').innerHTML = BILLS.filter(b=>b.no.toLowerCase().includes(q)||b.table.toLowerCase().includes(q)).map(b=>`
       <tr>
@@ -278,6 +319,9 @@
         <td><div class="row-actions"><button class="icon-act go" title="Restock"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit"><i class="fa-solid fa-pen"></i></button></div></td>
       </tr>`; }).join('');
     $$('#inv-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Purchase order drafted','fa-truck')));
+
+    // Dispatch custom event to notify other modules
+    document.dispatchEvent(new CustomEvent('rs:render-inventory'));
   };
 
   /* ============================================================
@@ -300,18 +344,117 @@
      REPORTS
      ============================================================ */
   const renderReports = () => {
-    const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], vals=[28,34,30,42,58,72,64], max=Math.max(...vals);
-    $('#chart-revenue').innerHTML = days.map((d,i)=>`<div class="cbar"><div class="bar ${i===5?'':''}" style="height:0" data-h="${vals[i]/max*100}"><span class="bv">${rs(vals[i]*1000)}</span></div><span class="bl">${d}</span></div>`).join('');
-    setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
-    // payment donut
-    const pay=[['UPI',58,'var(--violet)'],['Cash',24,'var(--green)'],['Card',18,'var(--orange)']];
-    let acc=0; const seg=pay.map(p=>{const s=`${p[2]} ${acc}% ${acc+p[1]}%`;acc+=p[1];return s;}).join(',');
-    $('#donut-pay').style.background=`conic-gradient(${seg})`;
-    $('#legend-pay').innerHTML=pay.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${p[0]}<span class="lg-val">${p[1]}%</span></div>`).join('');
-    // category bars
-    const cats=[['Mains',42],['Starters',23],['Breads',14],['Beverages',12],['Desserts',9]];
-    $('#cat-bars').innerHTML=cats.map(c=>`<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${c[0]}</span><b style="color:var(--text)">${c[1]}%</b></div><div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div></div>`).join('');
-    setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
+    const paidBills = BILLS.filter(b => b.status === 'paid');
+    
+    // Calculate stats
+    const totalRevenue = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const totalOrders = paidBills.length;
+    const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+    
+    // Estimate GST collected (assume 5% average)
+    const netTaxableSales = Math.round(totalRevenue / 1.05);
+    const gstCollected = totalRevenue - netTaxableSales;
+    
+    const reportsTab = document.getElementById('reports-tab');
+    if (reportsTab) {
+      const svElements = reportsTab.querySelectorAll('.stat-row .stat-card .sv');
+      if (svElements.length >= 4) {
+        svElements[0].textContent = totalRevenue > 0 ? rs(totalRevenue) : '₹0';
+        svElements[1].textContent = totalOrders;
+        svElements[2].textContent = aov > 0 ? rs(aov) : '₹0';
+        svElements[3].textContent = gstCollected > 0 ? rs(gstCollected) : '₹0';
+      }
+      
+      const tbody = reportsTab.querySelector('.panel table.data-table tbody');
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">${rs(gstCollected)}</td></tr>
+          <tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">${rs(0)}</td></tr>
+          <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">${rs(netTaxableSales)}</td></tr>
+          <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">${rs(gstCollected)}</b></td></tr>
+        `;
+      }
+    }
+
+    // Daily revenue chart
+    const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const dayVals = [0, 0, 0, 0, 0, 0, 0];
+    
+    paidBills.forEach(b => {
+      if (b.time) {
+        const todayDay = new Date().getDay();
+        const index = (todayDay + 6) % 7;
+        dayVals[index] += b.amount || 0;
+      }
+    });
+
+    const maxVal = Math.max(...dayVals) || 1;
+    const hasDailyData = dayVals.some(v => v > 0);
+    
+    if (!hasDailyData) {
+      $('#chart-revenue').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-mute); font-size:12px; grid-column:1/-1; width:100%;">No sales trend data available</div>`;
+    } else {
+      $('#chart-revenue').innerHTML = days.map((d,i)=>`<div class="cbar"><div class="bar" style="height:0" data-h="${dayVals[i]/maxVal*100}"><span class="bv">${rs(dayVals[i])}</span></div><span class="bl">${d}</span></div>`).join('');
+      setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
+    }
+    
+    // Payment mix donut
+    const payCounts = { UPI: 0, Cash: 0, Card: 0 };
+    paidBills.forEach(b => {
+      if (payCounts[b.pay] !== undefined) {
+        payCounts[b.pay] += b.amount || 0;
+      }
+    });
+    const payTotal = payCounts.UPI + payCounts.Cash + payCounts.Card;
+    
+    if (payTotal === 0) {
+      $('#donut-pay').style.background = 'var(--glass-2)';
+      $('#donut-pay .donut-center .dc-v').textContent = '₹0';
+      $('#legend-pay').innerHTML = `<div style="color:var(--text-mute); font-size:12px; margin-top:10px; text-align:center;">No payments recorded</div>`;
+    } else {
+      const upiPct = Math.round(payCounts.UPI / payTotal * 100);
+      const cashPct = Math.round(payCounts.Cash / payTotal * 100);
+      const cardPct = 100 - upiPct - cashPct;
+      
+      const payMix = [
+        ['UPI', upiPct, 'var(--violet)'],
+        ['Cash', cashPct, 'var(--green)'],
+        ['Card', cardPct, 'var(--orange)']
+      ];
+      
+      let acc=0; const seg=payMix.map(p=>{const s=`${p[2]} ${acc}% ${acc+p[1]}%`;acc+=p[1];return s;}).join(',');
+      $('#donut-pay').style.background=`conic-gradient(${seg})`;
+      $('#donut-pay .donut-center .dc-v').textContent = totalRevenue > 0 ? rs(totalRevenue) : '₹0';
+      $('#legend-pay').innerHTML=payMix.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${p[0]}<span class="lg-val">${p[1]}%</span></div>`).join('');
+    }
+    
+    // Category sales distribution
+    const catSales = {};
+    paidBills.forEach(b => {
+      if (typeof b.items === 'string') {
+        b.items.split(',').forEach(itemStr => {
+          const cleanStr = itemStr.trim();
+          const menuItem = MENU.find(m => cleanStr.startsWith(m.name) || cleanStr.includes(m.name));
+          const cat = menuItem ? menuItem.cat : 'Others';
+          const qtyMatch = cleanStr.match(/\sx(\d+)/);
+          const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+          const price = menuItem ? menuItem.price : 100;
+          catSales[cat] = (catSales[cat] || 0) + (price * qty);
+        });
+      }
+    });
+
+    const catTotal = Object.values(catSales).reduce((a,b)=>a+b, 0);
+    if (catTotal === 0) {
+      $('#cat-bars').innerHTML = `<div style="color:var(--text-mute); font-size:12px; text-align:center; padding:20px;">No category sales data available</div>`;
+    } else {
+      const sortedCats = Object.entries(catSales).sort((a,b)=>b[1]-a[1]).map(entry => {
+        const pct = Math.round(entry[1] / catTotal * 100);
+        return [entry[0], pct];
+      });
+      $('#cat-bars').innerHTML=sortedCats.map(c=>`<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${c[0]}</span><b style="color:var(--text)">${c[1]}%</b></div><div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div></div>`).join('');
+      setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
+    }
   };
 
   /* ============================================================
@@ -319,6 +462,23 @@
      ============================================================ */
   let kdsState={};
   const renderKDS = () => {
+    // Update KDS avg prep time pill
+    const avgPrepEl = document.getElementById('kds-avg-prep');
+    if (avgPrepEl) {
+      if (KDS.length > 0) {
+        let totalMins = 0;
+        KDS.forEach(o => {
+          const mins = (Date.now() - o.start) / 60000;
+          totalMins += mins;
+        });
+        const avg = totalMins / KDS.length;
+        const m = Math.floor(avg), s = Math.floor((avg - m) * 60);
+        avgPrepEl.textContent = `Avg prep ${m}:${String(s).padStart(2, '0')}`;
+      } else {
+        avgPrepEl.textContent = 'Avg prep --:--';
+      }
+    }
+
     $('#kds-grid').innerHTML = KDS.map((o,i)=>`
       <div class="kds-card" data-k="${i}">
         <div class="kds-h"><div><div class="ktok">${o.tok}</div><div class="ktype">${o.type}</div></div><span class="kds-timer" data-start="${o.start}">0:00</span></div>
@@ -386,6 +546,30 @@
      ============================================================ */
   const EMPLOYEES = [];
   const renderEmployees = () => {
+    const totalStaff = EMPLOYEES.length;
+    const onShift = EMPLOYEES.filter(e => e.shift && e.shift !== 'Off').length;
+    let payrollSum = 0;
+    EMPLOYEES.forEach(e => {
+      if (e.payroll) {
+        const num = parseFloat(String(e.payroll).replace(/[^0-9.]/g, ''));
+        if (!isNaN(num)) payrollSum += num;
+      }
+    });
+
+    const empTab = document.getElementById('employees-tab');
+    if (empTab) {
+      const svElements = empTab.querySelectorAll('.stat-row .stat-card .sv');
+      if (svElements.length >= 4) {
+        svElements[0].textContent = totalStaff;
+        svElements[1].textContent = onShift;
+        svElements[2].textContent = payrollSum > 0 ? rs(payrollSum) : '₹0';
+        svElements[3].textContent = totalStaff > 0 ? '100%' : '0%';
+      }
+    }
+
+    // Dispatch custom event to notify other modules
+    document.dispatchEvent(new CustomEvent('rs:render-employees'));
+
     $('#emp-grid').innerHTML = EMPLOYEES.map((e,i)=>`
       <div class="emp-card">
         <div class="emp-top"><div class="emp-av" style="background:${avatarColors[i%avatarColors.length]}">${initials(e.name)}</div><div style="flex:1"><div class="en">${e.name}</div><div class="ee">${e.email}</div></div></div>

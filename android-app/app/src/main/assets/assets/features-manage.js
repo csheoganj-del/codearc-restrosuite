@@ -27,6 +27,8 @@
       panes.id = 'inv-panes-wrapper';
       sec.appendChild(panes);
 
+      document.addEventListener('rs:render-inventory', drawPanes);
+
       function drawPanes() {
         panes.innerHTML = `
           <div class="panel panel-pad subtab-pane" data-pane="suppliers">
@@ -102,8 +104,8 @@
     const shiftFor = (i,d)=>{ const pat=[['M','M','M','O','M','M','M'],['M','E','M','E','M','E','O'],['E','E','O','E','E','E','E'],['D','D','D','D','D','O','D'],['E','M','E','M','E','E','O'],['M','M','E','E','M','O','M']][i%6][d]; return pat; };
     const shiftName = {M:'Morning',E:'Evening',D:'Full day',O:'Off'};
     const shiftCls = {M:'pill-amber',E:'pill-violet',D:'pill-green',O:''};
-    const ATT = (RS.EMPLOYEES||[]).map((e,i)=>({name:e.name,role:e.role,rc:e.rc,inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],outT:['—','18:05','22:10','17:30','—','18:00'][i%6],status:['present','present','present','present','late','present'][i%6]}));
-    const PAY = (RS.EMPLOYEES||[]).map((e,i)=>{ const base=[28000,18000,15000,16000,18000,15000][i%6]; const inc=[6000,2200,1800,1200,2400,1500][i%6]; const ded=[1200,600,500,540,600,500][i%6]; return {name:e.name,role:e.role,rc:e.rc,base,inc,ded,net:base+inc-ded}; });
+    let ATT = [];
+    let PAY = [];
     const attPill = {present:'pill-green',late:'pill-amber',absent:'pill-red'};
 
     function enhanceEmployees(){
@@ -113,12 +115,48 @@
       panes.id = 'emp-panes-wrapper';
       sec.appendChild(panes);
 
+      document.addEventListener('rs:render-employees', () => {
+        // Redraw on employees update
+        if (RS.EMPLOYEES) {
+          ATT.length = 0;
+          RS.EMPLOYEES.forEach((e,i)=>{
+            ATT.push({
+              name:e.name,role:e.role,rc:e.rc,
+              inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
+              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
+              status:['present','present','present','present','late','present'][i%6]
+            });
+          });
+        }
+        drawPanes();
+      });
+
       function drawPanes() {
+        const currentEmployees = RS.EMPLOYEES || [];
+
+        if (ATT.length === 0 && currentEmployees.length > 0) {
+          currentEmployees.forEach((e,i)=>{
+            ATT.push({
+              name:e.name,role:e.role,rc:e.rc,
+              inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
+              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
+              status:['present','present','present','present','late','present'][i%6]
+            });
+          });
+        }
+
+        const currentPay = currentEmployees.map((e,i)=>{
+          const base=[28000,18000,15000,16000,18000,15000][i%6];
+          const inc=[6000,2200,1800,1200,2400,1500][i%6];
+          const ded=[1200,600,500,540,600,500][i%6];
+          return {name:e.name,role:e.role,rc:e.rc,base,inc,ded,net:base+inc-ded};
+        });
+
         panes.innerHTML = `
           <div class="panel panel-pad subtab-pane" data-pane="roster">
             <div class="panel-head"><h3>Weekly shift roster</h3><button class="btn btn-primary btn-sm"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-schedule</button></div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>
-            ${(RS.EMPLOYEES||[]).map((e,i)=>`<tr><td><b>${e.name}</b><div style="font-size:11px;color:var(--text-mute)">${e.role}</div></td>${DAYS.map((d,di)=>{const s=shiftFor(i,di);return `<td>${s==='O'?'<span style="color:var(--text-faint);font-size:12px">Off</span>':`<span class="pill ${shiftCls[s]}" style="padding:3px 8px;font-size:11px">${shiftName[s]}</span>`}</td>`;}).join('')}</tr>`).join('')}
+            ${currentEmployees.map((e,i)=>`<tr><td><b>${e.name}</b><div style="font-size:11px;color:var(--text-mute)">${e.role}</div></td>${DAYS.map((d,di)=>{const s=shiftFor(i,di);return `<td>${s==='O'?'<span style="color:var(--text-faint);font-size:12px">Off</span>':`<span class="pill ${shiftCls[s]}" style="padding:3px 8px;font-size:11px">${shiftName[s]}</span>`}</td>`;}).join('')}</tr>`).join('')}
             </tbody></table></div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="attendance">
@@ -130,8 +168,8 @@
           <div class="panel panel-pad subtab-pane" data-pane="payroll">
             <div class="panel-head"><h3>Payroll · June 2026</h3><button class="btn btn-primary btn-sm"><i class="fa-solid fa-money-check-dollar"></i> Run payroll</button></div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Base</th><th>Incentive</th><th>Deductions</th><th>Net pay</th></tr></thead><tbody>
-            ${PAY.map(p=>`<tr><td><b>${p.name}</b></td><td><span class="role-tag ${p.rc}">${p.role}</span></td><td>${rs(p.base)}</td><td style="color:var(--green)">+${rs(p.inc)}</td><td style="color:var(--red)">– ${rs(p.ded)}</td><td class="td-strong">${rs(p.net)}</td></tr>`).join('')}
-            <tr><td colspan="5" style="text-align:right"><b style="color:var(--text)">Total payout</b></td><td><b style="color:var(--orange);font-size:15px">${rs(PAY.reduce((a,p)=>a+p.net,0))}</b></td></tr>
+            ${currentPay.map(p=>`<tr><td><b>${p.name}</b></td><td><span class="role-tag ${p.rc}">${p.role}</span></td><td>${rs(p.base)}</td><td style="color:var(--green)">+${rs(p.inc)}</td><td style="color:var(--red)">– ${rs(p.ded)}</td><td class="td-strong">${rs(p.net)}</td></tr>`).join('')}
+            <tr><td colspan="5" style="text-align:right"><b style="color:var(--text)">Total payout</b></td><td><b style="color:var(--orange);font-size:15px">${rs(currentPay.reduce((a,p)=>a+p.net,0))}</b></td></tr>
             </tbody></table></div>
           </div>`;
         const activeBtn = sec.querySelector('.seg button.active');

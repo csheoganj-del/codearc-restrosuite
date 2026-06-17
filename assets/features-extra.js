@@ -8,15 +8,8 @@
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
     /* ===================== TOKEN DISPLAY ===================== */
-    const PREPARING = [
-      {tok:'A-114',type:'Takeaway',items:3,min:4},{tok:'A-115',type:'Zomato',items:2,min:6},
-      {tok:'A-116',type:'Dine-in T-05',items:5,min:2},{tok:'A-117',type:'Swiggy',items:1,min:8},
-      {tok:'A-118',type:'Takeaway',items:4,min:1}
-    ];
-    const READY = [
-      {tok:'A-109',type:'Takeaway',items:2},{tok:'A-110',type:'Zomato',items:3},
-      {tok:'A-112',type:'Dine-in T-02',items:1}
-    ];
+    const PREPARING = [];
+    const READY = [];
     function renderTokens(){
       const sec = $('#tokens-tab');
       sec.innerHTML = `
@@ -40,15 +33,7 @@
     RS.addRenderer('tokens-tab', renderTokens);
 
     /* ===================== TAX & GST ===================== */
-    const TAX_LEDGER = [
-      {no:'INV-2041',cust:'Aarav Mehta',time:'14 Jun · 8:42 PM',taxable:2180,pay:'UPI'},
-      {no:'INV-2040',cust:'Walk-in',time:'14 Jun · 8:30 PM',taxable:713,pay:'Cash'},
-      {no:'INV-2039',cust:'Priya Sharma',time:'14 Jun · 8:05 PM',taxable:1240,pay:'Card'},
-      {no:'INV-2038',cust:'Rohit Singh',time:'14 Jun · 7:48 PM',taxable:586,pay:'Split'},
-      {no:'INV-2037',cust:'Walk-in',time:'14 Jun · 7:20 PM',taxable:3460,pay:'UPI'},
-      {no:'INV-2036',cust:'Neha Gupta',time:'14 Jun · 6:58 PM',taxable:980,pay:'Cash'},
-      {no:'INV-2035',cust:'Divya Patel',time:'14 Jun · 6:30 PM',taxable:1820,pay:'Card'}
-    ];
+    const TAX_LEDGER = [];
     function renderTax(){
       const sec = $('#tax-tab');
       const taxable = TAX_LEDGER.reduce((a,r)=>a+r.taxable,0);
@@ -86,7 +71,7 @@
         <div class="panel panel-pad" style="margin-top:16px">
           <div class="panel-head"><h3>Tax invoice ledger</h3><div class="row" style="gap:8px"><button class="btn btn-ghost btn-sm" id="tax-json"><i class="fa-solid fa-file-code"></i> JSON</button><button class="btn btn-ghost btn-sm" id="tax-csv"><i class="fa-solid fa-file-csv"></i> CSV</button></div></div>
           <div class="table-scroll"><table class="data-table"><thead><tr><th>Invoice #</th><th>Customer</th><th>Date &amp; time</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>Total tax</th><th>Bill</th><th>Pay</th></tr></thead><tbody>
-          ${TAX_LEDGER.map(r=>{const c=Math.round(r.taxable*0.025);const tot=c*2;return `<tr><td><b>${r.no}</b></td><td>${r.cust}</td><td>${r.time}</td><td class="td-strong">${rs(r.taxable)}</td><td>${rs(c)}</td><td>${rs(c)}</td><td>${rs(tot)}</td><td class="td-strong">${rs(r.taxable+tot)}</td><td><span class="pill" style="padding:3px 9px">${r.pay}</span></td></tr>`;}).join('')}
+          ${TAX_LEDGER.length > 0 ? TAX_LEDGER.map(r=>{const c=Math.round(r.taxable*0.025);const tot=c*2;return `<tr><td><b>${r.no}</b></td><td>${r.cust}</td><td>${r.time}</td><td class="td-strong">${rs(r.taxable)}</td><td>${rs(c)}</td><td>${rs(c)}</td><td>${rs(tot)}</td><td class="td-strong">${rs(r.taxable+tot)}</td><td><span class="pill" style="padding:3px 9px">${r.pay}</span></td></tr>`;}).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--text-mute)">No compliance invoices logged</td></tr>'}
           </tbody></table></div>
         </div>
 
@@ -118,19 +103,25 @@
     RS.addRenderer('tax-tab', renderTax);
 
     /* ===================== ADVANCED ANALYTICS ===================== */
-    const DAILY = [42,38,55,61,48,72,68,80,74,66,88,95,79,84,92,71,68,77,85,99,90,82,76,88,94,86,79,91,97,84];
-    const HOURS = [2,1,0,0,0,0,1,3,6,9,12,18,22,16,9,7,8,11,17,24,28,21,12,5];
-    const ITEMS = [['Butter Chicken',182,'+12%'],['Veg Biryani',164,'+8%'],['Paneer Tikka',141,'+22%'],['Garlic Naan',398,'+5%'],['Masala Dosa',97,'-3%'],['Mango Lassi',210,'+15%']];
-    const PAY = [['UPI',52,'var(--orange)'],['Cash',23,'var(--teal)'],['Card',18,'var(--violet-soft)'],['Online',7,'var(--amber)']];
-    const STAFF = [['Ravi Kumar','Admin',312,'₹4.2L'],['Sunita Rao','Cashier',289,'₹3.6L'],['Imran Ali','Cashier',204,'₹2.4L'],['Deepak M.','Waiter',176,'₹1.9L']];
+    const DAILY = [];
+    const HOURS = [];
+    const ITEMS = [];
+    const PAY = [];
+    const STAFF = [];
 
     function spark(data, color, h=120){
-      const max=Math.max(...data), w=100, step=w/(data.length-1);
+      if (!data || data.length === 0) {
+        return `<div style="height:${h}px; display:flex; align-items:center; justify-content:center; color:var(--text-mute); font-size:12px; border:1px dashed var(--stroke); border-radius:8px;">No transaction data available yet</div>`;
+      }
+      const max=Math.max(...data) || 1, w=100, step=w/(data.length-1 || 1);
       const pts=data.map((v,i)=>`${(i*step).toFixed(1)},${(h-(v/max)*(h-12)-6).toFixed(1)}`).join(' ');
       const area=`0,${h} `+pts+` ${w},${h}`;
       return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block"><defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".28"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#sg)"/><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
     }
     function donut(data){
+      if (!data || data.length === 0) {
+        return `<svg viewBox="0 0 120 120" style="width:150px;height:150px"><circle r="42" cx="60" cy="60" fill="none" stroke="var(--stroke)" stroke-dasharray="0 263.89" stroke-width="16" /><text x="60" y="56" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="800" font-family="Plus Jakarta Sans">0%</text><text x="60" y="72" text-anchor="middle" fill="var(--text-mute)" font-size="9">payments</text></svg>`;
+      }
       let acc=0, segs='';
       const C=2*Math.PI*42;
       data.forEach(d=>{ const frac=d[1]/100; const len=frac*C; segs+=`<circle r="42" cx="60" cy="60" fill="none" stroke="${d[2]}" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-acc*C}" transform="rotate(-90 60 60)"/>`; acc+=frac; });
@@ -139,47 +130,51 @@
     function renderAnalytics(){
       const sec = $('#analytics-tab');
       const total = DAILY.reduce((a,b)=>a+b,0)*1000;
-      const orders = 2148, aov = Math.round(total/orders), today=97000, peakHour='8–9 PM';
+      const orders = 0, aov = 0, today=0, peakHour='N/A';
       sec.innerHTML = `
         <div class="toolbar-row"><span class="eyebrow">Last 30 days</span><div class="grow"></div>
           <select class="form-input" id="an-period" style="width:auto;padding:9px 32px 9px 14px"><option>Last 7 days</option><option selected>Last 30 days</option><option>Last 90 days</option></select>
           <button class="btn btn-ghost btn-sm" id="an-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
         <div class="stat-row" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
-          <div class="stat-card"><div><div class="sl">Total revenue</div><div class="sv">${rs(total)}</div><div class="sd up"><i class="fa-solid fa-arrow-up"></i> 18% vs prev</div></div></div>
-          <div class="stat-card"><div><div class="sl">Total orders</div><div class="sv" style="color:var(--violet-soft)">${orders.toLocaleString('en-IN')}</div><div class="sd">bills generated</div></div></div>
+          <div class="stat-card"><div><div class="sl">Total revenue</div><div class="sv">${rs(total)}</div><div class="sd" style="display:none"></div></div></div>
+          <div class="stat-card"><div><div class="sl">Total orders</div><div class="sv" style="color:var(--violet-soft)">${orders}</div><div class="sd">bills generated</div></div></div>
           <div class="stat-card"><div><div class="sl">Avg order value</div><div class="sv" style="color:var(--green)">${rs(aov)}</div><div class="sd">per transaction</div></div></div>
-          <div class="stat-card"><div><div class="sl">Today's revenue</div><div class="sv" style="color:var(--amber)">${rs(today)}</div><div class="sd up">214 orders today</div></div></div>
-          <div class="stat-card"><div><div class="sl">Peak hour</div><div class="sv" style="color:var(--orange)">${peakHour}</div><div class="sd">Busiest: Saturday</div></div></div>
+          <div class="stat-card"><div><div class="sl">Today's revenue</div><div class="sv" style="color:var(--amber)">${rs(today)}</div><div class="sd">0 orders today</div></div></div>
+          <div class="stat-card"><div><div class="sl">Peak hour</div><div class="sv" style="color:var(--orange)">${peakHour}</div><div class="sd">Busiest: -</div></div></div>
         </div>
 
         <div class="report-grid" style="--cols:2fr 1fr;margin-top:4px">
           <div class="panel panel-pad">
-            <div class="panel-head"><h3>Daily revenue trend</h3><span class="pill pill-green">+18%</span></div>
+            <div class="panel-head"><h3>Daily revenue trend</h3><span class="pill pill-green">0%</span></div>
             ${spark(DAILY,'var(--orange)',150)}
             <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>30 days ago</span><span>Today</span></div>
           </div>
           <div class="panel panel-pad">
             <div class="panel-head"><h3>Payment mix</h3></div>
-            <div style="display:flex;align-items:center;gap:16px"><div>${donut(PAY)}</div><div style="flex:1">${PAY.map(p=>`<div class="kv" style="padding:5px 0"><span><span class="lg-dot" style="background:${p[2]}"></span> ${p[0]}</span><b>${p[1]}%</b></div>`).join('')}</div></div>
+            <div style="display:flex;align-items:center;gap:16px"><div>${donut(PAY)}</div><div style="flex:1">${PAY.length > 0 ? PAY.map(p=>`<div class="kv" style="padding:5px 0"><span><span class="lg-dot" style="background:${p[2]}"></span> ${p[0]}</span><b>${p[1]}%</b></div>`).join('') : '<div style="color:var(--text-mute);font-size:12px;text-align:center;">No payment data</div>'}</div></div>
           </div>
         </div>
 
         <div class="report-grid" style="--cols:1fr 1fr;margin-top:16px">
           <div class="panel panel-pad">
             <div class="panel-head"><h3>Hourly footfall</h3><span class="pill">Avg/day</span></div>
-            <div class="bars" style="height:130px;display:flex;align-items:flex-end;gap:3px">${HOURS.map((v,i)=>`<div style="flex:1;border-radius:3px 3px 0 0;background:${i>=19&&i<=21?'var(--orange)':'color-mix(in srgb,var(--orange) 35%,transparent)'};height:${Math.max(4,v/Math.max(...HOURS)*100)}%" title="${i}:00 · ${v} orders"></div>`).join('')}</div>
+            <div class="bars" style="height:130px;display:flex;align-items:flex-end;gap:3px;justify-content:center;">
+              ${HOURS.length > 0 ? HOURS.map((v,i)=>`<div style="flex:1;border-radius:3px 3px 0 0;background:${i>=19&&i<=21?'var(--orange)':'color-mix(in srgb,var(--orange) 35%,transparent)'};height:${Math.max(4,v/Math.max(...HOURS)*100)}%" title="${i}:00 · ${v} orders"></div>`).join('') : '<div style="color:var(--text-mute);font-size:12px;">No footfall data</div>'}
+            </div>
             <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>12 AM</span><span>12 PM</span><span>11 PM</span></div>
           </div>
           <div class="panel panel-pad">
             <div class="panel-head"><h3>Top selling items</h3></div>
-            <table class="data-table"><tbody>${ITEMS.map((it,i)=>`<tr><td style="width:24px;color:var(--text-mute)">${i+1}</td><td><b>${it[0]}</b></td><td>${it[1]} sold</td><td style="text-align:right;color:${it[2][0]==='-'?'var(--red)':'var(--green)'}">${it[2]}</td></tr>`).join('')}</tbody></table>
+            <table class="data-table"><tbody>
+              ${ITEMS.length > 0 ? ITEMS.map((it,i)=>`<tr><td style="width:24px;color:var(--text-mute)">${i+1}</td><td><b>${it[0]}</b></td><td>${it[1]} sold</td><td style="text-align:right;color:${it[2][0]==='-'?'var(--red)':'var(--green)'}">${it[2]}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-mute)">No sales items yet</td></tr>'}
+            </tbody></table>
           </div>
         </div>
 
         <div class="panel panel-pad" style="margin-top:16px">
           <div class="panel-head"><h3>Staff performance</h3><span class="pill">This month</span></div>
           <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Orders handled</th><th>Sales attributed</th><th>Share</th></tr></thead><tbody>
-          ${STAFF.map(s=>{const pct=Math.round(s[2]/STAFF.reduce((a,x)=>a+x[2],0)*100);return `<tr><td><b>${s[0]}</b></td><td>${s[1]}</td><td>${s[2]}</td><td class="td-strong">${s[3]}</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;border-radius:99px;background:var(--glass-3);max-width:90px"><div style="height:100%;border-radius:99px;background:var(--orange);width:${pct}%"></div></div><span style="font-size:12px;color:var(--text-mute)">${pct}%</span></div></td></tr>`;}).join('')}
+          ${STAFF.length > 0 ? STAFF.map(s=>{const pct=Math.round(s[2]/STAFF.reduce((a,x)=>a+x[2],0)*100);return `<tr><td><b>${s[0]}</b></td><td>${s[1]}</td><td>${s[2]}</td><td class="td-strong">${s[3]}</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;border-radius:99px;background:var(--glass-3);max-width:90px"><div style="height:100%;border-radius:99px;background:var(--orange);width:${pct}%"></div></div><span style="font-size:12px;color:var(--text-mute)">${pct}%</span></div></td></tr>`;}).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-mute)">No staff performance records logged</td></tr>'}
           </tbody></table></div>
         </div>`;
       const r=$('#an-refresh'); if(r) r.onclick=()=>{ renderAnalytics(); RS.toast('Analytics refreshed','fa-rotate'); };

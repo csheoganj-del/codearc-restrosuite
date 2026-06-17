@@ -121,6 +121,13 @@
     const platName = {zomato:'Zomato',swiggy:'Swiggy',ondc:'ONDC'};
     function renderAgg(){
       const sec = $('#aggregator-tab');
+      // Update Online Orders sidebar badge dynamically
+      const newAndPrep = ONLINE.filter(o => o.status === 'new' || o.status === 'preparing').length;
+      const onlineBadge = document.querySelector('.sidebar-link[data-tab="aggregator-tab"] .badge-count');
+      if (onlineBadge) {
+        onlineBadge.textContent = newAndPrep;
+        onlineBadge.style.display = newAndPrep > 0 ? '' : 'none';
+      }
       sec.innerHTML = `
         <div class="stat-row">
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-bowl-rice"></i></div><div><div class="sv">${ONLINE.filter(o=>o.status==='new').length}</div><div class="sl">New orders</div></div></div>
@@ -172,14 +179,24 @@
     }
 
     function drawCustomersUI(sec){
-      const total = CUSTOMERS.length || 1, repeat = Math.round(CUSTOMERS.filter(c=>c.visits>5).length/total*100);
+      // Calculate visits and spend dynamically for each customer from RS.BILLS
+      const bills = RS.BILLS || [];
+      CUSTOMERS.forEach(c => {
+        const cBills = bills.filter(b => b.customerPhone === c.phone || (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name));
+        c.visits = cBills.length;
+        c.spend = cBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+        c.last = cBills.length > 0 ? cBills[0].time : 'never';
+      });
+
+      const total = CUSTOMERS.length || 1;
+      const repeat = Math.round(CUSTOMERS.filter(c=>c.visits>1).length/total*100);
       const totalSpend = CUSTOMERS.reduce((a,c)=>a+(c.spend||0),0);
       sec.innerHTML = `
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Total customers</div><div class="sd up"><i class="fa-solid fa-arrow-up"></i> 64 this month</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Total customers</div><div class="sd" style="display:none"></div></div></div>
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(Math.round(totalSpend/total))}</div><div class="sl">Avg lifetime spend</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-gift"></i></div><div><div class="sv">412</div><div class="sl">Loyalty members</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-gift"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Loyalty members</div></div></div>
         </div>
         <div class="toolbar-row"><div class="pos-search grow" style="max-width:320px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone…"></div><div class="grow"></div><button class="btn btn-ghost btn-sm"><i class="fa-brands fa-whatsapp"></i> Broadcast</button><button class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button></div>
         <div class="crm-grid" id="crm-grid"></div>`;
@@ -236,11 +253,16 @@
       };
     }
     function customerModal(c){
-      const history = [['Today','Butter Chicken, Naan',512],['Last week','Paneer Tikka, Lassi',468],['2 weeks ago','Veg Biryani x2',438]];
+      const custBills = (RS.BILLS || []).filter(b => b.customerPhone === c.phone || (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name));
+      const history = custBills.map(b => [b.time, (b._items || []).map(i => `${i.name} x${i.qty}`).join(', '), b.amount]);
+
+      const avgVisit = c.visits > 0 ? Math.round(c.spend/c.visits) : 0;
+      const points = c.spend > 0 ? Math.round(c.spend/100) : 0;
+
       RSModal.open({ title:c.name, sub:c.phone+' · '+c.tier.toUpperCase()+' member', icon:'fa-user', size:'md',
-        body:`<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${c.visits}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend)}</div><div class="csl">Lifetime</div></div><div class="cs"><div class="csv">${Math.round(c.spend/c.visits)}</div><div class="csl">Avg ₹/visit</div></div><div class="cs"><div class="csv" style="color:var(--orange)">${Math.round(c.spend/100)}</div><div class="csl">Points</div></div></div>
+        body:`<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${c.visits}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend)}</div><div class="csl">Lifetime</div></div><div class="cs"><div class="csv">${rs(avgVisit)}</div><div class="csl">Avg ₹/visit</div></div><div class="cs"><div class="csv" style="color:var(--orange)">${points}</div><div class="csl">Points</div></div></div>
           <div class="panel-head" style="margin-bottom:10px"><h3 style="font-size:14px">Recent orders</h3></div>
-          <table class="data-table"><tbody>${history.map(h=>`<tr><td>${h[0]}</td><td style="color:var(--text-soft)">${h[1]}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('')}</tbody></table>`,
+          <table class="data-table"><tbody>${history.length > 0 ? history.map(h=>`<tr><td>${h[0]}</td><td style="color:var(--text-soft)">${h[1]}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-mute)">No order history</td></tr>'}</tbody></table>`,
         foot:`<button class="btn btn-ghost" style="flex:1" data-wa><i class="fa-brands fa-whatsapp"></i> Message</button><button class="btn btn-primary" style="flex:1" data-offer><i class="fa-solid fa-tags"></i> Send offer</button>`,
         onMount(modal,close){ modal.querySelector('[data-wa]').onclick=()=>{close();RS.toast('WhatsApp opened for '+c.name,'fa-whatsapp');}; modal.querySelector('[data-offer]').onclick=()=>{close();RS.toast('Loyalty offer sent to '+c.name,'fa-tags');}; }});
     }
