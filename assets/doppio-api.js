@@ -150,22 +150,31 @@
       }
       const token = ssGet(K.token);
       if(!token) return null;
-      const r = await post('tenant-access', { action:'validate_session', session_token: token }, ANON, 'Session validation failed');
-      if(r.session) {
-        // Preserve session_token if validate response doesn't return it
-        if(!r.session.session_token) {
-          r.session.session_token = token;
+      try {
+        const r = await post('tenant-access', { action:'validate_session', session_token: token }, ANON, 'Session validation failed');
+        if(r.session) {
+          // Preserve session_token if validate response doesn't return it
+          if(!r.session.session_token) {
+            r.session.session_token = token;
+          }
+          // Preserve admin_token for superadmin: the validate response doesn't echo it back
+          const existingAdminToken = ssGet('superadmin_admin_token');
+          if(r.session.role === 'superadmin' && existingAdminToken) {
+            r.session.admin_token = existingAdminToken;
+          }
+          // keep same persistence preference
+          const persist = ssGet(K.persist) !== '0';
+          storeSession(r.session, persist);
         }
-        // Preserve admin_token for superadmin: the validate response doesn't echo it back
-        const existingAdminToken = ssGet('superadmin_admin_token');
-        if(r.session.role === 'superadmin' && existingAdminToken) {
-          r.session.admin_token = existingAdminToken;
+        return r.session || null;
+      } catch (err) {
+        // If the server explicitly rejected it with 401 or 403, bounce to login (sess = null)
+        if (err.status === 401 || err.status === 403) {
+          return null;
         }
-        // keep same persistence preference
-        const persist = ssGet(K.persist) !== '0';
-        storeSession(r.session, persist);
+        // Network error or offline — keep the local session alive
+        throw err;
       }
-      return r.session || null;
     },
 
     session(){ const t = ssGet(K.token); if(!t) return null;
