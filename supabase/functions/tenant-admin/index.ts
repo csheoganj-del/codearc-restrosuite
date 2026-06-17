@@ -161,7 +161,7 @@ async function verifySuperadminToken(req: Request) {
 
 function getGatewayUrlAndToken() {
   let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || "";
-  const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
+  const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
 
   if (!url) {
     const relayUrl = Deno.env.get("EMAIL_RELAY_URL") || "";

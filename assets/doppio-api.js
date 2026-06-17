@@ -108,18 +108,11 @@
     async register(payload){
       // payload: { name, slug, outlet_type, email, phone, username, password }
       if(!CONFIGURED) {
-        const mockSession = {
-          tenant_id: payload.slug || 'demo-tenant',
-          tenant_slug: payload.slug || 'demo-tenant',
-          tenant_name: payload.name || 'Demo Restaurant',
-          username: payload.username || 'demo',
-          role: 'admin',
-          allowed_tabs: ['pos-tab', 'qr-orders-tab', 'bills-tab', 'inventory-tab', 'editor-tab', 'reports-tab', 'kds-tab', 'growth-hub-tab', 'employees-tab'],
-          session_token: 'demo-session-token',
-          admin_token: ''
-        };
-        storeSession(mockSession);
-        return { message: 'Outlet created' };
+        // Demo/unconfigured mode: do NOT store a session — registration creates a PENDING
+        // outlet that must be approved before login. Storing a session here would bypass
+        // the approval gate and auto-redirect to dashboard.
+        await new Promise(r => setTimeout(r, 600));
+        return { message: 'Registration submitted! Once CodeArc approves your outlet you can sign in.' };
       }
       return post('tenant-access', { action:'register', ...payload }, ANON, 'Registration failed');
     },
