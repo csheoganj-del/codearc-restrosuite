@@ -1173,7 +1173,7 @@
     // 3. Update sidebar branding for superadmin
     const brandName = $('#sidebar-brand-name');
     const brandType = $('#sidebar-brand-type');
-    if(brandName) brandName.textContent = 'RESTO';
+    if(brandName) brandName.textContent = 'RESTRO';
     if(brandType) brandType.textContent = 'Suite';
     // 4. Update user pill
     const userNameEl = document.querySelector('.user-pill .un');
