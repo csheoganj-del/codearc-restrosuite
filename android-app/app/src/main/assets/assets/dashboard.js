@@ -1617,36 +1617,64 @@
                 : [];
               if(!rows || !rows.length) throw new Error('No rows found in CSV');
 
-              const cleanKey = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.cleanKey
-                ? window.RestroSuite.imports.cleanKey
-                : (k) => String(k || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+              const cleanNumber = (val) => {
+                if (val === undefined || val === null || val === '') return NaN;
+                if (typeof val === 'number') return val;
+                let str = String(val).trim();
+                str = str.replace(/[₹$€£¥\s]/g, '');
 
-              const cleanRow = (r) => {
-                const res = {};
-                for(const [k, v] of Object.entries(r || {})) {
-                  res[cleanKey(k)] = typeof v === 'string' ? v.trim() : v;
+                const hasComma = str.includes(',');
+                const hasDot = str.includes('.');
+
+                if (hasComma && hasDot) {
+                  const commaIdx = str.indexOf(',');
+                  const dotIdx = str.indexOf('.');
+                  if (commaIdx < dotIdx) {
+                    str = str.replace(/,/g, '');
+                  } else {
+                    str = str.replace(/\./g, '').replace(/,/g, '.');
+                  }
+                } else if (hasComma) {
+                  if (/, \d{2}$/.test(str) || /,\d{2}$/.test(str)) {
+                    str = str.replace(/,/g, '.');
+                  } else {
+                    str = str.replace(/,/g, '');
+                  }
                 }
-                return res;
+                return Number(str);
+              };
+
+              const getValue = (row, possibleKeys) => {
+                const targets = possibleKeys.map(k => String(k).toLowerCase().replace(/[^a-z0-9]/g, ''));
+                for (const [rk, rv] of Object.entries(row || {})) {
+                  const cleanRk = String(rk).toLowerCase().replace(/[^a-z0-9]/g, '');
+                  if (targets.includes(cleanRk)) {
+                    if (rv !== undefined && rv !== null && rv !== '') return rv;
+                  }
+                }
+                return '';
               };
 
               let count = 0;
               for(const row of rows) {
-                const crow = cleanRow(row);
-                const name = crow.name || crow.itemname || crow.menuitem || crow.item || crow.ingredientname || crow.ingredient;
+                const name = getValue(row, ['name', 'itemname', 'menuitem', 'item', 'ingredientname', 'ingredient']);
                 if(!name) continue;
-                const cat = crow.category || crow.cat || 'Mains';
-                const price = Number(crow.price || crow.sellingprice || 0);
-                const desc = crow.description || '';
-                const available = String(crow.available || 'YES').toUpperCase() !== 'NO';
+                const cat = getValue(row, ['category', 'cat', 'itemcategory']) || 'Mains';
+                const parsedPrice = cleanNumber(getValue(row, ['price', 'sellingprice', 'cost', 'unitcost']));
+                const price = Number.isFinite(parsedPrice) ? parsedPrice : 0;
+                const desc = getValue(row, ['description', 'desc']) || '';
+                const availableVal = getValue(row, ['available', 'status', 'stock']);
+                const available = String(availableVal || 'YES').toUpperCase() !== 'NO' && String(availableVal || 'YES').toUpperCase() !== 'OUT';
                 
                 const existing = MENU.find(x => String(x.name).toLowerCase() === String(name).toLowerCase());
                 const item = {
                   id: existing ? existing.id : 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                   name: String(name),
                   cat: String(cat),
-                  price: Number.isFinite(price) ? price : 0,
+                  price: price,
                   veg: !String(name + ' ' + cat).toLowerCase().includes('chicken') && !String(name + ' ' + cat).toLowerCase().includes('mutton') && !String(name + ' ' + cat).toLowerCase().includes('fish') && !String(name + ' ' + cat).toLowerCase().includes('egg'),
-                  stock: available ? 'ok' : 'out'
+                  stock: available ? 'ok' : 'out',
+                  description: String(desc)
                 };
                 await RS.saveOne('menu', item);
                 count++;
@@ -1709,37 +1737,62 @@
                 : [];
               if(!rows || !rows.length) throw new Error('No rows found in CSV');
 
-              const cleanKey = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.cleanKey
-                ? window.RestroSuite.imports.cleanKey
-                : (k) => String(k || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+              const cleanNumber = (val) => {
+                if (val === undefined || val === null || val === '') return NaN;
+                if (typeof val === 'number') return val;
+                let str = String(val).trim();
+                str = str.replace(/[₹$€£¥\s]/g, '');
 
-              const cleanRow = (r) => {
-                const res = {};
-                for(const [k, v] of Object.entries(r || {})) {
-                  res[cleanKey(k)] = typeof v === 'string' ? v.trim() : v;
+                const hasComma = str.includes(',');
+                const hasDot = str.includes('.');
+
+                if (hasComma && hasDot) {
+                  const commaIdx = str.indexOf(',');
+                  const dotIdx = str.indexOf('.');
+                  if (commaIdx < dotIdx) {
+                    str = str.replace(/,/g, '');
+                  } else {
+                    str = str.replace(/\./g, '').replace(/,/g, '.');
+                  }
+                } else if (hasComma) {
+                  if (/, \d{2}$/.test(str) || /,\d{2}$/.test(str)) {
+                    str = str.replace(/,/g, '.');
+                  } else {
+                    str = str.replace(/,/g, '');
+                  }
                 }
-                return res;
+                return Number(str);
+              };
+
+              const getValue = (row, possibleKeys) => {
+                const targets = possibleKeys.map(k => String(k).toLowerCase().replace(/[^a-z0-9]/g, ''));
+                for (const [rk, rv] of Object.entries(row || {})) {
+                  const cleanRk = String(rk).toLowerCase().replace(/[^a-z0-9]/g, '');
+                  if (targets.includes(cleanRk)) {
+                    if (rv !== undefined && rv !== null && rv !== '') return rv;
+                  }
+                }
+                return '';
               };
 
               let count = 0;
               for(const row of rows) {
-                const crow = cleanRow(row);
-                const name = crow.ingredientname || crow.ingredient || crow.name || crow.item || crow.ingredientkey;
+                const name = getValue(row, ['ingredientname', 'ingredient', 'name', 'item', 'ingredientkey']);
                 if(!name) continue;
-                const cat = crow.category || crow.cat || 'General';
-                const stock = Number(crow.instock || crow.stock || crow.currentstock || crow.current || 0);
-                const min = Number(crow.minlevel || crow.min || crow.threshold || 10);
-                const cost = Number(crow.unitcost || crow.cost || crow.price || 0);
-                const unit = crow.unit || 'unit';
+                const cat = getValue(row, ['category', 'cat', 'itemcategory']) || 'General';
+                const parsedStock = cleanNumber(getValue(row, ['instock', 'stock', 'currentstock', 'current', 'quantity']));
+                const parsedMin = cleanNumber(getValue(row, ['minlevel', 'min', 'threshold', 'reorderlevelpercent']));
+                const parsedCost = cleanNumber(getValue(row, ['unitcost', 'cost', 'price', 'sellingprice']));
+                const unit = getValue(row, ['unit', 'unitofmeasure']) || 'unit';
                 
                 const existing = INVENTORY.find(x => String(x.name).toLowerCase() === String(name).toLowerCase() || String(x.key).toLowerCase() === String(name).toLowerCase());
                 const item = {
                   id: existing ? existing.id : 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                   name: String(name),
                   cat: String(cat),
-                  stock: Number.isFinite(stock) ? stock : 0,
-                  min: Number.isFinite(min) ? min : 10,
-                  cost: Number.isFinite(cost) ? cost : 0,
+                  stock: Number.isFinite(parsedStock) ? parsedStock : 0,
+                  min: Number.isFinite(parsedMin) ? parsedMin : 10,
+                  cost: Number.isFinite(parsedCost) ? parsedCost : 0,
                   unit: String(unit)
                 };
                 await RS.saveOne('inventory', item);

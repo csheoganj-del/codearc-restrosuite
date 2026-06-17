@@ -33,12 +33,7 @@
 
     /* ---------------- print helper ---------------- */
     window.RSPrint = function(innerHTML, title){
-      const f = document.createElement('iframe');
-      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-      document.body.appendChild(f);
-      const d = f.contentWindow.document;
-      d.open();
-      d.write(`<!doctype html><html><head><title>${title||'Print'}</title>
+      const style = `
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@800&display=swap');
           *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',monospace;}
@@ -52,7 +47,24 @@
           .kot-h .kt{font-family:'Plus Jakarta Sans';font-weight:800;font-size:18px}
           .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}
           .kot-item .kq{font-family:'Plus Jakarta Sans';font-weight:800;min-width:28px}.kot-item .kno{font-size:11px;color:#8a4b00}
-        </style></head><body>${innerHTML}</body></html>`);
+        </style>`;
+      const fullHtml = `<!doctype html><html><head><title>${title||'Print'}</title>${style}</head><body>${innerHTML}</body></html>`;
+
+      if (window.AndroidInterface && typeof window.AndroidInterface.printReceipt === 'function') {
+        try {
+          window.AndroidInterface.printReceipt(fullHtml);
+          return;
+        } catch (e) {
+          console.error("Android print failed", e);
+        }
+      }
+
+      const f = document.createElement('iframe');
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+      document.body.appendChild(f);
+      const d = f.contentWindow.document;
+      d.open();
+      d.write(fullHtml);
       d.close();
       setTimeout(()=>{ f.contentWindow.focus(); f.contentWindow.print(); setTimeout(()=>f.remove(), 800); }, 350);
     };
@@ -203,6 +215,19 @@
             RS.clearCart();
             const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'); if(cn)cn.value=''; if(cp)cp.value='';
             RS.toast('Payment received · '+rs(bill.grand),'fa-circle-check');
+
+            // Auto-print receipt if enabled in settings
+            if (window.RS && typeof window.RS.getSettings === 'function') {
+              try {
+                const settings = await window.RS.getSettings();
+                if (settings && settings.set_auto_print_receipt) {
+                  RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`,'Receipt '+bill.no);
+                }
+              } catch(e) {
+                console.error("Failed to read settings for auto-print", e);
+              }
+            }
+
             showReceipt(bill);
           };
           quicks(); render();
@@ -254,6 +279,18 @@
               }
             }
             RS.toast('KOT '+tok+' fired to kitchen','fa-fire');
+
+            // Auto-print KOT if enabled in settings
+            if (window.RS && typeof window.RS.getSettings === 'function') {
+              try {
+                const settings = await window.RS.getSettings();
+                if (settings && settings.set_auto_print_kot) {
+                  RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`,'KOT '+tok);
+                }
+              } catch(e) {
+                console.error("Failed to read settings for auto-print KOT", e);
+              }
+            }
           };
         }
       });

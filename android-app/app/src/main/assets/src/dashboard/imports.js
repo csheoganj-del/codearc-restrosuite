@@ -49,14 +49,55 @@
 
   function value(row, aliases) {
     for (const alias of aliases) {
-      const candidate = row[cleanKey(alias)];
-      if (candidate !== undefined && candidate !== null && candidate !== "") return candidate;
+      const targetClean = cleanKey(alias);
+      const targetStripped = targetClean.replace(/_/g, "");
+      
+      if (row[targetClean] !== undefined && row[targetClean] !== null && row[targetClean] !== "") {
+        return row[targetClean];
+      }
+      for (const [rk, rv] of Object.entries(row || {})) {
+        if (rk.replace(/_/g, "") === targetStripped) {
+          if (rv !== undefined && rv !== null && rv !== "") return rv;
+        }
+      }
     }
     return "";
   }
 
+  function cleanNumber(val) {
+    if (val === undefined || val === null || val === "") return NaN;
+    if (typeof val === "number") return val;
+    let str = String(val).trim();
+    // Remove common currency symbols and whitespace
+    str = str.replace(/[₹$€£¥\s]/g, "");
+
+    const hasComma = str.includes(",");
+    const hasDot = str.includes(".");
+
+    if (hasComma && hasDot) {
+      const commaIdx = str.indexOf(",");
+      const dotIdx = str.indexOf(".");
+      if (commaIdx < dotIdx) {
+        // e.g. 1,234.56
+        str = str.replace(/,/g, "");
+      } else {
+        // e.g. 1.234,56
+        str = str.replace(/\./g, "").replace(/,/g, ".");
+      }
+    } else if (hasComma) {
+      // e.g. 12,50 or 1,200
+      if (/, \d{2}$/.test(str) || /,\d{2}$/.test(str)) {
+        str = str.replace(/,/g, ".");
+      } else {
+        // e.g. 1,200 or 12,000 -> remove comma
+        str = str.replace(/,/g, "");
+      }
+    }
+    return Number(str);
+  }
+
   function numberValue(input, fallback = 0) {
-    const parsed = Number(input);
+    const parsed = cleanNumber(input);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
@@ -86,9 +127,9 @@
 
     sheetRows(sheets, "Menu").forEach((source, index) => {
       const row = normalizedRow(source);
-      const name = String(value(row, ["Name", "ItemName", "MenuItem"])).trim();
-      const category = String(value(row, ["Category"])).trim();
-      const price = numberValue(value(row, ["Price", "SellingPrice"]), NaN);
+      const name = String(value(row, ["Name", "ItemName", "MenuItem", "Item"])).trim();
+      const category = String(value(row, ["Category", "ItemCategory", "Cat"])).trim();
+      const price = numberValue(value(row, ["Price", "SellingPrice", "Cost", "UnitCost"]), NaN);
       if (!name || !category || !Number.isFinite(price) || price <= 0) {
         result.errors.push(`Menu row ${index + 2}: Name, Category and a positive Price are required.`);
         return;
@@ -109,8 +150,8 @@
       const row = normalizedRow(source);
       const key = cleanKey(value(row, ["IngredientKey", "Key", "IngredientName"]));
       const label = String(value(row, ["IngredientName", "Name", "IngredientKey"])).trim();
-      const current = numberValue(value(row, ["CurrentStock", "Current", "Stock"]), NaN);
-      const max = numberValue(value(row, ["MaxStock", "Capacity", "Maximum"]), NaN);
+      const current = numberValue(value(row, ["CurrentStock", "Current", "Stock", "InStock"]), NaN);
+      const max = numberValue(value(row, ["MaxStock", "Capacity", "Maximum", "Max"]), NaN);
       if (!key || !Number.isFinite(current) || current < 0 || !Number.isFinite(max) || max <= 0) {
         result.errors.push(`Inventory row ${index + 2}: IngredientKey, non-negative CurrentStock and positive MaxStock are required.`);
         return;
@@ -129,8 +170,8 @@
 
     sheetRows(sheets, "Recipes").forEach((source, index) => {
       const row = normalizedRow(source);
-      const menuItem = String(value(row, ["MenuItem", "ItemName", "Name"])).trim().toLowerCase();
-      const ingredientKey = cleanKey(value(row, ["IngredientKey", "Ingredient"]));
+      const menuItem = String(value(row, ["MenuItem", "ItemName", "Name", "Item"])).trim().toLowerCase();
+      const ingredientKey = cleanKey(value(row, ["IngredientKey", "Ingredient", "IngredientName"]));
       const quantity = numberValue(value(row, ["Quantity", "Qty", "Amount"]), NaN);
       if (!menuItem || !ingredientKey || !Number.isFinite(quantity) || quantity <= 0) {
         result.errors.push(`Recipes row ${index + 2}: MenuItem, IngredientKey and a positive Quantity are required.`);
@@ -142,7 +183,7 @@
 
     sheetRows(sheets, "Employees").forEach((source, index) => {
       const row = normalizedRow(source);
-      const name = String(value(row, ["Name", "EmployeeName"])).trim();
+      const name = String(value(row, ["Name", "EmployeeName", "NameOfEmployee"])).trim();
       if (!name) {
         result.errors.push(`Employees row ${index + 2}: Name is required.`);
         return;
@@ -163,7 +204,7 @@
 
     sheetRows(sheets, "Customers").forEach((source, index) => {
       const row = normalizedRow(source);
-      const phone = String(value(row, ["Phone", "Mobile"])).replace(/\D/g, "").slice(-10);
+      const phone = String(value(row, ["Phone", "Mobile", "Contact", "CustomerPhone"])).replace(/\D/g, "").slice(-10);
       const name = String(value(row, ["Name", "CustomerName"])).trim();
       if (!name || phone.length !== 10) {
         result.errors.push(`Customers row ${index + 2}: Name and a valid 10-digit Phone are required.`);
@@ -200,6 +241,19 @@
     let cell = "";
     let quoted = false;
     const source = String(text || "").replace(/^\uFEFF/, "");
+
+    // Sniff delimiter
+    const firstLine = source.split(/\r?\n/)[0] || "";
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semiCount = (firstLine.match(/;/g) || []).length;
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    let delimiter = ",";
+    if (semiCount > commaCount && semiCount > tabCount) {
+      delimiter = ";";
+    } else if (tabCount > commaCount && tabCount > semiCount) {
+      delimiter = "\t";
+    }
+
     for (let index = 0; index < source.length; index++) {
       const char = source[index];
       if (char === '"') {
@@ -209,7 +263,7 @@
         } else {
           quoted = !quoted;
         }
-      } else if (char === "," && !quoted) {
+      } else if (char === delimiter && !quoted) {
         row.push(cell);
         cell = "";
       } else if ((char === "\n" || char === "\r") && !quoted) {
@@ -224,7 +278,7 @@
     }
     row.push(cell);
     if (row.some((value) => String(value).trim() !== "")) rows.push(row);
-    const headers = rows.shift() || [];
+    const headers = (rows.shift() || []).map((h) => String(h).trim());
     return rows.map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] || ""])));
   }
 

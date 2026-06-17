@@ -285,36 +285,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void printReceipt(final String htmlContent) {
-        Log.d(TAG, "Launching Android PrintManager directly on main WebView...");
+        Log.d(TAG, "Launching Android PrintManager on temporary WebView...");
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    // Use system SERVICE definition safely
-                    PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-                    if (pm != null && myWebView != null) {
-                        String jobName = getString(R.string.app_name) + " Thermal Receipt";
-                        
-                        // Create PrintDocumentAdapter from our main visible WebView
-                        PrintDocumentAdapter printAdapter;
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                            printAdapter = myWebView.createPrintDocumentAdapter(jobName);
-                        } else {
-                            printAdapter = myWebView.createPrintDocumentAdapter();
-                        }
-                        
-                        // Set monochrome thermal roll attributes optimized for 58mm (2.28 inch width)
-                        PrintAttributes.Builder printBuilder = new PrintAttributes.Builder();
-                        printBuilder.setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME);
-                        
-                        PrintAttributes.MediaSize custom58mm = new PrintAttributes.MediaSize(
-                                "Roll58mm", "58mm Thermal Roll", 2283, 12000);
-                        printBuilder.setMediaSize(custom58mm);
-                        
-                        pm.print(jobName, printAdapter, printBuilder.build());
+                    final PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                    if (pm != null) {
+                        final WebView tempWebView = new WebView(MainActivity.this);
+                        tempWebView.setWebViewClient(new WebViewClient() {
+                            @Override
+                            public void onPageFinished(WebView view, String url) {
+                                String jobName = getString(R.string.app_name) + " Thermal Receipt";
+                                PrintDocumentAdapter printAdapter;
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                    printAdapter = tempWebView.createPrintDocumentAdapter(jobName);
+                                } else {
+                                    printAdapter = tempWebView.createPrintDocumentAdapter();
+                                }
+                                
+                                PrintAttributes.Builder printBuilder = new PrintAttributes.Builder();
+                                printBuilder.setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME);
+                                
+                                PrintAttributes.MediaSize custom58mm = new PrintAttributes.MediaSize(
+                                        "Roll58mm", "58mm Thermal Roll", 2283, 12000);
+                                printBuilder.setMediaSize(custom58mm);
+                                
+                                pm.print(jobName, printAdapter, printBuilder.build());
+                            }
+                        });
+                        // Load receipt HTML content
+                        tempWebView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "utf-8", null);
                     }
                 } catch (Throwable t) {
-                    Log.e(TAG, "Error printing from main WebView: " + t.getMessage());
+                    Log.e(TAG, "Error printing from temporary WebView: " + t.getMessage());
                     Toast.makeText(MainActivity.this, "Printing failed: " + t.getMessage(), Toast.LENGTH_LONG).show();
                 }
             }
