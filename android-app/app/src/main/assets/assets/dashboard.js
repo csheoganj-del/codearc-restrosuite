@@ -97,13 +97,22 @@
         <div class="pname">${m.name}</div>
         <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></div>
       </div>`).join('');
-    $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(+el.dataset.id)));
+    $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
   };
-  function addToCart(id){ const m=MENU.find(x=>x.id===id); const line=cart.find(c=>c.id===id); if(line) line.qty++; else cart.push({...m,qty:1}); renderCart(); toast(`${m.name} added`,'fa-plus'); }
-  function changeQty(id,d){ const line=cart.find(c=>c.id===id); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>c.id!==id); renderCart(); }
+  function addToCart(id){ const m=MENU.find(x=>String(x.id)===String(id)); const line=cart.find(c=>String(c.id)===String(id)); if(line) line.qty++; else cart.push({...m,qty:1}); renderCart(); toast(`${m.name} added`,'fa-plus'); }
+  function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
   function renderCart(){
     const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
     $('#cart-count').textContent = count+(count===1?' item':' items');
+
+    const badge = $('#pos-m-cart-badge');
+    if (badge) {
+      badge.textContent = count;
+      badge.classList.remove('bounce-scale');
+      void badge.offsetWidth;
+      badge.classList.add('bounce-scale');
+    }
+
     if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
     else { wrap.innerHTML = cart.map(c=>`
       <div class="cart-line">
@@ -112,7 +121,7 @@
         <div class="qty"><button data-d="-1" data-id="${c.id}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${c.id}"><i class="fa-solid fa-plus"></i></button></div>
         <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
       </div>`).join('');
-      $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(+b.dataset.id,+b.dataset.d)));
+      $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
     }
     const sub=cart.reduce((a,c)=>a+c.price*c.qty,0);
     const disc=Math.round(sub*discountPct/100);
@@ -120,7 +129,19 @@
     $('#t-sub').textContent=rs(sub); $('#t-disc').textContent='– '+rs(disc); $('#t-gst').textContent=rs(gst); $('#t-grand').textContent=rs(taxed+gst);
   }
   function getTotals(){ const sub=cart.reduce((a,c)=>a+c.price*c.qty,0); const disc=Math.round(sub*discountPct/100); const taxed=sub-disc; const gst=Math.round(taxed*0.05); return {sub,disc,gst,grand:taxed+gst,count:cart.reduce((a,c)=>a+c.qty,0),discountPct,items:cart.map(c=>({...c}))}; }
-  function clearCart(){ cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart(); }
+  function clearCart(){
+    cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart();
+    if (window.innerWidth <= 1024) {
+      const posLeft = $('.pos-left');
+      const posCart = $('.pos-cart');
+      const cartBtn = $('#pos-m-cart-btn');
+      if (posLeft && posCart && cartBtn) {
+        posLeft.classList.remove('hidden');
+        posCart.classList.remove('active');
+        cartBtn.style.display = 'flex';
+      }
+    }
+  }
   function getCustomer(){ return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') }; }
   // POS init (static parts present in HTML, wire them)
   function initPOS(){
@@ -131,6 +152,54 @@
     $('#disc-input').addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').addEventListener('click',()=>{ if(!cart.length)return toast('Cart is empty','fa-circle-exclamation'); if(window.RSPOS&&window.RSPOS.kot) return window.RSPOS.kot(); toast('KOT sent to kitchen','fa-fire'); });
     $('#btn-checkout').addEventListener('click',()=>{ if(!cart.length)return toast('Cart is empty','fa-circle-exclamation'); if(window.RSPOS&&window.RSPOS.checkout) return window.RSPOS.checkout(); toast('Bill printed & WhatsApp sent','fa-print'); clearCart(); });
+
+    // Grid size slider controls
+    const slider = $('#pos-grid-slider');
+    const grid = $('#pos-grid');
+    const decBtn = $('#btn-grid-dec');
+    const incBtn = $('#btn-grid-inc');
+    if (slider && grid && decBtn && incBtn) {
+      const updateGridSize = (val) => {
+        val = Math.min(250, Math.max(110, val));
+        slider.value = val;
+        grid.style.setProperty('--pos-grid-size', val + 'px');
+        try { localStorage.setItem('rs-pos-grid-size', val); } catch(e){}
+      };
+      slider.oninput = () => updateGridSize(parseInt(slider.value) || 158);
+      decBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) - 15);
+      incBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) + 15);
+      try {
+        const savedSize = localStorage.getItem('rs-pos-grid-size') || 158;
+        updateGridSize(parseInt(savedSize));
+      } catch(e) {
+        updateGridSize(158);
+      }
+    }
+
+    // Mobile view toggles
+    const cartBtn = $('#pos-m-cart-btn');
+    const backBtn = $('#btn-pos-back-menu');
+    const posLeft = $('.pos-left');
+    const posCart = $('.pos-cart');
+    if (cartBtn && posLeft && posCart) {
+      cartBtn.onclick = () => {
+        if (window.innerWidth <= 1024) {
+          posLeft.classList.add('hidden');
+          posCart.classList.add('active');
+          cartBtn.style.display = 'none';
+        }
+      };
+    }
+    if (backBtn && posLeft && posCart && cartBtn) {
+      backBtn.onclick = () => {
+        if (window.innerWidth <= 1024) {
+          posLeft.classList.remove('hidden');
+          posCart.classList.remove('active');
+          cartBtn.style.display = 'flex';
+        }
+      };
+    }
+
     renderPOS(); renderCart();
   }
 

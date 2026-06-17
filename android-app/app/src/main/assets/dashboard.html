@@ -100,6 +100,11 @@
           <div class="pos-left">
             <div class="pos-toolbar">
               <div class="pos-search"><i class="fa-solid fa-magnifying-glass"></i><input id="pos-search-input" placeholder="Search menu…"></div>
+              <div class="pos-size-control">
+                <button id="btn-grid-dec" title="Decrease item size"><i class="fa-solid fa-minus"></i></button>
+                <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Adjust item size">
+                <button id="btn-grid-inc" title="Increase item size"><i class="fa-solid fa-plus"></i></button>
+              </div>
               <div class="order-types">
                 <button class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
                 <button class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
@@ -111,7 +116,11 @@
           </div>
 
           <aside class="pos-cart">
-            <div class="cart-head"><h3>Current Order</h3><span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span></div>
+            <div class="cart-head">
+              <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" style="margin-right:8px; padding: 4px 8px; font-size:12px; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> Back</button>
+              <h3>Current Order</h3>
+              <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
+            </div>
             <div class="cart-table-sel">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
             </div>
@@ -694,10 +703,13 @@
         </button>
       </div>
     </div>
-  </div>
-  <!-- END ONBOARDING TOUR -->
+  <!-- Mobile Floating Cart Button -->
+  <button id="pos-m-cart-btn" class="pos-m-cart-btn" title="View Order">
+    <i class="fa-solid fa-shopping-basket"></i>
+    <span class="pos-m-cart-badge" id="pos-m-cart-badge">0</span>
+  </button>
 
-<div id="rs-modal-root"></div>
+  <div id="rs-modal-root"></div>
 
 <script>
   // clock

@@ -33,9 +33,11 @@
       table:'doppio_menu', pk:'id', clientId:true,
       from: r => ({ id:r.id, name:r.name, cat:r.category, price:num(r.price),
                     veg: !(r.recipe_specs && r.recipe_specs.veg===false),
-                    stock: r.available===false ? 'out' : 'ok' }),
+                    stock: r.available===false ? 'out' : 'ok',
+                    ingredients: (r.recipe_specs && r.recipe_specs.ingredients) || [] }),
       to: o => ({ name:o.name, category:o.cat, price:num(o.price),
-                  available: o.stock!=='out', recipe_specs:{ veg: !!o.veg } })
+                  available: o.stock!=='out',
+                  recipe_specs: { veg: !!o.veg, ingredients: o.ingredients || [] } })
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},

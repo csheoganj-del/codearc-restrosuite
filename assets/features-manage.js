@@ -174,7 +174,7 @@
 
           recipeListBody.querySelectorAll('[data-edit-rec]').forEach(b => {
             b.onclick = () => {
-              const m = RS.MENU.find(x => x.id === +b.dataset.editRec);
+              const m = RS.MENU.find(x => String(x.id) === String(b.dataset.editRec));
               if (m) {
                 openRecipeEditModal(m);
               }

@@ -69,14 +69,31 @@
           }});
       }
       $('#ed-reset').onclick = resetForm;
-      $('#ed-save').onclick = ()=>{
+      $('#ed-save').onclick = async ()=>{
         const name = $('#ed-name').value.trim();
         const price = +$('#ed-price').value;
         if(!name) return RS.toast('Enter an item name','fa-circle-exclamation');
         if(!price||price<=0) return RS.toast('Enter a valid price','fa-circle-exclamation');
         const data = { name, price, cat:$('#ed-cat').value, veg:$('#ed-type').value==='veg', gst:$('#ed-gst').value, ingredients:draftIngs.slice() };
-        if(editingId){ const m=RS.MENU.find(x=>x.id===editingId); Object.assign(m,data); RS.saveOne&&RS.saveOne('menu',m); RS.toast('“'+name+'” updated','fa-circle-check'); }
-        else { const id=Math.max(0,...RS.MENU.map(x=>x.id))+1; const rec={id, stock:'ok', ...data}; RS.MENU.push(rec); RS.saveOne&&RS.saveOne('menu',rec); RS.toast('“'+name+'” added to menu','fa-circle-plus'); }
+        if(editingId){
+          const m=RS.MENU.find(x=>String(x.id)===String(editingId));
+          Object.assign(m,data);
+          if (RS.saveOne) {
+            const saved = await RS.saveOne('menu', m);
+            if (saved) Object.assign(m, saved);
+          }
+          RS.toast('“'+name+'” updated','fa-circle-check');
+        }
+        else {
+          const id=Math.max(0,...RS.MENU.map(x=>Number.isFinite(Number(x.id))?Number(x.id):0))+1;
+          const rec={id, stock:'ok', ...data};
+          RS.MENU.push(rec);
+          if (RS.saveOne) {
+            const saved = await RS.saveOne('menu', rec);
+            if (saved) Object.assign(rec, saved);
+          }
+          RS.toast('“'+name+'” added to menu','fa-circle-plus');
+        }
         resetForm(); renderList(); try{ RS.renderPOS(); }catch(e){}
       };
       // expose for edit
@@ -101,10 +118,10 @@
         </tr>`).join('');
       const count = RS.MENU.length, cats=[...new Set(RS.MENU.map(m=>m.cat))].length;
       const sub = $('#editor-tab .ph-sub'); if(sub) sub.textContent = `${count} items · ${cats} categories`;
-      body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>{ buildForm(); buildForm._load(RS.MENU.find(x=>x.id===+b.dataset.edit)); $('#editor-tab').scrollIntoView({block:'start'}); });
-      body.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=> confirmDelete(+b.dataset.del));
-      body.querySelectorAll('[data-recipe]').forEach(b=> b.onclick=()=> recipeModal(+b.dataset.recipe));
-      body.querySelectorAll('[data-av]').forEach(c=> c.onchange=()=>{ const m=RS.MENU.find(x=>x.id===+c.dataset.av); m.stock = c.checked?'ok':'out'; RS.saveOne&&RS.saveOne('menu',m); renderList(); try{RS.renderPOS();}catch(e){} RS.toast(m.name+(c.checked?' available':' marked sold out'), c.checked?'fa-circle-check':'fa-ban'); });
+      body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>{ buildForm(); buildForm._load(RS.MENU.find(x=>String(x.id)===String(b.dataset.edit))); $('#editor-tab').scrollIntoView({block:'start'}); });
+      body.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=> confirmDelete(b.dataset.del));
+      body.querySelectorAll('[data-recipe]').forEach(b=> b.onclick=()=> recipeModal(b.dataset.recipe));
+      body.querySelectorAll('[data-av]').forEach(c=> c.onchange=()=>{ const m=RS.MENU.find(x=>String(x.id)===String(c.dataset.av)); m.stock = c.checked?'ok':'out'; RS.saveOne&&RS.saveOne('menu',m); renderList(); try{RS.renderPOS();}catch(e){} RS.toast(m.name+(c.checked?' available':' marked sold out'), c.checked?'fa-circle-check':'fa-ban'); });
       
       const btnAll = $('#btn-enable-all-menu');
       if (btnAll) {
@@ -135,15 +152,15 @@
     }
 
     function confirmDelete(id){
-      const m = RS.MENU.find(x=>x.id===id);
+      const m = RS.MENU.find(x=>String(x.id)===String(id));
       RSModal.open({ title:'Delete item?', icon:'fa-trash', size:'sm',
         body:`<p style="color:var(--text-soft);font-size:14.5px">Remove <b style="color:var(--text)">${m.name}</b> from the menu? This can’t be undone.</p>`,
         foot:`<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1;background:var(--red);box-shadow:none" data-ok><i class="fa-solid fa-trash"></i> Delete</button>`,
-        onMount(modal, close){ modal.querySelector('[data-x]').onclick=close; modal.querySelector('[data-ok]').onclick=()=>{ const i=RS.MENU.findIndex(x=>x.id===id); RS.MENU.splice(i,1); RS.removeOne&&RS.removeOne('menu',id); close(); renderList(); try{RS.renderPOS();}catch(e){} RS.toast('Item removed','fa-trash'); }; }});
+        onMount(modal, close){ modal.querySelector('[data-x]').onclick=close; modal.querySelector('[data-ok]').onclick=()=>{ const i=RS.MENU.findIndex(x=>String(x.id)===String(id)); RS.MENU.splice(i,1); RS.removeOne&&RS.removeOne('menu',id); close(); renderList(); try{RS.renderPOS();}catch(e){} RS.toast('Item removed','fa-trash'); }; }});
     }
 
     function recipeModal(id){
-      const m = RS.MENU.find(x=>x.id===id); const ings = recipeOf(m);
+      const m = RS.MENU.find(x=>String(x.id)===String(id)); const ings = recipeOf(m);
       const cost = plateCost(m); const margin = m.price? Math.round((1-cost/m.price)*100):0;
       RSModal.open({ title:m.name+' · recipe', sub:'Plate cost & margin', icon:'fa-flask', size:'md',
         body:`<div class="report-grid" style="--cols:1fr;gap:16px">

@@ -100,6 +100,11 @@
           <div class="pos-left">
             <div class="pos-toolbar">
               <div class="pos-search"><i class="fa-solid fa-magnifying-glass"></i><input id="pos-search-input" placeholder="Search menu…"></div>
+              <div class="pos-size-control">
+                <button id="btn-grid-dec" title="Decrease item size"><i class="fa-solid fa-minus"></i></button>
+                <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Adjust item size">
+                <button id="btn-grid-inc" title="Increase item size"><i class="fa-solid fa-plus"></i></button>
+              </div>
               <div class="order-types">
                 <button class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
                 <button class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
@@ -111,7 +116,11 @@
           </div>
 
           <aside class="pos-cart">
-            <div class="cart-head"><h3>Current Order</h3><span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span></div>
+            <div class="cart-head">
+              <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" style="margin-right:8px; padding: 4px 8px; font-size:12px; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> Back</button>
+              <h3>Current Order</h3>
+              <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
+            </div>
             <div class="cart-table-sel">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
             </div>
@@ -191,16 +200,34 @@
           <button class="btn btn-primary btn-sm banner-cta"><i class="fa-solid fa-truck"></i> Auto-draft POs</button>
         </div>
         <div class="toolbar-row">
-          <div class="seg"><button class="active">Stock levels</button><button>Recipes</button><button>Suppliers</button><button>Purchase orders</button><button>Waste log</button></div>
+          <div class="seg" id="inv-seg">
+            <button class="active" data-inv-tab="stock">Stock levels</button>
+            <button data-inv-tab="recipes">Recipes</button>
+            <button data-inv-tab="suppliers">Suppliers</button>
+          </div>
           <div class="grow"></div>
           <button class="btn btn-ghost btn-sm" id="btn-download-inventory-template"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
           <button class="btn btn-ghost btn-sm" id="btn-import-inventory"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
-          <button class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Add ingredient</button>
+          <button class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>
         </div>
-        <div class="panel panel-pad"><div class="table-scroll"><table class="data-table">
+        <!-- Stock panel -->
+        <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table">
           <thead><tr><th>Ingredient</th><th>Category</th><th>In stock</th><th>Min level</th><th>Unit cost</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="inv-table-body"></tbody>
         </table></div></div>
+        <!-- Recipes panel -->
+        <div id="inv-panel-recipes" class="inv-panel-section panel panel-pad" style="display:none;">
+          <div class="panel-head"><h3>Menu Recipes</h3><span class="ph-sub">Ingredients linked to each menu item — used for automatic inventory deduction</span></div>
+          <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Menu Item</th><th>Category</th><th>Ingredients</th><th>Plate Cost</th><th>Selling Price</th><th>Margin</th><th>Actions</th></tr></thead>
+            <tbody id="recipe-table-body"></tbody>
+          </table></div>
+        </div>
+        <!-- Suppliers panel -->
+        <div id="inv-panel-suppliers" class="inv-panel-section panel panel-pad" style="display:none;">
+          <div class="panel-head"><h3>Suppliers</h3><span class="ph-sub">Manage your raw material vendors and purchase orders</span></div>
+          <div style="color:var(--text-mute);font-size:13px;padding:20px 0;text-align:center;"><i class="fa-solid fa-truck" style="font-size:32px;opacity:.3;margin-bottom:12px;"></i><br>No suppliers configured yet. Add suppliers via Growth Hub → Procurement.</div>
+        </div>
       </section>
 
       <!-- ============ MENU EDITOR ============ -->
@@ -694,10 +721,29 @@
         </button>
       </div>
     </div>
-  </div>
-  <!-- END ONBOARDING TOUR -->
+  </div><!-- /#onboarding-overlay -->
 
-<div id="rs-modal-root"></div>
+  <!-- Mobile Floating Cart Button -->
+  <button id="pos-m-cart-btn" class="pos-m-cart-btn" title="View Order">
+    <i class="fa-solid fa-shopping-basket"></i>
+    <span class="pos-m-cart-badge" id="pos-m-cart-badge">0</span>
+  </button>
+
+  <!-- Mobile More Bottom Sheet -->
+  <div id="mobile-more-sheet" style="display:none;position:fixed;inset:0;z-index:500;">
+    <div id="mobile-more-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);" onclick="document.getElementById('mobile-more-sheet').style.display='none'"></div>
+    <div style="position:absolute;bottom:70px;left:12px;right:12px;background:var(--panel);border:1px solid var(--stroke);border-radius:20px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-mute);grid-column:1/-1;margin-bottom:4px;">MORE SECTIONS</div>
+      <button class="mnav-more-btn" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></button>
+      <button class="mnav-more-btn" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i><span>Menu Editor</span></button>
+      <button class="mnav-more-btn" data-tab="employees-tab"><i class="fa-solid fa-users"></i><span>Employees</span></button>
+      <button class="mnav-more-btn" data-tab="customers-tab"><i class="fa-solid fa-address-book"></i><span>Customers</span></button>
+      <button class="mnav-more-btn" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></button>
+      <button class="mnav-more-btn" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Tables</span></button>
+    </div>
+  </div>
+
+  <div id="rs-modal-root"></div>
 
 <script>
   // clock
