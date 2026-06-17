@@ -1274,6 +1274,24 @@
     },
     'inventory-tab':()=>{
       renderInventory();
+      const btnDownloadTemplate = $('#btn-download-inventory-template');
+      if (btnDownloadTemplate && !btnDownloadTemplate.dataset.listenerBound) {
+        btnDownloadTemplate.dataset.listenerBound = 'true';
+        btnDownloadTemplate.addEventListener('click', () => {
+          const headers = ['IngredientKey', 'IngredientName', 'Category', 'CurrentStock', 'MaxStock', 'Unit', 'ReorderLevelPercent', 'ExpiryDate'];
+          const sampleRows = [
+            ['espresso_shot', 'Espresso Shot', 'drinks', '3000', '6000', 'ml', '20', ''],
+            ['milk', 'Milk', 'drinks', '6000', '10000', 'ml', '25', '2026-06-16'],
+            ['bread', 'Bread', 'food', '60', '100', 'slices', '20', '2026-06-13']
+          ];
+          const csv = [
+            headers.join(','),
+            ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+          ].join('\n');
+          RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'inventory-template.csv');
+          toast('Inventory CSV template downloaded', 'fa-circle-check');
+        });
+      }
       const btnImport = $('#btn-import-inventory');
       if (btnImport && !btnImport.dataset.listenerBound) {
         btnImport.dataset.listenerBound = 'true';
