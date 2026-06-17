@@ -1803,9 +1803,15 @@
   // Only run hydrate for non-superadmin (superadmin doesn't need tenant data)
   if(!isSuper) hydrate();
 
-  // validate the stored session against the backend; bounce to login if revoked/expired
+  // validate the stored session against the backend; only bounce if server explicitly rejects it
   if(window.RS_API && RS_API.configured){
-    RS_API.validateSession().catch(()=>{ try{ RS_API.logout(); }catch(e){} location.href='login.html'; });
+    RS_API.validateSession().then(sess => {
+      // null = server confirmed token is invalid/expired → redirect
+      if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
+    }).catch(() => {
+      // Network error / Supabase offline — keep user on dashboard, don't log them out
+      console.warn('[RS] validateSession network error — keeping local session alive.');
+    });
   }
 
   // Wire up logout button cleanly

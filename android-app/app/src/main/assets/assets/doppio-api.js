@@ -34,10 +34,46 @@
   const CONFIGURED = !!(REMOTE_BASE && ANON);
 
   const SS = window.sessionStorage;
+  const LS_SESS = window.localStorage; // persistent session storage
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',
-              tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display' };
+              tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display',
+              persist:'rs_session_persistent' };
 
   const supabaseClient = (window.supabase && CONFIGURED) ? window.supabase.createClient(REMOTE_BASE, ANON) : null;
+
+  // Helper: read from localStorage first (persistent), then sessionStorage (tab-only)
+  function ssGet(k){ return LS_SESS.getItem(k) || SS.getItem(k); }
+  function ssSet(k, v, persist){
+    if(persist){
+      LS_SESS.setItem(k, v);
+      SS.removeItem(k); // clear session copy if upgrading to persistent
+    } else {
+      SS.setItem(k, v);
+      LS_SESS.removeItem(k);
+    }
+  }
+  function ssClear(){
+    [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,'superadmin_admin_token']
+      .forEach(k=>{ SS.removeItem(k); LS_SESS.removeItem(k); });
+  }
+
+  function storeSession(s, remember){
+    // If remember is not provided, check existing preference or default to true
+    const persist = (remember !== false);
+    const store = (k, v) => ssSet(k, v, persist);
+    // For superadmin, admin_token is the primary token (no session_token)
+    const primaryToken = s.session_token || s.admin_token || '';
+    store(K.token, primaryToken);
+    store(K.tid, s.tenant_id || '');
+    store(K.slug, s.tenant_slug || '');
+    store(K.name, s.tenant_name || 'Restaurant');
+    store(K.tabs, JSON.stringify(s.allowed_tabs || []));
+    store(K.user, s.username || '');
+    store(K.role, s.role || 'admin');
+    store(K.display, s.display_name || s.username || '');
+    store(K.persist, persist ? '1' : '0');
+    if(s.admin_token) ssSet('superadmin_admin_token', s.admin_token, persist);
+  }
 
   async function post(fn, body, token, fallbackMsg){
     try {
@@ -59,20 +95,8 @@
     }
   }
 
+
   /* ---------------- AUTH ---------------- */
-  function storeSession(s){
-    // For superadmin, admin_token is the primary token (no session_token)
-    const primaryToken = s.session_token || s.admin_token || '';
-    SS.setItem(K.token, primaryToken);
-    SS.setItem(K.tid, s.tenant_id || '');
-    SS.setItem(K.slug, s.tenant_slug || '');
-    SS.setItem(K.name, s.tenant_name || 'Restaurant');
-    SS.setItem(K.tabs, JSON.stringify(s.allowed_tabs || []));
-    SS.setItem(K.user, s.username || '');
-    SS.setItem(K.role, s.role || 'admin');
-    SS.setItem(K.display, s.display_name || s.username || '');
-    if(s.admin_token) SS.setItem('superadmin_admin_token', s.admin_token);
-  }
 
   const api = {
     configured: CONFIGURED,
@@ -83,7 +107,7 @@
 
     async checkSlug(slug){ const r = await post('tenant-access', { action:'check_slug', slug }, ANON, 'Could not check availability'); return r.available === true; },
 
-    async login({ slug, username, password }){
+    async login({ slug, username, password, remember }){
       if(!CONFIGURED) {
         await new Promise(r=>setTimeout(r,600));
         const mockSession = {
@@ -96,12 +120,12 @@
           session_token: slug === 'superadmin' ? '' : 'demo-session-token',
           admin_token: slug === 'superadmin' ? 'demo-admin-token' : ''
         };
-        storeSession(mockSession);
+        storeSession(mockSession, remember !== false);
         return mockSession;
       }
       const r = await post('tenant-access', { action:'login', slug, username, password }, ANON, 'Login failed');
       if(!r.session) throw new Error('Login failed');
-      storeSession(r.session);
+      storeSession(r.session, remember !== false);
       return r.session;
     },
 
@@ -124,30 +148,32 @@
       if(!CONFIGURED) {
         return api.session();
       }
-      const token = SS.getItem(K.token);
+      const token = ssGet(K.token);
       if(!token) return null;
       const r = await post('tenant-access', { action:'validate_session', session_token: token }, ANON, 'Session validation failed');
       if(r.session) {
         // Preserve admin_token for superadmin: the validate response doesn't echo it back
-        const existingAdminToken = SS.getItem('superadmin_admin_token');
+        const existingAdminToken = ssGet('superadmin_admin_token');
         if(r.session.role === 'superadmin' && existingAdminToken) {
           r.session.admin_token = existingAdminToken;
         }
-        storeSession(r.session);
+        // keep same persistence preference
+        const persist = ssGet(K.persist) !== '0';
+        storeSession(r.session, persist);
       }
       return r.session || null;
     },
 
-    session(){ const t = SS.getItem(K.token); if(!t) return null;
-      return { token:t, tenant_id:SS.getItem(K.tid), tenant_slug:SS.getItem(K.slug), tenant_name:SS.getItem(K.name),
-               username:SS.getItem(K.user), role:SS.getItem(K.role), display_name:SS.getItem(K.display),
-               allowed_tabs: JSON.parse(SS.getItem(K.tabs)||'[]') }; },
+    session(){ const t = ssGet(K.token); if(!t) return null;
+      return { token:t, tenant_id:ssGet(K.tid), tenant_slug:ssGet(K.slug), tenant_name:ssGet(K.name),
+               username:ssGet(K.user), role:ssGet(K.role), display_name:ssGet(K.display),
+               allowed_tabs: JSON.parse(ssGet(K.tabs)||'[]') }; },
 
-    logout(){ [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,'superadmin_admin_token'].forEach(k=>SS.removeItem(k)); },
+    logout(){ ssClear(); },
 
     /* ---------------- DATA (tenant-data) ---------------- */
     async data(payload){
-      const token = SS.getItem(K.token);
+      const token = ssGet(K.token);
       if(!token) throw new Error('Not signed in');
       const r = await post('tenant-data', payload, token, 'Data request failed');
       return r.data;
@@ -255,7 +281,7 @@
         return { error: 'Unknown action' };
       }
       
-      const adminToken = sessionStorage.getItem('superadmin_admin_token');
+      const adminToken = ssGet('superadmin_admin_token');
       if(!adminToken) throw new Error("Superadmin session expired. Please log in again.");
       return post('tenant-admin', { action, ...payload }, adminToken, 'Superadmin request failed');
     }

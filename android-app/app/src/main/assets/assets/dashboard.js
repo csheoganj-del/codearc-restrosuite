@@ -201,6 +201,21 @@
     }
 
     renderPOS(); renderCart();
+
+    // Mobile "More" bottom nav sheet
+    const mnavMore = document.getElementById('mnav-more');
+    const moreSheet = document.getElementById('mobile-more-sheet');
+    if (mnavMore && moreSheet) {
+      mnavMore.addEventListener('click', () => {
+        moreSheet.style.display = moreSheet.style.display === 'none' ? 'block' : 'none';
+      });
+      moreSheet.querySelectorAll('.mnav-more-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          moreSheet.style.display = 'none';
+          activateTab(btn.dataset.tab);
+        });
+      });
+    }
   }
 
   /* ============================================================
@@ -378,16 +393,116 @@
     const low = INVENTORY.filter(i=>i.stock<i.min);
     $('#inv-banner').style.display = low.length?'flex':'none';
     $('#inv-low-count').textContent = low.length;
-    $('#inv-table-body').innerHTML = INVENTORY.map(i=>{
-      const st = i.stock<i.min?'out':(i.stock<i.min*1.4?'low':'ok'); const pct=Math.min(100,Math.round(i.stock/(i.min*2)*100));
-      return `<tr>
-        <td><b>${i.name}</b></td><td>${i.cat}</td>
-        <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${i.unit}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st==='out'?'var(--red)':st==='low'?'var(--amber)':'var(--green)'}"></span></div></div></td>
-        <td>${i.min} ${i.unit}</td><td>${rs(i.cost)}/${i.unit}</td>
-        <td><span class="stock-dot ${stockCls[st]}">${st==='out'?'Reorder':st==='low'?'Low':'Healthy'}</span></td>
-        <td><div class="row-actions"><button class="icon-act go" title="Restock"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit"><i class="fa-solid fa-pen"></i></button></div></td>
-      </tr>`; }).join('');
-    $$('#inv-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Purchase order drafted','fa-truck')));
+
+    // render stock table
+    const invBody = $('#inv-table-body');
+    if (invBody) {
+      invBody.innerHTML = INVENTORY.map(i=>{
+        const st = i.stock<i.min?'out':(i.stock<i.min*1.4?'low':'ok'); const pct=Math.min(100,Math.round(i.stock/(i.min*2)*100));
+        return `<tr>
+          <td><b>${i.name}</b></td><td>${i.cat}</td>
+          <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${i.unit}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st==='out'?'var(--red)':st==='low'?'var(--amber)':'var(--green)'}"></span></div></div></td>
+          <td>${i.min} ${i.unit}</td><td>${rs(i.cost)}/${i.unit}</td>
+          <td><span class="stock-dot ${stockCls[st]}">${st==='out'?'Reorder':st==='low'?'Low':'Healthy'}</span></td>
+          <td><div class="row-actions"><button class="icon-act go" title="Restock"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit"><i class="fa-solid fa-pen"></i></button></div></td>
+        </tr>`; }).join('');
+      $$('#inv-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Purchase order drafted','fa-truck')));
+    }
+
+    // render recipe table
+    const recipeBody = $('#recipe-table-body');
+    if (recipeBody) {
+      const invCost = name => { const inv=(INVENTORY||[]).find(x=>x.name===name); return inv?inv.cost:0; };
+      recipeBody.innerHTML = MENU.length
+        ? MENU.map(m => {
+          const ings = m.ingredients || [];
+          const cost = ings.reduce((a,g)=>a+g.qty*invCost(g.name),0);
+          const margin = m.price && cost ? Math.round((1-cost/m.price)*100) : (m.price?100:0);
+          const ingText = ings.length ? ings.map(g=>`${g.qty}${g.unit} ${g.name}`).join(', ') : '<span style="color:var(--text-mute)">No recipe — click ✏ to define</span>';
+          return `<tr>
+            <td><div style="display:flex;align-items:center;gap:9px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${m.name}</b></div></td>
+            <td>${m.cat}</td>
+            <td style="max-width:220px;font-size:12px">${ingText}</td>
+            <td class="td-strong">${cost?rs(cost):'—'}</td>
+            <td class="td-strong">${rs(m.price)}</td>
+            <td><span class="stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}">${cost?margin+'%':'—'}</span></td>
+            <td><button class="icon-act go" data-recipe-edit="${m.id}" title="Define recipe"><i class="fa-solid fa-pen"></i></button></td>
+          </tr>`;
+        }).join('')
+        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet — add items in Menu Editor first</td></tr>';
+
+      // clicking recipe edit navigates to menu editor and opens that item
+      $$('#recipe-table-body [data-recipe-edit]').forEach(btn => {
+        btn.onclick = () => {
+          window.RS && window.RS.activateTab('editor-tab');
+          setTimeout(() => {
+            const m = MENU.find(x=>String(x.id)===String(btn.dataset.recipeEdit));
+            if (m && window.buildFormLoad) window.buildFormLoad(m);
+          }, 200);
+        };
+      });
+    }
+
+    // wire sub-tab seg buttons (only once)
+    const seg = $('#inv-seg');
+    if (seg && !seg.dataset.wired) {
+      seg.dataset.wired = '1';
+      const panels = { stock:'#inv-panel-stock', recipes:'#inv-panel-recipes', suppliers:'#inv-panel-suppliers' };
+      seg.querySelectorAll('[data-inv-tab]').forEach(btn => {
+        btn.onclick = () => {
+          seg.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+          Object.values(panels).forEach(p=>{ const el=$(p); if(el) el.style.display='none'; });
+          const panel = $(panels[btn.dataset.invTab]);
+          if (panel) panel.style.display = '';
+        };
+      });
+    }
+
+    // wire Add ingredient button
+    const addIngBtn = $('#btn-add-ingredient');
+    if (addIngBtn && !addIngBtn.dataset.wired) {
+      addIngBtn.dataset.wired = '1';
+      addIngBtn.onclick = () => {
+        if (!window.RSModal) return;
+        RSModal.open({ title:'Add ingredient', sub:'Add a raw material to inventory', icon:'fa-cube', size:'sm',
+          body:`
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div><label class="fl">Ingredient name</label><input class="form-input" id="add-ing-name" placeholder="e.g. Paneer"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div><label class="fl">Category</label><input class="form-input" id="add-ing-cat" placeholder="e.g. dairy"></div>
+                <div><label class="fl">Unit</label><input class="form-input" id="add-ing-unit" placeholder="kg / L / g"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div><label class="fl">Current stock</label><input class="form-input" id="add-ing-stock" type="number" min="0" placeholder="0"></div>
+                <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="add-ing-min" type="number" min="0" placeholder="10"></div>
+              </div>
+              <div><label class="fl">Unit cost (₹)</label><input class="form-input" id="add-ing-cost" type="number" min="0" placeholder="0"></div>
+            </div>`,
+          foot:`<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Add ingredient</button>`,
+          onMount(modal, close) {
+            modal.querySelector('[data-x]').onclick = close;
+            modal.querySelector('[data-ok]').onclick = async () => {
+              const name = modal.querySelector('#add-ing-name').value.trim();
+              if (!name) return toast('Enter ingredient name','fa-circle-exclamation');
+              const item = {
+                id: 'inv_' + name.toLowerCase().replace(/[^a-z0-9]+/g,'_') + '_' + Date.now(),
+                name, cat: modal.querySelector('#add-ing-cat').value.trim() || 'General',
+                unit: modal.querySelector('#add-ing-unit').value.trim() || 'unit',
+                stock: +modal.querySelector('#add-ing-stock').value || 0,
+                min: +modal.querySelector('#add-ing-min').value || 10,
+                cost: +modal.querySelector('#add-ing-cost').value || 0
+              };
+              INVENTORY.push(item);
+              if (window.RS_DB) await RS_DB.put('inventory', item.id, item);
+              close();
+              renderInventory();
+              toast(`${name} added to inventory`,'fa-circle-check');
+            };
+          }
+        });
+      };
+    }
 
     // Dispatch custom event to notify other modules
     document.dispatchEvent(new CustomEvent('rs:render-inventory'));
@@ -1688,9 +1803,15 @@
   // Only run hydrate for non-superadmin (superadmin doesn't need tenant data)
   if(!isSuper) hydrate();
 
-  // validate the stored session against the backend; bounce to login if revoked/expired
+  // validate the stored session against the backend; only bounce if server explicitly rejects it
   if(window.RS_API && RS_API.configured){
-    RS_API.validateSession().catch(()=>{ try{ RS_API.logout(); }catch(e){} location.href='login.html'; });
+    RS_API.validateSession().then(sess => {
+      // null = server confirmed token is invalid/expired → redirect
+      if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
+    }).catch(() => {
+      // Network error / Supabase offline — keep user on dashboard, don't log them out
+      console.warn('[RS] validateSession network error — keeping local session alive.');
+    });
   }
 
   // Wire up logout button cleanly

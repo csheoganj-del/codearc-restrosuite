@@ -28,6 +28,27 @@
   const num = v => (v==null||v==='') ? 0 : Number(v);
   const parseItems = t => { try { const a=JSON.parse(t); return Array.isArray(a)?a:[]; } catch(e){ return []; } };
 
+  function stableNumericId(str) {
+    let hash = 5381;
+    const clean = String(str || '').toLowerCase().trim();
+    for (let i = 0; i < clean.length; i++) {
+      hash = (hash * 33) ^ clean.charCodeAt(i);
+    }
+    return Math.abs(hash) % 9007199254740991;
+  }
+
+  function cleanIdForCollection(c, id) {
+    if (id == null) return id;
+    const isBigIntPK = ['menu', 'inventory', 'bills', 'customers', 'drafts', 'pending_orders'].includes(c);
+    if (isBigIntPK) {
+      if (Number.isFinite(Number(id))) {
+        return Number(id);
+      }
+      return stableNumericId(id);
+    }
+    return id;
+  }
+
   const MAP = {
     menu: {
       table:'doppio_menu', pk:'id', clientId:true,
@@ -35,7 +56,7 @@
                     veg: !(r.recipe_specs && r.recipe_specs.veg===false),
                     stock: r.available===false ? 'out' : 'ok',
                     ingredients: (r.recipe_specs && r.recipe_specs.ingredients) || [] }),
-      to: o => ({ name:o.name, category:o.cat, price:num(o.price),
+      to: o => ({ id:o.id, name:o.name, category:o.cat, price:num(o.price),
                   available: o.stock!=='out',
                   recipe_specs: { veg: !!o.veg, ingredients: o.ingredients || [] } })
     },
@@ -45,7 +66,7 @@
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
                     amount:num(r.total), pay:r.paymentMethod, status:'paid',
                     customerName:r.customerName, customerPhone:r.customerPhone }),
-      to: o => ({ orderId:o.no, customerName:o.customerName||'Walk-in Guest', customerPhone:o.customerPhone||null,
+      to: o => ({ id:o.id, orderId:o.no, customerName:o.customerName||'Walk-in Guest', customerPhone:o.customerPhone||null,
                   items: JSON.stringify(o._items||[]), subtotal:num(o.subtotal), gst:num(o.gst),
                   cgst:num(o.cgst), sgst:num(o.sgst), igst:0, total:num(o.amount),
                   paymentMethod:o.pay||'UPI', dateTime:o.time||new Date().toISOString(), transaction_type:'intra' })
@@ -54,7 +75,7 @@
       table:'doppio_inventory', pk:'id', clientId:true,
       from: r => ({ id:r.id, key:r.key, name:r.label||r.name, cat:r.category, stock:num(r.current),
                     unit:r.unit, min:num(r.threshold), max:num(r.max_stock), cost:0 }),
-      to: o => ({ key:o.key||String(o.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_'),
+      to: o => ({ id:o.id, key:o.key||String(o.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_'),
                   name:o.name, label:o.name, category:o.cat||'General', current:num(o.stock),
                   threshold:num(o.min), max_stock:num(o.max||o.stock), unit:o.unit||'unit' })
     },
@@ -62,20 +83,20 @@
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
       from: r => ({ id:r.id, name:r.name, phone:r.phone, visits:num(r.visits), spend:num(r.total_spend),
                     email:r.email, last:r.last_visit, tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
-      to: o => ({ name:o.name, phone:o.phone, visits:num(o.visits)||1, total_spend:num(o.spend),
+      to: o => ({ id:o.id, name:o.name, phone:o.phone, visits:num(o.visits)||1, total_spend:num(o.spend),
                   email:o.email||'', marketing_opt_in:true })
     },
     employees: {
       table:'doppio_employees', pk:'id', clientId:true,
       from: r => ({ id:r.id, name:r.name, role:r.role, rc:'r-'+String(r.role||'').toLowerCase(),
                     email:r.contact, baseSalary:num(r.baseSalary), shift:r.shift }),
-      to: o => ({ name:o.name, role:o.role, contact:o.email||'', baseSalary:num(o.baseSalary), shift:o.shift||'Morning', daily_rate:0 })
+      to: o => ({ id:o.id, name:o.name, role:o.role, contact:o.email||'', baseSalary:num(o.baseSalary), shift:o.shift||'Morning', daily_rate:0 })
     },
     drafts: {
       table:'doppio_draft_orders', pk:'id', clientId:true,
       from: r => ({ id:r.id, draftId:r.draftId, name:r.draftName, customerName:r.customerName, total:num(r.total),
                     items: parseItems(r.items) }),
-      to: o => ({ draftId:o.draftId||('D'+Date.now()), draftName:o.name||o.table||'Held order',
+      to: o => ({ id:o.id, draftId:o.draftId||('D'+Date.now()), draftName:o.name||o.table||'Held order',
                   customerName:o.customerName||'', customerPhone:o.customerPhone||'', paymentMethod:'UPI',
                   items: JSON.stringify(o.items||[]), subtotal:num(o.subtotal), gst:num(o.gst), total:num(o.total) })
     },
@@ -85,7 +106,7 @@
                     items: parseItems(r.items), subtotal:num(r.subtotal), discount:num(r.discount),
                     gst:num(r.gst), total:num(r.total), paymentMethod:r.paymentMethod,
                     orderType:r.orderType, tableNumber:r.tableNumber, status:r.status, dateTime:r.dateTime, priority:r.priority||'normal' }),
-      to: o => ({ orderId:o.orderId, customerName:o.customerName||'Guest', customerPhone:o.customerPhone||null,
+      to: o => ({ id:o.id, orderId:o.orderId, customerName:o.customerName||'Guest', customerPhone:o.customerPhone||null,
                   items: JSON.stringify(o.items||[]), subtotal:num(o.subtotal), discount:num(o.discount),
                   gst:num(o.gst), total:num(o.total), paymentMethod:o.paymentMethod||'UPI',
                   orderType:o.orderType||'Dine-in', tableNumber:o.tableNumber||'Walk-in',
@@ -154,9 +175,33 @@
     read:c=>{ try{ return JSON.parse(localStorage.getItem(LS.key(c)))||[]; }catch(e){ return []; } },
     write:(c,a)=>{ try{ localStorage.setItem(LS.key(c), JSON.stringify(a)); }catch(e){} },
     async list(c){ return LS.read(c); },
-    async put(c,id,obj){ const a=LS.read(c); const rec={...obj,id}; const i=a.findIndex(x=>String(x.id)===String(id)); if(i>=0)a[i]=rec; else a.push(rec); LS.write(c,a); return rec; },
-    async bulkPut(c,arr){ const a=LS.read(c); arr.forEach(o=>{ const i=a.findIndex(x=>String(x.id)===String(o.id)); if(i>=0)a[i]=o; else a.push(o); }); LS.write(c,a); return arr; },
-    async del(c,id){ LS.write(c, LS.read(c).filter(x=>String(x.id)!==String(id))); return true; },
+    async put(c,id,obj){
+      const cleanId = cleanIdForCollection(c, id);
+      const a=LS.read(c);
+      const rec={...obj,id:cleanId};
+      const i=a.findIndex(x=>String(x.id)===String(cleanId));
+      if(i>=0)a[i]=rec; else a.push(rec);
+      LS.write(c,a);
+      return rec;
+    },
+    async bulkPut(c,arr){
+      const a=LS.read(c);
+      const cleanedArr = arr.map(o => {
+        const cleanId = cleanIdForCollection(c, o.id);
+        return { ...o, id: cleanId };
+      });
+      cleanedArr.forEach(o=>{
+        const i=a.findIndex(x=>String(x.id)===String(o.id));
+        if(i>=0)a[i]=o; else a.push(o);
+      });
+      LS.write(c,a);
+      return cleanedArr;
+    },
+    async del(c,id){
+      const cleanId = cleanIdForCollection(c, id);
+      LS.write(c, LS.read(c).filter(x=>String(x.id)!==String(cleanId)));
+      return true;
+    },
     async getSettings(){ try{ return JSON.parse(localStorage.getItem('rs_v2:settings'))||null; }catch(e){ return null; } },
     async setSettings(o){ try{ localStorage.setItem('rs_v2:settings', JSON.stringify(o)); }catch(e){} return o; }
   };
@@ -175,17 +220,28 @@
     },
     async put(c,id,obj){
       const m=MAP[c]; if(!m) return obj;
-      const body = m.to(obj);
-      const isKnown = known[c] && known[c].has(String(id));
-      if(isKnown){ await API.update(m.table, body, [{operator:'eq',column:m.pk,value:id}]); return obj; }
-      if(m.clientId){ body[m.pk] = newClientId(); }
+      const cleanId = cleanIdForCollection(c, id);
+      const cleanObj = { ...obj, id: cleanId };
+      const body = m.to(cleanObj);
+      const isKnown = known[c] && known[c].has(String(cleanId));
+      if(isKnown){ await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]); return cleanObj; }
+      // Only auto-generate a new ID if clientId mode AND the body doesn't already have one
+      if(m.clientId && !body[m.pk]) { body[m.pk] = cleanId || newClientId(); }
+      else if(!body[m.pk]) { body[m.pk] = cleanId; }
       const res = await API.insert(m.table, body);
-      const newId = (Array.isArray(res)&&res[0]&&res[0][m.pk]!=null) ? res[0][m.pk] : (body[m.pk]!=null?body[m.pk]:id);
-      if(!known[c]) known[c]=new Set(); known[c].add(String(newId));
-      return { ...obj, id:newId };
+      const newId = (Array.isArray(res)&&res[0]&&res[0][m.pk]!=null) ? res[0][m.pk] : (body[m.pk]!=null?body[m.pk]:cleanId);
+      const cleanNewId = cleanIdForCollection(c, newId);
+      if(!known[c]) known[c]=new Set(); known[c].add(String(cleanNewId));
+      return { ...obj, id:cleanNewId };
     },
     async bulkPut(c,arr){ for(const o of arr){ await CLOUD.put(c, o.id, o); } return arr; },
-    async del(c,id){ const m=MAP[c]; if(!m) return true; await API.remove(m.table, [{operator:'eq',column:m.pk,value:id}]); if(known[c]) known[c].delete(String(id)); return true; },
+    async del(c,id){
+      const m=MAP[c]; if(!m) return true;
+      const cleanId = cleanIdForCollection(c, id);
+      await API.remove(m.table, [{operator:'eq',column:m.pk,value:cleanId}]);
+      if(known[c]) known[c].delete(String(cleanId));
+      return true;
+    },
     async getSettings(){
       const row = await API.select('doppio_business_profile', { maybeSingle:true });
       if(!row) return null;

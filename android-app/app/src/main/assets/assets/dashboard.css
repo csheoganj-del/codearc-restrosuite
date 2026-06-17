@@ -363,3 +363,18 @@
 .form-input:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 4px rgba(255,79,0,0.12); }
 select.form-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23807F92' stroke-width='2'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: block; margin-bottom: 7px; }
+
+/* ===================== INVENTORY SUB-TABS ===================== */
+.inv-panel-section { margin-top: 0; }
+
+/* ===================== MOBILE MORE SHEET BUTTONS ===================== */
+.mnav-more-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 8px; border-radius: var(--r-md); border: 1px solid var(--stroke-2);
+  background: var(--glass); color: var(--text-soft); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: var(--t); text-align: center;
+}
+.mnav-more-btn i { font-size: 18px; }
+.mnav-more-btn:hover, .mnav-more-btn:active { background: var(--orange-tint); color: var(--orange); border-color: rgba(255,79,0,0.35); }
+.mnav-more-btn span { line-height: 1.1; }
+

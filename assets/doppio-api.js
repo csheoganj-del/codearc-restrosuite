@@ -173,7 +173,7 @@
 
     /* ---------------- DATA (tenant-data) ---------------- */
     async data(payload){
-      const token = SS.getItem(K.token);
+      const token = ssGet(K.token);
       if(!token) throw new Error('Not signed in');
       const r = await post('tenant-data', payload, token, 'Data request failed');
       return r.data;
@@ -281,7 +281,7 @@
         return { error: 'Unknown action' };
       }
       
-      const adminToken = sessionStorage.getItem('superadmin_admin_token');
+      const adminToken = ssGet('superadmin_admin_token');
       if(!adminToken) throw new Error("Superadmin session expired. Please log in again.");
       return post('tenant-admin', { action, ...payload }, adminToken, 'Superadmin request failed');
     }

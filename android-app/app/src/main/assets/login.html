@@ -726,10 +726,11 @@
   loginForm.onsubmit=async e=>{
     e.preventDefault();
     const slug=document.getElementById('tenant-id').value.trim().toLowerCase(), u=document.getElementById('username').value.trim(), p=document.getElementById('password').value;
+    const remember = document.getElementById('remember-me').checked;
     if(!slug||!u||!p){showErr('Please fill in your outlet ID, username and password.');loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);return;}
     const btn=document.getElementById('login-submit'); const orig=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying…'; btn.disabled=true;
     try{
-      if(window.RS_API){ await RS_API.login({ slug, username:u, password:p }); }
+      if(window.RS_API){ await RS_API.login({ slug, username:u, password:p, remember }); }
       else { await new Promise(r=>setTimeout(r,600)); }
       showOk('Verified — opening your console…');
       setTimeout(()=>location.href='dashboard.html',700);
@@ -739,6 +740,7 @@
       loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
     }
   };
+
 
   // auto slug generation from name
   const regName = document.getElementById('reg-name');
