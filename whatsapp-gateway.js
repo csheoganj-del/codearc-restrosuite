@@ -2581,17 +2581,26 @@ app.listen(PORT, async () => {
     if (supabaseService) {
         try {
             console.log('[Startup] Ensuring storage bucket limits are set correctly...');
-            await supabaseService.storage.updateBucket(SESSION_BUCKET, {
-                public: false,
-                fileSizeLimit: 157286400 // 150MB
-            });
+            const bucketTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+            await Promise.race([
+                supabaseService.storage.updateBucket(SESSION_BUCKET, {
+                    public: false,
+                    fileSizeLimit: 157286400 // 150MB
+                }),
+                bucketTimeout
+            ]);
             console.log('[Startup] Storage bucket configured.');
         } catch (err) {
-            console.error('[Startup Storage Config Warning]', err.message);
+            console.warn('[Startup Storage Config Warning]', err.message === 'timeout' ? 'Bucket update timed out — skipping.' : err.message);
         }
     }
 
-    await logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() });
+    try {
+        const healthTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+        await Promise.race([logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() }), healthTimeout]);
+    } catch (err) {
+        console.warn('[Startup Health Log Warning] Skipped:', err.message);
+    }
 
     // Clean up any stale lock/socket/cookie files from a previous run first
     console.log('[Startup] Cleaning up any stale browser lock/socket/cookie files...');
@@ -2599,7 +2608,13 @@ app.listen(PORT, async () => {
 
     // Attempt to restore WhatsApp session from Supabase Storage
     console.log('[Startup] Attempting to restore WhatsApp session from Supabase Storage...');
-    const sessionRestored = await restoreSessionFromSupabase();
+    let sessionRestored = false;
+    try {
+        const restoreTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
+        sessionRestored = await Promise.race([restoreSessionFromSupabase(), restoreTimeout]);
+    } catch (err) {
+        console.warn('[Startup Session Restore Warning] Timed out or failed:', err.message);
+    }
 
     if (sessionRestored) {
         console.log('[Startup] ✅ Session restored. Connecting to WhatsApp without QR scan...');
@@ -2608,7 +2623,12 @@ app.listen(PORT, async () => {
     }
 
     // Send startup alert email (informational only)
-    await sendAdminAlert('startup', { sessionRestored });
+    try {
+        const alertTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
+        await Promise.race([sendAdminAlert('startup', { sessionRestored }), alertTimeout]);
+    } catch (err) {
+        console.warn('[Startup Alert Warning] Skipped:', err.message);
+    }
 
     console.log('[Startup] Initializing WhatsApp driver...');
     startWatchdog(); // Start watchdog — auto-resets if stuck at connecting
