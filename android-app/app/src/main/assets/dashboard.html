@@ -131,24 +131,19 @@
             <div class="cart-table-sel">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
             </div>
-            <div class="cust-row" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 16px 0;">
-              <div style="display: flex; gap: 8px; width: 100%;">
-                <input class="form-input" id="cust-name" placeholder="Customer name" style="flex: 1;">
-                <input class="form-input" id="cust-phone" placeholder="Phone" style="max-width:120px">
-              </div>
-              <input class="form-input" id="cust-gst" placeholder="Customer GSTIN (Optional)">
-            </div>
             <div class="cart-items" id="cart-items"></div>
             <div class="cart-foot">
-              <div class="disc-row">
-                <input class="form-input" id="disc-input" type="number" min="0" max="100" placeholder="Discount %">
-                <select class="form-input" style="max-width:130px"><option>No coupon</option><option>WELCOME10</option><option>FEAST20</option></select>
-              </div>
               <div class="totals">
                 <div class="tr"><span>Subtotal</span><b id="t-sub">₹0</b></div>
-                <div class="tr"><span>Discount</span><b id="t-disc">– ₹0</b></div>
-                <div class="tr"><span>GST (5%)</span><b id="t-gst">₹0</b></div>
                 <div class="tr grand"><span class="lbl">Total</span><span class="amt" id="t-grand">₹0</span></div>
+              </div>
+              <div class="cart-payment" id="cart-payment">
+                <div class="cpay-head"><span>Payment</span><span id="pay-method-note">Cash</span></div>
+                <div class="cpay-methods" id="cart-pay-methods">
+                  <button type="button" class="active" data-pay-method="Cash">Cash</button>
+                  <button type="button" data-pay-method="UPI">UPI</button>
+                  <button type="button" data-pay-method="Card">Card</button>
+                </div>
               </div>
               <div class="cart-actions">
                 <button class="btn btn-ghost" id="btn-hold"><i class="fa-solid fa-pause"></i> Hold <span id="held-count"></span></button>

@@ -68,7 +68,9 @@
       d.open();
       d.write(fullHtml);
       d.close();
-      setTimeout(()=>{ f.contentWindow.focus(); f.contentWindow.print(); setTimeout(()=>f.remove(), 800); }, 350);
+      f.contentWindow.focus();
+      f.contentWindow.print();
+      setTimeout(()=>f.remove(), 800);
     };
 
     /* ---------------- receipt builder ---------------- */
@@ -96,8 +98,8 @@
         <hr class="rcp-hr">
         <div class="rcp-line"><span>Subtotal</span><span>${rs(bill.sub)}</span></div>
         ${bill.disc?`<div class="rcp-line"><span>Discount</span><span>– ${rs(bill.disc)}</span></div>`:''}
-        <div class="rcp-line"><span>CGST 2.5%</span><span>${rs(Math.round(bill.gst/2))}</span></div>
-        <div class="rcp-line"><span>SGST 2.5%</span><span>${rs(bill.gst-Math.round(bill.gst/2))}</span></div>
+        ${bill.gst?`<div class="rcp-line"><span>CGST 2.5%</span><span>${rs(Math.round(bill.gst/2))}</span></div>
+        <div class="rcp-line"><span>SGST 2.5%</span><span>${rs(bill.gst-Math.round(bill.gst/2))}</span></div>`:''}
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
         <hr class="rcp-hr">
         ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${t.method}</span><span>${rs(t.amount)}</span></div>`).join('')}
@@ -105,177 +107,94 @@
         <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
     }
 
-    function showReceipt(bill){
-      RSModal.open({
-        title:'Bill settled', sub: bill.no+' · '+rs(bill.grand), icon:'fa-circle-check', size:'sm',
-        body:`<div class="receipt-paper">${receiptHTML(bill)}</div>`,
-        foot:`<button class="btn btn-ghost" id="rcp-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
-              <button class="btn btn-ghost" id="rcp-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
-              <button class="btn btn-primary" id="rcp-done" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
-        onMount(modal, close){
-          modal.querySelector('#rcp-print').onclick = ()=> RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`,'Receipt '+bill.no);
-          modal.querySelector('#rcp-wa').onclick = ()=> RS.toast('Invoice sent on WhatsApp','fa-whatsapp');
-          modal.querySelector('#rcp-done').onclick = close;
-        }
-      });
+    /* ---------------- inline cart payment ---------------- */
+    const paymentState = { method: 'Cash' };
+    let kotSentKey = '';
+    const orderType = () => (document.querySelector('.order-type-btn.active')?.textContent || 'Takeaway').trim();
+    const cartKey = () => {
+      const totals = RS.getTotals();
+      const cust = RS.getCustomer();
+      return `${cust.table}|${orderType()}|${totals.grand}|${totals.items.map(i=>`${i.id}:${i.qty}`).join(',')}`;
+    };
+    const isDineIn = () => orderType().toLowerCase().includes('dine');
+    const isKotSent = () => kotSentKey && kotSentKey === cartKey();
+    const markKotSent = () => { kotSentKey = cartKey(); };
+    const resetCustomerFields = () => {};
+    function getPaymentDetails(){
+      const totals = RS.getTotals();
+      const method = paymentState.method || 'Cash';
+      return { method, received: totals.grand, change: 0, valid: totals.count > 0 };
     }
-
-    /* ---------------- payment modal ---------------- */
-    function checkout(){
+    function resetPayment(){
+      paymentState.method = 'Cash';
+      kotSentKey = '';
+      refreshPaymentPanel();
+    }
+    function refreshPaymentPanel(){
+      const totals = RS.getTotals();
+      const note = document.getElementById('pay-method-note');
+      const checkoutBtn = document.getElementById('btn-checkout');
+      if(!checkoutBtn) return;
+      document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.classList.toggle('active', btn.dataset.payMethod === paymentState.method));
+      if(note) note.textContent = paymentState.method;
+      checkoutBtn.disabled = totals.count < 1;
+    }
+    function wirePaymentPanel(){
+      const methods = document.getElementById('cart-pay-methods');
+      if(methods) methods.addEventListener('click', e=>{
+        const btn = e.target.closest('[data-pay-method]'); if(!btn) return;
+        paymentState.method = btn.dataset.payMethod;
+        refreshPaymentPanel();
+      });
+      refreshPaymentPanel();
+    }
+    async function checkout(){
       const totals = RS.getTotals();
       const cust = RS.getCustomer();
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
-      let tenders = [{ method: 'Cash', amount: totals.grand, isDefault: true }];
-      let method = 'Cash';
-      let buffer = '';
-      const methods = [['Cash','fa-money-bill-wave'],['UPI','fa-mobile-screen'],['Card','fa-credit-card']];
- 
-      RSModal.open({
-        title:'Take payment', sub: totals.count+' items · '+cust.table, icon:'fa-indian-rupee-sign', size:'lg', bare:true,
-        body:`<div class="pay-grid">
-          <div class="pay-left">
-            <div class="pay-due"><div class="lbl">Amount due</div><div class="amt" id="pay-remaining">${rs(totals.grand)}</div></div>
-            <div class="pay-methods" id="pay-methods">${methods.map(m=>`<div class="pay-m ${m[0]==='Cash'?'active':''}" data-m="${m[0]}"><i class="fa-solid ${m[1]}"></i><div class="mn">${m[0]}</div></div>`).join('')}</div>
-            <div id="tender-list"></div>
-            <div id="change-wrap"></div>
-          </div>
-          <div class="pay-right">
-            <input class="amt-input" id="pay-amt" value="${totals.grand}" readonly>
-            <div class="quick-tenders" id="quick-tenders"></div>
-            <div class="numpad" id="numpad">
-              ${['1','2','3','4','5','6','7','8','9'].map(n=>`<button data-k="${n}">${n}</button>`).join('')}
-              <button data-k="00">00</button><button data-k="0">0</button><button class="fn" data-k="del"><i class="fa-solid fa-delete-left"></i></button>
-              <button class="wide fn" data-k="add"><i class="fa-solid fa-plus"></i> Add ${method} payment</button>
-              <button class="fn" data-k="clr">Clear</button>
-            </div>
-          </div>
-        </div>`,
-        foot:`<div style="flex:1;font-size:13px;color:var(--text-mute)">Tip: split across methods by adding multiple payments</div>
-              <button class="btn btn-primary btn-lg" id="pay-complete" disabled><i class="fa-solid fa-check-double"></i> Complete & print</button>`,
-        onMount(modal, close){
-          const remEl = modal.querySelector('#pay-remaining');
-          const amtEl = modal.querySelector('#pay-amt');
-          const tList = modal.querySelector('#tender-list');
-          const chWrap = modal.querySelector('#change-wrap');
-          const addBtn = modal.querySelector('[data-k="add"]');
-          const completeBtn = modal.querySelector('#pay-complete');
-          const paid = (excludeDefault)=> tenders.reduce((a,t)=>a + (excludeDefault && t.isDefault ? 0 : t.amount), 0);
-          const remaining = (excludeDefault)=> Math.max(0, totals.grand - paid(excludeDefault));
- 
-          function clearDefaultIfPresent() {
-            if (tenders.length === 1 && tenders[0].isDefault) {
-              tenders = [];
+      const payment = getPaymentDetails();
+      if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
+      if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
+
+      const bill = {
+        no:'INV-'+(billSeq++), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
+        table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
+        tenders: [{ method: payment.method, amount: totals.grand }], change: 0
+      };
+      try {
+        const gstHalf = Math.round((totals.gst||0)/2);
+        const billRow = { id:bill.no, no:bill.no, time:'Just now', table:bill.table, items: totals.count,
+          amount: bill.grand, pay: payment.method, status:'paid',
+          receivedAmount: payment.received, changeAmount: payment.change,
+          customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
+          subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
+          _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
+        RS.BILLS.unshift(billRow); RS.saveOne&&RS.saveOne('bills',billRow); RS.render('bills-tab');
+      } catch(e){}
+
+      RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`,'Receipt '+bill.no);
+      RS.clearCart();
+      resetCustomerFields();
+      resetPayment();
+      RS.toast('Bill printed successfully.','fa-circle-check');
+
+      if (window.RS_DB) {
+        (async () => {
+          try {
+            const rows = await RS_DB.list('pending_orders');
+            const matched = rows.find(r =>
+              (r.tableNumber === cust.table || r.tableNumber === cust.table.replace('Table ', '')) &&
+              (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
+            );
+            if (matched) {
+              await RS_DB.del('pending_orders', matched.id);
+              if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
             }
+          } catch(e) {
+            console.warn("Failed to clear pending order on checkout", e);
           }
- 
-          function quicks(){
-            const r = remaining(true);
-            const rounds = [r, Math.ceil(r/100)*100, Math.ceil(r/500)*500, 500, 1000, 2000].filter((v,i,a)=>v>0 && a.indexOf(v)===i).slice(0,4);
-            modal.querySelector('#quick-tenders').innerHTML = rounds.map((v,i)=>`<button data-q="${v}">${i===0?'Exact ':''}${rs(v)}</button>`).join('');
-            modal.querySelectorAll('#quick-tenders button').forEach(b=> b.onclick=()=>{
-              clearDefaultIfPresent();
-              buffer=String(b.dataset.q);
-              render();
-            });
-          }
-          function render(){
-            amtEl.value = buffer===''? remaining(true) : buffer;
-            remEl.textContent = rs(remaining());
-            remEl.classList.toggle('done', remaining()===0);
-            addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> Add ${method} payment`;
-            tList.innerHTML = tenders.map((t,i)=>`<div class="tender-row"><span class="tm"><i class="fa-solid ${t.method==='Cash'?'fa-money-bill-wave':t.method==='UPI'?'fa-mobile-screen':'fa-credit-card'}"></i> ${t.method}</span><span style="font-weight:700">${rs(t.amount)}</span> <span class="tx" data-rm="${i}"><i class="fa-solid fa-xmark"></i></span></div>`).join('');
-            tList.querySelectorAll('[data-rm]').forEach(x=> x.onclick=()=>{ tenders.splice(+x.dataset.rm,1); buffer=''; quicks(); render(); });
-            const chg = paid() - totals.grand;
-            chWrap.innerHTML = (chg>0) ? `<div class="change-box"><span class="cl"><i class="fa-solid fa-hand-holding-dollar"></i> Change to return</span><span class="cv">${rs(chg)}</span></div>` : '';
-            completeBtn.disabled = paid() < totals.grand;
-            modal.querySelectorAll('.pay-m').forEach(m=> m.classList.toggle('active', m.dataset.m===method));
-          }
-          modal.querySelector('#pay-methods').onclick = e=>{
-            const m=e.target.closest('.pay-m'); if(!m)return;
-            method=m.dataset.m;
-            if (tenders.length === 1 && tenders[0].isDefault) {
-              tenders[0].method = method;
-            }
-            render();
-          };
-          modal.querySelector('#numpad').onclick = e=>{
-            const b=e.target.closest('button'); if(!b)return; const k=b.dataset.k;
-            if(k==='del') {
-              clearDefaultIfPresent();
-              buffer = buffer.slice(0,-1);
-            }
-            else if(k==='clr'){ tenders = []; buffer=''; }
-            else if(k==='add'){
-              const amt = buffer===''? remaining() : +buffer;
-              if(amt>0){
-                tenders = tenders.filter(t => !t.isDefault);
-                tenders.push({method, amount:amt});
-                buffer='';
-                quicks();
-              }
-            }
-            else {
-              clearDefaultIfPresent();
-              buffer = (buffer + k).replace(/^0+(?=\d)/,'').slice(0,7);
-            }
-            render();
-          };
-          completeBtn.onclick = async ()=>{
-            const bill = {
-              no:'INV-'+(billSeq++), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
-              table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
-              tenders: tenders.slice(), change: Math.max(0, paid()-totals.grand)
-            };
-            // push to Bills data (+ persist to doppio_bills in cloud mode)
-            try {
-              const gstHalf = Math.round((totals.gst||0)/2);
-              const billRow = { id:bill.no, no:bill.no, time:'Just now', table:bill.table, items: totals.count,
-                amount: bill.grand, pay: tenders.length>1?'Split':tenders[0].method, status:'paid',
-                customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
-                subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-                _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
-              RS.BILLS.unshift(billRow); RS.saveOne&&RS.saveOne('bills',billRow); RS.render('bills-tab');
-            } catch(e){}
-
-            // delete corresponding pending order from DB
-            if (window.RS_DB) {
-              try {
-                const rows = await RS_DB.list('pending_orders');
-                const matched = rows.find(r => 
-                  (r.tableNumber === cust.table || r.tableNumber === cust.table.replace('Table ', '')) &&
-                  (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
-                );
-                if (matched) {
-                  await RS_DB.del('pending_orders', matched.id);
-                  if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
-                }
-              } catch(e) {
-                console.warn("Failed to clear pending order on checkout", e);
-              }
-            }
-
-            close();
-            RS.clearCart();
-            const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'), cg=document.getElementById('cust-gst'); if(cn)cn.value=''; if(cp)cp.value=''; if(cg)cg.value='';
-            RS.toast('Payment received · '+rs(bill.grand),'fa-circle-check');
-
-            // Auto-print receipt if enabled in settings
-            if (window.RS && typeof window.RS.getSettings === 'function') {
-              try {
-                const settings = await window.RS.getSettings();
-                if (settings && settings.set_auto_print_receipt) {
-                  RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`,'Receipt '+bill.no);
-                }
-              } catch(e) {
-                console.error("Failed to read settings for auto-print", e);
-              }
-            }
-
-            showReceipt(bill);
-          };
-          quicks(); render();
-        }
-      });
+        })();
+      }
     }
 
     /* ---------------- KOT ---------------- */
@@ -321,6 +240,7 @@
                 console.warn("KOT save failed", e);
               }
             }
+            markKotSent();
             RS.toast('KOT '+tok+' fired to kitchen','fa-fire');
 
             // Auto-print KOT if enabled in settings
@@ -339,7 +259,8 @@
       });
     }
 
-    window.RSPOS = { checkout, kot };
+    wirePaymentPanel();
+    window.RSPOS = { checkout, kot, refreshPaymentPanel };
 
     /* ---------------- HOLD ORDERS / DRAFTS ---------------- */
     const held = [];

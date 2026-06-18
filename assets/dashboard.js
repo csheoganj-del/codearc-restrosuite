@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite Console — interactivity & data rendering
+   RestroSuite Console â€” interactivity & data rendering
    ============================================================ */
 (function () {
   'use strict';
@@ -25,7 +25,7 @@
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const rs = n => '₹' + Math.round(n).toLocaleString('en-IN');
+  const rs = n => '\u20b9' + Math.round(n).toLocaleString('en-IN');
   const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
@@ -87,6 +87,8 @@
      POS
      ============================================================ */
   let activeCat='All', cart=[], discountPct=0;
+  const posGstEnabled = false;
+  const posDiscountEnabled = false;
   const renderPOS = () => {
     const grid = $('#pos-grid');
     const q = ($('#pos-search-input')?.value||'').toLowerCase();
@@ -110,10 +112,13 @@
     $('#cart-count').textContent = count+(count===1?' item':' items');
 
     const sub=cart.reduce((a,c)=>a+c.price*c.qty,0);
-    const disc=Math.round(sub*discountPct/100);
-    const taxed=sub-disc; const gst=Math.round(taxed*0.05);
+    const disc=posDiscountEnabled ? Math.round(sub*discountPct/100) : 0;
+    const taxed=sub-disc; const gst=posGstEnabled ? Math.round(taxed*0.05) : 0;
     const grand=taxed+gst;
-    $('#t-sub').textContent=rs(sub); $('#t-disc').textContent='– '+rs(disc); $('#t-gst').textContent=rs(gst); $('#t-grand').textContent=rs(grand);
+    $('#t-sub').textContent=rs(sub);
+    if($('#t-disc')) $('#t-disc').textContent='– '+rs(disc);
+    if($('#t-gst')) $('#t-gst').textContent=rs(gst);
+    $('#t-grand').textContent=rs(grand);
 
     // Update Mobile Cart Bar
     const barCount = $('#pos-m-cart-bar-count');
@@ -140,10 +145,12 @@
       $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
     }
 
+    try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
+
     // Refresh POS Grid to update card badges
     try { renderPOS(); } catch (e) {}
   }
-  function getTotals(){ const sub=cart.reduce((a,c)=>a+c.price*c.qty,0); const disc=Math.round(sub*discountPct/100); const taxed=sub-disc; const gst=Math.round(taxed*0.05); return {sub,disc,gst,grand:taxed+gst,count:cart.reduce((a,c)=>a+c.qty,0),discountPct,items:cart.map(c=>({...c}))}; }
+  function getTotals(){ const sub=cart.reduce((a,c)=>a+c.price*c.qty,0); const disc=posDiscountEnabled ? Math.round(sub*discountPct/100) : 0; const taxed=sub-disc; const gst=posGstEnabled ? Math.round(taxed*0.05) : 0; return {sub,disc,gst,grand:taxed+gst,count:cart.reduce((a,c)=>a+c.qty,0),discountPct:posDiscountEnabled?discountPct:0,items:cart.map(c=>({...c}))}; }
   function clearCart(){
     cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart();
     if (window.innerWidth <= 1024) {
@@ -164,7 +171,7 @@
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{ activeCat=b.dataset.cat; $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b)); renderPOS(); }));
     $('#pos-search-input').addEventListener('input', renderPOS);
     $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{ $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }));
-    $('#disc-input').addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
+    $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {
       if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
       try {
@@ -280,7 +287,7 @@
         const mappedKds = activeKds.map(r => ({
           id: r.id,
           tok: r.orderId,
-          type: `${r.orderType} · ${r.tableNumber}`,
+          type: `${r.orderType} Â· ${r.tableNumber}`,
           start: r.dateTime ? new Date(r.dateTime).getTime() : Date.now(),
           items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
         }));
@@ -294,7 +301,7 @@
           table: r.tableNumber,
           time: r.dateTime ? getRelativeTime(r.dateTime) : 'just now',
           status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
-          items: (r.items || []).map(it => [`${it.qty}× ${it.name}`, it.price * it.qty]),
+          items: (r.items || []).map(it => [`${it.qty}Ã— ${it.name}`, it.price * it.qty]),
           total: r.total
         }));
         replaceArr(QR_ORDERS, mappedQr);
@@ -379,7 +386,7 @@
       } else {
         o.status=nextStatus; renderQR();
       }
-      toast('Table '+(o.table.split('-')[1]||o.table)+' → '+statusTxt[nextStatus]);
+      toast('Table '+(o.table.split('-')[1]||o.table)+' â†’ '+statusTxt[nextStatus]);
     }));
     $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>toast('Select another table to merge','fa-code-merge')));
     $$('#qr-grid [data-bill]').forEach(b=>b.addEventListener('click',()=>toast('Bill generated & sent','fa-receipt')));
@@ -416,7 +423,7 @@
         <td>${b.status==='paid'?'<span class="pill pill-green" style="padding:3px 9px">Paid</span>':'<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
         <td><div class="row-actions"><button class="icon-act go" title="Reprint"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger" title="Refund" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button></div></td>
       </tr>`).join('');
-    $$('#bills-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Reprinting bill…','fa-print')));
+    $$('#bills-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Reprinting billâ€¦','fa-print')));
     $$('#bills-table-body .icon-act .fa-whatsapp').forEach(b=>b.closest('button').addEventListener('click',()=>toast('Bill shared on WhatsApp','fa-whatsapp')));
     $$('#bills-table-body .icon-act.danger:not([disabled])').forEach(b=>b.addEventListener('click',()=>toast('Refund initiated','fa-rotate-left')));
   };
@@ -454,18 +461,18 @@
           const ings = m.ingredients || [];
           const cost = ings.reduce((a,g)=>a+g.qty*invCost(g.name),0);
           const margin = m.price && cost ? Math.round((1-cost/m.price)*100) : (m.price?100:0);
-          const ingText = ings.length ? ings.map(g=>`${g.qty}${g.unit} ${g.name}`).join(', ') : '<span style="color:var(--text-mute)">No recipe — click ✏ to define</span>';
+          const ingText = ings.length ? ings.map(g=>`${g.qty}${g.unit} ${g.name}`).join(', ') : '<span style="color:var(--text-mute)">No recipe â€” click âœ to define</span>';
           return `<tr>
             <td><div style="display:flex;align-items:center;gap:9px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${m.name}</b></div></td>
             <td>${m.cat}</td>
             <td style="max-width:220px;font-size:12px">${ingText}</td>
-            <td class="td-strong">${cost?rs(cost):'—'}</td>
+            <td class="td-strong">${cost?rs(cost):'â€”'}</td>
             <td class="td-strong">${rs(m.price)}</td>
-            <td><span class="stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}">${cost?margin+'%':'—'}</span></td>
+            <td><span class="stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}">${cost?margin+'%':'â€”'}</span></td>
             <td><button class="icon-act go" data-recipe-edit="${m.id}" title="Define recipe"><i class="fa-solid fa-pen"></i></button></td>
           </tr>`;
         }).join('')
-        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet — add items in Menu Editor first</td></tr>';
+        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet â€” add items in Menu Editor first</td></tr>';
 
       // clicking recipe edit navigates to menu editor and opens that item
       $$('#recipe-table-body [data-recipe-edit]').forEach(btn => {
@@ -550,13 +557,13 @@
   const renderEditor = () => {
     $('#editor-list').innerHTML = MENU.map(m=>`
       <tr>
-        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${m.name}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${m.cat}</div></div></div></td>
+        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${m.name}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} Â· ${m.cat}</div></div></div></td>
         <td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td>
         <td><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></td>
         <td><label class="switch-mini"><input type="checkbox" ${m.stock!=='out'?'checked':''}><span></span></label></td>
         <td><div class="row-actions"><button class="icon-act go" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" title="Recipe"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
       </tr>`).join('');
-    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editor…','fa-pen')));
+    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editorâ€¦','fa-pen')));
     $$('#editor-list .icon-act.danger').forEach(b=>b.addEventListener('click',()=>toast('Item removed','fa-trash')));
   };
 
@@ -702,7 +709,7 @@
     $('#kds-grid').innerHTML = KDS.map((o,i)=>`
       <div class="kds-card" data-k="${i}">
         <div class="kds-h"><div><div class="ktok">${o.tok}</div><div class="ktype">${o.type}</div></div><span class="kds-timer" data-start="${o.start}">0:00</span></div>
-        <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${it[0]}×</span><div><span class="kn">${it[1]}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${it[2]}</div>`:''}</div></div>`).join('')}</div>
+        <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${it[0]}Ã—</span><div><span class="kn">${it[1]}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${it[2]}</div>`:''}</div></div>`).join('')}</div>
         <div class="kds-foot"><button class="btn btn-primary btn-block" data-done="${i}"><i class="fa-solid fa-check"></i> Mark ready</button></div>
       </div>`).join('');
     $$('#kds-grid .kds-item').forEach(it=> it.addEventListener('click',()=>it.classList.toggle('done')));
@@ -748,7 +755,7 @@
     {ic:'fa-flask-vial',bg:'bg-g',t:'Recipe Costing',d:'Plate cost & margin calculator',m:'68% margin'},
     {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'4 live'},
     {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'3.1k reach'},
-    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 ★'},
+    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 â˜…'},
     {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'412 members'}
   ];
   const renderHub = () => {
@@ -758,7 +765,7 @@
         <h4>${h.t}</h4><p>${h.d}</p>
         <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${h.m}</span>
       </div>`).join('');
-    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'…','fa-arrow-up-right-from-square')));
+    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'â€¦','fa-arrow-up-right-from-square')));
   };
 
   /* ============================================================
@@ -797,7 +804,7 @@
         <div class="emp-stats"><div class="es"><div class="esv">${e.sales}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${e.orders}</div><div class="esl">Orders</div></div></div>
         <div class="emp-actions"><button class="btn btn-ghost btn-sm" style="flex:1"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove"><i class="fa-solid fa-user-minus"></i></button></div>
       </div>`).join('');
-    $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissions…','fa-user-gear')));
+    $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissionsâ€¦','fa-user-gear')));
   };
 
   /* ============================================================
@@ -882,7 +889,7 @@
   const renderSuper = async () => {
     const tbody = $('#tenant-table-body');
     if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registryâ€¦</td></tr>';
     renderPlatformSummary([]);
     try {
       let tenants = [];
@@ -920,14 +927,14 @@
         const statusKey = (t.status||'active').toLowerCase();
         const statusCls = tStatus[statusKey] || 't-active';
         const statusText = t.status ? (t.status.charAt(0).toUpperCase()+t.status.slice(1).replace(/_/g,' ')) : 'Active';
-        const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : '—';
+        const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : 'â€”';
         const mrr = t.mrr || 0;
         const name = t.name || t.tenant_name || t.slug || 'Unknown';
         const slug = t.slug || t.tenant_slug || '';
         return `<tr>
           <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${initials(name)}</div><div><b>${name}</b><div style="font-size:11px;color:var(--text-mute)">${slug}</div></div></div></td>
           <td><span class="pill ${planLabel.toLowerCase()} ${pillCls}" style="padding:3px 9px">${planLabel}</span></td>
-          <td class="td-strong">${mrr?rs(mrr):'—'}</td><td>${t.outlet_count||1}</td><td>${joined}</td>
+          <td class="td-strong">${mrr?rs(mrr):'â€”'}</td><td>${t.outlet_count||1}</td><td>${joined}</td>
           <td><span class="tenant-status ${statusCls}">${statusText}</span></td>
           <td><div class="row-actions"><button class="icon-act manage-tenant-btn" title="Manage" data-tid="${t.id||''}"><i class="fa-solid fa-gear"></i></button></div></td>
         </tr>`;
@@ -1129,7 +1136,7 @@
           const tenantId = document.getElementById('manage-tenant-id').value;
           const tenantName = document.getElementById('manage-tenant-name').textContent;
 
-          if (!confirm(`⚠️ RESET DATA for: ${tenantName}?\n\nThis will PERMANENTLY DELETE all of their operations data (bills, menus, inventory, staff, CRM, recipes).\n\nThe account credentials and options will be kept. Proceed?`)) return;
+          if (!confirm(`âš ï¸ RESET DATA for: ${tenantName}?\n\nThis will PERMANENTLY DELETE all of their operations data (bills, menus, inventory, staff, CRM, recipes).\n\nThe account credentials and options will be kept. Proceed?`)) return;
 
           resetTenantDataBtn.disabled = true;
           resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
@@ -1156,7 +1163,7 @@
           const tenantId = document.getElementById('manage-tenant-id').value;
           const tenantName = document.getElementById('manage-tenant-name').textContent;
 
-          if (!confirm(`⚠️ LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of menu, inventory, recipes, staff, and bills history. Operational data will be reset. Proceed?`)) return;
+          if (!confirm(`âš ï¸ LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of menu, inventory, recipes, staff, and bills history. Operational data will be reset. Proceed?`)) return;
 
           seedTenantDataBtn.disabled = true;
           seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
@@ -1183,7 +1190,7 @@
           const tenantId = document.getElementById('manage-tenant-id').value;
           const tenantName = document.getElementById('manage-tenant-name').textContent;
 
-          if (!confirm(`⚠️ REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records. Client-added data will remain intact. Proceed?`)) return;
+          if (!confirm(`âš ï¸ REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records. Client-added data will remain intact. Proceed?`)) return;
 
           purgeTenantDataBtn.disabled = true;
           purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging...';
@@ -1374,7 +1381,7 @@
           <article class="app-incident-card">
             <div style="flex: 1; min-width: 0;">
               <strong>${escHtml(report.error_message || 'Unknown application error')}</strong>
-              <span>${escHtml(report.tenant_slug || 'unknown workspace')} · ${escHtml(report.source || 'dashboard')} · ${escHtml(report.url_path || 'unknown path')}</span>
+              <span>${escHtml(report.tenant_slug || 'unknown workspace')} Â· ${escHtml(report.source || 'dashboard')} Â· ${escHtml(report.url_path || 'unknown path')}</span>
               ${stack}
               <div class="app-incident-meta">
                 <span class="app-incident-pill ${escHtml(severity)}">${escHtml(severity)}</span>
@@ -1573,7 +1580,7 @@
   const sess = window.RS_API ? RS_API.session() : null;
   const isSuper = sess && sess.role === 'superadmin';
 
-  // ── Apply superadmin-specific UI lockdown before first render ──
+  // â”€â”€ Apply superadmin-specific UI lockdown before first render â”€â”€
   if (isSuper) {
     // 1. Show superadmin-only elements (sidebar links, section labels)
     $$('.superadmin-only').forEach(el => {
@@ -1650,7 +1657,7 @@
                 if (val === undefined || val === null || val === '') return NaN;
                 if (typeof val === 'number') return val;
                 let str = String(val).trim();
-                str = str.replace(/[₹$€£¥\s]/g, '');
+                str = str.replace(/[₹$???\s]/g, '');
 
                 const hasComma = str.includes(',');
                 const hasDot = str.includes('.');
@@ -1770,7 +1777,7 @@
                 if (val === undefined || val === null || val === '') return NaN;
                 if (typeof val === 'number') return val;
                 let str = String(val).trim();
-                str = str.replace(/[₹$€£¥\s]/g, '');
+                str = str.replace(/[₹$???\s]/g, '');
 
                 const hasComma = str.includes(',');
                 const hasDot = str.includes('.');
@@ -1924,11 +1931,11 @@
   // validate the stored session against the backend; only bounce if server explicitly rejects it
   if(window.RS_API && RS_API.configured){
     RS_API.validateSession().then(sess => {
-      // null = server confirmed token is invalid/expired → redirect
+      // null = server confirmed token is invalid/expired â†’ redirect
       if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
     }).catch(() => {
-      // Network error / Supabase offline — keep user on dashboard, don't log them out
-      console.warn('[RS] validateSession network error — keeping local session alive.');
+      // Network error / Supabase offline â€” keep user on dashboard, don't log them out
+      console.warn('[RS] validateSession network error â€” keeping local session alive.');
     });
   }
 
@@ -1941,7 +1948,7 @@
     });
   });
 
-  // superadmin toggle (role switch demo) — only show for non-superadmin users
+  // superadmin toggle (role switch demo) â€” only show for non-superadmin users
   if(!isSuper) {
     $('#role-switch')?.addEventListener('click',()=>{
       const on = $('#role-switch').classList.toggle('on');
