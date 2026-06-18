@@ -1,0 +1,12 @@
+{
+  "version": "2026.06.18",
+  "title": "Safer updates, clearer billing, and import/export progress",
+  "summary": "This release improves day-to-day POS reliability and gives staff clearer guidance when the system updates.",
+  "highlights": [
+    "Automatic update detection now prompts staff with a guided update dialog.",
+    "Current cart, bills, stock, recipes, settings, and drafts are saved locally before updating.",
+    "Bill numbers and exported bill files are easier to identify date-wise.",
+    "Import and export actions now show progress so staff know the system is working.",
+    "Inventory and Recipe Maker sync is safer for multi-branch/outlet data."
+  ]
+}

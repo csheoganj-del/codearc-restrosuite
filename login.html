@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Doppio Cafe POS Terminal | Staff Login</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -36,24 +39,6 @@
       position: relative;
     }
 
-    /* Ambient background glowing coffee beans simulation */
-    body::before {
-      content: "☕";
-      position: absolute;
-      font-size: 200px;
-      opacity: 0.03;
-      top: -50px;
-      left: -50px;
-    }
-    body::after {
-      content: "🥐";
-      position: absolute;
-      font-size: 150px;
-      opacity: 0.02;
-      bottom: -30px;
-      right: -30px;
-    }
-
     .login-container {
       width: 100%;
       max-width: 400px;
@@ -76,32 +61,17 @@
     }
 
     .logo-container {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 8px 16px;
-      background: rgba(201, 138, 74, 0.1);
-      border: 1px solid rgba(201, 138, 74, 0.25);
-      border-radius: 50px;
+      display: flex;
+      justify-content: center;
       margin-bottom: 12px;
     }
 
-    .logo-icon {
-      font-size: 20px;
-      color: var(--accent-caramel);
-    }
-
-    .logo-text {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: #FFF;
-    }
-
-    .logo-text span {
-      color: var(--accent-caramel);
-      font-weight: 400;
-      font-style: italic;
+    .login-brand-logo-img {
+      display: block;
+      width: min(220px, 78vw);
+      height: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.28));
     }
 
     .login-title {
@@ -258,8 +228,7 @@
       <!-- Brand Logo -->
       <div class="brand-logo">
         <div class="logo-container">
-          <span class="logo-icon">☕</span>
-          <span class="logo-text">DOPPIO <span>Café</span></span>
+          <img src="images/restrosuite_logo.png" alt="CodeArc RestroSuite" class="login-brand-logo-img">
         </div>
         <h2 class="login-title">POS Control Terminal</h2>
         <p class="login-subtitle">Nagpur Cashier & Staff Access Only</p>

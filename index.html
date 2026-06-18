@@ -3,9 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Doppio Cafe Nagpur | Savor the Perfect Brew</title>
   <meta name="description" content="Welcome to Doppio Cafe Nagpur. Indulge in our exquisite collection of double-shot espresso, lattes, peri peri fries, mocktails, and fresh combos. Located on London Street, Nagpur.">
-  <link rel="stylesheet" href="styles.css">
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var updateToken = params.get('appv') || String(Date.now());
+      window.__RESTROSUITE_ASSET_VERSION__ = updateToken;
+      document.write('<link rel="stylesheet" href="styles.css?v=' + encodeURIComponent(updateToken) + '">');
+    })();
+  </script>
   <!-- FontAwesome for Social Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -14,8 +24,7 @@
   <!-- Header -->
   <header>
     <a href="#" class="logo" id="header-logo">
-      <span class="logo-doppio">DOPPIO</span>
-      <span class="logo-cafe">Café</span>
+      <img src="images/restrosuite_logo.png" alt="CodeArc RestroSuite" class="brand-logo-img">
     </a>
     <nav aria-label="Main Navigation">
       <a href="#home">Home</a>
@@ -298,8 +307,7 @@
     <div class="login-modal-card">
       <div class="login-close" id="login-close"><i class="fa-solid fa-xmark"></i></div>
       <div class="logo login-logo">
-        <span class="logo-doppio">DOPPIO</span>
-        <span class="logo-cafe">Café</span>
+        <img src="images/restrosuite_logo.png" alt="CodeArc RestroSuite" class="brand-logo-img">
       </div>
       <h2 class="login-title">Staff Portal</h2>
       <p class="login-subtitle">Enter your cashier credentials to enter dashboard</p>
@@ -320,6 +328,11 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script>
+    (function () {
+      var updateToken = window.__RESTROSUITE_ASSET_VERSION__ || String(Date.now());
+      document.write('<script src="script.js?v=' + encodeURIComponent(updateToken) + '"><\/script>');
+    })();
+  </script>
 </body>
 </html>

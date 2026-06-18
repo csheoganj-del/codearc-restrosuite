@@ -3,8 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Doppio Cafe Nagpur | Premium Cashier POS Control System</title>
-  <link rel="stylesheet" href="dashboard-styles.css">
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var updateToken = params.get('appv') || String(Date.now());
+      window.__RESTROSUITE_ASSET_VERSION__ = updateToken;
+      document.write('<link rel="stylesheet" href="dashboard-styles.css?v=' + encodeURIComponent(updateToken) + '">');
+    })();
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -14,8 +24,7 @@
     <div class="lock-card" style="background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 30px 70px rgba(0,0,0,0.5); border-radius: 28px; width: 360px; padding: 40px 30px; text-align: center; display: flex; flex-direction: column; align-items: center; box-sizing: border-box; color: #FFF; animation: fadeInUp 0.5s ease;">
       
       <!-- Brand Logo -->
-      <div style="font-family: 'Playfair Display', serif; font-size: 34px; font-weight: 700; color: #E7D7C9; margin-bottom: 2px; letter-spacing: 2px;">DOPPIO</div>
-      <div style="font-size: 11px; color: #C98A4A; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; margin-bottom: 25px;">Café Nagpur POS</div>
+      <img src="images/restrosuite_logo.png" alt="CodeArc RestroSuite" class="lock-brand-logo" id="lock-brand-logo">
       
       <!-- Security Icon -->
       <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(201, 138, 74, 0.1); border: 2px solid #C98A4A; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
@@ -56,7 +65,7 @@
 
   <!-- Mobile Top Header Bar -->
   <div class="mobile-top-header">
-    <div style="font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--primary-brand); letter-spacing: 1px;">DOPPIO <span style="font-size:12px; color:var(--accent-caramel); text-transform:uppercase; letter-spacing:2px;">Café</span></div>
+    <img src="images/restrosuite_logo.png" alt="CodeArc RestroSuite" class="mobile-brand-logo" id="mobile-brand-logo">
     
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- Mobile Network Status Dot -->
@@ -87,9 +96,8 @@
   <div class="dashboard-wrapper">
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
-      <div class="sidebar-brand" id="header-logo">
-        <span class="brand-doppio">DOPPIO</span>
-        <span class="brand-cafe">Café</span>
+      <div class="sidebar-brand" id="header-logo" aria-label="CodeArc RestroSuite">
+        <img src="images/restrosuite_logo.png" alt="CodeArc RestroSuite" class="restrosuite-logo-img" id="sidebar-brand-logo">
       </div>
       
       <div class="user-pill">
@@ -198,85 +206,166 @@
 
             <!-- Cart Sidebar -->
             <div class="pos-cart-side pos-cart-sidebar" id="pos-cart-sidebar">
+
+              <!-- 1. CART HEADER -->
               <div class="cart-header">
-                <div class="cart-header-title" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                  <h2>Takeaway Cart</h2>
-                  <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none; background:rgba(43,24,19,0.06); border:none; border-radius:50%; width:30px; height:30px; font-size:18px; line-height:28px; text-align:center; color:var(--primary-brand); font-weight:700; cursor:pointer;">&times;</button>
+                <div class="cart-header-left">
+                  <h2 class="cart-title" id="cart-title">Order</h2>
+                  <span class="cart-count-badge" id="cart-order-badge">0</span>
                 </div>
-                <button class="clear-cart-btn" id="clear-cart"><i class="fa-solid fa-trash-can"></i> Clear</button>
-              </div>
-
-              <!-- Order Type Toggle Pills -->
-              <div class="order-type-picker">
-                <button class="order-type-btn active" data-type="Takeaway" id="order-takeaway-btn"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
-                <button class="order-type-btn" data-type="DineIn" id="order-dinein-btn"><i class="fa-solid fa-chair"></i> Dine-in</button>
-                <button class="order-type-btn" data-type="Delivery" id="order-delivery-btn"><i class="fa-solid fa-truck"></i> Delivery</button>
-              </div>
-
-              <!-- Takeaway Customer Fields -->
-              <div class="takeaway-fields">
-                <div class="form-group">
-                  <label for="cust-name">Customer Name</label>
-                  <input type="text" id="cust-name" placeholder="Enter guest name...">
-                </div>
-                <div class="form-group">
-                  <label for="cust-phone">Phone Number (Loyalty Link)</label>
-                  <input type="text" id="cust-phone" placeholder="Enter 10 digit number...">
+                <div class="cart-header-right">
+                  <!-- Order type segment (functional, JS listens to .order-type-btn) -->
+                  <div class="order-type-picker">
+                    <button class="order-type-btn active" data-type="Takeaway" id="order-takeaway-btn">Walk-in</button>
+                    <button class="order-type-btn" data-type="DineIn" id="order-dinein-btn">Dine-in</button>
+                    <button class="order-type-btn" data-type="Delivery" id="order-delivery-btn">Delivery</button>
+                  </div>
+                  <select class="customer-type-select" aria-label="Customer type">
+                    <option>Walk-in</option>
+                    <option>Dine-in</option>
+                    <option>Delivery</option>
+                  </select>
+                  <button class="clear-cart-btn" id="clear-cart" title="Clear cart"><i class="fa-solid fa-trash-can"></i></button>
+                  <button type="button" class="close-cart-drawer-btn" id="close-mobile-cart-btn" style="display:none;">&times;</button>
                 </div>
               </div>
 
-              <!-- Loyalty Status Box -->
-              <div class="loyalty-status-box" id="loyalty-status-box" style="display: none; padding: 10px 12px; background: rgba(201, 138, 74, 0.08); border: 1px solid rgba(201, 138, 74, 0.3); border-radius: 8px; font-size: 11px; margin-bottom: 12px; color: var(--primary-brand); line-height: 1.4;">
-                <!-- Filled dynamically -->
+              <!-- 2. CUSTOMER SECTION (collapsible) -->
+              <div class="customer-section">
+                <button type="button" class="customer-toggle-row" id="guest-toggle-btn">
+                  <div class="customer-toggle-left">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>+ Add customer details</span>
+                  </div>
+                  <span class="customer-toggle-state" id="guest-toggle-indicator"><i class="fa-solid fa-chevron-down"></i> Add</span>
+                </button>
+                <div class="customer-details-expanded takeaway-fields">
+                  <div class="customer-fields-grid">
+                    <div class="form-group">
+                      <label for="cust-name">Name</label>
+                      <input type="text" id="cust-name" placeholder="Guest name">
+                    </div>
+                    <div class="form-group">
+                      <label for="cust-phone">Phone</label>
+                      <input type="text" id="cust-phone" placeholder="10 digit number">
+                    </div>
+                    <div class="form-group">
+                      <label for="cust-gstin">GSTIN</label>
+                      <input type="text" id="cust-gstin" placeholder="Optional">
+                    </div>
+                  </div>
+                </div>
+                <div class="loyalty-status-box" id="loyalty-status-box" style="display: none;"></div>
               </div>
 
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label for="order-num">Takeaway Order #</label>
-                <input type="text" id="order-num" placeholder="Auto-generated" readonly style="background: var(--bg-cream-light); font-weight: 700;">
+              <!-- Order # subtle bar -->
+              <div class="order-num-bar">
+                <span class="order-num-label"><i class="fa-solid fa-hashtag"></i> Order</span>
+                <input type="text" id="order-num" class="order-num-input" placeholder="Auto-generated" readonly>
               </div>
 
-              <!-- Cart list -->
+              <!-- 3. ITEMS SECTION -->
+              <div class="cart-section-label">Items</div>
               <div class="cart-items-list" id="cart-items-list">
                 <div class="empty-cart-state">
                   <i class="fa-solid fa-basket-shopping"></i>
-                  <p>Cart is currently empty.<br>Tap items to add & customize.</p>
+                  <p>Cart is empty.<br>Tap items to add.</p>
                 </div>
               </div>
 
-              <!-- Checkout Summary -->
+              <!-- 4. BILL SUMMARY + ACTIONS -->
               <div class="cart-summary">
-                <div class="summary-row">
-                  <span>Subtotal</span>
-                  <span id="cart-subtotal">₹0.00</span>
-                </div>
-                <div class="summary-row">
-                  <span>Taxes & Discounts</span>
-                  <span id="cart-gst">₹0.00</span>
-                </div>
-                <div class="summary-row total-row">
-                  <span>Total Amount</span>
-                  <span id="cart-total">₹0.00</span>
+
+                <!-- Subtle discount/coupon rows -->
+                <div class="discount-coupon-rows">
+                  <div class="discount-inline-row">
+                    <span>Discount</span>
+                    <span class="discount-action-link" id="discount-add-link">Add</span>
+                  </div>
+                  <!-- Inline discount input panel (hidden by default) -->
+                  <div class="discount-input-panel" id="discount-input-panel" style="display:none; padding:8px 0; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <select id="discount-type" style="padding:6px 8px; border:1px solid rgba(43,24,19,0.15); border-radius:6px; font-size:11px; background:var(--bg-card); color:var(--text-dark); font-weight:600;">
+                      <option value="flat">Flat (₹)</option>
+                      <option value="percent">Percent (%)</option>
+                    </select>
+                    <input type="number" id="discount-value" placeholder="0" min="0" style="width:70px; padding:6px 8px; border:1px solid rgba(43,24,19,0.15); border-radius:6px; font-size:12px; font-weight:600; background:var(--bg-card); color:var(--text-dark);">
+                    <button type="button" id="discount-remove-link" style="background:none; border:none; color:var(--danger-color); font-size:11px; font-weight:700; cursor:pointer; padding:4px 6px;">Remove</button>
+                  </div>
+                  <div class="discount-inline-row">
+                    <span>Coupon</span>
+                    <span class="discount-action-link" id="coupon-select-link">Select</span>
+                  </div>
                 </div>
 
+                <!-- Bill rows -->
+                <div class="bill-summary-block">
+                  <div class="summary-row">
+                    <span>Subtotal</span>
+                    <span id="cart-subtotal">₹0.00</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>Discount</span>
+                    <span id="cart-discount">₹0.00</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>GST</span>
+                    <span id="cart-gst">₹0.00</span>
+                  </div>
+                  <div class="bill-divider-line"></div>
+                  <div class="summary-row total-row">
+                    <span>Total</span>
+                    <span id="cart-total">₹0.00</span>
+                  </div>
+                </div>
+
+                <!-- Payment method -->
                 <div class="payment-selection">
-                  <label>Payment Method</label>
+                  <label>Payment</label>
                   <div class="payment-methods">
-                    <button class="pay-method-btn active" data-method="UPI"><i class="fa-solid fa-mobile-screen-button"></i> UPI</button>
-                    <button class="pay-method-btn" data-method="Cash"><i class="fa-solid fa-money-bill-1"></i> Cash</button>
+                    <button class="pay-method-btn" data-method="UPI"><i class="fa-solid fa-mobile-screen-button"></i> UPI</button>
+                    <button class="pay-method-btn active" data-method="Cash"><i class="fa-solid fa-money-bill-1"></i> Cash</button>
                     <button class="pay-method-btn" data-method="Card"><i class="fa-solid fa-credit-card"></i> Card</button>
                   </div>
                 </div>
 
-                <div class="cart-draft-actions" style="display: flex; gap: 8px; margin-top: 14px; margin-bottom: 8px; width: 100%;">
-                  <button class="btn btn-secondary" id="hold-order-btn" style="flex: 1; padding: 10px; font-size: 12.5px; font-weight: 700; border-color: var(--accent-caramel); color: var(--primary-brand); background: #fff; cursor: pointer; transition: all 0.15s ease;">
-                    <i class="fa-solid fa-pause"></i> Hold Order
+                <!-- Cash payment details (shown only when Cash selected) -->
+                <div class="cash-payment-section" id="cash-payment-section">
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                    <label style="font-size:11px; font-weight:600; color:var(--text-dark);">Received</label>
+                    <input type="number" id="cash-received-input" placeholder="0" min="0" style="width:100px; padding:6px 10px; border:1px solid rgba(43,24,19,0.12); border-radius:8px; font-size:14px; font-weight:700; text-align:right; background:var(--bg-card); color:var(--text-dark); outline:none;">
+                  </div>
+                  <div class="cash-quick-btns" style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                    <button type="button" class="cash-quick-btn" data-amount="exact" style="flex:1; min-width:55px; padding:5px 4px; border:1px solid rgba(43,24,19,0.1); border-radius:6px; background:rgba(201,138,74,0.08); color:var(--primary-brand); font-size:10px; font-weight:700; cursor:pointer;">Exact</button>
+                    <button type="button" class="cash-quick-btn" data-amount="200" style="flex:1; min-width:55px; padding:5px 4px; border:1px solid rgba(43,24,19,0.1); border-radius:6px; background:var(--bg-cream-light); color:var(--text-dark); font-size:10px; font-weight:600; cursor:pointer;">&#8377;200</button>
+                    <button type="button" class="cash-quick-btn" data-amount="500" style="flex:1; min-width:55px; padding:5px 4px; border:1px solid rgba(43,24,19,0.1); border-radius:6px; background:var(--bg-cream-light); color:var(--text-dark); font-size:10px; font-weight:600; cursor:pointer;">&#8377;500</button>
+                    <button type="button" class="cash-quick-btn" data-amount="1000" style="flex:1; min-width:55px; padding:5px 4px; border:1px solid rgba(43,24,19,0.1); border-radius:6px; background:var(--bg-cream-light); color:var(--text-dark); font-size:10px; font-weight:600; cursor:pointer;">&#8377;1000</button>
+                  </div>
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-muted);">Change</span>
+                    <span id="cash-change-display" style="font-size:14px; font-weight:700; color:var(--success-color);">&#8377;0</span>
+                  </div>
+                  <div id="cash-warning-msg" style="display:none; font-size:10px; color:var(--danger-color); font-weight:600; padding:2px 0;">Received amount is less than total.</div>
+                </div>
+
+                <!-- Secondary action buttons -->
+                <div class="cart-secondary-actions">
+                  <button class="cart-sec-btn" id="hold-order-btn">
+                    <i class="fa-solid fa-pause"></i> Hold
                   </button>
-                  <button class="btn btn-secondary" id="view-drafts-btn" style="flex: 1; padding: 10px; font-size: 12.5px; font-weight: 700; background-color: rgba(201, 138, 74, 0.08); border-color: var(--accent-caramel); color: var(--primary-brand); position: relative; cursor: pointer; transition: all 0.15s ease;">
-                    <i class="fa-solid fa-list-check"></i> Open Drafts <span class="badge" id="drafts-count-badge" style="position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; border-radius: 50%; font-size: 9px; width: 16px; height: 16px; line-height: 16px; text-align: center; display: none; font-weight: 700;">0</span>
+                  <button class="cart-sec-btn" id="print-kot-btn" style="position:relative;">
+                    <i class="fa-solid fa-kitchen-set"></i> Send KOT
+                  </button>
+                  <button class="cart-sec-btn cart-drafts-btn" id="view-drafts-btn" style="position:relative;" title="Open drafts">
+                    <i class="fa-solid fa-list-check"></i> Drafts
+                    <span class="badge" id="drafts-count-badge" style="position:absolute;top:-5px;right:-5px;background:#e74c3c;color:white;border-radius:50%;font-size:9px;width:16px;height:16px;line-height:16px;text-align:center;display:none;font-weight:700;">0</span>
                   </button>
                 </div>
 
-                <button class="checkout-btn" id="checkout-btn"><i class="fa-solid fa-cash-register"></i> Complete Checkout & Print</button>
+                <!-- Primary CTA -->
+                <button class="checkout-btn" id="checkout-print-btn">
+                  <i class="fa-solid fa-print"></i> Print &amp; Pay &#8377;0
+                </button>
+
               </div>
             </div>
           </div>
@@ -1168,6 +1257,11 @@ CREATE INDEX IF NOT EXISTS idx_doppio_drafts_id ON public.doppio_draft_orders("d
   <input type="file" id="import-tax-file-input" accept=".json,.csv" style="display: none;">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="dashboard.js"></script>
+  <script>
+    (function () {
+      var updateToken = window.__RESTROSUITE_ASSET_VERSION__ || String(Date.now());
+      document.write('<script src="dashboard.js?v=' + encodeURIComponent(updateToken) + '"><\/script>');
+    })();
+  </script>
 </body>
 </html>

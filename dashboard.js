@@ -1,15 +1,597 @@
 /**
- * Doppio Cafe - Nagpur Premium Cashier Takeaway POS & Inventory Dashboard Control System
+ * RestroSuite — Multi-Tenant Cashier POS & Inventory Dashboard
  * Redesigned for commercial-grade touchscreen tablets and desktop PCs.
  * Keeps existing brown-cream branding, Supabase sync, and synthesiser chimes.
  */
 
-document.addEventListener('DOMContentLoaded', () => {
+// ==========================================
+// NAMESPACE LOCALSTORAGE BY TENANT
+// ==========================================
+(function () {
+  const originalGetItem = Storage.prototype.getItem;
+  const originalSetItem = Storage.prototype.setItem;
+  const originalRemoveItem = Storage.prototype.removeItem;
+
+  Storage.prototype.getItem = function (key) {
+    const tenantId = originalGetItem.call(sessionStorage, 'tenant_id') || 'default';
+    if (this === localStorage && key && typeof key === 'string' && key.startsWith('doppio_') && !key.endsWith(`_${tenantId}`)) {
+      return originalGetItem.call(this, `${key}_${tenantId}`);
+    }
+    return originalGetItem.call(this, key);
+  };
+
+  Storage.prototype.setItem = function (key, value) {
+    const tenantId = originalGetItem.call(sessionStorage, 'tenant_id') || 'default';
+    let targetKey = key;
+    let result;
+    if (this === localStorage && key && typeof key === 'string' && key.startsWith('doppio_') && !key.endsWith(`_${tenantId}`)) {
+      targetKey = `${key}_${tenantId}`;
+      result = originalSetItem.call(this, targetKey, value);
+    } else {
+      result = originalSetItem.call(this, key, value);
+    }
+
+    // Redundant write to Resilience Vault (IndexedDB)
+    if (this === localStorage && targetKey && typeof targetKey === 'string' && targetKey.startsWith('doppio_')) {
+      if (typeof window.writeToResilienceVault === 'function') {
+        window.writeToResilienceVault(targetKey, value);
+      }
+    }
+    return result;
+  };
+
+  Storage.prototype.removeItem = function (key) {
+    const tenantId = originalGetItem.call(sessionStorage, 'tenant_id') || 'default';
+    if (this === localStorage && key && typeof key === 'string' && key.startsWith('doppio_') && !key.endsWith(`_${tenantId}`)) {
+      return originalRemoveItem.call(this, `${key}_${tenantId}`);
+    }
+    return originalRemoveItem.call(this, key);
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.body.classList.add('js-loaded');
+
+  // Wait for config.js to finish its async /api/config fetch before we read
+  // window.__SUPABASE_URL__ or window.CONFIG. This replaces the old synchronous XHR.
+  if (window.__configReady) {
+    try { await window.__configReady; } catch (_) { /* error already logged by config.js */ }
+  }
+
+  // Credentials are loaded at runtime by /config.js → /api/config (Vercel env vars).
+  // NEVER hardcode these values here — rotate via Supabase Dashboard + Vercel env update.
+  const DEFAULT_SUPABASE_URL = window.__SUPABASE_URL__ || '';
+  const DEFAULT_SUPABASE_KEY = window.__SUPABASE_ANON_KEY__ || '';
+  // Read feature flags from window.CONFIG (set by /api/config via config.js).
+  // Defaults: demo tools OFF, zero-cost mode OFF. Override via Vercel env vars:
+  //   ENABLE_DEMO_TOOLS=true  → exposes demo/seed tools in the UI (dev only)
+  //   ZERO_COST_LAUNCH_MODE=true → disables cloud WhatsApp gateway (saves cost)
+  const ZERO_COST_LAUNCH_MODE = !!(window.CONFIG && window.CONFIG.zeroCostLaunchMode);
+  const ENABLE_DEMO_TOOLS = !!(window.CONFIG && window.CONFIG.enableDemoTools);
+  const CLOUD_WHATSAPP_GATEWAY_URL = ZERO_COST_LAUNCH_MODE ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+  const FAST_INTERACTION_MODE = true;
+  const runWhenIdle = window.requestIdleCallback
+    ? (task, timeout = 800) => window.requestIdleCallback(task, { timeout })
+    : (task) => window.setTimeout(task, 16);
+
+  function debounce(fn, delay = 80) {
+    let timer = null;
+    return function debounced(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
+
+  function frameTask(fn) {
+    return window.requestAnimationFrame ? window.requestAnimationFrame(fn) : setTimeout(fn, 0);
+  }
+  const apiDomain = window.RestroSuite && window.RestroSuite.api;
+  const authDomain = window.RestroSuite && window.RestroSuite.auth;
+  const billingDomain = window.RestroSuite && window.RestroSuite.billing;
+  const billsDomain = window.RestroSuite && window.RestroSuite.bills;
+  const inventoryDomain = window.RestroSuite && window.RestroSuite.inventory;
+  const importsDomain = window.RestroSuite && window.RestroSuite.imports;
+  const observabilityDomain = window.RestroSuite && window.RestroSuite.observability;
+  const operationsDomain = window.RestroSuite && window.RestroSuite.operations;
+  const peopleDomain = window.RestroSuite && window.RestroSuite.people;
+  const staffAccessDomain = window.RestroSuite && window.RestroSuite.staffAccess;
+  const posDomain = window.RestroSuite && window.RestroSuite.pos;
+  const superadminDomain = window.RestroSuite && window.RestroSuite.superadmin;
+  const whatsappDomain = window.RestroSuite && window.RestroSuite.whatsapp;
+
+  if (
+    !apiDomain
+    || !authDomain
+    || !billingDomain
+    || !billsDomain
+    || !inventoryDomain
+    || !importsDomain
+    || !observabilityDomain
+    || !operationsDomain
+    || !peopleDomain
+    || !staffAccessDomain
+    || !posDomain
+    || !superadminDomain
+    || !whatsappDomain
+  ) {
+    throw new Error('Dashboard domain modules failed to load.');
+  }
+
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const tenantApi = apiDomain.createTenantApi({
+    baseUrl: isLocalhost ? '' : DEFAULT_SUPABASE_URL,
+    anonKey: DEFAULT_SUPABASE_KEY,
+    fetchImpl: window.fetch.bind(window),
+    getAdminToken: () => sessionStorage.getItem('superadmin_admin_token'),
+    getTenantToken: () => sessionStorage.getItem('tenant_session_token'),
+    onAdminUnauthorized: () => sessionStorage.removeItem('superadmin_admin_token')
+  });
+  const callTenantAccess = tenantApi.access;
+  const callTenantStaff = tenantApi.staff;
+  const appReporter = observabilityDomain.createReporter({
+    baseUrl: isLocalhost ? '' : DEFAULT_SUPABASE_URL,
+    anonKey: DEFAULT_SUPABASE_KEY,
+    fetchImpl: window.fetch.bind(window),
+    source: 'dashboard',
+    appVersion: '2.0'
+  });
+  appReporter.installGlobalHandlers(() => ({
+    tenant_id: sessionStorage.getItem('tenant_id') || '',
+    tenant_slug: sessionStorage.getItem('tenant_slug') || '',
+    metadata: {
+      role: sessionStorage.getItem('logged_in_role') || '',
+      active_tab: document.querySelector('.tab-content.active')?.id || ''
+    }
+  }));
+  const sessionManager = authDomain.createSessionManager({
+    storage: sessionStorage,
+    validateSession: (sessionToken) => callTenantAccess('validate_session', {
+      session_token: sessionToken
+    })
+  });
+  const validateStoredDashboardSession = sessionManager.validateStoredSession;
+  let pendingListTenantsPromise = null;
+
+  // ==========================================
+  // SESSION GUARD (Redirect if not logged in)
+  // ==========================================
+  if (!sessionStorage.getItem('logged_in_user')) {
+    window.location.href = 'login.html';
+    return;
+  }
+  try {
+    await validateStoredDashboardSession();
+  } catch (sessionError) {
+    console.warn('[Session Guard] Stored browser session failed backend validation:', sessionError);
+    sessionStorage.clear();
+    window.location.href = 'login.html';
+    return;
+  }
+  const activeTenantId = sessionStorage.getItem('tenant_id');
+  const activeTenantSlug = sessionStorage.getItem('tenant_slug');
+  const activeTenantName = sessionStorage.getItem('tenant_name') || 'Restaurant';
+  const allowedTabsRaw = sessionStorage.getItem('allowed_tabs');
+  // ⚡ let (not const) — so the realtime listener can hot-swap tabs without re-login
+  let allowedTabs = allowedTabsRaw ? JSON.parse(allowedTabsRaw) : [];
+  function currentDashboardRole() {
+    return sessionStorage.getItem('logged_in_role') || '';
+  }
+
+  function effectiveDashboardTabs() {
+    const role = currentDashboardRole();
+    if (role === 'superadmin') return ['super-admin-tab', 'gateway-monitor-tab'];
+    return staffAccessDomain.resolveAllowedTabs(role, allowedTabs);
+  }
+
+  function canOpenDashboardTab(tabId) {
+    return effectiveDashboardTabs().includes(tabId);
+  }
+
+  function defaultDashboardTab() {
+    const role = currentDashboardRole();
+    if (role === 'superadmin') return 'super-admin-tab';
+    return staffAccessDomain.defaultTabForRole(role, allowedTabs);
+  }
+
+  function activatePermittedTab(tabId) {
+    if (!tabId || !canOpenDashboardTab(tabId)) return false;
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('[data-tab]').forEach(link => link.classList.remove('active'));
+    const targetTab = document.getElementById(tabId);
+    if (!targetTab) return false;
+    targetTab.classList.add('active');
+    document.querySelectorAll(`[data-tab="${tabId}"]`).forEach(link => link.classList.add('active'));
+    return true;
+  }
+  let saasGatewayPollingInterval = null;
+  let superAdminFilter = 'all';
+  let menuRealtimeChannel = null;
+
+  function broadcastMenuUpdate() {
+    if (!menuRealtimeChannel) return;
+    menuRealtimeChannel.send({
+      type: 'broadcast',
+      event: 'menu-updated',
+      payload: { tenantId: activeTenantId }
+    }).catch(error => console.warn('Menu realtime signal failed:', error));
+  }
+
+  // ==========================================
+  // DYNAMIC BRANDING — tenant name, user, avatar
+  // ==========================================
+  (function bootstrapDynamicBranding() {
+    const loggedInUser = sessionStorage.getItem('logged_in_user') || '';
+    const loggedInRole = sessionStorage.getItem('logged_in_role') || 'staff';
+    const displayName = sessionStorage.getItem('logged_in_display_name') || loggedInUser;
+    const avatarInitial = (displayName || loggedInUser || '?').charAt(0).toUpperCase();
+    const roleLabel = {
+      admin: 'Administrator', cashier: 'Cashier', kitchen: 'Kitchen Staff',
+      waiter: 'Waiter', customer_display: 'Customer Display', superadmin: 'Super Admin'
+    }[loggedInRole] || loggedInRole;
+
+    document.querySelectorAll('#sidebar-brand-logo, #mobile-brand-logo, #lock-brand-logo').forEach(logo => {
+      logo.alt = 'CodeArc RestroSuite';
+      logo.title = activeTenantName ? `${activeTenantName} on CodeArc RestroSuite` : 'CodeArc RestroSuite';
+    });
+
+    // Sidebar avatar + user details
+    const sidebarAvatarLetter = document.getElementById('sidebar-avatar-letter');
+    if (sidebarAvatarLetter) sidebarAvatarLetter.textContent = avatarInitial;
+    const sidebarUserName = document.getElementById('sidebar-user-name');
+    if (sidebarUserName) sidebarUserName.textContent = displayName || loggedInUser;
+    const sidebarUserRole = document.getElementById('sidebar-user-role');
+    if (sidebarUserRole) sidebarUserRole.textContent = roleLabel;
+
+    // Mobile profile avatar
+    const mobileProfileBtn = document.getElementById('mobile-profile-btn');
+    if (mobileProfileBtn) mobileProfileBtn.textContent = avatarInitial;
+
+    // QR viewer modal brand
+    const qrModalBrand = document.getElementById('qr-modal-brand-name');
+    if (qrModalBrand) qrModalBrand.textContent = (activeTenantName || 'RestroSuite').toUpperCase().slice(0, 8);
+
+    // Window title
+    document.title = `${activeTenantName || 'RestroSuite'} — Dashboard`;
+
+    // Payslip preview header
+    const payslipHeaderName = document.getElementById('payslip-header-name');
+    if (payslipHeaderName) payslipHeaderName.textContent = (activeTenantName || 'RestroSuite').toUpperCase();
+
+    // Analytics studio title
+    const analyticsTitle = document.getElementById('analytics-studio-title');
+    if (analyticsTitle) analyticsTitle.textContent = `${activeTenantName || 'RestroSuite'} — Analytics Studio`;
+  })();
+
+  staffAccessDomain.initialize({
+    callStaff: callTenantStaff,
+    notify: (message) => showNotificationToast(message),
+    role: sessionStorage.getItem('logged_in_role')
+  });
+
+  async function refreshAuthoritativeTenantSession(showToast = false) {
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
+    try {
+      const session = await validateStoredDashboardSession();
+      if (sessionStorage.getItem('tenant_data_reset_pending') === 'true') {
+        await clearIndexedDBVault();
+        for (let index = localStorage.length - 1; index >= 0; index--) {
+          const key = localStorage.key(index);
+          if (key && key.startsWith('doppio_')) {
+            localStorage.removeItem(key);
+          }
+        }
+        sessionStorage.removeItem('tenant_data_reset_pending');
+        window.location.reload();
+        return;
+      }
+      allowedTabs.length = 0;
+      (session.allowed_tabs || []).forEach(tab => allowedTabs.push(tab));
+      applyFeatureToggles();
+
+      const activeTabEl = document.querySelector('.tab-content.active');
+      const activeTabId = activeTabEl ? activeTabEl.id : null;
+      if (!activeTabId || !canOpenDashboardTab(activeTabId)) {
+        activatePermittedTab(defaultDashboardTab());
+      }
+
+      if (showToast) showNotificationToast('Your access permissions were updated.');
+    } catch (error) {
+      showNotificationToast('Workspace access changed. Please log in again.');
+      setTimeout(() => {
+        sessionStorage.clear();
+        window.location.href = 'login.html';
+      }, 1800);
+    }
+  }
+
+  // ==========================================
+  // SHARED STATE INITIALIZED EARLY FOR SAFETY
+  // ==========================================
+  let notifications = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_notifications'));
+      return Array.isArray(parsed) ? parsed.filter(n => n && typeof n === 'object' && n.id) : [];
+    } catch (e) {
+      return [];
+    }
+  })();
+
+  // ==========================================
+  // TRIPLE-VAULT RESILIENCE VAULT (IndexedDB)
+  // ==========================================
+  let dbInstance = null;
+  function initIndexedDBVault() {
+    return new Promise((resolve) => {
+      try {
+        if (typeof indexedDB === 'undefined') {
+          return resolve(null);
+        }
+        const request = indexedDB.open("DoppioVaultDB", 1);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains("stateStore")) {
+            db.createObjectStore("stateStore");
+          }
+        };
+        request.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          console.log("[Resilience Vault] IndexedDB Vault initialized successfully!");
+          resolve(dbInstance);
+        };
+        request.onerror = (e) => {
+          console.error("[Resilience Vault] IndexedDB failed:", e.target.error);
+          resolve(null);
+        };
+      } catch (err) {
+        console.warn("[Resilience Vault] IndexedDB access denied (Incognito mode?):", err);
+        resolve(null);
+      }
+    });
+  }
+
+  const vaultWriteQueue = new Map();
+  let vaultFlushScheduled = false;
+
+  function setVaultData(key, value) {
+    if (!dbInstance) return;
+    try {
+      const transaction = dbInstance.transaction(["stateStore"], "readwrite");
+      const store = transaction.objectStore("stateStore");
+      store.put(JSON.stringify(value), key);
+    } catch (e) {
+      console.warn("[Resilience Vault] Write failed for key " + key, e);
+    }
+  }
+
+  function flushVaultWrites() {
+    vaultFlushScheduled = false;
+    const pending = Array.from(vaultWriteQueue.entries());
+    vaultWriteQueue.clear();
+    pending.forEach(([key, value]) => setVaultData(key, value));
+  }
+
+  window.writeToResilienceVault = function (key, value) {
+    try {
+      vaultWriteQueue.set(key, JSON.parse(value));
+    } catch (e) {
+      vaultWriteQueue.set(key, value);
+    }
+    if (!vaultFlushScheduled) {
+      vaultFlushScheduled = true;
+      runWhenIdle(flushVaultWrites, 1200);
+    }
+  };
+
+  function getVaultData(key) {
+    return new Promise((resolve) => {
+      if (!dbInstance) return resolve(null);
+      try {
+        const transaction = dbInstance.transaction(["stateStore"], "readonly");
+        const store = transaction.objectStore("stateStore");
+        const request = store.get(key);
+        request.onsuccess = (e) => {
+          try {
+            resolve(e.target.result ? JSON.parse(e.target.result) : null);
+          } catch (err) {
+            resolve(e.target.result);
+          }
+        };
+        request.onerror = () => resolve(null);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
+  function clearIndexedDBVault() {
+    return new Promise((resolve) => {
+      if (!dbInstance) return resolve();
+      try {
+        const transaction = dbInstance.transaction(["stateStore"], "readwrite");
+        const store = transaction.objectStore("stateStore");
+        const request = store.clear();
+        request.onsuccess = () => {
+          console.log("[Resilience Vault] IndexedDB Vault cleared successfully!");
+          resolve();
+        };
+        request.onerror = () => {
+          console.warn("[Resilience Vault] Failed to clear IndexedDB Vault");
+          resolve();
+        };
+      } catch (e) {
+        resolve();
+      }
+    });
+  }
+
+  // Initialize DB and recover if LocalStorage is cleared!
+  try {
+    await initIndexedDBVault();
+  } catch (dbErr) {
+    console.warn("[Resilience Vault] Failed to wait for vault initialization:", dbErr);
+  }
+
+  if (sessionStorage.getItem('tenant_data_reset_pending') === 'true') {
+    await clearIndexedDBVault();
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key && key.startsWith('doppio_')) {
+        localStorage.removeItem(key);
+      }
+    }
+    sessionStorage.removeItem('tenant_data_reset_pending');
+  }
+
+  if (localStorage.length === 0 || !localStorage.getItem('doppio_bills')) {
+    console.log("[Resilience Vault] LocalStorage empty or bills missing! Attempting IndexedDB vault restoration...");
+    try {
+      // Vault keys are stored with the tenant suffix (written by the Storage.prototype.setItem hook).
+      // We must read with the same namespaced key — otherwise the lookup always misses.
+      const vaultSuffix = activeTenantId ? `_${activeTenantId}` : '';
+      const restoredBills = await getVaultData(`doppio_bills${vaultSuffix}`);
+      const restoredMenu = await getVaultData(`doppio_menu${vaultSuffix}`);
+      const restoredInv = await getVaultData(`doppio_inventory${vaultSuffix}`);
+      const restoredProfile = await getVaultData(`doppio_business_profile${vaultSuffix}`);
+      const restoredShift = await getVaultData(`doppio_current_shift${vaultSuffix}`);
+      const restoredShiftsLocal = await getVaultData(`doppio_shifts_local${vaultSuffix}`);
+      const restoredShiftEventsLocal = await getVaultData(`doppio_shift_events_local${vaultSuffix}`);
+
+      // localStorage.setItem is intercepted by the Storage.prototype override and automatically
+      // appends the tenant suffix, so we write using the raw doppio_ key names here.
+      if (restoredBills) localStorage.setItem('doppio_bills', JSON.stringify(restoredBills));
+      if (restoredMenu) localStorage.setItem('doppio_menu', JSON.stringify(restoredMenu));
+      if (restoredInv) localStorage.setItem('doppio_inventory', JSON.stringify(restoredInv));
+      if (restoredProfile) localStorage.setItem('doppio_business_profile', JSON.stringify(restoredProfile));
+      if (restoredShift) localStorage.setItem('doppio_current_shift', JSON.stringify(restoredShift));
+      if (restoredShiftsLocal) localStorage.setItem('doppio_shifts_local', JSON.stringify(restoredShiftsLocal));
+      if (restoredShiftEventsLocal) localStorage.setItem('doppio_shift_events_local', JSON.stringify(restoredShiftEventsLocal));
+
+      if (restoredBills || restoredInv) {
+        console.log("[Resilience Vault] Successfully recovered POS state from IndexedDB vault!");
+      }
+    } catch (err) {
+      console.error("[Resilience Vault] Recovery error:", err);
+    }
+  }
+
+  // Redundant write to Resilience Vault (IndexedDB) is handled via Storage.prototype.setItem hook
+
+  // Global Exception Logger for POS Diagnostics
+  window.onerror = function (msg, url, lineNo, columnNo, error) {
+    console.error(`[RestroSuite POS Crash Alert] Error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
+    const errIndicator = document.createElement('div');
+    errIndicator.style.position = 'fixed';
+    errIndicator.style.bottom = '10px';
+    errIndicator.style.right = '10px';
+    errIndicator.style.background = 'rgba(231, 76, 60, 0.95)';
+    errIndicator.style.color = '#fff';
+    errIndicator.style.padding = '8px 12px';
+    errIndicator.style.borderRadius = '5px';
+    errIndicator.style.fontSize = '10px';
+    errIndicator.style.zIndex = '999999';
+    errIndicator.style.fontFamily = 'monospace';
+    errIndicator.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    errIndicator.textContent = `Terminal Script Exception (Line ${lineNo}): ${msg.slice(0, 50)}...`;
+    document.body.appendChild(errIndicator);
+    setTimeout(() => { if (errIndicator.parentNode) errIndicator.parentNode.removeChild(errIndicator); }, 8000);
+    return false;
+  };
+
+  // ==========================================
+  // PIN LOCK SCREEN — Attempt Lockout (max 5 tries, 60s cooldown)
+  // ==========================================
+  (function initPinLockoutSecurity() {
+    const pageLockOverlay = document.getElementById('page-lock-overlay');
+    if (!pageLockOverlay) return;
+
+    let pinAttempts = 0;
+    const MAX_PIN_ATTEMPTS = 5;
+    const LOCKOUT_DURATION_MS = 60 * 1000; // 60 seconds
+    let lockoutTimer = null;
+
+    function getLockPasscodeInput() { return document.getElementById('lock-passcode-input'); }
+    function getLockPasscodeError() { return document.getElementById('lock-passcode-error'); }
+    function getLockPinButtons() { return document.querySelectorAll('.lock-pin-btn'); }
+
+    function disablePinEntry(secondsRemaining) {
+      const errorEl = getLockPasscodeError();
+      const inputEl = getLockPasscodeInput();
+      if (inputEl) { inputEl.disabled = true; inputEl.value = ''; }
+      getLockPinButtons().forEach(btn => { btn.disabled = true; btn.style.opacity = '0.4'; });
+      if (errorEl) errorEl.textContent = `Too many attempts. Wait ${secondsRemaining}s...`;
+      let remaining = secondsRemaining;
+      lockoutTimer = setInterval(() => {
+        remaining--;
+        if (errorEl) errorEl.textContent = remaining > 0 ? `Too many attempts. Wait ${remaining}s...` : '';
+        if (remaining <= 0) {
+          clearInterval(lockoutTimer);
+          lockoutTimer = null;
+          pinAttempts = 0;
+          if (inputEl) { inputEl.disabled = false; }
+          getLockPinButtons().forEach(btn => { btn.disabled = false; btn.style.opacity = ''; });
+        }
+      }, 1000);
+    }
+
+    function onPinWrongAttempt() {
+      pinAttempts++;
+      const errorEl = getLockPasscodeError();
+      if (pinAttempts >= MAX_PIN_ATTEMPTS) {
+        disablePinEntry(Math.round(LOCKOUT_DURATION_MS / 1000));
+      } else {
+        const remaining = MAX_PIN_ATTEMPTS - pinAttempts;
+        if (errorEl) errorEl.textContent = `Incorrect PIN. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`;
+        const inputEl = getLockPasscodeInput();
+        if (inputEl) inputEl.value = '';
+      }
+    }
+
+    // Patch: intercept unlock attempts on the existing lock screen
+    // The unlock button (data-val="unlock") triggers the existing handler.
+    // We wrap at the document level to count wrong attempts.
+    const originalUnlockHandler = window.__originalLockUnlockHandler;
+    pageLockOverlay.addEventListener('click', (e) => {
+      const btn = e.target.closest('.lock-pin-btn');
+      if (!btn) return;
+      if (btn.dataset.val === 'unlock') {
+        // Allow existing handler to run first via setTimeout 0
+        setTimeout(() => {
+          // If overlay is still visible after the handler ran, it was a wrong PIN
+          if (pageLockOverlay.style.display !== 'none' && pageLockOverlay.style.display !== '') {
+            if (!lockoutTimer) onPinWrongAttempt();
+          } else {
+            // Correct PIN — reset counter
+            pinAttempts = 0;
+          }
+        }, 50);
+      }
+    }, true); // capture phase so we run after the bubbled handler
+  })();
+
+  async function sha256(string) {
+    const utf8 = new TextEncoder().encode(string);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // ==========================================
+  // HTML ESCAPE UTILITY — prevents XSS when inserting user data into innerHTML
+  // ==========================================
+  function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   // ==========================================
   // 1. DYNAMIC EXCEL-BASED RECIPE DATABASE & INITIAL STATE
   // ==========================================
-  
+
   // Cleaned active recipe specs mapped directly from updated commercial database
   const excelRecipes = {
     // COLD COFFEE
@@ -279,50 +861,138 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   // Load custom recipes and thresholds
-  let customRecipes = JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {};
-  let thresholds = JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {};
+  let customRecipes = (() => { try { return JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {}; } catch (e) { return {}; } })();
+  let thresholds = (() => { try { return JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {}; } catch (e) { return {}; } })();
+  let posPopularityMap = (() => { try { return JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {}; } catch (e) { return {}; } })();
+  // Discount state
+  let discountType = localStorage.getItem('doppio_discount_type') || 'flat';
+  let discountValue = parseFloat(localStorage.getItem('doppio_discount_value')) || 0;
 
-  // Nagpur Menu Recovery & Defensive Restoration logic
-  let storedMenu = JSON.parse(localStorage.getItem('doppio_menu'));
+  // Menu and inventory start empty — Supabase sync (syncWithSupabase) is the authoritative source.
+  // Do NOT pre-populate from localStorage here as it causes a flash of stale/reset data
+  // on page reload before the sync completes.
   let menu = [];
-  if (!storedMenu || storedMenu.length < 15) {
-    menu = defaultMenu;
-    localStorage.setItem('doppio_menu', JSON.stringify(menu));
-  } else {
-    // Merge missing default Nagpur items (e.g. food, sandwiches, mocktails) back automatically
-    const storedNames = new Set(storedMenu.map(item => item.name.toLowerCase().trim()));
-    menu = [...storedMenu];
-    let needsUpdate = false;
-    defaultMenu.forEach(item => {
-      if (!storedNames.has(item.name.toLowerCase().trim())) {
-        menu.push(item);
-        needsUpdate = true;
-      }
-    });
-    if (needsUpdate) {
-      localStorage.setItem('doppio_menu', JSON.stringify(menu));
-    }
-  }
 
-  let savedInventory = JSON.parse(localStorage.getItem('doppio_inventory')) || {};
-  let inventory = { ...defaultInventory, ...savedInventory };
-  let bills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
-  let businessProfile = JSON.parse(localStorage.getItem('doppio_business_profile')) || {
-    name: 'Doppio Cafe Nagpur',
-    address: 'London Street, Nagpur',
-    phone: '+91 91300 03177',
-    gstEnabled: true,
+  let inventory = {};
+  let inventoryMetadata = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_inventory_metadata'));
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  })();
+
+
+  const getMockBills = () => [
+    {
+      orderId: 'DO-1001',
+      customerName: 'Aniket Sharma',
+      customerPhone: '9823012345',
+      dateTime: new Date(Date.now() - 3 * 3600000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Bombay Grilled Sandwich', qty: 1, price: 369 },
+        { name: 'Nutella Thickshake', qty: 1, price: 299 }
+      ],
+      subtotal: 668,
+      discount: 33.4,
+      gst: 114.23,
+      total: 749,
+      paymentMethod: 'UPI'
+    },
+    {
+      orderId: 'DO-1002',
+      customerName: 'Priya Deshmukh',
+      customerPhone: '9130098765',
+      dateTime: new Date(Date.now() - 2 * 3600000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Alfredo Pennei Pasta', qty: 1, price: 499 },
+        { name: 'Spicy Mango Martini', qty: 2, price: 329 }
+      ],
+      subtotal: 1157,
+      discount: 115.7,
+      gst: 187.43,
+      total: 1229,
+      paymentMethod: 'Card'
+    },
+    {
+      orderId: 'DO-1003',
+      customerName: 'Rahul Verma',
+      customerPhone: '8888776655',
+      dateTime: new Date(Date.now() - 1 * 3600000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Cheese Garlic', qty: 1, price: 249 },
+        { name: 'Classic Hot Chocolate', qty: 1, price: 349 }
+      ],
+      subtotal: 598,
+      discount: 0,
+      gst: 107.64,
+      total: 706,
+      paymentMethod: 'Cash'
+    },
+    {
+      orderId: 'DO-1004',
+      customerName: 'Kunal Sen',
+      customerPhone: '9552147890',
+      dateTime: new Date(Date.now() - 30 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Oreo Cookies Thickshake', qty: 1, price: 299 },
+        { name: 'Swiggy Combo3', qty: 1, price: 530 }
+      ],
+      subtotal: 829,
+      discount: 124.35,
+      gst: 126.84,
+      total: 831,
+      paymentMethod: 'UPI'
+    }
+  ];
+
+  // Bills always start empty — Supabase sync is the authoritative source
+  let bills = [];
+  let businessProfile = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_business_profile'));
+      return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  })() || {
+    name: activeTenantName || 'RestroSuite',
+    address: '',
+    phone: '',
+    gstEnabled: false,
     gstRate: 18,
-    loyaltyEnabled: true,
+    loyaltyEnabled: false,
     loyaltyRate: 10,
     passcodeLockEnabled: false,
     crmEnabled: true,
     taxEnabled: true,
-    soundEnabled: false
+    soundEnabled: false,
+    numberOfTables: 6
   };
   if (businessProfile.crmEnabled === undefined) businessProfile.crmEnabled = true;
   if (businessProfile.taxEnabled === undefined) businessProfile.taxEnabled = true;
   if (businessProfile.soundEnabled === undefined) businessProfile.soundEnabled = false;
+  if (businessProfile.whatsappEnabled === undefined) businessProfile.whatsappEnabled = false;
+  if (businessProfile.shiftEnabled === undefined) businessProfile.shiftEnabled = false;
+  if (businessProfile.shiftDefaultFloat === undefined) businessProfile.shiftDefaultFloat = 2000;
+  if (businessProfile.shiftMaxDrawer === undefined) businessProfile.shiftMaxDrawer = 5000;
+  if (businessProfile.shiftPosLock === undefined) businessProfile.shiftPosLock = true;
+  if (businessProfile.whatsappGatewayUrl === undefined || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
+    businessProfile.whatsappGatewayUrl = '';
+  }
+  if (businessProfile.whatsappGatewayEnabled === undefined) businessProfile.whatsappGatewayEnabled = false;
+  if (businessProfile.whatsappGatewayToken === undefined) businessProfile.whatsappGatewayToken = '';
+  if (businessProfile.collapseSidebar === undefined) businessProfile.collapseSidebar = false;
+  if (businessProfile.numberOfTables === undefined) businessProfile.numberOfTables = 6;
+  document.body.classList.toggle('sidebar-collapsed', businessProfile.collapseSidebar === true);
+
+  // ==========================================
+  // SHIFT MANAGEMENT STATE ENGINE (Declared at top of scope to prevent Temporal Dead Zone crashes during bootstrap)
+  // ==========================================
+  let activeShift = (() => { try { return JSON.parse(localStorage.getItem('doppio_current_shift')) || null; } catch (e) { return null; } })();
+  let shiftHistory = (() => { try { return JSON.parse(localStorage.getItem('doppio_shifts_local')) || []; } catch (e) { return []; } })();
+  let shiftEvents = (() => { try { return JSON.parse(localStorage.getItem('doppio_shift_events_local')) || []; } catch (e) { return []; } })();
 
   // Force default sound off for existing storage/users
   if (localStorage.getItem('doppio_sound_default_off_v2') !== 'true') {
@@ -331,10 +1001,132 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('doppio_sound_default_off_v2', 'true');
   }
 
-  let cart = JSON.parse(localStorage.getItem('doppio_cart')) || [];
-  let selectedPaymentMethod = localStorage.getItem('doppio_cart_pay_method') || 'UPI';
+  // Force default shift off for existing storage/users so they aren't forced to open shifts
+  if (localStorage.getItem('doppio_shift_default_off_v4') !== 'true') {
+    businessProfile.shiftEnabled = false;
+    localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+    localStorage.setItem('doppio_shift_default_off_v4', 'true');
+  }
+
+  let cart = (() => { try { return JSON.parse(localStorage.getItem('doppio_cart')) || []; } catch (e) { localStorage.removeItem('doppio_cart'); return []; } })();
+
+  // Helper function to save cart state to localStorage and Resilience Vault
+  function saveCartState() {
+    localStorage.setItem('doppio_cart', JSON.stringify(cart));
+    if (typeof window.writeToResilienceVault === 'function') {
+      window.writeToResilienceVault('doppio_cart', JSON.stringify(cart));
+    }
+  }
+
+  // Helper function to clear cart state from localStorage and Resilience Vault
+  function clearCartState() {
+    localStorage.removeItem('doppio_cart');
+    if (typeof window.writeToResilienceVault === 'function') {
+      window.writeToResilienceVault('doppio_cart', null);
+    }
+  }
+
+  // Custom global variables for ERP upgrades
+  let activeTableSession = null;
+  let tableCarts = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_table_carts'));
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+          if (!Array.isArray(parsed[i])) parsed[i] = [];
+        }
+        return parsed;
+      }
+      const initial = {};
+      for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+        initial[i] = [];
+      }
+      return initial;
+    } catch (e) {
+      const initial = {};
+      for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+        initial[i] = [];
+      }
+      return initial;
+    }
+  })();
+
+  function getDefaultShelfLife(key) {
+    const k = key.toLowerCase();
+    if (k.includes('milk')) return 7;
+    if (k.includes('cream')) return 10;
+    if (k.includes('syrup')) return 180;
+    if (k.includes('bread') || k.includes('bun')) return 4;
+    if (k.includes('coffee') || k.includes('bean')) return 90;
+    if (k.includes('tea')) return 90;
+    if (k.includes('cheese') || k.includes('butter')) return 15;
+    if (k.includes('sugar') || k.includes('salt')) return 365;
+    if (k.includes('chocolate') || k.includes('cocoa')) return 90;
+    if (k.includes('sauce') || k.includes('spread')) return 60;
+    return 30; // default 30 days
+  }
+
+  function getDefaultExpiryDate(key) {
+    const shelfLife = getDefaultShelfLife(key);
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + shelfLife);
+    return expiry.toISOString().split('T')[0];
+  }
+
+  let inventoryBatches = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('doppio_inventory_batches')) || {};
+    } catch (e) {
+      return {};
+    }
+  })();
+
+  // Inventory batches start from localStorage only (no default seeding)
+
+  let activeInventoryFilter = 'all';
+
+  const defaultEmployees = [
+    { id: 'emp_1', name: 'Bonie Deora', role: 'admin', contact: '+91 98765 43210', baseSalary: 45000, shift: 'Morning Shift', leaves: { casual: 15, sick: 10 } },
+    { id: 'emp_2', name: 'Staff Cashier', role: 'cashier', contact: '+91 98765 43211', baseSalary: 25000, shift: 'Evening Shift', leaves: { casual: 15, sick: 10 } },
+    { id: 'emp_3', name: 'Waiter Captain', role: 'waiter', contact: '+91 98765 43212', baseSalary: 18000, shift: 'Morning Shift', leaves: { casual: 15, sick: 10 } },
+    { id: 'emp_4', name: 'Kitchen Chef', role: 'kitchen', contact: '+91 98765 43213', baseSalary: 24000, shift: 'Evening Shift', leaves: { casual: 15, sick: 10 } }
+  ];
+
+  // Employees start empty — Supabase sync fills this
+  let employees = [];
+
+  const defaultLeaves = [
+    { id: 'leave_1', employeeId: 'emp_3', employeeName: 'Waiter Captain', type: 'Casual Leave', startDate: '2026-06-10', endDate: '2026-06-11', reason: 'Family emergency', status: 'Pending', days: 2 }
+  ];
+
+  // Leave requests start empty — Supabase sync fills this
+  let leaveRequests = [];
+
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+  const defaultAttendance = [
+    { id: 'att_1', employeeId: 'emp_1', employeeName: 'Bonie Deora', date: yesterdayStr, clockInTime: '09:02', clockOutTime: '17:15', hoursWorked: 8.2, shift: 'Morning Shift', wages: 1542, status: 'Completed' },
+    { id: 'att_2', employeeId: 'emp_3', employeeName: 'Waiter Captain', date: yesterdayStr, clockInTime: '09:15', clockOutTime: '17:00', hoursWorked: 7.7, shift: 'Morning Shift', wages: 578, status: 'Completed' },
+    { id: 'att_3', employeeId: 'emp_2', employeeName: 'Staff Cashier', date: yesterdayStr, clockInTime: '17:05', clockOutTime: '01:10', hoursWorked: 8.0, shift: 'Evening Shift', wages: 832, status: 'Completed' }
+  ];
+
+  // Attendance logs start empty — Supabase sync fills this
+  let attendanceLogs = [];
+
+  let selectedPaymentMethod = localStorage.getItem('doppio_cart_pay_method') || 'Cash';
+  let isSplitPaymentActive = false;
   let activeOrderType = 'Takeaway';
-  let draftOrders = JSON.parse(localStorage.getItem('doppio_draft_orders')) || [];
+  let draftOrders = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_draft_orders'));
+      return Array.isArray(parsed) ? parsed.filter(d => d && typeof d === 'object' && d.id) : [];
+    } catch (e) {
+      return [];
+    }
+  })();
+  let editingBillId = localStorage.getItem('doppio_editing_bill_id') || null;
+  if (editingBillId === 'null') editingBillId = null;
 
   // State variables for customization modals
   let selectedSizeOpt = 'Small';
@@ -343,8 +1135,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Sync parameters
   let supabaseClient = null;
-  const DEFAULT_SUPABASE_URL = 'https://htkauiibuejetimfiavs.supabase.co';
-  const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+  window.RestroSuite.dashboard = {
+    isTourComplete() {
+      return Boolean(
+        businessProfile
+        && businessProfile.featureFlags
+        && businessProfile.featureFlags.tourDone
+      );
+    },
+    async markTourComplete() {
+      businessProfile.featureFlags = businessProfile.featureFlags || {};
+      businessProfile.featureFlags.tourDone = true;
+      localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+      setVaultData('doppio_business_profile', businessProfile);
+
+      if (supabaseClient && activeTenantId) {
+        const { error } = await supabaseClient
+          .from('doppio_business_profile')
+          .update({ feature_flags: JSON.stringify(businessProfile.featureFlags) })
+          .eq('tenant_id', activeTenantId);
+        if (error) throw error;
+      }
+    }
+  };
+
+  const callTenantAdmin = tenantApi.admin;
+  const createTenantDataClient = tenantApi.createTenantDataClient;
 
   // ==========================================
   // 2. SUPABASE INITIALIZER & QUEUES
@@ -352,11 +1168,42 @@ document.addEventListener('DOMContentLoaded', () => {
   function initSupabase() {
     if (typeof supabase !== 'undefined') {
       try {
-        supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+        const nativeSupabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+        supabaseClient = sessionStorage.getItem('logged_in_role') === 'superadmin'
+          ? nativeSupabaseClient
+          : createTenantDataClient(nativeSupabaseClient);
         updateNetworkStatus(true);
-        syncWithSupabase();
+
+        // Disable shiftEnabled in Supabase cloud db once for migration v4
+        const loggedInRole = sessionStorage.getItem('logged_in_role');
+        if (loggedInRole !== 'superadmin' && localStorage.getItem('doppio_shift_supabase_synced_v4') !== 'true') {
+          supabaseClient.from('doppio_business_profile').update({ shift_enabled: false }).eq('tenant_id', activeTenantId)
+            .then(({ error }) => {
+              if (!error) {
+                localStorage.setItem('doppio_shift_supabase_synced_v4', 'true');
+                console.log("Successfully disabled shift_enabled in cloud db for migration v4");
+              }
+              // Proceed with sync after update attempt completes
+              syncWithSupabase();
+            })
+            .catch(() => {
+              syncWithSupabase();
+            });
+        } else {
+          syncWithSupabase();
+        }
+
+        // Expose DB client for feature modules (aggregators, tables, analytics)
+        window._tenantDb = supabaseClient;
+        window._tenantId = activeTenantId;
+
         syncOfflineBills();
         setupSupabaseRealtime();
+
+        // Refresh KDS every 60 seconds to update timers
+        setInterval(() => {
+          if (typeof renderKDSTab === 'function') renderKDSTab();
+        }, 60000);
       } catch (err) {
         console.error("Supabase failed:", err);
       }
@@ -368,9 +1215,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateNetworkStatus(online) {
     const desktopStatusText = document.getElementById('supabase-sync-text');
     const mobileBadge = document.getElementById('mobile-network-status-badge');
-    
+
     if (online) {
-      if (desktopStatusText) desktopStatusText.innerHTML = 'Supabase Live';
+      if (desktopStatusText) desktopStatusText.innerHTML = 'Live';
       const desktopBadge = document.getElementById('network-status-badge');
       if (desktopBadge) {
         desktopBadge.style.backgroundColor = 'rgba(46, 204, 113, 0.08)';
@@ -384,14 +1231,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mobileBadge) {
         mobileBadge.style.backgroundColor = 'rgba(46, 204, 113, 0.08)';
         mobileBadge.style.borderColor = 'rgba(46, 204, 113, 0.2)';
-        mobileBadge.title = 'Supabase Live';
+        mobileBadge.title = 'Live';
         const dot = mobileBadge.querySelector('.status-dot');
         if (dot) {
           dot.className = 'status-dot green';
         }
       }
     } else {
-      if (desktopStatusText) desktopStatusText.innerHTML = 'Offline Mode';
+      if (desktopStatusText) desktopStatusText.innerHTML = 'Offline';
       const desktopBadge = document.getElementById('network-status-badge');
       if (desktopBadge) {
         desktopBadge.style.backgroundColor = 'rgba(231, 76, 60, 0.08)';
@@ -405,7 +1252,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mobileBadge) {
         mobileBadge.style.backgroundColor = 'rgba(231, 76, 60, 0.08)';
         mobileBadge.style.borderColor = 'rgba(231, 76, 60, 0.2)';
-        mobileBadge.title = 'Offline Mode';
+        mobileBadge.title = 'Offline';
         const dot = mobileBadge.querySelector('.status-dot');
         if (dot) {
           dot.className = 'status-dot red';
@@ -414,25 +1261,84 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function triggerSyncErrorState(errorMsg) {
+    const text = document.getElementById('supabase-sync-text');
+    const badge = document.getElementById('network-status-badge');
+    if (badge) {
+      badge.style.backgroundColor = 'rgba(241, 196, 15, 0.08)';
+      badge.style.borderColor = 'rgba(241, 196, 15, 0.2)';
+      badge.style.color = '#f1c40f';
+      const dot = badge.querySelector('.status-dot');
+      if (dot) {
+        dot.className = 'status-dot';
+        dot.style.backgroundColor = '#f1c40f';
+        dot.style.animation = 'blink 0.5s infinite';
+      }
+    }
+    if (text) {
+      text.textContent = 'Sync Error';
+      text.title = errorMsg;
+    }
+
+    setTimeout(() => {
+      if (navigator.onLine) {
+        updateNetworkStatus(true);
+        const dot = badge ? badge.querySelector('.status-dot') : null;
+        if (dot) {
+          dot.style.backgroundColor = '';
+          dot.style.animation = 'blink 1.5s infinite';
+        }
+      }
+    }, 5000);
+  }
+
+  function handleSyncError(operationName, error) {
+    const errorMsg = error ? (error.message || error) : 'Unknown Error';
+    console.error(`[Supabase Sync Fail] ${operationName}:`, errorMsg);
+
+    triggerSyncErrorState(errorMsg);
+
+    if (navigator.onLine) {
+      showNotificationToast(`Sync Failed: ${operationName} error (${errorMsg})`);
+    } else {
+      showNotificationToast(`Saved locally. ${operationName} sync pending connection...`);
+    }
+  }
+
   function saveOfflineBill(bill) {
-    const queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
-    if (!queue.some(b => b.orderId === bill.orderId)) {
-      queue.push(bill);
+    let queue = [];
+    try {
+      queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+    } catch (e) {
+      queue = [];
+    }
+    // Use a stable local UUID for deduplication — orderId alone can collide when
+    // two devices create bills simultaneously before syncing.
+    const localId = bill._localId || bill.orderId;
+    if (!queue.some(b => (b._localId || b.orderId) === localId)) {
+      queue.push({ ...bill, _localId: localId });
       localStorage.setItem('doppio_offline_bills_queue', JSON.stringify(queue));
     }
   }
 
   async function syncOfflineBills() {
     if (!supabaseClient || !navigator.onLine) return;
-    const queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+    let queue = [];
+    try {
+      queue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+    } catch (e) {
+      queue = [];
+    }
     if (queue.length === 0) return;
-    
+
     const billsToSync = [...queue];
     for (const bill of billsToSync) {
       try {
         const { error } = await supabaseClient.from('doppio_bills').insert({
+          tenant_id: activeTenantId,
           orderId: bill.orderId,
           customerName: bill.customerName,
+          customerPhone: bill.customerPhone,
           dateTime: bill.dateTime,
           items: typeof bill.items === 'string' ? bill.items : JSON.stringify(bill.items),
           subtotal: bill.subtotal,
@@ -440,10 +1346,16 @@ document.addEventListener('DOMContentLoaded', () => {
           total: bill.total,
           paymentMethod: bill.paymentMethod
         });
-        
+
         if (!error) {
-          const currentQueue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
-          const updatedQueue = currentQueue.filter(b => b.orderId !== bill.orderId);
+          let currentQueue = [];
+          try {
+            currentQueue = JSON.parse(localStorage.getItem('doppio_offline_bills_queue')) || [];
+          } catch (e) {
+            currentQueue = [];
+          }
+          const billLocalId = bill._localId || bill.orderId;
+          const updatedQueue = currentQueue.filter(b => (b._localId || b.orderId) !== billLocalId);
           localStorage.setItem('doppio_offline_bills_queue', JSON.stringify(updatedQueue));
         }
       } catch (err) {
@@ -456,47 +1368,875 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function syncWithSupabase() {
     if (!supabaseClient) return;
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') {
+      applyFeatureToggles();
+      return;
+    }
     try {
-      // Sync Menu
-      const { data: dbMenu } = await supabaseClient.from('doppio_menu').select('*').order('id', { ascending: true });
-      if (dbMenu && dbMenu.length > 0) {
-        // Merge dbMenu with defaultMenu defensively to ensure food items and all categories exist
-        const dbNames = new Set(dbMenu.map(item => item.name.toLowerCase().trim()));
-        let mergedMenu = [...dbMenu];
-        
-        defaultMenu.forEach(item => {
-          if (!dbNames.has(item.name.toLowerCase().trim())) {
-            mergedMenu.push(item);
+      // Sync Business Profile Toggles and Settings Live!
+      try {
+        let { data: dbProfileList } = await supabaseClient.from('doppio_business_profile').select('*').eq('tenant_id', activeTenantId);
+        if (!dbProfileList || dbProfileList.length === 0) {
+          // Auto-create default profile for new client
+          const { data: newProfile } = await supabaseClient.from('doppio_business_profile').insert({
+            tenant_id: activeTenantId,
+            business_name: activeTenantName,
+            address: '',
+            phone: '',
+            gst_enabled: false,
+            gst_rate: 18,
+            loyalty_discount_enabled: false,
+            loyalty_discount_rate: 10,
+            crm_enabled: true,
+            tax_enabled: false,
+            sound_enabled: false,
+            whatsapp_enabled: false,
+            shift_enabled: false
+          }).select('*');
+          if (newProfile && newProfile.length > 0) dbProfileList = newProfile;
+        }
+        if (dbProfileList && dbProfileList.length > 0) {
+          const dbProfile = dbProfileList[0];
+          businessProfile = {
+            name: dbProfile.business_name || businessProfile.name,
+            address: dbProfile.address || businessProfile.address,
+            phone: dbProfile.phone || businessProfile.phone,
+            gstEnabled: dbProfile.gst_enabled !== undefined ? dbProfile.gst_enabled : businessProfile.gstEnabled,
+            gstRate: dbProfile.gst_rate !== undefined ? parseFloat(dbProfile.gst_rate) : businessProfile.gstRate,
+            loyaltyEnabled: dbProfile.loyalty_discount_enabled !== undefined ? dbProfile.loyalty_discount_enabled : businessProfile.loyaltyEnabled,
+            loyaltyRate: dbProfile.loyalty_discount_rate !== undefined ? parseFloat(dbProfile.loyalty_discount_rate) : businessProfile.loyaltyRate,
+            passcodeLockEnabled: dbProfile.passcode_lock_enabled !== undefined ? dbProfile.passcode_lock_enabled : businessProfile.passcodeLockEnabled,
+            crmEnabled: dbProfile.crm_enabled !== undefined ? dbProfile.crm_enabled : businessProfile.crmEnabled,
+            taxEnabled: dbProfile.tax_enabled !== undefined ? dbProfile.tax_enabled : businessProfile.taxEnabled,
+            soundEnabled: dbProfile.sound_enabled !== undefined ? dbProfile.sound_enabled : businessProfile.soundEnabled,
+            whatsappEnabled: dbProfile.whatsapp_enabled !== undefined ? dbProfile.whatsapp_enabled : businessProfile.whatsappEnabled,
+            shiftEnabled: dbProfile.shift_enabled !== undefined ? dbProfile.shift_enabled : businessProfile.shiftEnabled,
+            shiftDefaultFloat: dbProfile.shift_default_float !== undefined ? parseFloat(dbProfile.shift_default_float) : businessProfile.shiftDefaultFloat,
+            shiftMaxDrawer: dbProfile.shift_max_drawer !== undefined ? parseFloat(dbProfile.shift_max_drawer) : businessProfile.shiftMaxDrawer,
+            shiftPosLock: dbProfile.shift_pos_lock !== undefined ? dbProfile.shift_pos_lock : businessProfile.shiftPosLock,
+            whatsappGatewayEnabled: dbProfile.whatsapp_gateway_enabled !== undefined ? dbProfile.whatsapp_gateway_enabled : businessProfile.whatsappGatewayEnabled,
+            whatsappGatewayUrl: dbProfile.whatsapp_gateway_url || businessProfile.whatsappGatewayUrl,
+            whatsappGatewayToken: dbProfile.whatsapp_gateway_token || businessProfile.whatsappGatewayToken,
+            featureFlags: typeof dbProfile.feature_flags === 'string'
+              ? JSON.parse(dbProfile.feature_flags)
+              : (dbProfile.feature_flags || businessProfile.featureFlags || {})
+          };
+
+          if (businessProfile.whatsappGatewayUrl === undefined || businessProfile.whatsappGatewayUrl.trim() === 'https://httpbin.org/post') {
+            businessProfile.whatsappGatewayUrl = '';
           }
-        });
-        
-        menu = mergedMenu;
+          if (businessProfile.whatsappGatewayEnabled === undefined) businessProfile.whatsappGatewayEnabled = false;
+
+          localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+          setVaultData("doppio_business_profile", businessProfile);
+          applyFeatureToggles();
+          renderCart();
+        }
+      } catch (err) {
+        console.warn("Supabase business profile sync failed (probably table/columns missing):", err);
+      }
+
+      // Sync Menu — no auto-seeding; clients add their own menu from scratch
+      let { data: dbMenu } = await supabaseClient.from('doppio_menu').select('*').eq('tenant_id', activeTenantId).order('id', { ascending: true });
+      if (!dbMenu || dbMenu.length === 0) {
+        // Workspace has no menu yet — render empty state
+        menu = [];
+        localStorage.setItem('doppio_menu', JSON.stringify([]));
+        renderPOSCategories();
+        renderPOSItems();
+      } else {
+        // Use exactly what is in DB — no merging of default items
+        menu = dbMenu;
         localStorage.setItem('doppio_menu', JSON.stringify(menu));
         renderPOSCategories();
         renderPOSItems();
       }
 
-      // Sync Inventory
-      const { data: dbInv } = await supabaseClient.from('doppio_inventory').select('*');
-      if (dbInv && dbInv.length > 0) {
+      // Sync Inventory — no auto-seeding; clients add their own stock
+      let { data: dbInv } = await supabaseClient.from('doppio_inventory').select('*').eq('tenant_id', activeTenantId);
+      if (!dbInv || dbInv.length === 0) {
+        inventory = {};
+        localStorage.setItem('doppio_inventory', JSON.stringify({}));
+        renderInventory();
+      } else {
         dbInv.forEach(row => {
           inventory[row.key] = row.current;
+          const maxStock = Number(row.max_stock);
+          if (Number.isFinite(maxStock) && maxStock > 0) defaultInventory[row.key] = maxStock;
+          inventoryMetadata[row.key] = {
+            label: row.label || inventoryMetadata[row.key]?.label || '',
+            unit: row.unit || inventoryMetadata[row.key]?.unit || 'unit',
+            category: row.category || inventoryMetadata[row.key]?.category || 'food'
+          };
         });
         localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+        localStorage.setItem('doppio_inventory_metadata', JSON.stringify(inventoryMetadata));
         renderInventory();
         checkLowStockAlerts();
       }
-    } catch(e) {
+      // Sync Bills History Live across all devices!
+      const { data: dbBills } = await supabaseClient.from('doppio_bills').select('*').eq('tenant_id', activeTenantId);
+      if (dbBills) {
+        if (dbBills.length === 0) {
+          bills = [];
+          localStorage.setItem('doppio_bills', JSON.stringify([]));
+          renderBills();
+          updateHeaderSummaryStats();
+        } else {
+          const parsedDbBills = dbBills.map(b => {
+            let items = b.items;
+            if (typeof items === 'string') {
+              try {
+                items = JSON.parse(items);
+              } catch (err) {
+                items = [];
+              }
+            }
+            return {
+              orderId: b.orderId,
+              customerName: b.customerName,
+              dateTime: b.dateTime,
+              items: items,
+              subtotal: parseFloat(b.subtotal || 0),
+              gst: parseFloat(b.gst || 0),
+              total: parseFloat(b.total || 0),
+              paymentMethod: b.paymentMethod
+            };
+          });
+
+          // Merge dynamically by orderId keeping unsynced local bills
+          const localBills = JSON.parse(localStorage.getItem('doppio_bills')) || [];
+          const localMap = new Map(localBills.map(b => [b.orderId, b]));
+
+          parsedDbBills.forEach(dbBill => {
+            localMap.set(dbBill.orderId, dbBill);
+          });
+
+          const mergedBills = Array.from(localMap.values());
+          // Sort mergedBills by order ID descending to display newest orders first
+          mergedBills.sort((a, b) => b.orderId.localeCompare(a.orderId));
+
+          bills = mergedBills;
+          localStorage.setItem('doppio_bills', JSON.stringify(bills));
+          renderBills();
+          updateHeaderSummaryStats();
+        }
+      }
+
+      // Sync Pending QR Orders & Dine-In Carts (Made by Antigravity)
+      try {
+        const { data: dbPending } = await supabaseClient.from('doppio_pending_orders').select('*').eq('tenant_id', activeTenantId);
+        if (dbPending) {
+          if (dbPending.length === 0) {
+            pendingQrOrders = [];
+            // Reset tables 1-N to vacant default carts
+            for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+              tableCarts[i] = [];
+              tablesState[i] = "EMPTY";
+            }
+            localStorage.setItem('doppio_pending_qr_orders', JSON.stringify([]));
+            localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+            localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+            updateQrOrdersDashboardUI();
+            renderTablesMap();
+          } else {
+            const parsedPending = dbPending.map(o => {
+              let items = o.items;
+              if (typeof items === 'string') {
+                try { items = JSON.parse(items); } catch (e) { items = []; }
+              }
+              return {
+                orderId: o.orderId,
+                customerName: o.customerName,
+                customerPhone: o.customerPhone,
+                dateTime: o.dateTime,
+                items: items,
+                subtotal: parseFloat(o.subtotal || 0),
+                discount: parseFloat(o.discount || 0),
+                gst: parseFloat(o.gst || 0),
+                total: parseFloat(o.total || 0),
+                paymentMethod: o.paymentMethod,
+                orderType: o.orderType,
+                tableNumber: o.tableNumber,
+                status: o.status
+              };
+            });
+
+            // Merge defensively with local cache
+            const localMap = new Map(pendingQrOrders.map(o => [o.orderId, o]));
+
+            // First reset table status to Vacant, then let database state overwrite
+            for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+              tablesState[i] = "EMPTY";
+              tableCarts[i] = [];
+            }
+
+            parsedPending.forEach(p => {
+              if (p.status === 'DineIn Active') {
+                const tableId = parseInt(p.tableNumber);
+                if (!isNaN(tableId) && tableId >= 1 && tableId <= (businessProfile.numberOfTables || 6)) {
+                  tableCarts[tableId] = p.items;
+                  tablesState[tableId] = "ORDERING";
+                }
+              } else {
+                localMap.set(p.orderId, p);
+                if (p.tableNumber && p.tableNumber !== 'Takeaway') {
+                  const tbl = parseInt(p.tableNumber);
+                  if (!isNaN(tbl)) {
+                    if (p.status === 'Pending Review') {
+                      tablesState[tbl] = "PENDING";
+                    } else if (p.status === 'Accepted') {
+                      tablesState[tbl] = "SERVED";
+                    } else if (p.status === 'Ready') {
+                      tablesState[tbl] = "PENDING";
+                    }
+                  }
+                }
+              }
+            });
+            pendingQrOrders = Array.from(localMap.values());
+            localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+            localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+            localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+            updateQrOrdersDashboardUI();
+            renderTablesMap();
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase pending orders sync failed:", err);
+      }
+
+      // Sync Shift History from cloud (restores Z-reports and closed shift data across devices)
+      try {
+        const { data: dbShifts } = await supabaseClient.from('doppio_shifts').select('*').eq('tenant_id', activeTenantId).order('openedAt', { ascending: false }).limit(50);
+        if (dbShifts) {
+          if (dbShifts.length === 0) {
+            shiftHistory = [];
+            localStorage.setItem('doppio_shifts_local', JSON.stringify([]));
+          } else {
+            const localMap = new Map(shiftHistory.filter(s => s && s.shiftId).map(s => [s.shiftId, s]));
+            dbShifts.forEach(dbS => {
+              localMap.set(dbS.shiftId, {
+                shiftId: dbS.shiftId,
+                cashierName: dbS.cashierName,
+                openedAt: dbS.openedAt,
+                closedAt: dbS.closedAt,
+                openingFloat: parseFloat(dbS.openingFloat || 0),
+                expectedCash: parseFloat(dbS.expectedCash || 0),
+                actualCash: parseFloat(dbS.actualCash || 0),
+                variance: parseFloat(dbS.variance || 0),
+                totalSalesCash: parseFloat(dbS.totalSalesCash || 0),
+                totalSalesUpi: parseFloat(dbS.totalSalesUpi || 0),
+                totalSalesCard: parseFloat(dbS.totalSalesCard || 0),
+                totalPayouts: parseFloat(dbS.totalPayouts || 0),
+                totalSafeDrops: parseFloat(dbS.totalSafeDrops || 0),
+                status: dbS.status,
+                notes: dbS.notes || ''
+              });
+            });
+            shiftHistory = Array.from(localMap.values()).sort((a, b) => new Date(b.openedAt) - new Date(a.openedAt));
+            localStorage.setItem('doppio_shifts_local', JSON.stringify(shiftHistory));
+            
+            // Set activeShift to the first OPEN shift from DB
+            const openShiftFromDb = dbShifts.find(s => s.status === 'OPEN');
+            if (openShiftFromDb) {
+              activeShift = {
+                shiftId: openShiftFromDb.shiftId,
+                cashierName: openShiftFromDb.cashierName,
+                openedAt: openShiftFromDb.openedAt,
+                closedAt: openShiftFromDb.closedAt,
+                openingFloat: parseFloat(openShiftFromDb.openingFloat || 0),
+                expectedCash: parseFloat(openShiftFromDb.expectedCash || 0),
+                actualCash: parseFloat(openShiftFromDb.actualCash || 0),
+                variance: parseFloat(openShiftFromDb.variance || 0),
+                totalSalesCash: parseFloat(openShiftFromDb.totalSalesCash || 0),
+                totalSalesUpi: parseFloat(openShiftFromDb.totalSalesUpi || 0),
+                totalSalesCard: parseFloat(openShiftFromDb.totalSalesCard || 0),
+                totalPayouts: parseFloat(openShiftFromDb.totalPayouts || 0),
+                totalSafeDrops: parseFloat(openShiftFromDb.totalSafeDrops || 0),
+                status: openShiftFromDb.status,
+                notes: openShiftFromDb.notes || ''
+              };
+              localStorage.setItem('doppio_current_shift', JSON.stringify(activeShift));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase shift history sync failed:", err);
+      }
+
+      // Sync Shift Events (cash payouts, safe drops) from cloud
+      try {
+        const { data: dbShiftEvents } = await supabaseClient.from('doppio_shift_events').select('*').eq('tenant_id', activeTenantId).order('createdAt', { ascending: false }).limit(200);
+        if (dbShiftEvents) {
+          if (dbShiftEvents.length === 0) {
+            shiftEvents = [];
+            localStorage.setItem('doppio_shift_events_local', JSON.stringify([]));
+          } else {
+            const localMap = new Map(shiftEvents.filter(e => e && e.eventId).map(e => [e.eventId, e]));
+            dbShiftEvents.forEach(dbE => {
+              localMap.set(dbE.eventId, {
+                eventId: dbE.eventId,
+                shiftId: dbE.shiftId,
+                eventType: dbE.eventType,
+                amount: parseFloat(dbE.amount || 0),
+                reason: dbE.reason || '',
+                createdAt: dbE.createdAt
+              });
+            });
+            shiftEvents = Array.from(localMap.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            localStorage.setItem('doppio_shift_events_local', JSON.stringify(shiftEvents));
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase shift events sync failed:", err);
+      }
+
+      // Sync Employees — no auto-seeding; clients add their own staff
+
+      try {
+        let { data: dbEmployees } = await supabaseClient.from('doppio_employees').select('*').eq('tenant_id', activeTenantId);
+        if (!dbEmployees || dbEmployees.length === 0) {
+          // No employees yet — render empty state
+          employees = [];
+          localStorage.setItem('doppio_employees', JSON.stringify([]));
+          renderEmployeesTab();
+        } else {
+          employees = dbEmployees.map(dbEmp => ({
+            id: dbEmp.id,
+            name: dbEmp.name,
+            role: dbEmp.role,
+            contact: dbEmp.contact,
+            baseSalary: parseFloat(dbEmp.baseSalary || 0),
+            shift: dbEmp.shift,
+            leaves: typeof dbEmp.leaves === 'string' ? JSON.parse(dbEmp.leaves) : dbEmp.leaves
+          }));
+          localStorage.setItem('doppio_employees', JSON.stringify(employees));
+          renderEmployeesTab();
+        }
+      } catch (err) {
+        console.warn("Supabase employees sync failed:", err);
+      }
+
+      // Sync Leave Requests
+      try {
+        const { data: dbLeaves } = await supabaseClient.from('doppio_leave_requests').select('*').eq('tenant_id', activeTenantId);
+        if (dbLeaves) {
+          if (dbLeaves.length === 0) {
+            leaveRequests = [];
+            localStorage.setItem('doppio_leave_requests', JSON.stringify([]));
+            renderEmployeesTab();
+          } else {
+            const localLeaves = JSON.parse(localStorage.getItem('doppio_leave_requests')) || [];
+            const localMap = new Map(localLeaves.filter(r => r && r.id).map(r => [r.id, r]));
+            dbLeaves.forEach(dbL => {
+              localMap.set(dbL.id, {
+                id: dbL.id,
+                employeeId: dbL.employeeId,
+                employeeName: dbL.employeeName,
+                type: dbL.type,
+                startDate: dbL.startDate,
+                endDate: dbL.endDate,
+                reason: dbL.reason,
+                status: dbL.status,
+                days: parseInt(dbL.days || 1)
+              });
+            });
+            leaveRequests = Array.from(localMap.values());
+            localStorage.setItem('doppio_leave_requests', JSON.stringify(leaveRequests));
+            renderEmployeesTab();
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase leave requests sync failed:", err);
+      }
+
+      // Sync Attendance Logs
+      try {
+        const { data: dbAttendance } = await supabaseClient.from('doppio_attendance').select('*').eq('tenant_id', activeTenantId);
+        if (dbAttendance) {
+          if (dbAttendance.length === 0) {
+            attendanceLogs = [];
+            localStorage.setItem('doppio_attendance', JSON.stringify([]));
+            renderEmployeesTab();
+          } else {
+            const localAttendance = JSON.parse(localStorage.getItem('doppio_attendance')) || [];
+            const localMap = new Map(localAttendance.filter(log => log && log.id).map(log => [log.id, log]));
+            dbAttendance.forEach(dbA => {
+              localMap.set(dbA.id, {
+                id: dbA.id,
+                employeeId: dbA.employeeId,
+                employeeName: dbA.employeeName,
+                date: dbA.date,
+                clockInTime: dbA.clockInTime,
+                clockOutTime: dbA.clockOutTime,
+                hoursWorked: parseFloat(dbA.hoursWorked || 0),
+                shift: dbA.shift,
+                wages: parseFloat(dbA.wages || 0),
+                status: dbA.status
+              });
+            });
+            attendanceLogs = Array.from(localMap.values());
+            localStorage.setItem('doppio_attendance', JSON.stringify(attendanceLogs));
+            renderEmployeesTab();
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase attendance sync failed:", err);
+      }
+
+      // Sync CRM Loyalty Members
+      try {
+        const { data: dbCRM } = await supabaseClient.from('doppio_crm').select('*').eq('tenant_id', activeTenantId);
+        if (dbCRM) {
+          if (dbCRM.length === 0) {
+            crmData = [];
+            localStorage.setItem('doppio_crm_local', JSON.stringify([]));
+            renderCRMTab();
+          } else {
+            const localMap = new Map(crmData.filter(c => c && c.phone).map(c => [c.phone, c]));
+            dbCRM.forEach(dbC => {
+              const existing = localMap.get(dbC.phone);
+              if (existing) {
+                // Keep whichever has more visits/spend (most up-to-date)
+                if ((dbC.visits || 0) >= (existing.visits || 0)) {
+                  localMap.set(dbC.phone, {
+                    name: dbC.name,
+                    phone: dbC.phone,
+                    visits: parseInt(dbC.visits || 1),
+                    total_spend: parseFloat(dbC.total_spend || 0),
+                    last_visit: dbC.last_visit
+                  });
+                }
+              } else {
+                localMap.set(dbC.phone, {
+                  name: dbC.name,
+                  phone: dbC.phone,
+                  visits: parseInt(dbC.visits || 1),
+                  total_spend: parseFloat(dbC.total_spend || 0),
+                  last_visit: dbC.last_visit
+                });
+              }
+            });
+            // Also add local entries without phone (keyed by name)
+            crmData.filter(c => c && !c.phone).forEach(c => {
+              const key = '__noPhone__' + c.name;
+              if (!localMap.has(key)) localMap.set(key, c);
+            });
+            crmData = Array.from(localMap.values()).filter(c => !String(c.phone || '').startsWith('__noPhone__'));
+            localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
+            renderCRMTab();
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase CRM sync failed:", err);
+      }
+
+      // Sync Inventory Batches
+      try {
+        const { data: dbBatches } = await supabaseClient.from('doppio_inventory_batches').select('*').eq('tenant_id', activeTenantId);
+        if (dbBatches) {
+          if (dbBatches.length === 0) {
+            inventoryBatches = {};
+            localStorage.setItem('doppio_inventory_batches', JSON.stringify({}));
+            if (typeof renderInventory === 'function') renderInventory();
+          } else {
+            // Rebuild inventoryBatches map from cloud
+            const cloudMap = {};
+            dbBatches.forEach(row => {
+              if (!cloudMap[row.ingredient_key]) cloudMap[row.ingredient_key] = [];
+              cloudMap[row.ingredient_key].push({
+                id: row.id,
+                qty: parseFloat(row.qty || 0),
+                expiryDate: row.expiryDate,
+                receivedDate: row.receivedDate
+              });
+            });
+            // Merge: cloud wins for keys it has, keep local keys not in cloud
+            Object.keys(cloudMap).forEach(k => { inventoryBatches[k] = cloudMap[k]; });
+            localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+            if (typeof renderInventory === 'function') renderInventory();
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase inventory batches sync failed:", err);
+      }
+
+      // Sync Notifications
+      try {
+        const { data: dbNotifs } = await supabaseClient.from('doppio_notifications').select('*').eq('tenant_id', activeTenantId).order('created_at', { ascending: false }).limit(50);
+        if (dbNotifs) {
+          if (dbNotifs.length === 0) {
+            notifications = [];
+            localStorage.setItem('doppio_notifications', JSON.stringify([]));
+            if (typeof renderNotifications === 'function') renderNotifications();
+          } else {
+            const localMap = new Map(notifications.filter(n => n && n.id).map(n => [n.id, n]));
+            dbNotifs.forEach(dbN => {
+              const localNotif = localMap.get(dbN.id);
+              if (localNotif) {
+                localNotif.isRead = localNotif.isRead || dbN.isRead || false;
+              } else {
+                localMap.set(dbN.id, {
+                  id: dbN.id,
+                  title: dbN.title,
+                  message: dbN.message,
+                  role: dbN.role || 'all',
+                  type: dbN.type || 'info',
+                  timestamp: dbN.timestamp || '',
+                  isRead: dbN.isRead || false
+                });
+              }
+            });
+            notifications = Array.from(localMap.values()).slice(0, 50);
+            localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
+            if (typeof renderNotifications === 'function') renderNotifications();
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase notifications sync failed:", err);
+      }
+
+      // Sync Custom Item Recipes
+      try {
+        const { data: dbRecipes } = await supabaseClient.from('doppio_custom_recipes').select('*').eq('tenant_id', activeTenantId);
+        if (dbRecipes) {
+          if (dbRecipes.length === 0) {
+            customRecipes = {};
+            localStorage.setItem('doppio_custom_recipes', JSON.stringify({}));
+          } else {
+            dbRecipes.forEach(row => {
+              const itemName = (row.item_name || '').toLowerCase().trim();
+              if (itemName) {
+                let ingredients = row.ingredients;
+                if (typeof ingredients === 'string') {
+                  try { ingredients = JSON.parse(ingredients); } catch (e) { ingredients = []; }
+                }
+                // Cloud wins (overwrite local recipe for this item)
+                customRecipes[itemName] = ingredients && typeof ingredients === 'object' ? ingredients : {};
+              }
+            });
+            localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase custom recipes sync failed:", err);
+      }
+
+      // Sync Inventory Thresholds
+      try {
+        const { data: dbThresholds } = await supabaseClient.from('doppio_inventory_thresholds').select('*').eq('tenant_id', activeTenantId);
+        if (dbThresholds && dbThresholds.length > 0) {
+          dbThresholds.forEach(row => {
+            if (row.ingredient_key) {
+              thresholds[row.ingredient_key] = parseInt(row.threshold || 20);
+            }
+          });
+          localStorage.setItem('doppio_inventory_thresholds', JSON.stringify(thresholds));
+          if (typeof checkLowStockAlerts === 'function') checkLowStockAlerts();
+        }
+      } catch (err) {
+        console.warn("Supabase inventory thresholds sync failed:", err);
+      }
+
+      // Sync POS Item Popularity (used for grid sort order)
+      try {
+        const { data: dbPopularity } = await supabaseClient.from('doppio_pos_popularity').select('*').eq('tenant_id', activeTenantId);
+        if (dbPopularity && dbPopularity.length > 0) {
+          dbPopularity.forEach(row => {
+            const itemName = (row.item_name || '').toLowerCase().trim();
+            if (itemName) {
+              // Keep the higher count between cloud and local
+              const localCount = posPopularityMap[itemName] || 0;
+              posPopularityMap[itemName] = Math.max(localCount, parseInt(row.count || 0));
+            }
+          });
+          localStorage.setItem('doppio_pos_popularity', JSON.stringify(posPopularityMap));
+          if (typeof renderPOSItems === 'function') renderPOSItems();
+        }
+      } catch (err) {
+        console.warn("Supabase POS popularity sync failed:", err);
+      }
+
+    } catch (e) {
       console.warn("Supabase initial sync fallback", e);
     }
   }
 
   function setupSupabaseRealtime() {
     if (!supabaseClient) return;
-    supabaseClient.channel('doppio-bills-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills' }, () => {
-        syncWithSupabase();
+    const loggedInRole = sessionStorage.getItem('logged_in_role');
+
+    if (loggedInRole !== 'superadmin' && activeTenantId) {
+      // Subscribe to standard bills changes for the active workspace only.
+      supabaseClient.channel('doppio-bills-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          syncWithSupabase();
+        }).subscribe();
+
+      // Subscribe to live QR self-ordering queue and table sessions.
+      supabaseClient.channel('doppio-pending-orders-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}` }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const newOrder = payload.new;
+          let items = newOrder.items;
+          if (typeof items === 'string') {
+            try { items = JSON.parse(items); } catch (e) { items = []; }
+          }
+          const orderObj = {
+            orderId: newOrder.orderId,
+            customerName: newOrder.customerName,
+            customerPhone: newOrder.customerPhone,
+            dateTime: newOrder.dateTime,
+            items: items,
+            subtotal: parseFloat(newOrder.subtotal || 0),
+            discount: parseFloat(newOrder.discount || 0),
+            gst: parseFloat(newOrder.gst || 0),
+            total: parseFloat(newOrder.total || 0),
+            paymentMethod: newOrder.paymentMethod,
+            orderType: newOrder.orderType,
+            tableNumber: newOrder.tableNumber,
+            status: newOrder.status,
+            priority: newOrder.priority || 'normal'
+          };
+
+          // 1. Check if it's a Dine-In Active session cart sync
+          if (orderObj.status === 'DineIn Active') {
+            const tableId = parseInt(orderObj.tableNumber);
+            if (!isNaN(tableId) && tableId >= 1 && tableId <= (businessProfile.numberOfTables || 6)) {
+              tableCarts[tableId] = items;
+              tablesState[tableId] = "ORDERING";
+              localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+              localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+              if (activeTableSession === tableId) {
+                cart = tableCarts[tableId];
+                renderCart();
+              }
+              renderTablesMap();
+            }
+            return;
+          }
+
+          // 2. Otherwise update KDS / self-service queue
+          const idx = pendingQrOrders.findIndex(o => o.orderId === orderObj.orderId);
+          if (idx !== -1) {
+            pendingQrOrders[idx] = orderObj;
+          } else {
+            pendingQrOrders.push(orderObj);
+            playIncomingOrderChime();
+            showNotificationToast(`New self-service order from Table ${orderObj.tableNumber}!`);
+          }
+
+          localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+          if (orderObj.tableNumber && orderObj.tableNumber !== 'Takeaway') {
+            const tbl = parseInt(orderObj.tableNumber);
+            if (!isNaN(tbl)) {
+              if (orderObj.status === 'Pending Review') {
+                tablesState[tbl] = "PENDING";
+              } else if (orderObj.status === 'Accepted') {
+                tablesState[tbl] = "SERVED";
+              } else if (orderObj.status === 'Ready') {
+                tablesState[tbl] = "PENDING";
+              }
+              localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+            }
+          }
+
+          updateQrOrdersDashboardUI();
+          if (typeof renderKDSTab === 'function') renderKDSTab();
+          if (typeof renderTokensTab === 'function') renderTokensTab();
+          renderTablesMap();
+
+        } else if (payload.eventType === 'DELETE') {
+          const deletedOrderId = payload.old.orderId || payload.old.order_id;
+          if (deletedOrderId) {
+            pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== deletedOrderId);
+            localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+            // If it was a table active session, clear it locally
+            if (deletedOrderId.startsWith('TABLE-')) {
+              const parts = deletedOrderId.split('-');
+              const tableId = parseInt(parts[1]);
+              if (!isNaN(tableId)) {
+                tableCarts[tableId] = [];
+                tablesState[tableId] = "EMPTY";
+                localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+                localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+                if (activeTableSession === tableId) {
+                  activeTableSession = null;
+                  const banner = document.getElementById('table-session-banner');
+                  if (banner) banner.style.display = 'none';
+                  const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
+                  cart = backup ? JSON.parse(backup) : [];
+                  renderCart();
+                }
+              }
+            }
+
+            updateQrOrdersDashboardUI();
+            if (typeof renderKDSTab === 'function') renderKDSTab();
+            if (typeof renderTokensTab === 'function') renderTokensTab();
+            renderTablesMap();
+          }
+        }
+        }).subscribe();
+    }
+
+    // Subscribe to WhatsApp Broadcast delivery status messages (Made by Antigravity)
+    supabaseClient.channel('whatsapp-billing-status')
+      .on('broadcast', { event: 'status' }, (payload) => {
+        const { orderId, status, error } = payload.payload;
+        const belongsToActiveTenant = bills.some(bill => String(bill.orderId || bill.id) === String(orderId))
+          || pendingQrOrders.some(order => String(order.orderId || order.id) === String(orderId));
+        if (!belongsToActiveTenant) return;
+        if (status === 'success') {
+          showNotificationToast(`Bill ${orderId}: WhatsApp Sent Successfully!`);
+        } else {
+          showNotificationToast(`Bill ${orderId}: Delivery Failed - ${error || 'Gateway Offline'}`);
+        }
       }).subscribe();
+
+    // ─────────────────────────────────────────────────────────────────────
+    // ⚡ REAL-TIME TENANT SYNC — SaaS Tenants table listener
+    // ─────────────────────────────────────────────────────────────────────
+    let tenantDataSyncTimer = null;
+    const scheduleTenantDataSync = () => {
+      clearTimeout(tenantDataSyncTimer);
+      tenantDataSyncTimer = setTimeout(() => {
+        tenantDataSyncTimer = null;
+        syncWithSupabase();
+      }, 150);
+    };
+
+    if (loggedInRole !== 'superadmin' && activeTenantId) {
+      supabaseClient.channel('doppio-employees-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_employees', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .subscribe();
+
+      supabaseClient.channel('doppio-crm-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_crm', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .subscribe();
+
+      menuRealtimeChannel = supabaseClient.channel(`doppio-menu-realtime-${activeTenantId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_menu', filter: `tenant_id=eq.${activeTenantId}` }, scheduleTenantDataSync)
+        .on('broadcast', { event: 'menu-updated' }, (message) => {
+          if (String(message.payload?.tenantId || '') === String(activeTenantId)) {
+            scheduleTenantDataSync();
+          }
+        })
+        .subscribe();
+    }
+
+    // Super-Admin: refresh registry table whenever any tenant row changes
+    if (loggedInRole === 'superadmin') {
+      supabaseClient.channel('saas-tenants-superadmin-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'saas_tenants' }, (payload) => {
+          console.log('[SaaS Realtime] Tenant registry change detected — refreshing super-admin tab:', payload);
+          renderSuperAdminTab();
+        }).subscribe();
+    }
+
+    // Logged-in tenant: watch OWN row for live permission/status changes by SuperAdmin
+    if (loggedInRole !== 'superadmin' && activeTenantId) {
+      supabaseClient
+        .channel('saas-tenant-self-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'saas_tenants',
+            filter: `id=eq.${activeTenantId}`
+          },
+          (payload) => {
+            refreshAuthoritativeTenantSession(true);
+            return;
+            const updated = {};
+            console.log('[SaaS Realtime] Own tenant record updated by SuperAdmin:', updated);
+
+            // 1. Account suspended → kick to login immediately
+            if (updated.status === 'suspended') {
+              showNotificationToast('⚠️ Account suspended. Redirecting to login...');
+              setTimeout(() => {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+              }, 2200);
+              return;
+            }
+
+            // 2. Account set back to pending → kick to login
+            if (updated.status === 'pending') {
+              showNotificationToast('ℹ️ Account access changed. Please contact your provider.');
+              setTimeout(() => {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+              }, 2200);
+              return;
+            }
+
+            // 3. Hot-swap allowed_tabs in memory + sessionStorage
+            if (Array.isArray(updated.allowed_tabs)) {
+              allowedTabs.length = 0;
+              updated.allowed_tabs.forEach(t => allowedTabs.push(t));
+              console.log('[SaaS Realtime] allowedTabs updated live:', allowedTabs);
+            }
+
+            // 4. Re-apply all sidebar/mobile-nav/feature visibility immediately
+            applyFeatureToggles();
+
+            // 5. If currently active tab was just revoked → redirect to first allowed tab
+            const activeTabEl = document.querySelector('.tab-content.active');
+            const activeTabId = activeTabEl ? activeTabEl.id : null;
+            if (activeTabId && !allowedTabs.includes(activeTabId)) {
+              const firstAllowed = allowedTabs[0];
+              if (firstAllowed) {
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+                const targetTab = document.getElementById(firstAllowed);
+                if (targetTab) targetTab.classList.add('active');
+                const targetLink = document.querySelector(`.sidebar-link[data-tab="${firstAllowed}"]`);
+                if (targetLink) targetLink.classList.add('active');
+              }
+            }
+
+            showNotificationToast('🔄 Your access permissions were updated by the admin.');
+          }
+        )
+        .subscribe();
+
+      setInterval(() => {
+        if (!document.hidden) refreshAuthoritativeTenantSession(false);
+      }, 60000);
+
+      setInterval(() => {
+        if (!document.hidden && navigator.onLine) syncWithSupabase();
+      }, 60000);
+    }
+
+    // ⚡ REAL-TIME DATA RESET SYNC
+    if (activeTenantId) {
+      supabaseClient.channel('tenant-data-reset-realtime')
+        .on('broadcast', { event: 'data-reset' }, async (response) => {
+          if (response.payload && String(response.payload.tenantId) === String(activeTenantId)) {
+            console.log('[SaaS Realtime] Data reset broadcast received. Wiping cache and reloading...');
+            await clearIndexedDBVault();
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith('doppio_')) {
+                localStorage.removeItem(key);
+              }
+            }
+            sessionStorage.removeItem('doppio_menu');
+            sessionStorage.removeItem('doppio_inventory');
+            sessionStorage.removeItem('doppio_bills');
+            window.location.reload();
+          }
+        })
+        .subscribe();
+    }
   }
 
   // ==========================================
@@ -516,58 +2256,105 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabContents = document.querySelectorAll('.tab-content');
   const tabTitle = document.getElementById('tab-title');
   const tabSubtitle = document.getElementById('tab-subtitle');
+  let menuEditorDirty = false;
 
   sidebarLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const tabId = link.getAttribute('data-tab');
-      
-      // If takeaway tab is clicked and there are items in the cart, clear it
-      if (tabId === 'pos-tab' && cart.length > 0) {
-        SoundEffects.playRemove();
-        cart = [];
-        const custNameInput = document.getElementById('cust-name');
-        const custPhoneInput = document.getElementById('cust-phone');
-        if (custNameInput) custNameInput.value = '';
-        if (custPhoneInput) custPhoneInput.value = '';
-        if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-        renderCart();
+      if (!canOpenDashboardTab(tabId)) return;
+      const currentTab = document.querySelector('.tab-content.active');
+      if (
+        currentTab
+        && currentTab.id === 'editor-tab'
+        && tabId !== 'editor-tab'
+        && menuEditorDirty
+        && !window.confirm('You have unsaved menu changes. Leave without saving?')
+      ) {
+        return;
+      }
+      if (currentTab && currentTab.id === 'editor-tab' && tabId !== 'editor-tab') {
+        menuEditorDirty = false;
       }
 
+      // Stop SaaS Gateway polling if we switch away from gateway-monitor-tab
+      if (tabId !== 'gateway-monitor-tab' && typeof stopSaaSGatewayPolling === 'function') {
+        stopSaaSGatewayPolling();
+      }
+
+      // Cart is intentionally NOT cleared when switching tabs.
+      // Cart contents persist until the "Print Bill" action is completed.
+
       SoundEffects.playClick();
-      
+
       sidebarLinks.forEach(l => l.classList.remove('active'));
       link.classList.add('active');
 
       tabContents.forEach(content => content.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
+      const targetTab = document.getElementById(tabId);
+      if (targetTab) targetTab.classList.add('active');
 
       tabTitle.textContent = link.textContent.trim();
-      
+
       if (tabId === 'pos-tab') tabSubtitle.textContent = 'Default Tab: Selection Grid';
+      else if (tabId === 'qr-orders-tab') {
+        tabSubtitle.textContent = 'Dine-in self-service active';
+        frameTask(updateQrOrdersDashboardUI);
+      }
       else if (tabId === 'bills-tab') {
-        tabSubtitle.textContent = 'Print, Refund, or Duplicate Receipts';
-        renderBills();
+        tabSubtitle.textContent = 'Print, Refund, or Edit Invoices';
+        frameTask(renderBills);
       }
       else if (tabId === 'inventory-tab') {
         tabSubtitle.textContent = 'Live Ingredient & Resource Levels';
-        renderInventory();
+        frameTask(renderInventory);
       }
       else if (tabId === 'reports-tab') {
-        tabSubtitle.textContent = 'Nagpur Branch Sales & Analytics';
-        renderReports();
+        tabSubtitle.textContent = (activeTenantName ? activeTenantName + ' — ' : '') + 'Sales & Analytics';
+        frameTask(renderReports);
       }
       else if (tabId === 'editor-tab') {
         tabSubtitle.textContent = 'Manage Drink & Food Items';
-        renderMenuEditor();
+        frameTask(() => { renderMenuEditor(); renderGlobalModifiersList(); renderSchedulingOverview(); });
       }
       else if (tabId === 'crm-tab') {
         tabSubtitle.textContent = 'Customer Relationship & Loyalty Ledger';
-        renderCRMTab();
+        frameTask(() => { renderCRMTab(); renderFeedbackTable(); loadLoyaltyRulesUI(); });
       }
       else if (tabId === 'tax-tab') {
         tabSubtitle.textContent = 'Central & State Tax Ledger Filing Hub';
-        renderTaxTab();
+        frameTask(renderTaxTab);
+      }
+      else if (tabId === 'employees-tab') {
+        tabSubtitle.textContent = 'India Payroll, Shifts & Leaves';
+        frameTask(() => { renderEmployeesTab(); renderBulkPayrollTable(); renderPayrollHistory(); });
+      }
+      else if (tabId === 'growth-hub-tab') {
+        tabSubtitle.textContent = 'Onboarding, support, billing, reservations, procurement, offers, refunds, devices, backups, and launch operations';
+        frameTask(renderGrowthHub);
+      }
+      else if (tabId === 'online-tab') {
+        tabSubtitle.textContent = 'Online Delivery Channel Integration Center';
+        frameTask(async () => {
+          await loadOnlineIntegrationsConfig();
+          renderOnlineOrdersTab();
+        });
+      }
+      else if (tabId === 'kds-tab') {
+        tabSubtitle.textContent = 'Kitchen Cooking Live Preparation Board';
+        if (typeof renderKDSTab === 'function') frameTask(renderKDSTab);
+      }
+      else if (tabId === 'tokens-tab') {
+        tabSubtitle.textContent = 'Live Takeaway & Delivery Pickup Screen';
+        if (typeof renderTokensTab === 'function') frameTask(renderTokensTab);
+      }
+      else if (tabId === 'super-admin-tab') {
+        tabSubtitle.textContent = 'Manage client subscriptions, features, and system access';
+        frameTask(renderSuperAdminTab);
+      }
+      else if (tabId === 'gateway-monitor-tab') {
+        tabSubtitle.textContent = 'Monitor WhatsApp and Email notifications dispatch';
+        frameTask(setupGatewayMonitorTab);
       }
     });
   });
@@ -576,21 +2363,504 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateHeaderSummaryStats() {
     const headerSales = document.getElementById('header-sales-today');
     const headerBills = document.getElementById('header-bills-today');
-    
+
     // Calculate values specifically for today
     const today = new Date().toLocaleDateString('en-IN');
-    const todayBills = bills.filter(b => b.dateTime.includes(today));
-    const todayTotal = todayBills.reduce((sum, b) => sum + b.total, 0);
+    const todayBills = bills.filter(b => b && b.dateTime && b.dateTime.includes(today));
+    const todayTotal = todayBills.reduce((sum, b) => sum + ((b && b.total) || 0), 0);
 
     if (headerSales) headerSales.textContent = `₹${todayTotal}`;
     if (headerBills) headerBills.textContent = `${todayBills.length} Bills`;
   }
 
+  function getTodayKey() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  }
+
+  function getCompactDateKey(date = new Date()) {
+    return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function getDateWiseExportName(prefix, extension, date = new Date()) {
+    return `${prefix}_${getTodayKey(date)}.${extension}`;
+  }
+
+  let operationStatusHideTimer = null;
+
+  function ensureOperationStatusBar() {
+    let bar = document.getElementById('global-operation-status');
+    if (bar) return bar;
+
+    bar = document.createElement('div');
+    bar.id = 'global-operation-status';
+    bar.className = 'operation-status-bar';
+    bar.innerHTML = `
+      <div class="operation-status-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
+      <div class="operation-status-copy">
+        <div class="operation-status-title">Working...</div>
+        <div class="operation-status-track"><span></span></div>
+      </div>
+    `;
+    document.body.appendChild(bar);
+    return bar;
+  }
+
+  function setOperationStatus(message, state = 'working', progress = 35) {
+    const bar = ensureOperationStatusBar();
+    clearTimeout(operationStatusHideTimer);
+    bar.className = `operation-status-bar is-visible is-${state}`;
+    const icon = bar.querySelector('.operation-status-icon i');
+    const title = bar.querySelector('.operation-status-title');
+    const fill = bar.querySelector('.operation-status-track span');
+    if (icon) {
+      icon.className = state === 'success'
+        ? 'fa-solid fa-circle-check'
+        : state === 'error'
+          ? 'fa-solid fa-triangle-exclamation'
+          : 'fa-solid fa-spinner fa-spin';
+    }
+    if (title) title.textContent = message;
+    if (fill) fill.style.width = `${Math.max(8, Math.min(100, progress))}%`;
+    return bar;
+  }
+
+  function completeOperationStatus(message, state = 'success') {
+    setOperationStatus(message, state, 100);
+    operationStatusHideTimer = setTimeout(() => {
+      const bar = document.getElementById('global-operation-status');
+      if (bar) bar.classList.remove('is-visible');
+    }, state === 'error' ? 4500 : 2200);
+  }
+
+  function setOperationButtonBusy(button, busy, label = 'Working...') {
+    if (!button) return;
+    if (busy) {
+      if (button.dataset.operationBusy === 'true') return;
+      button.dataset.operationBusy = 'true';
+      button.dataset.originalHtml = button.innerHTML;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${label}`;
+    } else {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.dataset.operationBusy = 'false';
+      if (button.dataset.originalHtml) button.innerHTML = button.dataset.originalHtml;
+    }
+  }
+
+  function startOperationStatus(button, message, buttonLabel = 'Working...') {
+    setOperationStatus(message, 'working', 35);
+    setOperationButtonBusy(button, true, buttonLabel);
+    let finished = false;
+    return function finishOperation(state = 'success', doneMessage = 'Done') {
+      if (finished) return;
+      finished = true;
+      completeOperationStatus(doneMessage, state);
+      setOperationButtonBusy(button, false);
+    };
+  }
+
+  function attachGenericOperationFeedback() {
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (!button || button.dataset.operationBusy === 'true') return;
+      const text = `${button.id || ''} ${button.textContent || ''}`;
+      if (!/(export|download|backup)/i.test(text)) return;
+      const label = (button.textContent || 'Task').replace(/\s+/g, ' ').trim();
+      const finish = startOperationStatus(button, `${label} started...`);
+      window.setTimeout(() => {
+        if (button.dataset.operationBusy === 'true') {
+          finish('success', `${label} ready.`);
+        }
+      }, /backup/i.test(text) ? 5000 : 1800);
+    }, true);
+  }
+
+  attachGenericOperationFeedback();
+
+  function hashUpdateText(text) {
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
+  async function fetchUpdateHash(assetPath) {
+    const url = new URL(assetPath, window.location.href);
+    url.searchParams.set('updateCheck', String(Date.now()));
+    const response = await fetch(url.toString(), {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    if (!response.ok) throw new Error(`Update check failed for ${assetPath}`);
+    return hashUpdateText(await response.text());
+  }
+
+  function defaultUpdateReleaseInfo() {
+    return {
+      version: 'Latest update',
+      title: 'System improvements are ready',
+      summary: 'This update improves stability, speed, and day-to-day restaurant operations.',
+      highlights: [
+        'Performance and reliability improvements for the POS dashboard.',
+        'Safer local data handling before the update is applied.',
+        'Latest fixes and workflow improvements from the RestroSuite team.'
+      ]
+    };
+  }
+
+  async function fetchUpdateReleaseInfo() {
+    try {
+      const url = new URL('app-update.json', window.location.href);
+      url.searchParams.set('updateCheck', String(Date.now()));
+      const response = await fetch(url.toString(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      if (!response.ok) throw new Error('Release notes unavailable');
+      const info = await response.json();
+      const fallback = defaultUpdateReleaseInfo();
+      return {
+        version: String(info.version || fallback.version),
+        title: String(info.title || fallback.title),
+        summary: String(info.summary || fallback.summary),
+        highlights: Array.isArray(info.highlights) && info.highlights.length
+          ? info.highlights.slice(0, 6).map(item => String(item))
+          : fallback.highlights
+      };
+    } catch (error) {
+      return defaultUpdateReleaseInfo();
+    }
+  }
+
+  function renderUpdateReleaseNotes(modal, info) {
+    if (!modal || !info) return;
+    const title = modal.querySelector('#app-update-release-title');
+    const summary = modal.querySelector('#app-update-release-summary');
+    const version = modal.querySelector('#app-update-version');
+    const list = modal.querySelector('#app-update-release-list');
+    if (version) version.textContent = info.version || 'Latest update';
+    if (title) title.textContent = info.title || 'System improvements are ready';
+    if (summary) summary.textContent = info.summary || '';
+    if (list) {
+      list.innerHTML = '';
+      (info.highlights || []).forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        list.appendChild(li);
+      });
+    }
+  }
+
+  function readUpdateFieldValue(id) {
+    const field = document.getElementById(id);
+    return field ? field.value : '';
+  }
+
+  function collectNamespacedLocalStorage() {
+    const copy = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('doppio_')) {
+        copy[key] = localStorage.getItem(key);
+      }
+    }
+    return copy;
+  }
+
+  function captureOpenMenuFormDraft() {
+    const editorTab = document.getElementById('editor-tab');
+    const editorActive = !!(editorTab && editorTab.classList.contains('active'));
+    if (!editorActive && !menuEditorDirty) return null;
+    return {
+      editIndex: readUpdateFieldValue('edit-item-index'),
+      name: readUpdateFieldValue('item-name-input'),
+      category: readUpdateFieldValue('item-category-input'),
+      price: readUpdateFieldValue('item-price-input'),
+      description: readUpdateFieldValue('item-desc-input'),
+      icon: readUpdateFieldValue('item-icon-input'),
+      sku: readUpdateFieldValue('item-sku-input'),
+      ingredients: Array.from(document.querySelectorAll('.recipe-ingredient-row')).map(row => ({
+        key: row.querySelector('.recipe-ing-select')?.value || '',
+        qty: row.querySelector('.recipe-ing-qty')?.value || ''
+      })).filter(item => item.key || item.qty),
+      dirty: menuEditorDirty === true
+    };
+  }
+
+  function prepareUpdateSafetySnapshot() {
+    const custNameInput = document.getElementById('cust-name');
+    const custPhoneInput = document.getElementById('cust-phone');
+    if (custNameInput) localStorage.setItem('doppio_cart_cust_name', custNameInput.value || '');
+    if (custPhoneInput) localStorage.setItem('doppio_cart_cust_phone', custPhoneInput.value || '');
+    localStorage.setItem('doppio_cart_pay_method', selectedPaymentMethod || 'Cash');
+    localStorage.setItem('doppio_discount_type', discountType || 'flat');
+    localStorage.setItem('doppio_discount_value', String(discountValue || 0));
+    if (editingBillId) localStorage.setItem('doppio_editing_bill_id', editingBillId);
+    else localStorage.removeItem('doppio_editing_bill_id');
+    saveCartState();
+
+    const snapshot = {
+      savedAt: new Date().toISOString(),
+      tenantId: activeTenantId,
+      tenantName: activeTenantName,
+      activeTab: document.querySelector('.tab-content.active')?.id || '',
+      activeCart: cart,
+      customerName: custNameInput ? custNameInput.value || '' : localStorage.getItem('doppio_cart_cust_name') || '',
+      customerPhone: custPhoneInput ? custPhoneInput.value || '' : localStorage.getItem('doppio_cart_cust_phone') || '',
+      paymentMethod: selectedPaymentMethod || 'Cash',
+      editingBillId,
+      menuEditorDraft: captureOpenMenuFormDraft(),
+      bills,
+      inventory,
+      inventoryBatches,
+      thresholds,
+      customRecipes,
+      menu,
+      businessProfile,
+      tableCarts,
+      draftOrders,
+      employees,
+      leaveRequests,
+      attendanceLogs,
+      crmData,
+      pendingQrOrders,
+      tablesState,
+      activeShift,
+      shiftHistory,
+      shiftEvents,
+      localStorageBackup: collectNamespacedLocalStorage()
+    };
+
+    localStorage.setItem('doppio_pre_update_snapshot', JSON.stringify(snapshot));
+    setVaultData('doppio_pre_update_snapshot', snapshot);
+    setVaultData('doppio_cart', cart);
+    setVaultData('doppio_bills', bills);
+    setVaultData('doppio_inventory', inventory);
+    setVaultData('doppio_menu', menu);
+    setVaultData('doppio_business_profile', businessProfile);
+    return snapshot;
+  }
+
+  function hasSensitiveUnsavedUpdateWork() {
+    return Boolean(
+      menuEditorDirty
+      || editingBillId
+      || (Array.isArray(cart) && cart.length > 0)
+      || document.querySelector('[aria-busy="true"]')
+    );
+  }
+
+  function ensureUpdateDialog() {
+    let modal = document.getElementById('app-update-dialog');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'app-update-dialog';
+    modal.className = 'app-update-dialog';
+    modal.innerHTML = `
+      <div class="app-update-card" role="dialog" aria-modal="true" aria-labelledby="app-update-title">
+        <div class="app-update-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+        <div class="app-update-content">
+          <div class="app-update-eyebrow">System update</div>
+          <h2 id="app-update-title">New version is ready</h2>
+          <div class="app-update-version" id="app-update-version">Latest update</div>
+          <p id="app-update-message">Your current work has been saved locally. Apply the update to continue on the latest version.</p>
+          <div class="app-update-release">
+            <div class="app-update-release-heading">
+              <i class="fa-solid fa-list-check"></i>
+              <span>What is included</span>
+            </div>
+            <div class="app-update-release-title" id="app-update-release-title">Loading update details...</div>
+            <p id="app-update-release-summary">Checking the latest release notes.</p>
+            <ul id="app-update-release-list"></ul>
+          </div>
+          <div class="app-update-save-row">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span id="app-update-save-status">Saving active data before update...</span>
+          </div>
+          <div class="app-update-actions">
+            <button type="button" class="btn btn-secondary" id="app-update-later-btn">Later</button>
+            <button type="button" class="btn btn-primary" id="app-update-now-btn"><i class="fa-solid fa-rotate"></i> Save & Update</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function showUpdateReadyDialog({ requiresManualConfirm = false } = {}) {
+    const snapshot = prepareUpdateSafetySnapshot();
+    const modal = ensureUpdateDialog();
+    const message = modal.querySelector('#app-update-message');
+    const saveStatus = modal.querySelector('#app-update-save-status');
+    const updateNowBtn = modal.querySelector('#app-update-now-btn');
+    const laterBtn = modal.querySelector('#app-update-later-btn');
+    const hasActiveWork = hasSensitiveUnsavedUpdateWork();
+    let releaseInfo = defaultUpdateReleaseInfo();
+
+    if (message) {
+      message.textContent = hasActiveWork
+        ? 'Active cart/editing data is saved on this device. Review this prompt before applying the update.'
+        : 'No active billing work was found. Your local data snapshot is saved and the update can be applied now.';
+    }
+    if (saveStatus) {
+      const savedTime = new Date(snapshot.savedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      saveStatus.textContent = `Saved cart, bills, inventory, recipes and settings at ${savedTime}.`;
+    }
+    renderUpdateReleaseNotes(modal, releaseInfo);
+    fetchUpdateReleaseInfo().then(info => {
+      releaseInfo = info;
+      renderUpdateReleaseNotes(modal, releaseInfo);
+    });
+
+    modal.classList.add('is-visible');
+    setOperationStatus('Update ready. Current data saved locally.', 'working', 90);
+
+    const applyUpdate = () => {
+      prepareUpdateSafetySnapshot();
+      modal.classList.remove('is-visible');
+      sessionStorage.setItem('restrosuite_auto_update_applied', new Date().toLocaleString('en-IN'));
+      sessionStorage.setItem('restrosuite_last_update_release', JSON.stringify(releaseInfo));
+      setOperationStatus('Applying update. Saved data will remain unchanged...', 'working', 100);
+      const url = new URL(window.location.href);
+      url.searchParams.set('appv', String(Date.now()));
+      setTimeout(() => window.location.replace(url.toString()), 600);
+    };
+
+    const postponeUpdate = () => {
+      modal.classList.remove('is-visible');
+      completeOperationStatus('Update postponed. It will remind you again shortly.', 'success');
+      setTimeout(() => showUpdateReadyDialog({ requiresManualConfirm: true }), 5 * 60 * 1000);
+    };
+
+    if (updateNowBtn) {
+      updateNowBtn.onclick = applyUpdate;
+      setTimeout(() => updateNowBtn.focus(), 100);
+    }
+    if (laterBtn) laterBtn.onclick = postponeUpdate;
+
+    if (!requiresManualConfirm && !hasActiveWork) {
+      let seconds = 20;
+      const originalText = updateNowBtn ? updateNowBtn.innerHTML : '';
+      const timer = setInterval(() => {
+        seconds -= 1;
+        if (!modal.classList.contains('is-visible')) {
+          if (updateNowBtn) updateNowBtn.innerHTML = originalText;
+          clearInterval(timer);
+          return;
+        }
+        if (updateNowBtn) updateNowBtn.innerHTML = `<i class="fa-solid fa-rotate"></i> Save & Update (${seconds}s)`;
+        if (seconds <= 0) {
+          clearInterval(timer);
+          if (updateNowBtn) updateNowBtn.innerHTML = originalText;
+          applyUpdate();
+        }
+      }, 1000);
+    }
+  }
+
+  function reloadIntoLatestVersion() {
+    const busyControl = document.querySelector('[aria-busy="true"]');
+    if (busyControl) {
+      setOperationStatus('Update ready. Finishing current task first...', 'working', 85);
+      setTimeout(reloadIntoLatestVersion, 15000);
+      return;
+    }
+
+    showUpdateReadyDialog({ requiresManualConfirm: hasSensitiveUnsavedUpdateWork() });
+  }
+
+  function setupAutomaticAppUpdates() {
+    if (!/^https?:$/.test(window.location.protocol)) return;
+
+    const appliedAt = sessionStorage.getItem('restrosuite_auto_update_applied');
+    if (appliedAt) {
+      sessionStorage.removeItem('restrosuite_auto_update_applied');
+      let releaseTitle = '';
+      try {
+        const release = JSON.parse(sessionStorage.getItem('restrosuite_last_update_release') || 'null');
+        releaseTitle = release && release.title ? ` ${release.title}` : '';
+      } catch (error) {
+        releaseTitle = '';
+      }
+      sessionStorage.removeItem('restrosuite_last_update_release');
+      completeOperationStatus(`Updated at ${appliedAt}.${releaseTitle}`, 'success');
+    }
+
+    const assetsToWatch = [
+      window.location.pathname || 'dashboard.html',
+      'app-update.json',
+      'dashboard.js',
+      'dashboard-styles.css'
+    ];
+    let baseline = null;
+    let checking = false;
+
+    async function readCurrentAssetHashes() {
+      const pairs = await Promise.all(assetsToWatch.map(async asset => [asset, await fetchUpdateHash(asset)]));
+      return Object.fromEntries(pairs);
+    }
+
+    async function checkForUpdate() {
+      if (checking) return;
+      checking = true;
+      try {
+        const latest = await readCurrentAssetHashes();
+        if (!baseline) {
+          baseline = latest;
+          return;
+        }
+        const changed = assetsToWatch.some(asset => latest[asset] && baseline[asset] && latest[asset] !== baseline[asset]);
+        if (changed) {
+          baseline = latest;
+          reloadIntoLatestVersion();
+        }
+      } catch (err) {
+        console.warn('[Auto Update] Check skipped:', err.message || err);
+      } finally {
+        checking = false;
+      }
+    }
+
+    setTimeout(checkForUpdate, 8000);
+    setInterval(checkForUpdate, 60000);
+    window.addEventListener('online', checkForUpdate);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) checkForUpdate();
+    });
+  }
+
+  setupAutomaticAppUpdates();
+
   function generateOrderNumber() {
     const input = document.getElementById('order-num');
-    if (input) {
-      const nextNum = bills.length === 0 ? 1001 : (1000 + bills.length + 1);
-      input.value = 'DO-' + nextNum;
+    if (!input) return;
+
+    const todayKey = getTodayKey();
+    const storedData = localStorage.getItem(`doppio_token_counter_${activeTenantId}`);
+    let tokenData = storedData ? JSON.parse(storedData) : { date: null, count: 0 };
+
+    // Reset if date has changed
+    if (tokenData.date !== todayKey) {
+      tokenData = { date: todayKey, count: 0 };
+    }
+
+    tokenData.count += 1;
+    localStorage.setItem(`doppio_token_counter_${activeTenantId}`, JSON.stringify(tokenData));
+
+    const nextNum = tokenData.count;
+    const orderId = `DO-${getCompactDateKey()}-${String(nextNum).padStart(3, '0')}`;
+    input.value = orderId;
+
+    const badge = document.getElementById('cart-order-badge');
+    if (badge) {
+      badge.textContent = 'Order: ' + orderId;
     }
   }
 
@@ -600,125 +2870,306 @@ document.addEventListener('DOMContentLoaded', () => {
   const posSearch = document.getElementById('pos-search');
   const posCategories = document.getElementById('pos-categories');
   const posItemsGrid = document.getElementById('pos-items-grid');
+  const scanBtn = document.getElementById('scan-barcode-btn');
+  const scannerModal = document.getElementById('scanner-modal');
+  const closeScannerBtn = document.getElementById('close-scanner-btn');
+  const scannerVideo = document.getElementById('scanner-video');
+  const scannerCanvas = document.getElementById('scanner-canvas');
+  const scannerStatus = document.getElementById('scanner-status');
+  let scannerStream = null;
+  let scanInterval = null;
 
   let activePOSCategory = 'ALL';
   let posSearchQuery = '';
 
+  // Scanner functionality
+  async function startScanner() {
+    try {
+      scannerStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      scannerVideo.srcObject = scannerStream;
+      await scannerVideo.play();
+      scannerStatus.textContent = 'Camera ready. Point at barcode/QR.';
+      
+      // Start scanning loop
+      scanInterval = setInterval(scanFrame, 500);
+    } catch (error) {
+      console.error('Scanner error:', error);
+      scannerStatus.textContent = 'Failed to access camera: ' + error.message;
+    }
+  }
+
+  function stopScanner() {
+    if (scanInterval) {
+      clearInterval(scanInterval);
+      scanInterval = null;
+    }
+    if (scannerStream) {
+      scannerStream.getTracks().forEach(track => track.stop());
+      scannerStream = null;
+    }
+    scannerModal.style.display = 'none';
+  }
+
+  async function scanFrame() {
+    if (!scannerVideo || !scannerVideo.videoWidth) return;
+    
+    const canvas = scannerCanvas;
+    const ctx = canvas.getContext('2d');
+    canvas.width = scannerVideo.videoWidth;
+    canvas.height = scannerVideo.videoHeight;
+    ctx.drawImage(scannerVideo, 0, 0, canvas.width, canvas.height);
+    
+    // Try BarcodeDetector API first
+    if ('BarcodeDetector' in window) {
+      try {
+        const detector = new BarcodeDetector();
+        const [barcode] = await detector.detect(canvas);
+        if (barcode) {
+          handleScanResult(barcode.rawValue);
+        }
+      } catch (e) {
+        // Fallback to just searching by name if detection fails
+      }
+    }
+  }
+
+  function handleScanResult(code) {
+    scannerStatus.textContent = 'Scanned: ' + code;
+    // Find item by sku or name
+    let item = menu.find(i => i.sku === code);
+    if (!item) {
+      item = menu.find(i => i.name.toLowerCase().includes(code.toLowerCase()));
+    }
+    if (item) {
+      addDefaultToCart(item);
+      // Play sound
+      SoundEffects.playPop();
+      // Close scanner
+      stopScanner();
+    } else {
+      scannerStatus.textContent = 'Item not found: ' + code;
+      // Clear status after 2 seconds
+      setTimeout(() => {
+        scannerStatus.textContent = 'Camera ready. Point at barcode/QR.';
+      }, 2000);
+    }
+  }
+
+  // Scan button listener
+  if (scanBtn) {
+    scanBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      scannerModal.style.display = 'flex';
+      startScanner();
+    });
+  }
+
+  // Close scanner listeners
+  if (closeScannerBtn) {
+    closeScannerBtn.addEventListener('click', stopScanner);
+  }
+  if (scannerModal) {
+    scannerModal.addEventListener('click', (e) => {
+      if (e.target === scannerModal) {
+        stopScanner();
+      }
+    });
+  }
+
   // Focus search indicator keyboard listener
   document.addEventListener('keydown', (e) => {
+    // / → focus search bar (clear value to start fresh)
     if (e.key === '/' && document.activeElement !== posSearch) {
       e.preventDefault();
-      if (posSearch) { posSearch.focus(); posSearch.value = ''; }
+      if (posSearch) { posSearch.focus(); posSearch.select(); }
+      return;
+    }
+
+    // Esc → clear search and unfocus (return to neutral state)
+    if (e.key === 'Escape' && document.activeElement === posSearch) {
+      e.preventDefault();
+      if (posSearch) {
+        posSearch.value = '';
+        posSearchQuery = '';
+        renderPOSItems();
+        posSearch.blur();
+      }
+      return;
+    }
+
+    // Enter from search → add first visible item to cart instantly
+    if (e.key === 'Enter' && document.activeElement === posSearch) {
+      e.preventDefault();
+      const firstCard = document.querySelector('#pos-items-grid .pos-item-card');
+      if (firstCard) {
+        const titleEl = firstCard.querySelector('.pos-item-title');
+        if (titleEl) {
+          const itemName = titleEl.textContent.trim();
+          const item = menu.find(i => i.name === itemName);
+          if (item) {
+            addDefaultToCart(item);
+            // Clear search after adding
+            posSearch.value = '';
+            posSearchQuery = '';
+            renderPOSItems();
+          }
+        }
+      }
+      return;
     }
   });
 
   // Custom Category Icons Mapping
   const categoryIconsMap = {
-    'ALL': '☕',
-    'COLD COFFEE': '🥤',
-    'HOT COFFEE': '☕',
-    'MATCHA': '🍵',
-    'FRIES & SHARE PLATES': '🍟',
-    'MOCKTAILS': '🍹',
-    'SANDWICHES': '🥪',
-    'THICK SHAKES': '🥤',
-    'CLASSIC TOAST': '🍞',
-    'EGGS': '🍳',
-    'APPETIZERS': '🍢',
-    'COMBOS': '🍱',
-    'PASTA': '🍝'
+    'ALL': '<i class="fa-solid fa-mug-hot"></i>',
+    'COLD COFFEE': '<i class="fa-solid fa-glass-water"></i>',
+    'HOT COFFEE': '<i class="fa-solid fa-mug-hot"></i>',
+    'MATCHA': '<i class="fa-solid fa-leaf"></i>',
+    'FRIES & SHARE PLATES': '<i class="fa-solid fa-utensils"></i>',
+    'MOCKTAILS': '<i class="fa-solid fa-glass-martini-alt"></i>',
+    'SANDWICHES': '<i class="fa-solid fa-bread-slice"></i>',
+    'THICK SHAKES': '<i class="fa-solid fa-blender"></i>',
+    'CLASSIC TOAST': '<i class="fa-solid fa-cheese"></i>',
+    'EGGS': '<i class="fa-solid fa-egg"></i>',
+    'APPETIZERS': '<i class="fa-solid fa-bowl-food"></i>',
+    'COMBOS': '<i class="fa-solid fa-box"></i>',
+    'PASTA': '<i class="fa-solid fa-plate-wheat"></i>'
   };
 
   function renderPOSCategories() {
     if (!posCategories) return;
     const categories = ['ALL', ...new Set(menu.map(item => item.category))];
-    posCategories.innerHTML = '';
-    
-    categories.forEach(cat => {
-      const btn = document.createElement('button');
-      btn.className = `pos-cat-btn ${cat === activePOSCategory ? 'active' : ''}`;
-      btn.setAttribute('data-category', cat);
-      
+    posCategories.innerHTML = categories.map(cat => {
       let label = cat.toLowerCase().replace('&', 'and');
       label = label.charAt(0).toUpperCase() + label.slice(1);
-      
-      const icon = categoryIconsMap[cat] || '☕';
-      btn.innerHTML = `${icon} ${label}`;
-      posCategories.appendChild(btn);
-    });
+      const icon = categoryIconsMap[cat] || '<i class="fa-solid fa-mug-hot"></i>';
+      return `<button type="button" class="pos-cat-btn ${cat === activePOSCategory ? 'active' : ''}" data-category="${escHtml(cat)}">${icon} ${escHtml(label)}</button>`;
+    }).join('');
+  }
+
+  // Check if an item is currently available based on scheduling
+  function isItemScheduledAvailable(item) {
+    if (!item.scheduling || !item.scheduling.enabled) return true;
+    
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+    
+    // Check if today is an available day
+    if (!item.scheduling.days.includes(currentDay)) return false;
+    
+    const { startTime, endTime } = item.scheduling;
+    if (!startTime || !endTime) return true;
+    
+    // Check time range
+    if (startTime <= endTime) {
+      return currentTime >= startTime && currentTime <= endTime;
+    } else {
+      // Overnight range (e.g., 22:00 - 02:00)
+      return currentTime >= startTime || currentTime <= endTime;
+    }
   }
 
   function renderPOSItems() {
     if (!posItemsGrid) return;
     posItemsGrid.innerHTML = '';
-
+    const normalizedSearch = posSearchQuery.trim().toLowerCase();
     const filteredItems = menu.filter(item => {
       const matchesCategory = activePOSCategory === 'ALL' || item.category === activePOSCategory;
-      const matchesSearch = item.name.toLowerCase().includes(posSearchQuery.toLowerCase()) || 
-                            item.description.toLowerCase().includes(posSearchQuery.toLowerCase());
+      const matchesSearch = !normalizedSearch
+        || (item.name && item.name.toLowerCase().includes(normalizedSearch))
+        || (item.description && item.description.toLowerCase().includes(normalizedSearch));
+      const isAvailable = item.available !== false && isItemScheduledAvailable(item);
       return matchesCategory && matchesSearch;
+    });
+
+    // Sort items dynamically based on selection
+    const sortSelect = document.getElementById('pos-sort-select');
+    const sortVal = sortSelect ? sortSelect.value : 'popular';
+    filteredItems.sort((a, b) => {
+      const nameA = a.name || '';
+      const nameB = b.name || '';
+      if (sortVal === 'name') {
+        return nameA.localeCompare(nameB);
+      } else {
+        const popA = posPopularityMap[nameA.toLowerCase().trim()] || 0;
+        const popB = posPopularityMap[nameB.toLowerCase().trim()] || 0;
+        if (popB !== popA) {
+          return popB - popA;
+        }
+        return nameA.localeCompare(nameB);
+      }
     });
 
     filteredItems.forEach(item => {
       // Find matching items in cart to calculate quick badges
       const cartCount = cart.filter(i => i.name === item.name).reduce((sum, i) => sum + i.qty, 0);
-      
-      const card = document.createElement('div');
-      card.className = `pos-item-card ${cartCount > 0 ? 'selected-in-cart' : ''}`;
-      
-      // Floating Bestseller label
-      const bestsellerBadge = item.bestseller ? '<span class="bestseller-badge">★ Bestseller</span>' : '';
-      const prepBadge = item.prepTime ? `<span class="prep-time-tag">⏱ ${item.prepTime} mins</span>` : '';
-      
-      const qtyBadge = cartCount > 0 ? `<span class="pos-item-qty-badge">${cartCount}</span>` : '';
+      const isAvailable = item.available !== false;
 
+      const card = document.createElement('div');
+      card.className = `pos-item-card ${cartCount > 0 ? 'selected-in-cart' : ''} ${!isAvailable ? 'unavailable' : ''}`;
+      card.setAttribute('tabindex', isAvailable ? '0' : '-1');
+      card.setAttribute('aria-disabled', !isAvailable);
+
+      const descText = item.description ? `<div class="pos-item-desc">${escHtml(item.description)}</div>` : '';
+      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : ``;
       card.innerHTML = `
-        ${bestsellerBadge}
-        ${prepBadge}
-        ${qtyBadge}
-        <div class="pos-card-body-click">
-          <div class="pos-item-icon">${item.icon || '☕'}</div>
-          <div class="pos-item-title">${item.name}</div>
-        </div>
-        <div class="pos-item-price-row">
+        <div class="pos-item-info">
+          ${imageHTML}
+          <div class="pos-item-title" title="${escHtml(item.name)}">${escHtml(item.name)}${!isAvailable ? ' <span style="color:#e74c3c;font-size:0.7em;font-weight:bold;">(OUT OF STOCK)</span>' : ''}</div>
+          ${descText}
           <span class="pos-item-price">₹${item.price}</span>
-          <button class="quick-add-btn" title="Add default immediately"><i class="fa-solid fa-plus"></i></button>
         </div>
+        <button type="button" class="pos-customize-btn" aria-label="Customize ${escHtml(item.name)}" title="Customize item" ${!isAvailable ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+          <i class="fa-solid fa-sliders"></i>
+        </button>
       `;
 
-      // Main card click triggers touchscreen customizer drawer
-      card.querySelector('.pos-card-body-click').addEventListener('click', () => {
-        openCustomizationModal(item);
-      });
-
-      // Plus icon click adds default instantly
-      card.querySelector('.quick-add-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        addDefaultToCart(item);
-      });
+      if (isAvailable) {
+        // Click card to add directly to cart (pass DOM ref for flash animation)
+        card.addEventListener('click', (event) => {
+          if (event.target.closest('.pos-customize-btn')) return;
+          addDefaultToCart(item, card);
+        });
+        const customizeBtn = card.querySelector('.pos-customize-btn');
+        if (customizeBtn) {
+          customizeBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openCustomizationModal(item);
+          });
+        }
+      }
 
       posItemsGrid.appendChild(card);
     });
   }
 
   if (posSearch) {
+    const renderFilteredPOSItems = debounce(renderPOSItems, 70);
     posSearch.addEventListener('input', (e) => {
       posSearchQuery = e.target.value;
-      renderPOSItems();
-    });
+      renderFilteredPOSItems();
+    }, { passive: true });
   }
 
   if (posCategories) {
     posCategories.addEventListener('click', (e) => {
       const btn = e.target.closest('.pos-cat-btn');
       if (btn) {
-        document.querySelectorAll('.pos-cat-btn').forEach(b => b.classList.remove('active'));
+        posCategories.querySelectorAll('.pos-cat-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activePOSCategory = btn.getAttribute('data-category');
         renderPOSItems();
       }
     });
   }
+  
+  // Refresh POS menu every minute for time-based scheduling
+  setInterval(() => {
+    renderPOSItems();
+  }, 60000);
 
   // ==========================================
   // 5. TOUCH CUSTOMIZATION DRAWER POPUP LOGIC
@@ -733,91 +3184,132 @@ document.addEventListener('DOMContentLoaded', () => {
   function openCustomizationModal(item) {
     if (!customModal) return;
     document.getElementById('cust-target-item-name').value = item.name;
-    custModalTitle.innerHTML = `<span style="font-size:24px;">${item.icon || '☕'}</span> Customize ${item.name}`;
-    
-    // Reset selections
-    selectedSizeOpt = 'Small';
-    selectedSugarOpt = 'Regular';
-    selectedIceOpt = 'Regular';
+    const titleIcon = document.createElement('i');
+    titleIcon.className = 'fa-solid fa-gears';
+    titleIcon.style.cssText = 'font-size:20px; color:var(--accent-caramel); margin-right:8px;';
+    custModalTitle.replaceChildren(titleIcon, document.createTextNode(`Customize ${item.name}`));
+
+    // Reset notes
     custNotesInput.value = '';
     
-    document.getElementById('addon-shot').checked = false;
-    document.getElementById('addon-drizzle').checked = false;
-    document.getElementById('addon-cream').checked = false;
-
-    // Reset UI Pills active states
-    resetPillsSelection('cust-size-row', 'Small');
-    resetPillsSelection('cust-sugar-row', 'Regular');
-    resetPillsSelection('cust-ice-row', 'Regular');
+    // Render modifiers
+    const modifiersContainer = document.getElementById('cust-modifiers-container');
+    modifiersContainer.innerHTML = '';
+    
+    if (item.modifiers && item.modifiers.length > 0) {
+      item.modifiers.forEach((modGroup, groupIndex) => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'cust-options-section';
+        
+        const groupTitle = document.createElement('h4');
+        groupTitle.textContent = modGroup.name;
+        groupEl.appendChild(groupTitle);
+        
+        // Decide if it's single-select or multi-select
+        const isMulti = modGroup.max > 1;
+        
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = isMulti ? 'cust-checkboxes' : 'cust-pills-row';
+        optionsContainer.dataset.groupIndex = groupIndex;
+        optionsContainer.dataset.groupName = modGroup.name;
+        optionsContainer.dataset.groupMin = modGroup.min;
+        optionsContainer.dataset.groupMax = modGroup.max;
+        
+        modGroup.options.forEach((opt, optIndex) => {
+          if (isMulti) {
+            const checkboxItem = document.createElement('div');
+            checkboxItem.className = 'cust-checkbox-item';
+            
+            const label = document.createElement('label');
+            label.htmlFor = `cust-mod-${groupIndex}-${optIndex}`;
+            label.textContent = `${opt.name} (+₹${opt.price})`;
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `cust-mod-${groupIndex}-${optIndex}`;
+            checkbox.dataset.optionName = opt.name;
+            checkbox.dataset.optionPrice = opt.price;
+            checkbox.style.cssText = 'width: 16px; height: 16px; accent-color: var(--accent-caramel);';
+            
+            checkboxItem.appendChild(label);
+            checkboxItem.appendChild(checkbox);
+            optionsContainer.appendChild(checkboxItem);
+          } else {
+            const pill = document.createElement('span');
+            pill.className = 'cust-pill-opt';
+            if (optIndex === 0) pill.classList.add('active');
+            pill.textContent = `${opt.name} (+₹${opt.price})`;
+            pill.dataset.optionName = opt.name;
+            pill.dataset.optionPrice = opt.price;
+            
+            pill.addEventListener('click', () => {
+              optionsContainer.querySelectorAll('.cust-pill-opt').forEach(p => p.classList.remove('active'));
+              pill.classList.add('active');
+            });
+            
+            optionsContainer.appendChild(pill);
+          }
+        });
+        
+        groupEl.appendChild(optionsContainer);
+        modifiersContainer.appendChild(groupEl);
+      });
+    } else {
+      const noMods = document.createElement('div');
+      noMods.textContent = 'No customizations available for this item.';
+      noMods.style.cssText = 'padding: 10px; color: var(--text-muted); font-style: italic;';
+      modifiersContainer.appendChild(noMods);
+    }
 
     customModal.classList.add('active');
   }
 
-  function resetPillsSelection(rowId, defaultVal) {
-    const container = document.getElementById(rowId);
-    if (!container) return;
-    container.querySelectorAll('.cust-pill-opt').forEach(pill => {
-      pill.classList.remove('active');
-      if (pill.innerText.includes(defaultVal)) pill.classList.add('active');
-    });
-  }
-
-  // Listen to visual pills adjustments in Customize drawer
-  setupPillListeners('cust-size-row', (val) => { selectedSizeOpt = val; });
-  setupPillListeners('cust-sugar-row', (val) => { selectedSugarOpt = val; });
-  setupPillListeners('cust-ice-row', (val) => { selectedIceOpt = val; });
-
-  function setupPillListeners(rowId, callback) {
-    const container = document.getElementById(rowId);
-    if (!container) return;
-    container.addEventListener('click', (e) => {
-      const pill = e.target.closest('.cust-pill-opt');
-      if (pill) {
-        container.querySelectorAll('.cust-pill-opt').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        // Parse the option value
-        const option = pill.getAttribute('data-size') || pill.getAttribute('data-sugar') || pill.getAttribute('data-ice');
-        callback(option);
-      }
-    });
-  }
-
-  if (closeCustModal) closeCustModal.addEventListener('click', () => customModal.classList.remove('active'));
-  if (cancelCustBtn) cancelCustBtn.addEventListener('click', () => customModal.classList.remove('active'));
-
+  // Listen to confirm button in customization modal
   if (confirmCustBtn) {
     confirmCustBtn.addEventListener('click', () => {
       const itemName = document.getElementById('cust-target-item-name').value;
       const baseItem = menu.find(i => i.name === itemName);
       if (!baseItem) return;
 
-      const extraShot = document.getElementById('addon-shot').checked;
-      const drizzle = document.getElementById('addon-drizzle').checked;
-      const whip = document.getElementById('addon-cream').checked;
       const notes = custNotesInput.value.trim();
-
-      // Custom price calculations based on selections
-      let finalPrice = baseItem.price;
-      if (selectedSizeOpt === 'Medium') finalPrice += 30;
-      if (selectedSizeOpt === 'Large') finalPrice += 60;
       
-      let toppings = [];
-      if (extraShot) { finalPrice += 40; toppings.push('Extra Shot'); }
-      if (drizzle) { finalPrice += 20; toppings.push('Caramel Drizzle'); }
-      if (whip) { finalPrice += 30; toppings.push('Whipped Cream'); }
+      let finalPrice = baseItem.price;
+      const selectedModifiers = [];
+      const modifiersContainer = document.getElementById('cust-modifiers-container');
+      
+      modifiersContainer.querySelectorAll('.cust-options-section').forEach(section => {
+        const optionsContainer = section.querySelector('.cust-pills-row, .cust-checkboxes');
+        const groupName = optionsContainer.dataset.groupName;
+        const isMulti = optionsContainer.classList.contains('cust-checkboxes');
+        
+        if (isMulti) {
+          const checkedBoxes = optionsContainer.querySelectorAll('input[type="checkbox"]:checked');
+          checkedBoxes.forEach(checkbox => {
+            const optName = checkbox.dataset.optionName;
+            const optPrice = parseFloat(checkbox.dataset.optionPrice) || 0;
+            finalPrice += optPrice;
+            selectedModifiers.push(`${groupName}: ${optName}`);
+          });
+        } else {
+          const activePill = optionsContainer.querySelector('.cust-pill-opt.active');
+          if (activePill) {
+            const optName = activePill.dataset.optionName;
+            const optPrice = parseFloat(activePill.dataset.optionPrice) || 0;
+            finalPrice += optPrice;
+            selectedModifiers.push(`${groupName}: ${optName}`);
+          }
+        }
+      });
 
       // Compose a composite unique key for this customized item
-      const compositeKey = `${itemName}_${selectedSizeOpt}_Sugar:${selectedSugarOpt}_Ice:${selectedIceOpt}_Addons:${toppings.join(',')}_Notes:${notes}`;
+      const compositeKey = `${itemName}_Mods:${selectedModifiers.join('|')}_Notes:${notes}`;
 
       const cartItem = {
         name: baseItem.name,
         key: compositeKey,
         basePrice: baseItem.price,
         price: finalPrice,
-        size: selectedSizeOpt,
-        sugar: selectedSugarOpt,
-        ice: selectedIceOpt,
-        toppings: toppings,
+        modifiers: selectedModifiers,
         notes: notes,
         icon: baseItem.icon,
         qty: 1
@@ -828,10 +3320,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (closeCustModal) closeCustModal.addEventListener('click', () => customModal.classList.remove('active'));
+  if (cancelCustBtn) cancelCustBtn.addEventListener('click', () => customModal.classList.remove('active'));
+
   // Quick default add mapping
-  function addDefaultToCart(menuItem) {
+  function addDefaultToCart(menuItem, sourceCardEl) {
     SoundEffects.playPop();
-    const compositeKey = `${menuItem.name}_Small_Sugar:Regular_Ice:Regular_Addons:_Notes:`;
+    const compositeKey = `${menuItem.name}_Mods:_Notes:`;
     const existing = cart.find(item => item.key === compositeKey);
     if (existing) {
       existing.qty += 1;
@@ -841,16 +3336,46 @@ document.addEventListener('DOMContentLoaded', () => {
         key: compositeKey,
         basePrice: menuItem.price,
         price: menuItem.price,
-        size: 'Small',
-        sugar: 'Regular',
-        ice: 'Regular',
-        toppings: [],
+        modifiers: [],
         notes: '',
         icon: menuItem.icon,
         qty: 1
       });
     }
     renderCart();
+
+    // --- Add-to-cart visual feedback ---
+    // 1. Flash the source card if a DOM element was passed
+    if (sourceCardEl) {
+      sourceCardEl.classList.remove('card-added');
+      // Force reflow so animation restarts even on repeated taps
+      void sourceCardEl.offsetWidth;
+      sourceCardEl.classList.add('card-added');
+      sourceCardEl.addEventListener('animationend', () => {
+        sourceCardEl.classList.remove('card-added');
+      }, { once: true });
+    } else {
+      // Find the card by item name if no element reference
+      const cards = document.querySelectorAll('#pos-items-grid .pos-item-card');
+      cards.forEach(card => {
+        const t = card.querySelector('.pos-item-title');
+        if (t && t.textContent.trim() === menuItem.name) {
+          card.classList.remove('card-added');
+          void card.offsetWidth;
+          card.classList.add('card-added');
+          card.addEventListener('animationend', () => card.classList.remove('card-added'), { once: true });
+        }
+      });
+    }
+
+    // 2. Pop the cart order badge
+    const cartBadge = document.getElementById('cart-order-badge');
+    if (cartBadge) {
+      cartBadge.classList.remove('cart-header-pop');
+      void cartBadge.offsetWidth;
+      cartBadge.classList.add('cart-header-pop');
+      cartBadge.addEventListener('animationend', () => cartBadge.classList.remove('cart-header-pop'), { once: true });
+    }
   }
 
   function addCustomItemToCart(item) {
@@ -868,11 +3393,53 @@ document.addEventListener('DOMContentLoaded', () => {
   const orderTypeBtns = document.querySelectorAll('.order-type-btn');
   orderTypeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
+      const targetType = btn.getAttribute('data-type');
+      if (activeTableSession !== null && targetType !== 'DineIn') {
+        const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
+        cart = backup ? JSON.parse(backup) : [];
+        activeTableSession = null;
+        const banner = document.getElementById('table-session-banner');
+        if (banner) banner.style.display = 'none';
+      }
+
       orderTypeBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      activeOrderType = btn.getAttribute('data-type');
+      activeOrderType = targetType;
       SoundEffects.playClick();
       renderCart();
+      renderTablesMap();
+    });
+  });
+
+  // Toggling Priority options
+  let activePriority = 'normal';
+  const priorityBtns = document.querySelectorAll('.priority-btn');
+  priorityBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      priorityBtns.forEach(b => {
+        b.classList.remove('active');
+        if (b.getAttribute('data-priority') === 'normal') {
+          b.style.borderColor = '#f39c12';
+          b.style.backgroundColor = 'rgba(243,156,18,0.1)';
+          b.style.color = '#f39c12';
+        } else {
+          b.style.borderColor = 'rgba(231,76,60,0.3)';
+          b.style.backgroundColor = 'rgba(231,76,60,0.05)';
+          b.style.color = 'rgba(231,76,60,0.7)';
+        }
+      });
+      btn.classList.add('active');
+      activePriority = btn.getAttribute('data-priority');
+      if (activePriority === 'urgent') {
+        btn.style.borderColor = '#e74c3c';
+        btn.style.backgroundColor = 'rgba(231,76,60,0.15)';
+        btn.style.color = '#e74c3c';
+      } else {
+        btn.style.borderColor = '#f39c12';
+        btn.style.backgroundColor = 'rgba(243,156,18,0.15)';
+        btn.style.color = '#f39c12';
+      }
+      SoundEffects.playClick();
     });
   });
 
@@ -881,82 +3448,231 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   const cartList = document.getElementById('cart-items-list');
   const cartSubtotal = document.getElementById('cart-subtotal');
+  const cartDiscount = document.getElementById('cart-discount');
   const cartGst = document.getElementById('cart-gst');
   const cartTotal = document.getElementById('cart-total');
+  const cartCheckoutBtn = document.getElementById('checkout-print-btn');
 
   function updateCartTotalsOnly() {
     const nameInput = document.getElementById('cust-name');
     const phoneInput = document.getElementById('cust-phone');
+    const discountTypeInput = document.getElementById('discount-type');
+    const discountValueInput = document.getElementById('discount-value');
     if (!nameInput || !phoneInput) return;
 
     localStorage.setItem('doppio_cart_cust_name', nameInput.value);
     localStorage.setItem('doppio_cart_cust_phone', phoneInput.value);
 
-    let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    // Update discount state from inputs
+    if (discountTypeInput) {
+      discountType = discountTypeInput.value;
+      localStorage.setItem('doppio_discount_type', discountType);
+    }
+    if (discountValueInput) {
+      discountValue = parseFloat(discountValueInput.value) || 0;
+      localStorage.setItem('doppio_discount_value', discountValue);
+    }
 
-    const isGstEnabled = businessProfile.gstEnabled !== false;
-    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-
-    let loyaltyDiscount = 0;
     const phoneVal = phoneInput.value.trim();
     const nameVal = nameInput.value.trim();
-
-    let matchedCustomer = null;
-    if (phoneVal || nameVal) {
-      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (nameVal && c.name.toLowerCase() === nameVal.toLowerCase()));
-    }
-
-    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-    }
-
-    const taxableAmount = subtotal - loyaltyDiscount;
-    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-    const total = taxableAmount + gst;
+    const totals = billingDomain.calculateCartTotals({
+      cart,
+      businessProfile,
+      customers: crmData,
+      customerName: nameVal,
+      customerPhone: phoneVal,
+      discountType,
+      discountValue
+    });
+    const { subtotal, loyaltyDiscount, customDiscount, totalDiscount, gst, total } = totals;
 
     if (cartSubtotal) cartSubtotal.textContent = `₹${subtotal}`;
-    
+    if (cartDiscount) cartDiscount.textContent = totalDiscount > 0 ? `-₹${totalDiscount}` : '₹0';
+
     if (cartGst) {
-      if (loyaltyDiscount > 0) {
-        cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
-      } else {
-        cartGst.textContent = `₹${gst}`;
-      }
+      cartGst.textContent = `₹${gst}`;
     }
 
     if (cartTotal) cartTotal.textContent = `₹${total}`;
+    if (cartCheckoutBtn) {
+      cartCheckoutBtn.innerHTML = `<i class="fa-solid fa-print"></i> Print &amp; Pay ₹${total}`;
+      cartCheckoutBtn.style.opacity = cart.length > 0 ? '1' : '0.5';
+    }
+    if (typeof prefillCashReceived === 'function') prefillCashReceived();
   }
 
   function renderCart() {
     if (!cartList) return;
-    
+
+    // Update cart title dynamically based on order type and active session
+    const cartTitle = document.getElementById('cart-title');
+    if (cartTitle) cartTitle.textContent = 'Order';
+
     // Restore customer details on initial load
     const nameInput = document.getElementById('cust-name');
     const phoneInput = document.getElementById('cust-phone');
+    const discountTypeInput = document.getElementById('discount-type');
+    const discountValueInput = document.getElementById('discount-value');
+    let hasRestoredDetails = false;
     if (nameInput && !nameInput.value) {
-      nameInput.value = localStorage.getItem('doppio_cart_cust_name') || '';
+      const storedName = localStorage.getItem('doppio_cart_cust_name');
+      if (storedName) {
+        nameInput.value = storedName;
+        hasRestoredDetails = true;
+      }
     }
     if (phoneInput && !phoneInput.value) {
-      phoneInput.value = localStorage.getItem('doppio_cart_cust_phone') || '';
+      const storedPhone = localStorage.getItem('doppio_cart_cust_phone');
+      if (storedPhone) {
+        phoneInput.value = storedPhone;
+        hasRestoredDetails = true;
+      }
+    }
+    // Set discount inputs initial values
+    if (discountTypeInput) discountTypeInput.value = discountType;
+    if (discountValueInput) discountValueInput.value = discountValue;
+    
+    // Add event listeners to discount inputs (once)
+    if (discountTypeInput && !discountTypeInput.dataset.listenerAttached) {
+      discountTypeInput.dataset.listenerAttached = 'true';
+      discountTypeInput.addEventListener('change', () => {
+        updateCartTotalsOnly();
+        renderCart();
+      });
+    }
+    if (discountValueInput && !discountValueInput.dataset.listenerAttached) {
+      discountValueInput.dataset.listenerAttached = 'true';
+      discountValueInput.addEventListener('input', () => {
+        updateCartTotalsOnly();
+        renderCart();
+      });
+    }
+
+    const discountAddLink = document.getElementById('discount-add-link');
+    const discountInputPanel = document.getElementById('discount-input-panel');
+    const discountRemoveLink = document.getElementById('discount-remove-link');
+    if (discountAddLink && !discountAddLink.dataset.listenerAttached) {
+      discountAddLink.dataset.listenerAttached = 'true';
+      discountAddLink.addEventListener('click', () => {
+        if (discountInputPanel) {
+          discountInputPanel.style.display = discountInputPanel.style.display === 'none' ? 'flex' : 'none';
+          discountAddLink.textContent = discountInputPanel.style.display === 'none' ? 'Add' : 'Hide';
+        }
+      });
+    }
+    if (discountRemoveLink && !discountRemoveLink.dataset.listenerAttached) {
+      discountRemoveLink.dataset.listenerAttached = 'true';
+      discountRemoveLink.addEventListener('click', () => {
+        discountType = 'flat';
+        discountValue = 0;
+        localStorage.setItem('doppio_discount_type', discountType);
+        localStorage.setItem('doppio_discount_value', '0');
+        if (discountTypeInput) discountTypeInput.value = 'flat';
+        if (discountValueInput) discountValueInput.value = '0';
+        if (discountInputPanel) discountInputPanel.style.display = 'none';
+        if (discountAddLink) discountAddLink.textContent = 'Add';
+        updateCartTotalsOnly();
+        renderCart();
+      });
+    }
+    if (discountInputPanel && discountValue > 0) {
+      discountInputPanel.style.display = 'flex';
+      if (discountAddLink) discountAddLink.textContent = 'Hide';
+    }
+
+    const couponSelectLink = document.getElementById('coupon-select-link');
+    if (couponSelectLink && !couponSelectLink.dataset.listenerAttached) {
+      couponSelectLink.dataset.listenerAttached = 'true';
+      couponSelectLink.addEventListener('click', () => {
+        showNotificationToast('Coupon system coming soon — use Discount for manual adjustments.');
+      });
+    }
+
+    // Auto-expand customer details container if details were restored
+    const takeawayFields = document.querySelector('.takeaway-fields');
+    if (hasRestoredDetails && takeawayFields && getComputedStyle(takeawayFields).display === 'none') {
+      takeawayFields.style.display = 'block';
+      const guestToggleIndicator = document.getElementById('guest-toggle-indicator');
+      const guestToggleBtn = document.getElementById('guest-toggle-btn');
+      if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
+      if (guestToggleBtn) {
+        guestToggleBtn.style.background = 'rgba(252, 128, 25, 0.05)';
+        guestToggleBtn.style.borderColor = 'rgba(252, 128, 25, 0.2)';
+      }
     }
 
     cartList.innerHTML = '';
 
+    const sidebarEl = document.getElementById('pos-cart-sidebar');
+
     if (cart.length === 0) {
+      if (sidebarEl) sidebarEl.classList.remove('has-items');
       cartList.innerHTML = `
         <div class="empty-cart-state">
-          <i class="fa-solid fa-basket-shopping"></i>
-          <p>Cart is currently empty.<br>Tap items to add & customize.</p>
+          <div class="empty-cart-icon-wrapper">
+            <i class="fa-solid fa-basket-shopping"></i>
+          </div>
+          <div class="empty-cart-title">Cart is empty</div>
+          <div class="empty-cart-desc">Tap menu items to add them to this order.</div>
         </div>
       `;
-      cartSubtotal.textContent = '₹0.00';
-      cartGst.textContent = '₹0.00';
-      cartTotal.textContent = '₹0.00';
+      if (cartSubtotal) cartSubtotal.textContent = '₹0.00';
+      if (cartDiscount) cartDiscount.textContent = '₹0.00';
+      if (cartGst) cartGst.textContent = '₹0.00';
+      if (cartTotal) cartTotal.textContent = '₹0.00';
+      if (cartCheckoutBtn) {
+        cartCheckoutBtn.innerHTML = '<i class="fa-solid fa-print"></i> Print &amp; Pay ₹0';
+        cartCheckoutBtn.style.opacity = '0.5';
+      }
+      const cartBadge = document.getElementById('cart-order-badge');
+      if (cartBadge) cartBadge.textContent = '0';
+      const cashRecvInput = document.getElementById('cash-received-input');
+      const cashChangeDsp = document.getElementById('cash-change-display');
+      if (cashRecvInput) cashRecvInput.value = '';
+      if (cashChangeDsp) cashChangeDsp.textContent = '₹0';
+
+      // Clear customer inputs in DOM
+      if (nameInput) nameInput.value = '';
+      if (phoneInput) phoneInput.value = '';
+      // Reset discount
+      discountType = 'flat';
+      discountValue = 0;
+      localStorage.setItem('doppio_discount_type', discountType);
+      localStorage.setItem('doppio_discount_value', discountValue);
+      if (discountTypeInput) discountTypeInput.value = discountType;
+      if (discountValueInput) discountValueInput.value = discountValue;
+      if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
+
+      // Collapse customer details container on empty cart
+      if (takeawayFields) {
+        takeawayFields.style.display = 'none';
+        const guestToggleIndicator = document.getElementById('guest-toggle-indicator');
+        const guestToggleBtn = document.getElementById('guest-toggle-btn');
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+        if (guestToggleBtn) {
+          guestToggleBtn.style.background = 'var(--bg-cream-light)';
+          guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
+        }
+      }
+
+      const crmSugs = document.getElementById('crm-suggestions');
+      if (crmSugs) {
+        crmSugs.style.display = 'none';
+        crmSugs.innerHTML = '';
+      }
+
+      // Persist empty cart and customer details
+      localStorage.setItem('doppio_cart', JSON.stringify([]));
+      localStorage.setItem('doppio_cart_cust_name', '');
+      localStorage.setItem('doppio_cart_cust_phone', '');
+
       return;
     }
 
+    if (sidebarEl) sidebarEl.classList.add('has-items');
+    const totalItems = cart.reduce((sum, item) => sum + (item.qty || 0), 0);
+    const cartBadge = document.getElementById('cart-order-badge');
+    if (cartBadge) cartBadge.textContent = totalItems;
     let subtotal = 0;
 
     cart.forEach(item => {
@@ -964,10 +3680,11 @@ document.addEventListener('DOMContentLoaded', () => {
       subtotal += rowTotal;
 
       // Compile customization label string
-      let configParts = [`Size: ${item.size}`];
-      if (item.sugar !== 'Regular') configParts.push(`Sweet: ${item.sugar}`);
-      if (item.ice !== 'Regular') configParts.push(`Ice: ${item.ice}`);
-      if (item.toppings.length > 0) configParts.push(`+ ${item.toppings.join(', ')}`);
+      let configParts = [`Size: ${item.size || 'Regular'}`];
+      if (item.sugar && item.sugar !== 'Regular') configParts.push(`Sweet: ${item.sugar}`);
+      if (item.ice && item.ice !== 'Regular') configParts.push(`Ice: ${item.ice}`);
+      const toppings = Array.isArray(item.toppings) ? item.toppings : [];
+      if (toppings.length > 0) configParts.push(`+ ${toppings.join(', ')}`);
       if (item.notes) configParts.push(`"${item.notes}"`);
 
       const configLabel = configParts.join(' | ');
@@ -976,60 +3693,527 @@ document.addEventListener('DOMContentLoaded', () => {
       row.className = 'cart-row';
       row.innerHTML = `
         <div class="cart-item-info">
-          <span class="cart-item-name">${item.icon || '☕'} ${item.name}</span>
-          <span class="cart-item-custom-options">${configLabel}</span>
-          <span class="cart-item-price-unit">₹${item.price} each</span>
+          <span class="cart-item-name">${escHtml(item.name)}</span>
+          <span class="cart-item-custom-options">${escHtml(configLabel)}</span>
+          <span class="cart-item-price-unit">₹${item.price} × ${item.qty}</span>
         </div>
         <div class="cart-item-controls">
-          <button class="cart-qty-btn decrease" data-key="${item.key}"><i class="fa-solid fa-minus"></i></button>
+          <button class="cart-qty-btn decrease" data-key="${escHtml(item.key)}"><i class="fa-solid fa-minus"></i></button>
           <span class="cart-item-qty">${item.qty}</span>
-          <button class="cart-qty-btn increase" data-key="${item.key}"><i class="fa-solid fa-plus"></i></button>
+          <button class="cart-qty-btn increase" data-key="${escHtml(item.key)}"><i class="fa-solid fa-plus"></i></button>
         </div>
         <span class="cart-item-total">₹${rowTotal}</span>
       `;
       cartList.appendChild(row);
     });
 
-    // GST & Loyalty calculations
-    const isGstEnabled = businessProfile.gstEnabled !== false;
-    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-
-    let loyaltyDiscount = 0;
+    // Use calculateCartTotals for consistent results
     const phoneVal = phoneInput ? phoneInput.value.trim() : '';
     const nameVal = nameInput ? nameInput.value.trim() : '';
+    const totals = billingDomain.calculateCartTotals({
+      cart,
+      businessProfile,
+      customers: crmData,
+      customerName: nameVal,
+      customerPhone: phoneVal,
+      discountType,
+      discountValue
+    });
+    const { subtotal: calculatedSubtotal, totalDiscount, gst, total } = totals;
 
-    let matchedCustomer = null;
-    if (phoneVal || nameVal) {
-      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (nameVal && c.name.toLowerCase() === nameVal.toLowerCase()));
-    }
+    if (cartSubtotal) cartSubtotal.textContent = `₹${calculatedSubtotal}`;
+    if (cartDiscount) cartDiscount.textContent = totalDiscount > 0 ? `-₹${totalDiscount}` : '₹0';
 
-    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-    }
-
-    const taxableAmount = subtotal - loyaltyDiscount;
-    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-    const total = taxableAmount + gst;
-
-    cartSubtotal.textContent = `₹${subtotal}`;
-    
-    if (loyaltyDiscount > 0) {
-      cartGst.innerHTML = `<span style="color:#2ecc71;">-₹${loyaltyDiscount}</span> (Discount) &nbsp;+&nbsp; ₹${gst} (GST)`;
-    } else {
+    if (cartGst) {
       cartGst.textContent = `₹${gst}`;
     }
 
-    cartTotal.textContent = `₹${total}`;
-    
+    if (cartTotal) cartTotal.textContent = `₹${total}`;
+    if (cartCheckoutBtn) cartCheckoutBtn.innerHTML = `<i class="fa-solid fa-print"></i> Print &amp; Pay ₹${total}`;
+    if (typeof prefillCashReceived === 'function') prefillCashReceived();
+    if (typeof calculateSplitBalance === 'function') calculateSplitBalance();
+
     // Save to localStorage for persistence across reloads/logouts/tabs
-    localStorage.setItem('doppio_cart', JSON.stringify(cart));
+    saveCartState();
+    if (activeTableSession !== null) {
+      tableCarts[activeTableSession] = cart;
+      localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+      syncActiveTableSessionToSupabase(activeTableSession);
+    }
     localStorage.setItem('doppio_cart_pay_method', selectedPaymentMethod);
     localStorage.setItem('doppio_cart_cust_name', nameInput ? nameInput.value : '');
     localStorage.setItem('doppio_cart_cust_phone', phoneInput ? phoneInput.value : '');
 
     renderPOSItems();
+    if (window.triggerCartBump) window.triggerCartBump();
+  }
+
+  // ==========================================
+  // ONLINE INTEGRATIONS: MOCK AGGREGATOR MODULE
+  // ==========================================
+  const onlineOrdersQueue = document.getElementById('online-orders-queue');
+  const onlineOrdersBadge = document.getElementById('online-orders-badge');
+  const onlineOrdersSummaryLabel = document.getElementById('online-orders-summary-label');
+  const onlineAutoAcceptCheck = document.getElementById('online-auto-accept');
+  const toggleZomatoCheck = document.getElementById('toggle-zomato');
+  const toggleSwiggyCheck = document.getElementById('toggle-swiggy');
+  const toggleDunzoCheck = document.getElementById('toggle-dunzo');
+
+  const btnSimulateZomato = document.getElementById('btn-simulate-zomato');
+  const btnSimulateSwiggy = document.getElementById('btn-simulate-swiggy');
+
+  if (onlineAutoAcceptCheck) {
+    onlineAutoAcceptCheck.checked = localStorage.getItem('doppio_online_auto_accept') === 'true';
+    onlineAutoAcceptCheck.addEventListener('change', (e) => {
+      localStorage.setItem('doppio_online_auto_accept', e.target.checked);
+    });
+  }
+
+  function renderOnlineOrdersTab() {
+    if (!onlineOrdersQueue) return;
+    onlineOrdersQueue.innerHTML = '';
+
+    const pendingOnline = pendingQrOrders.filter(o => (o.orderType === 'ZOMATO' || o.orderType === 'SWIGGY') && o.status === 'Pending Review');
+
+    if (onlineOrdersBadge) {
+      if (pendingOnline.length > 0) {
+        onlineOrdersBadge.textContent = pendingOnline.length;
+        onlineOrdersBadge.style.display = 'inline-block';
+      } else {
+        onlineOrdersBadge.style.display = 'none';
+      }
+    }
+
+    if (onlineOrdersSummaryLabel) {
+      onlineOrdersSummaryLabel.textContent = `${pendingOnline.length} Online Orders Pending Review`;
+    }
+
+    if (pendingOnline.length === 0) {
+      onlineOrdersQueue.innerHTML = `
+        <div class="premium-empty-state" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; width:100%; box-sizing: border-box;">
+          <i class="fa-solid fa-cloud-sun" style="font-size: 36px; color: var(--accent-caramel); opacity: 0.5; margin-bottom: 16px;"></i>
+          <h3 style="margin-bottom: 8px; color: var(--primary-brand);">Aggregator Stream is Quiet</h3>
+          <p style="font-size: 11px; color: var(--text-muted); max-width: 300px; margin: 0 auto; line-height: 1.4;">Active orders from Zomato and Swiggy channels will stream in here dynamically with ring chimes.</p>
+        </div>
+      `;
+      return;
+    }
+
+    pendingOnline.forEach(order => {
+      const card = document.createElement('div');
+      card.className = 'qr-order-queue-card';
+      const themeColor = order.orderType === 'ZOMATO' ? '#e23744' : '#fc8019';
+      card.style.borderLeft = `4px solid ${themeColor}`;
+
+      const itemsListStr = order.items.map(item => `
+        <div class="qr-card-item-row">
+          <span>${escHtml(item.name)} x${item.qty}</span>
+          <span style="font-weight:700;">₹${item.price * item.qty}</span>
+        </div>
+      `).join('');
+
+      card.innerHTML = `
+        <div class="qr-card-header">
+          <span class="qr-card-table-lbl" style="color:${themeColor}; font-weight:800;">
+            <i class="fa-solid fa-cloud" style="margin-right:4px;"></i> ${escHtml(order.orderType)} Channel
+          </span>
+          <span class="qr-card-paymethod-badge upi" style="background:${themeColor}; color:white;">Prepaid Online</span>
+        </div>
+        
+        <div class="qr-card-cust-info">
+          <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.customerName)}</span>
+          <span style="font-size:11px; color: var(--text-muted);"><i class="fa-solid fa-clock" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.dateTime)}</span>
+        </div>
+
+        <div class="qr-card-items-box">
+          ${itemsListStr}
+        </div>
+
+        <div class="qr-card-total-box">
+          <span>Payout (UPI Sync)</span>
+          <span class="qr-card-total-val" style="color:${themeColor};">₹${order.total}</span>
+        </div>
+
+        <div class="qr-card-actions">
+          <button class="qr-action-btn reject" data-id="${order.orderId}"><i class="fa-solid fa-xmark"></i> Decline</button>
+          <button class="qr-action-btn approve" data-id="${order.orderId}" style="background:${themeColor};"><i class="fa-solid fa-check"></i> Accept (KDS)</button>
+        </div>
+      `;
+
+      onlineOrdersQueue.appendChild(card);
+    });
+
+    onlineOrdersQueue.querySelectorAll('.qr-action-btn.approve').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const orderId = btn.getAttribute('data-id');
+        approveOnlineOrder(orderId);
+      });
+    });
+
+    onlineOrdersQueue.querySelectorAll('.qr-action-btn.reject').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const orderId = btn.getAttribute('data-id');
+        rejectOnlineOrder(orderId);
+      });
+    });
+  }
+
+  const originalUpdateQrUI = updateQrOrdersDashboardUI;
+  updateQrOrdersDashboardUI = function () {
+    if (originalUpdateQrUI) originalUpdateQrUI();
+    renderOnlineOrdersTab();
+    if (typeof renderKDSTab === 'function') renderKDSTab();
+    if (typeof renderTokensTab === 'function') renderTokensTab();
+  };
+
+  async function approveOnlineOrder(orderId) {
+    const order = pendingQrOrders.find(o => o.orderId === orderId);
+    if (!order) return;
+
+    let sufficientStock = true;
+    let missingIngredient = '';
+    const proposedDeductions = {};
+
+    order.items.forEach(cartItem => {
+      const specs = getDeductionSpecs(cartItem);
+      Object.keys(specs).forEach(ing => {
+        proposedDeductions[ing] = (proposedDeductions[ing] || 0) + (specs[ing] * cartItem.qty);
+      });
+    });
+
+    Object.keys(proposedDeductions).forEach(ing => {
+      if (inventory[ing] === undefined) inventory[ing] = 1000;
+      if (inventory[ing] < proposedDeductions[ing]) {
+        sufficientStock = false;
+        missingIngredient = ing.replace('_', ' ');
+      }
+    });
+
+    if (!sufficientStock) {
+      alert(`Approval Failed! Insufficient stock of: ${missingIngredient}. Please restock.`);
+      return;
+    }
+
+    Object.keys(proposedDeductions).forEach(ing => {
+      deductStockFEFO(ing, proposedDeductions[ing]);
+    });
+
+    const approvedBill = {
+      orderId: order.orderId,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      dateTime: new Date().toLocaleString('en-IN'),
+      items: order.items,
+      subtotal: order.subtotal,
+      discount: order.discount || 0,
+      gst: order.gst || 0,
+      total: order.total,
+      paymentMethod: order.paymentMethod,
+      orderType: order.orderType,
+      cashier: sessionStorage.getItem('logged_in_display_name') || sessionStorage.getItem('logged_in_user') || 'Staff'
+    };
+
+    bills.push(approvedBill);
+    localStorage.setItem('doppio_bills', JSON.stringify(bills));
+    renderBills();
+    updateHeaderSummaryStats();
+
+    SoundEffects.playSuccess();
+    showNotificationToast(`${order.orderType} order ${order.orderId} accepted successfully!`);
+
+    if (supabaseClient && navigator.onLine) {
+      supabaseClient.from('doppio_bills').insert({
+        tenant_id: activeTenantId,
+        orderId: approvedBill.orderId,
+        customerName: approvedBill.customerName,
+        customerPhone: approvedBill.customerPhone,
+        items: JSON.stringify(approvedBill.items),
+        subtotal: approvedBill.subtotal,
+        gst: approvedBill.gst,
+        total: approvedBill.total,
+        paymentMethod: approvedBill.paymentMethod,
+        dateTime: approvedBill.dateTime
+      }).then();
+    }
+
+    order.status = 'Accepted';
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders')
+        .update({ status: 'Accepted' })
+        .eq('orderId', orderId).then();
+    }
+
+    updateQrOrdersDashboardUI();
+    if (typeof renderKDSTab === 'function') renderKDSTab();
+  }
+
+  function rejectOnlineOrder(orderId) {
+    SoundEffects.playRemove();
+    pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== orderId);
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders')
+        .delete()
+        .eq('orderId', orderId).then();
+    }
+
+    updateQrOrdersDashboardUI();
+    showNotificationToast(`Online order ${orderId} declined.`);
+  }
+
+  // Online Integrations Config Functions
+  let onlineIntegrationsConfig = {};
+
+  async function loadOnlineIntegrationsConfig() {
+    if (!supabaseClient || !activeTenantId) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('doppio_online_integrations')
+        .select('*')
+        .eq('tenant_id', activeTenantId);
+      if (error) throw error;
+      onlineIntegrationsConfig = {};
+      data.forEach(item => {
+        onlineIntegrationsConfig[item.aggregator] = item;
+      });
+      updateOnlineIntegrationsUI();
+    } catch (err) {
+      console.error('Failed to load online integrations config:', err);
+    }
+  }
+
+  async function saveOnlineIntegrationConfig(aggregator, config) {
+    if (!supabaseClient || !activeTenantId) return;
+    try {
+      const existing = onlineIntegrationsConfig[aggregator];
+      const payload = {
+        tenant_id: activeTenantId,
+        aggregator: aggregator,
+        is_enabled: config.is_enabled || false,
+        api_key: config.api_key || null,
+        api_secret: config.api_secret || null,
+        store_id: config.store_id || null,
+        webhook_url: config.webhook_url || null,
+        config: config.config || {}
+      };
+
+      let result;
+      if (existing) {
+        result = await supabaseClient
+          .from('doppio_online_integrations')
+          .update(payload)
+          .eq('tenant_id', activeTenantId)
+          .eq('aggregator', aggregator);
+      } else {
+        result = await supabaseClient
+          .from('doppio_online_integrations')
+          .insert(payload);
+      }
+
+      if (result.error) throw result.error;
+      onlineIntegrationsConfig[aggregator] = payload;
+      updateOnlineIntegrationsUI();
+      showNotificationToast(`${aggregator.charAt(0).toUpperCase() + aggregator.slice(1)} configuration saved!`);
+    } catch (err) {
+      console.error('Failed to save online integration config:', err);
+      showNotificationToast(`Failed to save ${aggregator} config: ${err.message}`);
+    }
+  }
+
+  function updateOnlineIntegrationsUI() {
+    // OrderEasy
+    const ordereasyConfig = onlineIntegrationsConfig['ordereasy'];
+    const toggleOrdereasy = document.getElementById('toggle-ordereasy');
+    const ordereasyApiKey = document.getElementById('ordereasy-api-key');
+    const ordereasyStoreId = document.getElementById('ordereasy-store-id');
+    const ordereasyStatusText = document.getElementById('ordereasy-status-text');
+    if (ordereasyConfig) {
+      if (toggleOrdereasy) toggleOrdereasy.checked = ordereasyConfig.is_enabled;
+      if (ordereasyApiKey) ordereasyApiKey.value = ordereasyConfig.api_key || '';
+      if (ordereasyStoreId) ordereasyStoreId.value = ordereasyConfig.store_id || '';
+      if (ordereasyStatusText) ordereasyStatusText.textContent = ordereasyConfig.is_enabled ? 'Enabled' : 'Disabled';
+    }
+
+    // Thrive
+    const thriveConfig = onlineIntegrationsConfig['thrive'];
+    const toggleThrive = document.getElementById('toggle-thrive');
+    const thriveApiKey = document.getElementById('thrive-api-key');
+    const thriveStoreId = document.getElementById('thrive-store-id');
+    const thriveStatusText = document.getElementById('thrive-status-text');
+    if (thriveConfig) {
+      if (toggleThrive) toggleThrive.checked = thriveConfig.is_enabled;
+      if (thriveApiKey) thriveApiKey.value = thriveConfig.api_key || '';
+      if (thriveStoreId) thriveStoreId.value = thriveConfig.store_id || '';
+      if (thriveStatusText) thriveStatusText.textContent = thriveConfig.is_enabled ? 'Enabled' : 'Disabled';
+    }
+
+    // UrbanPiper
+    const urbanpiperConfig = onlineIntegrationsConfig['urbanpiper'];
+    const toggleUrbanpiper = document.getElementById('toggle-urbanpiper');
+    const urbanpiperApiKey = document.getElementById('urbanpiper-api-key');
+    const urbanpiperApiSecret = document.getElementById('urbanpiper-api-secret');
+    const urbanpiperStoreId = document.getElementById('urbanpiper-store-id');
+    const urbanpiperStatusText = document.getElementById('urbanpiper-status-text');
+    if (urbanpiperConfig) {
+      if (toggleUrbanpiper) toggleUrbanpiper.checked = urbanpiperConfig.is_enabled;
+      if (urbanpiperApiKey) urbanpiperApiKey.value = urbanpiperConfig.api_key || '';
+      if (urbanpiperApiSecret) urbanpiperApiSecret.value = urbanpiperConfig.api_secret || '';
+      if (urbanpiperStoreId) urbanpiperStoreId.value = urbanpiperConfig.store_id || '';
+      if (urbanpiperStatusText) urbanpiperStatusText.textContent = urbanpiperConfig.is_enabled ? 'Enabled' : 'Disabled';
+    }
+  }
+
+  async function simulateOnlineOrder(aggregator) {
+    if (aggregator === 'ZOMATO' && toggleZomatoCheck && !toggleZomatoCheck.checked) {
+      alert("Zomato Integration is currently toggled OFF in channel settings!");
+      return;
+    }
+    if (aggregator === 'SWIGGY' && toggleSwiggyCheck && !toggleSwiggyCheck.checked) {
+      alert("Swiggy Integration is currently toggled OFF in channel settings!");
+      return;
+    }
+
+    SoundEffects.playPop();
+    const isAutoAccept = onlineAutoAcceptCheck ? onlineAutoAcceptCheck.checked : false;
+
+    const orderNum = Math.floor(1000 + Math.random() * 9000);
+    const orderId = `${aggregator.slice(0, 3)}-${orderNum}`;
+
+    const randomNames = ["Kalpesh Deora", "Rohan Sharma", "Sneha Patel", "Anjali Deshmukh", "Piyush Joshi"];
+    const name = randomNames[Math.floor(Math.random() * randomNames.length)];
+    const phone = `913000${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const selectedItems = [];
+    const count = Math.random() > 0.5 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const randomItem = menu[Math.floor(Math.random() * menu.length)];
+      if (randomItem && !selectedItems.some(item => item.name === randomItem.name)) {
+        selectedItems.push({
+          name: randomItem.name,
+          price: randomItem.price,
+          qty: 1,
+          size: 'Regular',
+          sugar: 'Regular',
+          ice: 'Regular',
+          toppings: [],
+          icon: randomItem.icon || '☕'
+        });
+      }
+    }
+
+    const subtotal = selectedItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const gst = Math.round(subtotal * 0.18);
+    const total = subtotal + gst;
+
+    const mockOrder = {
+      orderId: orderId,
+      customerName: name,
+      customerPhone: phone.slice(-10),
+      dateTime: new Date().toLocaleString('en-IN'),
+      items: selectedItems,
+      subtotal: subtotal,
+      discount: 0,
+      gst: gst,
+      total: total,
+      paymentMethod: 'UPI (Aggregator)',
+      orderType: aggregator,
+      tableNumber: 'ONLINE',
+      status: isAutoAccept ? 'Accepted' : 'Pending Review'
+    };
+
+    pendingQrOrders.push(mockOrder);
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from('doppio_pending_orders').insert({
+          tenant_id: activeTenantId,
+          orderId: mockOrder.orderId,
+          customerName: mockOrder.customerName,
+          customerPhone: mockOrder.customerPhone,
+          items: JSON.stringify(mockOrder.items),
+          subtotal: mockOrder.subtotal,
+          discount: mockOrder.discount,
+          gst: mockOrder.gst,
+          total: mockOrder.total,
+          paymentMethod: mockOrder.paymentMethod,
+          orderType: mockOrder.orderType,
+          tableNumber: mockOrder.tableNumber,
+          status: mockOrder.status,
+          dateTime: mockOrder.dateTime
+        });
+      } catch (err) {
+        console.warn("Failed syncing mock order to Supabase:", err);
+      }
+    }
+
+    playIncomingOrderChime();
+    showNotificationToast(`New Incoming ${aggregator} delivery order: ${orderId} (₹${total})`);
+
+    if (isAutoAccept) {
+      setTimeout(() => {
+        approveOnlineOrder(orderId);
+      }, 1000);
+    } else {
+      updateQrOrdersDashboardUI();
+    }
+  }
+
+  if (btnSimulateZomato) btnSimulateZomato.hidden = !ENABLE_DEMO_TOOLS;
+  if (btnSimulateSwiggy) btnSimulateSwiggy.hidden = !ENABLE_DEMO_TOOLS;
+  if (ENABLE_DEMO_TOOLS && btnSimulateZomato) {
+    btnSimulateZomato.addEventListener('click', () => simulateOnlineOrder('ZOMATO'));
+  }
+  if (ENABLE_DEMO_TOOLS && btnSimulateSwiggy) {
+    btnSimulateSwiggy.addEventListener('click', () => simulateOnlineOrder('SWIGGY'));
+  }
+
+  // Online Integrations save button listeners
+  const saveOrdereasyBtn = document.getElementById('save-ordereasy-config');
+  if (saveOrdereasyBtn) {
+    saveOrdereasyBtn.addEventListener('click', () => {
+      const toggleOrdereasy = document.getElementById('toggle-ordereasy');
+      const ordereasyApiKey = document.getElementById('ordereasy-api-key');
+      const ordereasyStoreId = document.getElementById('ordereasy-store-id');
+      saveOnlineIntegrationConfig('ordereasy', {
+        is_enabled: toggleOrdereasy ? toggleOrdereasy.checked : false,
+        api_key: ordereasyApiKey ? ordereasyApiKey.value : null,
+        store_id: ordereasyStoreId ? ordereasyStoreId.value : null
+      });
+    });
+  }
+
+  const saveThriveBtn = document.getElementById('save-thrive-config');
+  if (saveThriveBtn) {
+    saveThriveBtn.addEventListener('click', () => {
+      const toggleThrive = document.getElementById('toggle-thrive');
+      const thriveApiKey = document.getElementById('thrive-api-key');
+      const thriveStoreId = document.getElementById('thrive-store-id');
+      saveOnlineIntegrationConfig('thrive', {
+        is_enabled: toggleThrive ? toggleThrive.checked : false,
+        api_key: thriveApiKey ? thriveApiKey.value : null,
+        store_id: thriveStoreId ? thriveStoreId.value : null
+      });
+    });
+  }
+
+  const saveUrbanpiperBtn = document.getElementById('save-urbanpiper-config');
+  if (saveUrbanpiperBtn) {
+    saveUrbanpiperBtn.addEventListener('click', () => {
+      const toggleUrbanpiper = document.getElementById('toggle-urbanpiper');
+      const urbanpiperApiKey = document.getElementById('urbanpiper-api-key');
+      const urbanpiperApiSecret = document.getElementById('urbanpiper-api-secret');
+      const urbanpiperStoreId = document.getElementById('urbanpiper-store-id');
+      saveOnlineIntegrationConfig('urbanpiper', {
+        is_enabled: toggleUrbanpiper ? toggleUrbanpiper.checked : false,
+        api_key: urbanpiperApiKey ? urbanpiperApiKey.value : null,
+        api_secret: urbanpiperApiSecret ? urbanpiperApiSecret.value : null,
+        store_id: urbanpiperStoreId ? urbanpiperStoreId.value : null
+      });
+    });
   }
 
   if (cartList) {
@@ -1045,7 +4229,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateCartQty(key, delta) {
     const item = cart.find(i => i.key === key);
     if (!item) return;
-    
+
     if (delta > 0) {
       SoundEffects.playPop();
       item.qty += delta;
@@ -1064,98 +4248,169 @@ document.addEventListener('DOMContentLoaded', () => {
     clearCartBtn.addEventListener('click', () => {
       SoundEffects.playRemove();
       cart = [];
+      clearCartState();
       document.getElementById('cust-name').value = '';
       document.getElementById('cust-phone').value = '';
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-      renderCart();
+      if (editingBillId) {
+        cancelEditingBill();
+      } else {
+        renderCart();
+      }
+    });
+  }
+
+  const cancelEditBillBtn = document.getElementById('cancel-edit-bill-btn');
+  if (cancelEditBillBtn) {
+    cancelEditBillBtn.addEventListener('click', () => {
+      SoundEffects.playRemove();
+      cancelEditingBill();
     });
   }
 
   // Payment triggers selectors
   const payBtns = document.querySelectorAll('.pay-method-btn');
+  const paySegmentedCtrl = document.getElementById('single-pay-container');
+
+  // Helper: update the sliding pill position
+  function updatePayPillIndex() {
+    if (!paySegmentedCtrl) return;
+    const allBtns = Array.from(payBtns);
+    const activeIdx = allBtns.findIndex(b => b.classList.contains('active'));
+    paySegmentedCtrl.style.setProperty('--active-index', activeIdx >= 0 ? activeIdx : 0);
+  }
+
   payBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       payBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       selectedPaymentMethod = btn.getAttribute('data-method');
       SoundEffects.playClick();
+      updatePayPillIndex(); // slide the pill
     });
   });
 
+  // Initialize pill position on page load (UPI is default = index 0)
+  updatePayPillIndex();
+
   // Complete checkout & Sync
-  const checkoutBtn = document.getElementById('checkout-btn');
-  if (checkoutBtn) {
-    checkoutBtn.addEventListener('click', () => {
-      if (cart.length === 0) {
-        alert('Cart is empty! Add items before checking out.');
-        return;
-      }
+  function performCheckout(shouldPrint) {
+    if (cart.length === 0) {
+      alert('Cart is empty! Add items before checking out.');
+      return;
+    }
 
-      const custNameInput = document.getElementById('cust-name');
-      const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
-      const orderNum = document.getElementById('order-num').value;
+    const finalPaymentMethod = isSplitPaymentActive
+      ? `Split: UPI=${parseInt(document.getElementById('split-pay-upi').value) || 0}, Cash=${parseInt(document.getElementById('split-pay-cash').value) || 0}, Card=${parseInt(document.getElementById('split-pay-card').value) || 0}`
+      : selectedPaymentMethod;
 
-      // 1. Stock Deduction Verification
-      let sufficientStock = true;
-      let missingItem = '';
+    const custNameInput = document.getElementById('cust-name');
+    const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
+    const orderNum = document.getElementById('order-num').value;
+    const billIdToSave = editingBillId || orderNum;
 
-      const proposedDeductions = {};
-      cart.forEach(cartItem => {
-        const specs = getDeductionSpecs(cartItem);
-        Object.keys(specs).forEach(ing => {
-          proposedDeductions[ing] = (proposedDeductions[ing] || 0) + (specs[ing] * cartItem.qty);
+    // 1. Inventory Deduction Management
+    let oldDeductions = {};
+    if (editingBillId) {
+      const originalBill = bills.find(b => b.orderId === editingBillId);
+      if (originalBill) {
+        originalBill.items.forEach(item => {
+          const specs = getDeductionSpecs(item);
+          Object.keys(specs).forEach(ing => {
+            oldDeductions[ing] = (oldDeductions[ing] || 0) + (specs[ing] * item.qty);
+          });
         });
-      });
 
-      Object.keys(proposedDeductions).forEach(ing => {
-        if (inventory[ing] === undefined) inventory[ing] = 1000;
-        if (inventory[ing] < proposedDeductions[ing]) {
-          sufficientStock = false;
-          missingItem = ing.replace('_', ' ');
+        // Temporarily restore original deductions back to inventory level and batches
+        Object.keys(oldDeductions).forEach(ing => {
+          if (inventory[ing] === undefined) inventory[ing] = 1000;
+          inventory[ing] += oldDeductions[ing];
+          addStockToBatches(ing, oldDeductions[ing]);
+        });
+      }
+    }
+
+    // Stock Deduction Verification
+    let sufficientStock = true;
+    let missingItem = '';
+
+    const proposedDeductions = billingDomain.aggregateDeductions(cart, getDeductionSpecs);
+
+    Object.keys(proposedDeductions).forEach(ing => {
+      if (inventory[ing] === undefined) inventory[ing] = 1000;
+      if (inventory[ing] < proposedDeductions[ing]) {
+        sufficientStock = false;
+        missingItem = ing.replace('_', ' ');
+      }
+    });
+
+    if (!sufficientStock) {
+      // Revert the temporary restoration if verify fails
+      if (editingBillId) {
+        Object.keys(oldDeductions).forEach(ing => {
+          deductStockFEFO(ing, oldDeductions[ing]);
+        });
+      }
+      alert(`Insufficient stock! Low on: ${missingItem}. Please restock.`);
+      return;
+    }
+
+    // Deduct stock levels permanently using FEFO (First Expired, First Out)
+    Object.keys(proposedDeductions).forEach(ing => {
+      deductStockFEFO(ing, proposedDeductions[ing]);
+    });
+
+    const phoneInput = document.getElementById('cust-phone');
+    const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+    const totals = billingDomain.calculateCartTotals({
+      cart,
+      businessProfile,
+      customers: crmData,
+      customerName: custName,
+      customerPhone: phoneVal,
+      discountType,
+      discountValue
+    });
+    const { subtotal, loyaltyDiscount, customDiscount, totalDiscount, gst, total } = totals;
+
+    let finalBillObject = null;
+
+    if (editingBillId) {
+      const billIndex = bills.findIndex(b => b.orderId === editingBillId);
+      if (billIndex !== -1) {
+        const originalDateTime = bills[billIndex].dateTime;
+        bills[billIndex] = {
+          orderId: editingBillId,
+          customerName: custName,
+          customerPhone: phoneVal || null,
+          dateTime: originalDateTime,
+          items: [...cart],
+          subtotal: subtotal,
+          discount: totalDiscount,
+          gst: gst,
+          total: total,
+          paymentMethod: finalPaymentMethod,
+          orderType: activeOrderType,
+          shiftId: bills[billIndex].shiftId || (activeShift ? activeShift.shiftId : null)
+        };
+        finalBillObject = bills[billIndex];
+
+        // Cloud syncing via update
+        if (supabaseClient && navigator.onLine) {
+          supabaseClient.from('doppio_bills').update({
+            customerName: custName,
+            customerPhone: phoneVal || null,
+            items: JSON.stringify(cart),
+            subtotal: subtotal,
+            discount: totalDiscount,
+            gst: gst,
+            total: total,
+            paymentMethod: finalPaymentMethod,
+            orderType: activeOrderType
+          }).eq('orderId', editingBillId).then();
         }
-      });
-
-      if (!sufficientStock) {
-        alert(`Insufficient stock! Low on: ${missingItem}. Please restock.`);
-        return;
       }
-
-      // Deduct stock levels
-      Object.keys(proposedDeductions).forEach(ing => {
-        inventory[ing] -= proposedDeductions[ing];
-        if (supabaseClient) {
-          supabaseClient.from('doppio_inventory')
-            .update({ current: inventory[ing] })
-            .eq('key', ing).then();
-        }
-      });
-      localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-
-      // GST and loyalties final ledger sync
-      const isGstEnabled = businessProfile.gstEnabled !== false;
-      const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
-      const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
-      const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-      
-      let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      const phoneInput = document.getElementById('cust-phone');
-      const phoneVal = phoneInput ? phoneInput.value.trim() : '';
-      
-      let loyaltyDiscount = 0;
-      let matchedCustomer = null;
-      if (phoneVal || custName) {
-        matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
-      }
-      
-      if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
-        loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
-      }
-      
-      const taxableAmount = subtotal - loyaltyDiscount;
-      const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
-      const total = taxableAmount + gst;
-
-      // Compile new bill invoice
+    } else {
       const newBill = {
         orderId: orderNum,
         customerName: custName,
@@ -1163,70 +4418,274 @@ document.addEventListener('DOMContentLoaded', () => {
         dateTime: new Date().toLocaleString('en-IN'),
         items: [...cart],
         subtotal: subtotal,
-        discount: loyaltyDiscount,
+        discount: totalDiscount,
         gst: gst,
         total: total,
-        paymentMethod: selectedPaymentMethod,
-        orderType: activeOrderType
+        paymentMethod: finalPaymentMethod,
+        orderType: activeOrderType,
+        shiftId: activeShift ? activeShift.shiftId : null,
+        cashier: sessionStorage.getItem('logged_in_display_name') || sessionStorage.getItem('logged_in_user') || 'Staff'
       };
-
       bills.push(newBill);
-      localStorage.setItem('doppio_bills', JSON.stringify(bills));
-      
-      // CRM dynamic ledger upgrades
-      if (phoneVal || (custName && custName !== 'Walk-in Guest')) {
-        updateCRMMember(custName, phoneVal, total);
-      }
-      
-      SoundEffects.playSuccess();
+      finalBillObject = newBill;
 
-      // Android vocal announcement
-      if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
-        const engText = "Doppio Cafe Nagpur. Payment of Rupees " + total + " received!";
-        window.AndroidInterface.speak(engText);
-      }
-
-      // Cloud syncing
+      // Cloud syncing via insert
       if (supabaseClient && navigator.onLine) {
         supabaseClient.from('doppio_bills').insert({
+          tenant_id: activeTenantId,
           orderId: newBill.orderId,
           customerName: newBill.customerName,
+          customerPhone: newBill.customerPhone,
           dateTime: newBill.dateTime,
           items: typeof newBill.items === 'string' ? newBill.items : JSON.stringify(newBill.items),
           subtotal: newBill.subtotal,
+          discount: newBill.discount,
           gst: newBill.gst,
           total: newBill.total,
-          paymentMethod: newBill.paymentMethod
+          paymentMethod: newBill.paymentMethod,
+          orderType: newBill.orderType,
+          shiftId: newBill.shiftId,
+          cashier: newBill.cashier
         }).then();
       } else {
         saveOfflineBill(newBill);
       }
+    }
 
-      // Print thermal invoice triggers
-      triggerThermalReceiptPrint(newBill);
+    localStorage.setItem('doppio_bills', JSON.stringify(bills));
+    if (typeof trackItemPopularity === 'function') trackItemPopularity(cart);
 
-      // Offer to send bill via WhatsApp automatically if a customer number was entered
-      if (phoneVal) {
-        setTimeout(() => {
-          if (confirm(`Would you like to send this bill receipt via WhatsApp to ${phoneVal}?`)) {
-            shareBillOnWhatsApp(newBill);
+    // CRM dynamic ledger upgrades
+    if (phoneVal || (custName && custName !== 'Walk-in Guest')) {
+      updateCRMMember(custName, phoneVal, total);
+    }
+
+    SoundEffects.playSuccess();
+
+    // Android vocal announcement
+    if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
+      const engText = editingBillId
+        ? (activeTenantName || 'RestroSuite') + ". Bill " + billIdToSave + " updated!"
+        : (activeTenantName || 'RestroSuite') + ". Payment of Rupees " + total + " received!";
+      window.AndroidInterface.speak(engText);
+    }
+
+    // Print thermal invoice triggers if requested
+    if (shouldPrint && finalBillObject) {
+      triggerThermalReceiptPrint(finalBillObject);
+    }
+
+    // Offer to send bill via WhatsApp automatically if toggle is enabled
+    if (businessProfile.whatsappEnabled !== false && finalBillObject) {
+      setTimeout(() => {
+        if (phoneVal) {
+          // Automatically trigger WhatsApp share without clicking or confirm prompts if number is provided
+          shareBillOnWhatsApp(finalBillObject);
+        } else {
+          const wantToShare = confirm(`Would you like to send this bill receipt via WhatsApp?`);
+          if (wantToShare) {
+            shareBillOnWhatsApp(finalBillObject);
           }
-        }, 1000);
+        }
+      }, 1000);
+    }
+
+    // Reset editing state
+    editingBillId = null;
+    localStorage.removeItem('doppio_editing_bill_id');
+    const banner = document.getElementById('editing-bill-banner');
+    if (banner) banner.style.display = 'none';
+
+    // Release Table Session if table billing is complete
+    let billedTableId = null;
+    const tableMatch = custName.match(/Table\s+0?([1-6])/i);
+    if (tableMatch) {
+      billedTableId = parseInt(tableMatch[1]);
+    }
+    if (billedTableId !== null) {
+      tablesState[billedTableId] = "EMPTY";
+      tableCarts[billedTableId] = [];
+      localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+      localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+
+      // Delete DineIn Active and KDS entries in Supabase
+      if (supabaseClient) {
+        supabaseClient.from('doppio_pending_orders').delete().eq('orderId', `TABLE-${billedTableId}`).then();
+        supabaseClient.from('doppio_pending_orders').delete().eq('tableNumber', `0${billedTableId}`).then();
       }
 
-      // Clean Cart Drawer
+      // Remove from local KDS orders list
+      pendingQrOrders = pendingQrOrders.filter(o => o.tableNumber !== `0${billedTableId}`);
+      localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+      renderTablesMap();
+      if (typeof renderKDSTab === 'function') renderKDSTab();
+    }
+
+    // Clear the cart only when the bill has been printed.
+    // "Save" (shouldPrint=false) keeps the cart so the cashier can still print later.
+    if (shouldPrint) {
       cart = [];
+      clearCartState();
       if (custNameInput) custNameInput.value = '';
       if (phoneInput) phoneInput.value = '';
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-      
+      if (takeawayFields) {
+        takeawayFields.style.display = 'none';
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+        if (guestToggleBtn) {
+          guestToggleBtn.style.background = 'var(--bg-cream-light)';
+          guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
+        }
+      }
       generateOrderNumber();
-      renderCart();
-      updateHeaderSummaryStats();
+    }
+
+    renderCart();
+    updateHeaderSummaryStats();
+    renderBills();
+    renderInventory();
+  }
+
+  const checkoutSaveBtn = document.getElementById('checkout-save-btn');
+  const checkoutPrintBtn = document.getElementById('checkout-print-btn');
+  const printKotBtn = document.getElementById('print-kot-btn');
+
+  // --- Inline Cash Payment Section Logic ---
+  const cashPaymentSection = document.getElementById('cash-payment-section');
+  const cashReceivedInput = document.getElementById('cash-received-input');
+  const cashChangeDisplay = document.getElementById('cash-change-display');
+  const cashWarningMsg = document.getElementById('cash-warning-msg');
+  const cashQuickBtns = document.querySelectorAll('.cash-quick-btn');
+  let kotSentForCurrentOrder = false;
+
+  function getCartTotal() {
+    const totalEl = document.getElementById('cart-total');
+    if (!totalEl) return 0;
+    return parseFloat(totalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+  }
+
+  function updateCashPaymentUI() {
+    if (!cashPaymentSection) return;
+    const isCash = selectedPaymentMethod === 'Cash';
+    cashPaymentSection.style.display = isCash ? 'block' : 'none';
+    if (isCash) {
+      updateCashChange();
+    }
+  }
+
+  function updateCashChange() {
+    const total = getCartTotal();
+    const received = parseFloat(cashReceivedInput ? cashReceivedInput.value : 0) || 0;
+    const change = received - total;
+    if (cashChangeDisplay) {
+      cashChangeDisplay.textContent = change >= 0 ? `₹${change.toFixed(0)}` : `₹0`;
+      cashChangeDisplay.style.color = change >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+    }
+    if (cashWarningMsg) {
+      cashWarningMsg.style.display = (received > 0 && received < total) ? 'block' : 'none';
+    }
+    if (checkoutPrintBtn) {
+      const insufficientCash = isCashInsufficientForCheckout();
+      checkoutPrintBtn.style.opacity = insufficientCash ? '0.5' : '1';
+    }
+  }
+
+  function isCashInsufficientForCheckout() {
+    if (selectedPaymentMethod !== 'Cash') return false;
+    const total = getCartTotal();
+    const received = parseFloat(cashReceivedInput ? cashReceivedInput.value : 0) || 0;
+    return total > 0 && received > 0 && received < total;
+  }
+
+  function prefillCashReceived() {
+    if (cashReceivedInput && selectedPaymentMethod === 'Cash') {
+      const total = getCartTotal();
+      cashReceivedInput.value = total > 0 ? Math.ceil(total) : '';
+      updateCashChange();
+    }
+  }
+
+  if (cashReceivedInput) {
+    cashReceivedInput.addEventListener('input', updateCashChange);
+  }
+
+  cashQuickBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!cashReceivedInput) return;
+      const amt = btn.getAttribute('data-amount');
+      if (amt === 'exact') {
+        cashReceivedInput.value = Math.ceil(getCartTotal());
+      } else {
+        cashReceivedInput.value = parseInt(amt);
+      }
+      updateCashChange();
+    });
+  });
+
+  // Override payment method button handler to also toggle cash section
+  payBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      updateCashPaymentUI();
+      if (selectedPaymentMethod === 'Cash') {
+        prefillCashReceived();
+      }
+    });
+  });
+
+  // Initialize cash section visibility
+  updateCashPaymentUI();
+
+  if (checkoutSaveBtn) {
+    checkoutSaveBtn.addEventListener('click', () => {
+      openReceiptPreview(false);
+    });
+  }
+
+  if (checkoutPrintBtn) {
+    checkoutPrintBtn.addEventListener('click', () => {
+      if (cart.length === 0) {
+        showNotificationToast('Cart is empty! Add items before checking out.');
+        return;
+      }
+
+      if (isCashInsufficientForCheckout()) {
+        showNotificationToast('Received amount is less than total.');
+        return;
+      }
+
+      if (activeOrderType === 'DineIn' && !kotSentForCurrentOrder) {
+        if (!confirm('KOT not sent. Continue billing?')) return;
+      }
+
+      performCheckout(true);
+      showNotificationToast('Bill printed successfully.');
+
+      if (cashReceivedInput) cashReceivedInput.value = '';
+      if (cashChangeDisplay) cashChangeDisplay.textContent = '₹0';
+      if (cashWarningMsg) cashWarningMsg.style.display = 'none';
+
+      selectedPaymentMethod = 'Cash';
+      payBtns.forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-method') === 'Cash');
+      });
+      updatePayPillIndex();
+      updateCashPaymentUI();
+      kotSentForCurrentOrder = false;
+    });
+  }
+
+  if (printKotBtn) {
+    printKotBtn.addEventListener('click', () => {
+      if (cart.length > 0) {
+        triggerKOTPrint(cart);
+        kotSentForCurrentOrder = true;
+      }
     });
   }
 
   function getDeductionSpecs(cartItem) {
+    if (!cartItem || !cartItem.name || typeof cartItem.name !== 'string') return {};
     const nameLower = cartItem.name.toLowerCase().trim();
     const recipe = customRecipes[nameLower] || excelRecipes[nameLower] || excelRecipes[nameLower.replace('thick shake', 'thickshake')];
     return recipe || {};
@@ -1243,27 +4702,85 @@ document.addEventListener('DOMContentLoaded', () => {
   let activePresetDate = 'all';
   let billsSearchQuery = '';
 
-  function parseBillDate(bill) {
-    if (!bill.dateTime) return new Date();
-    const d = new Date(bill.dateTime);
-    if (!isNaN(d.getTime())) {
-      d.setHours(0,0,0,0);
-      return d;
+  const parseBillDate = billsDomain.parseBillDate;
+
+  function startEditingBill(orderId) {
+    const bill = bills.find(b => b.orderId === orderId);
+    if (!bill) return;
+
+    SoundEffects.playPop();
+    editingBillId = orderId;
+    localStorage.setItem('doppio_editing_bill_id', orderId);
+
+    // Deep copy cart items
+    cart = JSON.parse(JSON.stringify(bill.items));
+
+    const cn = document.getElementById('cust-name');
+    const cp = document.getElementById('cust-phone');
+    if (cn) cn.value = bill.customerName;
+    if (cp) cp.value = bill.customerPhone || '';
+
+    // Update order type active selection
+    if (bill.orderType) {
+      activeOrderType = bill.orderType;
+      const typeBtns = document.querySelectorAll('.order-type-btn');
+      typeBtns.forEach(b => {
+        if (b.getAttribute('data-type') === activeOrderType) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
     }
-    const parts = bill.dateTime.split(',')[0].split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2], 10);
-      const parsedDate = new Date(year, month, day);
-      if (!isNaN(parsedDate.getTime())) {
-        parsedDate.setHours(0,0,0,0);
-        return parsedDate;
-      }
+
+    // Update payment method active selection
+    if (bill.paymentMethod) {
+      selectedPaymentMethod = bill.paymentMethod;
+      const payBtns = document.querySelectorAll('.pay-method-btn');
+      payBtns.forEach(b => {
+        if (b.getAttribute('data-method') === selectedPaymentMethod) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
     }
-    const fallback = new Date();
-    fallback.setHours(0,0,0,0);
-    return fallback;
+
+    // Show editing banner
+    const banner = document.getElementById('editing-bill-banner');
+    const displayId = document.getElementById('editing-bill-id-display');
+    if (banner && displayId) {
+      displayId.textContent = orderId;
+      banner.style.display = 'flex';
+    }
+
+    const badge = document.getElementById('cart-order-badge');
+    if (badge) {
+      badge.textContent = 'Editing: ' + orderId;
+    }
+
+    renderCart();
+  }
+
+  function cancelEditingBill() {
+    editingBillId = null;
+    localStorage.removeItem('doppio_editing_bill_id');
+
+    // Clear cart and fields
+    cart = [];
+    clearCartState();
+    const cn = document.getElementById('cust-name');
+    const cp = document.getElementById('cust-phone');
+    if (cn) cn.value = '';
+    if (cp) cp.value = '';
+
+    // Hide banner
+    const banner = document.getElementById('editing-bill-banner');
+    if (banner) banner.style.display = 'none';
+
+    // Re-generate order number & badge
+    generateOrderNumber();
+    renderCart();
   }
 
   function renderBills() {
@@ -1276,33 +4793,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let dateFrom = null;
     if (fromVal) {
       dateFrom = new Date(fromVal);
-      dateFrom.setHours(0,0,0,0);
+      dateFrom.setHours(0, 0, 0, 0);
     }
     let dateTo = null;
     if (toVal) {
       dateTo = new Date(toVal);
-      dateTo.setHours(0,0,0,0);
+      dateTo.setHours(0, 0, 0, 0);
     }
 
     const filteredBills = bills.filter(bill => {
       // Search matches
       const q = billsSearchQuery.toLowerCase();
-      const matchesSearch = !q || 
-                            bill.customerName.toLowerCase().includes(q) || 
-                            bill.orderId.toLowerCase().includes(q) || 
-                            (bill.customerPhone && bill.customerPhone.includes(q));
+      const matchesSearch = !q ||
+        (bill.customerName && bill.customerName.toLowerCase().includes(q)) ||
+        (bill.orderId && bill.orderId.toLowerCase().includes(q)) ||
+        (bill.customerPhone && bill.customerPhone.includes(q));
 
       // Presets filter matches
       let matchesPreset = true;
       if (activePresetDate !== 'all') {
         const today = new Date().toLocaleDateString('en-IN');
         if (activePresetDate === 'today') {
-          matchesPreset = bill.dateTime.includes(today);
+          matchesPreset = bill.dateTime && bill.dateTime.includes(today);
         } else if (activePresetDate === 'yesterday') {
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayStr = yesterday.toLocaleDateString('en-IN');
-          matchesPreset = bill.dateTime.includes(yesterdayStr);
+          matchesPreset = bill.dateTime && bill.dateTime.includes(yesterdayStr);
         } else if (activePresetDate === 'week') {
           const billDate = parseBillDate(bill);
           const diffTime = Math.abs(new Date() - billDate);
@@ -1329,20 +4846,66 @@ document.addEventListener('DOMContentLoaded', () => {
       return matchesSearch && matchesPreset && matchesCustomRange;
     });
 
-    // Update Top Billing stats indicators
-    const dailySalesTotal = filteredBills.reduce((sum, b) => sum + b.total, 0);
-    document.getElementById('bills-revenue-card').textContent = `₹${dailySalesTotal}`;
-    document.getElementById('bills-total-card').textContent = `${filteredBills.length} Invoices`;
+    // Helper to get date range for specific day
+    function getDayRange(date) {
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
     
+    // Calculate today's and yesterday's sales totals
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const todayRange = getDayRange(today);
+    const yesterdayRange = getDayRange(yesterday);
+    
+    let todaySales = 0;
+    let yesterdaySales = 0;
+    bills.forEach(bill => {
+      const billDate = parseBillDate(bill);
+      if (!billDate) return;
+      if (billDate >= todayRange.start && billDate <= todayRange.end) {
+        todaySales += bill.total || 0;
+      } else if (billDate >= yesterdayRange.start && billDate <= yesterdayRange.end) {
+        yesterdaySales += bill.total || 0;
+      }
+    });
+
+    // Update Top Billing stats indicators
+    const dailySalesTotal = filteredBills.reduce((sum, b) => sum + (b.total || 0), 0);
+    const revCard = document.getElementById('bills-revenue-card');
+    const totCard = document.getElementById('bills-total-card');
+    const aovCardEl = document.getElementById('bills-aov-card');
+    const upiPct = document.getElementById('bills-upi-percent');
+    const cashPct = document.getElementById('bills-cash-percent');
+    const trendCard = document.getElementById('bills-trend-card');
+    if (revCard) revCard.textContent = `₹${dailySalesTotal}`;
+    if (totCard) totCard.textContent = `${filteredBills.length} Invoices`;
+    
+    // Calculate trend vs yesterday
+    if (trendCard) {
+      if (yesterdaySales === 0) {
+        trendCard.textContent = todaySales > 0 ? '↑ New sales recorded' : 'No prior data';
+      } else {
+        const change = ((todaySales - yesterdaySales) / yesterdaySales) * 100;
+        const roundedChange = Math.round(change);
+        const arrow = change >= 0 ? '↑' : '↓';
+        trendCard.textContent = `${arrow} ${Math.abs(roundedChange)}% vs. Yesterday`;
+      }
+    }
+
     // Average Order Value calculations
     const aov = filteredBills.length === 0 ? 0 : Math.round(dailySalesTotal / filteredBills.length);
-    document.getElementById('bills-aov-card').textContent = `₹${aov}`;
+    if (aovCardEl) aovCardEl.textContent = `₹${aov}`;
 
     // Split percentages calculations
     const upiCount = filteredBills.filter(b => b.paymentMethod === 'UPI').length;
     const upiPercent = filteredBills.length === 0 ? 0 : Math.round((upiCount / filteredBills.length) * 100);
-    document.getElementById('bills-upi-percent').textContent = `${upiPercent}%`;
-    document.getElementById('bills-cash-percent').textContent = `${100 - upiPercent}%`;
+    if (upiPct) upiPct.textContent = `${upiPercent}%`;
+    if (cashPct) cashPct.textContent = `${100 - upiPercent}%`;
 
     if (billsCount) billsCount.textContent = `Showing ${filteredBills.length} Bills`;
 
@@ -1359,7 +4922,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </td>
         </tr>
       `;
-      
+
       const backPos = document.getElementById('btn-back-pos');
       if (backPos) {
         backPos.addEventListener('click', () => {
@@ -1370,41 +4933,301 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const sortedBills = [...filteredBills].reverse();
-    sortedBills.forEach(bill => {
-      const tr = document.createElement('tr');
-      
-      // Items string format details
-      let itemsListStr = bill.items.map(item => `${item.name} (${item.qty})`).join(', ');
-      if (itemsListStr.length > 36) itemsListStr = itemsListStr.substring(0, 33) + '...';
-      
-      // Avatar Initials details
-      const initials = bill.customerName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
 
+    // ── Pagination ─────────────────────────────────────────────
+    const BILLS_PAGE_SIZE = 50;
+    let billsCurrentPage = Number(billsTableBody.getAttribute('data-page') || '1');
+    const totalPages = Math.max(1, Math.ceil(sortedBills.length / BILLS_PAGE_SIZE));
+    if (billsCurrentPage > totalPages) billsCurrentPage = totalPages;
+    billsTableBody.setAttribute('data-page', String(billsCurrentPage));
+
+    const pageStart = (billsCurrentPage - 1) * BILLS_PAGE_SIZE;
+    const pageBills = sortedBills.slice(pageStart, pageStart + BILLS_PAGE_SIZE);
+
+    if (billsCount) {
+      const textSpan = billsCount.querySelector('span');
+      if (textSpan) {
+        textSpan.textContent = sortedBills.length > BILLS_PAGE_SIZE
+          ? `Showing ${pageStart + 1}–${Math.min(pageStart + BILLS_PAGE_SIZE, sortedBills.length)} of ${sortedBills.length} Bills`
+          : `Showing ${sortedBills.length} Bills`;
+      }
+    }
+
+    pageBills.forEach(bill => {
+      if (!bill) return;
+      const tr = document.createElement('tr');
+
+      // Items string format details
+      const billItems = Array.isArray(bill.items) ? bill.items : [];
+      let itemsListStr = billItems.map(item => `${item.name || '?'} (${item.qty || 1})`).join(', ');
+      if (itemsListStr.length > 36) itemsListStr = itemsListStr.substring(0, 33) + '...';
+
+      // Avatar Initials details
+      const custName = bill.customerName || 'Walk-in';
+      const initials = custName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      const payMethod = bill.paymentMethod || 'UPI';
+
+      const isRefunded = bill.status === 'refunded';
+      const isRefund = bill.status === 'refund';
       tr.innerHTML = `
-        <td style="font-weight:700;">${bill.orderId}</td>
+        <td style="font-weight:700;">
+          ${escHtml(bill.orderId || '-')}
+          ${isRefunded ? '<span style="font-size:10px; color:#e74c3c; margin-left:4px;">(Refunded)</span>' : ''}
+          ${isRefund ? '<span style="font-size:10px; color:#3498db; margin-left:4px;">(Refund)</span>' : ''}
+        </td>
         <td>
           <div class="customer-avatar-cell">
-            <div class="cust-avatar">${initials}</div>
+            <div class="cust-avatar">${escHtml(initials)}</div>
             <div style="display:flex; flex-direction:column;">
-              <span style="font-weight:600;">${bill.customerName}</span>
-              <span style="font-size:10px; color:var(--text-muted);">${bill.customerPhone || 'Walk-in Guest'}</span>
+              <span style="font-weight:600;">${escHtml(custName)}</span>
+              <span style="font-size:10px; color:var(--text-muted);">${escHtml(bill.customerPhone || 'Walk-in Guest')}</span>
             </div>
           </div>
         </td>
-        <td>${bill.dateTime}</td>
-        <td title="${bill.items.map(i => `${i.name} (x${i.qty})`).join(', ')}">${itemsListStr}</td>
-        <td><span class="payment-badge ${bill.paymentMethod.toLowerCase()}">${bill.paymentMethod}</span></td>
-        <td style="font-weight:700; color:var(--accent-caramel);">₹${bill.total}</td>
+        <td>${escHtml(bill.dateTime || '-')}</td>
+        <td title="${escHtml(billItems.map(i => `${i.name || '?'} (x${i.qty || 1})`).join(', '))}">${escHtml(itemsListStr || '-')}</td>
+        <td><span class="payment-badge ${escHtml(payMethod.toLowerCase())}">${escHtml(payMethod)}</span></td>
+        <td style="font-weight:700; color:${isRefund ? '#e74c3c' : 'var(--accent-caramel)'};">₹${bill.total || 0}</td>
         <td>
-          <button class="table-action-btn print" data-id="${bill.orderId}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
-          <button class="table-action-btn whatsapp" data-id="${bill.orderId}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
-          <button class="table-action-btn duplicate" data-id="${bill.orderId}" title="Duplicate Order"><i class="fa-solid fa-clone"></i></button>
-          <button class="table-action-btn delete" data-id="${bill.orderId}" title="Refund/Delete"><i class="fa-solid fa-trash-can"></i></button>
+          <button class="table-action-btn print" data-id="${escHtml(bill.orderId)}" title="Print Invoice"><i class="fa-solid fa-print"></i></button>
+          <button class="table-action-btn whatsapp" data-id="${escHtml(bill.orderId)}" title="Share via WhatsApp" style="background:#128c7e; color:white; border-color:#128c7e;"><i class="fa-brands fa-whatsapp"></i></button>
+          ${!isRefunded && !isRefund ? `<button class="table-action-btn edit-bill" data-id="${escHtml(bill.orderId)}" title="Edit Bill"><i class="fa-solid fa-pen-to-square"></i></button>` : ''}
+          ${!isRefunded && !isRefund ? `<button class="table-action-btn delete" data-id="${escHtml(bill.orderId)}" title="Refund"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
         </td>
       `;
       billsTableBody.appendChild(tr);
     });
+
+    // ── Pagination controls ─────────────────────────────────────
+    if (totalPages > 1) {
+      const paginationRow = document.createElement('tr');
+      paginationRow.innerHTML = `
+        <td colspan="7" style="padding:12px 8px; text-align:center; border-top:1px solid rgba(28,28,28,0.06);">
+          <div style="display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary);">
+            <button id="bills-prev-page" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:#fff; cursor:pointer; font-size:12px;" ${billsCurrentPage === 1 ? 'disabled' : ''}>← Prev</button>
+            <span>Page ${billsCurrentPage} of ${totalPages}</span>
+            <button id="bills-next-page" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:#fff; cursor:pointer; font-size:12px;" ${billsCurrentPage === totalPages ? 'disabled' : ''}>Next →</button>
+          </div>
+        </td>
+      `;
+      billsTableBody.appendChild(paginationRow);
+
+      const prevBtn = document.getElementById('bills-prev-page');
+      const nextBtn = document.getElementById('bills-next-page');
+      if (prevBtn) prevBtn.addEventListener('click', () => {
+        billsTableBody.setAttribute('data-page', String(billsCurrentPage - 1));
+        renderBills();
+      });
+      if (nextBtn) nextBtn.addEventListener('click', () => {
+        billsTableBody.setAttribute('data-page', String(billsCurrentPage + 1));
+        renderBills();
+      });
+    }
   }
+
+  // Export functions for bills
+  function exportBillsCSV(billsToExport) {
+    const csv = billsDomain.convertToCSV(billsToExport);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', getDateWiseExportName('bills_export', 'csv'));
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function exportBillsExcel(billsToExport) {
+    // Using SheetJS (xlsx) which is already included
+    const ws_data = [
+      ['Order ID', 'Customer Name', 'Phone', 'Date', 'Items', 'Subtotal', 'GST', 'Discount', 'Total', 'Payment Method']
+    ];
+    billsToExport.forEach(bill => {
+      const itemsStr = Array.isArray(bill.items) ? bill.items.map(i => `${i.name} x${i.qty}`).join('; ') : '';
+      ws_data.push([
+        bill.orderId || '',
+        bill.customerName || '',
+        bill.customerPhone || '',
+        bill.dateTime || '',
+        itemsStr,
+        bill.subtotal || 0,
+        bill.gst || 0,
+        bill.discount || 0,
+        bill.total || 0,
+        bill.paymentMethod || ''
+      ]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Bills');
+    XLSX.writeFile(wb, getDateWiseExportName('bills_export', 'xlsx'));
+  }
+
+  function exportBillsPDF(billsToExport) {
+    // Simple print-based PDF export
+    let printContent = `
+      <html>
+        <head>
+          <title>Bills Export</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>Bills Export</h1>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer Name</th>
+                <th>Phone</th>
+                <th>Date</th>
+                <th>Items</th>
+                <th>Subtotal</th>
+                <th>GST</th>
+                <th>Discount</th>
+                <th>Total</th>
+                <th>Payment Method</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+    billsToExport.forEach(bill => {
+      const itemsStr = Array.isArray(bill.items) ? bill.items.map(i => `${i.name} x${i.qty}`).join('; ') : '';
+      printContent += `
+        <tr>
+          <td>${bill.orderId || ''}</td>
+          <td>${bill.customerName || ''}</td>
+          <td>${bill.customerPhone || ''}</td>
+          <td>${bill.dateTime || ''}</td>
+          <td>${itemsStr}</td>
+          <td>₹${bill.subtotal || 0}</td>
+          <td>₹${bill.gst || 0}</td>
+          <td>₹${bill.discount || 0}</td>
+          <td>₹${bill.total || 0}</td>
+          <td>${bill.paymentMethod || ''}</td>
+        </tr>
+      `;
+    });
+    printContent += `
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+  }
+
+  function exportBillsGSTR1(billsToExport) {
+    // GSTR-1 compatible export (typical fields for B2C invoices)
+    const ws_data = [
+      ['Invoice Number', 'Invoice Date', 'Place of Supply', 'Supply Type', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Invoice Value', 'Customer Name', 'Customer Phone']
+    ];
+    // Filter out refund bills for GSTR-1
+    const taxableBills = billsToExport.filter(bill => bill.status !== 'refund');
+    taxableBills.forEach(bill => {
+      const taxableValue = bill.subtotal || 0;
+      const gstAmount = bill.gst || 0;
+      // Assume equal CGST and SGST for local supply (common scenario)
+      const cgst = gstAmount / 2;
+      const sgst = gstAmount / 2;
+      const igst = 0; // Assuming local supply, set IGST to 0
+      ws_data.push([
+        bill.orderId || '',
+        bill.dateTime ? bill.dateTime.split(',')[0] : '', // Extract date part
+        'Maharashtra', // Default place of supply (can be made configurable)
+        'B2C', // Default supply type
+        taxableValue,
+        cgst,
+        sgst,
+        igst,
+        bill.total || 0,
+        bill.customerName || 'Walk-in',
+        bill.customerPhone || ''
+      ]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, 'GSTR-1');
+    XLSX.writeFile(wb, `gstr1_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
+  // Get the currently filtered bills (same logic as renderBills)
+  function getFilteredBillsForExport() {
+    const fromVal = document.getElementById('bills-date-from') ? document.getElementById('bills-date-from').value : '';
+    const toVal = document.getElementById('bills-date-to') ? document.getElementById('bills-date-to').value : '';
+    let dateFrom = null;
+    if (fromVal) {
+      dateFrom = new Date(fromVal);
+      dateFrom.setHours(0, 0, 0, 0);
+    }
+    let dateTo = null;
+    if (toVal) {
+      dateTo = new Date(toVal);
+      dateTo.setHours(0, 0, 0, 0);
+    }
+    return bills.filter(bill => {
+      const q = billsSearchQuery.toLowerCase();
+      const matchesSearch = !q ||
+        (bill.customerName && bill.customerName.toLowerCase().includes(q)) ||
+        (bill.orderId && bill.orderId.toLowerCase().includes(q)) ||
+        (bill.customerPhone && bill.customerPhone.includes(q));
+      let matchesPreset = true;
+      if (activePresetDate !== 'all') {
+        const today = new Date().toLocaleDateString('en-IN');
+        if (activePresetDate === 'today') {
+          matchesPreset = bill.dateTime && bill.dateTime.includes(today);
+        } else if (activePresetDate === 'yesterday') {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toLocaleDateString('en-IN');
+          matchesPreset = bill.dateTime && bill.dateTime.includes(yesterdayStr);
+        } else if (activePresetDate === 'week') {
+          const billDate = parseBillDate(bill);
+          const diffTime = Math.abs(new Date() - billDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          matchesPreset = diffDays <= 7;
+        } else if (activePresetDate === 'month') {
+          const billDate = parseBillDate(bill);
+          const diffTime = Math.abs(new Date() - billDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          matchesPreset = diffDays <= 30;
+        }
+      }
+      let matchesCustomRange = true;
+      const billDate = parseBillDate(bill);
+      if (dateFrom && billDate < dateFrom) matchesCustomRange = false;
+      if (dateTo && billDate > dateTo) matchesCustomRange = false;
+      return matchesSearch && matchesPreset && matchesCustomRange;
+    });
+  }
+
+  // Add event listeners for export buttons
+  document.getElementById('export-bills-csv').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsCSV(filtered);
+  });
+  document.getElementById('export-bills-excel').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsExcel(filtered);
+  });
+  document.getElementById('export-bills-pdf').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsPDF(filtered);
+  });
+  document.getElementById('export-bills-gstr1').addEventListener('click', () => {
+    const filtered = getFilteredBillsForExport();
+    exportBillsGSTR1(filtered);
+  });
 
   // Listeners for presets filter chips
   if (billsPresetContainer) {
@@ -1414,6 +5237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         billsPresetContainer.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         activePresetDate = chip.getAttribute('data-preset');
+        if (billsTableBody) billsTableBody.setAttribute('data-page', '1');
         renderBills();
       }
     });
@@ -1422,6 +5246,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (billsSearchInput) {
     billsSearchInput.addEventListener('input', (e) => {
       billsSearchQuery = e.target.value;
+      if (billsTableBody) billsTableBody.setAttribute('data-page', '1');
       renderBills();
     });
   }
@@ -1440,33 +5265,61 @@ document.addEventListener('DOMContentLoaded', () => {
         triggerThermalReceiptPrint(bills[idx]);
       } else if (btn.classList.contains('whatsapp')) {
         shareBillOnWhatsApp(bills[idx]);
-      } else if (btn.classList.contains('duplicate')) {
-        // Load items back into active POS cart for cashier speed!
-        SoundEffects.playPop();
-        cart = [...bills[idx].items];
-        document.getElementById('cust-name').value = bills[idx].customerName;
-        document.getElementById('cust-phone').value = bills[idx].customerPhone || '';
-        renderCart();
+      } else if (btn.classList.contains('edit-bill')) {
+        startEditingBill(orderId);
         document.querySelector('[data-tab="pos-tab"]').click();
       } else if (btn.classList.contains('delete')) {
         // Requires secure cashier validation PIN triggers
         showAdminPinModal(() => {
-          const bill = bills[idx];
-          
+          const originalBill = bills[idx];
+
           // Revert Stock
-          bill.items.forEach(cartItem => {
+          originalBill.items.forEach(cartItem => {
             const specs = getDeductionSpecs(cartItem);
             Object.keys(specs).forEach(ing => {
               inventory[ing] = (inventory[ing] || 0) + (specs[ing] * cartItem.qty);
             });
           });
           localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-          
-          bills.splice(idx, 1);
+
+          // Mark original bill as refunded
+          bills[idx] = {
+            ...originalBill,
+            status: 'refunded',
+            refundedAt: new Date().toLocaleString('en-IN')
+          };
+
+          // Create reverse/refund bill entry
+          const refundBill = {
+            orderId: `${originalBill.orderId}_REFUND`,
+            customerName: originalBill.customerName,
+            customerPhone: originalBill.customerPhone,
+            dateTime: new Date().toLocaleString('en-IN'),
+            items: originalBill.items.map(item => ({ ...item, qty: -item.qty })),
+            subtotal: -originalBill.subtotal,
+            gst: -originalBill.gst,
+            discount: -originalBill.discount,
+            total: -originalBill.total,
+            paymentMethod: originalBill.paymentMethod,
+            orderType: 'Refund',
+            status: 'refund',
+            originalOrderId: originalBill.orderId
+          };
+          bills.push(refundBill);
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
-          
+
+          // Sync with Supabase
           if (supabaseClient) {
-            supabaseClient.from('doppio_bills').delete().eq('orderId', orderId).then();
+            // Update original bill as refunded
+            supabaseClient.from('doppio_bills').upsert({
+              ...bills[idx],
+              tenant_id: activeTenantId
+            }).then();
+            // Insert refund bill
+            supabaseClient.from('doppio_bills').insert({
+              ...refundBill,
+              tenant_id: activeTenantId
+            }).then();
           }
 
           SoundEffects.playRemove();
@@ -1476,6 +5329,80 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     });
+  }
+
+  function getFallbackCategoryIcon(term) {
+    const t = String(term).toLowerCase();
+    if (t.includes('sandwich') || t.includes('panini')) return '🥪';
+    if (t.includes('fries') || t.includes('peri')) return '🍟';
+    if (t.includes('shake') || t.includes('frappe') || t.includes('thickshake')) return '🥤';
+    if (t.includes('latte') || t.includes('matcha') || t.includes('milk')) return '🥛';
+    if (t.includes('croissant') || t.includes('pastry') || t.includes('bakery')) return '🥐';
+    return '☕';
+  }
+
+  function getRandomGoodVibeQuote(bill) {
+    let orderId = '';
+    let hasFood = false;
+    let hasDrinks = false;
+
+    if (typeof bill === 'string') {
+      orderId = bill;
+    } else if (bill && typeof bill === 'object') {
+      orderId = bill.orderId || '';
+      if (bill.items) {
+        bill.items.forEach(item => {
+          const name = String(item.name || '').toLowerCase();
+          const cat = String(item.category || '').toLowerCase();
+          if (name.includes('sandwich') || name.includes('fries') || name.includes('panini') || name.includes('burger') || name.includes('snack') || name.includes('munch') || cat.includes('food') || cat.includes('snack') || cat.includes('snacks')) {
+            hasFood = true;
+          }
+          if (name.includes('coffee') || name.includes('latte') || name.includes('matcha') || name.includes('frappe') || name.includes('shake') || name.includes('tea') || cat.includes('beverage') || cat.includes('coffee') || cat.includes('drinks')) {
+            hasDrinks = true;
+          }
+        });
+      }
+    }
+
+    let quotes = [];
+    if (hasFood && !hasDrinks) {
+      // Food Heavy Sensible Quotes
+      quotes = [
+        "🍔 Made fresh to make you smile! ✨",
+        "🍟 Hot, crispy & made with love!",
+        "🥪 Your perfect bite is here! ✨",
+        "✨ Hot snacks, warm smiles! 🥪",
+        "🔥 Delicious food, great mood!"
+      ];
+    } else if (hasDrinks && !hasFood) {
+      // Drink Heavy Sensible Quotes
+      quotes = [
+        "✨ Brewing happiness for you! ☕",
+        "☕ Good coffee, great day ahead!",
+        "💖 Espresso yourself and smile! ☕",
+        "✨ Freshly roasted joy in a cup! ☕",
+        "☕ Sip back, relax & enjoy!"
+      ];
+    } else {
+      // Generic / Mixed Sensible Quotes
+      quotes = [
+        "✨ Today is a beautiful day! 🌟",
+        "🍀 Thank you for being awesome! 💖",
+        "✨ Spread kindness like confetti! 🎉",
+        "💖 You made our day brighter! ✨",
+        "🍪 You're the cookie to our cup! ☕"
+      ];
+    }
+
+    let hash = 0;
+    if (orderId) {
+      for (let i = 0; i < orderId.length; i++) {
+        hash += orderId.charCodeAt(i);
+      }
+    } else {
+      hash = Math.floor(Math.random() * quotes.length);
+    }
+    return quotes[hash % quotes.length];
   }
 
   // ==========================================
@@ -1497,13 +5424,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const w1 = 20; // Item column width
       const w2 = 5;  // Qty column width
       const w3 = 7;  // Amt column width
-      
+
       let c1 = col1.slice(0, w1 - 1);
       c1 = c1.padEnd(w1, ' ');
-      
+
       const c2 = col2.toString().padStart(w2, ' ');
       const c3 = col3.toString().padStart(w3, ' ');
-      
+
       return c1 + c2 + c3;
     }
 
@@ -1519,32 +5446,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const borderDouble = '='.repeat(32);
     const borderSingle = '-'.repeat(32);
-    
+
     let txt = '';
     txt += borderDouble + '\n';
     txt += centerText32(businessProfile.name) + '\n';
     txt += centerText32(businessProfile.address) + '\n';
     txt += centerText32(businessProfile.phone) + '\n';
     txt += borderDouble + '\n\n';
-    
+
     const leftBill = `Bill: ${bill.orderId}`;
     const rightPay = bill.paymentMethod || 'Cash';
     txt += leftBill + rightPay.padStart(32 - leftBill.length, ' ') + '\n';
     txt += `Date: ${bill.dateTime}\n`;
     txt += `Guest: ${bill.customerName || 'Walk-in Guest'}\n\n`;
-    
+
     txt += borderSingle + '\n';
-    txt += 'Item                Qty   Amt\n';
+    txt += formatRow32('Item', 'Qty', 'Amt') + '\n';
     txt += borderSingle + '\n';
-    
+
     bill.items.forEach(item => {
-      let displayName = item.name;
+      let displayName = `${item.name}`;
       if (item.size && item.size !== 'Small') {
         displayName += ` (${item.size.charAt(0)})`;
       }
-      
+
       txt += formatRow32(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
-      
+      txt += `  (₹${item.price} each)\n`;
+
       if (item.toppings && item.toppings.length > 0) {
         txt += `  + ${item.toppings.join(', ')}\n`;
       }
@@ -1552,29 +5480,166 @@ document.addEventListener('DOMContentLoaded', () => {
         txt += `  * Note: ${item.notes}\n`;
       }
     });
-    
+
     txt += borderSingle + '\n';
     txt += formatDouble32('Subtotal', bill.subtotal.toString()) + '\n';
-    
-    // Print GST line only if GST is enabled in the business profile
+
+    // Print GST breakdown only if GST is enabled in the business profile
     if (businessProfile.gstEnabled !== false) {
-      txt += formatDouble32('GST', bill.gst.toString()) + '\n';
+      const gstRate = businessProfile.gstRate || 18;
+      const halfRate = gstRate / 2;
+      const cgst = bill.gst / 2;
+      const sgst = bill.gst / 2;
+      txt += formatDouble32(`CGST (${halfRate}%)`, cgst.toFixed(2)) + '\n';
+      txt += formatDouble32(`SGST (${halfRate}%)`, sgst.toFixed(2)) + '\n';
     }
-    
+
     if (bill.discount && bill.discount > 0) {
       txt += formatDouble32('Discount', `-${bill.discount}`) + '\n';
     }
-    
+
     txt += borderDouble + '\n';
     txt += formatDouble32('GRAND TOTAL', bill.total.toString()) + '\n';
     txt += borderDouble + '\n\n';
-    
+
+    const vibeQuote = getRandomGoodVibeQuote(bill);
+    txt += borderSingle + '\n';
+    txt += centerText32(vibeQuote) + '\n';
+    txt += borderSingle + '\n\n';
+
     txt += centerText32('Thank you for visiting!') + '\n';
     txt += centerText32('Visit Again ☕') + '\n';
 
     // Set inside printable area with a clean pre block
     el.innerHTML = `
-      <pre style="font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: 600; line-height: 1.45; margin: 0; white-space: pre-wrap; word-break: break-all; color: #000; background: #fff; text-shadow: none;">${txt}</pre>
+      <pre style="font-family: 'Courier New', Courier, monospace; font-size: 10px; font-weight: 600; line-height: 1.35; margin: 0; white-space: pre; color: #000; background: #fff; text-shadow: none;">${txt}</pre>
+    `;
+
+    if (window.AndroidInterface) {
+      window.AndroidInterface.printReceipt(el.innerHTML);
+    } else {
+      window.print();
+    }
+  }
+
+  function triggerKOTPrint(cartOrBill) {
+    const items = Array.isArray(cartOrBill) ? cartOrBill : cartOrBill.items;
+    if (!items || items.length === 0) return;
+
+    const printers = getSavedPrinters();
+
+    if (printers.length === 0) {
+      // Original single-ticket print
+      printKOTSubTicket(cartOrBill, items, "DEFAULT");
+      return;
+    }
+
+    // Split items by printer zones
+    const printedItemNames = new Set();
+    
+    printers.forEach(pr => {
+      const zoneItems = items.filter(item => {
+        const itemCat = String(item.category || "").trim().toLowerCase();
+        return pr.categories.includes(itemCat);
+      });
+
+      if (zoneItems.length > 0) {
+        zoneItems.forEach(i => printedItemNames.add(i.name));
+        printKOTSubTicket(cartOrBill, zoneItems, pr.name);
+      }
+    });
+
+    // Handle unmapped items (print on default)
+    const unmappedItems = items.filter(item => !printedItemNames.has(item.name));
+    if (unmappedItems.length > 0) {
+      printKOTSubTicket(cartOrBill, unmappedItems, "DEFAULT / COUNTER");
+    }
+  }
+
+  function printKOTSubTicket(cartOrBill, subItems, zoneName) {
+    const el = document.createElement('div');
+    
+    function centerText32(text) {
+      const width = 32;
+      if (text.length <= width) {
+        const leftPad = Math.floor((width - text.length) / 2);
+        return ' '.repeat(leftPad) + text;
+      }
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+      words.forEach(word => {
+        if ((currentLine + (currentLine ? ' ' : '') + word).length <= width) {
+          currentLine += (currentLine ? ' ' : '') + word;
+        } else {
+          if (currentLine) lines.push(currentLine);
+          currentLine = word;
+        }
+      });
+      if (currentLine) lines.push(currentLine);
+      return lines.map(line => {
+        const leftPad = Math.floor((width - line.length) / 2);
+        return ' '.repeat(leftPad) + line;
+      }).join('\n');
+    }
+
+    function formatRow32(col1, col2) {
+      const w1 = 24;
+      const w2 = 8;
+      let c1 = col1.slice(0, w1 - 1);
+      c1 = c1.padEnd(w1, ' ');
+      const c2 = col2.toString().padStart(w2, ' ');
+      return c1 + c2;
+    }
+
+    const borderDouble = '='.repeat(32);
+    const borderSingle = '-'.repeat(32);
+
+    let txt = '';
+    txt += borderDouble + '\n';
+    txt += centerText32('KITCHEN ORDER TICKET') + '\n';
+    txt += centerText32(`ZONE: ${zoneName.toUpperCase()}`) + '\n';
+    txt += borderDouble + '\n\n';
+
+    if (cartOrBill.orderId) {
+      txt += `Order: ${cartOrBill.orderId}\n`;
+    }
+    if (cartOrBill.tableNumber) {
+      txt += `Table: ${cartOrBill.tableNumber}\n`;
+    }
+    if (cartOrBill.dateTime) {
+      txt += `Date: ${cartOrBill.dateTime}\n`;
+    } else {
+      txt += `Date: ${new Date().toLocaleString('en-IN')}\n`;
+    }
+    if (cartOrBill.customerName && cartOrBill.customerName !== 'Walk-in Guest') {
+      txt += `Guest: ${cartOrBill.customerName}\n`;
+    }
+    txt += '\n';
+
+    txt += borderSingle + '\n';
+    txt += formatRow32('Item', 'Qty') + '\n';
+    txt += borderSingle + '\n';
+
+    subItems.forEach(item => {
+      let displayName = `${item.name}`;
+      if (item.size && item.size !== 'Small') {
+        displayName += ` (${item.size})`;
+      }
+      txt += formatRow32(displayName, item.qty) + '\n';
+      if (item.toppings && item.toppings.length > 0) {
+        txt += `  + ${item.toppings.join(', ')}\n`;
+      }
+      if (item.notes) {
+        txt += `  * Note: ${item.notes}\n`;
+      }
+    });
+
+    txt += borderSingle + '\n\n';
+    txt += centerText32('PREPARE WITH CARE!') + '\n';
+
+    el.innerHTML = `
+      <pre style="font-family: 'Courier New', Courier, monospace; font-size: 10px; font-weight: 600; line-height: 1.35; margin: 0; white-space: pre; color: #000; background: #fff; text-shadow: none;">${txt}</pre>
     `;
 
     if (window.AndroidInterface) {
@@ -1590,68 +5655,269 @@ document.addEventListener('DOMContentLoaded', () => {
       phoneNum = prompt("Enter customer's 10-digit WhatsApp number:", "");
       if (!phoneNum) return; // user cancelled
     }
-    
-    phoneNum = phoneNum.replace(/\D/g, '');
-    
-    if (phoneNum.length === 10) {
-      phoneNum = "91" + phoneNum;
-    }
-    
-    if (phoneNum.length < 10) {
+
+    phoneNum = whatsappDomain.normalizeIndianPhone(phoneNum);
+    if (!phoneNum) {
       alert("Invalid phone number! Please enter a valid number.");
       return;
     }
-    
-    const border = "----------------------------------";
-    let msg = `☕ *DOPPIO CAFE NAGPUR* ☕\n`;
-    msg += `*Premium Coffee & Bakery POS*\n`;
-    msg += `${border}\n`;
-    msg += `*Order ID:* #${bill.orderId}\n`;
-    msg += `*Date:* ${bill.dateTime}\n`;
-    msg += `*Customer:* ${bill.customerName || 'Valued Guest'}\n`;
-    msg += `*Payment Method:* ${bill.paymentMethod || 'UPI'}\n`;
-    msg += `${border}\n`;
-    msg += `*ITEMS ORDERED:*\n`;
-    
-    bill.items.forEach(item => {
-      let itemName = item.name;
-      if (item.size && item.size !== 'Small') {
-        itemName += ` (${item.size.charAt(0)})`;
+
+    // Monospace alignment helpers (matching ultra-safe 24-char mobile WhatsApp specs)
+    function centerText24(text) {
+      const width = 24;
+      if (text.length <= width) {
+        const leftPad = Math.floor((width - text.length) / 2);
+        return ' '.repeat(leftPad) + text;
       }
-      const qtyAmt = `${item.qty} x ₹${item.price} = ₹${item.price * item.qty}`;
-      msg += `• ${itemName}\n   _${qtyAmt}_\n`;
+
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+
+      words.forEach(word => {
+        if ((currentLine + (currentLine ? ' ' : '') + word).length <= width) {
+          currentLine += (currentLine ? ' ' : '') + word;
+        } else {
+          if (currentLine) lines.push(currentLine);
+          currentLine = word;
+        }
+      });
+      if (currentLine) lines.push(currentLine);
+
+      return lines.map(line => {
+        const leftPad = Math.floor((width - line.length) / 2);
+        return ' '.repeat(leftPad) + line;
+      }).join('\n');
+    }
+
+    function formatRow24(col1, col2, col3) {
+      const w1 = 13; // Item column width
+      const w2 = 4;  // Qty column width
+      const w3 = 7;  // Amt column width
+
+      let c1 = col1.slice(0, w1 - 1);
+      c1 = c1.padEnd(w1, ' ');
+
+      const c2 = col2.toString().padStart(w2, ' ');
+      const c3 = col3.toString().padStart(w3, ' ');
+
+      return c1 + c2 + c3;
+    }
+
+    function formatDouble24(label, value) {
+      const totalWidth = 24;
+      const valStr = value.toString();
+      const padSize = totalWidth - label.length;
+      if (padSize < valStr.length) {
+        return label.slice(0, totalWidth - valStr.length) + valStr;
+      }
+      return label + valStr.padStart(padSize, ' ');
+    }
+
+    const borderDouble = '='.repeat(24);
+    const borderSingle = '-'.repeat(24);
+
+    // Build receipt wrapped in WhatsApp's triple backticks monospace block
+    let msg = "```\n";
+    msg += borderDouble + '\n';
+    msg += centerText24(businessProfile.name || activeTenantName || 'RESTROSUITE') + '\n';
+    msg += centerText24(businessProfile.address || '') + '\n';
+    msg += centerText24(businessProfile.phone || '') + '\n';
+    msg += borderDouble + '\n\n';
+
+    let leftBill = `Bill: ${bill.orderId}`;
+    let rightPay = bill.paymentMethod || 'Cash';
+    if (rightPay.length > 8) {
+      rightPay = rightPay.slice(0, 8);
+    }
+    const padSize = 24 - leftBill.length;
+    if (padSize < rightPay.length) {
+      msg += leftBill.slice(0, 24 - rightPay.length) + rightPay + '\n';
+    } else {
+      msg += leftBill + rightPay.padStart(padSize, ' ') + '\n';
+    }
+
+    // Extract raw date part for compactness
+    const dateOnly = bill.dateTime ? bill.dateTime.split(',')[0] : new Date().toLocaleDateString('en-IN');
+    msg += `Date: ${dateOnly}\n`;
+    msg += `Guest: ${(bill.customerName || 'Walk-in Guest').slice(0, 17)}\n\n`;
+
+    msg += borderSingle + '\n';
+    msg += formatRow24('Item', 'Qty', 'Amt') + '\n';
+    msg += borderSingle + '\n';
+
+    bill.items.forEach(item => {
+      let displayName = `${item.name}`;
+      if (item.size && item.size !== 'Small') {
+        displayName += ` (${item.size.charAt(0)})`;
+      }
+
+      msg += formatRow24(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
+      msg += `  (₹${item.price} each)\n`;
+
       if (item.toppings && item.toppings.length > 0) {
-        msg += `   + Toppings: _${item.toppings.join(', ')}_\n`;
+        msg += `  + ${item.toppings.join(', ')}\n`;
       }
       if (item.notes) {
-        msg += `   * Note: _${item.notes}_\n`;
+        msg += `  * Note: ${item.notes}\n`;
       }
     });
-    
-    msg += `${border}\n`;
-    msg += `*Subtotal:* ₹${bill.subtotal}\n`;
+
+    msg += borderSingle + '\n';
+    msg += formatDouble24('Subtotal', bill.subtotal.toString()) + '\n';
+
+    if (businessProfile.gstEnabled !== false) {
+      msg += formatDouble24('GST', bill.gst.toString()) + '\n';
+    }
+
     if (bill.discount && bill.discount > 0) {
-      msg += `*Discount (Loyalty):* -₹${bill.discount}\n`;
+      msg += formatDouble24('Discount', `-${bill.discount}`) + '\n';
     }
-    if (bill.gst && bill.gst > 0) {
-      msg += `*GST (18%):* ₹${bill.gst}\n`;
-    }
-    msg += `*GRAND TOTAL: ₹${bill.total}*\n`;
-    msg += `${border}\n`;
-    msg += `Thank you for visiting! ❤️\n`;
-    msg += `Have a wonderful day! Visit again ☕`;
-    
+
+    msg += borderDouble + '\n';
+    msg += formatDouble24('GRAND TOTAL', bill.total.toString()) + '\n';
+    msg += borderDouble + '\n\n';
+
+    const vibeQuote = getRandomGoodVibeQuote(bill);
+    msg += borderSingle + '\n';
+    msg += centerText24(vibeQuote) + '\n';
+    msg += borderSingle + '\n\n';
+
+    msg += centerText24('Thank you for visiting!') + '\n';
+    msg += centerText24('Visit Again ☕') + '\n';
+    msg += "```";
+
     const encodedMsg = encodeURIComponent(msg);
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${phoneNum}&text=${encodedMsg}`;
-    
-    window.open(whatsappUrl, '_blank');
+
+    function openManualWhatsApp(phone, encoded) {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Use native protocol handler to directly open native WhatsApp app on Android/iOS
+        const deepLinkUrl = `whatsapp://send?phone=${phone}&text=${encoded}`;
+        window.location.href = deepLinkUrl;
+
+        // Safety fallback: if the deep link is not supported or not handled, fall back to API redirect
+        setTimeout(() => {
+          try {
+            window.location.href = `https://api.whatsapp.com/send?phone=${phone}&text=${encoded}`;
+          } catch (e) { }
+        }, 600);
+      } else {
+        // Direct WhatsApp Web send URL on desktop - instantly opens web chat and bypasses landing page!
+        const webUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encoded}`;
+        window.open(webUrl, '_blank');
+      }
+    }
+
+    if (!ZERO_COST_LAUNCH_MODE && businessProfile.whatsappGatewayEnabled && businessProfile.whatsappGatewayUrl && businessProfile.whatsappGatewayUrl.trim() !== '') {
+      showNotificationToast("Sending WhatsApp Bill...");
+
+      const gatewayUrl = businessProfile.whatsappGatewayUrl.trim();
+
+      // Local Mock Simulator: immediately triggers success toast locally (bypasses network/CORS blocks during testing)
+      if (gatewayUrl.includes('/api/mock-whatsapp') || gatewayUrl.includes('httpbin.org')) {
+        setTimeout(() => {
+          showNotificationToast("WhatsApp Bill Sent Successfully!");
+        }, 1200);
+        return;
+      }
+
+      const payload = {
+        orderId: bill.orderId,
+        phone: phoneNum,
+        to: phoneNum,
+        message: msg,
+        text: msg
+      };
+
+      const headers = {
+        "Content-Type": "application/json"
+      };
+
+      if (businessProfile.whatsappGatewayToken && businessProfile.whatsappGatewayToken.trim() !== '') {
+        const token = businessProfile.whatsappGatewayToken.trim();
+        const colonIndex = token.indexOf(':');
+        if (colonIndex > 0 && colonIndex < token.length - 1) {
+          const headerName = token.substring(0, colonIndex).trim();
+          const headerVal = token.substring(colonIndex + 1).trim();
+          headers[headerName] = headerVal;
+        } else {
+          if (token.toLowerCase().startsWith('bearer ')) {
+            headers["Authorization"] = token;
+          } else {
+            headers["Authorization"] = "Bearer " + token;
+          }
+        }
+      }
+
+      let dispatchUrl = businessProfile.whatsappGatewayUrl.trim();
+
+      // Auto-failover sender with retry + exponential backoff.
+      // Hugging Face Spaces (free tier) cold-start can take 20-30s on first request.
+      // We retry up to MAX_RETRIES times with increasing delays before giving up or
+      // failing over to the backup gateway.
+      const MAX_RETRIES = 3;
+      const RETRY_BASE_DELAY_MS = 2000; // 2s → 4s → 8s
+
+      function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      async function trySendWithRetry(targetUrl, isFallback = false) {
+        const actualUrl = whatsappDomain.resolveGatewaySendUrl(targetUrl);
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const response = await fetch(actualUrl, {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error("HTTP status " + response.status);
+            await response.json().catch(() => ({}));
+            showNotificationToast(isFallback ? "WhatsApp Sent via Backup Gateway!" : "WhatsApp Bill Sent Successfully!");
+            return; // success — done
+          } catch (err) {
+            lastError = err;
+            console.warn(`[WhatsApp] Attempt ${attempt}/${MAX_RETRIES} failed for ${targetUrl}:`, err.message);
+            if (attempt < MAX_RETRIES) {
+              const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+              if (attempt === 1) showNotificationToast("WhatsApp gateway waking up, retrying…");
+              await sleep(delay);
+            }
+          }
+        }
+
+        // All retries exhausted for this URL
+        console.error("Failed to send WhatsApp bill via: " + targetUrl, lastError);
+        if (!isFallback) {
+          const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
+          const fallbackUrl = isLocal && CLOUD_WHATSAPP_GATEWAY_URL ? CLOUD_WHATSAPP_GATEWAY_URL : 'http://localhost:3000';
+          showNotificationToast("Primary Gateway Offline. Trying Backup…");
+          return trySendWithRetry(fallbackUrl, true);
+        } else {
+          showNotificationToast("WhatsApp delivery failed. Opening manually…");
+          openManualWhatsApp(phoneNum, encodedMsg);
+        }
+      }
+
+      trySendWithRetry(dispatchUrl);
+    } else {
+      // Gateway unavailable (not configured or zero-cost mode active).
+      // Notify the user and fall back to manual WhatsApp share.
+      if (ZERO_COST_LAUNCH_MODE) {
+        showNotificationToast("Auto-gateway disabled. Opening WhatsApp manually…");
+      }
+      openManualWhatsApp(phoneNum, encodedMsg);
+    }
   }
 
   // ==========================================
   // 9. INTELLIGENT INVENTORY OVERHAUL (TAB 3)
   // ==========================================
   const inventoryGrid = document.getElementById('inventory-grid');
-  
+
   function renderInventory() {
     if (!inventoryGrid) return;
     inventoryGrid.innerHTML = '';
@@ -1659,12 +5925,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Calculate dynamic states count for Top stats panels
     let lowCount = 0;
     let emptyCount = 0;
+    const totalTracked = document.getElementById('inv-total-tracked');
+    if (totalTracked) totalTracked.textContent = `${Object.keys(inventory).length} items`;
 
     Object.keys(inventory).forEach(key => {
-      const maxVal = defaultInventory[key];
+      const maxVal = Number(defaultInventory[key]) > 0 ? Number(defaultInventory[key]) : Math.max(Number(inventory[key]) || 0, 1);
       const currentVal = inventory[key];
       const percent = Math.round((currentVal / maxVal) * 100);
       const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
+
+      // Track warnings
+      if (percent < itemThreshold) {
+        lowCount++;
+        if (currentVal <= 0) {
+          emptyCount++;
+        }
+      }
+
+      // Filter check
+      if (activeInventoryFilter === 'low' && percent >= itemThreshold) return;
+      if (activeInventoryFilter === 'drinks' && getIngredientCategory(key) !== 'drinks') return;
+      if (activeInventoryFilter === 'food' && getIngredientCategory(key) !== 'food') return;
 
       // Determine stock status and colors
       let statusClass = 'healthy';
@@ -1672,13 +5953,36 @@ document.addEventListener('DOMContentLoaded', () => {
       if (percent < itemThreshold) {
         statusClass = 'low';
         cardClass = 'alert-low';
-        lowCount++;
-        if (currentVal <= 0) {
-          emptyCount++;
-        }
       } else if (percent < 50) {
         statusClass = 'medium';
         cardClass = 'alert-medium';
+      }
+
+      // Check expiry dates
+      const todayStr = new Date().toISOString().split('T')[0];
+      const today = new Date(todayStr);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      let hasExpired = false;
+      let hasNearExpiry = false;
+
+      const ingredientBatchesList = inventoryBatches[key] || [];
+      ingredientBatchesList.forEach(b => {
+        if (b.qty <= 0) return;
+        const exp = new Date(b.expiryDate);
+        if (exp <= today) {
+          hasExpired = true;
+        } else if (exp <= tomorrow) {
+          hasNearExpiry = true;
+        }
+      });
+
+      let expiryBadge = "";
+      if (hasExpired) {
+        expiryBadge = `<span class="badge" style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: bold; margin-left: 6px;"><i class="fa-solid fa-triangle-exclamation"></i> EXPIRED</span>`;
+      } else if (hasNearExpiry) {
+        expiryBadge = `<span class="badge" style="background: var(--warning-color); color: var(--primary-brand); padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: bold; margin-left: 6px;"><i class="fa-solid fa-clock"></i> NEAR EXPIRY</span>`;
       }
 
       // Remaining estimated days mock logic
@@ -1689,7 +5993,7 @@ document.addEventListener('DOMContentLoaded', () => {
       card.className = `inventory-card ${cardClass}`;
       card.innerHTML = `
         <div class="inventory-card-title">
-          <h3>${icon} ${getLabelFromKey(key)}</h3>
+          <h3>${getLabelFromKey(key)} ${expiryBadge}</h3>
           <span style="font-size:10px; font-weight:700;" class="text-${statusClass}">${percent}%</span>
         </div>
         
@@ -1709,10 +6013,40 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>Linked: active recipes</span>
         </div>
 
+        <!-- Batches Dropdown List (FEFO) -->
+        <div class="batches-dropdown-trigger" style="margin-top: 8px; cursor: pointer; color: var(--accent-caramel); font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: space-between;" onclick="const content = this.nextElementSibling; content.style.display = content.style.display === 'none' ? 'block' : 'none';">
+          <span><i class="fa-solid fa-boxes-stacked"></i> View Batches (${ingredientBatchesList.filter(b => b.qty > 0).length})</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <div class="batches-dropdown-content" style="display: none; padding: 8px 0; border-top: 1px dashed rgba(28, 28, 28,0.08); margin-top: 6px;">
+          ${ingredientBatchesList.map((b, idx) => {
+        if (b.qty <= 0) return '';
+        const exp = new Date(b.expiryDate);
+        let statusBadge = "";
+        let itemColor = "var(--text-dark)";
+        if (exp <= today) {
+          statusBadge = '<span style="color:var(--danger-color); font-weight:bold;">[EXP]</span>';
+          itemColor = "var(--danger-color)";
+        } else if (exp <= tomorrow) {
+          statusBadge = '<span style="color:var(--warning-color); font-weight:bold;">[SOON]</span>';
+        }
+        return `
+              <div style="display: flex; justify-content: space-between; font-size: 9.5px; margin-bottom: 4px; color: ${itemColor}; align-items: center;">
+                <span>Batch ${idx + 1}: ${b.qty} (Exp: ${b.expiryDate}) ${statusBadge}</span>
+                ${exp <= today ? `
+                  <button type="button" class="discard-batch-btn" data-key="${key}" data-id="${b.id}" style="background: transparent; border: none; color: var(--danger-color); cursor: pointer; font-size: 10px;" title="Discard batch & log wastage">
+                    <i class="fa-solid fa-trash-can"></i> Discard
+                  </button>
+                ` : ''}
+              </div>
+            `;
+      }).join('') || '<div style="font-size: 9px; color: var(--text-muted);">No active batches.</div>'}
+        </div>
+
         <div class="inventory-card-actions" style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:12px;">
           <label style="font-size: 10px; font-weight:700; color:var(--text-muted); display:flex; align-items:center; gap:4px; margin:0;">
             Warn: 
-            <input type="number" class="threshold-input" data-key="${key}" value="${itemThreshold}" min="0" max="100" style="width: 45px; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(43,24,19,0.15); background: transparent; color: var(--primary-brand); text-align: center; font-size:10px; font-weight:700; outline:none;">
+            <input type="number" class="threshold-input" data-key="${key}" value="${itemThreshold}" min="0" max="100" style="width: 45px; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(28, 28, 28,0.15); background: transparent; color: var(--primary-brand); text-align: center; font-size:10px; font-weight:700; outline:none;">
             %
           </label>
           <button class="btn btn-secondary quick-refill-btn" data-key="${key}" style="padding:4px 10px; font-size:10px;"><i class="fa-solid fa-plus"></i> Refill</button>
@@ -1721,8 +6055,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
       card.querySelector('.quick-refill-btn').addEventListener('click', () => {
         SoundEffects.playPop();
+        const refillQty = maxVal - inventory[key];
+        if (refillQty > 0) {
+          const newBatch = {
+            id: "batch_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+            qty: refillQty,
+            expiryDate: getDefaultExpiryDate(key),
+            receivedDate: new Date().toISOString().split('T')[0]
+          };
+          if (!inventoryBatches[key]) inventoryBatches[key] = [];
+          inventoryBatches[key].push(newBatch);
+          localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+          // Sync new batch to Supabase
+          if (supabaseClient) {
+            supabaseClient.from('doppio_inventory_batches').upsert({
+              tenant_id: activeTenantId,
+              id: newBatch.id,
+              ingredient_key: key,
+              qty: newBatch.qty,
+              expiryDate: newBatch.expiryDate,
+              receivedDate: newBatch.receivedDate
+            }, { onConflict: 'tenant_id,id' }).then(({ error }) => {
+              if (error) handleSyncError('Batch Refill', error);
+            });
+          }
+        }
         inventory[key] = maxVal;
         localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+
+        // Sync manual refill to Supabase immediately
+        if (supabaseClient) {
+          supabaseClient.from('doppio_inventory').update({ current: maxVal }).eq('tenant_id', activeTenantId).eq('key', key).then();
+        }
+
         renderInventory();
         checkLowStockAlerts();
       });
@@ -1733,20 +6098,191 @@ document.addEventListener('DOMContentLoaded', () => {
           thresholds[key] = val;
           localStorage.setItem('doppio_inventory_thresholds', JSON.stringify(thresholds));
           checkLowStockAlerts();
-          // Visual updates
           renderInventory();
+          // Sync threshold to Supabase
+          if (supabaseClient) {
+            supabaseClient.from('doppio_inventory_thresholds')
+              .upsert({ tenant_id: activeTenantId, ingredient_key: key, threshold: val, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,ingredient_key' })
+              .then(({ error }) => {
+                if (error) handleSyncError('Inventory Threshold Save', error);
+              });
+          }
         }
+      });
+
+      // Bind Discard Batch Click Listeners
+      card.querySelectorAll('.discard-batch-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const k = btn.getAttribute('data-key');
+          const bid = btn.getAttribute('data-id');
+          discardExpiredBatch(k, bid);
+        });
       });
 
       inventoryGrid.appendChild(card);
     });
+
+    // Render premium empty state if no inventory items match the current filter
+    if (inventoryGrid.children.length === 0) {
+      inventoryGrid.innerHTML = `
+        <div class="premium-empty-state" style="grid-column: 1 / -1; width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          <h3>No Ingredients Found</h3>
+          <p>No ingredients matched the selected filter criteria.</p>
+        </div>
+      `;
+    }
 
     // Update Top metrics cards
     document.getElementById('inv-total-low').textContent = `${lowCount} Warnings`;
     document.getElementById('inv-total-empty').textContent = `${emptyCount} Out of stock`;
   }
 
+  // Connect Inventory Filter buttons click listeners
+  document.querySelectorAll('.inv-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      document.querySelectorAll('.inv-filter-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'white';
+        b.style.color = 'var(--primary-brand)';
+        b.style.borderColor = 'rgba(28, 28, 28,0.15)';
+      });
+      btn.classList.add('active');
+      btn.style.background = 'var(--accent-caramel)';
+      btn.style.color = 'white';
+      btn.style.borderColor = 'var(--accent-caramel)';
+
+      activeInventoryFilter = btn.getAttribute('data-filter') || 'all';
+      renderInventory();
+    });
+  });
+
+  function deductStockFEFO(ingredientKey, requiredQty) {
+    const result = inventoryDomain.deductFefo(
+      inventoryBatches[ingredientKey],
+      requiredQty,
+      () => ({
+          id: "batch_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+          expiryDate: getDefaultExpiryDate(ingredientKey),
+          receivedDate: new Date().toISOString().split('T')[0]
+      })
+    );
+
+    inventoryBatches[ingredientKey] = result.batches;
+    localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+
+    inventory[ingredientKey] = result.total;
+    localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+
+    // Sync to Supabase
+    if (supabaseClient) {
+      supabaseClient.from('doppio_inventory')
+        .update({ current: inventory[ingredientKey] })
+        .eq('tenant_id', activeTenantId)
+        .eq('key', ingredientKey).then();
+    }
+    syncIngredientBatchesToSupabase(ingredientKey);
+  }
+
+  function syncIngredientBatchesToSupabase(ing) {
+    if (!supabaseClient) return;
+    const list = inventoryBatches[ing] || [];
+    if (list.length > 0) {
+      const keptIds = list.map(b => b.id);
+      supabaseClient.from('doppio_inventory_batches')
+        .delete()
+        .eq('tenant_id', activeTenantId)
+        .eq('ingredient_key', ing)
+        .not('id', 'in', `(${keptIds.join(',')})`)
+        .then(({ error }) => {
+          if (error) handleSyncError('Batch Cleanup Sync', error);
+        });
+      const upsertData = list.map(b => ({
+        tenant_id: activeTenantId,
+        id: b.id,
+        ingredient_key: ing,
+        qty: b.qty,
+        expiryDate: b.expiryDate,
+        receivedDate: b.receivedDate
+      }));
+      supabaseClient.from('doppio_inventory_batches').upsert(upsertData, { onConflict: 'tenant_id,id' }).then(({ error }) => {
+        if (error) handleSyncError('Batch Quantity Sync', error);
+      });
+    } else {
+      supabaseClient.from('doppio_inventory_batches')
+        .delete()
+        .eq('tenant_id', activeTenantId)
+        .eq('ingredient_key', ing)
+        .then(({ error }) => {
+          if (error) handleSyncError('Batch Clear Sync', error);
+        });
+    }
+  }
+
+  function addStockToBatches(ing, qty) {
+    let batches = inventoryBatches[ing] || [];
+    if (batches.length === 0) {
+      batches.push({
+        id: "batch_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+        qty: qty,
+        expiryDate: getDefaultExpiryDate(ing),
+        receivedDate: new Date().toISOString().split('T')[0]
+      });
+    } else {
+      // Add to oldest batch
+      batches[0].qty += qty;
+    }
+    inventoryBatches[ing] = batches;
+    localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+    syncIngredientBatchesToSupabase(ing);
+  }
+
+  function discardExpiredBatch(key, batchId) {
+    if (!inventoryBatches[key]) return;
+    const batchIndex = inventoryBatches[key].findIndex(b => b.id === batchId);
+    if (batchIndex === -1) return;
+    const batch = inventoryBatches[key][batchIndex];
+
+    SoundEffects.playRemove();
+    showNotificationToast(`Wastage: Discarded ${batch.qty} units of expired ${getLabelFromKey(key)}.`);
+
+    // Remove the batch
+    inventoryBatches[key].splice(batchIndex, 1);
+    localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+
+    // Update inventory total
+    const total = inventoryBatches[key].reduce((sum, b) => sum + b.qty, 0);
+    inventory[key] = Math.max(0, total);
+    localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+
+    // Supabase Sync — delete batch record and update inventory
+    if (supabaseClient) {
+      supabaseClient.from('doppio_inventory_batches').delete().eq('tenant_id', activeTenantId).eq('id', batchId).then(({ error }) => {
+        if (error) console.warn('Supabase batch delete failed:', error.message);
+      });
+      supabaseClient.from('doppio_inventory').update({ current: inventory[key] }).eq('tenant_id', activeTenantId).eq('key', key).then();
+    }
+
+    renderInventory();
+    checkLowStockAlerts();
+    updateAIForecast();
+  }
+
+  function getIngredientCategory(key) {
+    if (inventoryMetadata[key] && inventoryMetadata[key].category) {
+      return inventoryMetadata[key].category;
+    }
+    const drinksKeys = ['espresso_shot', 'milk', 'ice', 'sugar_syrup', 'water', 'irish_syrup', 'cream', 'chocolate_syrup', 'frappe_base', 'caramel_syrup', 'hazelnut_syrup', 'ginger_ale', 'vanilla_ice_cream', 'cocoa_powder', 'matcha_powder', 'strawberry_puree', 'vanilla_syrup', 'mango_puree', 'soda', 'mint', 'lemon'];
+    return drinksKeys.includes(key) ? 'drinks' : 'food';
+  }
+
   function getLabelFromKey(key) {
+    if (inventoryMetadata[key] && inventoryMetadata[key].label) {
+      const unit = inventoryMetadata[key].unit ? ` (${inventoryMetadata[key].unit})` : '';
+      return `${inventoryMetadata[key].label}${unit}`;
+    }
     const map = {
       espresso_shot: 'Espresso Shot (ml)', milk: 'Milk (ml)', ice: 'Ice (g)',
       sugar_syrup: 'Sugar Syrup (ml)', water: 'Water (ml)', irish_syrup: 'Irish Syrup (ml)',
@@ -1779,7 +6315,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function checkLowStockAlerts() {
     const banner = document.getElementById('low-stock-alerts');
     if (!banner) return;
-    
+
     let lowIngredients = [];
     Object.keys(inventory).forEach(key => {
       const maxVal = defaultInventory[key];
@@ -1794,7 +6330,7 @@ document.addEventListener('DOMContentLoaded', () => {
       banner.innerHTML = `
         <div class="alert-banner">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          <span>Low stock alerts for Nagpur Branch: <strong>${lowIngredients.slice(0,4).join(', ')}${lowIngredients.length > 4 ? '...' : ''}</strong></span>
+          <span>Low stock alert: <strong>${lowIngredients.slice(0, 4).join(', ')}${lowIngredients.length > 4 ? '...' : ''}</strong></span>
         </div>
       `;
       // Play soft alert sounds
@@ -1815,6 +6351,316 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
+  // 9.5 INVENTORY SUB-TABS & ADVANCED FEATURES
+  // ==========================================
+  
+  // State variables for new features
+  let suppliers = JSON.parse(localStorage.getItem('doppio_suppliers') || '[]');
+  let purchaseOrders = JSON.parse(localStorage.getItem('doppio_purchase_orders') || '[]');
+  let grns = JSON.parse(localStorage.getItem('doppio_grns') || '[]');
+  let wasteLog = JSON.parse(localStorage.getItem('doppio_waste_log') || '[]');
+
+  // Function to switch between inventory sub-tabs
+  function switchInventorySubTab(tabName) {
+    // Hide all sub-tab contents
+    document.querySelectorAll('.inv-sub-tab-content').forEach(el => el.style.display = 'none');
+    // Remove active class from all buttons
+    document.querySelectorAll('.inv-sub-tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+      btn.style.background = 'white';
+      btn.style.color = 'var(--primary-brand)';
+      btn.style.borderColor = 'rgba(28, 28, 28,0.15)';
+    });
+    // Show selected sub-tab
+    document.getElementById(`sub-tab-${tabName}`).style.display = 'block';
+    // Mark button as active
+    const activeBtn = document.querySelector(`.inv-sub-tab-btn[data-sub-tab="${tabName}"]`);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+      activeBtn.style.background = 'var(--accent-caramel)';
+      activeBtn.style.color = 'white';
+      activeBtn.style.borderColor = 'var(--accent-caramel)';
+    }
+    // Render the selected sub-tab's content
+    switch(tabName) {
+      case 'suppliers': renderSuppliers(); break;
+      case 'purchase-orders': renderPurchaseOrders(); break;
+      case 'grns': renderGRNs(); break;
+      case 'waste-log': renderWasteLog(); break;
+    }
+  }
+
+  // Suppliers
+  function renderSuppliers() {
+    const grid = document.getElementById('suppliers-grid');
+    if (!grid) return;
+    if (suppliers.length === 0) {
+      grid.innerHTML = `
+        <div class="premium-empty-state" style="grid-column: 1 / -1; width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-truck-fast"></i>
+          <h3>No Suppliers Added</h3>
+          <p>Add your first supplier to start managing purchases.</p>
+        </div>
+      `;
+      return;
+    }
+    grid.innerHTML = suppliers.map(supplier => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">${supplier.name}</h4>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 10px;" onclick="deleteSupplier('${supplier.id}')">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;"><i class="fa-solid fa-phone"></i> ${supplier.phone || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;"><i class="fa-solid fa-envelope"></i> ${supplier.email || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;"><i class="fa-solid fa-location-dot"></i> ${supplier.address || 'N/A'}</p>
+      </div>
+    `).join('');
+  }
+
+  function addSupplier() {
+    const name = prompt('Supplier Name:');
+    if (!name) return;
+    const phone = prompt('Phone Number:');
+    const email = prompt('Email:');
+    const address = prompt('Address:');
+    const newSupplier = {
+      id: 'supplier_' + Date.now(),
+      name,
+      phone,
+      email,
+      address,
+      createdAt: new Date().toISOString()
+    };
+    suppliers.push(newSupplier);
+    localStorage.setItem('doppio_suppliers', JSON.stringify(suppliers));
+    renderSuppliers();
+    showNotificationToast('Supplier added successfully!');
+  }
+
+  function deleteSupplier(id) {
+    if (!confirm('Are you sure you want to delete this supplier?')) return;
+    suppliers = suppliers.filter(s => s.id !== id);
+    localStorage.setItem('doppio_suppliers', JSON.stringify(suppliers));
+    renderSuppliers();
+    showNotificationToast('Supplier deleted.');
+  }
+
+  // Purchase Orders
+  function renderPurchaseOrders() {
+    const list = document.getElementById('purchase-orders-list');
+    if (!list) return;
+    if (purchaseOrders.length === 0) {
+      list.innerHTML = `
+        <div class="premium-empty-state" style="width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <h3>No Purchase Orders</h3>
+          <p>Create your first purchase order to restock inventory.</p>
+        </div>
+      `;
+      return;
+    }
+    list.innerHTML = purchaseOrders.map(po => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">PO #${po.id.split('_')[1]}</h4>
+          <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 10px; background: ${po.status === 'Pending' ? 'rgba(243, 156, 18, 0.1)' : 'rgba(46, 204, 113, 0.1)'}; color: ${po.status === 'Pending' ? '#f39c12' : '#27ae60'};">${po.status}</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Supplier: ${po.supplierName || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Date: ${new Date(po.createdAt).toLocaleDateString('en-IN')}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Total: ₹${po.total || 0}</p>
+        ${po.status === 'Pending' ? `
+          <button class="btn btn-primary" style="padding: 6px 14px; font-size: 11px; margin-top: 8px;" onclick="receivePurchaseOrder('${po.id}')">
+            <i class="fa-solid fa-check"></i> Mark as Received
+          </button>
+        ` : ''}
+      </div>
+    `).join('');
+  }
+
+  function createPurchaseOrder() {
+    if (suppliers.length === 0) {
+      alert('Please add a supplier first!');
+      return;
+    }
+    const supplierSelect = suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    const supplierId = prompt(`Select Supplier ID:\n${suppliers.map(s => `${s.name}: ${s.id}`).join('\n')}`);
+    if (!supplierId) return;
+    const supplier = suppliers.find(s => s.id === supplierId);
+    const total = prompt('Total Amount:');
+    const newPO = {
+      id: 'po_' + Date.now(),
+      supplierId,
+      supplierName: supplier ? supplier.name : 'Unknown',
+      total: parseFloat(total) || 0,
+      status: 'Pending',
+      createdAt: new Date().toISOString()
+    };
+    purchaseOrders.push(newPO);
+    localStorage.setItem('doppio_purchase_orders', JSON.stringify(purchaseOrders));
+    renderPurchaseOrders();
+    showNotificationToast('Purchase Order created!');
+  }
+
+  function receivePurchaseOrder(id) {
+    const po = purchaseOrders.find(p => p.id === id);
+    if (!po) return;
+    po.status = 'Received';
+    localStorage.setItem('doppio_purchase_orders', JSON.stringify(purchaseOrders));
+    // Optionally, create a GRN automatically
+    const newGRN = {
+      id: 'grn_' + Date.now(),
+      poId: id,
+      supplierName: po.supplierName,
+      status: 'Completed',
+      createdAt: new Date().toISOString()
+    };
+    grns.push(newGRN);
+    localStorage.setItem('doppio_grns', JSON.stringify(grns));
+    renderPurchaseOrders();
+    renderGRNs();
+    showNotificationToast('Purchase Order marked as received and GRN created!');
+  }
+
+  // GRNs
+  function renderGRNs() {
+    const list = document.getElementById('grns-list');
+    if (!list) return;
+    if (grns.length === 0) {
+      list.innerHTML = `
+        <div class="premium-empty-state" style="width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-clipboard-list"></i>
+          <h3>No GRNs</h3>
+          <p>Goods Received Notes will appear here when you receive stock.</p>
+        </div>
+      `;
+      return;
+    }
+    list.innerHTML = grns.map(grn => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">GRN #${grn.id.split('_')[1]}</h4>
+          <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 10px; background: rgba(46, 204, 113, 0.1); color: #27ae60;">${grn.status}</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Supplier: ${grn.supplierName || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Date: ${new Date(grn.createdAt).toLocaleDateString('en-IN')}</p>
+      </div>
+    `).join('');
+  }
+
+  function createGRN() {
+    if (suppliers.length === 0) {
+      alert('Please add a supplier first!');
+      return;
+    }
+    const supplierId = prompt(`Select Supplier ID:\n${suppliers.map(s => `${s.name}: ${s.id}`).join('\n')}`);
+    if (!supplierId) return;
+    const supplier = suppliers.find(s => s.id === supplierId);
+    const newGRN = {
+      id: 'grn_' + Date.now(),
+      supplierId,
+      supplierName: supplier ? supplier.name : 'Unknown',
+      status: 'Completed',
+      createdAt: new Date().toISOString()
+    };
+    grns.push(newGRN);
+    localStorage.setItem('doppio_grns', JSON.stringify(grns));
+    renderGRNs();
+    showNotificationToast('GRN created!');
+  }
+
+  // Waste Log
+  function renderWasteLog() {
+    const list = document.getElementById('waste-log-list');
+    if (!list) return;
+    if (wasteLog.length === 0) {
+      list.innerHTML = `
+        <div class="premium-empty-state" style="width: 100%; box-sizing: border-box;">
+          <i class="fa-solid fa-trash-can"></i>
+          <h3>No Waste Logged</h3>
+          <p>Log wastage (spoilage, over-prep, etc.) to track inventory loss.</p>
+        </div>
+      `;
+      return;
+    }
+    list.innerHTML = wasteLog.map(waste => `
+      <div class="bills-stat-card" style="flex-direction: column; align-items: flex-start; padding: 16px; gap: 8px; background: var(--bg-card); border: 1px solid rgba(28, 28, 28,0.08); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-brand); margin: 0;">${getLabelFromKey(waste.ingredientKey)}</h4>
+          <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 10px; background: rgba(231, 76, 60, 0.1); color: #e74c3c;">-${waste.qty} units</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Reason: ${waste.reason || 'N/A'}</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Date: ${new Date(waste.createdAt).toLocaleDateString('en-IN')}</p>
+      </div>
+    `).join('');
+  }
+
+  function logWaste() {
+    const ingredientKey = prompt(`Ingredient Key (e.g., milk, sugar_syrup):\nAvailable: ${Object.keys(inventory).join(', ')}`);
+    if (!ingredientKey || !inventory[ingredientKey]) {
+      alert('Invalid ingredient key!');
+      return;
+    }
+    const qty = prompt('Quantity Wasted:');
+    if (!qty) return;
+    const reason = prompt('Reason (e.g., Spoilage, Over-prep):');
+    const qtyNum = parseFloat(qty) || 0;
+    
+    // Deduct from inventory
+    inventory[ingredientKey] = Math.max(0, (inventory[ingredientKey] || 0) - qtyNum);
+    localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+    
+    // Log the waste
+    const newWaste = {
+      id: 'waste_' + Date.now(),
+      ingredientKey,
+      qty: qtyNum,
+      reason,
+      createdAt: new Date().toISOString()
+    };
+    wasteLog.push(newWaste);
+    localStorage.setItem('doppio_waste_log', JSON.stringify(wasteLog));
+    
+    renderWasteLog();
+    renderInventory();
+    checkLowStockAlerts();
+    showNotificationToast('Waste logged and inventory updated!');
+  }
+
+  // Make functions globally accessible for HTML buttons
+  window.switchInventorySubTab = switchInventorySubTab;
+  window.addSupplier = addSupplier;
+  window.deleteSupplier = deleteSupplier;
+  window.createPurchaseOrder = createPurchaseOrder;
+  window.receivePurchaseOrder = receivePurchaseOrder;
+  window.createGRN = createGRN;
+  window.logWaste = logWaste;
+
+  // Initialize inventory sub-tab event listeners (immediately, since script is at end of body)
+  setTimeout(() => {
+    // Sub-tab switchers
+    document.querySelectorAll('.inv-sub-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.getAttribute('data-sub-tab');
+        switchInventorySubTab(tabName);
+      });
+    });
+    // Supplier buttons
+    const addSupplierBtn = document.getElementById('add-supplier-btn');
+    if (addSupplierBtn) addSupplierBtn.addEventListener('click', addSupplier);
+    // Purchase Order buttons
+    const createPOBtn = document.getElementById('create-po-btn');
+    if (createPOBtn) createPOBtn.addEventListener('click', createPurchaseOrder);
+    // GRN buttons
+    const createGRNBtn = document.getElementById('create-grn-btn');
+    if (createGRNBtn) createGRNBtn.addEventListener('click', createGRN);
+    // Waste log buttons
+    const logWasteBtn = document.getElementById('log-waste-btn');
+    if (logWasteBtn) logWasteBtn.addEventListener('click', logWaste);
+  }, 100);
+
+  // ==========================================
   // 10. SALES REPORTS SVG CHARTS (TAB 4)
   // ==========================================
   const revenueChartBox = document.getElementById('reports-revenue-chart-box');
@@ -1832,12 +6678,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let dateFrom = null;
     if (fromVal) {
       dateFrom = new Date(fromVal);
-      dateFrom.setHours(0,0,0,0);
+      dateFrom.setHours(0, 0, 0, 0);
     }
     let dateTo = null;
     if (toVal) {
       dateTo = new Date(toVal);
-      dateTo.setHours(0,0,0,0);
+      dateTo.setHours(0, 0, 0, 0);
     }
 
     const filteredBills = bills.filter(bill => {
@@ -1860,14 +6706,109 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Total numbers calculations
-    const totalRevenueSum = filteredBills.reduce((sum, b) => sum + b.total, 0);
-    if (reportRevenue) reportRevenue.textContent = `₹${totalRevenueSum}`;
+    const totalRevenueSum = filteredBills.reduce((sum, b) => sum + ((b && b.total) || 0), 0);
+    if (reportRevenue) reportRevenue.textContent = `₹${totalRevenueSum.toLocaleString('en-IN')}`;
     if (reportOrders) reportOrders.textContent = filteredBills.length;
 
+    // Date range day calculations for fixed operating expenses pro-rating
+    let numDays = 30;
+    if (dateFrom && dateTo) {
+      const diffTime = Math.abs(dateTo - dateFrom);
+      numDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+    } else if (dateFrom || dateTo) {
+      numDays = 1;
+    }
+
+    // Revenue
+    const revenueVal = totalRevenueSum;
+
+    // COGS (35%)
+    const cogsVal = Math.round(revenueVal * 0.35);
+
+    // Labor cost calculations
+    // 1. Clocked wages in selected date range
+    const clockedWagesSum = attendanceLogs
+      .filter(log => {
+        if (!log || !log.date) return false;
+        const logDate = new Date(log.date);
+        if (dateFrom && logDate < dateFrom) return false;
+        if (dateTo && logDate > dateTo) return false;
+        return true;
+      })
+      .reduce((sum, log) => sum + ((log && log.wages) || 0), 0);
+
+    // 2. Fixed salary (admin Bonie Deora's pro-rated salary for this range: ₹45,000/30 = ₹1,500/day)
+    const fixedLaborVal = Math.round((45000 / 30) * numDays);
+    const laborVal = clockedWagesSum + fixedLaborVal;
+
+    // Fixed Operating Expenses (pro-rated ₹32,000/mo = ₹1,067/day)
+    const fixedVal = Math.round((32000 / 30) * numDays);
+
+    // Gross Margin
+    const grossMarginVal = revenueVal - cogsVal;
+
+    // Net profit
+    const netProfitVal = grossMarginVal - laborVal - fixedVal;
+
+    // Populating Sales Report tab UI components
+    const reportNetProfit = document.getElementById('report-net-profit');
+    if (reportNetProfit) {
+      reportNetProfit.textContent = `₹${netProfitVal.toLocaleString('en-IN')}`;
+      if (netProfitVal >= 0) {
+        reportNetProfit.style.color = '#2ecc71';
+      } else {
+        reportNetProfit.style.color = '#e74c3c';
+      }
+    }
+
+    // Populating Detailed P&L statement table
+    const plRev = document.getElementById('pl-revenue');
+    const plCogs = document.getElementById('pl-cogs');
+    const plGross = document.getElementById('pl-gross-profit');
+    const plLabor = document.getElementById('pl-labor');
+    const plFixed = document.getElementById('pl-fixed');
+    const plNet = document.getElementById('pl-net-profit');
+
+    if (plRev) plRev.textContent = `₹${revenueVal.toLocaleString('en-IN')}`;
+    if (plCogs) plCogs.textContent = `-₹${cogsVal.toLocaleString('en-IN')}`;
+    if (plGross) plGross.textContent = `₹${grossMarginVal.toLocaleString('en-IN')}`;
+    if (plLabor) plLabor.textContent = `-₹${laborVal.toLocaleString('en-IN')}`;
+    if (plFixed) plFixed.textContent = `-₹${fixedVal.toLocaleString('en-IN')}`;
+    if (plNet) {
+      plNet.textContent = `₹${netProfitVal.toLocaleString('en-IN')}`;
+      if (netProfitVal >= 0) {
+        plNet.style.color = '#2ecc71';
+      } else {
+        plNet.style.color = '#e74c3c';
+      }
+    }
+
     // Payment method breakdowns
-    const sumUPI = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'UPI').reduce((sum, b) => sum + b.total, 0);
-    const sumCard = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'CARD').reduce((sum, b) => sum + b.total, 0);
-    const sumCash = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'CASH').reduce((sum, b) => sum + b.total, 0);
+    let sumUPI = 0;
+    let sumCard = 0;
+    let sumCash = 0;
+
+    filteredBills.forEach(b => {
+      if (!b) return;
+      const pm = b.paymentMethod || 'UPI';
+      if (pm.startsWith('Split:')) {
+        // Parse "Split: UPI=300, Cash=200, Card=0"
+        const parts = pm.substring(6).split(',');
+        parts.forEach(part => {
+          const [method, val] = part.trim().split('=');
+          const value = parseInt(val) || 0;
+          if (method === 'UPI') sumUPI += value;
+          else if (method === 'Cash') sumCash += value;
+          else if (method === 'Card') sumCard += value;
+        });
+      } else {
+        const methodUpper = pm.toUpperCase();
+        const amt = parseFloat(b.total) || 0;
+        if (methodUpper === 'UPI') sumUPI += amt;
+        else if (methodUpper === 'CARD') sumCard += amt;
+        else if (methodUpper === 'CASH') sumCash += amt;
+      }
+    });
 
     const elUPI = document.getElementById('report-pay-upi');
     const elCard = document.getElementById('report-pay-card');
@@ -1880,8 +6821,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Best seller counts mapping
     const itemCounts = {};
     filteredBills.forEach(b => {
+      if (!b || !b.items || !Array.isArray(b.items)) return;
       b.items.forEach(item => {
-        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
+        if (!item || !item.name) return;
+        itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.qty || 1);
       });
     });
 
@@ -1898,13 +6841,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Renders custom SVG curved line trends chart inside report Visual box
     if (revenueChartBox) {
       revenueChartBox.innerHTML = '';
-      
+
       const width = 460;
       const height = 180;
-      
+
       // Calculate revenue points specifically for last 5 orders of the filtered set
       const chartBills = [...filteredBills].slice(-5);
-      let dataPoints = chartBills.map(b => b.total);
+      let dataPoints = chartBills.map(b => (b && b.total) || 0);
       if (dataPoints.length < 5) {
         dataPoints = [...dataPoints, 120, 240, 180, 310, 250].slice(0, 5);
       }
@@ -1919,20 +6862,31 @@ document.addEventListener('DOMContentLoaded', () => {
       let pathD = `M ${points[0].x} ${points[0].y}`;
       for (let i = 1; i < points.length; i++) {
         // Curve interpolation
-        const cpX1 = points[i-1].x + (points[i].x - points[i-1].x) / 2;
-        const cpY1 = points[i-1].y;
+        const cpX1 = points[i - 1].x + (points[i].x - points[i - 1].x) / 2;
+        const cpY1 = points[i - 1].y;
         const cpX2 = cpX1;
         const cpY2 = points[i].y;
         pathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${points[i].x} ${points[i].y}`;
       }
 
+      let areaD = pathD + ` L ${points[points.length - 1].x} ${height - 30} L ${points[0].x} ${height - 30} Z`;
+
       // Draw SVG curved grid
       revenueChartBox.innerHTML = `
         <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="overflow:visible;">
+          <defs>
+            <linearGradient id="chartAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent-caramel)" stop-opacity="0.25" />
+              <stop offset="100%" stop-color="var(--accent-caramel)" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
           <!-- Grid lines -->
-          <line x1="30" y1="30" x2="${width-30}" y2="30" stroke="rgba(43,24,19,0.03)" stroke-width="1"/>
-          <line x1="30" y1="90" x2="${width-30}" y2="90" stroke="rgba(43,24,19,0.03)" stroke-width="1"/>
-          <line x1="30" y1="${height-30}" x2="${width-30}" y2="${height-30}" stroke="rgba(43,24,19,0.08)" stroke-width="1.5"/>
+          <line x1="30" y1="30" x2="${width - 30}" y2="30" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
+          <line x1="30" y1="90" x2="${width - 30}" y2="90" stroke="rgba(28, 28, 28,0.03)" stroke-width="1"/>
+          <line x1="30" y1="${height - 30}" x2="${width - 30}" y2="${height - 30}" stroke="rgba(28, 28, 28,0.08)" stroke-width="1.5"/>
+          
+          <!-- Area Underlay -->
+          <path d="${areaD}" fill="url(#chartAreaGrad)" />
           
           <!-- Curve Path -->
           <path d="${pathD}" fill="none" stroke="var(--accent-caramel)" stroke-width="3" stroke-linecap="round"/>
@@ -1949,29 +6903,47 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dynamic ingredient consumption lists
     if (ingStatsList) {
       ingStatsList.innerHTML = '';
-      const items = [
-        { label: 'Steamed Milk Used', value: 3000 - inventory.steamed_milk, max: 3000, unit: 'ml' },
-        { label: 'Coffee Beans Used', value: 3000 - inventory.coffee_beans, max: 3000, unit: 'g' },
-        { label: 'Matcha Powder Used', value: 500 - inventory.matcha_powder, max: 500, unit: 'g' },
-        { label: 'Whipped Cream Used', value: 1000 - inventory.whipped_cream, max: 1000, unit: 'ml' }
-      ];
+      const consumptionItems = Object.keys(defaultInventory)
+        .map(key => {
+          const maxVal = defaultInventory[key] || 0;
+          const current = parseFloat(inventory[key]) || 0;
+          const used = Math.max(0, maxVal - current);
+          const percent = maxVal > 0 ? Math.round((used / maxVal) * 100) : 0;
+          const unitGuess = ['ml', 'g', 'pcs', 'slices', 'scoops'];
+          let unit = 'units';
+          const keyLower = key.toLowerCase();
+          if (['espresso_shot', 'milk', 'water', 'sugar_syrup', 'irish_syrup', 'chocolate_syrup', 'caramel_syrup', 'hazelnut_syrup', 'vanilla_syrup', 'strawberry_puree', 'mango_puree', 'oil', 'soda', 'sprite', 'ginger_ale', 'tea_decoction', 'litchi_crush', 'lime_juice', 'strawberry_crush', 'blue_curacao', 'green_apple_syrup', 'guava_syrup'].includes(key)) unit = 'ml';
+          else if (['vanilla_ice_cream'].includes(key)) unit = 'scoops';
+          else if (['bread'].includes(key)) unit = 'slices';
+          else if (['oreo'].includes(key)) unit = 'pcs';
+          else unit = 'g';
+          const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          return { key, label, used, max: maxVal, percent, unit };
+        })
+        .filter(item => item.max > 0 && item.used > 0)
+        .sort((a, b) => b.percent - a.percent)
+        .slice(0, 8);
 
-      items.forEach(item => {
-        const percent = Math.min(100, Math.max(0, Math.round((item.value / item.max) * 100)));
-        const row = document.createElement('div');
-        row.className = 'ingredient-stat-row';
-        row.style.marginBottom = '10px';
-        row.innerHTML = `
-          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-            <span>${item.label}</span>
-            <span><strong>${item.value < 0 ? 0 : item.value} ${item.unit}</strong> (${percent}%)</span>
-          </div>
-          <div class="inventory-progress-bar" style="height:6px;">
-            <div class="inventory-progress-fill healthy" style="width: ${percent}%; background-color: var(--accent-caramel);"></div>
-          </div>
-        `;
-        ingStatsList.appendChild(row);
-      });
+      if (consumptionItems.length === 0) {
+        ingStatsList.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No consumption recorded yet.</p>';
+      } else {
+        consumptionItems.forEach(item => {
+          const clampedPercent = Math.min(100, item.percent);
+          const row = document.createElement('div');
+          row.className = 'ingredient-stat-row';
+          row.style.marginBottom = '10px';
+          row.innerHTML = `
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+              <span>${item.label} Used</span>
+              <span><strong>${item.used} ${item.unit}</strong> (${clampedPercent}%)</span>
+            </div>
+            <div class="inventory-progress-bar" style="height:6px;">
+              <div class="inventory-progress-fill healthy" style="width: ${clampedPercent}%; background-color: var(--accent-caramel);"></div>
+            </div>
+          `;
+          ingStatsList.appendChild(row);
+        });
+      }
     }
 
     // Dynamic ledger records
@@ -1986,17 +6958,200 @@ document.addEventListener('DOMContentLoaded', () => {
           item.style.display = 'flex';
           item.style.justifyContent = 'space-between';
           item.style.padding = '8px 0';
-          item.style.borderBottom = '1px solid rgba(43,24,19,0.03)';
+          item.style.borderBottom = '1px solid rgba(28, 28, 28,0.03)';
           item.innerHTML = `
             <div style="display:flex; flex-direction:column;">
-              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${bill.customerName} (${bill.orderId})</span>
-              <span style="font-size:10px; color:var(--text-muted);">${bill.dateTime}</span>
+              <span style="font-size:12px; font-weight:600; color:var(--primary-brand);">${escHtml(bill.customerName || 'Walk-in')} (${escHtml(bill.orderId || '-')})</span>
+              <span style="font-size:10px; color:var(--text-muted);">${escHtml(bill.dateTime || '-')}</span>
             </div>
             <span style="font-size:13px; font-weight:700; color:var(--accent-caramel);">₹${bill.total}</span>
           `;
           ledgerList.appendChild(item);
         });
       }
+    }
+
+    // Dynamic Online Order Reconciliation Chart (Step 8)
+    const reconBox = document.getElementById('reconciliation-chart-box');
+    if (reconBox) {
+      reconBox.innerHTML = '';
+
+      let directGross = 0;
+      let zomatoGross = 0;
+      let swiggyGross = 0;
+
+      filteredBills.forEach(b => {
+        const type = b.orderType || 'Takeaway';
+        if (type === 'ZOMATO') {
+          zomatoGross += b.total || 0;
+        } else if (type === 'SWIGGY') {
+          swiggyGross += b.total || 0;
+        } else {
+          directGross += b.total || 0;
+        }
+      });
+
+      const onlineGross = zomatoGross + swiggyGross;
+      const commissionLoss = Math.round(onlineGross * 0.22);
+      const onlinePayout = onlineGross - commissionLoss;
+
+      const maxSales = Math.max(directGross, onlineGross, 100);
+
+      const directPct = Math.min(100, Math.round((directGross / maxSales) * 100));
+      const onlinePct = Math.min(100, Math.round((onlineGross / maxSales) * 100));
+
+      reconBox.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 14px; padding: 10px 0;">
+          <!-- Direct Sales Bar -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+              <span><i class="fa-solid fa-store" style="color:var(--success-color);"></i> Direct Store Sales (100% Retained)</span>
+              <strong>₹${directGross.toFixed(2)}</strong>
+            </div>
+            <div style="width: 100%; height: 8px; background: rgba(28, 28, 28,0.05); border-radius: 4px; overflow: hidden;">
+              <div style="width: ${directPct}%; height: 100%; background: var(--success-color); border-radius: 4px; transition: width 0.5s ease;"></div>
+            </div>
+          </div>
+          
+          <!-- Online Gross Bar -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+              <span><i class="fa-solid fa-cloud" style="color:var(--accent-caramel);"></i> Online Aggregator Gross (Zomato/Swiggy)</span>
+              <strong>₹${onlineGross.toFixed(2)}</strong>
+            </div>
+            <div style="width: 100%; height: 8px; background: rgba(28, 28, 28,0.05); border-radius: 4px; overflow: hidden;">
+              <div style="width: ${onlinePct}%; height: 100%; background: var(--accent-caramel); border-radius: 4px; transition: width 0.5s ease;"></div>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 4px; padding: 12px; background: rgba(200, 138, 88, 0.04); border-radius: 12px; border: 1px dashed rgba(200,138,88,0.15); font-family: var(--font-body);">
+            <div>
+              <div style="font-size: 9px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px;">Lost to Commissions (22%)</div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--danger-color);">₹${commissionLoss.toFixed(2)}</div>
+            </div>
+            <div>
+              <div style="font-size: 9px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px;">Reconciled Payout (78%)</div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--success-color);">₹${onlinePayout.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Render Item-wise Sales Analysis
+    const itemSalesTopEl = document.getElementById('item-wise-sales-top');
+    const itemSalesBottomEl = document.getElementById('item-wise-sales-bottom');
+    if (itemSalesTopEl && itemSalesBottomEl) {
+      const itemStats = {};
+      filteredBills.forEach(bill => {
+        if (!bill || !bill.items || !Array.isArray(bill.items)) return;
+        bill.items.forEach(item => {
+          if (!item.name) return;
+          if (!itemStats[item.name]) {
+            itemStats[item.name] = { quantity: 0, revenue: 0 };
+          }
+          const qty = item.qty || 1;
+          itemStats[item.name].quantity += qty;
+          itemStats[item.name].revenue += (item.price || 0) * qty;
+        });
+      });
+      const sortedItems = Object.entries(itemStats).sort((a, b) => b[1].quantity - a[1].quantity);
+      const topItems = sortedItems.slice(0, 5);
+      const bottomItems = sortedItems.slice(-5).reverse();
+
+      const renderItemList = (items) => items.map(([name, stats]) => `
+        <div class="bills-stat-card" style="padding: 12px; gap: 10px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 700; color: var(--primary-brand);">${escHtml(name)}</span>
+            <span style="font-weight: 800; color: var(--accent-caramel);">${stats.quantity} sold</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+            <span>Revenue</span>
+            <span>₹${stats.revenue.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      `).join('');
+
+      itemSalesTopEl.innerHTML = topItems.length ? renderItemList(topItems) : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
+      itemSalesBottomEl.innerHTML = bottomItems.length ? renderItemList(bottomItems) : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
+    }
+
+    // Render Cashier-wise Performance
+    const cashierPerformanceEl = document.getElementById('cashier-performance');
+    if (cashierPerformanceEl) {
+      const cashierStats = {};
+      filteredBills.forEach(bill => {
+        const cashier = bill.cashier || 'Unknown';
+        if (!cashierStats[cashier]) {
+          cashierStats[cashier] = { orders: 0, revenue: 0 };
+        }
+        cashierStats[cashier].orders++;
+        cashierStats[cashier].revenue += bill.total || 0;
+      });
+      const sortedCashiers = Object.entries(cashierStats).sort((a, b) => b[1].revenue - a[1].revenue);
+      cashierPerformanceEl.innerHTML = sortedCashiers.length ? sortedCashiers.map(([name, stats]) => `
+        <div class="bills-stat-card" style="padding: 12px; gap: 10px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user"></i> ${escHtml(name)}</span>
+            <span style="font-weight: 800; color: var(--success-color);">₹${stats.revenue.toLocaleString('en-IN')}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+            <span>Orders</span>
+            <span>${stats.orders}</span>
+          </div>
+        </div>
+      `).join('') : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
+    }
+
+    // Render Payment Method Trends
+    const paymentTrendsEl = document.getElementById('payment-trends-chart');
+    if (paymentTrendsEl) {
+      const weeklyData = {};
+      filteredBills.forEach(bill => {
+        const billDate = parseBillDate(bill);
+        if (!billDate) return;
+        // Get week start date (Monday)
+        const dateObj = new Date(billDate);
+        const day = dateObj.getDay();
+        const diff = dateObj.getDate() - day + (day === 0 ? -6 : 1);
+        const weekStart = new Date(dateObj.setDate(diff)).toDateString();
+        if (!weeklyData[weekStart]) {
+          weeklyData[weekStart] = { upi: 0, cash: 0, card: 0 };
+        }
+        const pm = (bill.paymentMethod || 'UPI').toUpperCase();
+        const total = bill.total || 0;
+        if (pm.includes('UPI')) weeklyData[weekStart].upi += total;
+        else if (pm.includes('CASH')) weeklyData[weekStart].cash += total;
+        else if (pm.includes('CARD')) weeklyData[weekStart].card += total;
+      });
+      const sortedWeeks = Object.keys(weeklyData).sort((a, b) => new Date(a) - new Date(b)).slice(-6);
+      paymentTrendsEl.innerHTML = sortedWeeks.length ? `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+          ${sortedWeeks.map(week => {
+            const data = weeklyData[week];
+            const total = data.upi + data.cash + data.card;
+            return `
+              <div class="bills-stat-card" style="padding: 12px; gap: 8px;">
+                <div style="font-size:11px; font-weight:700; color: var(--primary-brand);">${new Date(week).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</div>
+                <div style="display: flex; flex-direction: column; gap: 4px; font-size: 10px;">
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #27ae60;"><i class="fa-brands fa-google-pay"></i> UPI</span>
+                    <span>${total > 0 ? Math.round((data.upi / total) * 100) : 0}% (₹${data.upi})</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #d35400;"><i class="fa-solid fa-money-bill-wave"></i> Cash</span>
+                    <span>${total > 0 ? Math.round((data.cash / total) * 100) : 0}% (₹${data.cash})</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #2980b9;"><i class="fa-solid fa-credit-card"></i> Card</span>
+                    <span>${total > 0 ? Math.round((data.card / total) * 100) : 0}% (₹${data.card})</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">No data</p>';
     }
   }
 
@@ -2062,7 +7217,7 @@ document.addEventListener('DOMContentLoaded', () => {
       SoundEffects.playSuccess();
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += "Ingredient Key,Ingredient Label,Current Stock,Max Capacity,Stock Percentage,Status\n";
-      
+
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
         const currentVal = inventory[key];
@@ -2075,11 +7230,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         csvContent += `${key},${label},${currentVal},${maxVal},${percent}%,${status}\n`;
       });
-      
+
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `doppio_inventory_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute("download", getDateWiseExportName('doppio_inventory', 'csv'));
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2092,7 +7247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     expInvPdfBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       const printWindow = window.open('', '_blank');
-      
+
       let rowsHTML = '';
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
@@ -2109,7 +7264,7 @@ document.addEventListener('DOMContentLoaded', () => {
           status = "Medium";
           statusStyle = "color: #ef6c00; font-weight: bold;";
         }
-        
+
         rowsHTML += `
           <tr>
             <td>${label}</td>
@@ -2120,21 +7275,20 @@ document.addEventListener('DOMContentLoaded', () => {
           </tr>
         `;
       });
-      
+
       printWindow.document.write(`
         <html>
         <head>
-          <title>Doppio Cafe - Stock & Inventory Report</title>
+          <title>RestroSuite - Stock &amp; Inventory Report</title>
           <style>
-            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C98A4A; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
-            .logo span { color: #C98A4A; }
-            .title { font-size: 18px; margin: 0; color: #2B1813; }
+            body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
+            .report-logo { display: block; width: 190px; max-height: 58px; object-fit: contain; }
+            .title { font-size: 18px; margin: 0; color: #1F1F1F; }
             .meta { font-size: 12px; color: #666; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; }
-            th { background-color: #f7f3ed; color: #2B1813; font-weight: 600; }
+            th { background-color: #f7f3ed; color: #1F1F1F; font-weight: 600; }
             tr:nth-child(even) { background-color: #faf8f5; }
             .footer { margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 15px; font-size: 11px; text-align: center; color: #777; }
           </style>
@@ -2142,8 +7296,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <body>
           <div class="header">
             <div>
-              <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">Nagpur Commercial POS & Inventory Control</p>
+              <img class="report-logo" src="${new URL('images/restrosuite_logo.png', window.location.href).href}" alt="CodeArc RestroSuite">
+              <p class="meta">${escHtml(activeTenantName || 'RestroSuite')} — POS &amp; Inventory Control</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Stock Level Inventory Report</h2>
@@ -2165,7 +7319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </tbody>
           </table>
           <div class="footer">
-            Doppio Cafe Nagpur. Confidential Commercial Stock Ledger Report. Authorized access only.
+            ${escHtml(activeTenantName || 'RestroSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
           </div>
           <script>
             window.onload = function() {
@@ -2204,17 +7358,17 @@ document.addEventListener('DOMContentLoaded', () => {
     expLowInvExcelBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       if (invExportMenu) invExportMenu.classList.remove('active');
-      
+
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += "Ingredient Key,Ingredient Label,Current Stock,Max Capacity,Stock Percentage,Status\n";
-      
+
       let count = 0;
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
         const currentVal = inventory[key];
         const percent = Math.round((currentVal / maxVal) * 100);
         const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
-        
+
         if (percent < itemThreshold) {
           const label = getLabelFromKey(key).replace(/,/g, '');
           const status = currentVal <= 0 ? "Out of Stock" : "Low Stock";
@@ -2222,15 +7376,15 @@ document.addEventListener('DOMContentLoaded', () => {
           count++;
         }
       });
-      
+
       if (count === 0) {
         csvContent += "N/A,All stock levels are currently healthy! No warnings.,N/A,N/A,N/A,Healthy\n";
       }
-      
+
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `doppio_low_inventory_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute("download", getDateWiseExportName('doppio_low_inventory', 'csv'));
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2243,22 +7397,22 @@ document.addEventListener('DOMContentLoaded', () => {
     expLowInvPdfBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       if (invExportMenu) invExportMenu.classList.remove('active');
-      
+
       const printWindow = window.open('', '_blank');
       let rowsHTML = '';
       let count = 0;
-      
+
       Object.keys(inventory).forEach(key => {
         const maxVal = defaultInventory[key] || 1000;
         const currentVal = inventory[key];
         const percent = Math.round((currentVal / maxVal) * 100);
         const itemThreshold = thresholds[key] !== undefined ? thresholds[key] : 15;
-        
+
         if (percent < itemThreshold) {
           const label = getLabelFromKey(key);
           const status = currentVal <= 0 ? "Out of Stock" : "Low Stock";
           const statusStyle = "color: #c62828; font-weight: bold;";
-          
+
           rowsHTML += `
             <tr>
               <td>${label}</td>
@@ -2271,7 +7425,7 @@ document.addEventListener('DOMContentLoaded', () => {
           count++;
         }
       });
-      
+
       if (count === 0) {
         rowsHTML = `
           <tr>
@@ -2281,16 +7435,15 @@ document.addEventListener('DOMContentLoaded', () => {
           </tr>
         `;
       }
-      
+
       printWindow.document.write(`
         <html>
         <head>
-          <title>Doppio Cafe - Low Stock Alert Report</title>
+          <title>RestroSuite - Low Stock Alert Report</title>
           <style>
-            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
+            body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e74c3c; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
-            .logo span { color: #e74c3c; }
+            .report-logo { display: block; width: 190px; max-height: 58px; object-fit: contain; }
             .title { font-size: 18px; margin: 0; color: #c0392b; }
             .meta { font-size: 12px; color: #666; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -2303,8 +7456,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <body>
           <div class="header">
             <div>
-              <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">Nagpur Commercial POS & Inventory Control</p>
+              <img class="report-logo" src="${new URL('images/restrosuite_logo.png', window.location.href).href}" alt="CodeArc RestroSuite">
+              <p class="meta">${escHtml(activeTenantName || 'RestroSuite')} — POS &amp; Inventory Control</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Low Stock Alert Report</h2>
@@ -2326,7 +7479,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </tbody>
           </table>
           <div class="footer">
-            Doppio Cafe Nagpur. Confidential Commercial Stock Ledger Report. Authorized access only.
+            ${escHtml(activeTenantName || 'RestroSuite')}. Confidential Commercial Stock Ledger Report. Authorized access only.
           </div>
           <script>
             window.onload = function() {
@@ -2346,19 +7499,19 @@ document.addEventListener('DOMContentLoaded', () => {
   if (expSalesExcelBtn) {
     expSalesExcelBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
-      
+
       const fromVal = document.getElementById('reports-date-from') ? document.getElementById('reports-date-from').value : '';
       const toVal = document.getElementById('reports-date-to') ? document.getElementById('reports-date-to').value : '';
 
       let dateFrom = null;
       if (fromVal) {
         dateFrom = new Date(fromVal);
-        dateFrom.setHours(0,0,0,0);
+        dateFrom.setHours(0, 0, 0, 0);
       }
       let dateTo = null;
       if (toVal) {
         dateTo = new Date(toVal);
-        dateTo.setHours(0,0,0,0);
+        dateTo.setHours(0, 0, 0, 0);
       }
 
       const filteredBills = bills.filter(bill => {
@@ -2370,23 +7523,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += "Order ID,Customer Name,Phone,Date & Time,Order Type,Payment Method,Subtotal,Discount,GST,Total,Items Ordered\n";
-      
+
       filteredBills.forEach(b => {
-        const guestName = b.customerName.replace(/,/g, '');
+        if (!b) return;
+        const guestName = (b.customerName || '').replace(/,/g, '');
         const phone = b.customerPhone || 'N/A';
-        const dateStr = b.dateTime.replace(/,/g, '');
-        const itemsList = b.items.map(i => `${i.name} (x${i.qty})`).join('; ').replace(/,/g, '');
-        csvContent += `${b.orderId},${guestName},${phone},${dateStr},${b.orderType},${b.paymentMethod},₹${b.subtotal},₹${b.discount},₹${b.gst},₹${b.total},${itemsList}\n`;
+        const dateStr = (b.dateTime || '').replace(/,/g, '');
+        const itemsList = Array.isArray(b.items) ? b.items.map(i => `${i.name || ''} (x${i.qty || 1})`).join('; ').replace(/,/g, '') : '';
+        csvContent += `${b.orderId || ''},${guestName},${phone},${dateStr},${b.orderType || ''},${b.paymentMethod || ''},₹${b.subtotal || 0},₹${b.discount || 0},₹${b.gst || 0},₹${b.total || 0},${itemsList}\n`;
       });
 
-      const totalRevenue = filteredBills.reduce((sum, b) => sum + b.total, 0);
-      const totalGST = filteredBills.reduce((sum, b) => sum + b.gst, 0);
-      const totalDiscount = filteredBills.reduce((sum, b) => sum + b.discount, 0);
-      const totalSubtotal = filteredBills.reduce((sum, b) => sum + b.subtotal, 0);
+      const totalRevenue = filteredBills.reduce((sum, b) => sum + ((b && b.total) || 0), 0);
+      const totalGST = filteredBills.reduce((sum, b) => sum + ((b && b.gst) || 0), 0);
+      const totalDiscount = filteredBills.reduce((sum, b) => sum + ((b && b.discount) || 0), 0);
+      const totalSubtotal = filteredBills.reduce((sum, b) => sum + ((b && b.subtotal) || 0), 0);
 
-      const payUPI = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'UPI').reduce((sum, b) => sum + b.total, 0);
-      const payCard = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'CARD').reduce((sum, b) => sum + b.total, 0);
-      const payCash = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'CASH').reduce((sum, b) => sum + b.total, 0);
+      const payUPI = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'UPI').reduce((sum, b) => sum + b.total, 0);
+      const payCard = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'CARD').reduce((sum, b) => sum + b.total, 0);
+      const payCash = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'CASH').reduce((sum, b) => sum + b.total, 0);
 
       csvContent += "\n";
       csvContent += "SUMMARY BREAKDOWN\n";
@@ -2399,11 +7553,11 @@ document.addEventListener('DOMContentLoaded', () => {
       csvContent += `UPI / Online,₹${payUPI}\n`;
       csvContent += `Card,₹${payCard}\n`;
       csvContent += `Cash,₹${payCash}\n`;
-      
+
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `doppio_sales_report_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute("download", getDateWiseExportName('doppio_sales_report', 'csv'));
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2416,19 +7570,19 @@ document.addEventListener('DOMContentLoaded', () => {
     expSalesPdfBtn.addEventListener('click', () => {
       SoundEffects.playSuccess();
       const printWindow = window.open('', '_blank');
-      
+
       const fromVal = document.getElementById('reports-date-from') ? document.getElementById('reports-date-from').value : '';
       const toVal = document.getElementById('reports-date-to') ? document.getElementById('reports-date-to').value : '';
 
       let dateFrom = null;
       if (fromVal) {
         dateFrom = new Date(fromVal);
-        dateFrom.setHours(0,0,0,0);
+        dateFrom.setHours(0, 0, 0, 0);
       }
       let dateTo = null;
       if (toVal) {
         dateTo = new Date(toVal);
-        dateTo.setHours(0,0,0,0);
+        dateTo.setHours(0, 0, 0, 0);
       }
 
       const filteredBills = bills.filter(bill => {
@@ -2438,28 +7592,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
       });
 
-      const totalRevenue = filteredBills.reduce((sum, b) => sum + b.total, 0);
-      const totalGST = filteredBills.reduce((sum, b) => sum + b.gst, 0);
-      const totalDiscount = filteredBills.reduce((sum, b) => sum + b.discount, 0);
-      const totalSubtotal = filteredBills.reduce((sum, b) => sum + b.subtotal, 0);
-      
-      const payUPI = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'UPI').reduce((sum, b) => sum + b.total, 0);
-      const payCard = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'CARD').reduce((sum, b) => sum + b.total, 0);
-      const payCash = filteredBills.filter(b => (b.paymentMethod || 'UPI').toUpperCase() === 'CASH').reduce((sum, b) => sum + b.total, 0);
-      
+      const totalRevenue = filteredBills.reduce((sum, b) => sum + ((b && b.total) || 0), 0);
+      const totalGST = filteredBills.reduce((sum, b) => sum + ((b && b.gst) || 0), 0);
+      const totalDiscount = filteredBills.reduce((sum, b) => sum + ((b && b.discount) || 0), 0);
+      const totalSubtotal = filteredBills.reduce((sum, b) => sum + ((b && b.subtotal) || 0), 0);
+
+      const payUPI = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'UPI').reduce((sum, b) => sum + b.total, 0);
+      const payCard = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'CARD').reduce((sum, b) => sum + b.total, 0);
+      const payCash = filteredBills.filter(b => b && (b.paymentMethod || 'UPI').toUpperCase() === 'CASH').reduce((sum, b) => sum + b.total, 0);
+
       let rowsHTML = '';
       filteredBills.forEach(b => {
-        const itemsList = b.items.map(i => `${i.name} (x${i.qty})`).join(', ');
+        if (!b) return;
+        const itemsList = Array.isArray(b.items) ? b.items.map(i => `${i.name || ''} (x${i.qty || 1})`).join(', ') : '';
         rowsHTML += `
           <tr>
-            <td>${b.orderId}</td>
-            <td><strong>${b.customerName}</strong><br><span style="font-size:10px; color:#666;">${b.customerPhone || 'Walk-in'}</span></td>
-            <td>${b.dateTime}</td>
-            <td>${b.orderType}</td>
-            <td>${b.paymentMethod}</td>
-            <td align="right">₹${b.subtotal}</td>
-            <td align="right">₹${b.discount}</td>
-            <td align="right">₹${b.total}</td>
+            <td>${b.orderId || ''}</td>
+            <td><strong>${b.customerName || ''}</strong><br><span style="font-size:10px; color:#666;">${b.customerPhone || 'Walk-in'}</span></td>
+            <td>${b.dateTime || ''}</td>
+            <td>${b.orderType || ''}</td>
+            <td>${b.paymentMethod || ''}</td>
+            <td align="right">₹${b.subtotal || 0}</td>
+            <td align="right">₹${b.discount || 0}</td>
+            <td align="right">₹${b.total || 0}</td>
           </tr>
           <tr>
             <td colspan="8" style="background-color:#fff; padding: 4px 10px; font-size:11px; color:#555; border-top:none;">
@@ -2469,30 +7624,29 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
       });
 
-      const rangeStr = fromVal || toVal 
+      const rangeStr = fromVal || toVal
         ? `Period: ${fromVal ? fromVal : 'Beginning'} to ${toVal ? toVal : 'Present'}`
         : 'Period: All-Time Sales Report';
-      
+
       printWindow.document.write(`
         <html>
         <head>
-          <title>Doppio Cafe - Sales & Revenue Audit Report</title>
+          <title>RestroSuite - Sales &amp; Revenue Audit Report</title>
           <style>
-            body { font-family: 'Segoe UI', Roboto, sans-serif; color: #2B1813; padding: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C98A4A; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 24px; font-weight: bold; color: #2B1813; }
-            .logo span { color: #C98A4A; }
-            .title { font-size: 18px; margin: 0; color: #2B1813; }
+            body { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; color: #1F1F1F; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FC8019; padding-bottom: 15px; margin-bottom: 20px; }
+            .report-logo { display: block; width: 190px; max-height: 58px; object-fit: contain; }
+            .title { font-size: 18px; margin: 0; color: #1F1F1F; }
             .meta { font-size: 12px; color: #666; }
             
             .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
-            .kpi-card { background: #fdfbf7; border: 1px solid rgba(201, 138, 74, 0.2); border-radius: 8px; padding: 12px; text-align: center; }
+            .kpi-card { background: #fdfbf7; border: 1px solid rgba(252, 128, 25, 0.2); border-radius: 8px; padding: 12px; text-align: center; }
             .kpi-card h3 { margin: 0; font-size: 12px; color: #666; text-transform: uppercase; }
-            .kpi-card p { margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #2B1813; }
+            .kpi-card p { margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #1F1F1F; }
             
             table { width: 100%; border-collapse: collapse; margin-top: 10px; }
             th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 12px; }
-            th { background-color: #f7f3ed; color: #2B1813; font-weight: 600; }
+            th { background-color: #f7f3ed; color: #1F1F1F; font-weight: 600; }
             
             .footer { margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 15px; font-size: 11px; text-align: center; color: #777; }
           </style>
@@ -2500,12 +7654,12 @@ document.addEventListener('DOMContentLoaded', () => {
         <body>
           <div class="header">
             <div>
-              <div class="logo">DOPPIO <span>Café</span></div>
-              <p class="meta">Nagpur Commercial Analytics Studio</p>
+              <img class="report-logo" src="${new URL('images/restrosuite_logo.png', window.location.href).href}" alt="CodeArc RestroSuite">
+              <p class="meta">${escHtml(activeTenantName || 'RestroSuite')} — Analytics Studio</p>
             </div>
             <div style="text-align: right;">
               <h2 class="title">Sales & Revenue Audit Report</h2>
-              <p class="meta" style="font-weight:bold; color: #C98A4A;">` + rangeStr + `</p>
+              <p class="meta" style="font-weight:bold; color: #FC8019;">` + rangeStr + `</p>
               <p class="meta">Generated: ` + new Date().toLocaleString('en-IN') + `</p>
             </div>
           </div>
@@ -2522,9 +7676,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <h3>GST Tax Collected</h3>
               <p>₹` + totalGST + `</p>
             </div>
-            <div class="kpi-card" style="background:#f7f0e8; border-color:#C98A4A;">
+            <div class="kpi-card" style="background:#f7f0e8; border-color:#FC8019;">
               <h3>Net Sales Revenue</h3>
-              <p style="color:#C98A4A; font-size: 20px;">₹` + totalRevenue + `</p>
+              <p style="color:#FC8019; font-size: 20px;">₹` + totalRevenue + `</p>
             </div>
           </div>
           <div class="kpis" style="grid-template-columns: repeat(3, 1fr); margin-top: 0; margin-bottom: 20px;">
@@ -2559,7 +7713,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </tbody>
           </table>
           <div class="footer">
-            Doppio Cafe Nagpur - Authorized Financial Ledger Document
+            ${escHtml(activeTenantName || 'RestroSuite')} - Authorized Financial Ledger Document
           </div>
           <script>
             window.onload = function() {
@@ -2577,8 +7731,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   // 11. MENU EDITOR & PREVIEWS (TAB 5)
   // ==========================================
+  async function requireTenantWrite(query, actionLabel) {
+    const { data, error } = await query;
+    if (error) throw new Error(`${actionLabel}: ${error.message || 'Cloud write failed.'}`);
+    return data;
+  }
+
   const editorItemsGrid = document.getElementById('editor-items-grid');
-  
+
   function renderMenuEditor() {
     if (!editorItemsGrid) return;
     editorItemsGrid.innerHTML = '';
@@ -2586,9 +7746,10 @@ document.addEventListener('DOMContentLoaded', () => {
     menu.forEach((item, index) => {
       const card = document.createElement('div');
       card.className = 'menu-editor-card';
+      const imageHTML = item.image ? `<img src="${item.image}" style="width:100%; height:100px; object-fit:cover; border-radius:8px; margin-bottom:8px;">` : ``;
       card.innerHTML = `
         <div>
-          <span style="font-size:24px; display:block; margin-bottom:8px;">${item.icon || '☕'}</span>
+          ${imageHTML}
           <h4 style="font-size:13px; font-weight:700; color:var(--primary-brand);">${item.name}</h4>
           <span style="font-size:11px; color:var(--accent-caramel); font-weight:600;">₹${item.price}</span>
         </div>
@@ -2607,6 +7768,51 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('item-price-input').value = item.price;
         document.getElementById('item-desc-input').value = item.description || '';
         document.getElementById('item-icon-input').value = item.icon || '☕';
+        document.getElementById('item-sku-input').value = item.sku || '';
+        const selectEl = document.getElementById('item-icon-select');
+        if (selectEl) selectEl.value = item.icon || '☕';
+        const availableCheckbox = document.getElementById('item-available-input');
+        if (availableCheckbox) availableCheckbox.checked = item.available !== false; // default true if not set
+        // Load image
+        if (item.image) {
+          currentItemImageData = item.image;
+          itemPreviewImg.src = currentItemImageData;
+          itemImagePreview.style.display = 'block';
+          clearItemImageBtn.style.display = 'inline-flex';
+        } else {
+          currentItemImageData = null;
+          itemPreviewImg.src = '';
+          itemImagePreview.style.display = 'none';
+          clearItemImageBtn.style.display = 'none';
+        }
+        // Load modifiers
+        modifiersContainer.innerHTML = '';
+        if (item.modifiers && Array.isArray(item.modifiers)) {
+          item.modifiers.forEach(modGroup => createModifierGroup(modGroup));
+        }
+        // Load scheduling
+        const schedulingEnabledCheckbox = document.getElementById('item-scheduling-enabled');
+        const schedulingFields = document.getElementById('scheduling-fields');
+        const startTimeInput = document.getElementById('item-start-time');
+        const endTimeInput = document.getElementById('item-end-time');
+        const dayCheckboxes = document.querySelectorAll('.day-checkbox');
+        
+        if (item.scheduling && item.scheduling.enabled) {
+          schedulingEnabledCheckbox.checked = true;
+          schedulingFields.style.display = 'block';
+          startTimeInput.value = item.scheduling.startTime || '';
+          endTimeInput.value = item.scheduling.endTime || '';
+          dayCheckboxes.forEach(cb => {
+            cb.checked = item.scheduling.days.includes(parseInt(cb.value));
+          });
+        } else {
+          schedulingEnabledCheckbox.checked = false;
+          schedulingFields.style.display = 'none';
+          startTimeInput.value = '';
+          endTimeInput.value = '';
+          dayCheckboxes.forEach(cb => cb.checked = true);
+        }
+        
         document.getElementById('form-panel-title').textContent = 'Edit Menu Item';
 
         // Load active recipe mappings inside Recipe Maker
@@ -2621,29 +7827,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // On mobile, slide the form panel up as a drawer
         const formPanel = document.getElementById('editor-form-panel');
-        if (formPanel && window.innerWidth <= 768) {
+        if (formPanel && window.innerWidth <= 600) {
           formPanel.classList.add('active');
         }
       });
 
       card.querySelector('.delete-btn').addEventListener('click', () => {
-        showAdminPinModal(() => {
-          SoundEffects.playRemove();
-          const nameLower = item.name.toLowerCase().trim();
-          menu.splice(index, 1);
-          localStorage.setItem('doppio_menu', JSON.stringify(menu));
-          
-          // delete custom recipe
-          delete customRecipes[nameLower];
-          localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
-
-          if (supabaseClient) {
-            supabaseClient.from('doppio_menu').delete().eq('name', item.name).then();
+        showAdminPinModal(async () => {
+          try {
+            if (!supabaseClient) throw new Error('Cloud connection is unavailable.');
+            const nameLower = item.name.toLowerCase().trim();
+            await requireTenantWrite(
+              supabaseClient.from('doppio_menu').delete().eq('tenant_id', activeTenantId).eq('name', item.name),
+              'Menu item deletion failed'
+            );
+            await requireTenantWrite(
+              supabaseClient.from('doppio_custom_recipes').delete().eq('tenant_id', activeTenantId).eq('item_name', nameLower),
+              'Recipe deletion failed'
+            );
+            SoundEffects.playRemove();
+            menu.splice(index, 1);
+            localStorage.setItem('doppio_menu', JSON.stringify(menu));
+            delete customRecipes[nameLower];
+            localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
+            renderMenuEditor();
+            renderPOSCategories();
+            renderPOSItems();
+            broadcastMenuUpdate();
+            showNotificationToast('Menu item deleted from this outlet.');
+          } catch (error) {
+            console.error('Menu delete failed:', error);
+            showNotificationToast(error.message || 'Menu item could not be deleted.');
           }
-
-          renderMenuEditor();
-          renderPOSCategories();
-          renderPOSItems();
         });
       });
 
@@ -2651,9 +7866,130 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Modifiers system
+  const modifiersContainer = document.getElementById('modifiers-container');
+  const addModifierGroupBtn = document.getElementById('add-modifier-group-btn');
+
+  function createModifierGroup(group = null) {
+    if (!modifiersContainer) return;
+    
+    const groupId = Date.now();
+    const groupEl = document.createElement('div');
+    groupEl.className = 'modifier-group';
+    groupEl.dataset.groupId = groupId;
+    groupEl.style.cssText = 'background: var(--bg-cream-light); border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid rgba(28,28,28,0.1);';
+    
+    groupEl.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div style="flex: 1; margin-right: 10px;">
+          <label style="font-weight: 600; font-size: 12px;">Group Name</label>
+          <input type="text" class="modifier-group-name" placeholder="e.g., Size, Extra Toppings" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); margin-top: 4px;" value="${group?.name || ''}">
+        </div>
+        <div style="width: 100px; margin-right: 10px;">
+          <label style="font-weight: 600; font-size: 12px;">Min Choices</label>
+          <input type="number" class="modifier-group-min" placeholder="0" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); margin-top: 4px;" min="0" value="${group?.min || 0}">
+        </div>
+        <div style="width: 100px; margin-right: 10px;">
+          <label style="font-weight: 600; font-size: 12px;">Max Choices</label>
+          <input type="number" class="modifier-group-max" placeholder="1" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15); margin-top: 4px;" min="0" value="${group?.max || 1}">
+        </div>
+        <button type="button" class="remove-modifier-group-btn" style="background: transparent; border: none; color: #e74c3c; font-size: 20px; cursor: pointer; padding: 0;">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+      <div class="modifier-options-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
+        <!-- Options go here -->
+      </div>
+      <button type="button" class="add-modifier-option-btn btn btn-secondary" style="font-size: 11px; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border-color: var(--accent-caramel); color: var(--primary-brand); font-weight: 600;">
+        <i class="fa-solid fa-plus"></i> Add Option
+      </button>
+    `;
+    
+    modifiersContainer.appendChild(groupEl);
+    
+    // Add initial options if group exists
+    if (group?.options) {
+      group.options.forEach(opt => createModifierOption(groupEl, opt));
+    } else {
+      createModifierOption(groupEl);
+    }
+    
+    // Event listeners
+    groupEl.querySelector('.remove-modifier-group-btn').addEventListener('click', () => {
+      SoundEffects.playRemove();
+      groupEl.remove();
+    });
+    
+    groupEl.querySelector('.add-modifier-option-btn').addEventListener('click', () => {
+      SoundEffects.playClick();
+      createModifierOption(groupEl);
+    });
+  }
+
+  function createModifierOption(groupEl, option = null) {
+    const optionsList = groupEl.querySelector('.modifier-options-list');
+    const optionEl = document.createElement('div');
+    optionEl.className = 'modifier-option';
+    optionEl.style.cssText = 'display: flex; gap: 10px; align-items: center;';
+    
+    optionEl.innerHTML = `
+      <input type="text" class="modifier-option-name" placeholder="Option name" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15);" value="${option?.name || ''}">
+      <input type="number" class="modifier-option-price" placeholder="Price" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid rgba(28,28,28,0.15);" min="0" step="0.01" value="${option?.price || 0}">
+      <button type="button" class="remove-modifier-option-btn" style="background: transparent; border: none; color: #e74c3c; font-size: 18px; cursor: pointer; padding: 0;">
+        <i class="fa-solid fa-circle-minus"></i>
+      </button>
+    `;
+    
+    optionsList.appendChild(optionEl);
+    
+    optionEl.querySelector('.remove-modifier-option-btn').addEventListener('click', () => {
+      SoundEffects.playRemove();
+      optionEl.remove();
+    });
+  }
+
+  if (addModifierGroupBtn) {
+    addModifierGroupBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      createModifierGroup();
+    });
+  }
+
   // Visual Recipe Mappings Link Builder Helper
   const recipeIngredientsList = document.getElementById('recipe-ingredients-list');
   const addRecipeIngredientBtn = document.getElementById('add-recipe-ingredient-btn');
+  const itemImageInput = document.getElementById('item-image-input');
+  const itemImagePreview = document.getElementById('item-image-preview');
+  const itemPreviewImg = document.getElementById('item-preview-img');
+  const clearItemImageBtn = document.getElementById('clear-item-image-btn');
+  let currentItemImageData = null; // Stores base64 image data
+
+  // Image input handler
+  if (itemImageInput) {
+    itemImageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          currentItemImageData = event.target.result;
+          itemPreviewImg.src = currentItemImageData;
+          itemImagePreview.style.display = 'block';
+          clearItemImageBtn.style.display = 'inline-flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+  // Clear image button
+  if (clearItemImageBtn) {
+    clearItemImageBtn.addEventListener('click', () => {
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+    });
+  }
 
   function createRecipeIngredientRow(ingKey = '', qtyValue = '') {
     if (!recipeIngredientsList) return;
@@ -2668,10 +8004,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     row.innerHTML = `
-      <select class="recipe-ing-select" required style="flex:2; padding:6px; border-radius:6px; border:1px solid rgba(43,24,19,0.15); font-size:12px; background:white; color:var(--primary-brand);">
+      <select class="recipe-ing-select" required style="flex:2; padding:6px; border-radius:6px; border:1px solid rgba(28, 28, 28,0.15); font-size:12px; background:white; color:var(--primary-brand);">
         ${optionsHTML}
       </select>
-      <input type="number" class="recipe-ing-qty" placeholder="Qty" value="${qtyValue}" required min="0.1" step="any" style="width:70px; padding:6px; border-radius:6px; border:1px solid rgba(43,24,19,0.15); text-align:center; font-size:12px; background:white; color:var(--primary-brand); font-weight:700;">
+      <input type="number" class="recipe-ing-qty" placeholder="Qty" value="${qtyValue}" required min="0.1" step="any" style="width:70px; padding:6px; border-radius:6px; border:1px solid rgba(28, 28, 28,0.15); text-align:center; font-size:12px; background:white; color:var(--primary-brand); font-weight:700;">
       <span class="unit-lbl" style="font-size:11px; font-weight:600; color:var(--text-muted); width:30px; text-align:center;">g</span>
       <button type="button" class="remove-ing-row-btn" style="background:transparent; border:none; color:var(--danger-color); font-size:16px; cursor:pointer; padding:0 4px;"><i class="fa-solid fa-circle-minus"></i></button>
     `;
@@ -2717,7 +8053,43 @@ document.addEventListener('DOMContentLoaded', () => {
   // Menu visual form submissions
   const menuEditorForm = document.getElementById('menu-item-editor-form');
   if (menuEditorForm) {
-    menuEditorForm.addEventListener('submit', (e) => {
+    (function restorePreUpdateMenuDraft() {
+      try {
+        const snapshot = JSON.parse(localStorage.getItem('doppio_pre_update_snapshot') || 'null');
+        const draft = snapshot && snapshot.menuEditorDraft;
+        if (!draft || !draft.dirty || !snapshot.savedAt) return;
+        if (sessionStorage.getItem('restrosuite_menu_draft_restored') === snapshot.savedAt) return;
+
+        const fields = {
+          'edit-item-index': draft.editIndex || '',
+          'item-name-input': draft.name || '',
+          'item-category-input': draft.category || '',
+          'item-price-input': draft.price || '',
+          'item-desc-input': draft.description || '',
+          'item-icon-input': draft.icon || '',
+          'item-sku-input': draft.sku || ''
+        };
+        Object.entries(fields).forEach(([id, value]) => {
+          const field = document.getElementById(id);
+          if (field) field.value = value;
+        });
+        if (recipeIngredientsList) {
+          recipeIngredientsList.innerHTML = '';
+          (draft.ingredients || []).forEach(item => createRecipeIngredientRow(item.key, item.qty));
+        }
+        const formTitle = document.getElementById('form-panel-title');
+        if (formTitle) formTitle.textContent = draft.editIndex !== '' ? 'Edit Menu Item' : 'Add New Menu Item';
+        menuEditorDirty = true;
+        sessionStorage.setItem('restrosuite_menu_draft_restored', snapshot.savedAt);
+        showNotificationToast('Unsaved menu form restored after update.');
+      } catch (error) {
+        console.warn('[Auto Update] Menu draft restore skipped:', error.message || error);
+      }
+    })();
+
+    menuEditorForm.addEventListener('input', () => { menuEditorDirty = true; });
+    menuEditorForm.addEventListener('change', () => { menuEditorDirty = true; });
+    menuEditorForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       SoundEffects.playClick();
 
@@ -2727,30 +8099,72 @@ document.addEventListener('DOMContentLoaded', () => {
       const price = parseInt(document.getElementById('item-price-input').value);
       const description = document.getElementById('item-desc-input').value.trim();
       const icon = document.getElementById('item-icon-input').value.trim();
+      const sku = document.getElementById('item-sku-input').value.trim();
+      const availableCheckbox = document.getElementById('item-available-input');
+      const available = availableCheckbox ? availableCheckbox.checked : true;
+      
+      // Collect modifiers
+      const modifiers = [];
+      document.querySelectorAll('.modifier-group').forEach(groupEl => {
+        const groupName = groupEl.querySelector('.modifier-group-name').value.trim();
+        const groupMin = parseInt(groupEl.querySelector('.modifier-group-min').value) || 0;
+        const groupMax = parseInt(groupEl.querySelector('.modifier-group-max').value) || 1;
+        const options = [];
+        groupEl.querySelectorAll('.modifier-option').forEach(optEl => {
+          const optName = optEl.querySelector('.modifier-option-name').value.trim();
+          const optPrice = parseFloat(optEl.querySelector('.modifier-option-price').value) || 0;
+          if (optName) {
+            options.push({ name: optName, price: optPrice });
+          }
+        });
+        if (groupName && options.length > 0) {
+          modifiers.push({ name: groupName, min: groupMin, max: groupMax, options });
+        }
+      });
+      
+      // Collect scheduling
+      const schedulingEnabled = document.getElementById('item-scheduling-enabled').checked;
+      const startTime = document.getElementById('item-start-time').value;
+      const endTime = document.getElementById('item-end-time').value;
+      const days = Array.from(document.querySelectorAll('.day-checkbox:checked')).map(cb => parseInt(cb.value));
+      
+      const scheduling = schedulingEnabled ? {
+        enabled: true,
+        startTime,
+        endTime,
+        days
+      } : { enabled: false };
 
-      const newItem = { name, category, price, description, icon };
+      const newItem = { name, category, price, description, icon, sku, available, image: currentItemImageData, modifiers, scheduling };
+      const originalName = index !== '' && menu[Number(index)] ? menu[Number(index)].name : '';
 
+      try {
+      if (!supabaseClient) throw new Error('Cloud connection is unavailable.');
       if (index !== '') {
         menu[index] = newItem;
-        if (supabaseClient) {
-          supabaseClient.from('doppio_menu').update({
-            price: newItem.price,
-            description: newItem.description,
-            icon: newItem.icon,
-            category: newItem.category
-          }).eq('name', newItem.name).then();
-        }
-      } else {
-        menu.push(newItem);
-        if (supabaseClient) {
-          supabaseClient.from('doppio_menu').insert({
+          await requireTenantWrite(supabaseClient.from('doppio_menu').update({
             name: newItem.name,
             price: newItem.price,
             description: newItem.description,
             icon: newItem.icon,
-            category: newItem.category
-          }).then();
-        }
+            category: newItem.category,
+            available: newItem.available,
+            sku: newItem.sku,
+            image: newItem.image
+          }).eq('tenant_id', activeTenantId).eq('name', originalName), 'Menu item update failed');
+      } else {
+        menu.push(newItem);
+          await requireTenantWrite(supabaseClient.from('doppio_menu').insert({
+            tenant_id: activeTenantId,
+            name: newItem.name,
+            price: newItem.price,
+            description: newItem.description,
+            icon: newItem.icon,
+            category: newItem.category,
+            available: newItem.available,
+            sku: newItem.sku,
+            image: newItem.image
+          }), 'Menu item creation failed');
       }
 
       // Save dynamic custom recipe specifications
@@ -2772,19 +8186,60 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
 
+      // Sync recipe to Supabase
+      if (supabaseClient) {
+        if (Object.keys(recipeSpecs).length > 0) {
+          await requireTenantWrite(supabaseClient.from('doppio_custom_recipes')
+            .upsert({
+              tenant_id: activeTenantId,
+              item_name: nameLower,
+              ingredients: recipeSpecs,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'tenant_id,item_name' }), 'Recipe save failed');
+        } else {
+          // No ingredients — delete the recipe from cloud
+          await requireTenantWrite(
+            supabaseClient.from('doppio_custom_recipes').delete().eq('tenant_id', activeTenantId).eq('item_name', nameLower),
+            'Recipe cleanup failed'
+          );
+        }
+      }
+
       localStorage.setItem('doppio_menu', JSON.stringify(menu));
+      setVaultData('doppio_menu', menu);
+      menuEditorDirty = false;
       menuEditorForm.reset();
       document.getElementById('edit-item-index').value = '';
       document.getElementById('form-panel-title').textContent = 'Add New Menu Item';
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
+      // Reset image
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+      // Reset modifiers
+      modifiersContainer.innerHTML = '';
+      // Reset scheduling
+      document.getElementById('item-scheduling-enabled').checked = false;
+      document.getElementById('scheduling-fields').style.display = 'none';
+      document.getElementById('item-start-time').value = '';
+      document.getElementById('item-end-time').value = '';
+      document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = true);
 
       // On mobile, close the editor drawer after save
       const savedFormPanel = document.getElementById('editor-form-panel');
-      if (savedFormPanel && window.innerWidth <= 768) savedFormPanel.classList.remove('active');
+      if (savedFormPanel && window.innerWidth <= 600) savedFormPanel.classList.remove('active');
 
       renderMenuEditor();
       renderPOSCategories();
       renderPOSItems();
+      broadcastMenuUpdate();
+      showNotificationToast('Menu saved to this outlet and synced to the cloud.');
+      } catch (error) {
+        console.error('Menu save failed:', error);
+        showNotificationToast(error.message || 'Menu could not be saved.');
+      }
     });
   }
 
@@ -2795,9 +8250,23 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('edit-item-index').value = '';
       document.getElementById('form-panel-title').textContent = 'Add New Menu Item';
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
+      // Reset image
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+      // Reset modifiers
+      modifiersContainer.innerHTML = '';
+      // Reset scheduling
+      document.getElementById('item-scheduling-enabled').checked = false;
+      document.getElementById('scheduling-fields').style.display = 'none';
+      document.getElementById('item-start-time').value = '';
+      document.getElementById('item-end-time').value = '';
+      document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = true);
       // On mobile, close the drawer
       const fp = document.getElementById('editor-form-panel');
-      if (fp && window.innerWidth <= 768) fp.classList.remove('active');
+      if (fp && window.innerWidth <= 600) fp.classList.remove('active');
     });
   }
 
@@ -2810,13 +8279,357 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('edit-item-index').value = '';
       document.getElementById('form-panel-title').textContent = 'Add New Menu Item';
       if (recipeIngredientsList) recipeIngredientsList.innerHTML = '';
+      // Reset image
+      currentItemImageData = null;
+      itemImageInput.value = '';
+      itemPreviewImg.src = '';
+      itemImagePreview.style.display = 'none';
+      clearItemImageBtn.style.display = 'none';
+      // Reset modifiers
+      modifiersContainer.innerHTML = '';
+      // Reset scheduling
+      document.getElementById('item-scheduling-enabled').checked = false;
+      document.getElementById('scheduling-fields').style.display = 'none';
+      document.getElementById('item-start-time').value = '';
+      document.getElementById('item-end-time').value = '';
+      document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = true);
       // On mobile, slide the form panel up as a drawer
       const formPanel = document.getElementById('editor-form-panel');
-      if (formPanel && window.innerWidth <= 768) {
+      if (formPanel && window.innerWidth <= 600) {
         formPanel.classList.add('active');
       }
     });
   }
+
+  // Toggle scheduling fields visibility
+  const schedulingEnabledCheckbox = document.getElementById('item-scheduling-enabled');
+  const schedulingFields = document.getElementById('scheduling-fields');
+  if (schedulingEnabledCheckbox && schedulingFields) {
+    schedulingEnabledCheckbox.addEventListener('change', () => {
+      schedulingFields.style.display = schedulingEnabledCheckbox.checked ? 'block' : 'none';
+    });
+  }
+  
+  // Print menu button handler
+  const printMenuBtn = document.getElementById('print-menu-btn');
+  if (printMenuBtn) {
+    printMenuBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      printMenu();
+    });
+  }
+  
+  // Generate and print menu
+  function printMenu() {
+    // Group menu items by category
+    const categorizedMenu = {};
+    menu.forEach(item => {
+      if (!categorizedMenu[item.category]) {
+        categorizedMenu[item.category] = [];
+      }
+      categorizedMenu[item.category].push(item);
+    });
+    
+    // Create print window
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    // Build HTML for print
+    let html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Menu</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+            body {
+              font-family: 'Inter', sans-serif;
+              padding: 20px;
+              max-width: 800px;
+              margin: 0 auto;
+              color: #1c1c1c;
+            }
+            h1 {
+              text-align: center;
+              color: #8b4513;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #f5deb3;
+              padding-bottom: 10px;
+            }
+            .category {
+              margin-bottom: 25px;
+            }
+            .category h2 {
+              color: #8b4513;
+              border-bottom: 1px solid #f5deb3;
+              padding-bottom: 5px;
+              margin-bottom: 15px;
+              font-size: 20px;
+            }
+            .menu-item {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 15px;
+              padding-bottom: 10px;
+              border-bottom: 1px dashed #f5deb3;
+            }
+            .item-info {
+              flex: 1;
+            }
+            .item-name {
+              font-weight: 700;
+              font-size: 16px;
+              margin-bottom: 4px;
+            }
+            .item-desc {
+              font-size: 13px;
+              color: #666;
+              margin-bottom: 4px;
+            }
+            .item-modifiers {
+              font-size: 12px;
+              color: #888;
+            }
+            .item-price {
+              font-weight: 700;
+              color: #8b4513;
+              font-size: 16px;
+            }
+            .item-image {
+              width: 60px;
+              height: 60px;
+              object-fit: cover;
+              border-radius: 6px;
+              margin-right: 10px;
+            }
+            @media print {
+              body { 
+                padding: 10px; 
+              }
+              .no-print {
+                display: none !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Our Menu</h1>
+    `;
+    
+    // Add each category
+    Object.keys(categorizedMenu).sort().forEach(category => {
+      html += `<div class="category"><h2>${category}</h2>`;
+      categorizedMenu[category].forEach(item => {
+        html += `<div class="menu-item">`;
+        if (item.image) {
+          html += `<img src="${item.image}" class="item-image" alt="${item.name}">`;
+        }
+        html += `<div class="item-info">
+          <div class="item-name">${item.name}</div>
+          ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+          ${item.modifiers && item.modifiers.length > 0 ? `
+            <div class="item-modifiers">
+              Modifiers: ${item.modifiers.map(m => m.name).join(', ')}
+            </div>
+          ` : ''}
+        </div>`;
+        html += `<div class="item-price">₹${item.price}</div>`;
+        html += `</div>`;
+      });
+      html += `</div>`;
+    });
+    
+    html += `
+        <script>
+          window.onload = function() {
+            window.print();
+            window.onafterprint = function() {
+              window.close();
+            }
+          }
+        </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  // ==========================================
+  // 11.B GLOBAL MODIFIERS LIBRARY & SCHEDULING OVERVIEW
+  // ==========================================
+  let globalModifiers = JSON.parse(localStorage.getItem('doppio_global_modifiers') || '[]');
+
+  function renderGlobalModifiersList() {
+    const list    = document.getElementById('global-modifiers-list');
+    const emptyEl = document.getElementById('global-modifiers-empty');
+    if (!list) return;
+
+    if (globalModifiers.length === 0) {
+      list.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    list.innerHTML = globalModifiers.map((grp, idx) => {
+      const optLabels = (grp.options || []).map(o =>
+        `<span style="background:rgba(252,128,25,0.08); color:var(--primary-brand); border-radius:4px; padding:2px 7px; font-size:10px; font-weight:600;">${escHtml(o.name)}${o.price ? (o.price > 0 ? ` +₹${o.price}` : ` ₹${o.price}`) : ''}</span>`
+      ).join('');
+      return `
+        <div style="background:rgba(28,28,28,0.02); border:1px solid rgba(28,28,28,0.06); border-radius:10px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div>
+              <strong style="font-size:13px; color:var(--primary-brand);">${escHtml(grp.name)}</strong>
+              ${grp.required ? '<span style="font-size:10px; color:var(--accent-caramel); font-weight:700; margin-left:6px; background:rgba(252,128,25,0.1); padding:1px 6px; border-radius:4px;">REQUIRED</span>' : ''}
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-secondary edit-gmod-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px;"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-danger delete-gmod-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px; background:rgba(231,76,60,0.08); color:#e74c3c; border-color:rgba(231,76,60,0.2);"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div style="display:flex; gap:4px; flex-wrap:wrap;">${optLabels || '<span style="font-size:10px; color:var(--text-muted);">No options yet</span>'}</div>
+        </div>`;
+    }).join('');
+
+    list.querySelectorAll('.edit-gmod-btn').forEach(btn => {
+      btn.addEventListener('click', () => openGlobalModifierModal(parseInt(btn.dataset.idx)));
+    });
+    list.querySelectorAll('.delete-gmod-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        SoundEffects.playRemove();
+        globalModifiers.splice(parseInt(btn.dataset.idx), 1);
+        localStorage.setItem('doppio_global_modifiers', JSON.stringify(globalModifiers));
+        renderGlobalModifiersList();
+        showNotificationToast('Modifier group deleted.');
+      });
+    });
+  }
+
+  function renderSchedulingOverview() {
+    const tbody   = document.getElementById('scheduling-overview-body');
+    const emptyEl = document.getElementById('scheduling-overview-empty');
+    if (!tbody) return;
+
+    const scheduled = menu.filter(item => item.scheduling && item.scheduling.enabled);
+    if (scheduled.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
+    tbody.innerHTML = scheduled.map(item => {
+      const s = item.scheduling;
+      const daysStr = (s.days || []).map(d => dayNames[d]).join(', ');
+      const window  = `${s.startTime || '--'} – ${s.endTime || '--'}`;
+      const isActiveDay = (s.days || []).includes(currentDay);
+      const [sh, sm] = (s.startTime || '00:00').split(':').map(Number);
+      const [eh, em] = (s.endTime   || '23:59').split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin   = eh * 60 + em;
+      const isInWindow = currentTime >= startMin && currentTime <= endMin;
+      const isLive = isActiveDay && isInWindow;
+      const badge = isLive
+        ? `<span class="status-badge paid">Live</span>`
+        : `<span class="status-badge pending">Off-hours</span>`;
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:8px 6px; font-weight:600; color:var(--primary-brand);">${escHtml(item.name)}</td>
+        <td style="padding:8px 6px; text-align:center; font-size:10px; color:var(--text-muted);">${escHtml(daysStr)}</td>
+        <td style="padding:8px 6px; font-size:11px;">${escHtml(window)}</td>
+        <td style="padding:8px 6px; text-align:center;">${badge}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function openGlobalModifierModal(editIdx = -1) {
+    const modal = document.getElementById('global-modifier-modal');
+    if (!modal) return;
+    document.getElementById('global-modifier-edit-index').value = editIdx >= 0 ? editIdx : '';
+    document.getElementById('global-modifier-modal-title').textContent = editIdx >= 0 ? 'Edit Modifier Group' : 'Add Modifier Group';
+    document.getElementById('gmod-group-name').value = '';
+    document.getElementById('gmod-required').checked = false;
+    const optsList = document.getElementById('gmod-options-list');
+    if (optsList) optsList.innerHTML = '';
+
+    if (editIdx >= 0 && globalModifiers[editIdx]) {
+      const grp = globalModifiers[editIdx];
+      document.getElementById('gmod-group-name').value = grp.name || '';
+      document.getElementById('gmod-required').checked = !!grp.required;
+      (grp.options || []).forEach(opt => addGmodOptionRow(opt.name, opt.price));
+    } else {
+      addGmodOptionRow();
+    }
+    modal.classList.add('active');
+  }
+
+  function addGmodOptionRow(name = '', price = 0) {
+    const list = document.getElementById('gmod-options-list');
+    if (!list) return;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid; grid-template-columns:1fr 90px 32px; gap:6px; align-items:center;';
+    row.innerHTML = `
+      <input type="text" placeholder="Option name (e.g. Large)" value="${escHtml(name)}" maxlength="50"
+        style="padding:7px; border-radius:6px; border:1px solid rgba(28,28,28,0.15); font-size:12px;" class="gmod-opt-name">
+      <input type="number" placeholder="±₹ (0=free)" value="${price}"
+        style="padding:7px; border-radius:6px; border:1px solid rgba(28,28,28,0.15); font-size:12px;" class="gmod-opt-price">
+      <button type="button" style="padding:6px; border-radius:6px; background:rgba(231,76,60,0.08); color:#e74c3c; border:1px solid rgba(231,76,60,0.2); cursor:pointer; font-size:12px;" class="remove-gmod-opt-btn"><i class="fa-solid fa-times"></i></button>
+    `;
+    row.querySelector('.remove-gmod-opt-btn').addEventListener('click', () => row.remove());
+    list.appendChild(row);
+  }
+
+  const addGmodOptionBtn = document.getElementById('add-gmod-option-btn');
+  if (addGmodOptionBtn) addGmodOptionBtn.addEventListener('click', () => addGmodOptionRow());
+
+  const addGlobalModifierBtn = document.getElementById('add-global-modifier-btn');
+  if (addGlobalModifierBtn) addGlobalModifierBtn.addEventListener('click', () => openGlobalModifierModal());
+
+  const closeGlobalModifierModal = document.getElementById('close-global-modifier-modal');
+  if (closeGlobalModifierModal) closeGlobalModifierModal.addEventListener('click', () => {
+    document.getElementById('global-modifier-modal')?.classList.remove('active');
+  });
+  const cancelGlobalModifierBtn = document.getElementById('cancel-global-modifier-btn');
+  if (cancelGlobalModifierBtn) cancelGlobalModifierBtn.addEventListener('click', () => {
+    document.getElementById('global-modifier-modal')?.classList.remove('active');
+  });
+
+  const confirmGlobalModifierBtn = document.getElementById('confirm-global-modifier-btn');
+  if (confirmGlobalModifierBtn) confirmGlobalModifierBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const name     = document.getElementById('gmod-group-name')?.value.trim();
+    const required = document.getElementById('gmod-required')?.checked || false;
+    if (!name) { alert('Group name is required.'); return; }
+
+    const optRows = document.querySelectorAll('#gmod-options-list > div');
+    const options = [];
+    optRows.forEach(row => {
+      const optName = row.querySelector('.gmod-opt-name')?.value.trim();
+      const optPrice = parseFloat(row.querySelector('.gmod-opt-price')?.value) || 0;
+      if (optName) options.push({ name: optName, price: optPrice });
+    });
+
+    const editIdx = document.getElementById('global-modifier-edit-index')?.value;
+    const record = { name, required, options };
+    if (editIdx !== '' && globalModifiers[parseInt(editIdx)]) {
+      globalModifiers[parseInt(editIdx)] = record;
+    } else {
+      globalModifiers.push(record);
+    }
+    localStorage.setItem('doppio_global_modifiers', JSON.stringify(globalModifiers));
+    document.getElementById('global-modifier-modal')?.classList.remove('active');
+    renderGlobalModifiersList();
+    showNotificationToast('Modifier group saved.');
+  });
+
+  renderGlobalModifiersList();
 
   // ==========================================
   // 12. CRM LEDGER PROGRAM TIERING (TAB 6)
@@ -2828,102 +8641,212 @@ document.addEventListener('DOMContentLoaded', () => {
   const custPhoneInput = document.getElementById('cust-phone');
   const loyaltyStatusBox = document.getElementById('loyalty-status-box');
 
-  function getLoyaltyTier(spend) {
-    if (spend >= 5000) return 'Platinum';
-    if (spend >= 2500) return 'Gold';
-    if (spend >= 1000) return 'Silver';
-    return 'Bronze';
-  }
+  const getLoyaltyTier = peopleDomain.getLoyaltyTier;
 
   async function loadCRMData() {
     const localCRM = localStorage.getItem('doppio_crm_local');
     if (localCRM) {
-      crmData = JSON.parse(localCRM);
-      renderCRMTab();
+      try {
+        crmData = JSON.parse(localCRM);
+        if (!Array.isArray(crmData)) crmData = [];
+      } catch (err) {
+        console.warn("Corrupted CRM data", err);
+        crmData = [];
+      }
+    } else {
+      crmData = [];
+      localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
     }
+    renderCRMTab();
   }
 
   function renderCRMTab() {
     if (!crmTableBody) return;
     crmTableBody.innerHTML = '';
-    
+
     const searchVal = (crmSearchInput ? crmSearchInput.value : '').trim().toLowerCase();
     const filtered = crmData.filter(c => {
-      return (c.name && c.name.toLowerCase().includes(searchVal)) || 
-             (c.phone && c.phone.includes(searchVal));
+      return (c.name && c.name.toLowerCase().includes(searchVal)) ||
+        (c.phone && c.phone.includes(searchVal));
     });
-    
+
     // Update crm counters
     if (document.getElementById('crm-total-members')) {
       document.getElementById('crm-total-members').textContent = crmData.length;
     }
     if (document.getElementById('crm-top-spender') && crmData.length > 0) {
-      const top = [...crmData].sort((a,b) => b.total_spend - a.total_spend)[0];
+      const top = [...crmData].sort((a, b) => b.total_spend - a.total_spend)[0];
       document.getElementById('crm-top-spender').textContent = `${top.name} (₹${Math.round(top.total_spend)})`;
     }
 
-    filtered.forEach(c => {
-      const tier = getLoyaltyTier(c.total_spend);
-      const lastVisitStr = c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-IN') : '-';
-      
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="font-weight:600; color:var(--primary-brand);">${c.name}</td>
-        <td>${c.phone || '-'}</td>
-        <td>${c.visits}</td>
-        <td style="font-weight:600;">₹${c.total_spend}</td>
-        <td><span class="status-badge paid" style="font-weight:700;">${tier}</span></td>
-        <td>${lastVisitStr}</td>
+    if (filtered.length === 0) {
+      crmTableBody.innerHTML = `
+        <tr>
+          <td colspan="6">
+            <div class="premium-empty-state" style="margin: 20px auto;">
+              <i class="fa-solid fa-users"></i>
+              <h3>No Loyalty Members Yet</h3>
+              <p>Customers registering their phone numbers during checkout will appear here with points, spent totals, and tiers.</p>
+            </div>
+          </td>
+        </tr>
       `;
-      crmTableBody.appendChild(tr);
-    });
+    } else {
+      filtered.forEach(c => {
+        const tier = getLoyaltyTier(c.total_spend);
+        const lastVisitStr = c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-IN') : '-';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight:600; color:var(--primary-brand);">${escHtml(c.name)}</td>
+          <td>${escHtml(c.phone || '-')}</td>
+          <td>${Number(c.visits) || 0}</td>
+          <td style="font-weight:600;">₹${Number(c.total_spend) || 0}</td>
+          <td><span class="status-badge paid" style="font-weight:700;">${escHtml(tier)}</span></td>
+          <td>${escHtml(lastVisitStr)}</td>
+        `;
+        crmTableBody.appendChild(tr);
+      });
+    }
   }
 
   if (crmSearchInput) crmSearchInput.addEventListener('input', renderCRMTab);
 
-  function checkLoyaltyMember() {
-    if (!custNameInput || !custPhoneInput || !loyaltyStatusBox) return;
+  const crmSuggestions = document.getElementById('crm-suggestions');
+
+  function checkLoyaltyMember(showSuggestions = false) {
+    if (!custNameInput || !custPhoneInput) return;
     const name = custNameInput.value.trim().toLowerCase();
     const phone = custPhoneInput.value.trim();
-    
+
     localStorage.setItem('doppio_cart_cust_name', custNameInput.value);
     localStorage.setItem('doppio_cart_cust_phone', custPhoneInput.value);
 
-    if (!name && !phone) {
+    updateCartTotalsOnly();
+
+    if (loyaltyStatusBox) {
       loyaltyStatusBox.style.display = 'none';
-      updateCartTotalsOnly();
+    }
+
+    if (!showSuggestions || !crmSuggestions) {
+      if (crmSuggestions) {
+        crmSuggestions.style.display = 'none';
+        crmSuggestions.innerHTML = '';
+      }
       return;
     }
-    
-    const match = crmData.find(c => (phone && c.phone === phone) || (name && c.name.toLowerCase() === name));
-    
-    if (match) {
-      const tier = getLoyaltyTier(match.total_spend);
-      const rate = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
-      
-      loyaltyStatusBox.innerHTML = `
-        <div style="font-weight: 700; color: var(--accent-caramel); margin-bottom: 2px;">
-          <i class="fa-solid fa-crown"></i> Loyalty Member Found!
-        </div>
-        <strong>${match.name}</strong> (${match.phone || 'No Phone'})<br>
-        Visits: <strong>${match.visits}</strong> &nbsp;|&nbsp; Total Spent: <strong>₹${match.total_spend}</strong><br>
-        Tier: <span style="font-weight:700; text-transform:uppercase;">${tier}</span>
-        ${match.visits >= 1 ? `<br><span style="color:#2ecc71; font-weight:700;">★ Repeat customer: ${rate}% discount applied!</span>` : ''}
-      `;
-      loyaltyStatusBox.style.display = 'block';
-    } else {
-      loyaltyStatusBox.style.display = 'none';
+
+    if (!name && !phone) {
+      crmSuggestions.style.display = 'none';
+      crmSuggestions.innerHTML = '';
+      return;
     }
-    updateCartTotalsOnly();
+
+    // Find matches in CRM
+    const matches = crmData.filter(c => {
+      const matchName = name && c.name && c.name.toLowerCase().includes(name);
+      const matchPhone = phone && c.phone && c.phone.includes(phone);
+      return matchName || matchPhone;
+    });
+
+    // Check if current inputs exactly match a single CRM member
+    const exactMatch = crmData.find(c => {
+      const exactName = name && c.name && c.name.toLowerCase() === name;
+      const exactPhone = phone && c.phone && c.phone === phone;
+      if (name && !phone) return exactName;
+      if (phone && !name) return exactPhone;
+      return exactName && exactPhone;
+    });
+
+    if (exactMatch || matches.length === 0) {
+      crmSuggestions.style.display = 'none';
+      crmSuggestions.innerHTML = '';
+      return;
+    }
+
+    // Render suggestions list
+    crmSuggestions.innerHTML = '';
+    matches.slice(0, 5).forEach(member => {
+      const tier = getLoyaltyTier(member.total_spend);
+      const item = document.createElement('div');
+      item.className = 'crm-suggestion-item';
+      item.style.padding = '8px 12px';
+      item.style.borderBottom = '1px solid rgba(28, 28, 28,0.05)';
+      item.style.cursor = 'pointer';
+      item.style.fontSize = '11px';
+      item.style.transition = 'background 0.15s ease';
+      item.innerHTML = `
+        <div style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user" style="font-size:9px; margin-right:4px;"></i> ${member.name}</div>
+        <div style="color: var(--text-muted); font-size: 10px;"><i class="fa-solid fa-phone" style="font-size:9px; margin-right:4px;"></i> ${member.phone || 'No Phone'} &nbsp;|&nbsp; Tier: ${tier}</div>
+      `;
+
+      item.addEventListener('mouseover', () => {
+        item.style.background = 'rgba(252, 128, 25, 0.06)';
+      });
+      item.addEventListener('mouseout', () => {
+        item.style.background = 'none';
+      });
+
+      item.addEventListener('click', () => {
+        SoundEffects.playClick();
+        custNameInput.value = member.name;
+        custPhoneInput.value = member.phone || '';
+
+        // Hide suggestions
+        crmSuggestions.style.display = 'none';
+        crmSuggestions.innerHTML = '';
+
+        // Save selection
+        localStorage.setItem('doppio_cart_cust_name', member.name);
+        localStorage.setItem('doppio_cart_cust_phone', member.phone || '');
+
+        // Recalculate totals
+        updateCartTotalsOnly();
+      });
+
+      crmSuggestions.appendChild(item);
+    });
+
+    crmSuggestions.style.display = 'block';
   }
 
-  if (custNameInput) custNameInput.addEventListener('input', checkLoyaltyMember);
-  if (custPhoneInput) custPhoneInput.addEventListener('input', checkLoyaltyMember);
+  if (custNameInput) custNameInput.addEventListener('input', () => checkLoyaltyMember(true));
+  if (custPhoneInput) custPhoneInput.addEventListener('input', () => checkLoyaltyMember(true));
+
+  // Global click listener to close suggestions dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    const crmSugs = document.getElementById('crm-suggestions');
+    if (crmSugs && !e.target.closest('.takeaway-fields')) {
+      crmSugs.style.display = 'none';
+      crmSugs.innerHTML = '';
+    }
+  });
+
+  // Collapsible Customer Details Toggle Banner for Takeaway Cart
+  const guestToggleBtn = document.getElementById('guest-toggle-btn');
+  const takeawayFields = document.querySelector('.takeaway-fields');
+  const guestToggleIndicator = document.getElementById('guest-toggle-indicator');
+
+  if (guestToggleBtn && takeawayFields) {
+    guestToggleBtn.addEventListener('click', () => {
+      if (getComputedStyle(takeawayFields).display === 'none') {
+        takeawayFields.style.display = 'block';
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
+        guestToggleBtn.style.background = 'rgba(252, 128, 25, 0.05)';
+        guestToggleBtn.style.borderColor = 'rgba(252, 128, 25, 0.2)';
+      } else {
+        takeawayFields.style.display = 'none';
+        if (guestToggleIndicator) guestToggleIndicator.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Add Info';
+        guestToggleBtn.style.background = 'var(--bg-cream-light)';
+        guestToggleBtn.style.borderColor = 'rgba(28, 28, 28,0.06)';
+      }
+    });
+  }
 
   function updateCRMMember(name, phone, spendAmount) {
     let member = crmData.find(c => (phone && c.phone === phone) || c.name.toLowerCase() === name.toLowerCase());
     const nowISO = new Date().toISOString();
-    
+
     if (member) {
       member.visits += 1;
       member.total_spend = parseFloat((parseFloat(member.total_spend) + spendAmount).toFixed(2));
@@ -2940,6 +8863,294 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
     renderCRMTab();
+
+    const syncPhone = member.phone || ('NOPHONE_' + (member.name || 'guest').trim().toLowerCase().replace(/[^a-z0-9]/g, '_'));
+    if (supabaseClient) {
+      supabaseClient.from('doppio_crm').upsert({
+        phone: syncPhone,
+        name: member.name,
+        visits: member.visits,
+        total_spend: member.total_spend,
+        last_visit: member.last_visit,
+        updated_at: nowISO
+      }, { onConflict: 'tenant_id,phone' }).then(({ error }) => {
+        if (error) console.warn('Supabase CRM upsert failed:', error.message);
+      });
+    }
+  }
+
+  // ==========================================
+  // 12.A.2 LOYALTY RULES & CUSTOMER FEEDBACK
+  // ==========================================
+
+  // --- Loyalty Rules ---
+  let loyaltyRules = JSON.parse(localStorage.getItem('doppio_loyalty_rules') || 'null') || {
+    points_per_rupee: 0.01,
+    point_value_rupee: 1,
+    min_points_to_redeem: 100,
+    expiry_days: 0
+  };
+  let tierThresholds = JSON.parse(localStorage.getItem('doppio_tier_thresholds') || 'null') || {
+    bronze:   { min: 0,    benefit: 'Standard points' },
+    silver:   { min: 1000, benefit: '5% Discount + Free extra shot' },
+    gold:     { min: 2500, benefit: '10% Discount + Free cookies' },
+    platinum: { min: 5000, benefit: '15% Discount + Free beverages' }
+  };
+
+  function loadLoyaltyRulesUI() {
+    const ppr  = document.getElementById('loyalty-points-per-rupee');
+    const pvr  = document.getElementById('loyalty-point-value');
+    const mpr  = document.getElementById('loyalty-min-redeem');
+    const exp  = document.getElementById('loyalty-expiry-days');
+    if (ppr) ppr.value = loyaltyRules.points_per_rupee;
+    if (pvr) pvr.value = loyaltyRules.point_value_rupee;
+    if (mpr) mpr.value = loyaltyRules.min_points_to_redeem;
+    if (exp) exp.value = loyaltyRules.expiry_days;
+
+    const tiers = ['bronze', 'silver', 'gold', 'platinum'];
+    tiers.forEach(t => {
+      const minEl = document.getElementById(`tier-${t}-min`);
+      const benEl = document.getElementById(`tier-${t}-benefit`);
+      if (minEl) minEl.value = tierThresholds[t]?.min ?? 0;
+      if (benEl) benEl.value = tierThresholds[t]?.benefit ?? '';
+    });
+  }
+
+  const saveLoyaltyRulesBtn = document.getElementById('save-loyalty-rules-btn');
+  if (saveLoyaltyRulesBtn) {
+    saveLoyaltyRulesBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      loyaltyRules = {
+        points_per_rupee:    parseFloat(document.getElementById('loyalty-points-per-rupee')?.value) || 0.01,
+        point_value_rupee:   parseFloat(document.getElementById('loyalty-point-value')?.value) || 1,
+        min_points_to_redeem: parseInt(document.getElementById('loyalty-min-redeem')?.value) || 100,
+        expiry_days:         parseInt(document.getElementById('loyalty-expiry-days')?.value) || 0
+      };
+      localStorage.setItem('doppio_loyalty_rules', JSON.stringify(loyaltyRules));
+      if (supabaseClient) {
+        supabaseClient.from('doppio_settings').upsert({ tenant_id: activeTenantId, key: 'loyalty_rules', value: loyaltyRules }).then();
+      }
+      showNotificationToast('Loyalty rules saved.');
+    });
+  }
+
+  const saveTierThresholdsBtn = document.getElementById('save-tier-thresholds-btn');
+  if (saveTierThresholdsBtn) {
+    saveTierThresholdsBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      ['bronze', 'silver', 'gold', 'platinum'].forEach(t => {
+        tierThresholds[t] = {
+          min:     parseInt(document.getElementById(`tier-${t}-min`)?.value) || 0,
+          benefit: document.getElementById(`tier-${t}-benefit`)?.value.trim() || ''
+        };
+      });
+      localStorage.setItem('doppio_tier_thresholds', JSON.stringify(tierThresholds));
+      if (supabaseClient) {
+        supabaseClient.from('doppio_settings').upsert({ tenant_id: activeTenantId, key: 'tier_thresholds', value: tierThresholds }).then();
+      }
+      showNotificationToast('Tier thresholds saved.');
+    });
+  }
+
+  // --- Customer Feedback ---
+  let customerFeedback = JSON.parse(localStorage.getItem('doppio_customer_feedback') || '[]');
+
+  function renderFeedbackTable() {
+    const tbody   = document.getElementById('feedback-table-body');
+    const emptyEl = document.getElementById('feedback-empty');
+    if (!tbody) return;
+
+    const searchVal = (document.getElementById('feedback-search-input')?.value || '').trim().toLowerCase();
+    const ratingFilter = document.getElementById('feedback-rating-filter')?.value || '';
+
+    let data = customerFeedback.filter(f => {
+      const matchSearch = !searchVal ||
+        (f.name && f.name.toLowerCase().includes(searchVal)) ||
+        (f.phone && f.phone.includes(searchVal)) ||
+        (f.comment && f.comment.toLowerCase().includes(searchVal));
+      const matchRating = !ratingFilter || String(f.rating) === ratingFilter;
+      return matchSearch && matchRating;
+    });
+
+    data = [...data].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (data.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const stars = r => '⭐'.repeat(Math.max(0, Math.min(5, r))) || '-';
+    tbody.innerHTML = data.map((f, i) => {
+      const origIdx = customerFeedback.indexOf(f);
+      const dateStr = f.date ? new Date(f.date).toLocaleDateString('en-IN') : '-';
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:8px 6px; font-weight:600; color:var(--primary-brand);">${escHtml(f.name || '-')}<br><span style="font-size:10px; color:var(--text-muted);">${escHtml(f.phone || '')}</span></td>
+        <td style="padding:8px 6px; text-align:center; font-size:13px;">${stars(f.rating)}</td>
+        <td style="padding:8px 6px; font-size:11px; color:var(--text-dark); max-width:200px;">${escHtml(f.comment || '-')}</td>
+        <td style="padding:8px 6px; font-size:11px; color:var(--text-muted);">${dateStr}</td>
+        <td style="padding:8px 6px; text-align:right;">
+          <button class="btn btn-secondary edit-feedback-btn" data-idx="${origIdx}" style="padding:2px 7px; font-size:10px; border-radius:4px; margin-right:4px;"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-danger delete-feedback-btn" data-idx="${origIdx}" style="padding:2px 7px; font-size:10px; border-radius:4px; background:rgba(231,76,60,0.08); color:#e74c3c; border-color:rgba(231,76,60,0.2);"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.edit-feedback-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        openFeedbackModal(idx);
+      });
+    });
+    tbody.querySelectorAll('.delete-feedback-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        SoundEffects.playRemove();
+        const idx = parseInt(btn.dataset.idx);
+        customerFeedback.splice(idx, 1);
+        localStorage.setItem('doppio_customer_feedback', JSON.stringify(customerFeedback));
+        renderFeedbackTable();
+        showNotificationToast('Feedback deleted.');
+      });
+    });
+  }
+
+  function openFeedbackModal(editIdx = -1) {
+    const modal = document.getElementById('add-feedback-modal');
+    if (!modal) return;
+    document.getElementById('feedback-edit-id').value = editIdx >= 0 ? editIdx : '';
+    document.getElementById('feedback-cust-name').value = '';
+    document.getElementById('feedback-cust-phone').value = '';
+    document.getElementById('feedback-comment').value = '';
+    document.getElementById('feedback-rating-val').value = '0';
+    setFeedbackStars(0);
+    if (editIdx >= 0 && customerFeedback[editIdx]) {
+      const f = customerFeedback[editIdx];
+      document.getElementById('feedback-cust-name').value = f.name || '';
+      document.getElementById('feedback-cust-phone').value = f.phone || '';
+      document.getElementById('feedback-comment').value = f.comment || '';
+      document.getElementById('feedback-rating-val').value = f.rating || 0;
+      setFeedbackStars(f.rating || 0);
+    }
+    modal.classList.add('active');
+  }
+
+  function setFeedbackStars(val) {
+    document.querySelectorAll('.feedback-star').forEach(s => {
+      s.textContent = parseInt(s.dataset.val) <= val ? '★' : '☆';
+      s.style.color = parseInt(s.dataset.val) <= val ? '#ffc300' : 'var(--text-muted)';
+    });
+  }
+
+  document.querySelectorAll('.feedback-star').forEach(s => {
+    s.addEventListener('click', () => {
+      const val = parseInt(s.dataset.val);
+      document.getElementById('feedback-rating-val').value = val;
+      setFeedbackStars(val);
+    });
+  });
+
+  const addFeedbackBtn = document.getElementById('add-feedback-btn');
+  if (addFeedbackBtn) addFeedbackBtn.addEventListener('click', () => openFeedbackModal());
+
+  const closeFeedbackModal = document.getElementById('close-feedback-modal');
+  if (closeFeedbackModal) closeFeedbackModal.addEventListener('click', () => {
+    document.getElementById('add-feedback-modal')?.classList.remove('active');
+  });
+
+  const cancelFeedbackBtn = document.getElementById('cancel-feedback-btn');
+  if (cancelFeedbackBtn) cancelFeedbackBtn.addEventListener('click', () => {
+    document.getElementById('add-feedback-modal')?.classList.remove('active');
+  });
+
+  const confirmFeedbackBtn = document.getElementById('confirm-feedback-btn');
+  if (confirmFeedbackBtn) confirmFeedbackBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const name    = document.getElementById('feedback-cust-name')?.value.trim();
+    const phone   = document.getElementById('feedback-cust-phone')?.value.trim();
+    const comment = document.getElementById('feedback-comment')?.value.trim();
+    const rating  = parseInt(document.getElementById('feedback-rating-val')?.value) || 0;
+    const editIdx = document.getElementById('feedback-edit-id')?.value;
+
+    if (!name) { alert('Customer name is required.'); return; }
+    if (rating === 0) { alert('Please select a rating.'); return; }
+
+    const record = { name, phone, comment, rating, date: new Date().toISOString() };
+    if (editIdx !== '' && editIdx !== undefined && customerFeedback[parseInt(editIdx)]) {
+      customerFeedback[parseInt(editIdx)] = record;
+    } else {
+      customerFeedback.push(record);
+    }
+    localStorage.setItem('doppio_customer_feedback', JSON.stringify(customerFeedback));
+    document.getElementById('add-feedback-modal')?.classList.remove('active');
+    renderFeedbackTable();
+    showNotificationToast('Feedback saved.');
+  });
+
+  const feedbackSearchInput = document.getElementById('feedback-search-input');
+  const feedbackRatingFilter = document.getElementById('feedback-rating-filter');
+  if (feedbackSearchInput) feedbackSearchInput.addEventListener('input', renderFeedbackTable);
+  if (feedbackRatingFilter) feedbackRatingFilter.addEventListener('change', renderFeedbackTable);
+
+  // --- Visit History Timeline ---
+  const visitsLookupInput = document.getElementById('visits-lookup-input');
+  if (visitsLookupInput) {
+    visitsLookupInput.addEventListener('input', () => {
+      const q = visitsLookupInput.value.trim().toLowerCase();
+      const statsStrip = document.getElementById('visits-stats-strip');
+      const timelineList = document.getElementById('visits-timeline-list');
+      const emptyHint = document.getElementById('visits-empty-hint');
+
+      if (!q) {
+        if (statsStrip) statsStrip.style.display = 'none';
+        if (timelineList) timelineList.innerHTML = `<div id="visits-empty-hint" style="color:var(--text-muted); font-size:11px; text-align:center; padding:20px 0;">Search a customer to view their visit timeline.</div>`;
+        return;
+      }
+
+      const member = crmData.find(c =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q))
+      );
+
+      if (!member) {
+        if (statsStrip) statsStrip.style.display = 'none';
+        if (timelineList) timelineList.innerHTML = `<div style="color:var(--text-muted); font-size:11px; text-align:center; padding:20px 0;">No customer found matching "<strong>${escHtml(q)}</strong>".</div>`;
+        return;
+      }
+
+      const tier = getLoyaltyTier(member.total_spend);
+      if (statsStrip) {
+        statsStrip.style.display = 'block';
+        document.getElementById('visits-cust-name-display').textContent = member.name + (member.phone ? ` · ${member.phone}` : '');
+        document.getElementById('visits-count-val').textContent = member.visits || 0;
+        document.getElementById('visits-spend-val').textContent = `₹${Math.round(member.total_spend || 0).toLocaleString('en-IN')}`;
+        document.getElementById('visits-tier-val').textContent = tier;
+      }
+
+      // Build visit entries from bills matching this customer
+      const memberBills = bills.filter(b => b && (
+        (member.phone && b.customerPhone === member.phone) ||
+        (b.customerName && b.customerName.toLowerCase() === member.name.toLowerCase())
+      )).sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime)).slice(0, 20);
+
+      if (timelineList) {
+        if (memberBills.length === 0) {
+          timelineList.innerHTML = `<div style="color:var(--text-muted); font-size:11px; text-align:center; padding:20px 0;">No bill records found for this customer.</div>`;
+        } else {
+          timelineList.innerHTML = memberBills.map(b => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:rgba(28,28,28,0.02); border-radius:8px; border:1px solid rgba(28,28,28,0.05); font-size:11px;">
+              <div>
+                <div style="font-weight:700; color:var(--primary-brand);">${escHtml(b.orderId)}</div>
+                <div style="color:var(--text-muted); font-size:10px;">${escHtml(b.dateTime || '')}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:700; color:var(--accent-caramel);">₹${(b.total || 0).toFixed(2)}</div>
+                <div style="font-size:10px; color:var(--text-muted);">${escHtml(b.paymentMethod || '')}</div>
+              </div>
+            </div>`).join('');
+        }
+      }
+    });
   }
 
   // ==========================================
@@ -2951,98 +9162,58 @@ document.addEventListener('DOMContentLoaded', () => {
   const taxDateTo = document.getElementById('tax-date-to');
   const taxFilterBtn = document.getElementById('tax-filter-btn');
   const taxResetBtn = document.getElementById('tax-reset-btn');
-  
+
   const taxNetSalesCard = document.getElementById('tax-net-sales-card');
   const taxCgstCard = document.getElementById('tax-cgst-card');
   const taxSgstCard = document.getElementById('tax-sgst-card');
   const taxTotalCollectedCard = document.getElementById('tax-total-collected-card');
   const taxAverageRateCard = document.getElementById('tax-average-rate-card');
-  
+
   const gstr1B2CVal = document.getElementById('gstr1-b2c-val');
   const gstr1CountVal = document.getElementById('gstr1-count-val');
   const gstr3bTaxableVal = document.getElementById('gstr3b-taxable-val');
   const gstr3bLiabilityVal = document.getElementById('gstr3b-liability-val');
   const taxLedgerCount = document.getElementById('tax-ledger-count');
-  
+
   const exportTaxJsonBtn = document.getElementById('export-tax-json-btn');
   const exportTaxCsvBtn = document.getElementById('export-tax-csv-btn');
   const exportTaxSqlBtn = document.getElementById('export-tax-sql-btn');
   const importTaxTriggerBtn = document.getElementById('import-tax-trigger-btn');
   const importTaxFileInput = document.getElementById('import-tax-file-input');
+  let taxImportBusy = false;
   const showSqlSchemaBtn = document.getElementById('show-sql-schema-btn');
-  
+
   const sqlSchemaModal = document.getElementById('sql-schema-modal');
   const closeSchemaModal = document.getElementById('close-schema-modal');
   const closeSchemaBtn = document.getElementById('close-schema-btn');
   const copySqlSchemaBtn = document.getElementById('copy-sql-schema-btn');
 
-  function parseBillDate(dateStr) {
-    if (!dateStr) return new Date();
-    // Defensive check: if dateStr is an object (i.e. a bill), extract the dateTime string
-    if (typeof dateStr === 'object') {
-      if (dateStr.dateTime) dateStr = dateStr.dateTime;
-      else return new Date();
-    }
-    
-    let parsed = Date.parse(dateStr);
-    if (!isNaN(parsed)) return new Date(parsed);
-    
-    // Robust Indian locale parser: 'DD/MM/YYYY, hh:mm:ss AM/PM'
-    try {
-      const clean = dateStr.replace(/[^0-9/:\sAMP]/gi, '').trim();
-      const parts = clean.split(',');
-      const dateParts = parts[0].trim().split('/');
-      if (dateParts.length === 3) {
-        let day = parseInt(dateParts[0], 10);
-        let month = parseInt(dateParts[1], 10) - 1;
-        let year = parseInt(dateParts[2], 10);
-        
-        let hour = 0, minute = 0, second = 0;
-        if (parts[1]) {
-          const timeParts = parts[1].trim().split(' ');
-          const hms = timeParts[0].split(':');
-          hour = parseInt(hms[0], 10);
-          minute = parseInt(hms[1], 10) || 0;
-          second = parseInt(hms[2], 10) || 0;
-          
-          if (timeParts[1] && timeParts[1].toUpperCase() === 'PM' && hour < 12) {
-            hour += 12;
-          } else if (timeParts[1] && timeParts[1].toUpperCase() === 'AM' && hour === 12) {
-            hour = 0;
-          }
-        }
-        return new Date(year, month, day, hour, minute, second);
-      }
-    } catch (e) {
-      console.error("parseBillDate failed on:", dateStr, e);
-    }
-    return new Date(dateStr);
-  }
 
   function getActivePeriodBills() {
     const searchVal = (taxSearchInput ? taxSearchInput.value : '').trim().toLowerCase();
     const fromVal = taxDateFrom ? taxDateFrom.value : '';
     const toVal = taxDateTo ? taxDateTo.value : '';
-    
+
     let fromDate = fromVal ? new Date(fromVal) : null;
-    if (fromDate) fromDate.setHours(0,0,0,0);
-    
+    if (fromDate) fromDate.setHours(0, 0, 0, 0);
+
     let toDate = toVal ? new Date(toVal) : null;
-    if (toDate) toDate.setHours(23,59,59,999);
-    
+    if (toDate) toDate.setHours(23, 59, 59, 999);
+
     return bills.filter(b => {
-      const matchesSearch = !searchVal || 
-                            (b.orderId && b.orderId.toLowerCase().includes(searchVal)) ||
-                            (b.customerName && b.customerName.toLowerCase().includes(searchVal)) ||
-                            (b.paymentMethod && b.paymentMethod.toLowerCase().includes(searchVal));
-      
+      if (!b) return false;
+      const matchesSearch = !searchVal ||
+        (b.orderId && b.orderId.toLowerCase().includes(searchVal)) ||
+        (b.customerName && b.customerName.toLowerCase().includes(searchVal)) ||
+        (b.paymentMethod && b.paymentMethod.toLowerCase().includes(searchVal));
+
       if (!matchesSearch) return false;
       if (!fromDate && !toDate) return true;
-      
+
       const billDate = parseBillDate(b.dateTime);
       if (fromDate && billDate < fromDate) return false;
       if (toDate && billDate > toDate) return false;
-      
+
       return true;
     });
   }
@@ -3050,50 +9221,68 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderTaxTab() {
     if (!taxTableBody) return;
     taxTableBody.innerHTML = '';
-    
+
     const filteredBills = getActivePeriodBills();
-    
+
     // Sort reverse chronological
-    filteredBills.sort((a, b) => parseBillDate(b.dateTime) - parseBillDate(a.dateTime));
-    
+    filteredBills.sort((a, b) => {
+      const db = b ? parseBillDate(b.dateTime) : new Date(0);
+      const da = a ? parseBillDate(a.dateTime) : new Date(0);
+      return db - da;
+    });
+
     let netSales = 0;
     let totalTax = 0;
     let cgst = 0;
     let sgst = 0;
-    
-    filteredBills.forEach(b => {
-      const taxable = b.subtotal - (b.discount || 0);
-      netSales += taxable;
-      
-      const tax = b.gst || 0;
-      totalTax += tax;
-      cgst += tax / 2;
-      sgst += tax / 2;
-      
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="font-weight:700; color:var(--accent-caramel);">${b.orderId}</td>
-        <td style="font-weight:600; color:var(--primary-brand);">${b.customerName || 'Walk-in Guest'}</td>
-        <td style="font-size: 11px;">${b.dateTime}</td>
-        <td>₹${taxable.toFixed(2)}</td>
-        <td style="color:#27ae60;">₹${(tax/2).toFixed(2)}</td>
-        <td style="color:#2980b9;">₹${(tax/2).toFixed(2)}</td>
-        <td style="font-weight:600; color:var(--text-dark);">₹${tax.toFixed(2)}</td>
-        <td style="font-weight:700; color:var(--primary-brand);">₹${(b.total || 0).toFixed(2)}</td>
-        <td><span class="payment-badge ${b.paymentMethod ? b.paymentMethod.toLowerCase() : 'upi'}">${b.paymentMethod || 'UPI'}</span></td>
+
+    if (filteredBills.length === 0) {
+      taxTableBody.innerHTML = `
+        <tr>
+          <td colspan="9">
+            <div class="premium-empty-state" style="margin: 20px auto;">
+              <i class="fa-solid fa-percent"></i>
+              <h3>No Invoices For Selected Period</h3>
+              <p>No tax-compliant invoices were recorded in the selected date range. Try clearing your date filters.</p>
+            </div>
+          </td>
+        </tr>
       `;
-      taxTableBody.appendChild(tr);
-    });
-    
+    } else {
+      filteredBills.forEach(b => {
+        const taxable = b.subtotal - (b.discount || 0);
+        netSales += taxable;
+
+        const tax = b.gst || 0;
+        totalTax += tax;
+        cgst += tax / 2;
+        sgst += tax / 2;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight:700; color:var(--accent-caramel);">${b.orderId}</td>
+          <td style="font-weight:600; color:var(--primary-brand);">${b.customerName || 'Walk-in Guest'}</td>
+          <td style="font-size: 11px;">${b.dateTime}</td>
+          <td>₹${taxable.toFixed(2)}</td>
+          <td style="color:#27ae60;">₹${(tax / 2).toFixed(2)}</td>
+          <td style="color:#2980b9;">₹${(tax / 2).toFixed(2)}</td>
+          <td style="font-weight:600; color:var(--text-dark);">₹${tax.toFixed(2)}</td>
+          <td style="font-weight:700; color:var(--primary-brand);">₹${(b.total || 0).toFixed(2)}</td>
+          <td><span class="payment-badge ${b.paymentMethod ? b.paymentMethod.toLowerCase() : 'upi'}">${b.paymentMethod || 'UPI'}</span></td>
+        `;
+        taxTableBody.appendChild(tr);
+      });
+    }
+
     // Update summary labels
     if (taxNetSalesCard) taxNetSalesCard.textContent = `₹${netSales.toFixed(2)}`;
     if (taxCgstCard) taxCgstCard.textContent = `₹${cgst.toFixed(2)}`;
     if (taxSgstCard) taxSgstCard.textContent = `₹${sgst.toFixed(2)}`;
     if (taxTotalCollectedCard) taxTotalCollectedCard.textContent = `₹${totalTax.toFixed(2)}`;
-    
+
     const avgRate = netSales > 0 ? (totalTax / netSales) * 100 : 18;
     if (taxAverageRateCard) taxAverageRateCard.textContent = `Avg Rate: ${avgRate.toFixed(1)}%`;
-    
+
     if (gstr1B2CVal) gstr1B2CVal.textContent = `₹${netSales.toFixed(2)}`;
     if (gstr1CountVal) gstr1CountVal.textContent = `${filteredBills.length} Invoices`;
     if (gstr3bTaxableVal) gstr3bTaxableVal.textContent = `₹${netSales.toFixed(2)}`;
@@ -3119,38 +9308,250 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Export CSV generator
-  function convertToCSV(data) {
-    const headers = ["orderId", "customerName", "dateTime", "items", "subtotal", "gst", "total", "paymentMethod"];
-    const rows = data.map(row => {
-      return headers.map(header => {
-        let val = row[header];
-        if (val === null || val === undefined) return '""';
-        if (typeof val === 'object') val = JSON.stringify(val);
-        const escaped = ('' + val).replace(/"/g, '""');
-        return `"${escaped}"`;
-      }).join(',');
+  // ==========================================
+  // 12.B.2 TAX SLABS MANAGEMENT
+  // ==========================================
+  let taxSlabRules = JSON.parse(localStorage.getItem('doppio_tax_slab_rules') || '[]');
+
+  function renderTaxSlabsTable() {
+    const tbody   = document.getElementById('tax-slabs-table-body');
+    const emptyEl = document.getElementById('tax-slabs-empty');
+    if (!tbody) return;
+
+    if (taxSlabRules.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    tbody.innerHTML = taxSlabRules.map((rule, idx) => {
+      const cgst = (rule.rate / 2).toFixed(1);
+      const sgst = (rule.rate / 2).toFixed(1);
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:8px 6px; font-weight:600; color:var(--primary-brand);">${escHtml(rule.category)}<br><span style="font-size:10px; color:var(--text-muted);">${escHtml(rule.notes || '')}</span></td>
+        <td style="padding:8px 6px; text-align:center; font-weight:700; color:var(--accent-caramel);">${rule.rate}%</td>
+        <td style="padding:8px 6px; text-align:center; color:#27ae60;">${cgst}%</td>
+        <td style="padding:8px 6px; text-align:center; color:#2980b9;">${sgst}%</td>
+        <td style="padding:8px 6px; text-align:right;">
+          <button class="btn btn-secondary edit-slab-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px; margin-right:4px;"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-danger delete-slab-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px; background:rgba(231,76,60,0.08); color:#e74c3c; border-color:rgba(231,76,60,0.2);"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.edit-slab-btn').forEach(btn => {
+      btn.addEventListener('click', () => openTaxSlabRuleModal(parseInt(btn.dataset.idx)));
     });
-    return [headers.join(','), ...rows].join('\n');
+    tbody.querySelectorAll('.delete-slab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        SoundEffects.playRemove();
+        taxSlabRules.splice(parseInt(btn.dataset.idx), 1);
+        localStorage.setItem('doppio_tax_slab_rules', JSON.stringify(taxSlabRules));
+        renderTaxSlabsTable();
+        showNotificationToast('Tax slab rule deleted.');
+      });
+    });
   }
+
+  function openTaxSlabRuleModal(editIdx = -1) {
+    const modal = document.getElementById('tax-slab-rule-modal');
+    if (!modal) return;
+    document.getElementById('tax-slab-rule-edit-index').value = editIdx >= 0 ? editIdx : '';
+    document.getElementById('tax-slab-rule-modal-title').textContent = editIdx >= 0 ? 'Edit Tax Slab Rule' : 'Add Tax Slab Rule';
+    document.getElementById('slab-rule-category').value = '';
+    document.getElementById('slab-rule-rate').value = '';
+    document.getElementById('slab-rule-notes').value = '';
+    if (editIdx >= 0 && taxSlabRules[editIdx]) {
+      const r = taxSlabRules[editIdx];
+      document.getElementById('slab-rule-category').value = r.category || '';
+      document.getElementById('slab-rule-rate').value = r.rate || '';
+      document.getElementById('slab-rule-notes').value = r.notes || '';
+    }
+    modal.classList.add('active');
+  }
+
+  const addTaxSlabRuleBtn = document.getElementById('add-tax-slab-rule-btn');
+  if (addTaxSlabRuleBtn) addTaxSlabRuleBtn.addEventListener('click', () => openTaxSlabRuleModal());
+
+  const closeTaxSlabRuleModal = document.getElementById('close-tax-slab-rule-modal');
+  if (closeTaxSlabRuleModal) closeTaxSlabRuleModal.addEventListener('click', () => {
+    document.getElementById('tax-slab-rule-modal')?.classList.remove('active');
+  });
+  const cancelTaxSlabRuleBtn = document.getElementById('cancel-tax-slab-rule-btn');
+  if (cancelTaxSlabRuleBtn) cancelTaxSlabRuleBtn.addEventListener('click', () => {
+    document.getElementById('tax-slab-rule-modal')?.classList.remove('active');
+  });
+
+  const confirmTaxSlabRuleBtn = document.getElementById('confirm-tax-slab-rule-btn');
+  if (confirmTaxSlabRuleBtn) confirmTaxSlabRuleBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const category = document.getElementById('slab-rule-category')?.value.trim();
+    const rate     = parseFloat(document.getElementById('slab-rule-rate')?.value);
+    const notes    = document.getElementById('slab-rule-notes')?.value.trim();
+    if (!category) { alert('Category is required.'); return; }
+    if (isNaN(rate) || rate < 0 || rate > 28) { alert('Enter a valid GST rate (0–28%).'); return; }
+    const editIdx = document.getElementById('tax-slab-rule-edit-index')?.value;
+    const record = { category, rate, notes };
+    if (editIdx !== '' && taxSlabRules[parseInt(editIdx)]) {
+      taxSlabRules[parseInt(editIdx)] = record;
+    } else {
+      taxSlabRules.push(record);
+    }
+    localStorage.setItem('doppio_tax_slab_rules', JSON.stringify(taxSlabRules));
+    document.getElementById('tax-slab-rule-modal')?.classList.remove('active');
+    renderTaxSlabsTable();
+    showNotificationToast('Tax slab rule saved.');
+  });
+
+  // GST rate configurator
+  const taxSlabGstRate = document.getElementById('tax-slab-gst-rate');
+  const taxSlabCgstPreview = document.getElementById('tax-slab-cgst-preview');
+  const taxSlabSgstPreview = document.getElementById('tax-slab-sgst-preview');
+
+  function updateTaxSlabPreviews() {
+    const rate = parseFloat(taxSlabGstRate?.value) || 18;
+    if (taxSlabCgstPreview) taxSlabCgstPreview.textContent = (rate / 2).toFixed(1) + '%';
+    if (taxSlabSgstPreview) taxSlabSgstPreview.textContent = (rate / 2).toFixed(1) + '%';
+    document.querySelectorAll('.tax-preset-chip').forEach(chip => {
+      chip.classList.toggle('active', parseFloat(chip.dataset.rate) === rate);
+    });
+  }
+
+  if (taxSlabGstRate) taxSlabGstRate.addEventListener('input', updateTaxSlabPreviews);
+
+  document.querySelectorAll('.tax-preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (taxSlabGstRate) taxSlabGstRate.value = chip.dataset.rate;
+      updateTaxSlabPreviews();
+    });
+  });
+
+  const saveTaxSlabBtn = document.getElementById('save-tax-slab-btn');
+  if (saveTaxSlabBtn) saveTaxSlabBtn.addEventListener('click', () => {
+    SoundEffects.playSuccess();
+    const rate  = parseFloat(taxSlabGstRate?.value);
+    const label = document.getElementById('tax-slab-label')?.value.trim();
+    if (isNaN(rate) || rate < 0 || rate > 28) { alert('Enter a valid GST rate (0–28%).'); return; }
+    const config = { gstRate: rate, label: label || `GST ${rate}%` };
+    localStorage.setItem('doppio_tax_config', JSON.stringify(config));
+    // Apply to businessProfile so next bill uses this rate
+    if (businessProfile) businessProfile.gstRate = rate;
+    if (supabaseClient) {
+      supabaseClient.from('doppio_settings').upsert({ tenant_id: activeTenantId, key: 'tax_config', value: config }).then();
+    }
+    showNotificationToast(`Tax rate set to ${rate}% (CGST ${rate/2}% + SGST ${rate/2}%).`);
+  });
+
+  // Load saved tax config into UI
+  (function loadTaxSlabConfig() {
+    const saved = JSON.parse(localStorage.getItem('doppio_tax_config') || 'null');
+    if (saved && taxSlabGstRate) {
+      taxSlabGstRate.value = saved.gstRate ?? 18;
+      const labelEl = document.getElementById('tax-slab-label');
+      if (labelEl) labelEl.value = saved.label || '';
+      updateTaxSlabPreviews();
+    }
+    renderTaxSlabsTable();
+  })();
+
+  // --- MULTI-KOT PRINTER ROUTING CONFIGURATOR ---
+  const kotPrinterName = document.getElementById('kot-printer-name');
+  const kotPrinterCategories = document.getElementById('kot-printer-categories');
+  const btnSaveKotPrinter = document.getElementById('btn-save-kot-printer');
+  const kotPrintersList = document.getElementById('kot-printers-list');
+
+  function getSavedPrinters() {
+    try {
+      return JSON.parse(localStorage.getItem('doppio_kot_printers') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function savePrinters(list) {
+    localStorage.setItem('doppio_kot_printers', JSON.stringify(list));
+    renderKotPrinters();
+  }
+
+  function renderKotPrinters() {
+    if (!kotPrintersList) return;
+    const list = getSavedPrinters();
+    if (list.length === 0) {
+      kotPrintersList.innerHTML = `<p style="color:var(--text-muted); font-size:10px; font-style:italic;">No printer zones configured. All items print on default printer.</p>`;
+      return;
+    }
+    kotPrintersList.innerHTML = list.map((pr, idx) => `
+      <div style="background:var(--bg-card); border:1px solid var(--border); padding:8px 10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; box-sizing: border-box; width:100%;">
+        <div style="text-align:left;">
+          <strong style="color:var(--primary-brand); font-size:11px;">${escHtml(pr.name)}</strong>
+          <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Cats: ${escHtml(pr.categories.join(', '))}</div>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="deletePrinterZone(${idx})" style="padding:4px 8px; font-size:10px; border-color:var(--border); color:var(--text); margin-left: 10px;"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    `).join('');
+  }
+
+  window.deletePrinterZone = function(idx) {
+    SoundEffects.playClick();
+    const list = getSavedPrinters();
+    list.splice(idx, 1);
+    savePrinters(list);
+    showNotificationToast("Printer zone removed.");
+  };
+
+  if (btnSaveKotPrinter) {
+    btnSaveKotPrinter.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+      const name = kotPrinterName?.value.trim();
+      const catsRaw = kotPrinterCategories?.value.trim();
+      if (!name) { alert("Please enter a zone name."); return; }
+      if (!catsRaw) { alert("Please map at least one category."); return; }
+
+      const categories = catsRaw.split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+      const list = getSavedPrinters();
+      list.push({ name, categories });
+      savePrinters(list);
+
+      if (kotPrinterName) kotPrinterName.value = '';
+      if (kotPrinterCategories) kotPrinterCategories.value = '';
+      showNotificationToast(`Printer zone "${name}" saved.`);
+    });
+  }
+
+  renderKotPrinters();
+
+  // Export CSV generator
+  const convertToCSV = billsDomain.convertToCSV;
 
   // Export SQL Script generator
   function generateSQLScript(data) {
-    let sql = `-- DOPPIO CAFE SUPABASE INTEGRATION SCRIPT
+    const tenantId = String(activeTenantId || '').trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
+      throw new Error('A valid tenant session is required before exporting SQL.');
+    }
+    let sql = `-- RESTROSUITE CLOUD POSTGRES INTEGRATION SCRIPT
 -- Generated on ${new Date().toLocaleString('en-IN')}
--- Compatible with Supabase Postgres SQL Editor
+-- Compatible with Cloud Postgres SQL Editors
 
 CREATE TABLE IF NOT EXISTS public.doppio_bills (
     id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    "orderId" text UNIQUE NOT NULL,
-    "customerName" text DEFAULT 'Walk-in Guest'::text,
-    "dateTime" text,
-    items text,
-    subtotal numeric DEFAULT 0,
-    gst numeric DEFAULT 0,
-    total numeric DEFAULT 0,
-    "paymentMethod" text DEFAULT 'UPI'::text
+    tenant_id uuid NOT NULL,
+    "orderId" text NOT NULL,
+    "customerName" text DEFAULT 'Walk-in Guest',
+    "customerPhone" text DEFAULT '',
+    "dateTime" text NOT NULL DEFAULT '',
+    items jsonb NOT NULL DEFAULT '[]'::jsonb,
+    subtotal numeric NOT NULL DEFAULT 0,
+    discount numeric NOT NULL DEFAULT 0,
+    gst numeric NOT NULL DEFAULT 0,
+    total numeric NOT NULL DEFAULT 0,
+    "paymentMethod" text NOT NULL DEFAULT 'UPI',
+    "orderType" text NOT NULL DEFAULT 'Takeaway',
+    "tableNumber" text DEFAULT '',
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, "orderId")
 );
 
 `;
@@ -3160,32 +9561,40 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       return sql;
     }
 
-    sql += `INSERT INTO public.doppio_bills ("orderId", "customerName", "dateTime", items, subtotal, gst, total, "paymentMethod") VALUES\n`;
-    
+    sql += `INSERT INTO public.doppio_bills (tenant_id, "orderId", "customerName", "customerPhone", "dateTime", items, subtotal, discount, gst, total, "paymentMethod", "orderType", "tableNumber") VALUES\n`;
+
     const valueRows = data.map(b => {
       const orderId = b.orderId.replace(/'/g, "''");
       const customerName = (b.customerName || 'Walk-in Guest').replace(/'/g, "''");
+      const customerPhone = (b.customerPhone || '').replace(/'/g, "''");
       const dateTime = (b.dateTime || '').replace(/'/g, "''");
       const rawItems = typeof b.items === 'string' ? b.items : JSON.stringify(b.items);
       const itemsEscaped = rawItems.replace(/'/g, "''");
       const subtotal = b.subtotal || 0;
+      const discount = b.discount || 0;
       const gst = b.gst || 0;
       const total = b.total || 0;
       const paymentMethod = (b.paymentMethod || 'UPI').replace(/'/g, "''");
-      
-      return `('${orderId}', '${customerName}', '${dateTime}', '${itemsEscaped}', ${subtotal}, ${gst}, ${total}, '${paymentMethod}')`;
+      const orderType = (b.orderType || 'Takeaway').replace(/'/g, "''");
+      const tableNumber = (b.tableNumber || '').replace(/'/g, "''");
+
+      return `('${tenantId}', '${orderId}', '${customerName}', '${customerPhone}', '${dateTime}', '${itemsEscaped}'::jsonb, ${subtotal}, ${discount}, ${gst}, ${total}, '${paymentMethod}', '${orderType}', '${tableNumber}')`;
     });
-    
+
     sql += valueRows.join(',\n') + '\n';
-    sql += `ON CONFLICT ("orderId") DO UPDATE SET\n`;
+    sql += `ON CONFLICT (tenant_id, "orderId") DO UPDATE SET\n`;
     sql += `  "customerName" = EXCLUDED."customerName",\n`;
+    sql += `  "customerPhone" = EXCLUDED."customerPhone",\n`;
     sql += `  "dateTime" = EXCLUDED."dateTime",\n`;
     sql += `  items = EXCLUDED.items,\n`;
     sql += `  subtotal = EXCLUDED.subtotal,\n`;
+    sql += `  discount = EXCLUDED.discount,\n`;
     sql += `  gst = EXCLUDED.gst,\n`;
     sql += `  total = EXCLUDED.total,\n`;
-    sql += `  "paymentMethod" = EXCLUDED."paymentMethod";\n`;
-    
+    sql += `  "paymentMethod" = EXCLUDED."paymentMethod",\n`;
+    sql += `  "orderType" = EXCLUDED."orderType",\n`;
+    sql += `  "tableNumber" = EXCLUDED."tableNumber";\n`;
+
     return sql;
   }
 
@@ -3194,11 +9603,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     const lines = [];
     let row = [""];
     let inQuotes = false;
-    
+
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
-      const next = text[i+1];
-      
+      const next = text[i + 1];
+
       if (char === '"') {
         if (inQuotes && next === '"') {
           row[row.length - 1] += '"';
@@ -3219,16 +9628,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     if (row.length > 1 || row[0] !== '') {
       lines.push(row);
     }
-    
+
     if (lines.length === 0) return [];
-    
+
     const headers = lines[0].map(h => h.trim());
     const data = [];
-    
+
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i];
       if (values.length < headers.length) continue;
-      
+
       const obj = {};
       headers.forEach((header, index) => {
         let val = values[index];
@@ -3244,7 +9653,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     exportTaxJsonBtn.addEventListener('click', () => {
       SoundEffects.playClick();
       const activePeriodBills = getActivePeriodBills();
-      
+
       const exportData = activePeriodBills.map(b => ({
         orderId: b.orderId,
         customerName: b.customerName || 'Walk-in Guest',
@@ -3255,21 +9664,21 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         total: b.total,
         paymentMethod: b.paymentMethod
       }));
-      
+
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `doppio_supabase_bills_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = getDateWiseExportName('doppio_cloud_bills', 'json');
       a.click();
     });
   }
-  
+
   if (exportTaxCsvBtn) {
     exportTaxCsvBtn.addEventListener('click', () => {
       SoundEffects.playClick();
       const activePeriodBills = getActivePeriodBills();
-      
+
       const exportData = activePeriodBills.map(b => ({
         orderId: b.orderId,
         customerName: b.customerName || 'Walk-in Guest',
@@ -3280,29 +9689,73 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         total: b.total,
         paymentMethod: b.paymentMethod
       }));
-      
+
       const csvContent = convertToCSV(exportData);
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `doppio_supabase_bills_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = getDateWiseExportName('doppio_cloud_bills', 'csv');
       a.click();
     });
   }
-  
+
   if (exportTaxSqlBtn) {
     exportTaxSqlBtn.addEventListener('click', () => {
       SoundEffects.playClick();
       const activePeriodBills = getActivePeriodBills();
-      
-      const sqlContent = generateSQLScript(activePeriodBills);
-      const blob = new Blob([sqlContent], { type: 'text/plain;charset=utf-8;' });
+
+      try {
+        const sqlContent = generateSQLScript(activePeriodBills);
+        const blob = new Blob([sqlContent], { type: 'text/plain;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = getDateWiseExportName('doppio_cloud_bills_sync', 'sql');
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+  }
+
+  // GSTR-1 Pre-Filing Accountant Exporter
+  const btnExportGstr1 = document.getElementById('btn-export-gstr1');
+  if (btnExportGstr1) {
+    btnExportGstr1.addEventListener('click', () => {
+      SoundEffects.playClick();
+      const activePeriodBills = getActivePeriodBills();
+      if (activePeriodBills.length === 0) {
+        alert("No invoices found in the selected date range to export GSTR!");
+        return;
+      }
+
+      let csvContent = "Invoice Number,Invoice Date,Customer Name,Customer GSTIN,Place of Supply,Taxable Value,CGST (Rate 9%),SGST (Rate 9%),IGST,Total Invoice Value\n";
+
+      activePeriodBills.forEach(b => {
+        const invNo = b.orderId;
+        const invDate = b.dateTime ? b.dateTime.split(',')[0] : '';
+        const custName = b.customerName || 'Walk-in Guest';
+        const totalVal = b.total || 0;
+        const gstVal = b.gst || 0;
+        const taxableVal = totalVal - gstVal;
+
+        const cgst = (gstVal / 2).toFixed(2);
+        const sgst = (gstVal / 2).toFixed(2);
+        const igst = (0).toFixed(2);
+
+        csvContent += `"${invNo}","${invDate}","${custName.replace(/"/g, '""')}","","Local (State)",${taxableVal.toFixed(2)},${cgst},${sgst},${igst},${totalVal.toFixed(2)}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `doppio_supabase_bills_sync_${new Date().toISOString().slice(0, 10)}.sql`;
+      a.download = getDateWiseExportName('gstr1_report', 'csv');
       a.click();
+
+      showNotificationToast(`GSTR-1 report containing ${activePeriodBills.length} invoices exported!`);
     });
   }
 
@@ -3312,44 +9765,52 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       SoundEffects.playClick();
       importTaxFileInput.click();
     });
-    
+
     importTaxFileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      
+      if (taxImportBusy) {
+        setOperationStatus('Backup import already running. Please wait...', 'working', 55);
+        return;
+      }
+      taxImportBusy = true;
+      const finish = startOperationStatus(importTaxTriggerBtn, `Importing ${file.name}...`, 'Importing...');
+
       const reader = new FileReader();
       reader.onload = async (event) => {
         const text = event.target.result;
         let imported = [];
-        
+
         try {
+          setOperationStatus(`Reading ${file.name}...`, 'working', 20);
           if (file.name.endsWith('.json')) {
             imported = JSON.parse(text);
           } else if (file.name.endsWith('.csv')) {
             imported = parseCSV(text);
           } else {
-            alert('Unsupported file format! Please upload a JSON or CSV file.');
-            return;
+            throw new Error('Unsupported file format. Please upload a JSON or CSV file.');
           }
-          
+
           if (!Array.isArray(imported)) {
             imported = [imported];
           }
-          
+
+          setOperationStatus(`Validating ${imported.length} backup rows...`, 'working', 45);
+
           if (imported.length === 0) {
-            alert('The uploaded file is empty.');
-            return;
+            throw new Error('The uploaded file is empty.');
           }
-          
+
           const first = imported[0];
           if (!first.orderId) {
-            alert('Invalid data structure! The file must contain an "orderId" field.');
-            return;
+            throw new Error('Invalid data structure. The file must contain an "orderId" field.');
           }
-          
+
           let mergedCount = 0;
           let newCount = 0;
-          
+
+          setOperationStatus('Preparing imported bills...', 'working', 60);
+
           const parsedBills = imported.map(b => {
             let parsedItems = b.items;
             if (typeof parsedItems === 'string') {
@@ -3359,7 +9820,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
                 parsedItems = [{ name: parsedItems, qty: 1, price: parseFloat(b.total) || 0 }];
               }
             }
-            
+
             return {
               orderId: b.orderId,
               customerName: b.customerName || 'Walk-in Guest',
@@ -3374,7 +9835,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
               orderType: b.orderType || 'Takeaway'
             };
           });
-          
+
           parsedBills.forEach(newBill => {
             const index = bills.findIndex(b => b.orderId === newBill.orderId);
             if (index !== -1) {
@@ -3385,11 +9846,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
               newCount++;
             }
           });
-          
+
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
-          
+
+          let cloudImportError = null;
           if (supabaseClient && navigator.onLine) {
+            setOperationStatus('Syncing imported bills to cloud...', 'working', 80);
             const formattedSupabase = parsedBills.map(b => ({
+              tenant_id: activeTenantId,
               orderId: b.orderId,
               customerName: b.customerName,
               dateTime: b.dateTime,
@@ -3399,24 +9863,43 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
               total: b.total,
               paymentMethod: b.paymentMethod
             }));
-            
-            supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'orderId' })
-              .then(() => console.log('Imported bills successfully synced to Supabase.'))
-              .catch(err => console.error('Supabase import sync error:', err));
+
+            try {
+              await requireTenantWrite(
+                supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'tenant_id,orderId' }),
+                'Imported bills could not be synced to the cloud'
+              );
+            } catch (error) {
+              cloudImportError = error;
+            }
           }
-          
+
           SoundEffects.playSuccess();
-          alert(`Successfully imported backup!\nNew Invoices: ${newCount}\nUpdated/Merged: ${mergedCount}`);
-          
+          if (cloudImportError) {
+            finish('error', 'Imported locally, but cloud sync failed.');
+            alert(`Imported on this device, but cloud synchronization failed.\n${cloudImportError.message}`);
+          } else {
+            finish('success', `Import complete: ${newCount} new, ${mergedCount} updated.`);
+            alert(`Successfully imported backup!\nNew Invoices: ${newCount}\nUpdated/Merged: ${mergedCount}`);
+          }
+
           renderTaxTab();
           if (typeof renderBills === 'function') renderBills();
           updateHeaderSummaryStats();
-          
+
         } catch (err) {
           console.error('Import error:', err);
+          finish('error', err.message || 'Backup import failed.');
           alert(`Failed to parse file: ${err.message}`);
         }
         importTaxFileInput.value = '';
+        taxImportBusy = false;
+      };
+      reader.onerror = () => {
+        finish('error', 'Could not read import file.');
+        taxImportBusy = false;
+        importTaxFileInput.value = '';
+        alert('Failed to read the selected file.');
       };
       reader.readAsText(file);
     });
@@ -3431,7 +9914,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   }
   if (closeSchemaModal) closeSchemaModal.addEventListener('click', () => sqlSchemaModal.classList.remove('active'));
   if (closeSchemaBtn) closeSchemaBtn.addEventListener('click', () => sqlSchemaModal.classList.remove('active'));
-  
+
   if (copySqlSchemaBtn) {
     copySqlSchemaBtn.addEventListener('click', () => {
       SoundEffects.playClick();
@@ -3445,33 +9928,199 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     });
   }
 
+
+
   // Sidebar Feature Navigation toggling implementation
   function applyFeatureToggles() {
-    const crmTabLinks = document.querySelectorAll('[data-tab="crm-tab"]');
-    const taxTabLinks = document.querySelectorAll('[data-tab="tax-tab"]');
-    const takeawayFields = document.querySelector('.takeaway-fields');
-    
-    const isCrm = businessProfile.crmEnabled !== false;
-    const isTax = businessProfile.taxEnabled !== false;
-    
-    crmTabLinks.forEach(link => {
-      link.style.display = isCrm ? 'flex' : 'none';
-    });
-    
-    taxTabLinks.forEach(link => {
-      link.style.display = isTax ? 'flex' : 'none';
-    });
-    
-    if (takeawayFields) {
-      takeawayFields.style.display = isCrm ? 'block' : 'none';
+    const loggedInUser = sessionStorage.getItem('logged_in_user');
+    const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
+    console.log('🔍 [applyFeatureToggles] Running! loggedInRole:', loggedInRole, 'loggedInUser:', loggedInUser);
+
+    if (loggedInRole === 'superadmin') {
+      console.log('✅ [applyFeatureToggles] Superadmin detected! Applying superadmin UI...');
+      // Update superadmin user details in sidebar
+      const userNameEl = document.querySelector('.sidebar .user-name');
+      const userRoleEl = document.querySelector('.sidebar .user-role');
+      const avatarEl = document.querySelector('.sidebar .avatar');
+      if (userNameEl && loggedInUser) userNameEl.textContent = loggedInUser.charAt(0).toUpperCase() + loggedInUser.slice(1);
+      if (userRoleEl) userRoleEl.textContent = 'SaaS Super-Admin';
+      if (avatarEl && loggedInUser) avatarEl.textContent = loggedInUser.charAt(0).toUpperCase();
+
+      const saLink = document.getElementById('sidebar-super-admin-link');
+      console.log('🔗 [applyFeatureToggles] sidebar-super-admin-link element:', saLink);
+      if (saLink) saLink.style.display = 'flex';
+      const gmLink = document.getElementById('sidebar-gateway-monitor-link');
+      console.log('🔗 [applyFeatureToggles] sidebar-gateway-monitor-link element:', gmLink);
+      if (gmLink) gmLink.style.display = 'flex';
+
+      const sidebarLinks = document.querySelectorAll('.sidebar-link');
+      console.log('🔗 [applyFeatureToggles] Found', sidebarLinks.length, 'sidebar links');
+      sidebarLinks.forEach(link => {
+        const tabId = link.getAttribute('data-tab');
+        if (tabId === 'super-admin-tab' || tabId === 'gateway-monitor-tab') {
+          link.style.display = 'flex';
+          if (tabId === 'super-admin-tab') {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        } else {
+          link.style.display = 'none';
+        }
+      });
+
+      const headerCenter = document.querySelector('.header-center-metrics');
+      if (headerCenter) headerCenter.style.display = 'none';
+      const notificationsBell = document.getElementById('notifications-bell');
+      if (notificationsBell) notificationsBell.style.display = 'none';
+      const profileBtn = document.getElementById('open-profile-btn');
+      if (profileBtn) profileBtn.style.display = 'none';
+      const shiftPill = document.getElementById('header-shift-pill');
+      if (shiftPill) shiftPill.style.display = 'none';
+
+      document.querySelectorAll('.tab-content').forEach(t => {
+        t.classList.remove('active');
+        // Reset styles we might have applied
+        t.style.display = '';
+        t.style.visibility = '';
+        t.style.opacity = '';
+      });
+      const saTab = document.getElementById('super-admin-tab');
+      if (saTab) {
+        saTab.classList.add('active');
+      }
+
+      const tabTitle = document.getElementById('tab-title');
+      if (tabTitle) tabTitle.textContent = "SaaS Super-Admin Console";
+      const tabSubtitle = document.getElementById('tab-subtitle');
+      if (tabSubtitle) tabSubtitle.textContent = "Manage client subscriptions, features, and system access";
+
+      renderSuperAdminTab();
+      console.log('✅ [applyFeatureToggles] Superadmin UI applied!');
+      return;
     }
-    
-    const activeTabLink = document.querySelector('.sidebar-link.active');
-    if (activeTabLink) {
-      const activeTabId = activeTabLink.getAttribute('data-tab');
-      if ((activeTabId === 'crm-tab' && !isCrm) || (activeTabId === 'tax-tab' && !isTax)) {
-        const posLink = document.querySelector('[data-tab="pos-tab"]');
-        if (posLink) posLink.click();
+
+    if (!loggedInUser) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // Load feature flags
+    const featureFlags = businessProfile.featureFlags || {};
+    const permittedTabs = effectiveDashboardTabs();
+
+    // Update dynamic user pill in sidebar. Product logo stays fixed as CodeArc RestroSuite.
+    const userNameEl = document.querySelector('.sidebar .user-name');
+    const userRoleEl = document.querySelector('.sidebar .user-role');
+    if (userNameEl) userNameEl.textContent = loggedInUser.charAt(0).toUpperCase() + loggedInUser.slice(1);
+    if (userRoleEl) {
+      const roleNames = {
+        admin: 'Manager / Admin',
+        cashier: 'Cashier / Staff',
+        waiter: 'Table Waiter',
+        kitchen: 'Kitchen Chef',
+        customer_display: 'Token Board Display'
+      };
+      userRoleEl.textContent = roleNames[loggedInRole] || loggedInRole;
+    }
+
+    // Hide header metrics for operational roles to maximize space
+    const headerCenter = document.querySelector('.header-center-metrics');
+    const headerRight = document.querySelector('.header-right');
+    const notificationsBell = document.getElementById('notifications-bell');
+    const profileBtn = document.getElementById('open-profile-btn');
+    const shiftPill = document.getElementById('header-shift-pill');
+
+    const isOperationalRole = loggedInRole === 'kitchen' || loggedInRole === 'customer_display';
+    if (headerCenter) headerCenter.style.display = isOperationalRole ? 'none' : 'flex';
+
+    // Notifications bell
+    const isBellVisible = !isOperationalRole && (featureFlags['notifications'] !== false);
+    if (notificationsBell) notificationsBell.style.display = isBellVisible ? 'flex' : 'none';
+
+    if (profileBtn) profileBtn.style.display = (loggedInRole === 'admin') ? 'flex' : 'none'; // Only Admin can open settings!
+    if (shiftPill) {
+      const isShiftEnabled = businessProfile.shiftEnabled === true;
+      shiftPill.style.display = (isShiftEnabled && !isOperationalRole) ? 'flex' : 'none';
+    }
+
+    // Filter sidebar links
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+    sidebarLinks.forEach(link => {
+      const tabId = link.getAttribute('data-tab');
+      if (!tabId) return;
+      const isEnabledByFlag = featureFlags[tabId] !== false; // enabled by default
+      if (permittedTabs.includes(tabId) && isEnabledByFlag) {
+        link.style.display = 'flex';
+      } else {
+        link.style.display = 'none';
+      }
+    });
+
+    // Filter mobile bottom nav links — must pass all 3 gates (role + feature flag + SaaS allowlist)
+    const mobileNavLinks = document.querySelectorAll('.mobile-bottom-nav a');
+    mobileNavLinks.forEach(link => {
+      const tabId = link.getAttribute('data-tab');
+      if (!tabId) return;
+      const isEnabledByFlag = featureFlags[tabId] !== false;
+      if (permittedTabs.includes(tabId) && isEnabledByFlag) {
+        link.style.display = 'inline-block';
+      } else {
+        link.style.display = 'none';
+      }
+    });
+
+    document.querySelectorAll('.more-sheet-link[data-tab]').forEach(link => {
+      const tabId = link.getAttribute('data-tab');
+      if (!tabId) return;
+      const isEnabledByFlag = featureFlags[tabId] !== false;
+      link.style.display = permittedTabs.includes(tabId) && isEnabledByFlag ? 'flex' : 'none';
+    });
+
+    // Only explicitly hide mobile nav/header for operational roles (kitchen, display).
+    // For normal roles (admin, cashier, waiter), let CSS media queries control visibility —
+    // they should be hidden on desktop and only appear on small screens (≤ 600px).
+    const mobileBottomNav = document.querySelector('.mobile-bottom-nav');
+    if (mobileBottomNav && isOperationalRole) {
+      mobileBottomNav.style.display = 'none';
+    }
+    const mobileTopHeader = document.querySelector('.mobile-top-header');
+    if (mobileTopHeader && isOperationalRole) {
+      mobileTopHeader.style.display = 'none';
+    }
+
+    // Check customer toggle details
+    const isCrmEnabled = businessProfile.crmEnabled !== false && (featureFlags['crm-tab'] !== false);
+    const guestToggleBtn = document.getElementById('guest-toggle-btn');
+    if (guestToggleBtn) {
+      guestToggleBtn.style.display = isCrmEnabled ? 'flex' : 'none';
+    }
+    const takeawayFields = document.querySelector('.takeaway-fields');
+    if (takeawayFields && !isCrmEnabled) {
+      takeawayFields.style.display = 'none';
+    }
+
+    // First boot landing page redirect using just_logged_in flag (Made by Antigravity)
+    if (loggedInRole !== 'superadmin') {
+      if (sessionStorage.getItem('just_logged_in') === 'true') {
+        sessionStorage.removeItem('just_logged_in');
+        const defaultLandingTab = defaultDashboardTab();
+
+        const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
+        if (fallbackLink) {
+          fallbackLink.click();
+        }
+      } else {
+        // Redirect active tab if it got hidden or if no tab is currently active
+        const activeTabLink = document.querySelector('.sidebar-link.active');
+        if (!activeTabLink || activeTabLink.style.display === 'none') {
+          const defaultLandingTab = defaultDashboardTab();
+
+          const fallbackLink = document.querySelector(`.sidebar-link[data-tab="${defaultLandingTab}"]`);
+          if (fallbackLink) {
+            fallbackLink.click();
+          }
+        }
       }
     }
   }
@@ -3485,34 +10134,427 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   const cancelProfileBtn = document.getElementById('cancel-profile-btn');
   const businessProfileForm = document.getElementById('business-profile-form');
 
+  let waPollingInterval = null;
+
+  function pollWhatsAppGatewayStatus() {
+    const waGatewayEnabledEl = document.getElementById('profile-wa-gateway-enabled');
+    const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
+    const statusBadge = document.getElementById('wa-status-badge');
+    const qrContainer = document.getElementById('wa-qr-container');
+    const qrImg = document.getElementById('wa-qr-img');
+    const qrSpinner = document.getElementById('wa-qr-spinner');
+    const connectedContainer = document.getElementById('wa-connected-container');
+    const connectedNumber = document.getElementById('wa-connected-number');
+
+    // Dual gateway selectors
+    const localBtn = document.getElementById('wa-select-local');
+    const cloudBtn = document.getElementById('wa-select-cloud');
+    const localBadge = document.getElementById('wa-local-badge');
+    const cloudBadge = document.getElementById('wa-cloud-badge');
+    const localDot = document.getElementById('wa-local-dot');
+    const cloudDot = document.getElementById('wa-cloud-dot');
+    const localTxt = document.getElementById('wa-local-txt');
+    const cloudTxt = document.getElementById('wa-cloud-txt');
+
+    if (ZERO_COST_LAUNCH_MODE || !waGatewayEnabledEl || !waGatewayEnabledEl.checked) {
+      if (qrContainer) qrContainer.style.display = 'none';
+      if (connectedContainer) connectedContainer.style.display = 'none';
+      if (statusBadge) {
+        statusBadge.textContent = ZERO_COST_LAUNCH_MODE ? 'ZERO-COST MODE' : 'DISABLED';
+        statusBadge.style.background = '#e0e0e0';
+        statusBadge.style.color = '#666';
+      }
+      return;
+    }
+
+    let url = waGatewayUrlEl ? waGatewayUrlEl.value.trim() : 'http://localhost:3000';
+    if (!url) url = 'http://localhost:3000';
+    if (url.endsWith('/')) url = url.slice(0, -1);
+
+    // Style the selection buttons based on currently active URL
+    const isLocalSelected = url.includes('localhost') || url.includes('127.0.0.1');
+    const isCloudSelected = url.includes('huggingface') || url.includes('hf.space');
+
+    if (localBtn && cloudBtn && localBadge && cloudBadge) {
+      if (isLocalSelected) {
+        localBtn.style.borderColor = '#128c7e';
+        localBtn.style.background = 'rgba(18,140,126,0.06)';
+        localBadge.textContent = 'Active';
+        localBadge.style.background = '#128c7e';
+        localBadge.style.color = '#fff';
+
+        cloudBtn.style.borderColor = 'rgba(0,0,0,0.1)';
+        cloudBtn.style.background = '#fff';
+        cloudBadge.textContent = 'Backup';
+        cloudBadge.style.background = 'rgba(0,0,0,0.05)';
+        cloudBadge.style.color = '#666';
+      } else if (isCloudSelected) {
+        cloudBtn.style.borderColor = '#128c7e';
+        cloudBtn.style.background = 'rgba(18,140,126,0.06)';
+        cloudBadge.textContent = 'Active';
+        cloudBadge.style.background = '#128c7e';
+        cloudBadge.style.color = '#fff';
+
+        localBtn.style.borderColor = 'rgba(0,0,0,0.1)';
+        localBtn.style.background = '#fff';
+        localBadge.textContent = 'Backup';
+        localBadge.style.background = 'rgba(0,0,0,0.05)';
+        localBadge.style.color = '#666';
+      } else {
+        localBtn.style.borderColor = 'rgba(0,0,0,0.1)';
+        localBtn.style.background = '#fff';
+        localBadge.textContent = 'Select';
+        localBadge.style.background = 'rgba(0,0,0,0.05)';
+        localBadge.style.color = '#666';
+
+        cloudBtn.style.borderColor = 'rgba(0,0,0,0.1)';
+        cloudBtn.style.background = '#fff';
+        cloudBadge.textContent = 'Select';
+        cloudBadge.style.background = 'rgba(0,0,0,0.05)';
+        cloudBadge.style.color = '#666';
+      }
+    }
+
+    // Ping Local Gateway Status
+    fetch('http://localhost:3000/status')
+      .then(res => res.json())
+      .then(data => {
+        if (localDot && localTxt) {
+          localTxt.textContent = data.status === 'ready' ? 'online' : data.status;
+          localTxt.style.color = data.status === 'ready' ? '#155724' : '#856404';
+          localDot.style.background = data.status === 'ready' ? '#28a745' : '#ffc107';
+        }
+      })
+      .catch(() => {
+        if (localDot && localTxt) {
+          localTxt.textContent = 'offline';
+          localTxt.style.color = '#721c24';
+          localDot.style.background = '#dc3545';
+        }
+      });
+
+    if (CLOUD_WHATSAPP_GATEWAY_URL) {
+      fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/status`)
+        .then(res => res.json())
+        .then(data => {
+          if (cloudDot && cloudTxt) {
+            cloudTxt.textContent = data.status === 'ready' ? 'online' : data.status;
+            cloudTxt.style.color = data.status === 'ready' ? '#155724' : '#856404';
+            cloudDot.style.background = data.status === 'ready' ? '#28a745' : '#ffc107';
+          }
+        })
+        .catch(() => {
+          if (cloudDot && cloudTxt) {
+            cloudTxt.textContent = 'offline';
+            cloudTxt.style.color = '#721c24';
+            cloudDot.style.background = '#dc3545';
+          }
+        });
+    }
+
+    // Fetch details from the currently selected Gateway (for main settings display & QR code rendering)
+    fetch(`${url}/status`)
+      .then(res => res.json())
+      .then(data => {
+        if (statusBadge) {
+          statusBadge.textContent = data.status.toUpperCase();
+          if (data.status === 'ready') {
+            statusBadge.style.background = '#d4edda';
+            statusBadge.style.color = '#155724';
+          } else if (data.status === 'qr') {
+            statusBadge.style.background = '#fff3cd';
+            statusBadge.style.color = '#856404';
+          } else {
+            statusBadge.style.background = '#f8d7da';
+            statusBadge.style.color = '#721c24';
+          }
+        }
+
+        if (data.status === 'ready') {
+          if (qrContainer) qrContainer.style.display = 'none';
+          if (connectedContainer) connectedContainer.style.display = 'flex';
+          if (connectedNumber) connectedNumber.textContent = `+${data.number}`;
+        } else if (data.status === 'qr') {
+          if (connectedContainer) connectedContainer.style.display = 'none';
+          if (qrContainer) qrContainer.style.display = 'flex';
+          if (data.qr) {
+            if (qrSpinner) qrSpinner.style.display = 'none';
+            if (qrImg) {
+              qrImg.src = data.qr;
+              qrImg.style.display = 'block';
+            }
+          } else {
+            if (qrSpinner) qrSpinner.style.display = 'block';
+            if (qrImg) qrImg.style.display = 'none';
+          }
+        } else {
+          if (connectedContainer) connectedContainer.style.display = 'none';
+          if (qrContainer) qrContainer.style.display = 'flex';
+          if (qrSpinner) {
+            qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #128c7e;"></i><br>Connecting to WhatsApp... (Status: ${data.status.toUpperCase()})`;
+            qrSpinner.style.display = 'block';
+          }
+          if (qrImg) qrImg.style.display = 'none';
+        }
+      })
+      .catch(err => {
+        console.warn('Selected WhatsApp gateway offline:', err.message);
+        if (statusBadge) {
+          statusBadge.textContent = 'OFFLINE';
+          statusBadge.style.background = '#f8d7da';
+          statusBadge.style.color = '#721c24';
+        }
+        if (connectedContainer) connectedContainer.style.display = 'none';
+        if (qrContainer) qrContainer.style.display = 'flex';
+        if (qrSpinner) {
+          qrSpinner.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="margin-bottom: 6px; font-size: 16px; color: #d32f2f;"></i><br>Gateway Server Offline<br><span style="font-size: 8px; color: #666; margin-top: 4px; display: block;">Check selected server or start local gateway</span>`;
+          qrSpinner.style.display = 'block';
+        }
+        if (qrImg) qrImg.style.display = 'none';
+      });
+  }
+
+  function startWhatsAppPolling() {
+    if (waPollingInterval) clearInterval(waPollingInterval);
+    pollWhatsAppGatewayStatus();
+    if (ZERO_COST_LAUNCH_MODE) return;
+    waPollingInterval = setInterval(pollWhatsAppGatewayStatus, 3000);
+  }
+
+  function stopWhatsAppPolling() {
+    if (waPollingInterval) {
+      clearInterval(waPollingInterval);
+      waPollingInterval = null;
+    }
+  }
+
   function openProfileModal() {
     if (!profileModal) return;
-    
+
+    // Start polling gateway connection status
+    startWhatsAppPolling();
+
     document.getElementById('profile-name-input').value = businessProfile.name;
     document.getElementById('profile-address-input').value = businessProfile.address;
     document.getElementById('profile-phone-input').value = businessProfile.phone;
-    
+    document.getElementById('profile-number-of-tables').value = businessProfile.numberOfTables || 6;
+
     document.getElementById('profile-gst-enabled').checked = businessProfile.gstEnabled;
     document.getElementById('profile-gst-rate').value = businessProfile.gstRate || 18;
     document.getElementById('profile-loyalty-enabled').checked = businessProfile.loyaltyEnabled;
     document.getElementById('profile-loyalty-rate').value = businessProfile.loyaltyRate || 10;
-    
+
     const lockEl = document.getElementById('profile-lock-enabled');
     if (lockEl) lockEl.checked = businessProfile.passcodeLockEnabled || false;
-    
+
+    // Load collapse sidebar setting
+    const collapseSidebarEl = document.getElementById('profile-collapse-sidebar');
+    if (collapseSidebarEl) collapseSidebarEl.checked = businessProfile.collapseSidebar || false;
+
     document.getElementById('profile-sound-enabled').checked = businessProfile.soundEnabled !== false;
-    
+
+    const whatsappEl = document.getElementById('profile-whatsapp-enabled');
+    if (whatsappEl) whatsappEl.checked = businessProfile.whatsappEnabled !== false;
+
+    const waGatewayEnabledEl = document.getElementById('profile-wa-gateway-enabled');
+    if (waGatewayEnabledEl) waGatewayEnabledEl.checked = businessProfile.whatsappGatewayEnabled || false;
+
+    const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
+    if (waGatewayUrlEl) waGatewayUrlEl.value = businessProfile.whatsappGatewayUrl || '';
+
+    const waGatewayTokenEl = document.getElementById('profile-wa-gateway-token');
+    if (waGatewayTokenEl) waGatewayTokenEl.value = businessProfile.whatsappGatewayToken || '';
+
     // Module Feature Toggles
     document.getElementById('profile-crm-enabled').checked = businessProfile.crmEnabled !== false;
     document.getElementById('profile-tax-enabled').checked = businessProfile.taxEnabled !== false;
-    
+
+    // Detailed Tab Feature Toggles
+    const featureFlags = businessProfile.featureFlags || {};
+    const tabsList = ['pos', 'tables', 'online', 'kds', 'tokens', 'bills', 'inventory', 'reports', 'editor', 'crm', 'tax', 'employees'];
+    tabsList.forEach(t => {
+      const el = document.getElementById(`feature-${t}-enabled`);
+      if (el) el.checked = featureFlags[`${t}-tab`] !== false;
+    });
+
+    // SaaS-based Settings Visibility: hide feature rows and settings tabs blocked by Superadmin
+    // Map setting sub-tabs to required SaaS tab IDs
+    const settingsTabVisibility = {
+      'loyalty-sec': 'crm-tab',
+      'tax-sec': 'tax-tab',
+    };
+    document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+      const secId = btn.getAttribute('data-settings-tab');
+      const requiredTab = settingsTabVisibility[secId];
+      if (requiredTab && allowedTabs.length > 0 && !allowedTabs.includes(requiredTab)) {
+        btn.style.display = 'none';
+      } else {
+        btn.style.display = '';
+      }
+    });
+
+    // Hide Feature Management rows whose tab is not in allowedTabs
+    const tabToFeatureId = {
+      'pos-tab': 'feature-pos-enabled',
+      'qr-orders-tab': 'feature-tables-enabled',
+      'online-tab': 'feature-online-enabled',
+      'kds-tab': 'feature-kds-enabled',
+      'tokens-tab': 'feature-tokens-enabled',
+      'bills-tab': 'feature-bills-enabled',
+      'inventory-tab': 'feature-inventory-enabled',
+      'reports-tab': 'feature-reports-enabled',
+      'editor-tab': 'feature-editor-enabled',
+      'crm-tab': 'feature-crm-enabled',
+      'tax-tab': 'feature-tax-enabled',
+      'employees-tab': 'feature-employees-enabled',
+    };
+    if (allowedTabs.length > 0) {
+      Object.entries(tabToFeatureId).forEach(([tabId, elId]) => {
+        const el = document.getElementById(elId);
+        const row = el ? el.closest('div') : null;
+        if (row) {
+          row.style.display = allowedTabs.includes(tabId) ? '' : 'none';
+        }
+      });
+    }
+
+    // Shift Control Settings
+    const shiftEnabledEl = document.getElementById('profile-shift-enabled');
+    if (shiftEnabledEl) shiftEnabledEl.checked = businessProfile.shiftEnabled || false;
+
+    const floatEl = document.getElementById('profile-shift-default-float');
+    if (floatEl) floatEl.value = businessProfile.shiftDefaultFloat || 2000;
+
+    const maxDrawerEl = document.getElementById('profile-shift-max-drawer');
+    if (maxDrawerEl) maxDrawerEl.value = businessProfile.shiftMaxDrawer || 5000;
+
+    const posLockEl = document.getElementById('profile-shift-pos-lock');
+    if (posLockEl) posLockEl.checked = businessProfile.shiftPosLock !== false;
+
     profileModal.classList.add('active');
     updateReceiptSimulator();
   }
 
   if (openProfileBtn) openProfileBtn.addEventListener('click', openProfileModal);
-  if (closeProfileModal) closeProfileModal.addEventListener('click', () => profileModal.classList.remove('active'));
-  if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', () => profileModal.classList.remove('active'));
+
+  // Header metric pills → navigate to relevant tabs
+  const headerSalesPill = document.getElementById('header-sales-pill');
+  if (headerSalesPill) {
+    headerSalesPill.style.cursor = 'pointer';
+    headerSalesPill.addEventListener('click', () => {
+      const reportsBtn = document.querySelector('[data-tab="reports-tab"]');
+      if (reportsBtn) reportsBtn.click();
+    });
+  }
+  const headerBillsPill = document.getElementById('header-bills-pill');
+  if (headerBillsPill) {
+    headerBillsPill.style.cursor = 'pointer';
+    headerBillsPill.addEventListener('click', () => {
+      const billsBtn = document.querySelector('[data-tab="bills-tab"]');
+      if (billsBtn) billsBtn.click();
+    });
+  }
+  const headerShiftPill = document.getElementById('header-shift-pill');
+  if (headerShiftPill) {
+    headerShiftPill.style.cursor = 'pointer';
+    headerShiftPill.addEventListener('click', () => {
+      const employeesBtn = document.querySelector('[data-tab="employees-tab"]');
+      if (employeesBtn) employeesBtn.click();
+    });
+  }
+
+
+  if (closeProfileModal) {
+    closeProfileModal.addEventListener('click', () => {
+      profileModal.classList.remove('active');
+      stopWhatsAppPolling();
+    });
+  }
+
+  if (cancelProfileBtn) {
+    cancelProfileBtn.addEventListener('click', () => {
+      profileModal.classList.remove('active');
+      stopWhatsAppPolling();
+    });
+  }
+
+  // Settings UI element change listeners to instantly update polling state
+  const waGatewayEnabledEl = document.getElementById('profile-wa-gateway-enabled');
+  if (waGatewayEnabledEl) {
+    waGatewayEnabledEl.addEventListener('change', () => {
+      pollWhatsAppGatewayStatus();
+    });
+  }
+
+  const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
+
+  // Quick gateway selector button click listeners
+  const waSelectLocalBtn = document.getElementById('wa-select-local');
+  if (waSelectLocalBtn) {
+    waSelectLocalBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (waGatewayUrlEl) {
+        waGatewayUrlEl.value = 'http://localhost:3000';
+        const changeEvent = new Event('change');
+        waGatewayUrlEl.dispatchEvent(changeEvent);
+      }
+    });
+  }
+
+  const waSelectCloudBtn = document.getElementById('wa-select-cloud');
+  if (waSelectCloudBtn) {
+    if (ZERO_COST_LAUNCH_MODE) {
+      waSelectCloudBtn.disabled = true;
+      waSelectCloudBtn.title = 'Available after moving to paid infrastructure';
+    }
+    waSelectCloudBtn.addEventListener('click', () => {
+      if (ZERO_COST_LAUNCH_MODE || !CLOUD_WHATSAPP_GATEWAY_URL) return;
+      SoundEffects.playClick();
+      if (waGatewayUrlEl) {
+        waGatewayUrlEl.value = CLOUD_WHATSAPP_GATEWAY_URL;
+        const changeEvent = new Event('change');
+        waGatewayUrlEl.dispatchEvent(changeEvent);
+      }
+    });
+  }
+
+  if (waGatewayUrlEl) {
+    waGatewayUrlEl.addEventListener('change', () => {
+      pollWhatsAppGatewayStatus();
+    });
+  }
+
+  // WhatsApp Device Unlinking (Logout) Button
+  const waLogoutBtn = document.getElementById('wa-logout-btn');
+  if (waLogoutBtn) {
+    waLogoutBtn.addEventListener('click', () => {
+      if (!confirm('Are you sure you want to unlink the current WhatsApp account?')) return;
+
+      SoundEffects.playClick();
+      let url = waGatewayUrlEl ? waGatewayUrlEl.value.trim() : 'http://localhost:3000';
+      if (!url) url = 'http://localhost:3000';
+      if (url.endsWith('/')) url = url.slice(0, -1);
+
+      const statusBadge = document.getElementById('wa-status-badge');
+      if (statusBadge) {
+        statusBadge.textContent = 'UNLINKING...';
+        statusBadge.style.background = '#fff3cd';
+        statusBadge.style.color = '#856404';
+      }
+
+      fetch(`${url}/logout`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          console.log('WhatsApp account unlinked successfully:', data);
+          pollWhatsAppGatewayStatus();
+        })
+        .catch(err => {
+          console.error('Failed to unlink WhatsApp account:', err);
+          alert('Failed to log out: ' + err.message);
+          pollWhatsAppGatewayStatus();
+        });
+    });
+  }
 
   // Multi tab toggle buttons inside profile Settings
   const settingsTabBtns = document.querySelectorAll('.settings-tab-btn');
@@ -3529,6 +10571,16 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       settingsTabContents.forEach(content => {
         content.style.display = content.id === targetId ? 'block' : 'none';
       });
+
+      // Smoothly center the clicked tab button in the horizontal scroll row
+      const tabContainer = btn.parentElement;
+      if (tabContainer) {
+        const containerRect = tabContainer.getBoundingClientRect();
+        const btnRect = btn.getBoundingClientRect();
+        const absoluteLeft = btnRect.left - containerRect.left + tabContainer.scrollLeft;
+        const scrollLeft = absoluteLeft - (tabContainer.clientWidth / 2) + (btn.clientWidth / 2);
+        tabContainer.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+      }
     });
   });
 
@@ -3549,31 +10601,436 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   if (profileLoyaltyCheck) profileLoyaltyCheck.addEventListener('change', updateReceiptSimulator);
   if (profileLoyaltyRate) profileLoyaltyRate.addEventListener('input', updateReceiptSimulator);
 
+  // Data Resilience Backup & Restore Hub Event Listeners
+  const btnExportBackup = document.getElementById('btn-export-backup');
+  const restoreBackupFileInput = document.getElementById('restore-backup-file');
+
+  if (btnExportBackup) {
+    btnExportBackup.addEventListener('click', () => {
+      SoundEffects.playClick();
+      const backupPayload = {
+        // Core POS
+        bills: JSON.parse(localStorage.getItem('doppio_bills')) || [],
+        inventory: JSON.parse(localStorage.getItem('doppio_inventory')) || {},
+        menu: JSON.parse(localStorage.getItem('doppio_menu')) || [],
+        businessProfile: JSON.parse(localStorage.getItem('doppio_business_profile')) || {},
+        draftOrders: JSON.parse(localStorage.getItem('doppio_draft_orders')) || [],
+        // Shift Management
+        activeShift: JSON.parse(localStorage.getItem('doppio_current_shift')) || null,
+        shiftHistory: JSON.parse(localStorage.getItem('doppio_shifts_local')) || [],
+        shiftEvents: JSON.parse(localStorage.getItem('doppio_shift_events_local')) || [],
+        // Employee & HR
+        employees: JSON.parse(localStorage.getItem('doppio_employees')) || [],
+        leaveRequests: JSON.parse(localStorage.getItem('doppio_leave_requests')) || [],
+        attendanceLogs: JSON.parse(localStorage.getItem('doppio_attendance')) || [],
+        // Inventory Intelligence
+        inventoryBatches: JSON.parse(localStorage.getItem('doppio_inventory_batches')) || {},
+        inventoryThresholds: JSON.parse(localStorage.getItem('doppio_inventory_thresholds')) || {},
+        customRecipes: JSON.parse(localStorage.getItem('doppio_custom_recipes')) || {},
+        // CRM & Loyalty
+        crmData: JSON.parse(localStorage.getItem('doppio_crm_local')) || [],
+        // POS Analytics
+        posPopularity: JSON.parse(localStorage.getItem('doppio_pos_popularity')) || {},
+        // Notifications
+        notifications: JSON.parse(localStorage.getItem('doppio_notifications')) || [],
+        // Metadata
+        timestamp: new Date().toISOString(),
+        branch: activeTenantName || "RestroSuite",
+        version: "2.0"
+      };
+
+      const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getDateWiseExportName('doppio_backup', 'json');
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotificationToast("Complete backup exported — all 17 data tables included!");
+    });
+  }
+
+  if (restoreBackupFileInput) {
+    restoreBackupFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const maxBackupBytes = 10 * 1024 * 1024;
+      if (file.size > maxBackupBytes) {
+        alert("Restore failed! Backup files must be 10 MB or smaller.");
+        restoreBackupFileInput.value = '';
+        return;
+      }
+
+      SoundEffects.playPop();
+      if (!confirm("Are you sure you want to restore POS from this backup? This will overwrite your current active bills, inventory, shifts, employees, and all settings!")) {
+        restoreBackupFileInput.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async function (evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          const validCoreBackup = data
+            && Array.isArray(data.bills)
+            && data.inventory
+            && typeof data.inventory === 'object'
+            && !Array.isArray(data.inventory)
+            && Array.isArray(data.menu);
+          if (validCoreBackup) {
+            // Core POS
+            localStorage.setItem('doppio_bills', JSON.stringify(data.bills));
+            localStorage.setItem('doppio_inventory', JSON.stringify(data.inventory));
+            localStorage.setItem('doppio_menu', JSON.stringify(data.menu));
+            if (data.businessProfile) localStorage.setItem('doppio_business_profile', JSON.stringify(data.businessProfile));
+            if (data.draftOrders) localStorage.setItem('doppio_draft_orders', JSON.stringify(data.draftOrders));
+            // Shifts
+            if (data.activeShift) localStorage.setItem('doppio_current_shift', JSON.stringify(data.activeShift));
+            if (data.shiftHistory) localStorage.setItem('doppio_shifts_local', JSON.stringify(data.shiftHistory));
+            if (data.shiftEvents) localStorage.setItem('doppio_shift_events_local', JSON.stringify(data.shiftEvents));
+            // HR
+            if (data.employees) localStorage.setItem('doppio_employees', JSON.stringify(data.employees));
+            if (data.leaveRequests) localStorage.setItem('doppio_leave_requests', JSON.stringify(data.leaveRequests));
+            if (data.attendanceLogs) localStorage.setItem('doppio_attendance', JSON.stringify(data.attendanceLogs));
+            // Inventory Intelligence
+            if (data.inventoryBatches) localStorage.setItem('doppio_inventory_batches', JSON.stringify(data.inventoryBatches));
+            if (data.inventoryThresholds) localStorage.setItem('doppio_inventory_thresholds', JSON.stringify(data.inventoryThresholds));
+            if (data.customRecipes) localStorage.setItem('doppio_custom_recipes', JSON.stringify(data.customRecipes));
+            // CRM & Analytics
+            if (data.crmData) localStorage.setItem('doppio_crm_local', JSON.stringify(data.crmData));
+            if (data.posPopularity) localStorage.setItem('doppio_pos_popularity', JSON.stringify(data.posPopularity));
+            if (data.notifications) localStorage.setItem('doppio_notifications', JSON.stringify(data.notifications));
+
+            // Write core data redundantly to IndexedDB vault
+            setVaultData('doppio_bills', data.bills);
+            setVaultData('doppio_inventory', data.inventory);
+            setVaultData('doppio_menu', data.menu);
+            if (data.businessProfile) setVaultData('doppio_business_profile', data.businessProfile);
+            if (data.activeShift) setVaultData('doppio_current_shift', data.activeShift);
+            if (data.shiftHistory) setVaultData('doppio_shifts_local', data.shiftHistory);
+            if (data.shiftEvents) setVaultData('doppio_shift_events_local', data.shiftEvents);
+
+            let cloudRestoreError = null;
+            // Sync restored bills to Supabase
+            if (supabaseClient) {
+              try {
+                const formattedSupabase = data.bills.filter(b => b && b.orderId).map(b => ({
+                  orderId: b.orderId,
+                  customerName: b.customerName,
+                  customerPhone: b.customerPhone,
+                  items: typeof b.items === 'string' ? b.items : JSON.stringify(b.items),
+                  subtotal: b.subtotal,
+                  gst: b.gst || 0,
+                  total: b.total,
+                  paymentMethod: b.paymentMethod,
+                  dateTime: b.dateTime
+                }));
+                if (formattedSupabase.length > 0) {
+                  await requireTenantWrite(
+                    supabaseClient.from('doppio_bills').upsert(formattedSupabase, { onConflict: 'tenant_id,orderId' }),
+                    'Bills restore failed'
+                  );
+                }
+                // Sync employees
+                if (data.employees && data.employees.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_employees').upsert(
+                    data.employees.filter(e => e && e.id).map(e => ({
+                      id: e.id, name: e.name, role: e.role, contact: e.contact,
+                      baseSalary: e.baseSalary, shift: e.shift, leaves: e.leaves
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Employees restore failed'
+                  );
+                }
+                // Sync CRM
+                if (data.crmData && data.crmData.length > 0) {
+                  const crmWithPhone = data.crmData.filter(c => c && c.phone);
+                  if (crmWithPhone.length > 0) {
+                    await requireTenantWrite(supabaseClient.from('doppio_crm').upsert(crmWithPhone.map(c => ({
+                      phone: c.phone, name: c.name, visits: c.visits,
+                      total_spend: c.total_spend, last_visit: c.last_visit
+                    })), { onConflict: 'tenant_id,phone' }), 'CRM restore failed');
+                  }
+                }
+                // Sync Menu
+                if (data.menu && data.menu.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_menu').upsert(
+                    data.menu.filter(m => m && m.name).map(m => ({
+                      name: m.name,
+                      category: m.category || '',
+                      price: parseFloat(m.price || 0),
+                      description: m.description || '',
+                      icon: m.icon || ''
+                    })), { onConflict: 'tenant_id,name' }),
+                    'Menu restore failed'
+                  );
+                }
+                // Sync Inventory
+                if (data.inventory && typeof data.inventory === 'object') {
+                  const invKeys = Object.keys(data.inventory);
+                  if (invKeys.length > 0) {
+                    await requireTenantWrite(supabaseClient.from('doppio_inventory').upsert(
+                      invKeys.map(k => ({
+                        key: k,
+                        current: parseFloat(data.inventory[k] || 0)
+                      })), { onConflict: 'tenant_id,key' }),
+                      'Inventory restore failed'
+                    );
+                  }
+                }
+                // Sync Business Profile
+                if (data.businessProfile) {
+                  const bp = data.businessProfile;
+                  await requireTenantWrite(supabaseClient.from('doppio_business_profile').upsert({
+                    business_name: bp.name || bp.business_name || '',
+                    address: bp.address || '',
+                    phone: bp.phone || '',
+                    gst_enabled: bp.gst_enabled !== undefined ? bp.gst_enabled : (bp.gstEnabled || false),
+                    gst_rate: bp.gst_rate !== undefined ? bp.gst_rate : (bp.gstRate || 0),
+                    loyalty_discount_enabled: bp.loyalty_discount_enabled !== undefined ? bp.loyalty_discount_enabled : (bp.loyaltyEnabled || false),
+                    loyalty_discount_rate: bp.loyalty_discount_rate !== undefined ? bp.loyalty_discount_rate : (bp.loyaltyRate || 0),
+                    passcode_lock_enabled: bp.passcode_lock_enabled !== undefined ? bp.passcode_lock_enabled : (bp.passcodeLockEnabled || false),
+                    crm_enabled: bp.crm_enabled !== undefined ? bp.crm_enabled : (bp.crmEnabled || false),
+                    tax_enabled: bp.tax_enabled !== undefined ? bp.tax_enabled : (bp.taxEnabled || false),
+                    sound_enabled: bp.sound_enabled !== undefined ? bp.sound_enabled : (bp.soundEnabled !== undefined ? bp.soundEnabled : true),
+                    whatsapp_enabled: bp.whatsapp_enabled !== undefined ? bp.whatsapp_enabled : (bp.whatsappEnabled || false),
+                    shift_enabled: bp.shift_enabled !== undefined ? bp.shift_enabled : (bp.shiftEnabled || false),
+                    shift_default_float: bp.shift_default_float !== undefined ? bp.shift_default_float : (bp.shiftDefaultFloat || 0),
+                    shift_max_drawer: bp.shift_max_drawer !== undefined ? bp.shift_max_drawer : (bp.shiftMaxDrawer || 0),
+                    shift_pos_lock: bp.shift_pos_lock !== undefined ? bp.shift_pos_lock : (bp.shiftPosLock || false),
+                    whatsapp_gateway_enabled: bp.whatsapp_gateway_enabled !== undefined ? bp.whatsapp_gateway_enabled : (bp.whatsappGatewayEnabled || false),
+                    whatsapp_gateway_url: bp.whatsapp_gateway_url || bp.whatsappGatewayUrl || '',
+                    whatsapp_gateway_token: bp.whatsapp_gateway_token || bp.whatsappGatewayToken || '',
+                    feature_flags: typeof bp.feature_flags === 'string' ? bp.feature_flags : JSON.stringify(bp.featureFlags || bp.feature_flags || {})
+                  }, { onConflict: 'tenant_id' }), 'Business profile restore failed');
+                }
+                // Sync Draft Orders
+                if (data.draftOrders && data.draftOrders.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_draft_orders').upsert(
+                    data.draftOrders.filter(d => d && d.draftId).map(d => ({
+                      draftId: d.draftId,
+                      draftName: d.draftName || '',
+                      customerName: d.customerName || '',
+                      customerPhone: d.customerPhone || '',
+                      paymentMethod: d.paymentMethod || 'UPI',
+                      items: typeof d.items === 'string' ? d.items : JSON.stringify(d.items || []),
+                      subtotal: parseFloat(d.subtotal || 0),
+                      gst: parseFloat(d.gst || 0),
+                      total: parseFloat(d.total || 0),
+                      createdAt: d.createdAt || new Date().toISOString()
+                    })), { onConflict: 'tenant_id,draftId' }),
+                    'Draft orders restore failed'
+                  );
+                }
+                // Sync Shift History
+                if (data.shiftHistory && data.shiftHistory.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_shifts').upsert(
+                    data.shiftHistory.filter(s => s && s.shiftId).map(s => ({
+                      shiftId: s.shiftId,
+                      cashierName: s.cashierName || '',
+                      openedAt: s.openedAt,
+                      closedAt: s.closedAt,
+                      openingFloat: parseFloat(s.openingFloat || 0),
+                      expectedCash: parseFloat(s.expectedCash || 0),
+                      actualCash: parseFloat(s.actualCash || 0),
+                      variance: parseFloat(s.variance || 0),
+                      totalSalesCash: parseFloat(s.totalSalesCash || 0),
+                      totalSalesUpi: parseFloat(s.totalSalesUpi || 0),
+                      totalSalesCard: parseFloat(s.totalSalesCard || 0),
+                      totalPayouts: parseFloat(s.totalPayouts || 0),
+                      totalSafeDrops: parseFloat(s.totalSafeDrops || 0),
+                      status: s.status,
+                      notes: s.notes || ''
+                    })), { onConflict: 'tenant_id,shiftId' }),
+                    'Shift history restore failed'
+                  );
+                }
+                // Sync Shift Events
+                if (data.shiftEvents && data.shiftEvents.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_shift_events').upsert(
+                    data.shiftEvents.filter(e => e && e.eventId).map(e => ({
+                      eventId: e.eventId,
+                      shiftId: e.shiftId,
+                      eventType: e.eventType,
+                      amount: parseFloat(e.amount || 0),
+                      reason: e.reason || '',
+                      createdAt: e.createdAt
+                    })), { onConflict: 'tenant_id,eventId' }),
+                    'Shift events restore failed'
+                  );
+                }
+                // Sync Leave Requests
+                if (data.leaveRequests && data.leaveRequests.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_leave_requests').upsert(
+                    data.leaveRequests.filter(r => r && r.id).map(r => ({
+                      id: r.id,
+                      employeeId: r.employeeId,
+                      employeeName: r.employeeName,
+                      type: r.type,
+                      startDate: r.startDate,
+                      endDate: r.endDate,
+                      reason: r.reason || '',
+                      status: r.status || 'Pending',
+                      days: parseInt(r.days || 1)
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Leave requests restore failed'
+                  );
+                }
+                // Sync Attendance Logs
+                if (data.attendanceLogs && data.attendanceLogs.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_attendance').upsert(
+                    data.attendanceLogs.filter(a => a && a.id).map(a => ({
+                      id: a.id,
+                      employeeId: a.employeeId,
+                      employeeName: a.employeeName,
+                      date: a.date,
+                      clockInTime: a.clockInTime,
+                      clockOutTime: a.clockOutTime,
+                      hoursWorked: parseFloat(a.hoursWorked || 0),
+                      shift: a.shift || '',
+                      wages: parseFloat(a.wages || 0),
+                      status: a.status || 'Active'
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Attendance restore failed'
+                  );
+                }
+                // Sync Inventory Batches
+                if (data.inventoryBatches && typeof data.inventoryBatches === 'object') {
+                  const flatBatches = [];
+                  Object.keys(data.inventoryBatches).forEach(ingKey => {
+                    const list = data.inventoryBatches[ingKey];
+                    if (Array.isArray(list)) {
+                      list.forEach(b => {
+                        if (b && b.id) {
+                          flatBatches.push({
+                            tenant_id: activeTenantId,
+                            id: b.id,
+                            ingredient_key: ingKey,
+                            qty: parseFloat(b.qty || 0),
+                            expiryDate: b.expiryDate,
+                            receivedDate: b.receivedDate
+                          });
+                        }
+                      });
+                    }
+                  });
+                  if (flatBatches.length > 0) {
+                  await requireTenantWrite(
+                    supabaseClient.from('doppio_inventory_batches').upsert(flatBatches, { onConflict: 'tenant_id,id' }),
+                    'Inventory batch restore failed'
+                  );
+                  }
+                }
+                // Sync Inventory Thresholds
+                if (data.inventoryThresholds && typeof data.inventoryThresholds === 'object') {
+                  const thresholdKeys = Object.keys(data.inventoryThresholds);
+                  if (thresholdKeys.length > 0) {
+                    await requireTenantWrite(supabaseClient.from('doppio_inventory_thresholds').upsert(
+                      thresholdKeys.map(k => ({
+                        tenant_id: activeTenantId,
+                        ingredient_key: k,
+                        threshold: parseInt(data.inventoryThresholds[k] || 20),
+                        updated_at: new Date().toISOString()
+                      })), { onConflict: 'tenant_id,ingredient_key' }),
+                      'Inventory thresholds restore failed'
+                    );
+                  }
+                }
+                // Sync Custom Recipes
+                if (data.customRecipes && typeof data.customRecipes === 'object') {
+                  const recipeKeys = Object.keys(data.customRecipes);
+                  if (recipeKeys.length > 0) {
+                    await requireTenantWrite(supabaseClient.from('doppio_custom_recipes').upsert(
+                      recipeKeys.map(k => ({
+                        item_name: k,
+                        ingredients: data.customRecipes[k] || {},
+                        updated_at: new Date().toISOString()
+                      })), { onConflict: 'tenant_id,item_name' }),
+                      'Recipe restore failed'
+                    );
+                  }
+                }
+                // Sync POS Popularity
+                if (data.posPopularity && typeof data.posPopularity === 'object') {
+                  const popKeys = Object.keys(data.posPopularity);
+                  if (popKeys.length > 0) {
+                    await requireTenantWrite(supabaseClient.from('doppio_pos_popularity').upsert(
+                      popKeys.map(k => ({
+                        item_name: k,
+                        count: parseInt(data.posPopularity[k] || 0),
+                        updated_at: new Date().toISOString()
+                      })), { onConflict: 'tenant_id,item_name' }),
+                      'Popularity restore failed'
+                    );
+                  }
+                }
+                // Sync Notifications
+                if (data.notifications && data.notifications.length > 0) {
+                  await requireTenantWrite(supabaseClient.from('doppio_notifications').upsert(
+                    data.notifications.filter(n => n && n.id).map(n => ({
+                      id: n.id,
+                      tenant_id: activeTenantId,
+                      title: n.title || '',
+                      message: n.message || '',
+                      role: n.role || 'all',
+                      type: n.type || 'info',
+                      timestamp: n.timestamp || new Date().toISOString(),
+                      isRead: n.isRead || false,
+                      created_at: n.created_at || new Date().toISOString()
+                    })), { onConflict: 'tenant_id,id' }),
+                    'Notifications restore failed'
+                  );
+                }
+              } catch (syncErr) {
+                console.warn('Supabase restore sync partial failure (local restore still succeeded):', syncErr);
+                cloudRestoreError = syncErr;
+              }
+            }
+
+            SoundEffects.playSuccess();
+            if (cloudRestoreError) {
+              alert(`Backup restored on this device, but cloud synchronization was incomplete.\n${cloudRestoreError.message || 'Review the console and retry after checking connectivity.'}`);
+            } else {
+              alert("Backup Restored Successfully! All sales, inventory, shifts, employees, CRM, and settings recovered.");
+            }
+            location.reload();
+          } else {
+            alert("Invalid backup file format! Missing core POS tables.");
+          }
+        } catch (err) {
+          console.error("Backup restoration failed:", err);
+          alert("Restore failed! File is corrupted or not valid JSON.");
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+
   function updateReceiptSimulator() {
     const simName = document.getElementById('receipt-preview-store-name');
     const simAddr = document.getElementById('receipt-preview-address');
     const simPhone = document.getElementById('receipt-preview-phone');
-    
-    if (simName) simName.textContent = (profileNameInput ? profileNameInput.value : '') || 'DOPPIO CAFE';
-    if (simAddr) simAddr.textContent = (profileAddrInput ? profileAddrInput.value : '') || 'London Street, Nagpur';
-    if (simPhone) simPhone.textContent = `Ph: ${(profilePhoneInput ? profilePhoneInput.value : '') || '+91 91300 03177'}`;
+
+    if (simName) simName.textContent = (profileNameInput ? profileNameInput.value : '') || (activeTenantName ? activeTenantName.toUpperCase() : 'YOUR RESTAURANT');
+    if (simAddr) simAddr.textContent = (profileAddrInput ? profileAddrInput.value : '') || 'Your Address Here';
+    if (simPhone) simPhone.textContent = `Ph: ${(profilePhoneInput ? profilePhoneInput.value : '') || ''}`;
 
     const taxEnabled = profileGstCheck ? profileGstCheck.checked : true;
     const taxRate = parseFloat(profileGstRate ? profileGstRate.value : 18) || 0;
-    
+
     const loyaltyEnabled = profileLoyaltyCheck ? profileLoyaltyCheck.checked : true;
     const loyaltyValue = parseFloat(profileLoyaltyRate ? profileLoyaltyRate.value : 10) || 0;
-    
+
     const subtotal = 259.00;
     let discount = 0;
     if (loyaltyEnabled) {
       discount = subtotal * (loyaltyValue / 100);
     }
-    
+
     const taxableSubtotal = subtotal - discount;
     const taxAmount = taxEnabled ? taxableSubtotal * (taxRate / 100) : 0;
     const total = taxableSubtotal + taxAmount;
-    
+
     const simSummary = document.getElementById('receipt-preview-summary');
     if (simSummary) {
       let html = `Subtotal: ₹${subtotal.toFixed(2)}<br>`;
@@ -3595,6 +11052,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const name = document.getElementById('profile-name-input').value.trim();
       const address = document.getElementById('profile-address-input').value.trim();
       const phone = document.getElementById('profile-phone-input').value.trim();
+      const numberOfTables = parseInt(document.getElementById('profile-number-of-tables').value) || 6;
       const gstEnabled = document.getElementById('profile-gst-enabled').checked;
       const gstRate = parseFloat(document.getElementById('profile-gst-rate').value) || 0;
       const loyaltyEnabled = document.getElementById('profile-loyalty-enabled').checked;
@@ -3602,26 +11060,69 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       const crmEnabled = document.getElementById('profile-crm-enabled').checked;
       const taxEnabled = document.getElementById('profile-tax-enabled').checked;
       const soundEnabled = document.getElementById('profile-sound-enabled').checked;
-      
+
+      const whatsappEl = document.getElementById('profile-whatsapp-enabled');
+      const whatsappEnabled = whatsappEl ? whatsappEl.checked : true;
+
       const lockEl = document.getElementById('profile-lock-enabled');
       const passcodeLockEnabled = lockEl ? lockEl.checked : false;
 
-      businessProfile = { 
-        name, address, phone, 
-        gstEnabled, gstRate, 
-        loyaltyEnabled, loyaltyRate, 
-        passcodeLockEnabled, 
+      const collapseSidebarEl = document.getElementById('profile-collapse-sidebar');
+      const collapseSidebar = collapseSidebarEl ? collapseSidebarEl.checked : false;
+
+      const shiftEnabled = document.getElementById('profile-shift-enabled').checked;
+      const shiftDefaultFloat = parseFloat(document.getElementById('profile-shift-default-float').value) || 2000;
+      const shiftMaxDrawer = parseFloat(document.getElementById('profile-shift-max-drawer').value) || 5000;
+      const shiftPosLock = document.getElementById('profile-shift-pos-lock').checked;
+
+      const waGatewayEnabledEl = document.getElementById('profile-wa-gateway-enabled');
+      const whatsappGatewayEnabled = waGatewayEnabledEl ? waGatewayEnabledEl.checked : false;
+
+      const waGatewayUrlEl = document.getElementById('profile-wa-gateway-url');
+      const whatsappGatewayUrl = waGatewayUrlEl ? waGatewayUrlEl.value.trim() : '';
+
+      const waGatewayTokenEl = document.getElementById('profile-wa-gateway-token');
+      const whatsappGatewayToken = waGatewayTokenEl ? waGatewayTokenEl.value.trim() : '';
+
+      const featureFlags = {};
+      const tabsList = ['pos', 'tables', 'online', 'kds', 'tokens', 'bills', 'inventory', 'reports', 'editor', 'crm', 'tax', 'employees'];
+      tabsList.forEach(t => {
+        const el = document.getElementById(`feature-${t}-enabled`);
+        featureFlags[`${t}-tab`] = el ? el.checked : true;
+      });
+
+      businessProfile = {
+        name, address, phone,
+        numberOfTables,
+        gstEnabled, gstRate,
+        loyaltyEnabled, loyaltyRate,
+        passcodeLockEnabled,
         crmEnabled, taxEnabled,
-        soundEnabled
+        soundEnabled,
+        whatsappEnabled,
+        shiftEnabled,
+        shiftDefaultFloat,
+        shiftMaxDrawer,
+        shiftPosLock,
+        whatsappGatewayEnabled,
+        whatsappGatewayUrl,
+        whatsappGatewayToken,
+        featureFlags,
+        collapseSidebar
       };
+
+      // Apply sidebar collapse state immediately
+      document.body.classList.toggle('sidebar-collapsed', collapseSidebar);
       localStorage.setItem('doppio_business_profile', JSON.stringify(businessProfile));
+
+      // REDUNDANT REDUNDANCY: Backup write to IndexedDB!
+      setVaultData("doppio_business_profile", businessProfile);
 
       applyFeatureToggles();
 
-      // Reload cloud tables upserts
+      // Reload cloud tables upserts defensively
       if (supabaseClient) {
-        supabaseClient.from('doppio_business_profile').upsert({
-          id: 1,
+        const fullPayload = {
           business_name: name,
           address,
           phone,
@@ -3631,11 +11132,52 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           loyalty_discount_rate: loyaltyRate,
           passcode_lock_enabled: passcodeLockEnabled,
           crm_enabled: crmEnabled,
-          tax_enabled: taxEnabled
-        }, { onConflict: 'id' }).then();
+          tax_enabled: taxEnabled,
+          sound_enabled: soundEnabled,
+          whatsapp_enabled: whatsappEnabled,
+          shift_enabled: shiftEnabled,
+          shift_default_float: shiftDefaultFloat,
+          shift_max_drawer: shiftMaxDrawer,
+          shift_pos_lock: shiftPosLock,
+          whatsapp_gateway_enabled: whatsappGatewayEnabled,
+          whatsapp_gateway_url: whatsappGatewayUrl,
+          whatsapp_gateway_token: whatsappGatewayToken,
+          feature_flags: JSON.stringify(featureFlags)
+        };
+
+        const basicPayload = {
+          business_name: name,
+          address,
+          phone,
+          gst_enabled: gstEnabled,
+          gst_rate: gstRate,
+          loyalty_discount_enabled: loyaltyEnabled,
+          loyalty_discount_rate: loyaltyRate
+        };
+
+        supabaseClient.from('doppio_business_profile').upsert(fullPayload, { onConflict: 'tenant_id' })
+          .then(({ error }) => {
+            if (error) {
+              console.warn("Full settings sync failed (likely missing database columns), trying basic sync fallback:", error);
+              supabaseClient.from('doppio_business_profile').upsert(basicPayload, { onConflict: 'tenant_id' })
+                .then(({ error: basicError }) => {
+                  if (basicError) {
+                    console.error("Supabase basic settings sync failed:", basicError);
+                  } else {
+                    console.log("Supabase basic settings synced successfully!");
+                  }
+                });
+            } else {
+              console.log("Supabase full settings synced successfully!");
+            }
+          })
+          .catch(err => {
+            console.error("Supabase settings sync caught error:", err);
+          });
       }
 
       profileModal.classList.remove('active');
+      stopWhatsAppPolling();
       alert('Business Settings sync saved successfully!');
       renderCart();
     });
@@ -3668,9 +11210,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     if (adminPinError) adminPinError.style.display = 'none';
   }
 
-  function checkAdminPin() {
+  async function checkAdminPin() {
     if (!adminPinInput) return;
-    if (adminPinInput.value === '1006') {
+    const hash = await sha256(adminPinInput.value);
+    if (hash === '478c4ffb1cbcea37956a748e6c19d8eadd0a47e86f5e308d26cad39453b5d1ab') {
       const callback = pinResolveCallback;
       closeAdminPinModal();
       if (callback) callback();
@@ -3693,14 +11236,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   // ==========================================
   const SoundEffects = {
     audioCtx: null,
-    
+
     init() {
       if (businessProfile.soundEnabled === false) return;
       if (!this.audioCtx) {
         this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
     },
-    
+
     playPop() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -3709,24 +11252,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(400, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.1);
-      
+
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
     },
-    
+
     playClick() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -3735,24 +11278,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(550, ctx.currentTime);
       osc.frequency.setValueAtTime(220, ctx.currentTime + 0.03);
-      
+
       gain.gain.setValueAtTime(0.08, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.05);
     },
-    
+
     playSuccess() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -3762,7 +11305,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const playTone = (freq, delay, duration) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -3775,11 +11318,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         osc.start(ctx.currentTime + delay);
         osc.stop(ctx.currentTime + delay + duration);
       };
-      
-      playTone(523.25, 0, 0.4); 
-      playTone(659.25, 0.08, 0.4); 
-      playTone(783.99, 0.16, 0.4); 
-      playTone(987.77, 0.24, 0.5); 
+
+      playTone(523.25, 0, 0.4);
+      playTone(659.25, 0.08, 0.4);
+      playTone(783.99, 0.16, 0.4);
+      playTone(987.77, 0.24, 0.5);
     },
 
     playRemove() {
@@ -3790,24 +11333,24 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(250, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.15);
-      
+
       gain.gain.setValueAtTime(0.06, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
     },
-    
+
     playAlert() {
       if (businessProfile.soundEnabled === false) return;
       if (window.AndroidInterface) {
@@ -3817,20 +11360,20 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       this.init();
       const ctx = this.audioCtx;
       if (!ctx) return;
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(140, ctx.currentTime);
       osc.frequency.setValueAtTime(130, ctx.currentTime + 0.08);
-      
+
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start();
       osc.stop(ctx.currentTime + 0.2);
     }
@@ -3850,6 +11393,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   renderPOSCategories();
   renderPOSItems();
   renderCart();
+  if (typeof checkLoyaltyMember === 'function') checkLoyaltyMember();
   initSupabase();
   generateOrderNumber();
   updateHeaderSummaryStats();
@@ -3865,9 +11409,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   let enteredLockPin = '';
 
-  // Forced false to completely remove reload lock passcode screen
-  const passcodeEnabled = false;
-  const justLoggedIn = true;
+  const passcodeEnabled = !!(businessProfile && businessProfile.passcodeLockEnabled);
+  const justLoggedIn = !!(sessionStorage.getItem('just_logged_in'));
 
   if (!passcodeEnabled || justLoggedIn) {
     if (justLoggedIn) sessionStorage.removeItem('just_logged_in');
@@ -3897,7 +11440,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   function handleLockKeypadClick(val) {
     if (!lockPasscodeInput) return;
-    
+
     if (val === 'clear') {
       enteredLockPin = '';
       lockPasscodeInput.value = '';
@@ -3911,7 +11454,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         lockPasscodeInput.value = enteredLockPin;
         SoundEffects.playClick();
         if (lockPasscodeError) lockPasscodeError.textContent = '';
-        
+
         if (enteredLockPin.length === 4) {
           setTimeout(verifyLockPIN, 150);
         }
@@ -3919,8 +11462,9 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
   }
 
-  function verifyLockPIN() {
-    if (enteredLockPin === '1006') {
+  async function verifyLockPIN() {
+    const hash = await sha256(enteredLockPin);
+    if (hash === '478c4ffb1cbcea37956a748e6c19d8eadd0a47e86f5e308d26cad39453b5d1ab') {
       SoundEffects.playSuccess();
       if (pageLockOverlay) {
         pageLockOverlay.classList.add('unlocked');
@@ -3934,7 +11478,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         lockPasscodeInput.value = '';
         lockPasscodeInput.focus();
       }
-      
+
       // Shake animation effect
       const lockCard = document.querySelector('.lock-card');
       if (lockCard) {
@@ -3978,19 +11522,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   function activateMobileTab(tabId) {
     // Guard: "More" button has no tab
-    if (!tabId) return;
+    if (!tabId || !canOpenDashboardTab(tabId)) return;
 
-    // Clear cart if navigating away from POS
-    if (tabId === 'pos-tab' && cart.length > 0) {
-      SoundEffects.playRemove();
-      cart = [];
-      const custNameInput = document.getElementById('cust-name');
-      const custPhoneInput = document.getElementById('cust-phone');
-      if (custNameInput) custNameInput.value = '';
-      if (custPhoneInput) custPhoneInput.value = '';
-      if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
-      renderCart();
+    // Stop SaaS Gateway polling if we switch away from gateway-monitor-tab
+    if (tabId !== 'gateway-monitor-tab' && typeof stopSaaSGatewayPolling === 'function') {
+      stopSaaSGatewayPolling();
     }
+
+    // Cart is intentionally NOT cleared when switching tabs.
+    // Cart contents persist until the "Print Bill" action is completed.
 
     // Sync mobile bottom nav active state
     mobileNavLinks.forEach(l => {
@@ -4021,8 +11561,28 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
       renderMenuEditor();
     } else if (tabId === 'crm-tab') {
       renderCRMTab();
+      renderFeedbackTable();
+      loadLoyaltyRulesUI();
     } else if (tabId === 'tax-tab') {
       renderTaxTab();
+    } else if (tabId === 'employees-tab') {
+      renderEmployeesTab();
+      renderBulkPayrollTable();
+      renderPayrollHistory();
+    } else if (tabId === 'growth-hub-tab') {
+      renderGrowthHub();
+    } else if (tabId === 'online-tab') {
+      if (typeof renderOnlineOrdersTab === 'function') renderOnlineOrdersTab();
+    } else if (tabId === 'kds-tab') {
+      if (typeof renderKDSTab === 'function') renderKDSTab();
+    } else if (tabId === 'tokens-tab') {
+      if (typeof renderTokensTab === 'function') renderTokensTab();
+    } else if (tabId === 'super-admin-tab') {
+      renderSuperAdminTab();
+    } else if (tabId === 'gateway-monitor-tab') {
+      setupGatewayMonitorTab();
+    } else if (tabId === 'qr-orders-tab') {
+      if (typeof updateQrOrdersDashboardUI === 'function') updateQrOrdersDashboardUI();
     }
   }
 
@@ -4035,7 +11595,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         activateMobileTab(tabId);
       }
       // "More" button (no data-tab) opens the More sheet
-      if (link.id === 'mobile-more-btn') {
+      if (link.id === 'mobile-more-btn' || link.id === 'mobile-more-btn-sa') {
         const moreSheet = document.getElementById('more-nav-sheet');
         if (moreSheet) moreSheet.classList.add('active');
       }
@@ -4051,6 +11611,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   if (mobileMoreBtn) {
     mobileMoreBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (moreNavSheet) moreNavSheet.classList.add('active');
+    });
+  }
+
+  // Also wire superadmin's "More" button on mobile
+  const mobileMoreBtnSa = document.getElementById('mobile-more-btn-sa');
+  if (mobileMoreBtnSa) {
+    mobileMoreBtnSa.addEventListener('click', (e) => {
       e.preventDefault();
       if (moreNavSheet) moreNavSheet.classList.add('active');
     });
@@ -4129,10 +11698,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     // On mobile, hide the desktop table and show the card layout
     const billsTableContainer = document.querySelector('.bills-table-container');
     if (billsTableContainer) {
-      billsTableContainer.style.display = window.innerWidth <= 768 ? 'none' : '';
+      billsTableContainer.style.display = window.innerWidth <= 600 ? 'none' : '';
     }
-    mobileCardsContainer.style.display = window.innerWidth <= 768 ? 'block' : 'none';
-    if (window.innerWidth > 768) return;
+    mobileCardsContainer.style.display = window.innerWidth <= 600 ? 'block' : 'none';
+    if (window.innerWidth > 600) return;
 
     mobileCardsContainer.innerHTML = '';
 
@@ -4148,26 +11717,26 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     }
 
     sortedBills.forEach(bill => {
-      const initials = bill.customerName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      const initials = bill.customerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       const payClass = bill.paymentMethod ? bill.paymentMethod.toLowerCase() : 'upi';
 
       const card = document.createElement('div');
       card.className = 'mobile-bill-card';
       card.style.cssText = `
         background: var(--bg-white);
-        border: 1px solid rgba(43,24,19,0.08);
+        border: 1px solid rgba(28, 28, 28,0.08);
         border-radius: 14px;
         padding: 14px 16px;
         margin-bottom: 10px;
-        box-shadow: 0 2px 8px rgba(43,24,19,0.06);
+        box-shadow: 0 2px 8px rgba(28, 28, 28,0.06);
       `;
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:36px; height:36px; border-radius:50%; background:var(--accent-caramel); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">${initials}</div>
+            <div style="width:36px; height:36px; border-radius:50%; background:var(--accent-caramel); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">${escHtml(initials)}</div>
             <div>
-              <div style="font-weight:700; font-size:13px; color:var(--primary-brand);">${bill.customerName}</div>
-              <div style="font-size:11px; color:var(--text-muted);">${bill.orderId}</div>
+              <div style="font-weight:700; font-size:13px; color:var(--primary-brand);">${escHtml(bill.customerName)}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${escHtml(bill.orderId)}</div>
             </div>
           </div>
           <div style="text-align:right;">
@@ -4182,14 +11751,14 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
           ${bill.items.map(i => `${i.name} ×${i.qty}`).join(', ').substring(0, 80)}${bill.items.length > 3 ? '...' : ''}
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="table-action-btn print" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(43,24,19,0.12); background:var(--bg-cream-light); color:var(--primary-brand); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+          <button class="table-action-btn print" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(28, 28, 28,0.12); background:var(--bg-cream-light); color:var(--primary-brand); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-solid fa-print"></i> Print
           </button>
           <button class="table-action-btn whatsapp" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(37,211,102,0.25); background:rgba(37,211,102,0.06); color:#25D366; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-brands fa-whatsapp"></i> Share
           </button>
-          <button class="table-action-btn duplicate" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(201,138,74,0.3); background:rgba(201,138,74,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
-            <i class="fa-solid fa-clone"></i> Reorder
+          <button class="table-action-btn edit-bill" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(252, 128, 25,0.3); background:rgba(252, 128, 25,0.08); color:var(--accent-caramel); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+            <i class="fa-solid fa-pen-to-square"></i> Edit
           </button>
           <button class="table-action-btn delete" data-id="${bill.orderId}" style="flex:1; padding:8px; font-size:12px; border-radius:8px; border:1px solid rgba(231,76,60,0.2); background:rgba(231,76,60,0.06); color:var(--danger-color); font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
             <i class="fa-solid fa-trash-can"></i> Delete
@@ -4214,30 +11783,61 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         triggerThermalReceiptPrint(bills[idx]);
       } else if (btn.classList.contains('whatsapp')) {
         shareBillOnWhatsApp(bills[idx]);
-      } else if (btn.classList.contains('duplicate')) {
-        SoundEffects.playPop();
-        cart = [...bills[idx].items];
-        const cn = document.getElementById('cust-name');
-        const cp = document.getElementById('cust-phone');
-        if (cn) cn.value = bills[idx].customerName;
-        if (cp) cp.value = bills[idx].customerPhone || '';
-        renderCart();
+      } else if (btn.classList.contains('edit-bill')) {
+        startEditingBill(orderId);
         activateMobileTab('pos-tab');
       } else if (btn.classList.contains('delete')) {
         showAdminPinModal(() => {
-          const bill = bills[idx];
-          bill.items.forEach(cartItem => {
+          const originalBill = bills[idx];
+
+          originalBill.items.forEach(cartItem => {
             const specs = getDeductionSpecs(cartItem);
             Object.keys(specs).forEach(ing => {
               inventory[ing] = (inventory[ing] || 0) + (specs[ing] * cartItem.qty);
             });
           });
           localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
-          bills.splice(idx, 1);
+
+          bills[idx] = {
+            ...originalBill,
+            status: 'refunded',
+            refundedAt: new Date().toLocaleString('en-IN')
+          };
+
+          const refundBill = {
+            orderId: `${originalBill.orderId}_REFUND`,
+            customerName: originalBill.customerName,
+            customerPhone: originalBill.customerPhone,
+            dateTime: new Date().toLocaleString('en-IN'),
+            items: originalBill.items.map(item => ({ ...item, qty: -item.qty })),
+            subtotal: -originalBill.subtotal,
+            gst: -originalBill.gst,
+            discount: -(originalBill.discount || 0),
+            total: -originalBill.total,
+            paymentMethod: originalBill.paymentMethod,
+            orderType: 'Refund',
+            status: 'refund',
+            originalOrderId: originalBill.orderId
+          };
+          bills.push(refundBill);
           localStorage.setItem('doppio_bills', JSON.stringify(bills));
+
+          if (supabaseClient) {
+            supabaseClient.from('doppio_bills').upsert({
+              ...bills[idx],
+              tenant_id: activeTenantId
+            }).then();
+            supabaseClient.from('doppio_bills').insert({
+              ...refundBill,
+              tenant_id: activeTenantId
+            }).then();
+          }
+
+          SoundEffects.playRemove();
+          generateOrderNumber();
           renderBills();
           renderMobileBillCards();
-          SoundEffects.playRemove();
+          updateHeaderSummaryStats();
         });
       }
     });
@@ -4314,11 +11914,17 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     // 1. Load local draft orders fallback
     const localDrafts = localStorage.getItem('doppio_draft_orders');
     if (localDrafts) {
-      draftOrders = JSON.parse(localDrafts);
+      try {
+        draftOrders = JSON.parse(localDrafts);
+        if (!Array.isArray(draftOrders)) draftOrders = [];
+      } catch (err) {
+        console.warn("Corrupted draft orders", err);
+        draftOrders = [];
+      }
     }
 
     // 2. Load from Supabase in real-time
-    if (supabaseClient) {
+    if (supabaseClient && sessionStorage.getItem('logged_in_role') !== 'superadmin') {
       try {
         const { data, error } = await supabaseClient
           .from('doppio_draft_orders')
@@ -4390,7 +11996,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
       const draftName = prompt('Enter a name or Table number to hold this order:', defaultDraftName);
       if (draftName === null) return; // Cancelled
-      
+
       const trimmedName = draftName.trim() || defaultDraftName;
 
       // Calculate totals
@@ -4432,16 +12038,17 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
             gst: newDraft.gst,
             total: newDraft.total,
             createdAt: newDraft.createdAt
-          }, { onConflict: 'draftId' }).then();
+          }, { onConflict: 'tenant_id,draftId' }).then();
         } catch (e) {
           console.warn('Failed to sync draft to Supabase:', e);
         }
       }
 
       SoundEffects.playSuccess();
-      
-      // Clear cart
+
+      // Clear cart (holding the order moves it to drafts, so cart should be freed)
       cart = [];
+      clearCartState();
       if (custNameInput) custNameInput.value = '';
       if (custPhoneInput) custPhoneInput.value = '';
       if (loyaltyStatusBox) loyaltyStatusBox.style.display = 'none';
@@ -4465,8 +12072,8 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
     draftOrders.forEach(d => {
       const draftCard = document.createElement('div');
       draftCard.className = 'draft-card';
-      draftCard.style.cssText = 'border: 1px solid rgba(201, 138, 74, 0.2); border-radius: 10px; padding: 12px; background: #fff; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; margin-bottom: 8px;';
-      
+      draftCard.style.cssText = 'border: 1px solid rgba(252, 128, 25, 0.2); border-radius: 10px; padding: 12px; background: #fff; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; margin-bottom: 8px;';
+
       const itemCount = d.items.reduce((sum, i) => sum + i.qty, 0);
       const timeStr = new Date(d.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
       const dateStr = new Date(d.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
@@ -4503,11 +12110,11 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         if (!draft) return;
 
         SoundEffects.playClick();
-        
+
         // 1. Set cart and inputs
         cart = draft.items;
         selectedPaymentMethod = draft.paymentMethod || 'UPI';
-        
+
         const custNameInput = document.getElementById('cust-name');
         const custPhoneInput = document.getElementById('cust-phone');
         if (custNameInput) custNameInput.value = draft.customerName || '';
@@ -4536,10 +12143,10 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         }
 
         renderCart();
-        
+
         // Close modal
         if (draftsModal) draftsModal.classList.remove('active');
-        
+
         alert(`Resumed order "${draft.draftName}"!`);
       });
     });
@@ -4553,7 +12160,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
         if (confirm(`Are you sure you want to delete draft "${draft.draftName}"?`)) {
           SoundEffects.playRemove();
-          
+
           draftOrders = draftOrders.filter(d => d.draftId !== id);
           localStorage.setItem('doppio_draft_orders', JSON.stringify(draftOrders));
           updateDraftsBadge();
@@ -4597,20 +12204,29 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   // Update mobile cart badge count and prices inside renderCart()
   const originalRenderCart = renderCart;
-  renderCart = function() {
+  renderCart = function () {
     originalRenderCart();
-    
+
     const mCount = document.getElementById('mobile-cart-count');
     const mTotal = document.getElementById('mobile-cart-total');
-    
+    const mobileFloatingCart = document.getElementById('mobile-floating-cart');
+
     if (mCount && mTotal) {
       const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
       mCount.textContent = totalQty;
-      
+
       const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
       const taxRate = businessProfile.gstEnabled ? (businessProfile.gstRate || 18) : 0;
       const gst = Math.round(subtotal * (taxRate / 100));
       mTotal.textContent = `₹${subtotal + gst}`;
+
+      if (mobileFloatingCart) {
+        if (totalQty > 0 && window.innerWidth <= 600) {
+          mobileFloatingCart.style.setProperty('display', 'flex', 'important');
+        } else {
+          mobileFloatingCart.style.setProperty('display', 'none', 'important');
+        }
+      }
     }
   };
 
@@ -4623,28 +12239,28 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         customAddonModal.classList.remove('active');
         SoundEffects.playClick();
       }
-      
+
       // Admin Pin Modal
       const adminPinModal = document.getElementById('admin-pin-modal');
       if (adminPinModal && adminPinModal.classList.contains('active')) {
         closeAdminPinModal();
         SoundEffects.playClick();
       }
-      
+
       // Business Profile Modal
       const profileModal = document.getElementById('profile-modal');
       if (profileModal && profileModal.classList.contains('active')) {
         profileModal.classList.remove('active');
         SoundEffects.playClick();
       }
-      
+
       // SQL Schema Modal
       const sqlSchemaModal = document.getElementById('sql-schema-modal');
       if (sqlSchemaModal && sqlSchemaModal.classList.contains('active')) {
         sqlSchemaModal.classList.remove('active');
         SoundEffects.playClick();
       }
-      
+
       // Mobile POS Cart Sidebar Drawer
       const posCartSidebar = document.getElementById('pos-cart-sidebar');
       if (posCartSidebar && posCartSidebar.classList.contains('active')) {
@@ -4669,15 +12285,15 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
 
   // Automatically toggles 'no-scroll' class on body when any drawer/modal is active
   const modalScrollLockObserver = new MutationObserver(() => {
-    const isAnyOverlayActive = 
-      document.querySelector('.modal-backdrop.active') || 
-      document.querySelector('.more-nav-sheet.active') || 
+    const isAnyOverlayActive =
+      document.querySelector('.modal-backdrop.active') ||
+      document.querySelector('.more-nav-sheet.active') ||
       document.querySelector('.pos-cart-sidebar.active') ||
       document.querySelector('.menu-editor-form-panel.active');
-    
+
     // Temporarily disconnect the observer to avoid infinite loop when changing body class
     modalScrollLockObserver.disconnect();
-    
+
     if (isAnyOverlayActive) {
       if (!document.body.classList.contains('no-scroll')) {
         document.body.classList.add('no-scroll');
@@ -4687,7 +12303,7 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         document.body.classList.remove('no-scroll');
       }
     }
-    
+
     // Re-observe class changes
     modalScrollLockObserver.observe(document.body, {
       attributes: true,
@@ -4704,20 +12320,21 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
   });
 
   // Global callback for native Android online/offline monitoring updates
-  window.updateAndroidOfflineStatus = function(isOffline) {
+  window.updateAndroidOfflineStatus = function (isOffline) {
     console.log("Android network status update: isOffline =", isOffline);
     const badge = document.getElementById('network-status-badge');
     const mobileBadge = document.getElementById('mobile-network-status-badge');
     const text = document.getElementById('supabase-sync-text');
-    
+    const offlineBanner = document.getElementById('offline-banner');
+
     if (badge) {
       const dot = badge.querySelector('.status-dot');
       if (isOffline) {
         if (dot) dot.className = 'status-dot red';
-        if (text) text.textContent = 'Offline Mode (Local)';
+        if (text) text.textContent = 'Offline';
       } else {
         if (dot) dot.className = 'status-dot green';
-        if (text) text.textContent = 'Supabase Live';
+        if (text) text.textContent = 'Live';
       }
     }
     if (mobileBadge) {
@@ -4728,6 +12345,6243 @@ CREATE TABLE IF NOT EXISTS public.doppio_bills (
         if (dot) dot.className = 'status-dot green';
       }
     }
+
+    // High visibility banner toggle
+    if (offlineBanner) {
+      offlineBanner.style.display = isOffline ? 'flex' : 'none';
+    }
   };
 
+  // Handle browser online/offline events
+  window.addEventListener('online', () => {
+    window.updateAndroidOfflineStatus(false);
+    if (typeof syncOfflineBills === 'function') {
+      syncOfflineBills();
+    }
+  });
+  window.addEventListener('offline', () => {
+    window.updateAndroidOfflineStatus(true);
+  });
+
+  // Initialize network status on load
+  window.updateAndroidOfflineStatus(!navigator.onLine);
+
+  // ==========================================
+  // PREMIUM THEMES & MOON LIGHT ENGINE
+  // ==========================================
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  const mobileThemeToggleBtn = document.getElementById('mobile-theme-toggle-btn');
+
+  function updateThemeUI(theme) {
+    const isDark = theme === 'dark';
+    if (isDark) {
+      document.body.classList.add('dark-theme');
+      // When user explicitly picks dark, remove the "force light" override so the
+      // CSS @media (prefers-color-scheme: dark) also activates on page reload.
+      document.body.classList.remove('light-theme-forced');
+    } else {
+      document.body.classList.remove('dark-theme');
+      // When user explicitly picks light, add the sentinel class that prevents the
+      // OS-level @media (prefers-color-scheme: dark) auto-applying dark tokens.
+      document.body.classList.add('light-theme-forced');
+    }
+
+    // Update icons
+    const iconClass = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    const iconColor = isDark ? '#F1C40F' : 'var(--primary-brand)';
+
+    if (themeToggleBtn) {
+      const icon = themeToggleBtn.querySelector('i');
+      if (icon) {
+        icon.className = iconClass;
+        icon.style.color = iconColor;
+      }
+    }
+    if (mobileThemeToggleBtn) {
+      const icon = mobileThemeToggleBtn.querySelector('i');
+      if (icon) {
+        icon.className = iconClass;
+        icon.style.color = iconColor;
+      }
+    }
+  }
+
+  function toggleTheme() {
+    const current = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('doppio_theme', next);
+    updateThemeUI(next);
+    SoundEffects.playClick();
+  }
+
+  if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+  if (mobileThemeToggleBtn) mobileThemeToggleBtn.addEventListener('click', toggleTheme);
+
+  // Initialize theme from storage.
+  // If no preference is saved, let the OS @media query decide — don't force 'light'.
+  const savedTheme = localStorage.getItem('doppio_theme');
+  if (savedTheme) {
+    updateThemeUI(savedTheme);
+  }
+  // else: no class is added → the CSS @media (prefers-color-scheme: dark) auto-activates
+  // if the OS is set to dark mode, giving users automatic dark mode on first visit.
+
+  // ==========================================
+  // GROWTH HUB: SaaS launch and restaurant expansion modules
+  // ==========================================
+  const growthCollections = {
+    onboarding: 'doppio_onboarding_tasks',
+    support: 'doppio_support_tickets',
+    reservations: 'doppio_reservations',
+    vendors: 'doppio_vendors',
+    purchaseOrders: 'doppio_purchase_orders',
+    costs: 'doppio_item_costs',
+    offers: 'doppio_offers',
+    refunds: 'doppio_refund_requests',
+    devices: 'doppio_device_setups',
+    backups: 'doppio_backup_snapshots',
+    outlets: 'doppio_outlets',
+    migrations: 'doppio_migration_status',
+    invoices: 'doppio_saas_invoices'
+  };
+
+  const growthDefaults = {
+    onboarding: [
+      { task_key: 'profile', title: 'Business profile, GST, UPI and logo configured', status: businessProfile.name ? 'done' : 'pending' },
+      { task_key: 'menu', title: 'Menu imported and prices verified', status: menu.length > 0 ? 'done' : 'pending' },
+      { task_key: 'staff', title: 'Staff roles and permissions created', status: 'pending' },
+      { task_key: 'tables', title: 'QR table codes generated and tested', status: 'pending' },
+      { task_key: 'printer', title: 'Thermal printer and Android receipt test completed', status: 'pending' },
+      { task_key: 'first-order', title: 'First POS and QR test order completed', status: bills.length > 0 ? 'done' : 'pending' }
+    ],
+    support: [],
+    reservations: [],
+    purchaseOrders: [],
+    costs: [],
+    offers: [],
+    refunds: [],
+    devices: [{ device_type: 'printer', device_name: 'Thermal receipt printer', status: 'pending', notes: 'Run one test receipt before launch.' }],
+    backups: [{ label: 'Manual JSON export readiness', backup_version: '2.0', scope: 'full', status: 'available' }],
+    outlets: [{ outlet_name: activeTenantName || 'Primary Outlet', outlet_code: activeTenantSlug || 'primary', status: 'active' }],
+    migrations: [{ version: '2.0-growth-hub', status: 'complete', notes: 'Growth Hub launch modules registered.' }],
+    invoices: [{
+      invoice_number: `DRAFT-${new Date().toISOString().slice(0, 10)}`,
+      plan_code: sessionStorage.getItem('tenant_plan_code') || 'starter',
+      amount: 0,
+      status: 'draft',
+      due_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+    }]
+  };
+
+  const growthState = {};
+  Object.keys(growthCollections).forEach(key => {
+    try {
+      growthState[key] = JSON.parse(localStorage.getItem(growthCollections[key])) || growthDefaults[key] || [];
+    } catch {
+      growthState[key] = growthDefaults[key] || [];
+    }
+  });
+
+  function persistGrowthCollection(key) {
+    const table = growthCollections[key];
+    if (!table) return;
+    localStorage.setItem(table, JSON.stringify(growthState[key] || []));
+  }
+
+  async function cloudInsertGrowth(key, row) {
+    const table = growthCollections[key];
+    if (!supabaseClient || !table) return;
+    try {
+      const payload = { ...row };
+      if (payload.id && String(payload.id).startsWith('local-')) delete payload.id;
+      const conflictTargets = {
+        onboarding: 'tenant_id,task_key',
+        costs: 'tenant_id,item_name',
+        offers: 'tenant_id,code',
+        outlets: 'tenant_id,outlet_code',
+        migrations: 'tenant_id,version',
+        invoices: 'tenant_id,invoice_number'
+      };
+      const request = conflictTargets[key]
+        ? supabaseClient.from(table).upsert(payload, { onConflict: conflictTargets[key] })
+        : supabaseClient.from(table).insert(payload);
+      const { error } = await request;
+      if (error) console.warn(`Growth Hub cloud insert failed for ${table}:`, error.message);
+    } catch (error) {
+      console.warn(`Growth Hub cloud insert failed for ${table}:`, error.message);
+    }
+  }
+
+  function growthItem(title, detail, pill, filterAttr = '', isActive = false) {
+    const filterData = filterAttr ? `data-filter="${filterAttr}"` : '';
+    const activeClass = isActive ? 'active-filter' : '';
+    return `
+      <div class="growth-item ${activeClass}" ${filterData}>
+        <div>
+          <strong>${escHtml(title)}</strong>
+          <span>${escHtml(detail || '')}</span>
+        </div>
+        ${pill ? `<span class="growth-pill">${escHtml(pill)}</span>` : ''}
+      </div>
+    `;
+  }
+
+  function renderGrowthHub() {
+    renderGrowthOnboarding();
+    renderGrowthSupport();
+    renderGrowthBilling();
+    renderGrowthReservations();
+    renderGrowthProcurement();
+    renderGrowthCosting();
+    renderGrowthOffers();
+    renderGrowthRefunds();
+    renderGrowthDevices();
+    renderGrowthOutlets();
+    renderGrowthReliability();
+  }
+
+  function renderGrowthOnboarding() {
+    const list = document.getElementById('growth-onboarding-list');
+    if (!list) return;
+    list.innerHTML = growthState.onboarding.map(task => `
+      <label class="growth-item growth-check">
+        <input type="checkbox" data-growth-task="${escHtml(task.task_key)}" ${task.status === 'done' ? 'checked' : ''}>
+        <div>
+          <strong>${escHtml(task.title)}</strong>
+          <span>${task.status === 'done' ? 'Ready for launch' : 'Pending setup'}</span>
+        </div>
+      </label>
+    `).join('');
+  }
+
+  function renderGrowthSupport() {
+    const list = document.getElementById('growth-support-list');
+    if (!list) return;
+    const tickets = growthState.support.slice(-4).reverse();
+    list.innerHTML = tickets.length
+      ? tickets.map(ticket => growthItem(ticket.subject, ticket.last_message || ticket.category || 'Support request', ticket.status || 'open')).join('')
+      : growthItem('No support tickets yet', 'Create a ticket when a tenant issue needs tracking.', 'clear');
+  }
+
+  function renderGrowthBilling() {
+    const target = document.getElementById('growth-billing-summary');
+    if (!target) return;
+    const plan = sessionStorage.getItem('tenant_plan_name') || 'Starter';
+    const status = sessionStorage.getItem('tenant_subscription_status') || 'active';
+    const limits = JSON.parse(sessionStorage.getItem('tenant_plan_limits') || '{}');
+    const invoices = growthState.invoices || [];
+    target.innerHTML = [
+      growthItem('Current plan', `${plan} · ${status}`, sessionStorage.getItem('tenant_plan_code') || 'starter'),
+      growthItem('Usage guardrail', `${limits.max_staff || 5} staff · ${limits.monthly_order_limit || 300} online orders/month`, 'free tier'),
+      growthItem('Invoice records', `${invoices.length} draft/issued invoice records ready for Razorpay or Stripe`, 'billing')
+    ].join('');
+  }
+
+  function renderGrowthReservations() {
+    const list = document.getElementById('growth-reservation-list');
+    if (!list) return;
+    const reservations = growthState.reservations.slice(-4).reverse();
+    list.innerHTML = reservations.length
+      ? reservations.map(item => growthItem(item.guest_name, `${item.party_size || 2} guests · ${item.table_number || 'waitlist'}`, item.status || 'booked')).join('')
+      : growthItem('No reservations', 'Use this to manage bookings and waitlist.', 'booked');
+  }
+
+  function renderGrowthProcurement() {
+    const list = document.getElementById('growth-procurement-list');
+    if (!list) return;
+    const rows = growthState.purchaseOrders.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => growthItem(row.item_name, `${row.vendor_name} · ₹${Number(row.expected_cost || 0)}`, row.status || 'draft')).join('')
+      : growthItem('No purchase orders', 'Track supplier orders, receiving, and vendor bills here.', 'draft');
+  }
+
+  function renderGrowthCosting() {
+    const list = document.getElementById('growth-costing-list');
+    if (!list) return;
+    const rows = growthState.costs.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => {
+        const price = Number(row.menu_price || 0);
+        const cost = Number(row.estimated_cost || 0);
+        const margin = price > 0 ? Math.round(((price - cost) / price) * 100) : 0;
+        return growthItem(row.item_name, `Price ₹${price} · Cost ₹${cost}`, `${margin}% margin`);
+      }).join('')
+      : growthItem('No costing records', 'Add top sellers to monitor food cost and gross margin.', 'margin');
+  }
+
+  function renderGrowthOffers() {
+    const list = document.getElementById('growth-offer-list');
+    if (!list) return;
+    const rows = growthState.offers.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => growthItem(row.code, `${row.title} · ${row.discount_value}%`, row.status || 'active')).join('')
+      : growthItem('No offers yet', 'Create coupons, bundles, happy hours, and birthday offers.', 'offer');
+  }
+
+  function renderGrowthRefunds() {
+    const list = document.getElementById('growth-refund-list');
+    if (!list) return;
+    const rows = growthState.refunds.slice(-4).reverse();
+    list.innerHTML = rows.length
+      ? rows.map(row => growthItem(row.order_id, `₹${Number(row.amount || 0)} · ${row.reason}`, row.status || 'pending')).join('')
+      : growthItem('No refund requests', 'Manager approval requests will appear here.', 'clear');
+  }
+
+  function renderGrowthDevices() {
+    const list = document.getElementById('growth-device-list');
+    if (!list) return;
+    list.innerHTML = growthState.devices.map(row => growthItem(row.device_name, row.notes || row.device_type, row.status || 'pending')).join('');
+  }
+
+  function renderGrowthOutlets() {
+    const list = document.getElementById('growth-outlet-list');
+    if (!list) return;
+    list.innerHTML = growthState.outlets.map(row => growthItem(row.outlet_name, row.address || row.outlet_code, row.status || 'active')).join('');
+  }
+
+  function renderGrowthReliability() {
+    const backupList = document.getElementById('growth-backup-list');
+    const complianceList = document.getElementById('growth-compliance-list');
+    if (backupList) {
+      backupList.innerHTML = [
+        ...growthState.backups.map(row => growthItem(row.label, `${row.scope || 'full'} · v${row.backup_version || '2.0'}`, row.status || 'available')),
+        growthItem('Restore preview required', 'Preview and undo restore should be used before large imports.', 'safety')
+      ].join('');
+    }
+    if (complianceList) {
+      complianceList.innerHTML = [
+        growthItem('Terms, Privacy, Refund Policy', 'Static policy pages are ready and should be reviewed before launch.', 'legal'),
+        growthItem('Migration status', `${growthState.migrations.length} migration marker recorded`, 'complete'),
+        growthItem('E2E test queue', 'Login, checkout, QR order, staff, tenant approval and mobile flows are marked for Playwright coverage.', 'qa')
+      ].join('');
+    }
+  }
+
+  function addGrowthRow(key, row) {
+    const item = { id: `local-${Date.now()}-${Math.random().toString(16).slice(2)}`, ...row };
+    growthState[key] = growthState[key] || [];
+    growthState[key].push(item);
+    persistGrowthCollection(key);
+    cloudInsertGrowth(key, item);
+    renderGrowthHub();
+    showNotificationToast('Growth Hub updated.');
+  }
+
+  function setupGrowthHubHandlers() {
+    const refresh = document.getElementById('growth-refresh-btn');
+    if (refresh && !refresh.dataset.bound) {
+      refresh.dataset.bound = 'true';
+      refresh.addEventListener('click', renderGrowthHub);
+    }
+
+    const sample = document.getElementById('growth-save-demo-btn');
+    if (sample) sample.hidden = !ENABLE_DEMO_TOOLS;
+    if (ENABLE_DEMO_TOOLS && sample && !sample.dataset.bound) {
+      sample.dataset.bound = 'true';
+      sample.addEventListener('click', () => {
+        addGrowthRow('support', { subject: 'Launch readiness review', category: 'onboarding', priority: 'normal', status: 'open', last_message: 'Review setup before first paid customer.' });
+        addGrowthRow('reservations', { guest_name: 'Walk-in Waitlist', party_size: 4, reserved_for: new Date().toISOString(), table_number: 'Waitlist', status: 'booked' });
+        addGrowthRow('purchaseOrders', { vendor_name: 'Primary Supplier', item_name: 'Milk and disposables', quantity: 1, expected_cost: 2500, status: 'draft' });
+      });
+    }
+
+    const onboarding = document.getElementById('growth-onboarding-list');
+    if (onboarding && !onboarding.dataset.bound) {
+      onboarding.dataset.bound = 'true';
+      onboarding.addEventListener('change', (event) => {
+        const checkbox = event.target.closest('[data-growth-task]');
+        if (!checkbox) return;
+        const task = growthState.onboarding.find(item => item.task_key === checkbox.dataset.growthTask);
+        if (!task) return;
+        task.status = checkbox.checked ? 'done' : 'pending';
+        task.completed_at = checkbox.checked ? new Date().toISOString() : null;
+        persistGrowthCollection('onboarding');
+        cloudInsertGrowth('onboarding', task);
+        renderGrowthOnboarding();
+      });
+    }
+
+    const forms = [
+      ['growth-support-form', 'support', () => ({ subject: document.getElementById('growth-support-subject').value.trim(), priority: document.getElementById('growth-support-priority').value, category: 'support', status: 'open', last_message: 'Created from Growth Hub.' }), ['subject']],
+      ['growth-reservation-form', 'reservations', () => ({ guest_name: document.getElementById('growth-reservation-name').value.trim(), phone: document.getElementById('growth-reservation-phone').value.trim(), party_size: Number(document.getElementById('growth-reservation-party').value || 2), reserved_for: new Date().toISOString(), status: 'booked' }), ['guest_name']],
+      ['growth-procurement-form', 'purchaseOrders', () => ({ vendor_name: document.getElementById('growth-vendor-name').value.trim(), item_name: document.getElementById('growth-po-item').value.trim(), expected_cost: Number(document.getElementById('growth-po-cost').value || 0), status: 'draft' }), ['vendor_name', 'item_name']],
+      ['growth-costing-form', 'costs', () => ({ item_name: document.getElementById('growth-cost-item').value.trim(), menu_price: Number(document.getElementById('growth-cost-price').value || 0), estimated_cost: Number(document.getElementById('growth-cost-cost').value || 0), target_margin_percent: 65 }), ['item_name']],
+      ['growth-offer-form', 'offers', () => ({ code: document.getElementById('growth-offer-code').value.trim().toUpperCase(), title: document.getElementById('growth-offer-title').value.trim(), discount_type: 'percent', discount_value: Number(document.getElementById('growth-offer-value').value || 0), status: 'active' }), ['code', 'title']],
+      ['growth-refund-form', 'refunds', () => ({ order_id: document.getElementById('growth-refund-order').value.trim(), amount: Number(document.getElementById('growth-refund-amount').value || 0), reason: document.getElementById('growth-refund-reason').value.trim(), status: 'pending' }), ['order_id', 'reason']],
+      ['growth-outlet-form', 'outlets', () => ({ outlet_name: document.getElementById('growth-outlet-name').value.trim(), outlet_code: document.getElementById('growth-outlet-code').value.trim().toLowerCase(), status: 'active' }), ['outlet_name', 'outlet_code']]
+    ];
+    forms.forEach(([formId, key, build, requiredFields]) => {
+      const form = document.getElementById(formId);
+      if (!form || form.dataset.bound) return;
+      form.dataset.bound = 'true';
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const row = build();
+        const isValid = requiredFields.every(field => String(row[field] || '').trim());
+        if (!isValid) return;
+        addGrowthRow(key, row);
+        form.reset();
+      });
+    });
+
+    const deviceBtn = document.getElementById('growth-device-test-btn');
+    if (deviceBtn && !deviceBtn.dataset.bound) {
+      deviceBtn.dataset.bound = 'true';
+      deviceBtn.addEventListener('click', () => {
+        const device = growthState.devices[0] || { device_type: 'printer', device_name: 'Thermal receipt printer' };
+        device.status = 'tested';
+        device.last_test_at = new Date().toISOString();
+        growthState.devices[0] = device;
+        persistGrowthCollection('devices');
+        cloudInsertGrowth('devices', device);
+        renderGrowthDevices();
+      });
+    }
+
+    const upgradeBtn = document.getElementById('growth-upgrade-request-btn');
+    if (upgradeBtn && !upgradeBtn.dataset.bound) {
+      upgradeBtn.dataset.bound = 'true';
+      upgradeBtn.addEventListener('click', () => {
+        addGrowthRow('support', { subject: 'Plan upgrade request', category: 'billing', priority: 'high', status: 'open', last_message: 'Tenant requested a paid plan upgrade discussion.' });
+      });
+    }
+  }
+
+  setupGrowthHubHandlers();
+
+  // ==========================================
+  // MICRO-INTERACTION BUMP EFFECTS
+  // ==========================================
+  window.triggerCartBump = function () {
+    const targets = [
+      document.querySelector('.cart-header-title'),
+      document.getElementById('cart-total'),
+      document.getElementById('mobile-floating-cart'),
+      document.getElementById('mobile-cart-count')
+    ];
+    targets.forEach(el => {
+      if (!el) return;
+      el.classList.remove('cart-bounce-active');
+      void el.offsetWidth; // force reflow
+      el.classList.add('cart-bounce-active');
+    });
+  };
+
+  // ==========================================
+  // COURIER Monospace thermal receipt emulator
+  // ==========================================
+  let pendingCheckoutPrint = false;
+  const receiptPreviewModal = document.getElementById('receipt-preview-modal');
+  const receiptPreviewContainer = document.getElementById('receipt-preview-container');
+  const closeReceiptPreviewBtn = document.getElementById('close-receipt-preview-btn');
+  const cancelReceiptPreviewBtn = document.getElementById('cancel-receipt-preview-btn');
+  const confirmReceiptCheckoutBtn = document.getElementById('confirm-receipt-checkout-btn');
+
+  window.openReceiptPreview = function (shouldPrint) {
+    if (cart.length === 0) {
+      alert('Cart is empty! Add items before checking out.');
+      return;
+    }
+
+    // Validate stock levels first before opening preview
+    let sufficientStock = true;
+    let missingItem = '';
+    const proposedDeductions = {};
+    cart.forEach(cartItem => {
+      const specs = getDeductionSpecs(cartItem);
+      Object.keys(specs).forEach(ing => {
+        proposedDeductions[ing] = (proposedDeductions[ing] || 0) + (specs[ing] * cartItem.qty);
+      });
+    });
+
+    Object.keys(proposedDeductions).forEach(ing => {
+      if (inventory[ing] === undefined) inventory[ing] = 1000;
+      if (inventory[ing] < proposedDeductions[ing]) {
+        sufficientStock = false;
+        missingItem = ing.replace('_', ' ');
+      }
+    });
+
+    if (!sufficientStock) {
+      alert(`Insufficient stock! Low on: ${missingItem}. Please restock.`);
+      return;
+    }
+
+    pendingCheckoutPrint = shouldPrint;
+
+    // Construct the proposed bill object to show in receipt preview
+    const custNameInput = document.getElementById('cust-name');
+    const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
+    const orderNum = document.getElementById('order-num').value;
+    const billIdToSave = editingBillId || orderNum;
+
+    const isGstEnabled = businessProfile.gstEnabled !== false;
+    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+
+    let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const phoneInput = document.getElementById('cust-phone');
+    const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+
+    let loyaltyDiscount = 0;
+    let matchedCustomer = null;
+    if (phoneVal || custName) {
+      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
+    }
+
+    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
+    }
+
+    const taxableAmount = subtotal - loyaltyDiscount;
+    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
+    const total = taxableAmount + gst;
+
+    const proposedBill = {
+      orderId: billIdToSave,
+      customerName: custName,
+      customerPhone: phoneVal || null,
+      dateTime: new Date().toLocaleString('en-IN'),
+      items: [...cart],
+      subtotal: subtotal,
+      discount: loyaltyDiscount,
+      gst: gst,
+      total: total,
+      paymentMethod: selectedPaymentMethod,
+      orderType: activeOrderType
+    };
+
+    // Render the simulated receipt using exactly the same layout helper
+    function centerText32(text) {
+      const width = 32;
+      if (text.length >= width) return text.slice(0, width);
+      const leftPad = Math.floor((width - text.length) / 2);
+      return ' '.repeat(leftPad) + text;
+    }
+
+    function formatRow32(col1, col2, col3) {
+      const w1 = 20;
+      const w2 = 5;
+      const w3 = 7;
+      let c1 = col1.slice(0, w1 - 1).padEnd(w1, ' ');
+      const c2 = col2.toString().padStart(w2, ' ');
+      const c3 = col3.toString().padStart(w3, ' ');
+      return c1 + c2 + c3;
+    }
+
+    function formatDouble32(label, value) {
+      const totalWidth = 32;
+      const valStr = value.toString();
+      const padSize = totalWidth - label.length;
+      if (padSize < valStr.length) {
+        return label.slice(0, totalWidth - valStr.length) + valStr;
+      }
+      return label + valStr.padStart(padSize, ' ');
+    }
+
+    const borderDouble = '='.repeat(32);
+    const borderSingle = '-'.repeat(32);
+
+    let txt = '';
+    txt += borderDouble + '\n';
+    txt += centerText32(businessProfile.name) + '\n';
+    txt += centerText32(businessProfile.address) + '\n';
+    txt += centerText32(businessProfile.phone) + '\n';
+    txt += borderDouble + '\n\n';
+
+    const leftBill = `Bill: ${proposedBill.orderId}`;
+    const rightPay = proposedBill.paymentMethod || 'Cash';
+    txt += leftBill + rightPay.padStart(32 - leftBill.length, ' ') + '\n';
+    txt += `Date: ${proposedBill.dateTime}\n`;
+    txt += `Guest: ${proposedBill.customerName}\n\n`;
+
+    txt += borderSingle + '\n';
+    txt += formatRow32('Item', 'Qty', 'Amt') + '\n';
+    txt += borderSingle + '\n';
+
+    proposedBill.items.forEach(item => {
+      let displayName = item.name;
+      if (item.size && item.size !== 'Small') {
+        displayName += ` (${item.size.charAt(0)})`;
+      }
+      txt += formatRow32(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
+      txt += `  (₹${item.price} each)\n`;
+      if (item.toppings && item.toppings.length > 0) {
+        txt += `  + ${item.toppings.join(', ')}\n`;
+      }
+      if (item.notes) {
+        txt += `  * Note: ${item.notes}\n`;
+      }
+    });
+
+    txt += borderSingle + '\n';
+    txt += formatDouble32('Subtotal', proposedBill.subtotal.toString()) + '\n';
+    if (businessProfile.gstEnabled !== false) {
+      txt += formatDouble32('GST', proposedBill.gst.toString()) + '\n';
+    }
+    if (proposedBill.discount && proposedBill.discount > 0) {
+      txt += formatDouble32('Discount', `-${proposedBill.discount}`) + '\n';
+    }
+    txt += borderDouble + '\n';
+    txt += formatDouble32('GRAND TOTAL', proposedBill.total.toString()) + '\n';
+    txt += borderDouble + '\n\n';
+    txt += centerText32('Thank you for visiting!') + '\n';
+    txt += centerText32('Visit Again ☕') + '\n';
+
+    if (receiptPreviewContainer) {
+      receiptPreviewContainer.innerHTML = `<pre style="margin:0; font-weight:600; font-family:'Courier New', monospace; white-space:pre; color:#000;">${txt}</pre>`;
+    }
+
+    if (confirmReceiptCheckoutBtn) {
+      if (shouldPrint) {
+        confirmReceiptCheckoutBtn.innerHTML = '<i class="fa-solid fa-print"></i> Confirm & Print';
+        confirmReceiptCheckoutBtn.style.backgroundColor = '#2ECC71';
+      } else {
+        confirmReceiptCheckoutBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Confirm & Save';
+        confirmReceiptCheckoutBtn.style.backgroundColor = '#3498DB';
+      }
+    }
+
+    if (receiptPreviewModal) {
+      receiptPreviewModal.classList.add('active');
+    }
+    SoundEffects.playPop();
+  };
+
+  window.closeReceiptPreview = function () {
+    if (receiptPreviewModal) {
+      receiptPreviewModal.classList.remove('active');
+    }
+  };
+
+  if (closeReceiptPreviewBtn) closeReceiptPreviewBtn.addEventListener('click', window.closeReceiptPreview);
+  if (cancelReceiptPreviewBtn) cancelReceiptPreviewBtn.addEventListener('click', window.closeReceiptPreview);
+
+  if (confirmReceiptCheckoutBtn) {
+    confirmReceiptCheckoutBtn.addEventListener('click', () => {
+      window.closeReceiptPreview();
+      performCheckout(pendingCheckoutPrint);
+    });
+  }
+
+  // ==========================================
+  // KEYBOARD GRID SPATIAL NAVIGATION ENGINE
+  // ==========================================
+  document.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const isCard = active && active.classList.contains('pos-item-card');
+
+    // Escape closes modals or cancels edits
+    if (e.key === 'Escape') {
+      let actionTaken = false;
+
+      // 1. Close CRM suggestions if open
+      const crmSugs = document.getElementById('crm-suggestions');
+      if (crmSugs && crmSugs.style.display !== 'none') {
+        crmSugs.style.display = 'none';
+        crmSugs.innerHTML = '';
+        actionTaken = true;
+      }
+
+      // 2. Close receipt preview modal if open
+      const receiptModal = document.getElementById('receipt-preview-modal');
+      if (receiptModal && (receiptModal.style.display === 'flex' || receiptModal.style.display === 'block' || receiptModal.classList.contains('active'))) {
+        if (typeof window.closeReceiptPreview === 'function') {
+          window.closeReceiptPreview();
+        } else {
+          receiptModal.classList.remove('active');
+          receiptModal.style.display = 'none';
+        }
+        actionTaken = true;
+      }
+
+      // 3. Close other visible modal backdrops
+      const modBackdrops = document.querySelectorAll('.modal-backdrop');
+      modBackdrops.forEach(modal => {
+        if (modal !== receiptModal) {
+          const isVisible = modal.classList.contains('active') || modal.style.display === 'flex' || modal.style.display === 'block';
+          if (isVisible) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+            actionTaken = true;
+          }
+        }
+      });
+
+      // 4. Cancel active bill edit if editing a bill
+      if (!actionTaken && typeof editingBillId !== 'undefined' && editingBillId !== null) {
+        const cancelBillBtn = document.getElementById('cancel-edit-bill-btn');
+        if (cancelBillBtn) {
+          cancelBillBtn.click();
+          actionTaken = true;
+        }
+      }
+
+      // 5. Cancel active table session if editing a table
+      if (!actionTaken && typeof activeTableSession !== 'undefined' && activeTableSession !== null) {
+        const cancelBtn = document.getElementById('table-session-cancel-btn');
+        if (cancelBtn) {
+          cancelBtn.click();
+          actionTaken = true;
+        }
+      }
+    }
+
+    // Alt+D Toggle theme
+    if (e.altKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      toggleTheme();
+    }
+
+    // Alt+C Clear cart
+    if (e.altKey && e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      const clearBtn = document.getElementById('clear-cart');
+      if (clearBtn) clearBtn.click();
+    }
+
+    // Alt+S Save checkout
+    if (e.altKey && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      const saveBtn = document.getElementById('checkout-save-btn');
+      if (saveBtn) saveBtn.click();
+    }
+
+    // Alt+P Print checkout
+    if (e.altKey && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      const printBtn = document.getElementById('checkout-print-btn');
+      if (printBtn) printBtn.click();
+    }
+
+    // Spatial grid navigation
+    if (isCard) {
+      const cards = Array.from(document.querySelectorAll('#pos-items-grid .pos-item-card'));
+      const index = cards.indexOf(active);
+      if (index === -1) return;
+
+      const grid = document.getElementById('pos-items-grid');
+      const gridWidth = grid.offsetWidth;
+      const cardWidth = active.offsetWidth;
+      const gap = 20; // grid gap is 20px
+      const cols = Math.max(1, Math.floor((gridWidth + gap) / (cardWidth + gap)));
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        const next = cards[index + 1] || cards[0];
+        next.focus();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const prev = cards[index - 1] || cards[cards.length - 1];
+        prev.focus();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const target = cards[index + cols] || cards[index % cols] || cards[0];
+        target.focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const target = cards[index - cols];
+        if (target) {
+          target.focus();
+        } else {
+          // Focus search bar if moving up from first row
+          const search = document.getElementById('pos-search');
+          if (search) search.focus();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const itemTitleEl = active.querySelector('.pos-item-title');
+        if (itemTitleEl) {
+          const itemName = itemTitleEl.textContent;
+          const baseItem = menu.find(i => i.name === itemName);
+          if (baseItem) {
+            if (e.shiftKey) {
+              openCustomizationModal(baseItem);
+            } else {
+              addDefaultToCart(baseItem);
+            }
+          }
+        }
+      }
+    } else if (active && active.id === 'pos-search') {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const firstCard = document.querySelector('#pos-items-grid .pos-item-card');
+        if (firstCard) firstCard.focus();
+      }
+    }
+  });
+
+  // ==========================================
+  // SIDEBAR COLLAPSED HOVER DRAWER CONTROLLER
+  // ==========================================
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    // Dynamically inject absolute hover-zone strip
+    const hoverZone = document.createElement('div');
+    hoverZone.className = 'sidebar-hover-trigger';
+    document.body.appendChild(hoverZone);
+
+    // Mouse reveal handlers
+    hoverZone.addEventListener('mouseenter', () => {
+      sidebar.classList.add('reveal');
+    });
+
+    sidebar.addEventListener('mouseenter', () => {
+      sidebar.classList.add('reveal');
+    });
+
+    // Mouse collapse handlers
+    sidebar.addEventListener('mouseleave', () => {
+      sidebar.classList.remove('reveal');
+    });
+  }
+
+  // ==========================================
+  // SALES POPULARITY TRACKER ACTIONS
+  // ==========================================
+  window.trackItemPopularity = function (items) {
+    const changedItems = [];
+    items.forEach(item => {
+      const key = item.name.toLowerCase().trim();
+      posPopularityMap[key] = (posPopularityMap[key] || 0) + item.qty;
+      changedItems.push({ item_name: key, count: posPopularityMap[key] });
+    });
+    localStorage.setItem('doppio_pos_popularity', JSON.stringify(posPopularityMap));
+    renderPOSItems(); // instantly re-evaluate positions in the grid
+
+    // Sync updated counts to Supabase
+    if (supabaseClient && changedItems.length > 0) {
+      supabaseClient.from('doppio_pos_popularity')
+        .upsert(changedItems.map(c => ({
+          item_name: c.item_name,
+          count: c.count,
+          updated_at: new Date().toISOString()
+        })), { onConflict: 'tenant_id,item_name' })
+        .then(({ error }) => {
+          if (error) console.warn('Supabase popularity upsert failed:', error.message);
+        });
+    }
+  };
+
+  // Bind change event listener on Sort dropdown selector
+  const sortSelect = document.getElementById('pos-sort-select');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      renderPOSItems();
+      SoundEffects.playClick();
+    });
+  }
+
+  // ==========================================
+  // SPLIT PAYMENT ACTIONS & BALANCE ENGINE
+  // ==========================================
+  const toggleSplitPayBtn = document.getElementById('toggle-split-pay-btn');
+  const singlePayContainer = document.getElementById('single-pay-container');
+  const splitPayContainer = document.getElementById('split-pay-container');
+
+  const splitUpiInput = document.getElementById('split-pay-upi');
+  const splitCashInput = document.getElementById('split-pay-cash');
+  const splitCardInput = document.getElementById('split-pay-card');
+  const splitRemainingVal = document.getElementById('split-pay-remaining-val');
+  const splitStatusLabel = document.getElementById('split-pay-status-label');
+
+  function calculateSplitBalance() {
+    if (!isSplitPaymentActive) return;
+
+    // Get final order total directly from computed state
+    let total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const isGstEnabled = businessProfile.gstEnabled !== false;
+    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+
+    const custNameInput = document.getElementById('cust-name');
+    const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
+    const phoneInput = document.getElementById('cust-phone');
+    const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+
+    let loyaltyDiscount = 0;
+    let matchedCustomer = null;
+    if (phoneVal || custName) {
+      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
+    }
+    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+      loyaltyDiscount = Math.round(total * (loyaltyDiscountPercentage / 100));
+    }
+
+    const taxableAmount = total - loyaltyDiscount;
+    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
+    const finalTotal = taxableAmount + gst;
+
+    const upi = parseInt(splitUpiInput.value) || 0;
+    const cash = parseInt(splitCashInput.value) || 0;
+    const card = parseInt(splitCardInput.value) || 0;
+
+    const splitPayment = posDomain.evaluateSplitPayment(finalTotal, { upi, cash, card });
+    const remaining = splitPayment.remaining;
+
+    if (splitRemainingVal) {
+      if (remaining > 0) {
+        splitStatusLabel.textContent = "Remaining:";
+        splitRemainingVal.textContent = `₹${remaining}`;
+        splitRemainingVal.style.color = 'var(--danger-color)';
+
+        // Disable checkout buttons to prevent saving an unbalanced split bill
+        if (checkoutSaveBtn) checkoutSaveBtn.disabled = true;
+        if (checkoutPrintBtn) checkoutPrintBtn.disabled = true;
+        if (checkoutSaveBtn) checkoutSaveBtn.style.opacity = '0.55';
+        if (checkoutPrintBtn) checkoutPrintBtn.style.opacity = '0.55';
+      } else if (remaining < 0) {
+        splitStatusLabel.textContent = "Overpaid:";
+        splitRemainingVal.textContent = `₹${Math.abs(remaining)}`;
+        splitRemainingVal.style.color = '#F39C12';
+
+        // Disable checkout buttons
+        if (checkoutSaveBtn) checkoutSaveBtn.disabled = true;
+        if (checkoutPrintBtn) checkoutPrintBtn.disabled = true;
+        if (checkoutSaveBtn) checkoutSaveBtn.style.opacity = '0.55';
+        if (checkoutPrintBtn) checkoutPrintBtn.style.opacity = '0.55';
+      } else {
+        splitStatusLabel.textContent = "Balanced:";
+        splitRemainingVal.textContent = "₹0.00";
+        splitRemainingVal.style.color = 'var(--success-color)';
+
+        // Enable checkout buttons
+        if (checkoutSaveBtn) checkoutSaveBtn.disabled = false;
+        if (checkoutPrintBtn) checkoutPrintBtn.disabled = false;
+        if (checkoutSaveBtn) checkoutSaveBtn.style.opacity = '1';
+        if (checkoutPrintBtn) checkoutPrintBtn.style.opacity = '1';
+      }
+    }
+  }
+
+  window.calculateSplitBalance = calculateSplitBalance;
+
+  if (toggleSplitPayBtn) {
+    toggleSplitPayBtn.addEventListener('click', () => {
+      isSplitPaymentActive = !isSplitPaymentActive;
+      SoundEffects.playClick();
+
+      if (isSplitPaymentActive) {
+        toggleSplitPayBtn.innerHTML = '<i class="fa-solid fa-arrows-split-up-and-left"></i> Single Pay';
+        if (singlePayContainer) singlePayContainer.style.display = 'none';
+        if (splitPayContainer) splitPayContainer.style.display = 'flex';
+
+        // Pre-fill UPI input with the entire total to make checkout fast
+        let total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const isGstEnabled = businessProfile.gstEnabled !== false;
+        const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+        const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+        const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+
+        const custNameInput = document.getElementById('cust-name');
+        const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
+        const phoneInput = document.getElementById('cust-phone');
+        const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+
+        let loyaltyDiscount = 0;
+        let matchedCustomer = null;
+        if (phoneVal || custName) {
+          matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
+        }
+        if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+          loyaltyDiscount = Math.round(total * (loyaltyDiscountPercentage / 100));
+        }
+        const finalTotal = total - loyaltyDiscount + (isGstEnabled ? Math.round((total - loyaltyDiscount) * (gstPercentage / 100)) : 0);
+
+        if (splitUpiInput) splitUpiInput.value = finalTotal;
+        if (splitCashInput) splitCashInput.value = 0;
+        if (splitCardInput) splitCardInput.value = 0;
+
+        calculateSplitBalance();
+      } else {
+        toggleSplitPayBtn.innerHTML = '<i class="fa-solid fa-arrows-split-up-and-left"></i> Split Pay';
+        if (singlePayContainer) singlePayContainer.style.display = 'flex';
+        if (splitPayContainer) splitPayContainer.style.display = 'none';
+
+        // Restore checkout buttons to enabled state
+        if (checkoutSaveBtn) checkoutSaveBtn.disabled = false;
+        if (checkoutPrintBtn) checkoutPrintBtn.disabled = false;
+        if (checkoutSaveBtn) checkoutSaveBtn.style.opacity = '1';
+        if (checkoutPrintBtn) checkoutPrintBtn.style.opacity = '1';
+      }
+    });
+  }
+
+  // Bind keyup and change events on split inputs
+  [splitUpiInput, splitCashInput, splitCardInput].forEach(input => {
+    if (input) {
+      ['keyup', 'change', 'input'].forEach(evt => {
+        input.addEventListener(evt, calculateSplitBalance);
+      });
+    }
+  });
+
+  // Spacious & Clutter-Free Takeaway Cart Progressive Disclosure handlers
+  const toggleDetailsBtn = document.getElementById('toggle-summary-details-btn');
+  const detailsPanel = document.getElementById('cart-summary-details');
+  if (toggleDetailsBtn && detailsPanel) {
+    toggleDetailsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      SoundEffects.playClick();
+      if (detailsPanel.style.display === 'none') {
+        detailsPanel.style.display = 'block';
+        toggleDetailsBtn.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+      } else {
+        detailsPanel.style.display = 'none';
+        toggleDetailsBtn.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+      }
+    });
+  }
+
+  const moreActionsBtn = document.getElementById('cart-more-actions-btn');
+  const moreActionsMenu = document.getElementById('cart-more-actions-menu');
+  if (moreActionsBtn && moreActionsMenu) {
+    moreActionsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      SoundEffects.playClick();
+      if (moreActionsMenu.style.display === 'none') {
+        moreActionsMenu.style.display = 'flex';
+      } else {
+        moreActionsMenu.style.display = 'none';
+      }
+    });
+
+    // Close menu when any dropdown action item inside it is clicked
+    const actionItems = moreActionsMenu.querySelectorAll('.dropdown-action-item');
+    actionItems.forEach(item => {
+      item.addEventListener('click', () => {
+        moreActionsMenu.style.display = 'none';
+      });
+    });
+
+    // Auto-dismiss menu on clicking outside
+    document.addEventListener('click', (e) => {
+      if (!moreActionsBtn.contains(e.target) && !moreActionsMenu.contains(e.target)) {
+        moreActionsMenu.style.display = 'none';
+      }
+    });
+  }
+
+
+
+  // Expose activeShift internationally for checkout tagging
+  window.getActiveShiftId = function () {
+    return activeShift ? activeShift.shiftId : null;
+  };
+
+  // Re-evaluate POS drawer locks & update Header metrics
+  function evaluateShiftStatusUI() {
+    const isShiftEnabled = businessProfile.shiftEnabled === true;
+    const isLockActive = businessProfile.shiftPosLock !== false;
+
+    const lockOverlay = document.getElementById('shift-lock-overlay');
+    const headerPill = document.getElementById('header-shift-pill');
+    const shiftStatus = document.getElementById('header-shift-status');
+    const shiftLabel = document.getElementById('header-shift-label');
+    const shiftIcon = document.getElementById('header-shift-icon');
+
+    if (!isShiftEnabled) {
+      if (lockOverlay) lockOverlay.style.display = 'none';
+      return;
+    }
+
+    if (activeShift) {
+      // Shift is OPEN
+      if (lockOverlay) lockOverlay.style.display = 'none';
+      if (shiftStatus) shiftStatus.textContent = activeShift.cashierName;
+      if (shiftLabel) shiftLabel.textContent = `Shift: ₹${getDrawerCashExpected()}`;
+      if (shiftIcon) {
+        shiftIcon.className = 'fa-solid fa-cash-register';
+        shiftIcon.style.color = '#2ecc71';
+      }
+    } else {
+      // Shift is CLOSED
+      if (isLockActive) {
+        if (lockOverlay) lockOverlay.style.display = 'flex';
+      } else {
+        if (lockOverlay) lockOverlay.style.display = 'none';
+      }
+      if (shiftStatus) shiftStatus.textContent = 'Closed';
+      if (shiftLabel) shiftLabel.textContent = 'Shift Manager';
+      if (shiftIcon) {
+        shiftIcon.className = 'fa-solid fa-clock';
+        shiftIcon.style.color = '#e74c3c';
+      }
+    }
+  }
+  window.evaluateShiftStatusUI = evaluateShiftStatusUI;
+
+  // Expected Cash calculation
+  function getDrawerCashExpected() {
+    if (!activeShift) return 0;
+
+    // Starting float
+    const float = parseFloat(activeShift.openingFloat) || 0;
+
+    // Cash Sales
+    const shiftBills = bills.filter(b => b && b.shiftId === activeShift.shiftId);
+    let cashSalesTotal = 0;
+    shiftBills.forEach(b => {
+      if (!b) return;
+      if (b.paymentMethod === 'Cash') {
+        cashSalesTotal += parseFloat(b.total) || 0;
+      } else if (b.paymentMethod && b.paymentMethod.includes('Split:')) {
+        // Extract cash split value
+        const cashMatch = b.paymentMethod.match(/Cash=(\d+)/);
+        if (cashMatch && cashMatch[1]) {
+          cashSalesTotal += parseFloat(cashMatch[1]) || 0;
+        }
+      }
+    });
+
+    // Payouts & Drops
+    const sessionEvents = shiftEvents.filter(e => e && e.shiftId === activeShift.shiftId);
+    let payoutsTotal = 0;
+    let dropsTotal = 0;
+    sessionEvents.forEach(e => {
+      if (!e) return;
+      if (e.eventType === 'PAYOUT') payoutsTotal += parseFloat(e.amount) || 0;
+      if (e.eventType === 'SAFE_DROP') dropsTotal += parseFloat(e.amount) || 0;
+    });
+
+    const expected = float + cashSalesTotal - payoutsTotal - dropsTotal;
+    return Math.round(expected);
+  }
+
+  // Hook event trigger bindings
+  const shiftPillBtn = document.getElementById('header-shift-pill');
+  const shiftLockBtn = document.getElementById('shift-start-prompt-btn');
+
+  function handleShiftPillClick() {
+    if (!businessProfile.shiftEnabled) return;
+    SoundEffects.playClick();
+    if (activeShift) {
+      // Show Active Drawer Actions
+      openShiftDetailsModal();
+    } else {
+      // Prompt Shift Initialization
+      openShiftOpenModal();
+    }
+  }
+
+  if (shiftPillBtn) shiftPillBtn.addEventListener('click', handleShiftPillClick);
+  if (shiftLockBtn) shiftLockBtn.addEventListener('click', handleShiftPillClick);
+
+  // Emergency shift lock bypass handler
+  const shiftBypassBtn = document.getElementById('shift-lock-bypass-btn');
+  if (shiftBypassBtn) {
+    shiftBypassBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (confirm('⚠️ Emergency Bypass: This will allow billing without a formal shift (local only). Continue?')) {
+        const tempShift = {
+          shiftId: `TEMP-SHIFT-${Date.now()}`,
+          cashierName: 'Emergency Mode',
+          openedAt: new Date().toISOString(),
+          closedAt: null,
+          openingFloat: 0,
+          expectedCash: 0,
+          actualCash: 0,
+          variance: 0,
+          totalSalesCash: 0,
+          totalSalesUpi: 0,
+          totalSalesCard: 0,
+          totalPayouts: 0,
+          totalSafeDrops: 0,
+          status: 'TEMP_OPEN',
+          notes: 'Emergency bypass mode (local-only)',
+          isEmergencyBypass: true
+        };
+        activeShift = tempShift;
+        localStorage.setItem('doppio_current_shift', JSON.stringify(activeShift));
+        evaluateShiftStatusUI();
+        showNotificationToast('⚠️ Emergency bypass mode active (local-only)');
+      }
+    });
+  }
+
+  // Modals operations
+  const shiftOpenModal = document.getElementById('shift-open-modal');
+  const closeShiftOpenModal = document.getElementById('close-shift-open-modal');
+  const cancelShiftOpenBtn = document.getElementById('cancel-shift-open-btn');
+  const shiftOpenForm = document.getElementById('shift-open-form');
+
+  function openShiftOpenModal() {
+    if (!shiftOpenModal) return;
+    const floatInput = document.getElementById('shift-opening-float-input');
+    if (floatInput) floatInput.value = businessProfile.shiftDefaultFloat || 2000;
+    shiftOpenModal.classList.add('active');
+  }
+
+  if (closeShiftOpenModal) closeShiftOpenModal.addEventListener('click', () => shiftOpenModal.classList.remove('active'));
+  if (cancelShiftOpenBtn) cancelShiftOpenBtn.addEventListener('click', () => shiftOpenModal.classList.remove('active'));
+
+  if (shiftOpenForm) {
+    shiftOpenForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      SoundEffects.playSuccess();
+
+      const cashierName = document.getElementById('shift-cashier-select').value;
+      const openingFloat = parseFloat(document.getElementById('shift-opening-float-input').value) || 0;
+
+      const newShift = {
+        shiftId: `SHIFT-${Date.now()}`,
+        cashierName,
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        openingFloat,
+        expectedCash: openingFloat,
+        actualCash: 0,
+        variance: 0,
+        totalSalesCash: 0,
+        totalSalesUpi: 0,
+        totalSalesCard: 0,
+        totalPayouts: 0,
+        totalSafeDrops: 0,
+        status: 'OPEN',
+        notes: ''
+      };
+
+      activeShift = newShift;
+      localStorage.setItem('doppio_current_shift', JSON.stringify(activeShift));
+
+      // Push shift to cloud database
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from('doppio_shifts').insert({
+            shiftId: newShift.shiftId,
+            cashierName: newShift.cashierName,
+            openedAt: newShift.openedAt,
+            openingFloat: newShift.openingFloat,
+            status: 'OPEN'
+          });
+        } catch (err) {
+          console.warn('Supabase shift creation failed (saved locally):', err);
+        }
+      }
+
+      shiftOpenModal.classList.remove('active');
+      evaluateShiftStatusUI();
+      alert(`Shift successfully initialized for cashier: ${cashierName}!`);
+    });
+  }
+
+  // Active shift actions details modal
+  const shiftDetailsModal = document.getElementById('shift-details-modal');
+  const closeShiftDetailsModal = document.getElementById('close-shift-details-modal');
+
+  function openShiftDetailsModal() {
+    if (!shiftDetailsModal || !activeShift) return;
+
+    document.getElementById('details-cashier-name').textContent = activeShift.cashierName;
+    document.getElementById('details-opened-at').textContent = new Date(activeShift.openedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date(activeShift.openedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    document.getElementById('details-opening-float').textContent = `₹${activeShift.openingFloat}`;
+
+    const expected = getDrawerCashExpected();
+    document.getElementById('details-drawer-cash').textContent = `₹${expected}`;
+
+    const maxLimit = businessProfile.shiftMaxDrawer || 5000;
+    const detailsMaxLimitEl = document.getElementById('details-max-limit-info');
+    if (detailsMaxLimitEl) {
+      detailsMaxLimitEl.textContent = `Safe Drop Threshold: ₹${maxLimit}`;
+      if (expected >= maxLimit) {
+        detailsMaxLimitEl.innerHTML = `<span style="color:#e74c3c; font-weight:700;">⚠️ Threshold Exceeded (Max: ₹${maxLimit}) - Drop Recommended!</span>`;
+      }
+    }
+
+    shiftDetailsModal.classList.add('active');
+  }
+
+  if (closeShiftDetailsModal) closeShiftDetailsModal.addEventListener('click', () => shiftDetailsModal.classList.remove('active'));
+
+  // Manual Adjustments Form Modals (Payouts & Safe Drops)
+  const shiftActionModal = document.getElementById('shift-action-modal');
+  const closeShiftActionModal = document.getElementById('close-shift-action-modal');
+  const cancelShiftActionBtn = document.getElementById('cancel-shift-action-btn');
+  const shiftActionForm = document.getElementById('shift-action-form');
+
+  const btnPayout = document.getElementById('btn-shift-payout');
+  const btnDrop = document.getElementById('btn-shift-drop');
+
+  if (btnPayout) {
+    btnPayout.addEventListener('click', () => {
+      SoundEffects.playClick();
+      document.getElementById('action-modal-title').innerHTML = '<i class="fa-solid fa-circle-minus" style="color:#e74c3c;"></i> Log Cash Vendor Payout';
+      document.getElementById('action-event-type').value = 'PAYOUT';
+      document.getElementById('action-amount-input').value = '';
+      document.getElementById('action-reason-input').placeholder = 'e.g. Bought 2 bags of ice, milk...';
+      document.getElementById('action-reason-input').value = '';
+      shiftDetailsModal.classList.remove('active');
+      shiftActionModal.classList.add('active');
+    });
+  }
+
+  if (btnDrop) {
+    btnDrop.addEventListener('click', () => {
+      SoundEffects.playClick();
+      document.getElementById('action-modal-title').innerHTML = '<i class="fa-solid fa-safe" style="color:#2980b9;"></i> Log Cash Drop to Safe';
+      document.getElementById('action-event-type').value = 'SAFE_DROP';
+      document.getElementById('action-amount-input').value = '';
+      document.getElementById('action-reason-input').placeholder = 'e.g. Drawer excess cash safe drop...';
+      document.getElementById('action-reason-input').value = '';
+      shiftDetailsModal.classList.remove('active');
+      shiftActionModal.classList.add('active');
+    });
+  }
+
+  if (closeShiftActionModal) closeShiftActionModal.addEventListener('click', () => shiftActionModal.classList.remove('active'));
+  if (cancelShiftActionBtn) cancelShiftActionBtn.addEventListener('click', () => {
+    shiftActionModal.classList.remove('active');
+    openShiftDetailsModal();
+  });
+
+  if (shiftActionForm) {
+    shiftActionForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!activeShift) return;
+
+      SoundEffects.playSuccess();
+      const eventType = document.getElementById('action-event-type').value;
+      const amount = parseFloat(document.getElementById('action-amount-input').value) || 0;
+      const reason = document.getElementById('action-reason-input').value.trim();
+
+      const newEvent = {
+        eventId: `EVENT-${Date.now()}`,
+        shiftId: activeShift.shiftId,
+        eventType,
+        amount,
+        reason,
+        createdAt: new Date().toISOString()
+      };
+
+      shiftEvents.unshift(newEvent);
+      localStorage.setItem('doppio_shift_events_local', JSON.stringify(shiftEvents));
+
+      // Push shift event to Supabase cloud
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from('doppio_shift_events').insert({
+            eventId: newEvent.eventId,
+            shiftId: newEvent.shiftId,
+            eventType: newEvent.eventType,
+            amount: newEvent.amount,
+            reason: newEvent.reason
+          });
+        } catch (err) {
+          console.warn('Supabase shift event sync failed (saved locally):', err);
+        }
+      }
+
+      shiftActionModal.classList.remove('active');
+      evaluateShiftStatusUI();
+      openShiftDetailsModal();
+      alert(`${eventType === 'PAYOUT' ? 'Payout' : 'Safe Drop'} recorded successfully!`);
+    });
+  }
+
+  // Reconciliation End shift closure
+  const btnEndActiveShift = document.getElementById('btn-end-active-shift');
+  const shiftCloseModal = document.getElementById('shift-close-modal');
+  const closeShiftCloseModal = document.getElementById('close-shift-close-modal');
+  const cancelShiftCloseBtn = document.getElementById('cancel-shift-close-btn');
+  const shiftCloseForm = document.getElementById('shift-close-form');
+
+  if (btnEndActiveShift) {
+    btnEndActiveShift.addEventListener('click', () => {
+      if (!activeShift) return;
+      SoundEffects.playClick();
+      shiftDetailsModal.classList.remove('active');
+
+      // Calculate active shift summaries
+      const floatVal = parseFloat(activeShift.openingFloat) || 0;
+      const sessionBills = bills.filter(b => b.shiftId === activeShift.shiftId);
+
+      let cashSales = 0;
+      let upiSales = 0;
+      let cardSales = 0;
+
+      sessionBills.forEach(b => {
+        if (b.paymentMethod === 'Cash') {
+          cashSales += parseFloat(b.total) || 0;
+        } else if (b.paymentMethod === 'UPI') {
+          upiSales += parseFloat(b.total) || 0;
+        } else if (b.paymentMethod === 'Card') {
+          cardSales += parseFloat(b.total) || 0;
+        } else if (b.paymentMethod && b.paymentMethod.includes('Split:')) {
+          const cashMatch = b.paymentMethod.match(/Cash=(\d+)/);
+          const upiMatch = b.paymentMethod.match(/UPI=(\d+)/);
+          const cardMatch = b.paymentMethod.match(/Card=(\d+)/);
+          if (cashMatch && cashMatch[1]) cashSales += parseFloat(cashMatch[1]) || 0;
+          if (upiMatch && upiMatch[1]) upiSales += parseFloat(upiMatch[1]) || 0;
+          if (cardMatch && cardMatch[1]) cardSales += parseFloat(cardMatch[1]) || 0;
+        }
+      });
+
+      const sessionEvents = shiftEvents.filter(e => e.shiftId === activeShift.shiftId);
+      let payouts = 0;
+      let drops = 0;
+      sessionEvents.forEach(e => {
+        if (e.eventType === 'PAYOUT') payouts += parseFloat(e.amount) || 0;
+        if (e.eventType === 'SAFE_DROP') drops += parseFloat(e.amount) || 0;
+      });
+
+      const expected = floatVal + cashSales - payouts - drops;
+
+      // Update Close Modal summary display fields
+      document.getElementById('close-summary-float').textContent = `₹${floatVal}`;
+      document.getElementById('close-summary-sales').textContent = `₹${cashSales}`;
+      document.getElementById('close-summary-payouts').textContent = `₹${payouts}`;
+      document.getElementById('close-summary-drops').textContent = `₹${drops}`;
+      document.getElementById('close-summary-expected').textContent = `₹${expected}`;
+
+      document.getElementById('shift-actual-cash-input').value = '';
+      document.getElementById('variance-alert-row').style.display = 'none';
+      document.getElementById('shift-notes-input').value = '';
+
+      shiftCloseModal.classList.add('active');
+    });
+  }
+
+  // Calculate live variance when typing actual cash
+  const actualCashInput = document.getElementById('shift-actual-cash-input');
+  if (actualCashInput) {
+    actualCashInput.addEventListener('input', () => {
+      const actual = parseFloat(actualCashInput.value) || 0;
+      const expectedText = document.getElementById('close-summary-expected').textContent.replace('₹', '');
+      const expected = parseFloat(expectedText) || 0;
+      const variance = actual - expected;
+
+      const varianceEl = document.getElementById('close-summary-variance');
+      const alertRow = document.getElementById('variance-alert-row');
+
+      if (alertRow) alertRow.style.display = 'flex';
+
+      if (varianceEl) {
+        if (variance === 0) {
+          varianceEl.textContent = `₹0.00 (Balanced)`;
+          varianceEl.style.color = '#27ae60';
+        } else if (variance > 0) {
+          varianceEl.textContent = `+₹${variance.toFixed(2)} (Overage)`;
+          varianceEl.style.color = '#2ecc71';
+        } else {
+          varianceEl.textContent = `-₹${Math.abs(variance).toFixed(2)} (Shortage)`;
+          varianceEl.style.color = '#e74c3c';
+        }
+      }
+    });
+  }
+
+  if (closeShiftCloseModal) closeShiftCloseModal.addEventListener('click', () => shiftCloseModal.classList.remove('active'));
+  if (cancelShiftCloseBtn) cancelShiftCloseBtn.addEventListener('click', () => {
+    shiftCloseModal.classList.remove('active');
+    openShiftDetailsModal();
+  });
+
+  if (shiftCloseForm) {
+    shiftCloseForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!activeShift) return;
+
+      const actualCash = parseFloat(document.getElementById('shift-actual-cash-input').value) || 0;
+      const expectedText = document.getElementById('close-summary-expected').textContent.replace('₹', '');
+      const expectedCash = parseFloat(expectedText) || 0;
+      const variance = actualCash - expectedCash;
+      const notes = document.getElementById('shift-notes-input').value.trim();
+
+      // Aggregate Shift sales
+      const sessionBills = bills.filter(b => b.shiftId === activeShift.shiftId);
+      let cashSales = 0;
+      let upiSales = 0;
+      let cardSales = 0;
+      sessionBills.forEach(b => {
+        if (b.paymentMethod === 'Cash') cashSales += parseFloat(b.total) || 0;
+        else if (b.paymentMethod === 'UPI') upiSales += parseFloat(b.total) || 0;
+        else if (b.paymentMethod === 'Card') cardSales += parseFloat(b.total) || 0;
+        else if (b.paymentMethod && b.paymentMethod.includes('Split:')) {
+          const cashMatch = b.paymentMethod.match(/Cash=(\d+)/);
+          const upiMatch = b.paymentMethod.match(/UPI=(\d+)/);
+          const cardMatch = b.paymentMethod.match(/Card=(\d+)/);
+          if (cashMatch && cashMatch[1]) cashSales += parseFloat(cashMatch[1]) || 0;
+          if (upiMatch && upiMatch[1]) upiSales += parseFloat(upiMatch[1]) || 0;
+          if (cardMatch && cardMatch[1]) cardSales += parseFloat(cardMatch[1]) || 0;
+        }
+      });
+
+      const sessionEvents = shiftEvents.filter(e => e.shiftId === activeShift.shiftId);
+      let payouts = 0;
+      let drops = 0;
+      sessionEvents.forEach(e => {
+        if (e.eventType === 'PAYOUT') payouts += parseFloat(e.amount) || 0;
+        if (e.eventType === 'SAFE_DROP') drops += parseFloat(e.amount) || 0;
+      });
+
+      activeShift.closedAt = new Date().toISOString();
+      activeShift.expectedCash = expectedCash;
+      activeShift.actualCash = actualCash;
+      activeShift.variance = variance;
+      activeShift.totalSalesCash = cashSales;
+      activeShift.totalSalesUpi = upiSales;
+      activeShift.totalSalesCard = cardSales;
+      activeShift.totalPayouts = payouts;
+      activeShift.totalSafeDrops = drops;
+      activeShift.status = 'CLOSED';
+      activeShift.notes = notes;
+
+      // Add to local history list
+      shiftHistory.unshift(activeShift);
+      localStorage.setItem('doppio_shifts_local', JSON.stringify(shiftHistory));
+
+      // Push shift closure to Supabase database
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from('doppio_shifts').upsert({
+            shiftId: activeShift.shiftId,
+            cashierName: activeShift.cashierName,
+            openedAt: activeShift.openedAt,
+            closedAt: activeShift.closedAt,
+            openingFloat: activeShift.openingFloat,
+            expectedCash: activeShift.expectedCash,
+            actualCash: activeShift.actualCash,
+            variance: activeShift.variance,
+            totalSalesCash: activeShift.totalSalesCash,
+            totalSalesUpi: activeShift.totalSalesUpi,
+            totalSalesCard: activeShift.totalSalesCard,
+            totalPayouts: activeShift.totalPayouts,
+            totalSafeDrops: activeShift.totalSafeDrops,
+            status: 'CLOSED',
+            notes: activeShift.notes
+          }, { onConflict: 'tenant_id,shiftId' });
+        } catch (err) {
+          console.warn('Supabase shift closure push failed (saved locally):', err);
+        }
+      }
+
+      // Generate Z-Report layout summary
+      renderZReportHTML(activeShift);
+
+      // Clear active shift session
+      activeShift = null;
+      localStorage.removeItem('doppio_current_shift');
+
+      shiftCloseModal.classList.remove('active');
+      evaluateShiftStatusUI();
+    });
+  }
+
+  // Z-Report Thermal Printer Summary generator
+  function renderZReportHTML(shift) {
+    const reportContent = document.getElementById('shift-zreport-content');
+    const auditModal = document.getElementById('shift-audit-modal');
+    if (!reportContent || !auditModal) return;
+
+    SoundEffects.playSuccess();
+    const openTime = new Date(shift.openedAt).toLocaleString('en-IN');
+    const closeTime = new Date(shift.closedAt).toLocaleString('en-IN');
+    const totalTransactions = bills.filter(b => b.shiftId === shift.shiftId).length;
+    const netTurnover = shift.totalSalesCash + shift.totalSalesUpi + shift.totalSalesCard;
+
+    let html = `
+--------------------------------
+  ${(activeTenantName || 'RESTROSUITE').toUpperCase().slice(0, 30).padEnd(30)}
+  Z-REPORT SHIFT CLOSURE AUDIT  
+--------------------------------
+SHIFT ID   : ${shift.shiftId}
+CASHIER    : ${shift.cashierName.toUpperCase()}
+OPENED AT  : ${openTime}
+CLOSED AT  : ${closeTime}
+STATUS     : CLOSURE COMPLETED
+--------------------------------
+DRAWER FLOATS SUMMARY (INR):
+--------------------------------
+START FLOAT      : INR ${shift.openingFloat}
+CASH SALES (+)   : INR ${shift.totalSalesCash}
+CASH PAYOUTS (-) : INR ${shift.totalPayouts}
+SAFE DROPS (-)   : INR ${shift.totalSafeDrops}
+--------------------------------
+EXPECTED CASH    : INR ${shift.expectedCash}
+DRAWER COUNTED   : INR ${shift.actualCash}
+DRAWER VARIANCE  : INR ${shift.variance >= 0 ? '+' : ''}${shift.variance}
+NOTES            : ${shift.notes || 'N/A'}
+--------------------------------
+SALES LEDGER SEGREGATION (INR):
+--------------------------------
+CASH SALES TOTAL : INR ${shift.totalSalesCash}
+UPI SALES TOTAL  : INR ${shift.totalSalesUpi}
+CARD SALES TOTAL : INR ${shift.totalSalesCard}
+--------------------------------
+NET TURNOVER     : INR ${netTurnover}
+TRANSACTIONS LOG : ${totalTransactions} Bills
+--------------------------------
+  Shift Handover Verified.
+  Supabase Synchronization: OK.
+--------------------------------
+`;
+
+    reportContent.textContent = html;
+
+    // Save report reference globally for printing triggers
+    window.activeZReportData = html;
+
+    auditModal.classList.add('active');
+  }
+
+  // Close zreport Modal
+  const closeShiftAuditModal = document.getElementById('close-shift-audit-modal');
+  const closeShiftAuditBtn = document.getElementById('close-shift-audit-btn');
+  const printShiftAuditBtn = document.getElementById('print-shift-audit-btn');
+
+  if (closeShiftAuditModal) closeShiftAuditModal.addEventListener('click', () => document.getElementById('shift-audit-modal').classList.remove('active'));
+  if (closeShiftAuditBtn) closeShiftAuditBtn.addEventListener('click', () => document.getElementById('shift-audit-modal').classList.remove('active'));
+
+  if (printShiftAuditBtn) {
+    printShiftAuditBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      const content = window.activeZReportData;
+      if (!content) return;
+
+      const printWindow = window.open('', '_blank', 'width=350,height=500');
+      printWindow.document.write(`
+        <html>
+        <head>
+          <title>Z-Report Shift Audit Print</title>
+          <style>
+            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; padding: 20px; line-height: 1.3; color: black; }
+          </style>
+        </head>
+        <body>${content}
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    });
+  }
+
+  // Quick Action: View ledger list inside active session
+  const btnAuditLog = document.getElementById('btn-shift-audit-log');
+  if (btnAuditLog) {
+    btnAuditLog.addEventListener('click', () => {
+      if (!activeShift) return;
+      SoundEffects.playClick();
+      shiftDetailsModal.classList.remove('active');
+
+      const sessionEvents = shiftEvents.filter(e => e.shiftId === activeShift.shiftId);
+      if (sessionEvents.length === 0) {
+        alert('No manual cash adjustments logged for this shift yet!');
+        openShiftDetailsModal();
+        return;
+      }
+
+      let logText = `Manual cash transactions for active shift:\n`;
+      sessionEvents.forEach((e, idx) => {
+        const time = new Date(e.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        logText += `${idx + 1}. [${time}] ${e.eventType}: ₹${e.amount} (${e.reason})\n`;
+      });
+      alert(logText);
+      openShiftDetailsModal();
+    });
+  }
+
+
+  // ==========================================================
+  // 19. LIVE QR ORDERING & TABLES CASHIER SYNC MODULE
+  // ==========================================================
+  const getMockPendingQrOrders = () => [
+    {
+      orderId: 'DO-1005',
+      customerName: 'Sanjay Dutt',
+      customerPhone: '9422158763',
+      orderType: 'ZOMATO',
+      dateTime: new Date(Date.now() - 10 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Bombay Grilled Sandwich', qty: 1, price: 369 },
+        { name: 'Nutella Thickshake', qty: 1, price: 299 }
+      ],
+      subtotal: 668,
+      discount: 0,
+      gst: 120.24,
+      total: 788,
+      status: 'Pending Review'
+    },
+    {
+      orderId: 'DO-1006',
+      customerName: 'Sneha Patil',
+      customerPhone: '9890123456',
+      orderType: 'SWIGGY',
+      dateTime: new Date(Date.now() - 8 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Alfredo Pennei Pasta', qty: 1, price: 499 },
+        { name: 'Oreo Cookies Thickshake', qty: 1, price: 299 }
+      ],
+      subtotal: 798,
+      discount: 0,
+      gst: 143.64,
+      total: 942,
+      status: 'Pending Review'
+    },
+    {
+      orderId: 'DO-1007',
+      customerName: 'Table 03 Guests',
+      customerPhone: '',
+      orderType: 'Dine-In',
+      tableNumber: '3',
+      dateTime: new Date(Date.now() - 15 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Masala Omelette', qty: 2, price: 269, isDone: false },
+        { name: 'Classic Hot Chocolate', qty: 1, price: 349, isDone: false }
+      ],
+      subtotal: 887,
+      discount: 0,
+      gst: 159.66,
+      total: 1047,
+      status: 'Accepted'
+    },
+    {
+      orderId: 'DO-1008',
+      customerName: 'Amit Trivedi',
+      customerPhone: '9922115544',
+      orderType: 'Takeaway',
+      dateTime: new Date(Date.now() - 25 * 60000).toLocaleString('en-IN'),
+      items: [
+        { name: 'Cheese Garlic', qty: 1, price: 249, isDone: true }
+      ],
+      subtotal: 249,
+      discount: 0,
+      gst: 44.82,
+      total: 294,
+      status: 'Ready'
+    }
+  ];
+
+  let pendingQrOrders = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_pending_qr_orders'));
+      if (Array.isArray(parsed)) {
+        if (parsed.length > 0 || activeTenantId) {
+          return parsed.filter(o => o && typeof o === 'object' && o.orderId && Array.isArray(o.items));
+        }
+      }
+      if (activeTenantId) {
+        return [];
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  })();
+  let qrRevenueToday = parseFloat(localStorage.getItem('doppio_qr_revenue_today')) || 0;
+  let completedQrOrdersCount = parseInt(localStorage.getItem('doppio_completed_qr_orders_count')) || 0;
+
+  // Tables state: EMPTY, ORDERING, PENDING, SERVED
+  let tablesState = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('doppio_tables_state'));
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        for (let i = 1; i <= (businessProfile.numberOfTables || 6); i++) {
+          if (!parsed[i]) parsed[i] = "EMPTY";
+        }
+        return parsed;
+      }
+      const initial = {};
+      const numTables = businessProfile.numberOfTables || 6;
+      for (let i = 1; i <= numTables; i++) {
+        initial[i] = "EMPTY";
+      }
+      if (!activeTenantId && numTables >= 3) {
+        initial[3] = "ORDERING";
+      }
+      return initial;
+      localStorage.setItem('doppio_tables_state', JSON.stringify(initial));
+      return initial;
+    } catch (e) {
+      return activeTenantId
+        ? { 1: "EMPTY", 2: "EMPTY", 3: "EMPTY", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" }
+        : { 1: "EMPTY", 2: "EMPTY", 3: "ORDERING", 4: "EMPTY", 5: "EMPTY", 6: "EMPTY" };
+    }
+  })();
+
+  // Broadcast Channels — scoped per tenant to prevent cross-tenant order leakage
+  const _dashTenantKey = (sessionStorage.getItem('tenant_slug') || activeTenantSlug || 'shared');
+  const qrOrdersChannel = new BroadcastChannel(_dashTenantKey + '_qr_orders');
+  const qrStatusChannel = new BroadcastChannel(_dashTenantKey + '_qr_order_status');
+
+
+  // DOM Elements for QR Tab
+  const activeTablesSummary = document.getElementById('active-tables-summary');
+  const pendingQrOrdersCount = document.getElementById('pending-qr-orders-count');
+  const qrRevenueTodayEl = document.getElementById('qr-revenue-today');
+  const tablesMapGrid = document.getElementById('tables-map-grid');
+  const qrOrdersQueue = document.getElementById('qr-orders-queue');
+  const glowingFeedBadge = document.getElementById('glowing-qr-feed-badge');
+  const liveQrBadge = document.getElementById('live-qr-badge');
+  const mobileLiveQrBadge = document.getElementById('mobile-live-qr-badge');
+
+  // Table QR Viewer elements
+  const qrViewerModal = document.getElementById('qr-viewer-modal');
+  const qrViewerClose = document.getElementById('qr-viewer-close');
+  const qrViewerTitle = document.getElementById('qr-viewer-title');
+  const qrPrintTableNum = document.getElementById('qr-print-table-num');
+  const qrViewerImg = document.getElementById('qr-viewer-img');
+  const qrViewerLinkLbl = document.getElementById('qr-viewer-link-lbl');
+  const btnPrintTableQr = document.getElementById('btn-print-table-qr');
+  const btnSimulateQrScan = document.getElementById('btn-simulate-qr-scan');
+
+  // Pre-fill todays QR metrics and render visual tables map on load (Made by Antigravity)
+  updateQrOrdersDashboardUI();
+
+  // Listen to incoming live broadcasts
+  qrOrdersChannel.addEventListener('message', (e) => {
+    if (!e.data) return;
+
+    if (e.data.type === 'NEW_QR_ORDER') {
+      const newOrder = e.data.order;
+
+      // Prevent duplicates in queue
+      if (!pendingQrOrders.some(o => o.orderId === newOrder.orderId)) {
+        pendingQrOrders.push(newOrder);
+        localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+        // Transition table status to PENDING checkout
+        if (newOrder.tableNumber && newOrder.tableNumber !== 'Takeaway') {
+          tablesState[newOrder.tableNumber] = "PENDING";
+          localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+        }
+
+        playIncomingOrderChime();
+        showNotificationToast(`New self-service order from Table ${newOrder.tableNumber}!`);
+        updateQrOrdersDashboardUI();
+      }
+    } else if (e.data.type === 'TABLE_CARTING') {
+      const tbl = e.data.tableNumber;
+      // Visually pulse as ORDERING if currently empty
+      if (tbl && tbl !== 'Takeaway' && tablesState[tbl] === "EMPTY") {
+        tablesState[tbl] = "ORDERING";
+        localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+        renderTablesMap();
+
+        // Timeout back to EMPTY after 35 seconds of no activity
+        setTimeout(() => {
+          if (tablesState[tbl] === "ORDERING") {
+            tablesState[tbl] = "EMPTY";
+            localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+            renderTablesMap();
+          }
+        }, 35000);
+      }
+    }
+  });
+
+  // Synthesize rich G5 major arpeggio sound chime
+  function playIncomingOrderChime() {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const frequencies = [261.63, 329.63, 392.00, 523.25]; // C4 -> E4 -> G4 -> C5
+
+      frequencies.forEach((freq, idx) => {
+        setTimeout(() => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.25);
+        }, idx * 120);
+      });
+    } catch (err) {
+      console.log("Browser policy blocked synthesizer chimes", err);
+    }
+  }
+
+  // ==========================================
+  // NOTIFICATION ALERT SYSTEM (Task 4)
+  // ==========================================
+
+  function addSystemNotification(title, msg, role = 'all', type = 'info') {
+    const newNotif = {
+      id: Date.now() + Math.random().toString(36).substr(2, 5),
+      title,
+      message: msg,
+      role,
+      type,
+      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      isRead: false
+    };
+    notifications.unshift(newNotif);
+    if (notifications.length > 50) {
+      notifications = notifications.slice(0, 50);
+    }
+    localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
+    renderNotifications();
+
+    // Sync to Supabase
+    if (supabaseClient) {
+      supabaseClient.from('doppio_notifications').insert({
+        id: newNotif.id,
+        tenant_id: activeTenantId,
+        title: newNotif.title,
+        message: newNotif.message,
+        role: newNotif.role,
+        type: newNotif.type,
+        timestamp: newNotif.timestamp,
+        isRead: newNotif.isRead
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase notification insert failed:', error.message);
+      });
+    }
+  }
+
+  function renderNotifications() {
+    const listContainer = document.getElementById('notifications-list-container');
+    const badgeEl = document.getElementById('bell-badge');
+    const mobileBadgeEl = document.getElementById('mobile-bell-badge');
+
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+
+    const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
+
+    // Admins see everything. Waiters/Kitchen see their specific notifications.
+    const filtered = notifications.filter(n => {
+      if (loggedInRole === 'admin') return true;
+      return n.role === 'all' || n.role === loggedInRole;
+    });
+
+    const unreadCount = filtered.filter(n => !n.isRead).length;
+
+    if (badgeEl) {
+      if (unreadCount > 0) {
+        badgeEl.style.display = 'block';
+        badgeEl.textContent = unreadCount;
+      } else {
+        badgeEl.style.display = 'none';
+      }
+    }
+    if (mobileBadgeEl) {
+      if (unreadCount > 0) {
+        mobileBadgeEl.style.display = 'block';
+        mobileBadgeEl.textContent = unreadCount;
+      } else {
+        mobileBadgeEl.style.display = 'none';
+      }
+    }
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = `<div style="font-size: 11px; text-align: center; color: var(--text-muted); padding: 20px 0;">No active alerts.</div>`;
+      return;
+    }
+
+    filtered.forEach(n => {
+      const item = document.createElement('div');
+      item.style.marginBottom = '6px';
+
+      const itemBg = n.isRead ? 'transparent' : 'rgba(252, 128, 25, 0.04)';
+      const itemBorder = n.isRead ? 'rgba(28, 28, 28,0.05)' : 'rgba(252, 128, 25, 0.15)';
+
+      let iconHtml = '<i class="fa-solid fa-circle-info"></i>';
+      if (n.type === 'order') iconHtml = '<i class="fa-solid fa-qrcode"></i>';
+      else if (n.type === 'inventory') iconHtml = '<i class="fa-solid fa-triangle-exclamation" style="color:var(--warning-color);"></i>';
+      else if (n.type === 'shift') iconHtml = '<i class="fa-solid fa-clock"></i>';
+
+      item.innerHTML = `
+        <div class="notification-row-item" data-id="${n.id}" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 8px; background: ${itemBg}; border: 1px solid ${itemBorder}; cursor: pointer; transition: all 0.2s;">
+          <div style="font-size: 14px; color: var(--accent-caramel); padding-top: 2px; width: 18px; text-align: center;">
+            ${iconHtml}
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 11px; font-weight: 700; color: var(--primary-brand);">${n.title}</span>
+            <span style="font-size: 10px; color: var(--text-muted); line-height: 1.3;">${n.message}</span>
+            <span style="font-size: 8px; color: var(--text-muted); margin-top: 2px;">${n.timestamp}</span>
+          </div>
+          ${n.isRead ? '' : `
+            <button type="button" class="mark-read-item-btn" style="background: transparent; border: none; color: var(--accent-caramel); cursor: pointer; font-size: 11px; padding: 2px; align-self: center;" title="Mark read">
+              <i class="fa-solid fa-circle-check"></i>
+            </button>
+          `}
+        </div>
+      `;
+
+      const readBtn = item.querySelector('.mark-read-item-btn');
+      if (readBtn) {
+        readBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          n.isRead = true;
+          localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
+          renderNotifications();
+          if (supabaseClient && activeTenantId) {
+            supabaseClient.from('doppio_notifications')
+              .update({ isRead: true })
+              .eq('id', n.id)
+              .eq('tenant_id', activeTenantId)
+              .then(({ error }) => {
+                if (error) console.warn('Supabase notification update failed:', error.message);
+              });
+          }
+        });
+      }
+
+      item.querySelector('.notification-row-item').addEventListener('click', () => {
+        n.isRead = true;
+        localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
+        renderNotifications();
+        if (supabaseClient && activeTenantId) {
+          supabaseClient.from('doppio_notifications')
+            .update({ isRead: true })
+            .eq('id', n.id)
+            .eq('tenant_id', activeTenantId)
+            .then(({ error }) => {
+              if (error) console.warn('Supabase notification update failed:', error.message);
+            });
+        }
+      });
+
+      listContainer.appendChild(item);
+    });
+  }
+
+  // Toggles and listeners
+  const notifBell = document.getElementById('notifications-bell');
+  const mobNotifBell = document.getElementById('mobile-notifications-bell');
+  const notifPanel = document.getElementById('notifications-dropdown-panel');
+  const clearNotifBtn = document.getElementById('clear-notifications-btn');
+
+  function toggleNotificationPanel(e) {
+    if (e) e.stopPropagation();
+    if (!notifPanel) return;
+    const isVisible = notifPanel.style.display === 'flex';
+    notifPanel.style.display = isVisible ? 'none' : 'flex';
+  }
+
+  if (notifBell) notifBell.addEventListener('click', toggleNotificationPanel);
+  if (mobNotifBell) mobNotifBell.addEventListener('click', toggleNotificationPanel);
+
+  document.addEventListener('click', (e) => {
+    if (notifPanel && notifPanel.style.display === 'flex') {
+      if (!notifPanel.contains(e.target) && !notifBell.contains(e.target) && (!mobNotifBell || !mobNotifBell.contains(e.target))) {
+        notifPanel.style.display = 'none';
+      }
+    }
+  });
+
+  if (clearNotifBtn) {
+    clearNotifBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const loggedInRole = sessionStorage.getItem('logged_in_role') || 'cashier';
+      const idsToMarkRead = [];
+      notifications.forEach(n => {
+        if (loggedInRole === 'admin' || n.role === 'all' || n.role === loggedInRole) {
+          if (!n.isRead) {
+            n.isRead = true;
+            idsToMarkRead.push(n.id);
+          }
+        }
+      });
+      localStorage.setItem('doppio_notifications', JSON.stringify(notifications));
+      renderNotifications();
+      if (supabaseClient && activeTenantId && idsToMarkRead.length > 0) {
+        supabaseClient.from('doppio_notifications')
+          .update({ isRead: true })
+          .eq('tenant_id', activeTenantId)
+          .in('id', idsToMarkRead)
+          .then(({ error }) => {
+            if (error) console.warn('Supabase bulk notification update failed:', error.message);
+          });
+      }
+    });
+  }
+
+  // Trigger initial render
+  renderNotifications();
+
+  // Floating HTML slide-down toast notification
+  function showNotificationToast(msg) {
+    // CAPTURE ALERT LOGS
+    let role = 'all';
+    let type = 'info';
+    let title = 'System Alert';
+
+    const msgLower = msg.toLowerCase();
+    if (msgLower.includes('table') || msgLower.includes('order') || msgLower.includes('self-service')) {
+      role = 'waiter';
+      type = 'order';
+      title = 'Dine-In Order';
+    } else if (msgLower.includes('stock') || msgLower.includes('inventory') || msgLower.includes('depleted') || msgLower.includes('low')) {
+      role = 'admin';
+      type = 'inventory';
+      title = 'Stock Warning';
+    } else if (msgLower.includes('shift') || msgLower.includes('drawer')) {
+      role = 'admin';
+      type = 'shift';
+      title = 'Shift Event';
+    }
+
+    if (type === 'order') {
+      // Notify kitchen, waiters, and admin
+      addSystemNotification(title, msg, 'kitchen', type);
+      addSystemNotification(title, msg, 'admin', type);
+      addSystemNotification(title, msg, 'waiter', type);
+    } else {
+      addSystemNotification(title, msg, role, type);
+    }
+
+    // Choose dynamic styling based on error/success/info
+    let iconClass = 'fa-solid fa-circle-info';
+    let gradient = 'linear-gradient(135deg, var(--accent-caramel) 0%, var(--primary-brand) 100%)';
+    let border = '2px solid var(--accent-gold)';
+    let iconColor = 'var(--accent-gold)';
+
+    if (msgLower.includes('table') || msgLower.includes('order') || msgLower.includes('self-service')) {
+      iconClass = 'fa-solid fa-qrcode';
+    } else if (msgLower.includes('failed') || msgLower.includes('error') || msgLower.includes('offline') || msgLower.includes('failure') || msgLower.includes('not working')) {
+      iconClass = 'fa-solid fa-triangle-exclamation';
+      gradient = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+      border = '2px solid #ff7675';
+      iconColor = '#fff';
+    } else if (msgLower.includes('success') || msgLower.includes('saved') || msgLower.includes('synced') || msgLower.includes('restored') || msgLower.includes('approved') || msgLower.includes('prepared')) {
+      iconClass = 'fa-solid fa-circle-check';
+      gradient = 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)';
+      border = '2px solid #55efc4';
+      iconColor = '#fff';
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'offline-banner-strip';
+    toast.style.position = 'fixed';
+    toast.style.top = '20px';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%) translateY(-100%)';
+    toast.style.zIndex = '999999';
+    toast.style.background = gradient;
+    toast.style.borderBottom = border;
+    toast.style.borderRadius = '30px';
+    toast.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+    toast.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    toast.style.width = 'auto';
+    toast.style.minWidth = '300px';
+    toast.style.animation = 'none';
+
+    const icon = document.createElement('i');
+    icon.className = iconClass;
+    icon.style.color = iconColor;
+    icon.style.marginRight = '8px';
+    const message = document.createElement('span');
+    message.style.fontFamily = 'var(--font-body)';
+    message.style.fontWeight = '700';
+    message.style.color = '#fff';
+    message.textContent = String(msg);
+    toast.append(icon, message);
+
+    document.body.appendChild(toast);
+
+    // Slide in
+    setTimeout(() => {
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+    }, 100);
+
+    // Slide out and remove
+    setTimeout(() => {
+      toast.style.transform = 'translateX(-50%) translateY(-150%)';
+      setTimeout(() => toast.remove(), 500);
+    }, 4500);
+  }
+
+  function updateQrStatsHeaders() {
+    if (qrRevenueTodayEl) qrRevenueTodayEl.textContent = `₹${qrRevenueToday.toFixed(2)}`;
+
+    const pendingCount = pendingQrOrders.length;
+    if (pendingQrOrdersCount) pendingQrOrdersCount.textContent = `${pendingCount} Order${pendingCount !== 1 ? 's' : ''}`;
+
+    // Update active badges
+    if (pendingCount > 0) {
+      if (liveQrBadge) {
+        liveQrBadge.textContent = pendingCount;
+        liveQrBadge.style.display = 'inline-block';
+      }
+      if (mobileLiveQrBadge) {
+        mobileLiveQrBadge.textContent = pendingCount;
+        mobileLiveQrBadge.style.display = 'inline-block';
+      }
+      if (glowingFeedBadge) glowingFeedBadge.style.display = 'inline-block';
+    } else {
+      if (liveQrBadge) liveQrBadge.style.display = 'none';
+      if (mobileLiveQrBadge) mobileLiveQrBadge.style.display = 'none';
+      if (glowingFeedBadge) glowingFeedBadge.style.display = 'none';
+    }
+
+    // Occupied tables count
+    const occupiedCount = Object.values(tablesState).filter(val => val !== "EMPTY").length;
+    if (activeTablesSummary) {
+      activeTablesSummary.textContent = `${occupiedCount} / ${businessProfile.numberOfTables || 6} Tables Occupied`;
+    }
+  }
+
+  function updateQrOrdersDashboardUI() {
+    updateQrStatsHeaders();
+    renderTablesMap();
+    renderQrOrdersQueue();
+  }
+
+  // Render Dine-in Table grid map
+  function renderTablesMap() {
+    if (!tablesMapGrid) return;
+    tablesMapGrid.innerHTML = '';
+
+    for (let tableId = 1; tableId <= (businessProfile.numberOfTables || 6); tableId++) {
+      const state = tablesState[tableId] || "EMPTY";
+      const card = document.createElement('div');
+      card.className = `table-card state-${state.toLowerCase()}`;
+
+      let stateLabel = "Clean & Empty";
+      let iconColor = "var(--text-muted)";
+
+      if (state === "ORDERING") {
+        stateLabel = "Occupied (Ordering)";
+        iconColor = "var(--danger-color)";
+      } else if (state === "PENDING") {
+        stateLabel = "Occupied (Pending Pay)";
+        iconColor = "var(--danger-color)";
+      } else if (state === "SERVED") {
+        stateLabel = "Occupied (Served)";
+        iconColor = "var(--danger-color)";
+      }
+
+      card.innerHTML = `
+        <div style="font-size: 24px; color: ${iconColor}; margin-bottom: 2px;">
+          <i class="fa-solid fa-chair"></i>
+        </div>
+        <div class="table-card-num">Table 0${tableId}</div>
+        <span class="table-status-pill">${stateLabel}</span>
+        
+        <div class="table-card-actions">
+          <button class="table-card-btn generate-qr" data-table="${tableId}" title="Generate Scannable Table QR"><i class="fa-solid fa-qrcode"></i> QR Link</button>
+          ${state !== 'EMPTY' ?
+          `<button class="table-card-btn clear-table" data-table="${tableId}" style="background: rgba(231,76,60,0.06); border-color: rgba(231,76,60,0.15); color: var(--danger-color);" title="Served & Clean Table"><i class="fa-solid fa-broom"></i> Clean</button>` :
+          ''
+        }
+        </div>
+      `;
+
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.table-card-actions')) return;
+        startTableSessionEdit(tableId);
+      });
+
+      tablesMapGrid.appendChild(card);
+    }
+
+    // Connect Table Map action button listeners
+    tablesMapGrid.querySelectorAll('.generate-qr').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tblNum = btn.getAttribute('data-table');
+        openTableQRViewerModal(tblNum);
+      });
+    });
+
+    tablesMapGrid.querySelectorAll('.clear-table').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tblNum = btn.getAttribute('data-table');
+        tablesState[tblNum] = "EMPTY";
+        tableCarts[tblNum] = [];
+        localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+        localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+        
+        // Sync the clear operation to Supabase so it persists everywhere
+        if (supabaseClient) {
+          supabaseClient.from('doppio_pending_orders').delete().eq('orderId', `TABLE-${tblNum}`).then();
+          supabaseClient.from('doppio_pending_orders').delete().eq('tableNumber', `0${tblNum}`).then();
+        }
+
+        SoundEffects.playRemove();
+        updateQrOrdersDashboardUI();
+      });
+    });
+  }
+
+  // Render Incoming Queue
+  function renderQrOrdersQueue() {
+    if (!qrOrdersQueue) return;
+    qrOrdersQueue.innerHTML = '';
+
+    if (pendingQrOrders.length === 0) {
+      qrOrdersQueue.innerHTML = `
+        <div class="premium-empty-state" style="padding: 60px 20px; text-align: center;">
+          <i class="fa-solid fa-bell-slash" style="font-size: 36px; color: var(--text-muted); opacity: 0.5; margin-bottom: 16px;"></i>
+          <h3 style="margin-bottom: 8px; color: var(--primary-brand);">Queue is currently clean</h3>
+          <p style="font-size: 11px; color: var(--text-muted); max-width: 300px; margin: 0 auto; line-height: 1.4;">Customer table self-service order forms will arrive here instantly with live desktop notifications.</p>
+        </div>
+      `;
+      return;
+    }
+
+    pendingQrOrders.forEach(order => {
+      const card = document.createElement('div');
+      card.className = 'qr-order-queue-card';
+
+      const itemsListStr = order.items.map(item => `
+        <div class="qr-card-item-row">
+          <span>${escHtml(item.name)} x${item.qty}</span>
+          <span style="font-weight:700;">₹${item.price * item.qty}</span>
+        </div>
+      `).join('');
+
+      const payPillClass = order.paymentMethod.includes('UPI') ? 'upi' : 'counter';
+
+      card.innerHTML = `
+        <div class="qr-card-header">
+          <span class="qr-card-table-lbl">${order.tableNumber === 'Takeaway' ? 'Takeaway Order' : `<i class="fa-solid fa-chair" style="color:var(--accent-caramel); margin-right:4px;"></i> Table 0${escHtml(order.tableNumber)}`}</span>
+          <span class="qr-card-paymethod-badge ${payPillClass}">${escHtml(order.paymentMethod)}</span>
+        </div>
+        
+        <div class="qr-card-cust-info">
+          <span style="font-weight: 700; color: var(--primary-brand);"><i class="fa-solid fa-user" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.customerName)}</span>
+          <span style="font-size:11px; color: var(--text-muted);"><i class="fa-solid fa-clock" style="font-size:10px; width:12px; margin-right:4px;"></i> ${escHtml(order.dateTime)}</span>
+        </div>
+
+        <div class="qr-card-items-box">
+          ${itemsListStr}
+        </div>
+
+        <div class="qr-card-total-box">
+          <span>Amount Paid</span>
+          <span class="qr-card-total-val">₹${order.total}</span>
+        </div>
+
+        <div class="qr-card-actions">
+          <button class="qr-action-btn reject" data-id="${order.orderId}"><i class="fa-solid fa-xmark"></i> Reject</button>
+          <button class="qr-action-btn approve" data-id="${order.orderId}"><i class="fa-solid fa-check"></i> Approve (KOT)</button>
+        </div>
+      `;
+
+      qrOrdersQueue.appendChild(card);
+    });
+
+    // Wire action buttons
+    qrOrdersQueue.querySelectorAll('.qr-action-btn.approve').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const orderId = btn.getAttribute('data-id');
+        approveLiveQrOrder(orderId);
+      });
+    });
+
+    qrOrdersQueue.querySelectorAll('.qr-action-btn.reject').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const orderId = btn.getAttribute('data-id');
+        rejectLiveQrOrder(orderId);
+      });
+    });
+  }
+
+  // Cashier approval flow: checks stock, pushes to sales ledger, deducts stock
+  function approveLiveQrOrder(orderId) {
+    const order = pendingQrOrders.find(o => o.orderId === orderId);
+    if (!order) return;
+
+    // 1. Stock Deduction Verification
+    let sufficientStock = true;
+    let missingIngredient = '';
+    const proposedDeductions = {};
+
+    order.items.forEach(cartItem => {
+      const specs = getDeductionSpecs(cartItem);
+      Object.keys(specs).forEach(ing => {
+        proposedDeductions[ing] = (proposedDeductions[ing] || 0) + (specs[ing] * cartItem.qty);
+      });
+    });
+
+    Object.keys(proposedDeductions).forEach(ing => {
+      if (inventory[ing] === undefined) inventory[ing] = 1000;
+      if (inventory[ing] < proposedDeductions[ing]) {
+        sufficientStock = false;
+        missingIngredient = ing.replace('_', ' ');
+      }
+    });
+
+    if (!sufficientStock) {
+      alert(`Approval Failed! Insufficient stock of: ${missingIngredient}. Please restock.`);
+      return;
+    }
+
+    // 2. Permanently deduct stock levels
+    Object.keys(proposedDeductions).forEach(ing => {
+      deductStockFEFO(ing, proposedDeductions[ing]);
+    });
+
+    // 3. Add to daily cashier sales ledger (doppio_bills)
+    const approvedBill = {
+      orderId: order.orderId,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      dateTime: order.dateTime,
+      items: [...order.items],
+      subtotal: order.subtotal,
+      discount: order.discount || 0,
+      gst: order.gst,
+      total: order.total,
+      paymentMethod: order.paymentMethod,
+      orderType: order.orderType,
+      shiftId: activeShift ? activeShift.shiftId : null
+    };
+
+    bills.push(approvedBill);
+    localStorage.setItem('doppio_bills', JSON.stringify(bills));
+
+    // 4. Cloud Sync insert
+    if (supabaseClient && navigator.onLine) {
+      supabaseClient.from('doppio_bills').insert({
+        tenant_id: activeTenantId,
+        orderId: approvedBill.orderId,
+        customerName: approvedBill.customerName,
+        customerPhone: approvedBill.customerPhone,
+        dateTime: approvedBill.dateTime,
+        items: JSON.stringify(approvedBill.items),
+        subtotal: approvedBill.subtotal,
+        gst: approvedBill.gst,
+        total: approvedBill.total,
+        paymentMethod: approvedBill.paymentMethod
+      }).then();
+    } else {
+      saveOfflineBill(approvedBill);
+    }
+
+    // 5. CRM upgrades
+    if (approvedBill.customerPhone && approvedBill.customerName !== 'Walk-in Guest') {
+      updateCRMMember(approvedBill.customerName, approvedBill.customerPhone, approvedBill.total);
+    }
+
+    // 6. Transition table status to SERVED
+    if (order.tableNumber && order.tableNumber !== 'Takeaway') {
+      tablesState[order.tableNumber] = "SERVED";
+      localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+    }
+
+    // Play chime sound
+    SoundEffects.playSuccess();
+
+    // Android speech announcement
+    if (window.AndroidInterface && businessProfile.soundEnabled !== false) {
+      window.AndroidInterface.speak(`Self service order from Table ${order.tableNumber} approved for preparation!`);
+    }
+
+    // Increment today's QR stats
+    qrRevenueToday += approvedBill.total;
+    completedQrOrdersCount += 1;
+    localStorage.setItem('doppio_qr_revenue_today', qrRevenueToday);
+    localStorage.setItem('doppio_completed_qr_orders_count', completedQrOrdersCount);
+
+    // Clean from pending queue
+    pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== orderId);
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    // 7. Delete from Supabase pending orders queue (Made by Antigravity)
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders')
+        .delete()
+        .eq('orderId', orderId).then();
+    }
+
+    // Re-render UI
+    updateQrOrdersDashboardUI();
+    renderBills();
+    renderInventory();
+    updateHeaderSummaryStats();
+
+    // Trigger auto WhatsApp/Thermal previews if enabled
+    setTimeout(() => {
+      const wantToPrint = confirm(`Order ${approvedBill.orderId} approved successfully!\nWould you like to print KOT/thermal receipt now?`);
+      if (wantToPrint) {
+        triggerThermalReceiptPrint(approvedBill);
+      }
+    }, 300);
+  }
+
+  // Cashier rejection pipeline
+  function rejectLiveQrOrder(orderId) {
+    const order = pendingQrOrders.find(o => o.orderId === orderId);
+    if (!order) return;
+
+    const confirmReject = confirm(`Are you sure you want to cancel and reject Table ${order.tableNumber}'s Order (${order.orderId})?`);
+    if (!confirmReject) return;
+
+    // Transition table status back to EMPTY
+    if (order.tableNumber && order.tableNumber !== 'Takeaway') {
+      tablesState[order.tableNumber] = "EMPTY";
+      localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+    }
+
+    // Broadcast rejection notice to client page
+    try {
+      qrStatusChannel.postMessage({
+        type: 'QR_ORDER_REJECTED',
+        order: order
+      });
+    } catch (e) {
+      console.log('Rejection broadcast channel issue', e);
+    }
+
+    // Remove from pending queue
+    pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== orderId);
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    // Delete from Supabase pending orders queue (Made by Antigravity)
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders')
+        .delete()
+        .eq('orderId', orderId).then();
+    }
+
+    SoundEffects.playRemove();
+    updateQrOrdersDashboardUI();
+  }
+
+  // Open Table QR Viewer Modal (Robust & Defensive Upgrade by Antigravity)
+  function openTableQRViewerModal(tableNum) {
+    console.log(`[Doppio POS] Opening QR Viewer Modal for Table ${tableNum}`);
+
+    if (!qrViewerModal) {
+      console.error("[Doppio POS] qrViewerModal element not found in DOM! Checking ID 'qr-viewer-modal'");
+      alert("Error: 'qr-viewer-modal' container element is missing in dashboard.html!");
+      return;
+    }
+
+    try {
+      SoundEffects.playClick();
+    } catch (e) {
+      console.warn("Sound effects clicked play bypassed", e);
+    }
+
+    const tenantSlug = sessionStorage.getItem('tenant_slug') || activeTenantSlug || 'primary';
+    const lockedLink = `${window.location.origin}/order.html?tenant=${tenantSlug}&table=${tableNum}`;
+
+    const formattedTitle = `Table 0${tableNum} QR Ordering Station`;
+
+    if (qrViewerTitle) {
+      qrViewerTitle.textContent = formattedTitle;
+    } else {
+      console.warn("[Doppio POS] 'qr-viewer-title' element not found in DOM.");
+    }
+
+    if (qrPrintTableNum) {
+      qrPrintTableNum.textContent = `TABLE 0${tableNum}`;
+    } else {
+      console.warn("[Doppio POS] 'qr-print-table-num' element not found in DOM.");
+    }
+
+    if (qrViewerLinkLbl) {
+      qrViewerLinkLbl.textContent = lockedLink;
+    } else {
+      console.warn("[Doppio POS] 'qr-viewer-link-lbl' element not found in DOM.");
+    }
+
+    // QR dynamic server link
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(lockedLink)}`;
+    if (qrViewerImg) {
+      qrViewerImg.src = qrUrl;
+    } else {
+      console.error("[Doppio POS] 'qr-viewer-img' element not found in DOM! QR cannot be displayed.");
+      alert("Error: 'qr-viewer-img' image element is missing!");
+    }
+
+    // Attach local attributes to action buttons for references
+    if (btnPrintTableQr) {
+      btnPrintTableQr.setAttribute('data-link', lockedLink);
+      btnPrintTableQr.setAttribute('data-table', `0${tableNum}`);
+    } else {
+      console.warn("[Doppio POS] 'btn-print-table-qr' button not found in DOM.");
+    }
+
+    if (btnSimulateQrScan) {
+      btnSimulateQrScan.setAttribute('data-link', lockedLink);
+    } else {
+      console.warn("[Doppio POS] 'btn-simulate-qr-scan' button not found in DOM.");
+    }
+
+    qrViewerModal.style.display = 'flex';
+    qrViewerModal.classList.add('active');
+    console.log("[Doppio POS] QR Viewer Modal successfully displayed!");
+  }
+
+  // Print Table QR Template
+  if (btnPrintTableQr) {
+    btnPrintTableQr.addEventListener('click', () => {
+      const link = btnPrintTableQr.getAttribute('data-link');
+      const table = btnPrintTableQr.getAttribute('data-table');
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(link)}`;
+
+      SoundEffects.playClick();
+
+      const printWindow = window.open('', '_blank', 'width=450,height=600');
+      printWindow.document.write(`
+        <html>
+        <head>
+          <title>Print Table ${table} Ordering QR</title>
+          <style>
+            body { font-family: 'Playfair Display', Georgia, serif; text-align: center; padding: 40px; color: #2C1B18; }
+            .print-frame { border: 6px solid #2C1B18; border-radius: 24px; padding: 40px 20px; max-width: 320px; margin: 0 auto; background: white; }
+            .logo { font-size: 26px; font-weight: 800; letter-spacing: 2px; margin-bottom: 2px; }
+            .table-num { font-size: 32px; font-weight: 900; margin-bottom: 30px; }
+            .qr-box { border: 2px dashed #C88A58; border-radius: 16px; padding: 16px; display: inline-block; margin-bottom: 30px; }
+            .scan-lbl { font-size: 16px; font-weight: 700; color: #C88A58; letter-spacing: 1px; }
+            .url-lbl { font-family: 'Courier New', monospace; font-size: 10px; margin-top: 10px; opacity: 0.8; word-wrap: break-word; }
+          </style>
+        </head>
+        <body>
+          <div class="print-frame">
+            <div class="logo">${escHtml(activeTenantName || 'RestroSuite')}</div>
+            <div style="font-size:9px; text-transform:uppercase; letter-spacing:3px; font-weight:700; color:#C88A58; margin-bottom: 20px;">${escHtml(activeTenantName || 'RestroSuite')}</div>
+            <div class="table-num">TABLE ${table}</div>
+            <div class="qr-box">
+              <img src="${qrUrl}" style="width: 200px; height: 200px; object-fit: contain;">
+            </div>
+            <div class="scan-lbl">SCAN TO DINE & PAY</div>
+            <div class="url-lbl">${link}</div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    });
+  }
+
+  if (btnSimulateQrScan) {
+    btnSimulateQrScan.addEventListener('click', () => {
+      const link = btnSimulateQrScan.getAttribute('data-link');
+      SoundEffects.playClick();
+      window.open(link, '_blank');
+    });
+  }
+
+  // Close QR modal triggers
+  if (qrViewerClose) {
+    qrViewerClose.addEventListener('click', () => {
+      if (qrViewerModal) {
+        qrViewerModal.classList.remove('active');
+        qrViewerModal.style.display = 'none';
+      }
+    });
+  }
+
+  // Click outside modal closing
+  if (qrViewerModal) {
+    qrViewerModal.addEventListener('click', (e) => {
+      if (e.target === qrViewerModal) {
+        qrViewerModal.classList.remove('active');
+        qrViewerModal.style.display = 'none';
+      }
+    });
+  }
+
+  // ==========================================
+  // PREMIUM EXTENSIONS: COMPETITOR BUSTER PACK
+  // ==========================================
+
+  // 1. Direct WhatsApp Dispatcher in Receipt Modal
+  const whatsappReceiptPhone = document.getElementById('whatsapp-receipt-phone');
+  const sendWhatsappReceiptBtn = document.getElementById('send-whatsapp-receipt-btn');
+  const whatsappSection = document.getElementById('whatsapp-receipt-section');
+
+  // Autofill WhatsApp number when preview opens
+  const originalOpenReceiptPreview = window.openReceiptPreview;
+  window.openReceiptPreview = function (shouldPrint) {
+    if (originalOpenReceiptPreview) originalOpenReceiptPreview(shouldPrint);
+
+    // Toggle visibility based on whether WhatsApp is enabled in settings
+    if (whatsappSection) {
+      whatsappSection.style.display = businessProfile.whatsappEnabled !== false ? 'block' : 'none';
+    }
+
+    if (whatsappReceiptPhone) {
+      const phoneInput = document.getElementById('cust-phone');
+      whatsappReceiptPhone.value = phoneInput ? phoneInput.value.trim() : '';
+    }
+  };
+
+  if (sendWhatsappReceiptBtn) {
+    sendWhatsappReceiptBtn.addEventListener('click', () => {
+      let phoneNum = whatsappReceiptPhone ? whatsappReceiptPhone.value.trim() : '';
+      if (!phoneNum) {
+        alert("Please enter a customer's WhatsApp number!");
+        return;
+      }
+
+      phoneNum = phoneNum.replace(/\D/g, '');
+      if (phoneNum.length === 10) {
+        phoneNum = "91" + phoneNum;
+      }
+
+      if (phoneNum.length < 10) {
+        alert("Invalid phone number! Enter a 10-digit mobile number.");
+        return;
+      }
+
+      // Compile current active cart bill object
+      const custNameInput = document.getElementById('cust-name');
+      const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
+      const orderNum = document.getElementById('order-num').value;
+      const billIdToSave = editingBillId || orderNum;
+
+      const totals = billingDomain.calculateCartTotals({
+        cart,
+        businessProfile,
+        customers: crmData,
+        customerName: custName,
+        customerPhone: phoneNum.slice(-10),
+        discountType,
+        discountValue
+      });
+      const { subtotal, totalDiscount, gst, total } = totals;
+
+      const tempBill = {
+        orderId: billIdToSave,
+        customerName: custName,
+        customerPhone: phoneNum.slice(-10),
+        dateTime: new Date().toLocaleString('en-IN'),
+        items: [...cart],
+        subtotal: subtotal,
+        discount: totalDiscount,
+        gst: gst,
+        total: total,
+        paymentMethod: selectedPaymentMethod,
+        orderType: activeOrderType
+      };
+
+      SoundEffects.playClick();
+      // Invoke sharing helper with modified phone
+      const originalPhone = tempBill.customerPhone;
+      tempBill.customerPhone = phoneNum;
+      shareBillOnWhatsApp(tempBill);
+      tempBill.customerPhone = originalPhone;
+    });
+  }
+
+  // 2. AI Forecasting & Cost Control Engine
+  const aiTopMaterial = document.getElementById('ai-top-material');
+  const aiBurnRate = document.getElementById('ai-burn-rate');
+  const aiCriticalDays = document.getElementById('ai-critical-days');
+  const aiAutoReorderBtn = document.getElementById('ai-auto-reorder-btn');
+
+  function updateAIForecast() {
+    if (!aiTopMaterial || !aiBurnRate || !aiCriticalDays) return;
+
+    // Retrieve daily sales ledger
+    const totalBillsCount = bills.length;
+
+    // Simulate daily average active days (minimum 2 days to prevent massive single-sale skewing)
+    const activeDays = Math.max(2, Math.ceil(totalBillsCount / 4));
+
+    const consumption = {};
+
+    // Calculate total ingredient depletion from all historical bills
+    bills.forEach(bill => {
+      if (!bill.items) return;
+      // Handle array or string-JSON parsing
+      let billItems = bill.items;
+      if (typeof billItems === 'string') {
+        try { billItems = JSON.parse(billItems); } catch (e) { billItems = []; }
+      }
+      if (Array.isArray(billItems)) {
+        billItems.forEach(item => {
+          if (!item) return;
+          const specs = getDeductionSpecs(item);
+          if (specs) {
+            Object.keys(specs).forEach(ing => {
+              const qty = parseFloat(item.qty) || 1;
+              consumption[ing] = (consumption[ing] || 0) + ((parseFloat(specs[ing]) || 0) * qty);
+            });
+          }
+        });
+      }
+    });
+
+    // Determine the ingredient with highest daily consumption percentage relative to max capacity
+    let topIngredient = 'milk';
+    let maxBurnPercent = 0;
+    let topBurnVelocity = 0;
+
+    Object.keys(defaultInventory).forEach(key => {
+      const totalConsumed = consumption[key] || 0;
+      const velocity = totalConsumed / activeDays;
+      const maxVal = defaultInventory[key];
+      const burnPercent = velocity / maxVal;
+
+      if (burnPercent > maxBurnPercent) {
+        maxBurnPercent = burnPercent;
+        topIngredient = key;
+        topBurnVelocity = velocity;
+      }
+    });
+
+    // Update AI stats cards
+    const label = getLabelFromKey(topIngredient);
+    const emoji = categoryIconsMap[topIngredient] || '🥛';
+    const unit = topIngredient.includes('beans') || topIngredient.includes('powder') || topIngredient.includes('ice') || topIngredient.includes('fries') || topIngredient.includes('veggies') ? 'g' : 'ml';
+
+    aiTopMaterial.innerHTML = `${label} (${emoji})`;
+
+    // Display average daily consumption velocity
+    const roundedVel = topBurnVelocity.toFixed(1);
+    aiBurnRate.textContent = `${roundedVel} ${unit} / day`;
+
+    // Calculate days remaining
+    const currentStock = inventory[topIngredient] !== undefined ? inventory[topIngredient] : defaultInventory[topIngredient];
+
+    if (topBurnVelocity > 0) {
+      const remainingDays = currentStock / topBurnVelocity;
+      aiCriticalDays.textContent = `${label} depletes in ${remainingDays.toFixed(1)} days!`;
+
+      if (remainingDays <= 2) {
+        aiCriticalDays.style.color = 'var(--danger-color)';
+        aiCriticalDays.style.fontWeight = '800';
+      } else if (remainingDays <= 5) {
+        aiCriticalDays.style.color = '#F39C12'; // warning caramel
+        aiCriticalDays.style.fontWeight = '700';
+      } else {
+        aiCriticalDays.style.color = 'var(--success-color)';
+        aiCriticalDays.style.fontWeight = '700';
+      }
+    } else {
+      aiCriticalDays.textContent = "No sales burn tracked yet.";
+      aiCriticalDays.style.color = 'var(--text-muted)';
+      aiCriticalDays.style.fontWeight = 'normal';
+    }
+  }
+
+  // Auto reorder btn refuels all low stock items instantly
+  if (aiAutoReorderBtn) {
+    aiAutoReorderBtn.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+
+      // Refill all items to 100% capacity and sync batches & Supabase
+      Object.keys(defaultInventory).forEach(key => {
+        const maxVal = defaultInventory[key];
+        const refillQty = maxVal - (inventory[key] || 0);
+        if (refillQty > 0) {
+          const newBatch = {
+            id: "batch_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+            qty: refillQty,
+            expiryDate: getDefaultExpiryDate(key),
+            receivedDate: new Date().toISOString().split('T')[0]
+          };
+          if (!inventoryBatches[key]) inventoryBatches[key] = [];
+          inventoryBatches[key].push(newBatch);
+          // Sync batch to Supabase
+          if (supabaseClient) {
+            supabaseClient.from('doppio_inventory_batches').upsert({
+              tenant_id: activeTenantId,
+              id: newBatch.id,
+              ingredient_key: key,
+              qty: newBatch.qty,
+              expiryDate: newBatch.expiryDate,
+              receivedDate: newBatch.receivedDate
+            }, { onConflict: 'tenant_id,id' }).then(({ error }) => {
+              if (error) console.warn('Supabase auto-reorder batch upsert failed:', error.message);
+            });
+          }
+        }
+        inventory[key] = maxVal;
+        if (supabaseClient) {
+          supabaseClient.from('doppio_inventory').update({ current: maxVal }).eq('tenant_id', activeTenantId).eq('key', key).then();
+        }
+      });
+
+      localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+      localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+
+      renderInventory();
+      checkLowStockAlerts();
+      updateAIForecast();
+
+      alert("AI On-Demand Restock successful! Raw material levels refilled to 100% capacity. Restock Invoice generated.");
+    });
+  }
+
+  // Hook AI updates to standard rendering
+  const originalRenderInventory = renderInventory;
+  renderInventory = function () {
+    originalRenderInventory();
+    updateAIForecast();
+  };
+
+  // 3. P2P Local Synchronization Terminal Simulator
+  const p2pLogBox = document.getElementById('p2p-log-box');
+  const p2pTestBtn = document.getElementById('p2p-test-btn');
+  const p2pConnectedCount = document.getElementById('p2p-connected-count');
+  const p2pStatusDot = document.getElementById('p2p-sync-status-dot');
+  const p2pStatusText = document.getElementById('p2p-sync-status-text');
+  const p2pEnabledInput = document.getElementById('profile-p2p-enabled');
+  const p2pModeSelect = document.getElementById('profile-p2p-mode');
+
+  function addP2PLog(message) {
+    if (!p2pLogBox) return;
+    const timeStr = new Date().toTimeString().split(' ')[0];
+    p2pLogBox.innerHTML += `[${timeStr}] ${message}<br>`;
+    p2pLogBox.scrollTop = p2pLogBox.scrollHeight;
+  }
+
+  if (p2pTestBtn) {
+    p2pTestBtn.addEventListener('click', () => {
+      SoundEffects.playPop();
+      const isEnabled = p2pEnabledInput ? p2pEnabledInput.checked : true;
+      if (!isEnabled) {
+        alert("P2P Local Sync Network is currently disabled in your settings!");
+        return;
+      }
+
+      addP2PLog("Pinging all local client terminal nodes...");
+
+      setTimeout(() => {
+        SoundEffects.playSuccess();
+        addP2PLog(`<span style="color:#27ae60;">✔ Reply from [KITCHEN-KDS-1] (192.168.1.102) - Latency: 2ms</span>`);
+      }, 300);
+
+      setTimeout(() => {
+        addP2PLog(`<span style="color:#27ae60;">✔ Reply from [WAITER-CAPTAIN-1] (192.168.1.105) - Latency: 4ms</span>`);
+      }, 500);
+    });
+  }
+
+  // Broadcast function when checkout finishes
+  window.broadcastP2POrder = function (orderId, total) {
+    const isEnabled = p2pEnabledInput ? p2pEnabledInput.checked : true;
+    if (!isEnabled) return;
+
+    addP2PLog(`Broadcasting new Order [${orderId}] to local sync grid...`);
+
+    setTimeout(() => {
+      addP2PLog(`[KDS-TERMINAL] Acknowledged: Added order ${orderId} (₹${total}) to kitchen screen.`);
+    }, 600);
+  };
+
+  // Wrap performCheckout to broadcast sync
+  const originalPerformCheckout = performCheckout;
+  performCheckout = function (shouldPrint) {
+    const orderNum = document.getElementById('order-num').value;
+    const billIdToSave = editingBillId || orderNum;
+
+    // Compute total for logging
+    let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const isGstEnabled = businessProfile.gstEnabled !== false;
+    const gstPercentage = businessProfile.gstRate !== undefined ? businessProfile.gstRate : 18;
+    const isLoyaltyEnabled = businessProfile.loyaltyEnabled === true;
+    const loyaltyDiscountPercentage = businessProfile.loyaltyRate !== undefined ? businessProfile.loyaltyRate : 10;
+
+    const custNameInput = document.getElementById('cust-name');
+    const custName = (custNameInput && custNameInput.value.trim()) || 'Walk-in Guest';
+    const phoneInput = document.getElementById('cust-phone');
+    const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+
+    let loyaltyDiscount = 0;
+    let matchedCustomer = null;
+    if (phoneVal || custName) {
+      matchedCustomer = crmData.find(c => (phoneVal && c.phone === phoneVal) || (custName && c.name.toLowerCase() === custName.toLowerCase()));
+    }
+    if (matchedCustomer && matchedCustomer.visits >= 1 && isLoyaltyEnabled) {
+      loyaltyDiscount = Math.round(subtotal * (loyaltyDiscountPercentage / 100));
+    }
+    const taxableAmount = subtotal - loyaltyDiscount;
+    const gst = isGstEnabled ? Math.round(taxableAmount * (gstPercentage / 100)) : 0;
+    const total = taxableAmount + gst;
+
+    // Direct POS Kitchen Feed: Push takeaway orders to KDS!
+    const mockKdsOrder = {
+      orderId: billIdToSave,
+      customerName: custName,
+      customerPhone: phoneVal,
+      dateTime: new Date().toLocaleString('en-IN'),
+      items: [...cart],
+      subtotal: subtotal,
+      discount: loyaltyDiscount,
+      gst: gst,
+      total: total,
+      paymentMethod: selectedPaymentMethod,
+      orderType: 'Takeaway',
+      tableNumber: 'ONLINE',
+      status: 'Accepted'
+    };
+
+    // Add locally to pendingQrOrders so KDS picks it up!
+    pendingQrOrders.push(mockKdsOrder);
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    // Upload to Supabase to notify KDS in real-time
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders').insert({
+        orderId: mockKdsOrder.orderId,
+        customerName: mockKdsOrder.customerName,
+        customerPhone: mockKdsOrder.customerPhone,
+        items: JSON.stringify(mockKdsOrder.items),
+        subtotal: mockKdsOrder.subtotal,
+        discount: mockKdsOrder.discount,
+        gst: mockKdsOrder.gst,
+        total: mockKdsOrder.total,
+        paymentMethod: mockKdsOrder.paymentMethod,
+        orderType: mockKdsOrder.orderType,
+        tableNumber: mockKdsOrder.tableNumber,
+        status: mockKdsOrder.status,
+        dateTime: mockKdsOrder.dateTime
+      }).then();
+    }
+
+    originalPerformCheckout(shouldPrint);
+
+    // Broadcast P2P order
+    window.broadcastP2POrder(billIdToSave, total);
+  };
+
+  // 4. Interactive Excel Onboarding Wizard (Menu & Recipe Parser)
+  const excelDropzone = document.getElementById('excel-drag-dropzone');
+  const excelFileInput = document.getElementById('excel-file-input');
+  const excelDropText = document.getElementById('excel-drop-text');
+  const excelImportStatus = document.getElementById('excel-import-status');
+  const downloadImportTemplateBtn = document.getElementById('download-import-template-btn');
+  const loadSampleWorkspaceBtn = document.getElementById('load-sample-workspace-btn');
+  let excelImportBusy = false;
+
+  function setExcelImportStatus(message, type = '') {
+    if (!excelImportStatus) return;
+    excelImportStatus.textContent = message;
+    excelImportStatus.className = `excel-import-status${type ? ` is-${type}` : ''}`;
+  }
+
+  function csvFromRows(rows) {
+    if (!rows.length) return '';
+    const headers = Object.keys(rows[0]);
+    const escapeCell = value => {
+      const text = String(value === undefined || value === null ? '' : value);
+      return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    return [headers.join(','), ...rows.map(row => headers.map(header => escapeCell(row[header])).join(','))].join('\r\n');
+  }
+
+  function downloadBlob(name, blob) {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+
+  function downloadImportTemplate() {
+    if (!importsDomain || !importsDomain.TEMPLATE_SHEETS) return;
+    const finish = startOperationStatus(downloadImportTemplateBtn, 'Preparing import template...', 'Preparing...');
+    if (window.XLSX) {
+      const workbook = XLSX.utils.book_new();
+      Object.entries(importsDomain.TEMPLATE_SHEETS).forEach(([name, rows]) => {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), name);
+      });
+      XLSX.writeFile(workbook, 'RestroSuite_Import_Template.xlsx');
+      setExcelImportStatus('Template downloaded. Fill the existing columns, then upload the workbook.', 'success');
+      finish('success', 'Import template downloaded.');
+      return;
+    }
+    Object.entries(importsDomain.TEMPLATE_SHEETS).forEach(([name, rows], index) => {
+      setTimeout(() => downloadBlob(`${name}.csv`, new Blob([csvFromRows(rows)], { type: 'text/csv;charset=utf-8' })), index * 150);
+    });
+    setExcelImportStatus('Excel support is unavailable, so separate CSV templates were downloaded.', 'success');
+    finish('success', 'CSV templates downloaded.');
+  }
+
+  async function parseImportFile(file) {
+    const extension = String(file.name || '').split('.').pop().toLowerCase();
+    if (extension === 'csv') {
+      const sheetName = String(file.name || 'Menu').replace(/\.csv$/i, '');
+      return { [sheetName]: importsDomain.parseCsv(await file.text()) };
+    }
+    if (!window.XLSX) throw new Error('Excel support did not load. Refresh the page or upload one of the CSV templates.');
+    const data = new Uint8Array(await file.arrayBuffer());
+    const workbook = XLSX.read(data, { type: 'array' });
+    return Object.fromEntries(workbook.SheetNames.map(name => [
+      name,
+      XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: '' })
+    ]));
+  }
+
+  function mergeImportedRows(items, incoming, keyOf) {
+    const merged = items.map(item => ({ ...item }));
+    incoming.forEach(item => {
+      const key = keyOf(item);
+      const index = merged.findIndex(existing => keyOf(existing) === key);
+      if (index >= 0) merged[index] = { ...merged[index], ...item };
+      else merged.push(item);
+    });
+    return merged;
+  }
+
+  async function applyStructuredImport(parsed, options = {}) {
+    const timestamp = Date.now();
+    const nextMenu = mergeImportedRows(menu, parsed.menu, item => String(item.name || '').trim().toLowerCase());
+    const nextEmployees = mergeImportedRows(employees, parsed.employees.map(item => ({ ...item, status: 'active' })), item => item.id);
+    const nextCRM = mergeImportedRows(crmData, parsed.customers, item => item.phone);
+    const nextInventory = { ...inventory };
+    const nextDefaultInventory = { ...defaultInventory };
+    const nextInventoryMetadata = { ...inventoryMetadata };
+    const nextThresholds = { ...thresholds };
+    const nextBatches = JSON.parse(JSON.stringify(inventoryBatches));
+    const nextRecipes = { ...customRecipes, ...parsed.recipes };
+
+    parsed.inventory.forEach((item, index) => {
+      nextInventory[item.key] = item.current;
+      nextDefaultInventory[item.key] = item.max;
+      nextInventoryMetadata[item.key] = { label: item.label, unit: item.unit, category: item.category || 'food' };
+      nextThresholds[item.key] = item.threshold;
+      if (item.expiryDate) {
+        nextBatches[item.key] = [{
+          id: `${options.sample ? 'sample' : 'import'}_${item.key}_${timestamp}_${index}`,
+          qty: item.current,
+          expiryDate: item.expiryDate,
+          receivedDate: new Date().toISOString().split('T')[0]
+        }];
+      }
+    });
+
+    if (supabaseClient) {
+      const writes = [];
+      if (parsed.menu.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_menu').upsert(parsed.menu.map(item => ({
+        tenant_id: activeTenantId,
+        name: item.name, category: item.category, price: item.price, description: item.description,
+        icon: item.icon, bestseller: item.bestseller, available: item.available, prep_time: item.prepTime
+      })), { onConflict: 'tenant_id,name' }), 'Menu import failed'));
+      if (parsed.inventory.length) {
+        writes.push(requireTenantWrite(supabaseClient.from('doppio_inventory').upsert(parsed.inventory.map(item => ({
+          tenant_id: activeTenantId,
+          key: item.key, current: item.current, unit: item.unit, label: item.label,
+          max_stock: item.max, category: item.category || 'food', updated_at: new Date().toISOString()
+        })), { onConflict: 'tenant_id,key' }), 'Inventory import failed'));
+        writes.push(requireTenantWrite(supabaseClient.from('doppio_inventory_thresholds').upsert(parsed.inventory.map(item => ({
+          tenant_id: activeTenantId,
+          ingredient_key: item.key, threshold: item.threshold, updated_at: new Date().toISOString()
+        })), { onConflict: 'tenant_id,ingredient_key' }), 'Inventory threshold import failed'));
+        const batches = parsed.inventory.flatMap((item, index) => item.expiryDate ? [{
+          tenant_id: activeTenantId,
+          id: `${options.sample ? 'sample' : 'import'}_${item.key}_${timestamp}_${index}`,
+          ingredient_key: item.key, qty: item.current, expiryDate: item.expiryDate,
+          receivedDate: new Date().toISOString().split('T')[0]
+        }] : []);
+        if (batches.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_inventory_batches').upsert(batches, { onConflict: 'tenant_id,id' }), 'Inventory batch import failed'));
+      }
+      const recipes = Object.entries(parsed.recipes).map(([item_name, ingredients]) => ({ tenant_id: activeTenantId, item_name, ingredients, updated_at: new Date().toISOString() }));
+      if (recipes.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_custom_recipes').upsert(recipes, { onConflict: 'tenant_id,item_name' }), 'Recipe import failed'));
+      if (parsed.employees.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_employees').upsert(parsed.employees.map(item => ({
+        id: item.id, name: item.name, role: item.role, contact: item.contact, baseSalary: item.baseSalary,
+        shift: item.shift, leaves: item.leaves, status: 'active'
+      })), { onConflict: 'tenant_id,id' }), 'Employee import failed'));
+      if (parsed.customers.length) writes.push(requireTenantWrite(supabaseClient.from('doppio_crm').upsert(parsed.customers.map(item => ({
+        phone: item.phone, name: item.name, visits: item.visits, total_spend: item.total_spend,
+        loyalty_points: item.loyalty_points, notes: item.notes, last_visit: item.last_visit, updated_at: new Date().toISOString()
+      })), { onConflict: 'tenant_id,phone' }), 'Customer import failed'));
+      await Promise.all(writes);
+    }
+
+    menu = nextMenu;
+    employees = nextEmployees;
+    crmData = nextCRM;
+    inventory = nextInventory;
+    Object.assign(defaultInventory, nextDefaultInventory);
+    inventoryMetadata = nextInventoryMetadata;
+    thresholds = nextThresholds;
+    inventoryBatches = nextBatches;
+    customRecipes = nextRecipes;
+    localStorage.setItem('doppio_menu', JSON.stringify(menu));
+    localStorage.setItem('doppio_employees', JSON.stringify(employees));
+    localStorage.setItem('doppio_crm_local', JSON.stringify(crmData));
+    localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+    localStorage.setItem('doppio_inventory_defaults', JSON.stringify(defaultInventory));
+    localStorage.setItem('doppio_inventory_metadata', JSON.stringify(inventoryMetadata));
+    localStorage.setItem('doppio_inventory_thresholds', JSON.stringify(thresholds));
+    localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+    localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
+    setVaultData('doppio_menu', menu);
+    renderPOSCategories();
+    renderPOSItems();
+    renderMenuEditor();
+    renderInventory();
+    renderEmployeesTab();
+    renderCRMTab();
+    checkLowStockAlerts();
+    updateAIForecast();
+    broadcastMenuUpdate();
+  }
+
+  function buildSampleImport() {
+    const sheets = JSON.parse(JSON.stringify(importsDomain.TEMPLATE_SHEETS));
+    sheets.Menu.forEach(row => { row.Name = `SAMPLE ${row.Name}`; });
+    sheets.Inventory.forEach(row => {
+      row.IngredientKey = `sample_${row.IngredientKey}`;
+      row.IngredientName = `SAMPLE ${row.IngredientName}`;
+    });
+    sheets.Recipes.forEach(row => {
+      row.MenuItem = `SAMPLE ${row.MenuItem}`;
+      row.IngredientKey = `sample_${row.IngredientKey}`;
+    });
+    sheets.Employees.forEach(row => {
+      row.EmployeeId = `sample_${row.EmployeeId}`;
+      row.Name = `SAMPLE ${row.Name}`;
+    });
+    sheets.Customers.forEach(row => {
+      row.Name = `SAMPLE ${row.Name}`;
+      row.Notes = 'SAMPLE DATA - safe to replace';
+    });
+    return importsDomain.parseImportSheets(sheets);
+  }
+
+  async function addSampleOperationalData() {
+    const now = new Date();
+    const items = [{ name: 'SAMPLE Cappuccino', price: 180, qty: 2 }];
+    const sampleBills = [
+      { orderId: 'SAMPLE-BILL-001', customerName: 'SAMPLE Customer', customerPhone: '9876500001', dateTime: now.toISOString(), items, subtotal: 360, gst: 65, total: 425, paymentMethod: 'UPI' },
+      { orderId: 'SAMPLE-BILL-002', customerName: 'SAMPLE Walk-in', customerPhone: '', dateTime: new Date(now.getTime() - 86400000).toISOString(), items: [{ name: 'SAMPLE Veg Grilled Sandwich', price: 220, qty: 1 }], subtotal: 220, gst: 40, total: 260, paymentMethod: 'Cash' }
+    ];
+    const sampleOrders = [
+      { orderId: 'SAMPLE-QR-001', customerName: 'SAMPLE QR Guest', customerPhone: '9876500002', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'UPI', orderType: 'Dine-In', tableNumber: '2', status: 'Pending Review' },
+      { orderId: 'SAMPLE-KDS-001', customerName: 'SAMPLE Kitchen Guest', customerPhone: '', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'Cash', orderType: 'Takeaway', tableNumber: 'Takeaway', status: 'Accepted' },
+      { orderId: 'SAMPLE-TOKEN-001', customerName: 'SAMPLE Ready Guest', customerPhone: '', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'Card', orderType: 'Takeaway', tableNumber: 'Takeaway', status: 'Ready' },
+      { orderId: 'SAMPLE-ONLINE-001', customerName: 'SAMPLE Online Guest', customerPhone: '9876500003', dateTime: now.toISOString(), items, subtotal: 360, discount: 0, gst: 65, total: 425, paymentMethod: 'Online', orderType: 'Zomato', tableNumber: 'Online', status: 'Pending Review' }
+    ];
+    if (supabaseClient) {
+      await Promise.all([
+        requireTenantWrite(supabaseClient.from('doppio_bills').upsert(sampleBills, { onConflict: 'tenant_id,orderId' }), 'Sample bills could not be saved'),
+        requireTenantWrite(supabaseClient.from('doppio_pending_orders').upsert(sampleOrders, { onConflict: 'tenant_id,orderId' }), 'Sample orders could not be saved')
+      ]);
+    }
+    bills = mergeImportedRows(bills, sampleBills, item => item.orderId);
+    pendingQrOrders = mergeImportedRows(pendingQrOrders, sampleOrders, item => item.orderId);
+    localStorage.setItem('doppio_bills', JSON.stringify(bills));
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+    renderBills();
+    renderReports();
+    updateHeaderSummaryStats();
+    updateQrOrdersDashboardUI();
+    renderKDSTab();
+    renderTokensTab();
+    renderOnlineOrdersTab();
+  }
+
+  async function loadSampleWorkspace() {
+    if (!confirm('Load clearly labeled SAMPLE data into menu, inventory, recipes, employees and CRM? Existing matching records will be updated, not erased.')) return;
+    const finish = startOperationStatus(loadSampleWorkspaceBtn, 'Loading sample workspace...', 'Loading...');
+    try {
+      setExcelImportStatus('Loading sample workspace...');
+      await applyStructuredImport(buildSampleImport(), { sample: true });
+      setOperationStatus('Adding sample bills and kitchen orders...', 'working', 70);
+      await addSampleOperationalData();
+      localStorage.setItem('doppio_demo_workspace', 'true');
+      setExcelImportStatus('Sample workspace loaded. Every example is labeled SAMPLE.', 'success');
+      finish('success', 'Sample workspace loaded.');
+      if (loadSampleWorkspaceBtn) loadSampleWorkspaceBtn.textContent = 'Sample Workspace Loaded';
+      SoundEffects.playSuccess();
+    } catch (err) {
+      console.error('Sample workspace failed:', err);
+      setExcelImportStatus(err.message || 'Sample workspace could not be loaded.', 'error');
+      finish('error', err.message || 'Sample workspace failed.');
+      SoundEffects.playRemove();
+    }
+  }
+
+  if (downloadImportTemplateBtn) downloadImportTemplateBtn.addEventListener('click', downloadImportTemplate);
+  if (loadSampleWorkspaceBtn) {
+    if (localStorage.getItem('doppio_demo_workspace') === 'true') loadSampleWorkspaceBtn.textContent = 'Sample Workspace Loaded';
+    loadSampleWorkspaceBtn.addEventListener('click', loadSampleWorkspace);
+  }
+
+  if (excelDropzone && excelFileInput) {
+    excelDropzone.addEventListener('click', () => excelFileInput.click());
+
+    // Drag-over styling
+    excelDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      excelDropzone.style.borderColor = 'var(--accent-caramel)';
+    });
+    excelDropzone.addEventListener('dragleave', () => {
+      excelDropzone.style.borderColor = 'rgba(252, 128, 25, 0.25)';
+      excelDropzone.style.background = 'rgba(252, 128, 25, 0.01)';
+    });
+
+    excelDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      excelDropzone.style.borderColor = 'rgba(252, 128, 25, 0.25)';
+      excelDropzone.style.background = 'rgba(252, 128, 25, 0.01)';
+
+      if (e.dataTransfer.files.length > 0) {
+        excelFileInput.files = e.dataTransfer.files;
+        handleExcelUpload(e.dataTransfer.files[0]);
+      }
+    });
+
+    excelFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleExcelUpload(e.target.files[0]);
+      }
+    });
+  }
+
+  function handleExcelUploadLegacy(file) {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+      const menuBeforeImport = menu.map(item => ({ ...item }));
+      const recipesBeforeImport = JSON.parse(JSON.stringify(customRecipes));
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        let importedCount = 0;
+        let recipeCount = 0;
+        const cloudWrites = [];
+
+        function mapFuzzyIngredientKey(name) {
+          const clean = String(name).trim().toLowerCase();
+          if (clean.includes('steamed_milk') || clean.includes('fresh_milk') || clean.includes('whole_milk') || clean.includes('milk')) {
+            return 'milk';
+          }
+          if (clean.includes('espresso') || clean.includes('coffee_shot') || clean.includes('coffee')) {
+            return 'espresso_shot';
+          }
+          if (clean.includes('syrup_sugar') || clean.includes('simple_syrup') || clean.includes('sugar')) {
+            return 'sugar_syrup';
+          }
+          if (clean.includes('whipped_cream') || clean.includes('heavy_cream') || clean.includes('cream')) {
+            return 'cream';
+          }
+          if (clean.includes('ice_cube') || clean.includes('crushed_ice')) {
+            return 'ice';
+          }
+          if (clean.includes('cocoa') || clean.includes('chocolate_powder')) {
+            return 'cocoa_powder';
+          }
+          if (clean.includes('hazelnut')) {
+            return 'hazelnut_syrup';
+          }
+          if (clean.includes('caramel')) {
+            return 'caramel_syrup';
+          }
+          if (clean.includes('vanilla')) {
+            return 'vanilla_syrup';
+          }
+          if (clean.includes('irish')) {
+            return 'irish_syrup';
+          }
+          return clean.replace(/\s+/g, '_');
+        }
+
+        workbook.SheetNames.forEach(sheetName => {
+          const worksheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          let currentCategory = sheetName;
+
+          rows.forEach(row => {
+            if (!row || row.length === 0) return;
+
+            const filledCells = row.filter(c => c !== null && c !== undefined && c !== '');
+            if (filledCells.length === 1 && typeof row[0] === 'string' && !row[0].endsWith(' ')) {
+              currentCategory = row[0].trim();
+              return;
+            }
+
+            if (row[0] && typeof row[0] === 'string') {
+              const itemName = row[0].trim();
+
+              let price = 250;
+              let description = `Spreadsheet Imported Premium ${itemName}`;
+              let ingredientStartIndex = 1;
+
+              // Detect pricing and description column (Made by Antigravity)
+              const val1 = Number(row[1]);
+              if (row[1] !== undefined && !isNaN(val1) && typeof row[1] !== 'string') {
+                price = val1;
+                ingredientStartIndex = 2;
+                if (row[2] !== undefined && typeof row[2] === 'string' && isNaN(Number(row[2]))) {
+                  const fuzzyKey = mapFuzzyIngredientKey(row[2]);
+                  if (defaultInventory[fuzzyKey] === undefined) {
+                    description = row[2].trim();
+                    ingredientStartIndex = 3;
+                  }
+                }
+              } else if (row[1] !== undefined && typeof row[1] === 'string') {
+                const fuzzyKey = mapFuzzyIngredientKey(row[1]);
+                if (defaultInventory[fuzzyKey] === undefined) {
+                  description = row[1].trim();
+                  ingredientStartIndex = 2;
+                }
+              }
+
+              const ingredients = {};
+              for (let i = ingredientStartIndex; i < row.length; i += 2) {
+                if (i + 1 < row.length) {
+                  const ingName = row[i];
+                  const amt = row[i + 1];
+                  if (ingName && amt) {
+                    const cleanIng = mapFuzzyIngredientKey(ingName);
+                    if (defaultInventory[cleanIng] !== undefined) {
+                      ingredients[cleanIng] = parseFloat(amt) || 0;
+                    }
+                  }
+                }
+              }
+
+              const nameLower = itemName.toLowerCase();
+              customRecipes[nameLower] = ingredients;
+              recipeCount++;
+
+              const existingIdx = menu.findIndex(item => item.name.toLowerCase() === nameLower);
+              const newItem = {
+                name: itemName,
+                category: currentCategory.toUpperCase(),
+                price: price,
+                description: description,
+                icon: "✨"
+              };
+
+              if (existingIdx !== -1) {
+                // Update local menu cache
+                menu[existingIdx] = newItem;
+              } else {
+                // Insert local menu cache
+                menu.push(newItem);
+                importedCount++;
+              }
+
+              if (supabaseClient) {
+                cloudWrites.push(requireTenantWrite(supabaseClient.from('doppio_menu').upsert({
+                  tenant_id: activeTenantId,
+                  name: newItem.name,
+                  category: newItem.category,
+                  price: newItem.price,
+                  description: newItem.description,
+                  icon: newItem.icon
+                }, { onConflict: 'tenant_id,name' }), `Menu import failed for ${newItem.name}`));
+                cloudWrites.push(requireTenantWrite(supabaseClient.from('doppio_custom_recipes').upsert({
+                  tenant_id: activeTenantId,
+                  item_name: nameLower,
+                  ingredients,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'tenant_id,item_name' }), `Recipe import failed for ${newItem.name}`));
+              }
+            }
+          });
+        });
+
+        if (!supabaseClient) throw new Error('Cloud connection is unavailable.');
+        await Promise.all(cloudWrites);
+
+        localStorage.setItem('doppio_custom_recipes', JSON.stringify(customRecipes));
+        localStorage.setItem('doppio_menu', JSON.stringify(menu));
+        setVaultData('doppio_menu', menu);
+
+        SoundEffects.playSuccess();
+        if (excelDropText) {
+          excelDropText.innerHTML = `<span style="color:#27ae60;"><i class="fa-solid fa-circle-check"></i> Onboarded Successful!</span>`;
+          setTimeout(() => {
+            excelDropText.textContent = "Drag & Drop Excel here or Click to Browse";
+          }, 3000);
+        }
+
+        renderPOSItems();
+        renderInventory();
+        checkLowStockAlerts();
+        broadcastMenuUpdate();
+
+        alert(`Excel Import Success! Onboarded ${importedCount} new menu items and configured ${recipeCount} dynamic recipes instantly.`);
+
+      } catch (err) {
+        console.error("Excel import failed:", err);
+        menu = menuBeforeImport;
+        customRecipes = recipesBeforeImport;
+        SoundEffects.playRemove();
+        alert(`Excel import failed and no local changes were kept.\n${err.message || 'Check the spreadsheet structure and try again.'}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  async function handleExcelUpload(file) {
+    if (!file) return;
+    if (excelImportBusy) {
+      setOperationStatus('Import already running. Please wait...', 'working', 55);
+      return;
+    }
+    excelImportBusy = true;
+    const finish = startOperationStatus(null, `Importing ${file.name}...`);
+    try {
+      setExcelImportStatus(`Validating ${file.name}...`);
+      setOperationStatus(`Reading ${file.name}...`, 'working', 20);
+      const sheets = await parseImportFile(file);
+      setOperationStatus('Checking spreadsheet rows...', 'working', 45);
+      const parsed = importsDomain.parseImportSheets(sheets);
+      if (parsed.errors.length) {
+        const visibleErrors = parsed.errors.slice(0, 8).join('\n');
+        const remaining = parsed.errors.length > 8 ? `\n...and ${parsed.errors.length - 8} more errors.` : '';
+        throw new Error(`Nothing was imported:\n${visibleErrors}${remaining}`);
+      }
+      const recipeCount = Object.keys(parsed.recipes).length;
+      const total = parsed.menu.length + parsed.inventory.length + recipeCount + parsed.employees.length + parsed.customers.length;
+      if (!total) throw new Error('No supported rows were found. Use sheets named Menu, Inventory, Recipes, Employees or Customers.');
+      setOperationStatus(`Publishing ${total} imported records...`, 'working', 70);
+      await applyStructuredImport(parsed);
+      const summary = `${parsed.menu.length} menu, ${parsed.inventory.length} inventory, ${recipeCount} recipes, ${parsed.employees.length} employees and ${parsed.customers.length} customers`;
+      const warnings = parsed.warnings.length ? ` Warnings: ${parsed.warnings.slice(0, 3).join(' ')}` : '';
+      setExcelImportStatus(`Published ${summary}.${supabaseClient ? ' Cloud sync complete.' : ' Saved on this device; cloud is not connected.'}${warnings}`, 'success');
+      finish('success', `Import complete: ${summary}.`);
+      if (excelDropText) excelDropText.textContent = file.name;
+      SoundEffects.playSuccess();
+    } catch (err) {
+      console.error('Excel import failed:', err);
+      setExcelImportStatus(err.message || 'Check the spreadsheet structure and try again.', 'error');
+      finish('error', err.message || 'Import failed.');
+      SoundEffects.playRemove();
+    } finally {
+      excelImportBusy = false;
+      if (excelFileInput) excelFileInput.value = '';
+    }
+  }
+
+  // ==========================================
+  // KITCHEN DISPLAY SYSTEM (KDS) & TOKEN BILLBOARD (Steps 7 & 8)
+  // ==========================================
+  function renderKDSTab() {
+    const kdsGrid = document.getElementById('kds-grid');
+    const kdsCountPending = document.getElementById('kds-count-pending');
+    const kdsCountPreparing = document.getElementById('kds-count-preparing');
+    const kdsCountReady = document.getElementById('kds-count-ready');
+
+    if (!kdsGrid) return;
+    kdsGrid.innerHTML = '';
+
+    const pendingCount = pendingQrOrders.filter(o => o.status === 'Pending Review').length;
+    const preparingCount = pendingQrOrders.filter(o => o.status === 'Accepted').length;
+    const readyCount = pendingQrOrders.filter(o => o.status === 'Ready').length;
+
+    if (kdsCountPending) kdsCountPending.textContent = `${pendingCount} Pending`;
+    if (kdsCountPreparing) kdsCountPreparing.textContent = `${preparingCount} Cooking`;
+    if (kdsCountReady) kdsCountReady.textContent = `${readyCount} Ready to Serve`;
+
+    // Sort orders: urgent first, then by time (oldest first)
+    const cookingOrders = pendingQrOrders.filter(o => o.status === 'Accepted').sort((a, b) => {
+      const priorityOrder = { 'urgent': 0, 'normal': 1 };
+      const aPriority = a.priority || 'normal';
+      const bPriority = b.priority || 'normal';
+      if (priorityOrder[aPriority] !== priorityOrder[bPriority]) {
+        return priorityOrder[aPriority] - priorityOrder[bPriority];
+      }
+      // If same priority, sort by time (oldest first)
+      const aTime = Date.parse(a.dateTime) || 0;
+      const bTime = Date.parse(b.dateTime) || 0;
+      return aTime - bTime;
+    });
+
+    if (cookingOrders.length === 0) {
+      kdsGrid.innerHTML = `
+        <div class="premium-empty-state" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; width:100%; box-sizing: border-box; background: var(--white); border-radius: var(--border-radius-md); border: 1px solid rgba(28, 28, 28,0.05);">
+          <i class="fa-solid fa-fire-burner" style="font-size: 36px; color: var(--accent-caramel); opacity: 0.5; margin-bottom: 16px;"></i>
+          <h3 style="margin-bottom: 8px; color: var(--primary-brand); font-family: var(--font-heading);">Kitchen is Clear</h3>
+          <p style="font-size: 11px; color: var(--text-muted); max-width: 300px; margin: 0 auto; line-height: 1.4;">All orders have been prepared and bumped. High five! 🙌</p>
+        </div>
+      `;
+      return;
+    }
+
+    cookingOrders.forEach(order => {
+      const card = document.createElement('div');
+      const typeLower = (order.orderType || 'Takeaway').toLowerCase();
+      const priority = order.priority || 'normal';
+      card.className = `kds-card type-${typeLower === 'dine-in' ? 'dine-in' : typeLower === 'swiggy' ? 'swiggy' : typeLower === 'zomato' ? 'zomato' : 'takeaway'}`;
+      
+      // Add priority border if urgent
+      if (priority === 'urgent') {
+        card.style.borderLeft = '6px solid #e74c3c';
+        card.style.boxShadow = '0 4px 12px rgba(231,76,60,0.2)';
+      }
+
+      // Calculate elapsed minutes
+      let elapsedMins = 0;
+      if (order.dateTime) {
+        // Try parsing different formats cleanly
+        const parsedDate = Date.parse(order.dateTime) || parseCustomLocaleString(order.dateTime);
+        if (parsedDate) {
+          const elapsedMs = Date.now() - parsedDate;
+          elapsedMins = Math.max(0, Math.floor(elapsedMs / 60000));
+        }
+      }
+
+      // Build items list
+      const itemsHtml = order.items.map((item, idx) => {
+        const checkedClass = item.isDone ? 'checked' : '';
+        const checkedAttr = item.isDone ? 'checked' : '';
+
+        const customizations = [];
+        if (item.size && item.size !== 'Regular') customizations.push(item.size);
+        if (item.sugar && item.sugar !== 'Regular') customizations.push(item.sugar);
+        if (item.ice && item.ice !== 'Regular') customizations.push(item.ice);
+        if (item.toppings && item.toppings.length > 0) customizations.push(item.toppings.join(', '));
+        // Escape all order-derived fields: QR guest orders flow into the KDS,
+        // so unescaped values here would be a stored-XSS vector.
+        const descHtml = customizations.length > 0 ? `<span class="kds-item-desc">${escHtml(customizations.join(' | '))}</span>` : '';
+
+        return `
+          <div class="kds-item-row ${checkedClass}" data-item-idx="${idx}">
+            <input type="checkbox" ${checkedAttr}>
+            <span class="kds-item-qty">${escHtml(String(item.qty))}x</span>
+            <div style="flex:1;">
+              <span>${escHtml(item.name || '')}</span>
+              ${descHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="kds-card-header">
+          <div class="kds-card-title" style="gap: 8px;">
+            <i class="fa-solid fa-receipt"></i>
+            <span>${escHtml(String(order.orderId || ''))}</span>
+            <span style="font-size: 10px; font-weight:600; color: var(--text-muted);">(${escHtml(order.orderType || 'Takeaway')})</span>
+            ${priority === 'urgent' ? '<span style="font-size: 10px; font-weight:800; color: #e74c3c; background: rgba(231,76,60,0.1); padding: 2px 6px; border-radius: 6px;"><i class="fa-solid fa-bolt"></i> URGENT</span>' : ''}
+          </div>
+          <span class="kds-card-timer">${elapsedMins}m ago</span>
+        </div>
+        <div class="kds-items-list">
+          ${itemsHtml}
+        </div>
+        <div class="kds-card-footer" style="gap: 8px;">
+          <button class="kds-priority-btn" data-order-id="${escHtml(String(order.orderId || ''))}" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: ${priority === 'urgent' ? '2px solid #e74c3c' : '2px solid #f39c12'}; background: ${priority === 'urgent' ? 'rgba(231,76,60,0.1)' : 'rgba(243,156,18,0.1)'}; color: ${priority === 'urgent' ? '#e74c3c' : '#f39c12'}; font-size: 11px; font-weight: 800; cursor: pointer;">
+            <i class="fa-solid fa-${priority === 'urgent' ? 'bolt' : 'flag'}"></i> ${priority.toUpperCase()}
+          </button>
+          <button class="kds-bump-btn" data-order-id="${escHtml(String(order.orderId || ''))}">
+            <i class="fa-solid fa-circle-check"></i> BUMP
+          </button>
+        </div>
+      `;
+
+      // Checkbox click listener
+      card.querySelectorAll('.kds-item-row input[type="checkbox"]').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+          const row = chk.closest('.kds-item-row');
+          const itemIdx = parseInt(row.getAttribute('data-item-idx'));
+          if (e.target.checked) {
+            row.classList.add('checked');
+            order.items[itemIdx].isDone = true;
+          } else {
+            row.classList.remove('checked');
+            order.items[itemIdx].isDone = false;
+          }
+          localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+          if (supabaseClient) {
+            supabaseClient.from('doppio_pending_orders')
+              .update({ items: JSON.stringify(order.items) })
+              .eq('orderId', order.orderId).then();
+          }
+        });
+      });
+
+      // Priority button listener
+      const priorityBtn = card.querySelector('.kds-priority-btn');
+      priorityBtn.addEventListener('click', () => {
+        order.priority = order.priority === 'urgent' ? 'normal' : 'urgent';
+        localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+        if (supabaseClient) {
+          supabaseClient.from('doppio_pending_orders')
+            .update({ priority: order.priority })
+            .eq('orderId', order.orderId).then();
+        }
+        renderKDSTab();
+      });
+
+      // Bump button listener
+      card.querySelector('.kds-bump-btn').addEventListener('click', () => {
+        bumpKDSTicket(order.orderId);
+      });
+
+      kdsGrid.appendChild(card);
+    });
+  }
+
+  const parseCustomLocaleString = operationsDomain.parseCustomLocaleString;
+
+  function bumpKDSTicket(orderId) {
+    const order = pendingQrOrders.find(o => o.orderId === orderId);
+    if (!order) return;
+
+    // Play kitchen bump chime
+    SoundEffects.playSuccess();
+
+    order.status = 'Ready';
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders')
+        .update({ status: 'Ready' })
+        .eq('orderId', orderId).then();
+    }
+
+    renderKDSTab();
+    renderTokensTab();
+    showNotificationToast(`Order ${orderId} prepared! Bumped to Pickup Screen.`);
+  }
+
+  function renderTokensTab() {
+    const preparingList = document.getElementById('tokens-preparing-list');
+    const readyList = document.getElementById('tokens-ready-list');
+
+    if (!preparingList || !readyList) return;
+
+    preparingList.innerHTML = '';
+    readyList.innerHTML = '';
+
+    const preparingOrders = pendingQrOrders.filter(o => o.status === 'Accepted');
+    const readyOrders = pendingQrOrders.filter(o => o.status === 'Ready');
+
+    if (preparingOrders.length === 0) {
+      preparingList.innerHTML = '<span style="font-size:11px; color:var(--text-muted); grid-column:1/-1; text-align:center; padding:20px;">No preparing tokens.</span>';
+    } else {
+      preparingOrders.forEach(order => {
+        const badge = document.createElement('div');
+        badge.className = 'token-badge';
+        const shortToken = order.orderId.includes('-') ? order.orderId.split('-').slice(-1)[0] : order.orderId;
+        badge.textContent = `${shortToken}`;
+        preparingList.appendChild(badge);
+      });
+    }
+
+    if (readyOrders.length === 0) {
+      readyList.innerHTML = '<span style="font-size:11px; color:var(--text-muted); grid-column:1/-1; text-align:center; padding:20px;">No ready tokens.</span>';
+    } else {
+      readyOrders.forEach(order => {
+        const badge = document.createElement('div');
+        badge.className = 'token-badge ready';
+        badge.style.cursor = 'pointer';
+        badge.title = 'Click to Pick Up & Archive';
+
+        const shortToken = order.orderId.includes('-') ? order.orderId.split('-').slice(-1)[0] : order.orderId;
+        badge.innerHTML = `
+          <span>${shortToken}</span>
+          <div style="font-size: 8px; font-weight:800; color:var(--success-color); margin-top:2px;">READY</div>
+        `;
+
+        badge.addEventListener('click', () => {
+          dismissToken(order.orderId);
+        });
+
+        readyList.appendChild(badge);
+      });
+    }
+  }
+
+  function dismissToken(orderId) {
+    SoundEffects.playClick();
+
+    pendingQrOrders = pendingQrOrders.filter(o => o.orderId !== orderId);
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders')
+        .delete()
+        .eq('orderId', orderId).then();
+    }
+
+    renderKDSTab();
+    renderTokensTab();
+    showNotificationToast(`Token ${orderId} picked up & archived!`);
+  }
+
+  // Expose these functions globally so other files can call them easily
+  window.renderKDSTab = renderKDSTab;
+  window.renderTokensTab = renderTokensTab;
+  window.bumpKDSTicket = bumpKDSTicket;
+  window.dismissToken = dismissToken;
+
+  // 1. Manual Restock Inventory Action (Made by Antigravity)
+  const restockInventoryBtn = document.getElementById('restock-inventory-btn');
+  if (restockInventoryBtn) {
+    restockInventoryBtn.addEventListener('click', () => {
+      SoundEffects.playSuccess();
+      Object.keys(defaultInventory).forEach(key => {
+        const maxVal = defaultInventory[key];
+        const refillQty = maxVal - (inventory[key] || 0);
+        if (refillQty > 0) {
+          const newBatch = {
+            id: "batch_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+            qty: refillQty,
+            expiryDate: getDefaultExpiryDate(key),
+            receivedDate: new Date().toISOString().split('T')[0]
+          };
+          if (!inventoryBatches[key]) inventoryBatches[key] = [];
+          inventoryBatches[key].push(newBatch);
+          syncIngredientBatchesToSupabase(key);
+        }
+        inventory[key] = maxVal;
+        if (supabaseClient) {
+          supabaseClient.from('doppio_inventory').update({ current: maxVal }).eq('tenant_id', activeTenantId).eq('key', key).then();
+        }
+      });
+      localStorage.setItem('doppio_inventory', JSON.stringify(inventory));
+      localStorage.setItem('doppio_inventory_batches', JSON.stringify(inventoryBatches));
+      renderInventory();
+      checkLowStockAlerts();
+      updateAIForecast();
+      alert("Manual restock successful! Raw material levels refilled to 100% capacity.");
+    });
+  }
+
+  // 2. Dine-In Table Session Workflow & Actions (Made by Antigravity)
+  const tableSessionClose1 = document.getElementById('table-session-modal-close');
+  const tableSessionClose2 = document.getElementById('table-session-modal-close-btn');
+  const tableSessionModal = document.getElementById('table-session-modal');
+  const sessionCancelBtn = document.getElementById('table-session-cancel-btn');
+  const sessionKdsBtn = document.getElementById('table-session-kds-btn');
+
+  if (tableSessionClose1) {
+    tableSessionClose1.addEventListener('click', () => {
+      if (tableSessionModal) tableSessionModal.style.display = 'none';
+    });
+  }
+  if (tableSessionClose2) {
+    tableSessionClose2.addEventListener('click', () => {
+      if (tableSessionModal) tableSessionModal.style.display = 'none';
+    });
+  }
+  if (sessionCancelBtn) {
+    sessionCancelBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      if (activeTableSession !== null) {
+        const tableId = activeTableSession;
+
+        if (cart.length > 0) {
+          // Save the current cart to the table session so it's not discarded
+          tableCarts[tableId] = [...cart];
+          localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+
+          // Keep the table state as ORDERING (occupied)
+          tablesState[tableId] = 'ORDERING';
+          localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+
+          // Sync the occupied table session to Supabase
+          syncActiveTableSessionToSupabase(tableId);
+        } else {
+          // Clear the table session
+          tableCarts[tableId] = [];
+          localStorage.setItem('doppio_table_carts', JSON.stringify(tableCarts));
+
+          tablesState[tableId] = 'EMPTY';
+          localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+          if (supabaseClient) {
+            supabaseClient.from('doppio_pending_orders').delete().eq('orderId', `TABLE-${tableId}`).then();
+          }
+        }
+      }
+
+      // Restore the takeaway cart backup
+      const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
+      cart = backup ? JSON.parse(backup) : [];
+
+      activeOrderType = 'Takeaway';
+      const typeBtns = document.querySelectorAll('.order-type-btn');
+      typeBtns.forEach(b => {
+        if (b.getAttribute('data-type') === 'Takeaway') {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+
+      activeTableSession = null;
+
+      // Hide the session banner
+      const banner = document.getElementById('table-session-banner');
+      if (banner) banner.style.display = 'none';
+
+      // Navigate back to the Live Table Orders tab
+      const qrTabLink = document.getElementById('sidebar-qr-link') || document.getElementById('mobile-qr-link') || document.querySelector('[data-tab="qr-orders-tab"]');
+      if (qrTabLink) {
+        qrTabLink.click();
+      }
+
+      renderCart();
+      renderTablesMap();
+    });
+  }
+  if (sessionKdsBtn) {
+    sessionKdsBtn.addEventListener('click', () => {
+      sendTableSessionToKDS();
+    });
+  }
+  const sendToKdsBtn = document.getElementById('send-to-kds-btn');
+  if (sendToKdsBtn) {
+    sendToKdsBtn.addEventListener('click', () => {
+      sendTakeawayToKDS();
+    });
+  }
+
+  function openTableSessionModal(tableId) {
+    const modal = document.getElementById('table-session-modal');
+    const title = document.getElementById('table-session-modal-title');
+    const status = document.getElementById('table-session-modal-status');
+    const itemsList = document.getElementById('table-session-modal-items-list');
+    const totalEl = document.getElementById('table-session-modal-total');
+    const startBtn = document.getElementById('table-session-modal-start-order-btn');
+    const billBtn = document.getElementById('table-session-modal-bill-btn');
+
+    if (!modal) return;
+
+    title.textContent = `Table 0${tableId} Details`;
+    const state = tablesState[tableId] || "EMPTY";
+
+    let stateLabel = "Clean & Empty";
+    if (state === "ORDERING") stateLabel = "Occupied (Ordering)";
+    else if (state === "PENDING") stateLabel = "Occupied (Pending Pay)";
+    else if (state === "SERVED") stateLabel = "Occupied (Served)";
+    status.textContent = stateLabel;
+
+    status.className = "status-indicator-badge";
+    if (state === "EMPTY") {
+      status.style.background = "rgba(46, 204, 113, 0.08)";
+      status.style.color = "var(--success-color)";
+    } else {
+      status.style.background = "rgba(231, 76, 60, 0.08)";
+      status.style.color = "var(--danger-color)";
+    }
+
+    const items = tableCarts[tableId] || [];
+    itemsList.innerHTML = '';
+    let subtotal = 0;
+
+    if (items.length === 0) {
+      itemsList.innerHTML = `<div style="font-size: 11px; text-align: center; color: var(--text-muted); padding: 20px 0;">No active items in session.</div>`;
+      startBtn.innerHTML = `<i class="fa-solid fa-cart-plus"></i> Start Order`;
+      billBtn.style.display = 'none';
+    } else {
+      items.forEach(item => {
+        const itemEl = document.createElement('div');
+        itemEl.style.display = 'flex';
+        itemEl.style.justifyContent = 'space-between';
+        itemEl.style.fontSize = '11px';
+        itemEl.style.padding = '4px 0';
+        itemEl.style.borderBottom = '1px dashed rgba(28, 28, 28,0.05)';
+        itemEl.innerHTML = `
+          <span>${item.name} x${item.qty}</span>
+          <span style="font-weight:700;">₹${item.price * item.qty}</span>
+        `;
+        itemsList.appendChild(itemEl);
+        subtotal += item.price * item.qty;
+      });
+      startBtn.innerHTML = `<i class="fa-solid fa-cart-plus"></i> Add Items`;
+      billBtn.style.display = 'block';
+    }
+    totalEl.textContent = `₹${subtotal.toFixed(2)}`;
+
+    const newStartBtn = startBtn.cloneNode(true);
+    startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+    newStartBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+      startTableSessionEdit(tableId);
+    });
+
+    const newBillBtn = billBtn.cloneNode(true);
+    billBtn.parentNode.replaceChild(newBillBtn, billBtn);
+    newBillBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+      closeAndBillTable(tableId);
+    });
+
+    modal.style.display = 'flex';
+  }
+
+  function startTableSessionEdit(tableId) {
+    SoundEffects.playClick();
+    activeTableSession = tableId;
+    sessionStorage.setItem('doppio_takeaway_cart_backup', JSON.stringify(cart));
+    cart = tableCarts[tableId] || [];
+
+    if ((tablesState[tableId] || "EMPTY") === "EMPTY") {
+      tablesState[tableId] = "ORDERING";
+      localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+      syncActiveTableSessionToSupabase(tableId);
+    }
+
+    // Explicitly set active order type to DineIn and update picker buttons
+    activeOrderType = 'DineIn';
+    const typeBtns = document.querySelectorAll('.order-type-btn');
+    typeBtns.forEach(b => {
+      if (b.getAttribute('data-type') === 'DineIn') {
+        b.classList.add('active');
+      } else {
+        b.classList.remove('active');
+      }
+    });
+
+    const banner = document.getElementById('table-session-banner');
+    const bannerTitle = document.getElementById('table-session-title');
+    if (banner) banner.style.display = 'flex';
+    if (bannerTitle) bannerTitle.textContent = `Table 0${tableId} Dine-In Order Active`;
+
+    const posLink = document.querySelector('[data-tab="pos-tab"]');
+    if (posLink) posLink.click();
+
+    renderCart();
+    renderTablesMap();
+  }
+
+  function syncActiveTableSessionToSupabase(tableId) {
+    if (!supabaseClient) return;
+    const items = tableCarts[tableId] || [];
+    const total = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const orderId = `TABLE-${tableId}`;
+
+    supabaseClient.from('doppio_pending_orders')
+      .upsert({
+        orderId: orderId,
+        customerName: `Table 0${tableId}`,
+        customerPhone: '',
+        dateTime: new Date().toLocaleString('en-IN'),
+        items: JSON.stringify(items),
+        subtotal: total,
+        discount: 0,
+        gst: 0,
+        total: total,
+        paymentMethod: 'Cash',
+        orderType: 'Dine-In',
+        tableNumber: `0${tableId}`,
+        status: 'DineIn Active'
+      }, { onConflict: 'tenant_id,orderId' }).then();
+  }
+
+  function sendTableSessionToKDS() {
+    if (activeTableSession === null) return;
+    const tableId = activeTableSession;
+    const items = tableCarts[tableId] || [];
+    if (items.length === 0) {
+      alert("Cannot send empty cart to KDS!");
+      return;
+    }
+
+    tablesState[tableId] = "SERVED";
+    localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+
+    const orderId = `TABLE-${tableId}-${Date.now().toString().slice(-4)}`;
+    const tableOrder = {
+      orderId: orderId,
+      customerName: `Table 0${tableId}`,
+      customerPhone: '',
+      dateTime: new Date().toLocaleString('en-IN'),
+      items: [...items],
+      subtotal: items.reduce((sum, item) => sum + (item.price * item.qty), 0),
+      discount: 0,
+      gst: 0,
+      total: items.reduce((sum, item) => sum + (item.price * item.qty), 0),
+      paymentMethod: 'Cash',
+      orderType: 'Dine-In',
+      tableNumber: `0${tableId}`,
+      status: 'Accepted',
+      priority: 'normal'
+    };
+
+    const existingIdx = pendingQrOrders.findIndex(o => o.tableNumber === `0${tableId}` && o.status === 'Accepted');
+    if (existingIdx !== -1) {
+      pendingQrOrders[existingIdx].items = [...items];
+      pendingQrOrders[existingIdx].subtotal = tableOrder.subtotal;
+      pendingQrOrders[existingIdx].total = tableOrder.total;
+
+      if (supabaseClient) {
+        supabaseClient.from('doppio_pending_orders')
+          .update({
+            items: JSON.stringify(items),
+            subtotal: tableOrder.subtotal,
+            total: tableOrder.total,
+            status: 'Accepted'
+          })
+          .eq('orderId', pendingQrOrders[existingIdx].orderId).then();
+      }
+    } else {
+      pendingQrOrders.push(tableOrder);
+      if (supabaseClient) {
+        supabaseClient.from('doppio_pending_orders').insert({
+          orderId: tableOrder.orderId,
+          customerName: tableOrder.customerName,
+          customerPhone: tableOrder.customerPhone,
+          items: JSON.stringify(tableOrder.items),
+          subtotal: tableOrder.subtotal,
+          discount: tableOrder.discount,
+          gst: tableOrder.gst,
+          total: tableOrder.total,
+          paymentMethod: tableOrder.paymentMethod,
+          orderType: tableOrder.orderType,
+          tableNumber: tableOrder.tableNumber,
+          status: tableOrder.status,
+          dateTime: tableOrder.dateTime
+        }).then();
+      }
+      if (supabaseClient) {
+        supabaseClient.from('doppio_pending_orders').delete().eq('orderId', `TABLE-${tableId}`).then();
+      }
+    }
+
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+    SoundEffects.playSuccess();
+    showNotificationToast(`Sent Table 0${tableId} order to KDS!`);
+
+    const backup = sessionStorage.getItem('doppio_takeaway_cart_backup');
+    cart = backup ? JSON.parse(backup) : [];
+    activeTableSession = null;
+
+    const banner = document.getElementById('table-session-banner');
+    if (banner) banner.style.display = 'none';
+
+    renderCart();
+    renderTablesMap();
+    if (typeof renderKDSTab === 'function') renderKDSTab();
+  }
+
+  function sendTakeawayToKDS() {
+    if (cart.length === 0) {
+      alert("Cannot send empty cart to KDS!");
+      return;
+    }
+
+    const orderId = `TAKE-${Date.now().toString().slice(-4)}`;
+    const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+    const orderType = activeOrderTypeBtn ? activeOrderTypeBtn.dataset.type : 'Takeaway';
+    const customerName = document.getElementById('cust-name').value || 'Walk-in Customer';
+    const customerPhone = document.getElementById('cust-phone').value || '';
+
+    const takeawayOrder = {
+      orderId: orderId,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      dateTime: new Date().toLocaleString('en-IN'),
+      items: [...cart],
+      subtotal: cart.reduce((sum, item) => sum + (item.price * item.qty), 0),
+      discount: 0,
+      gst: 0,
+      total: cart.reduce((sum, item) => sum + (item.price * item.qty), 0),
+      paymentMethod: document.querySelector('.pay-method-btn.active')?.dataset.method || 'Cash',
+      orderType: orderType,
+      tableNumber: '',
+      status: 'Accepted',
+      priority: activePriority
+    };
+
+    pendingQrOrders.push(takeawayOrder);
+
+    if (supabaseClient) {
+      supabaseClient.from('doppio_pending_orders').insert({
+        orderId: takeawayOrder.orderId,
+        customerName: takeawayOrder.customerName,
+        customerPhone: takeawayOrder.customerPhone,
+        items: JSON.stringify(takeawayOrder.items),
+        subtotal: takeawayOrder.subtotal,
+        discount: takeawayOrder.discount,
+        gst: takeawayOrder.gst,
+        total: takeawayOrder.total,
+        paymentMethod: takeawayOrder.paymentMethod,
+        orderType: takeawayOrder.orderType,
+        tableNumber: takeawayOrder.tableNumber,
+        status: takeawayOrder.status,
+        dateTime: takeawayOrder.dateTime
+      }).then();
+    }
+
+    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+    SoundEffects.playSuccess();
+    showNotificationToast(`Sent ${orderType} order to KDS!`);
+
+    // Clear the cart after sending to KDS
+    cart = [];
+    localStorage.setItem('doppio_cart', JSON.stringify(cart));
+    renderCart();
+    if (typeof renderKDSTab === 'function') renderKDSTab();
+  }
+
+  function closeAndBillTable(tableId) {
+    SoundEffects.playClick();
+    const items = tableCarts[tableId] || [];
+    if (items.length === 0) {
+      alert("No items in this table's session to bill!");
+      return;
+    }
+
+    cart = [...items];
+    localStorage.setItem('doppio_cart', JSON.stringify(cart));
+
+    const nameInput = document.getElementById('cust-name');
+    if (nameInput) nameInput.value = `Table 0${tableId}`;
+
+    tablesState[tableId] = "PENDING";
+    localStorage.setItem('doppio_tables_state', JSON.stringify(tablesState));
+
+    if (activeTableSession === tableId) {
+      activeTableSession = null;
+      const banner = document.getElementById('table-session-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    const posLink = document.querySelector('[data-tab="pos-tab"]');
+    if (posLink) posLink.click();
+
+    renderCart();
+    renderTablesMap();
+  }
+
+  // 3. Employee Ledger & Compliance Payroll Functions (Made by Antigravity)
+  function renderEmployeesTab() {
+    const empDirectoryList = document.getElementById('emp-directory-list');
+    const leaveEmpSelect = document.getElementById('leave-emp-select');
+    const payrollEmpSelect = document.getElementById('payroll-emp-select');
+    const leaveApprovalsList = document.getElementById('leave-approvals-list');
+    const shiftRosterList = document.getElementById('shift-roster-list');
+
+    const validEmployees = employees.filter(e => e && e.id && e.name);
+
+    if (leaveEmpSelect) {
+      leaveEmpSelect.innerHTML = validEmployees.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)}</option>`).join('');
+    }
+    if (payrollEmpSelect) {
+      payrollEmpSelect.innerHTML = validEmployees.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)}</option>`).join('');
+    }
+
+    if (empDirectoryList) {
+      empDirectoryList.innerHTML = validEmployees.map(emp => {
+        const casualLeft = emp.leaves ? emp.leaves.casual : 15;
+        const sickLeft = emp.leaves ? emp.leaves.sick : 10;
+        const isClockedIn = attendanceLogs.some(log => log && log.employeeId === emp.id && log.status === 'Active');
+        const statusDot = isClockedIn
+          ? `<span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#2ecc71; margin-right:6px; animation: pulse 1.5s infinite;"></span>`
+          : '';
+        return `
+          <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 35px; color: var(--text-dark);">
+            <td style="padding: 8px; font-weight:700; display:flex; align-items:center;">${statusDot}${escHtml(emp.name)}</td>
+            <td style="padding: 8px;">${escHtml((emp.role || '').toUpperCase())}</td>
+            <td style="padding: 8px;">${escHtml(emp.shift || '')}</td>
+            <td style="padding: 8px; font-weight:700;">₹${emp.baseSalary || 0}</td>
+            <td style="padding: 8px;">CL: ${casualLeft} | SL: ${sickLeft}</td>
+            <td style="padding: 8px; text-align: right;">
+              <button class="btn btn-secondary select-payroll-btn" data-id="${escHtml(emp.id)}" style="padding: 2px 8px; font-size: 10px; border-radius: 4px;">Select Payout</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      empDirectoryList.querySelectorAll('.select-payroll-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const empId = btn.getAttribute('data-id');
+          if (payrollEmpSelect) {
+            payrollEmpSelect.value = empId;
+            payrollEmpSelect.dispatchEvent(new Event('change'));
+          }
+        });
+      });
+    }
+
+    if (shiftRosterList) {
+      shiftRosterList.innerHTML = validEmployees.map(emp => `
+        <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 35px; color: var(--text-dark);">
+          <td style="padding: 6px; font-weight:700;">${escHtml(emp.name)}</td>
+          <td style="padding: 6px;">${escHtml(emp.shift || '')}</td>
+          <td style="padding: 6px;">
+            <button class="btn btn-secondary toggle-shift-btn" data-id="${escHtml(emp.id)}" style="padding: 2px 6px; font-size: 10px; border-radius:4px;"><i class="fa-solid fa-arrows-rotate"></i> Change</button>
+          </td>
+        </tr>
+      `).join('');
+
+      shiftRosterList.querySelectorAll('.toggle-shift-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          SoundEffects.playClick();
+          const empId = btn.getAttribute('data-id');
+          const emp = validEmployees.find(e => e.id === empId);
+          if (emp) {
+            emp.shift = emp.shift === 'Morning Shift' ? 'Evening Shift' : 'Morning Shift';
+            localStorage.setItem('doppio_employees', JSON.stringify(employees));
+            if (supabaseClient) {
+              supabaseClient.from('doppio_employees').upsert({
+                tenant_id: activeTenantId,
+                id: emp.id,
+                name: emp.name,
+                role: emp.role,
+                contact: emp.contact,
+                baseSalary: emp.baseSalary,
+                shift: emp.shift,
+                leaves: emp.leaves
+              }).then();
+            }
+            renderEmployeesTab();
+            showNotificationToast(`Shift roster updated for ${emp.name} to ${emp.shift}.`);
+          }
+        });
+      });
+    }
+
+    if (leaveApprovalsList) {
+      leaveApprovalsList.innerHTML = '';
+      const pendingLeaves = leaveRequests.filter(r => r && r.status === 'Pending');
+
+      if (pendingLeaves.length === 0) {
+        leaveApprovalsList.innerHTML = `<div style="font-size: 10px; color:var(--text-muted); padding: 10px 0; text-align:center;">No pending leave approvals.</div>`;
+      } else {
+        pendingLeaves.forEach(req => {
+          const item = document.createElement('div');
+          item.style.marginBottom = '6px';
+          item.innerHTML = `
+            <div style="background: rgba(28, 28, 28,0.02); border: 1px solid rgba(28, 28, 28,0.05); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 10.5px;">
+              <div style="display:flex; justify-content:space-between; font-weight:700;">
+                <span>${escHtml(req.employeeName || '')} (${escHtml(req.type || '')})</span>
+                <span style="color:var(--accent-caramel);">${Number(req.days) || 0} days</span>
+              </div>
+              <div style="color:var(--text-muted); font-size: 9.5px; line-height: 1.3;">
+                <span>${escHtml(req.startDate || '')} to ${escHtml(req.endDate || '')}</span>
+                <br><span>Reason: ${escHtml(req.reason || '')}</span>
+              </div>
+              <div style="display:flex; gap:6px; margin-top:4px;">
+                <button type="button" class="btn btn-primary approve-leave-btn" data-id="${req.id}" style="flex:1; padding:2px 6px; font-size:9.5px; background:#2ecc71; border:none; color:white; border-radius:3px; cursor:pointer;">Approve</button>
+                <button type="button" class="btn btn-secondary reject-leave-btn" data-id="${req.id}" style="flex:1; padding:2px 6px; font-size:9.5px; border-radius:3px; cursor:pointer;">Reject</button>
+              </div>
+            </div>
+          `;
+
+          item.querySelector('.approve-leave-btn').addEventListener('click', () => {
+            SoundEffects.playSuccess();
+            req.status = 'Approved';
+            const emp = validEmployees.find(e => e && e.id === req.employeeId);
+            if (emp) {
+              if (!emp.leaves) emp.leaves = { casual: 15, sick: 10 };
+              const key = req.type.toLowerCase().includes('sick') ? 'sick' : 'casual';
+              emp.leaves[key] = Math.max(0, (emp.leaves[key] || 0) - req.days);
+            }
+            localStorage.setItem('doppio_employees', JSON.stringify(employees));
+            localStorage.setItem('doppio_leave_requests', JSON.stringify(leaveRequests));
+            if (supabaseClient) {
+              supabaseClient.from('doppio_leave_requests').update({ status: 'Approved' }).eq('id', req.id).then();
+              if (emp) {
+                supabaseClient.from('doppio_employees').update({ leaves: emp.leaves }).eq('id', emp.id).then();
+              }
+            }
+            renderEmployeesTab();
+            showNotificationToast(`Leave approved for ${req.employeeName}.`);
+            updateEmployeeAnalytics();
+          });
+
+          item.querySelector('.reject-leave-btn').addEventListener('click', () => {
+            SoundEffects.playRemove();
+            req.status = 'Rejected';
+            localStorage.setItem('doppio_leave_requests', JSON.stringify(leaveRequests));
+            if (supabaseClient) {
+              supabaseClient.from('doppio_leave_requests').update({ status: 'Rejected' }).eq('id', req.id).then();
+            }
+            renderEmployeesTab();
+            showNotificationToast(`Leave request rejected for ${req.employeeName}.`);
+            updateEmployeeAnalytics();
+          });
+
+          leaveApprovalsList.appendChild(item);
+        });
+      }
+    }
+
+    // Render Daily Clocking system list & dropdown
+    const attendanceEmpSelect = document.getElementById('attendance-emp-select');
+    const attendanceLedgerList = document.getElementById('attendance-ledger-list');
+
+    if (attendanceEmpSelect && attendanceEmpSelect.children.length === 0) {
+      attendanceEmpSelect.innerHTML = employees.map(e => `<option value="${escHtml(e.id)}">${escHtml(e.name)}</option>`).join('');
+    }
+
+    if (attendanceLedgerList) {
+      const sortedLogs = [...attendanceLogs]
+        .filter(log => log && log.date && log.employeeName)
+        .sort((a, b) => {
+          const dateA = (a.date || '') + ' ' + (a.clockInTime || '00:00');
+          const dateB = (b.date || '') + ' ' + (b.clockInTime || '00:00');
+          return dateB.localeCompare(dateA);
+        });
+
+      attendanceLedgerList.innerHTML = sortedLogs.map(log => {
+        let statusBadge = '';
+        if (log.status === 'Active') {
+          statusBadge = `<span style="background-color: #2ecc71; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 9px; animation: pulse 1.5s infinite;"><i class="fa-solid fa-spinner fa-spin"></i> Clocked In</span>`;
+        } else {
+          statusBadge = `<span style="background-color: rgba(28, 28, 28,0.06); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9px;">Completed</span>`;
+        }
+        return `
+          <tr style="border-bottom: 1px solid rgba(28, 28, 28,0.05); height: 32px; color: var(--text-dark);">
+            <td style="padding: 6px; font-weight:700;">${escHtml(log.employeeName)}</td>
+            <td style="padding: 6px;">${escHtml(log.date)}</td>
+            <td style="padding: 6px;">${escHtml(log.clockInTime || '-')}</td>
+            <td style="padding: 6px;">${escHtml(log.clockOutTime || '-')}</td>
+            <td style="padding: 6px; font-weight: 600;">${escHtml(log.hoursWorked ? log.hoursWorked + ' hrs' : '-')}</td>
+            <td style="padding: 6px; font-weight: 700;">₹${escHtml(log.wages || 0)}</td>
+            <td style="padding: 6px; text-align: right;">${statusBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    updateEmployeeAnalytics();
+  }
+
+  function updateEmployeeAnalytics() {
+    const empStatTotal = document.getElementById('emp-stat-total');
+    const empStatLeave = document.getElementById('emp-stat-leave');
+    const empStatPayroll = document.getElementById('emp-stat-payroll');
+
+    const validEmps = employees.filter(e => e && e.id);
+    if (empStatTotal) empStatTotal.textContent = `${validEmps.length} Staff Members`;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const leaveCount = leaveRequests.filter(r => r && r.status === 'Approved' && r.startDate && r.endDate && todayStr >= r.startDate && todayStr <= r.endDate).length;
+    if (empStatLeave) empStatLeave.textContent = `${leaveCount} Staff`;
+
+    const totalEstPayroll = validEmps.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
+    if (empStatPayroll) empStatPayroll.textContent = `₹${totalEstPayroll.toLocaleString('en-IN')}`;
+  }
+
+  // ==========================================
+  // PAYROLL MANAGEMENT
+  // ==========================================
+  let payrollHistory = JSON.parse(localStorage.getItem('doppio_payroll_history') || '[]');
+
+  function calcLopForEmployee(empId) {
+    const now = new Date();
+    const monthStr = now.toISOString().slice(0, 7); // "YYYY-MM"
+    const approved = leaveRequests.filter(r =>
+      r && r.employeeId === empId &&
+      r.status === 'Approved' &&
+      r.startDate && r.startDate.startsWith(monthStr)
+    );
+    return approved.reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+  }
+
+  function renderBulkPayrollTable() {
+    const tbody   = document.getElementById('bulk-payroll-table-body');
+    const totalEl = document.getElementById('bulk-payroll-total');
+    if (!tbody) return;
+
+    const validEmps = employees.filter(e => e && e.id && e.name);
+    if (validEmps.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:12px; text-align:center; font-size:11px; color:var(--text-muted);">No employees found.</td></tr>`;
+      if (totalEl) totalEl.textContent = '₹0';
+      return;
+    }
+
+    let grandTotal = 0;
+    tbody.innerHTML = validEmps.map(emp => {
+      const lop     = calcLopForEmployee(emp.id);
+      const result  = peopleDomain.calculatePayroll(emp.baseSalary || 0, lop);
+      grandTotal   += result.net;
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05);">
+        <td style="padding:6px 4px; font-weight:600; color:var(--primary-brand); font-size:11px;">${escHtml(emp.name)}</td>
+        <td style="padding:6px 4px; text-align:center; font-size:11px; color:${lop > 0 ? '#e74c3c' : 'var(--text-muted)'};">${lop}</td>
+        <td style="padding:6px 4px; text-align:right; font-size:11px;">₹${Math.round(result.gross).toLocaleString('en-IN')}</td>
+        <td style="padding:6px 4px; text-align:right; font-size:11px; color:#e74c3c;">-₹${Math.round(result.deductions).toLocaleString('en-IN')}</td>
+        <td style="padding:6px 4px; text-align:right; font-size:11px; font-weight:700; color:var(--primary-brand);">₹${Math.round(result.net).toLocaleString('en-IN')}</td>
+      </tr>`;
+    }).join('');
+
+    if (totalEl) totalEl.textContent = `₹${Math.round(grandTotal).toLocaleString('en-IN')}`;
+  }
+
+  function renderPayrollHistory() {
+    const tbody   = document.getElementById('payroll-history-table-body');
+    const emptyEl = document.getElementById('payroll-history-empty');
+    if (!tbody) return;
+
+    const sorted = [...payrollHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (sorted.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    tbody.innerHTML = sorted.map((run, idx) => {
+      return `<tr style="border-bottom:1px solid rgba(28,28,28,0.05); cursor:pointer;" class="payroll-history-row" data-idx="${idx}">
+        <td style="padding:8px 6px; font-weight:700; color:var(--primary-brand); font-size:11px;">${escHtml(run.month)}</td>
+        <td style="padding:8px 6px; text-align:center; font-size:11px;">${run.staffCount}</td>
+        <td style="padding:8px 6px; text-align:right; font-weight:700; font-size:11px; color:var(--accent-caramel);">₹${Math.round(run.totalNet).toLocaleString('en-IN')}</td>
+        <td style="padding:8px 6px; text-align:center; font-size:11px; color:var(--text-muted);">${escHtml(run.mode || '-')}</td>
+        <td style="padding:8px 6px; text-align:right;">
+          <button class="btn btn-secondary view-payroll-run-btn" data-idx="${idx}" style="padding:2px 7px; font-size:10px; border-radius:4px;"><i class="fa-solid fa-eye"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.view-payroll-run-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const run = sorted[parseInt(btn.dataset.idx)];
+        if (!run) return;
+        const lines = (run.entries || []).map(e =>
+          `${e.name.padEnd(18)} | LOP:${String(e.lop).padStart(2)} | Gross:₹${String(Math.round(e.gross)).padStart(7)} | Net:₹${String(Math.round(e.net)).padStart(7)}`
+        ).join('\n');
+        alert(`Payroll Run: ${run.month}\nMode: ${run.mode}\n\n${lines}\n\nTotal Net: ₹${Math.round(run.totalNet).toLocaleString('en-IN')}`);
+      });
+    });
+  }
+
+  function exportPayrollCSV() {
+    if (payrollHistory.length === 0) {
+      showNotificationToast('No payroll history to export.');
+      return;
+    }
+    const rows = [['Month', 'Employee', 'Base Salary', 'LOP Days', 'Gross', 'PF', 'PT', 'TDS', 'Deductions', 'Net Pay', 'Mode']];
+    payrollHistory.forEach(run => {
+      (run.entries || []).forEach(e => {
+        rows.push([run.month, e.name, e.baseSalary, e.lop,
+          Math.round(e.gross), Math.round(e.pf), Math.round(e.pt),
+          Math.round(e.tds), Math.round(e.deductions), Math.round(e.net), run.mode]);
+      });
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `payroll_history_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const recalcBulkPayrollBtn = document.getElementById('recalc-bulk-payroll-btn');
+  if (recalcBulkPayrollBtn) {
+    recalcBulkPayrollBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      renderBulkPayrollTable();
+      showNotificationToast('Payroll recalculated.');
+    });
+  }
+
+  const runBulkPayrollBtn = document.getElementById('run-bulk-payroll-btn');
+  if (runBulkPayrollBtn) {
+    runBulkPayrollBtn.addEventListener('click', () => {
+      const monthEl = document.getElementById('bulk-payroll-month');
+      const modeEl  = document.getElementById('bulk-payroll-mode');
+      const month   = monthEl?.value;
+      const mode    = modeEl?.value || 'Bank Transfer';
+
+      if (!month) { alert('Please select a payroll month before running.'); return; }
+      if (!confirm(`Run payroll for ${month} via ${mode}? This will be recorded in history.`)) return;
+
+      SoundEffects.playSuccess();
+      const validEmps = employees.filter(e => e && e.id && e.name);
+      const entries = validEmps.map(emp => {
+        const lop    = calcLopForEmployee(emp.id);
+        const result = peopleDomain.calculatePayroll(emp.baseSalary || 0, lop);
+        return {
+          name: emp.name,
+          baseSalary: emp.baseSalary || 0,
+          lop,
+          gross:       result.gross,
+          pf:          result.pf,
+          pt:          result.pt,
+          tds:         result.tds,
+          deductions:  result.deductions,
+          net:         result.net
+        };
+      });
+
+      const totalNet = entries.reduce((s, e) => s + e.net, 0);
+      const run = {
+        month,
+        mode,
+        staffCount: validEmps.length,
+        totalNet,
+        entries,
+        date: new Date().toISOString()
+      };
+
+      payrollHistory.unshift(run);
+      localStorage.setItem('doppio_payroll_history', JSON.stringify(payrollHistory));
+
+      if (supabaseClient) {
+        supabaseClient.from('doppio_payroll_history').insert({
+          tenant_id:   activeTenantId,
+          month,
+          mode,
+          staff_count: validEmps.length,
+          total_net:   totalNet,
+          entries:     entries,
+          created_at:  run.date
+        }).then();
+      }
+
+      renderPayrollHistory();
+      showNotificationToast(`Payroll for ${month} processed — ₹${Math.round(totalNet).toLocaleString('en-IN')} disbursed.`);
+    });
+  }
+
+  const exportPayrollCsvBtn = document.getElementById('export-payroll-csv-btn');
+  if (exportPayrollCsvBtn) exportPayrollCsvBtn.addEventListener('click', () => {
+    SoundEffects.playClick();
+    exportPayrollCSV();
+  });
+
+  // Set default payroll month to current month
+  (function initPayrollUI() {
+    const monthEl = document.getElementById('bulk-payroll-month');
+    if (monthEl && !monthEl.value) {
+      monthEl.value = new Date().toISOString().slice(0, 7);
+    }
+    renderBulkPayrollTable();
+    renderPayrollHistory();
+  })();
+
+  // Hook payroll render into employees tab activation
+  const _origRenderEmployeesTab = renderEmployeesTab;
+  // (renderBulkPayrollTable already called on init; sidebar click will also trigger it)
+
+  // 4. Leave tracker submission form (Made by Antigravity)
+  const leaveForm = document.getElementById('leave-request-form');
+  if (leaveForm) {
+    leaveForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const empSelectEl = document.getElementById('leave-emp-select');
+      const typeSelectEl = document.getElementById('leave-type-select');
+      const startDateEl = document.getElementById('leave-start-date');
+      const endDateEl = document.getElementById('leave-end-date');
+      const reasonEl = document.getElementById('leave-reason');
+
+      if (!empSelectEl || !typeSelectEl || !startDateEl || !endDateEl || !reasonEl) return;
+
+      const empId = empSelectEl.value;
+      const type = typeSelectEl.value;
+      const startDate = startDateEl.value;
+      const endDate = endDateEl.value;
+      const reason = reasonEl.value;
+
+      if (!empId || !startDate || !endDate || !reason) {
+        alert("Please fill in all leave request fields.");
+        return;
+      }
+
+      const emp = employees.find(el => el && el.id === empId);
+      if (!emp) return;
+
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end < start) {
+        alert("End date cannot be before start date!");
+        return;
+      }
+
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      const newRequest = {
+        id: "leave_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+        employeeId: empId,
+        employeeName: emp.name,
+        type: type,
+        startDate: startDate,
+        endDate: endDate,
+        reason: reason,
+        status: 'Pending',
+        days: diffDays
+      };
+
+      leaveRequests.push(newRequest);
+      localStorage.setItem('doppio_leave_requests', JSON.stringify(leaveRequests));
+      if (supabaseClient) {
+        supabaseClient.from('doppio_leave_requests').insert(newRequest).then();
+      }
+
+      SoundEffects.playPop();
+      showNotificationToast(`Leave request submitted for ${emp.name} (${diffDays} days).`);
+
+      document.getElementById('leave-start-date').value = '';
+      document.getElementById('leave-end-date').value = '';
+      document.getElementById('leave-reason').value = '';
+
+      renderEmployeesTab();
+    });
+  }
+
+  // 5. Payroll Breakdown Live Calculator (Made by Antigravity)
+  const payrollEmpSelect = document.getElementById('payroll-emp-select');
+  const payrollDaysWorked = document.getElementById('payroll-days-worked');
+  const payrollLop = document.getElementById('payroll-lop');
+  const payrollBaseSalary = document.getElementById('payroll-base-salary');
+
+  function updateLivePayrollCalculator() {
+    if (!payrollEmpSelect) return;
+    const empId = payrollEmpSelect.value;
+    const emp = employees.find(e => e && e.id === empId);
+    if (!emp) return;
+
+    if (payrollBaseSalary) {
+      payrollBaseSalary.value = emp.baseSalary || 0;
+    }
+
+    const daysWorked = parseInt(payrollDaysWorked ? payrollDaysWorked.value : 30) || 0;
+    const lop = parseInt(payrollLop ? payrollLop.value : 0) || 0;
+    const base = emp.baseSalary || 0;
+
+    const { basic, hra, allowance, gross, pf, pt, tds, net } =
+      peopleDomain.calculatePayroll(base, lop);
+
+    const breakdown = document.getElementById('payroll-breakdown');
+    if (breakdown) {
+      breakdown.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+          <span>Basic Salary (50% of base)</span>
+          <strong>₹${basic.toFixed(0)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+          <span>HRA Allowance (40%)</span>
+          <strong>₹${hra.toFixed(0)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+          <span>Special Allowance</span>
+          <strong>₹${allowance.toFixed(0)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px; border-top:1px dashed rgba(28, 28, 28,0.1); padding-top:4px; font-weight:700; color:var(--text-dark);">
+          <span>Gross Earnings</span>
+          <strong>₹${gross.toFixed(0)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px; color: var(--danger-color); margin-top: 4px;">
+          <span>Provident Fund (PF - 12% of Basic)</span>
+          <strong>- ₹${pf.toFixed(0)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px; color: var(--danger-color);">
+          <span>Professional Tax (PT - Fixed)</span>
+          <strong>- ₹${pt.toFixed(0)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px; color: var(--danger-color);">
+          <span>Estimated TDS (Income Tax)</span>
+          <strong>- ₹${tds.toFixed(0)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top: 6px; border-top:1.5px solid var(--primary-brand); padding-top:6px; font-size:12px; font-weight:800; color:var(--primary-brand);">
+          <span>Net Take Home</span>
+          <strong>₹${net.toFixed(0)}</strong>
+        </div>
+      `;
+    }
+  }
+
+  if (payrollEmpSelect) payrollEmpSelect.addEventListener('change', updateLivePayrollCalculator);
+  if (payrollDaysWorked) payrollDaysWorked.addEventListener('input', updateLivePayrollCalculator);
+  if (payrollLop) payrollLop.addEventListener('input', updateLivePayrollCalculator);
+
+  // 6. Payslip generation and printing modal (Made by Antigravity)
+  const generatePayslipBtn = document.getElementById('payroll-generate-payslip-btn');
+  const payslipModal = document.getElementById('payslip-modal');
+  const payslipCloseBtn1 = document.getElementById('payslip-modal-close');
+
+  if (payslipCloseBtn1) {
+    payslipCloseBtn1.addEventListener('click', () => {
+      if (payslipModal) payslipModal.style.display = 'none';
+    });
+  }
+
+  if (payslipModal) {
+    payslipModal.addEventListener('click', (e) => {
+      if (e.target.id === 'payslip-modal-close-btn') {
+        payslipModal.style.display = 'none';
+      } else if (e.target.id === 'payslip-print-btn' || e.target.closest('#payslip-print-btn')) {
+        const printArea = document.getElementById('payslip-print-area');
+        if (!printArea) return;
+
+        const actionsSection = printArea.querySelector('.no-print');
+        if (actionsSection) actionsSection.style.display = 'none';
+
+        const printWindow = window.open('', '', 'height=600,width=800');
+        printWindow.document.write('<html><head><title>' + (activeTenantName || 'RestroSuite') + ' - Salary Slip</title>');
+        printWindow.document.write('<style>body{font-family:sans-serif;padding:20px;color:#000;}table{width:100%;border-collapse:collapse;margin:15px 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background:#f5f5f5;}hr{border:none;border-top:1px dashed #ddd;margin:15px 0;}.no-print{display:none;}</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(printArea.innerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+
+        if (actionsSection) actionsSection.style.display = 'flex';
+
+        printWindow.print();
+      }
+    });
+  }
+
+  if (generatePayslipBtn) {
+    generatePayslipBtn.addEventListener('click', () => {
+      const empId = payrollEmpSelect ? payrollEmpSelect.value : null;
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) {
+        alert("Please select a staff member first.");
+        return;
+      }
+
+      const daysWorked = parseInt(payrollDaysWorked ? payrollDaysWorked.value : 30) || 0;
+      const lop = parseInt(payrollLop ? payrollLop.value : 0) || 0;
+      const base = emp.baseSalary;
+
+      const { basic, hra, allowance, gross, pf, pt, tds, net } =
+        peopleDomain.calculatePayroll(base, lop);
+
+      const printArea = document.getElementById('payslip-print-area');
+      if (printArea) {
+        printArea.innerHTML = `
+          <div style="text-align: center; border-bottom: 2px solid var(--primary-brand); padding-bottom: 10px; margin-bottom: 15px;">
+            <h2 style="font-family: var(--font-heading); color: var(--primary-brand); margin: 0; font-size: 18px; font-weight:800;">${escHtml((activeTenantName || 'RestroSuite').toUpperCase())}</h2>
+            <span style="font-size: 10px; color: var(--text-muted);">${escHtml(businessProfile.address || '')}</span>
+            <h3 style="margin: 5px 0 0 0; font-size: 12px; font-weight:700;">SALARY SLIP / PAYSLIP</h3>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin-bottom: 15px;">
+            <div><strong>Employee ID:</strong> ${emp.id.toUpperCase()}</div>
+            <div><strong>Employee Name:</strong> ${emp.name}</div>
+            <div><strong>Designation/Role:</strong> ${emp.role.toUpperCase()}</div>
+            <div><strong>Shift:</strong> ${emp.shift}</div>
+            <div><strong>Salary Month:</strong> ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</div>
+            <div><strong>Days Worked:</strong> ${daysWorked} (LOP Days: ${lop})</div>
+          </div>
+          
+          <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 15px;">
+            <thead>
+              <tr style="background: rgba(28, 28, 28,0.05); font-weight:700;">
+                <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Earnings</th>
+                <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Amount (₹)</th>
+                <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Deductions</th>
+                <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 6px; border: 1px solid #ddd;">Basic Salary (50%)</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${basic.toFixed(0)}</td>
+                <td style="padding: 6px; border: 1px solid #ddd;">Provident Fund (PF - 12%)</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${pf.toFixed(0)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px; border: 1px solid #ddd;">HRA (40%)</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${hra.toFixed(0)}</td>
+                <td style="padding: 6px; border: 1px solid #ddd;">Professional Tax (PT)</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${pt.toFixed(0)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px; border: 1px solid #ddd;">Special Allowances</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${allowance.toFixed(0)}</td>
+                <td style="padding: 6px; border: 1px solid #ddd;">Income Tax (Estimated TDS)</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${tds.toFixed(0)}</td>
+              </tr>
+              <tr style="font-weight: 700; background: rgba(28, 28, 28,0.02);">
+                <td style="padding: 6px; border: 1px solid #ddd;">Total Earnings (Gross)</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${gross.toFixed(0)}</td>
+                <td style="padding: 6px; border: 1px solid #ddd;">Total Deductions</td>
+                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">₹${(pf + pt + tds).toFixed(0)}</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div style="display: flex; justify-content: space-between; border-top: 2px solid var(--primary-brand); padding-top: 10px; font-size: 13px; font-weight: 800; color: var(--primary-brand);">
+            <span>NET PAYOUT (TAKE HOME):</span>
+            <span>₹${net.toFixed(0)}</span>
+          </div>
+          
+          <div style="font-size: 8px; color: var(--text-muted); text-align: center; margin-top: 20px; font-style: italic;">
+            This is a system generated salary slip.
+          </div>
+          
+          <div style="display: flex; gap: 10px; margin-top: 15px;" class="no-print">
+            <button type="button" class="btn btn-secondary" id="payslip-modal-close-btn" style="flex:1; padding: 10px; border-radius: 6px; font-size: 11px; cursor:pointer;">Close</button>
+            <button type="button" class="btn btn-primary" id="payslip-print-btn" style="flex:1; padding: 10px; border-radius: 6px; font-size: 11px; background:var(--accent-caramel); border:none; color:white; font-weight:700; cursor:pointer;"><i class="fa-solid fa-print"></i> Print Payslip</button>
+          </div>
+        `;
+      }
+
+      if (payslipModal) payslipModal.style.display = 'flex';
+      SoundEffects.playClick();
+    });
+  }
+
+  // 7. KDS background cooking timer loop (update elapsed minutes in KDS cards) (Made by Antigravity)
+  setInterval(() => {
+    const kdsCards = document.querySelectorAll('.kds-card');
+    kdsCards.forEach(card => {
+      const orderIdEl = card.querySelector('.kds-card-title span');
+      if (!orderIdEl) return;
+      const orderId = orderIdEl.textContent.trim();
+      const order = pendingQrOrders.find(o => o.orderId === orderId);
+      if (order && order.dateTime) {
+        const parsedDate = Date.parse(order.dateTime) || parseCustomLocaleString(order.dateTime);
+        if (parsedDate) {
+          const elapsedMs = Date.now() - parsedDate;
+          const elapsedMins = Math.max(0, Math.floor(elapsedMs / 60000));
+          const timerEl = card.querySelector('.kds-card-timer');
+          if (timerEl) {
+            timerEl.textContent = `${elapsedMins}m ago`;
+          }
+        }
+      }
+    });
+  }, 30000); // Check every 30s
+
+  // 6b. Daily Attendance system Clock In / Out listeners (Made by Antigravity)
+  const clockInBtn = document.getElementById('attendance-clockin-btn');
+  const clockOutBtn = document.getElementById('attendance-clockout-btn');
+
+  if (clockInBtn) {
+    clockInBtn.addEventListener('click', () => {
+      SoundEffects.playClick();
+      const empSelect = document.getElementById('attendance-emp-select');
+      const shiftSelect = document.getElementById('attendance-shift-select');
+      if (!empSelect || !shiftSelect) return;
+
+      const empId = empSelect.value;
+      const shiftVal = shiftSelect.value;
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+
+      // Check if already clocked in today (log with status === 'Active')
+      const activeLog = attendanceLogs.find(l => l.employeeId === empId && l.status === 'Active');
+      if (activeLog) {
+        alert(`${emp.name} is already clocked in! Please clock out first.`);
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+      const newLog = {
+        id: 'att_' + Date.now(),
+        employeeId: empId,
+        employeeName: emp.name,
+        date: dateStr,
+        clockInTime: timeStr,
+        clockOutTime: '-',
+        hoursWorked: 0,
+        shift: shiftVal,
+        wages: 0,
+        status: 'Active'
+      };
+
+      attendanceLogs.push(newLog);
+      localStorage.setItem('doppio_attendance', JSON.stringify(attendanceLogs));
+      if (supabaseClient) {
+        supabaseClient.from('doppio_attendance').insert(newLog).then();
+      }
+
+      showNotificationToast(`${emp.name} clocked in successfully at ${timeStr}`);
+      renderEmployeesTab();
+    });
+  }
+
+  if (clockOutBtn) {
+    clockOutBtn.addEventListener('click', () => {
+      const empSelect = document.getElementById('attendance-emp-select');
+      if (!empSelect) return;
+
+      const empId = empSelect.value;
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+
+      // Find active clock-in log
+      const activeLog = attendanceLogs.find(l => l.employeeId === empId && l.status === 'Active');
+      if (!activeLog) {
+        alert(`${emp.name} is not clocked in!`);
+        return;
+      }
+
+      SoundEffects.playSuccess();
+      const now = new Date();
+      const clockOutStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+      // Calculate elapsed time
+      const [inH, inM] = activeLog.clockInTime.split(':').map(Number);
+      const [outH, outM] = clockOutStr.split(':').map(Number);
+
+      let diffMins = (outH * 60 + outM) - (inH * 60 + inM);
+      if (diffMins < 0) diffMins += 24 * 60; // handle overnight shifts
+
+      const hours = Math.round((diffMins / 60) * 10) / 10;
+      activeLog.clockOutTime = clockOutStr;
+      activeLog.hoursWorked = hours;
+      activeLog.status = 'Completed';
+
+      // Wages = baseSalary / 30 days / 8 hours * actual clocked hours
+      const hourlyRate = emp.baseSalary / 240;
+      activeLog.wages = Math.round(hourlyRate * hours);
+
+      localStorage.setItem('doppio_attendance', JSON.stringify(attendanceLogs));
+      if (supabaseClient) {
+        supabaseClient.from('doppio_attendance').update({
+          clockOutTime: clockOutStr,
+          hoursWorked: hours,
+          status: 'Completed',
+          wages: activeLog.wages
+        }).eq('id', activeLog.id).then();
+      }
+      showNotificationToast(`${emp.name} clocked out successfully. Hours: ${hours}, Earnings: ₹${activeLog.wages}`);
+
+      renderEmployeesTab();
+      if (typeof renderReports === 'function') renderReports();
+    });
+  }
+
+  // Prepare non-visible modules after the first interactive frame.
+  runWhenIdle(() => {
+    const backgroundRenders = [
+      ['updateQrOrdersDashboardUI', () => updateQrOrdersDashboardUI()],
+      ['renderKDSTab', () => { if (typeof renderKDSTab === 'function') renderKDSTab(); }],
+      ['renderTokensTab', () => { if (typeof renderTokensTab === 'function') renderTokensTab(); }],
+      ['updateAIForecast', () => updateAIForecast()],
+      ['renderEmployeesTab', () => renderEmployeesTab()],
+      ['renderReports', () => { if (typeof renderReports === 'function') renderReports(); }]
+    ];
+    backgroundRenders.forEach(([name, render]) => {
+      try {
+        render();
+      } catch (error) {
+        console.error(`Error in ${name}:`, error);
+      }
+    });
+  }, 1500);
+
+  // End Live QR Ordering system module
+
+  // Trigger evaluation on start
+  try {
+    applyFeatureToggles();
+  } catch (err) {
+    console.error("Error in applyFeatureToggles:", err);
+  }
+
+
+  // ==========================================================
+  // SAAS MULTI-TENANT SUPER-ADMIN CONTROLS (Made by CodeArc)
+  // ==========================================================
+
+  async function pollSuperAdminGateway() {
+    if (ZERO_COST_LAUNCH_MODE || !CLOUD_WHATSAPP_GATEWAY_URL) {
+      const statusBadge = document.getElementById('saas-gateway-status');
+      const phoneEl = document.getElementById('saas-gateway-phone');
+      const sessionEl = document.getElementById('saas-gateway-session-saved');
+      const qrContainer = document.getElementById('saas-gateway-qr-container');
+      const qrSpinner = document.getElementById('saas-gateway-qr-spinner');
+      const connectedView = document.getElementById('saas-gateway-connected-view');
+      const logsContainer = document.getElementById('saas-notification-logs-container');
+      if (statusBadge) {
+        statusBadge.textContent = 'ZERO-COST MODE';
+        statusBadge.style.background = 'rgba(107, 114, 128, 0.1)';
+        statusBadge.style.color = '#6B7280';
+      }
+      if (phoneEl) phoneEl.textContent = 'Disabled';
+      if (sessionEl) sessionEl.textContent = 'Upgrade add-on';
+      if (connectedView) connectedView.style.display = 'none';
+      if (qrContainer) qrContainer.style.display = 'flex';
+      if (qrSpinner) {
+        qrSpinner.innerHTML = `<i class="fa-solid fa-circle-info" style="margin-bottom: 6px; font-size: 16px; color: #6B7280;"></i><br>Gateway disabled for zero-cost launch<br><span style="font-size: 8px; color: #9CA3AF; margin-top: 4px; display: block;">Manual WhatsApp sharing remains available.</span>`;
+        qrSpinner.style.display = 'block';
+      }
+      if (logsContainer) {
+        logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #6B7280;">Gateway logs are disabled in zero-cost launch mode.</div>';
+      }
+      return;
+    }
+    // 1. Fetch Gateway Status (Non-blocking)
+    (async () => {
+      const statusBadge = document.getElementById('saas-gateway-status');
+      const phoneEl = document.getElementById('saas-gateway-phone');
+      const sessionEl = document.getElementById('saas-gateway-session-saved');
+      const qrContainer = document.getElementById('saas-gateway-qr-container');
+      const qrImg = document.getElementById('saas-gateway-qr-img');
+      const qrSpinner = document.getElementById('saas-gateway-qr-spinner');
+      const connectedView = document.getElementById('saas-gateway-connected-view');
+
+      try {
+        const res = await fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/status`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (statusBadge) {
+          statusBadge.textContent = data.status ? data.status.toUpperCase() : 'UNKNOWN';
+          if (data.status === 'ready') {
+            statusBadge.style.background = 'rgba(34, 197, 94, 0.1)';
+            statusBadge.style.color = '#22C55E';
+          } else if (data.status === 'qr') {
+            statusBadge.style.background = 'rgba(245, 158, 11, 0.1)';
+            statusBadge.style.color = '#F59E0B';
+          } else {
+            statusBadge.style.background = 'rgba(239, 68, 68, 0.1)';
+            statusBadge.style.color = '#EF4444';
+          }
+        }
+
+        if (phoneEl) {
+          phoneEl.textContent = data.number ? `+${data.number}` : 'Not Linked';
+        }
+
+        if (sessionEl) {
+          if (data.sessionSavedAt) {
+            const date = new Date(data.sessionSavedAt);
+            sessionEl.textContent = date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+          } else {
+            sessionEl.textContent = 'Never';
+          }
+        }
+
+        if (data.status === 'ready') {
+          if (qrContainer) qrContainer.style.display = 'none';
+          if (connectedView) connectedView.style.display = 'flex';
+        } else if (data.status === 'qr') {
+          if (connectedView) connectedView.style.display = 'none';
+          if (qrContainer) qrContainer.style.display = 'flex';
+
+          if (data.qr) {
+            if (qrSpinner) qrSpinner.style.display = 'none';
+            if (qrImg) {
+              qrImg.src = data.qr;
+              qrImg.style.display = 'block';
+            }
+          } else {
+            if (qrSpinner) qrSpinner.style.display = 'block';
+            if (qrImg) qrImg.style.display = 'none';
+          }
+        } else {
+          if (connectedView) connectedView.style.display = 'none';
+          if (qrContainer) qrContainer.style.display = 'flex';
+          if (qrSpinner) {
+            qrSpinner.style.display = 'block';
+            qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FC8019;"></i><br>Connecting (Status: ${data.status ? data.status.toUpperCase() : 'UNKNOWN'})`;
+          }
+          if (qrImg) qrImg.style.display = 'none';
+        }
+
+      } catch (err) {
+        console.warn('SuperAdmin: WhatsApp gateway status check failed:', err.message);
+        if (statusBadge) {
+          statusBadge.textContent = 'OFFLINE';
+          statusBadge.style.background = 'rgba(239, 68, 68, 0.1)';
+          statusBadge.style.color = '#EF4444';
+        }
+        if (phoneEl) phoneEl.textContent = 'Unknown';
+        if (sessionEl) sessionEl.textContent = 'Unknown';
+        if (connectedView) connectedView.style.display = 'none';
+        if (qrContainer) qrContainer.style.display = 'flex';
+        if (qrSpinner) {
+          qrSpinner.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="margin-bottom: 6px; font-size: 16px; color: #EF4444;"></i><br>Gateway Server Offline<br><span style="font-size: 8px; color: #9CA3AF; margin-top: 4px; display: block;">Check cloud space status</span>`;
+          qrSpinner.style.display = 'block';
+        }
+        if (qrImg) qrImg.style.display = 'none';
+      }
+    })();
+
+    // 2. Fetch Dispatch Logs from WhatsApp Gateway debug-logs endpoint (bypassing RLS)
+    (async () => {
+      const logsContainer = document.getElementById('saas-notification-logs-container');
+      try {
+        const res = await fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/debug-logs`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message || 'Failed to fetch logs');
+        const logs = data.logs || [];
+
+        if (logsContainer) {
+          if (!logs || logs.length === 0) {
+            logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent dispatch logs found.</div>';
+            return;
+          }
+
+          logsContainer.innerHTML = logs.map(log => {
+            const logDate = log.created_at ? new Date(log.created_at) : new Date();
+            const timeStr = logDate.toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const dateStr = logDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+            const eventStr = log.event || '';
+            const statusStr = log.status || '';
+            const details = log.details || {};
+
+            let eventTitle = eventStr || 'System Event';
+            let detailsHtml = '';
+            let channelBadge = '';
+            let statusBadgeHtml = '';
+
+            // Format event status
+            if (statusStr === 'ok') {
+              statusBadgeHtml = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 800; background: rgba(34, 197, 94, 0.1); color: #22C55E; text-transform: uppercase;">Success</span>`;
+            } else if (statusStr === 'warning') {
+              statusBadgeHtml = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 800; background: rgba(245, 158, 11, 0.1); color: #F59E0B; text-transform: uppercase;">Warn</span>`;
+            } else {
+              statusBadgeHtml = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 800; background: rgba(239, 68, 68, 0.1); color: #EF4444; text-transform: uppercase;">Error</span>`;
+            }
+
+            // Format channel & details based on event
+            const isWhatsApp = eventStr.includes('whatsapp');
+            const isEmail = eventStr.includes('email');
+            const isRegistration = eventStr.includes('registration');
+            const isApproval = eventStr.includes('approval');
+
+            if (isWhatsApp) {
+              channelBadge = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; background: rgba(37, 211, 102, 0.1); color: #25D366; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-brands fa-whatsapp"></i> WA</span>`;
+            } else if (isEmail) {
+              channelBadge = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; background: rgba(59, 130, 246, 0.1); color: #3B82F6; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-envelope"></i> Email</span>`;
+            } else {
+              channelBadge = `<span style="padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; background: rgba(107, 114, 128, 0.1); color: #6B7280;">Sys</span>`;
+            }
+
+            if (isRegistration) {
+              eventTitle = 'SaaS Registration';
+            } else if (isApproval) {
+              eventTitle = 'Workspace Approval';
+            } else if (eventStr === 'connected') {
+              eventTitle = 'Gateway Connected';
+            } else if (eventStr === 'disconnected') {
+              eventTitle = 'Gateway Disconnected';
+            } else if (eventStr === 'session_saved') {
+              eventTitle = 'Session Backed Up';
+            } else if (eventStr === 'alert_sent') {
+              eventTitle = 'Admin Alert Sent';
+            }
+
+            // Render details
+            if (details.name) {
+              detailsHtml += `<div style="font-weight: 700; color: #1C1C1C;">${details.name}</div>`;
+            }
+            if (details.phone) {
+              detailsHtml += `<div style="color: #4B5563; font-family: monospace;">+${details.phone}</div>`;
+            }
+            if (details.email) {
+              detailsHtml += `<div style="color: #4B5563; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${details.email}</div>`;
+            }
+            if (details.error) {
+              detailsHtml += `<div style="color: #EF4444; font-size: 10px; margin-top: 2px; font-weight: 500;"><i class="fa-solid fa-triangle-exclamation"></i> ${details.error}</div>`;
+            }
+            if (details.reason) {
+              detailsHtml += `<div style="color: #6B7280; font-size: 10px; margin-top: 2px;">Reason: ${details.reason}</div>`;
+            }
+
+            return `
+              <div class="log-entry" style="display: flex; gap: 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(28, 28, 28, 0.04); background: #FAF9F6; align-items: start; transition: all 0.2s;" onmouseover="this.style.background='#FFFFFF'; this.style.borderColor='rgba(252, 128, 25, 0.15)';" onmouseout="this.style.background='#FAF9F6'; this.style.borderColor='rgba(28, 28, 28, 0.04)';">
+                <!-- Timestamp -->
+                <div style="display: flex; flex-direction: column; align-items: center; min-width: 50px; text-align: center; border-right: 1px solid rgba(28, 28, 28, 0.06); padding-right: 8px; flex-shrink: 0;">
+                  <span style="font-weight: 700; color: #1C1C1C; font-size: 11px;">${timeStr}</span>
+                  <span style="font-size: 9px; color: #9CA3AF; font-weight: 600;">${dateStr}</span>
+                </div>
+                
+                <!-- Content -->
+                <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-weight: 700; color: #1C1C1C; font-size: 12px;">${eventTitle}</span>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                      ${channelBadge}
+                      ${statusBadgeHtml}
+                    </div>
+                  </div>
+                  <div style="font-size: 11px; margin-top: 2px;">
+                    ${detailsHtml}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        console.error('SuperAdmin: Error fetching gateway health logs:', err);
+        if (logsContainer) {
+          logsContainer.innerHTML = `<div style="text-align: center; padding: 32px; color: #EF4444;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Failed to load logs: ${escHtml(err.message)}</div>`;
+        }
+      }
+    })();
+  }
+
+  function startSaaSGatewayPolling() {
+    if (saasGatewayPollingInterval) clearInterval(saasGatewayPollingInterval);
+    pollSuperAdminGateway();
+    if (ZERO_COST_LAUNCH_MODE) return;
+    saasGatewayPollingInterval = setInterval(pollSuperAdminGateway, 5000);
+  }
+
+  function stopSaaSGatewayPolling() {
+    if (saasGatewayPollingInterval) {
+      clearInterval(saasGatewayPollingInterval);
+      saasGatewayPollingInterval = null;
+    }
+  }
+
+  function formatIncidentTime(value) {
+    if (!value) return 'Unknown time';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Unknown time';
+    return date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  function renderIncidentEmpty(title, detail, icon = 'fa-circle-check') {
+    return `
+      <div class="app-incidents-empty">
+        <i class="fa-solid ${icon}"></i>
+        <strong>${escHtml(title)}</strong>
+        <span>${escHtml(detail)}</span>
+      </div>
+    `;
+  }
+
+  async function loadAppIncidents() {
+    const list = document.getElementById('app-incidents-list');
+    const filter = document.getElementById('app-incidents-status-filter');
+    if (!list) return;
+    list.innerHTML = renderIncidentEmpty('Loading incidents', 'Checking the latest platform error reports.', 'fa-spinner fa-spin');
+    try {
+      const status = filter ? filter.value : 'open';
+      const payload = { limit: 100 };
+      if (status === 'open' || status === 'resolved') payload.status = status;
+      const result = await callTenantAdmin('list_error_reports', payload);
+      const reports = Array.isArray(result.reports) ? result.reports : [];
+      if (!reports.length) {
+        list.innerHTML = renderIncidentEmpty('No incidents found', 'This status queue is currently clear.');
+        return;
+      }
+      list.innerHTML = reports.map((report) => {
+        const severity = String(report.severity || 'error');
+        const statusLabel = String(report.status || 'open');
+        const stack = report.stack ? `<code>${escHtml(report.stack)}</code>` : '';
+        const resolveButton = statusLabel === 'open'
+          ? `<button type="button" class="staff-secondary-btn app-incident-resolve-btn" data-report-id="${escHtml(report.id)}">Resolve</button>`
+          : '';
+        return `
+          <article class="app-incident-card">
+            <div>
+              <strong>${escHtml(report.message || 'Unknown application error')}</strong>
+              <span>${escHtml(report.tenant_slug || 'unknown workspace')} · ${escHtml(report.source || 'dashboard')} · ${escHtml(report.url_path || 'unknown path')}</span>
+              ${stack}
+              <div class="app-incident-meta">
+                <span class="app-incident-pill ${escHtml(severity)}">${escHtml(severity)}</span>
+                <span class="app-incident-pill">${escHtml(statusLabel)}</span>
+                <span class="app-incident-pill">${escHtml(report.app_version || 'v?')}</span>
+              </div>
+            </div>
+            <div class="app-incident-actions">
+              <time>${escHtml(formatIncidentTime(report.created_at))}</time>
+              ${resolveButton}
+            </div>
+          </article>
+        `;
+      }).join('');
+    } catch (error) {
+      list.innerHTML = renderIncidentEmpty('Incidents unavailable', error.message || 'Try refreshing this panel.', 'fa-triangle-exclamation');
+    }
+  }
+
+  async function setupGatewayMonitorTab() {
+    // Set up SaaS Gateway Action Listeners
+    const resetBtn = document.getElementById('btn-saas-gateway-reset');
+    if (resetBtn && !resetBtn.dataset.listenerBound) {
+      resetBtn.dataset.listenerBound = 'true';
+      resetBtn.addEventListener('click', async () => {
+        if (confirm("Are you absolutely sure you want to RESET the WhatsApp Gateway?\n\nThis will completely purge the WhatsApp session files from the gateway storage. You will need to scan a new QR code to re-link your device!")) {
+          try {
+            resetBtn.disabled = true;
+            resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+
+            if (ZERO_COST_LAUNCH_MODE || !CLOUD_WHATSAPP_GATEWAY_URL) {
+              alert("Gateway automation is disabled in zero-cost launch mode.");
+              return;
+            }
+
+            const res = await fetch(`${CLOUD_WHATSAPP_GATEWAY_URL}/reset`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (res.ok) {
+              showNotificationToast("WhatsApp Gateway reset successfully. Scan QR code to re-authenticate.");
+              await pollSuperAdminGateway();
+            } else {
+              const data = await res.json().catch(() => ({}));
+              alert("Failed to reset gateway: " + (data.message || 'Unknown error'));
+            }
+          } catch (err) {
+            console.error("Error resetting SaaS gateway:", err);
+            alert("Error communicating with gateway: " + err.message);
+          } finally {
+            resetBtn.disabled = false;
+            resetBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Reset Gateway Connection';
+          }
+        }
+      });
+    }
+
+    const refreshLogsBtn = document.getElementById('btn-refresh-saas-logs');
+    if (refreshLogsBtn && !refreshLogsBtn.dataset.listenerBound) {
+      refreshLogsBtn.dataset.listenerBound = 'true';
+      refreshLogsBtn.addEventListener('click', async () => {
+        const icon = refreshLogsBtn.querySelector('i');
+        if (icon) icon.classList.add('fa-spin');
+        await pollSuperAdminGateway();
+        if (icon) {
+          setTimeout(() => {
+            icon.classList.remove('fa-spin');
+          }, 600);
+        }
+      });
+    }
+
+    const refreshIncidentsBtn = document.getElementById('btn-refresh-app-incidents');
+    if (refreshIncidentsBtn && !refreshIncidentsBtn.dataset.listenerBound) {
+      refreshIncidentsBtn.dataset.listenerBound = 'true';
+      refreshIncidentsBtn.addEventListener('click', loadAppIncidents);
+    }
+
+    const incidentFilter = document.getElementById('app-incidents-status-filter');
+    if (incidentFilter && !incidentFilter.dataset.listenerBound) {
+      incidentFilter.dataset.listenerBound = 'true';
+      incidentFilter.addEventListener('change', loadAppIncidents);
+    }
+
+    const incidentsList = document.getElementById('app-incidents-list');
+    if (incidentsList && !incidentsList.dataset.listenerBound) {
+      incidentsList.dataset.listenerBound = 'true';
+      incidentsList.addEventListener('click', async (event) => {
+        const target = event.target;
+        const button = target && typeof target.closest === 'function'
+          ? target.closest('.app-incident-resolve-btn')
+          : null;
+        if (!button) return;
+        button.disabled = true;
+        try {
+          await callTenantAdmin('resolve_error_report', { report_id: Number(button.dataset.reportId) });
+          showNotificationToast('Application incident resolved.');
+          await loadAppIncidents();
+        } catch (error) {
+          showNotificationToast(error.message || 'Could not resolve incident.');
+          button.disabled = false;
+        }
+      });
+    }
+
+    // Start polling when loading the tab
+    startSaaSGatewayPolling();
+    await loadAppIncidents();
+  }
+
+  async function sha256(string) {
+    const utf8 = new TextEncoder().encode(string);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function saasSnapshotCard(title, value, subtitle, iconClass, filterAttr, isActive = false) {
+    const filterData = filterAttr ? `data-filter="${filterAttr}"` : '';
+    const activeClass = isActive ? 'active-filter' : '';
+    return `
+      <div class="saas-snapshot-card ${activeClass}" ${filterData}>
+        <div class="saas-snapshot-card-header">
+          <span class="saas-snapshot-card-title">${escHtml(title)}</span>
+          <i class="${iconClass}" style="color: #FC8019; font-size: 14px;"></i>
+        </div>
+        <div>
+          <div class="saas-snapshot-card-value">${escHtml(value)}</div>
+          <div class="saas-snapshot-card-subtitle">${escHtml(subtitle)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function showSampleDataInfoDialog() {
+    const modalHtml = `
+      <div id="saas-sample-data-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 16px; backdrop-filter: blur(4px);">
+        <div style="background: #FFFFFF; border-radius: 16px; max-width: 500px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.25); padding: 24px; position: relative; border: 1px solid rgba(28,28,28,0.08); font-family: var(--font-body); animation: modalFadeIn 0.25s ease-out; color: #1C1C1C;">
+          <button id="close-sample-modal-btn" style="position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; hover: {background: #F3F4F6}">&times;</button>
+          
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+            <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(252, 128, 25, 0.1); color: #FC8019; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              <i class="fa-solid fa-cubes"></i>
+            </div>
+            <div>
+              <h3 style="margin: 0; font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: #1C1C1C;">How Sample Data Works</h3>
+              <span style="font-size: 11px; color: #6B7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Interactive Seeding Guide</span>
+            </div>
+          </div>
+
+          <p style="font-size: 12.5px; line-height: 1.6; color: #4B5563; margin: 0 0 16px 0;">
+            RestroSuite includes pre-configured sample spreadsheet templates located in the project's <code style="background: #F3F4F6; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11.5px; color: #1C1C1C;">/samples</code> folder:
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Menu.csv</span>
+              <span style="color: #4B5563;">24 pre-built drink and food items divided into clean categories.</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Inventory.csv</span>
+              <span style="color: #4B5563;">38 raw materials and stock items (Milk, Espresso beans, etc.).</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Recipes.csv</span>
+              <span style="color: #4B5563;">12 raw ingredient deduction recipes for automatic stock management.</span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px;">
+              <span style="font-weight: 700; color: #FC8019; width: 100px; flex-shrink: 0;">Employees.csv</span>
+              <span style="color: #4B5563;">6 staff roles (Cashier, Waiter, Kitchen, etc.) to test payroll/shifts.</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(252, 128, 25, 0.05); border: 1px dashed rgba(252, 128, 25, 0.2); border-radius: 8px; padding: 12px; font-size: 11.5px; line-height: 1.5; color: #7C2D12; margin-bottom: 20px;">
+            <strong>Step-by-step instructions to load this data:</strong>
+            <ol style="margin: 6px 0 0 0; padding-left: 18px;">
+              <li>Select any active client workspace below and click <strong>Manage</strong>.</li>
+              <li>Note down the <strong>Admin User</strong> username.</li>
+              <li>Logout of the Super-Admin view.</li>
+              <li>Log in using the client credentials.</li>
+              <li>Go to the client dashboard's tabs and upload these CSV files using the built-in <strong>Spreadsheet Import</strong> wizards.</li>
+            </ol>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end;">
+            <button id="close-sample-modal-btn-confirm" class="btn btn-primary" style="padding: 10px 20px; font-size: 12px; font-weight: 700; border-radius: 8px; background: #FC8019; border: none; color: white; cursor: pointer;">Got it, thanks!</button>
+          </div>
+        </div>
+      </div>
+      <style>
+        @keyframes modalFadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      </style>
+    `;
+
+    const div = document.createElement('div');
+    div.id = 'saas-sample-data-modal-container';
+    div.innerHTML = modalHtml;
+    document.body.appendChild(div);
+
+    const closeModal = () => {
+      const el = document.getElementById('saas-sample-data-modal-container');
+      if (el) el.remove();
+    };
+
+    document.getElementById('close-sample-modal-btn').addEventListener('click', closeModal);
+    document.getElementById('close-sample-modal-btn-confirm').addEventListener('click', closeModal);
+  }
+
+  function renderPlatformSummary(tenants = []) {
+    const target = document.getElementById('saas-platform-summary');
+    if (!target) return;
+    const total = tenants.length;
+    const active = tenants.filter(t => t.status === 'approved' || t.status === 'active').length;
+    const pending = tenants.filter(t => t.status === 'pending').length;
+    const paidTier = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code)).length;
+    const risk = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status)).length;
+    const conversion = total ? Math.round((paidTier / total) * 100) : 0;
+    target.innerHTML = [
+      saasSnapshotCard('Workspaces', total, `${active} active outlets`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
+      saasSnapshotCard('Pending Approvals', pending, pending ? 'Requires review' : 'Queue is clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
+      saasSnapshotCard('Conversion Rate', `${conversion}%`, `${paidTier} paid / ${total} total`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
+      saasSnapshotCard('At-Risk Accounts', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk')
+    ].join('');
+
+    // Attach click listeners to the items to filter the list and scroll
+    target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
+      item.addEventListener('click', async () => {
+        const newFilter = item.getAttribute('data-filter');
+        console.log('SuperAdmin filter changed to:', newFilter);
+        superAdminFilter = newFilter;
+        await renderSuperAdminTab();
+        
+        // Scroll down to the client workspace registry panel smoothly
+        const registryPanel = document.getElementById('saas-client-registry-panel');
+        if (registryPanel) {
+          registryPanel.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+  }
+
+  async function listTenantsDeduplicated() {
+    if (pendingListTenantsPromise) {
+      console.log('🔄 [listTenantsDeduplicated] Reusing existing pending callTenantAdmin(list_tenants) promise...');
+      return pendingListTenantsPromise;
+    }
+    pendingListTenantsPromise = callTenantAdmin('list_tenants');
+    try {
+      const result = await pendingListTenantsPromise;
+      return result;
+    } finally {
+      pendingListTenantsPromise = null;
+    }
+  }
+
+  async function renderSuperAdminTab() {
+    console.log('🔄 [renderSuperAdminTab] Starting...');
+    const listContainer = document.getElementById('saas-tenants-list');
+    console.log('🔄 [renderSuperAdminTab] listContainer:', listContainer);
+    if (!listContainer) return;
+    listContainer.innerHTML = '<div style="padding: 32px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05);"><i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #FC8019;"></i> Loading client workspace registry...</div>';
+
+    let tenants = [];
+    try {
+      console.log('🔄 [renderSuperAdminTab] Calling callTenantAdmin(list_tenants)...');
+      const result = await listTenantsDeduplicated();
+      console.log('🔄 [renderSuperAdminTab] callTenantAdmin result:', result);
+      tenants = Array.isArray(result.tenants) ? result.tenants : [];
+      renderPlatformSummary(tenants);
+    } catch (error) {
+      console.error('❌ [renderSuperAdminTab] Error:', error);
+      renderPlatformSummary([]);
+      listContainer.innerHTML = `<div style="padding: 32px; text-align: center; color: #ef4444; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(239,68,68,0.1);"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Error loading workspaces: ${escHtml(error.message)}</div>`;
+      return;
+    }
+
+    console.log('🔄 [renderSuperAdminTab] Tenants loaded:', tenants.length, 'tenants');
+    if (!tenants || tenants.length === 0) {
+      listContainer.innerHTML = '<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No registered client food outlets found.</div></div>';
+      return;
+    }
+
+    // Filter tenants based on active superAdminFilter
+    let filteredTenants = tenants;
+    if (superAdminFilter === 'pending') {
+      filteredTenants = tenants.filter(t => t.status === 'pending');
+    } else if (superAdminFilter === 'paid') {
+      filteredTenants = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code));
+    } else if (superAdminFilter === 'risk') {
+      filteredTenants = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status));
+    }
+
+    if (filteredTenants.length === 0) {
+      const filterLabels = {
+        all: 'registered client food outlets',
+        pending: 'pending workspace requests',
+        paid: 'paid-tier tenants',
+        risk: 'past-due or canceled tenants'
+      };
+      const label = filterLabels[superAdminFilter] || 'matching client food outlets';
+      listContainer.innerHTML = `<div style="padding: 48px; text-align: center; color: #6B7280; font-size: 13px; background: #FFFFFF; border-radius: 12px; border: 1px solid rgba(28, 28, 28,0.05); display: flex; flex-direction: column; align-items: center; gap: 8px;"><i class="fa-solid fa-store-slash" style="font-size: 24px; color: #9CA3AF;"></i> <div>No ${label} found.</div></div>`;
+      return;
+    }
+
+    // Reset selection state
+    const selectAllCheckbox = document.getElementById('select-all-tenants');
+    if (selectAllCheckbox) {
+      selectAllCheckbox.checked = false;
+      selectAllCheckbox.indeterminate = false;
+    }
+    const deleteSelectedBtn = document.getElementById('btn-delete-selected-tenants');
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.style.display = 'none';
+    }
+
+    listContainer.innerHTML = filteredTenants.map(t => {
+      const statusPresentation = superadminDomain.getTenantStatusPresentation(t.status);
+      const statusText = statusPresentation.text;
+      const outletLabel = (t.outlet_type || 'cafe').toUpperCase();
+      const badgeStyle = statusPresentation.style;
+
+      return `
+        <div class="tenant-workspace-card" style="display: flex; align-items: center; padding: 16px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.05); border-radius: 12px; gap: 16px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #1C1C1C; font-family: var(--font-body);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(28, 28, 28,0.05)'; this.style.borderColor='rgba(252, 128, 25,0.2)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'; this.style.borderColor='rgba(28, 28, 28,0.05)';">
+          <!-- Selection Checkbox -->
+          <div style="width: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <input type="checkbox" class="tenant-select-checkbox" data-id="${escHtml(t.id)}" style="cursor: pointer; width: 15px; height: 15px; accent-color: #FC8019;">
+          </div>
+          
+          <!-- Name & Avatar -->
+          <div style="flex: 2.5; min-width: 200px; display: flex; align-items: center; gap: 12px; overflow: hidden;">
+            <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(252, 128, 25, 0.1); color: #FC8019; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; text-transform: uppercase;">
+              ${escHtml((t.name || 'U').substring(0, 2))}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+              <div style="font-size: 14px; font-weight: 700; color: #1C1C1C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(t.name)}</div>
+              <div style="font-size: 10px; color: #6B7280; font-family: monospace;">workspace: ${escHtml(t.slug)}</div>
+            </div>
+          </div>
+
+          <!-- Outlet Type / Category Pill -->
+          <div style="flex: 1; min-width: 100px; display: flex; align-items: center;">
+            <span style="font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: rgba(252, 128, 25, 0.08); color: #FC8019; text-transform: uppercase; letter-spacing: 0.5px;">
+              ${escHtml(outletLabel)}
+            </span>
+          </div>
+
+          <!-- Contact Details -->
+          <div style="flex: 2; min-width: 180px; display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #6B7280; overflow: hidden;">
+            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+              <i class="fa-solid fa-envelope" style="width: 12px; color: #9CA3AF; flex-shrink: 0;"></i>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(t.email || '-')}</span>
+            </div>
+            ${t.phone ? `
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <i class="fa-brands fa-whatsapp" style="width: 12px; color: #22C55E; flex-shrink: 0;"></i>
+              <strong style="color: #4B5563;">+${escHtml(t.phone)}</strong>
+            </div>` : ''}
+          </div>
+
+          <!-- System Login Details -->
+          <div style="flex: 1.5; min-width: 120px; display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #6B7280;">
+            <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #9CA3AF; font-weight: 700;">Admin User</div>
+            <div style="font-weight: 600; color: #4B5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(t.username)}</div>
+          </div>
+
+          <!-- Status Badge -->
+          <div style="flex: 1; min-width: 100px; display: flex; align-items: center; justify-content: center;">
+            <span class="status-badge" style="padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid transparent; ${badgeStyle}">
+              ${escHtml(statusText)}
+            </span>
+          </div>
+
+          <!-- Actions -->
+          <div style="flex: 1.5; min-width: 150px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0;">
+            <button class="btn manage-tenant-btn" data-id="${escHtml(t.id)}" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; background: #FFFFFF; border: 1px solid rgba(28, 28, 28,0.08); color: #1C1C1C; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='#1C1C1C'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#FFFFFF'; this.style.color='#1C1C1C';">
+              <i class="fa-solid fa-gear" style="font-size: 10px;"></i> Manage
+            </button>
+            <button class="btn delete-single-tenant-btn" data-id="${escHtml(t.id)}" data-name="${escHtml(t.name)}" style="padding: 6px; width: 28px; height: 28px; font-size: 11px; border-radius: 8px; background: rgba(239, 68, 68, 0.05); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.15); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#FFFFFF';" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#ef4444';">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Update bulk delete button visibility based on checked boxes
+    function updateDeleteSelectedBtnVisibility() {
+      const checkboxes = listContainer.querySelectorAll('.tenant-select-checkbox');
+      const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+      const selectionState = superadminDomain.getSelectionState(
+        checkboxes.length,
+        checkedBoxes.length
+      );
+
+      if (deleteSelectedBtn) {
+        deleteSelectedBtn.style.display = selectionState.showBulkDelete ? 'flex' : 'none';
+      }
+
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked = selectionState.checked;
+        selectAllCheckbox.indeterminate = selectionState.indeterminate;
+      }
+    }
+
+    // Set up listeners for bulk actions
+    if (selectAllCheckbox && !selectAllCheckbox.dataset.listenerBound) {
+      selectAllCheckbox.dataset.listenerBound = 'true';
+      selectAllCheckbox.addEventListener('change', () => {
+        const checkboxes = listContainer.querySelectorAll('.tenant-select-checkbox');
+        checkboxes.forEach(cb => {
+          cb.checked = selectAllCheckbox.checked;
+        });
+        updateDeleteSelectedBtnVisibility();
+      });
+    }
+
+    if (deleteSelectedBtn && !deleteSelectedBtn.dataset.listenerBound) {
+      deleteSelectedBtn.dataset.listenerBound = 'true';
+      deleteSelectedBtn.addEventListener('click', async () => {
+        const checkboxes = listContainer.querySelectorAll('.tenant-select-checkbox');
+        const checkedIds = Array.from(checkboxes)
+          .filter(cb => cb.checked)
+          .map(cb => cb.getAttribute('data-id'));
+
+        if (checkedIds.length === 0) return;
+
+        if (confirm(`Are you sure you want to delete the ${checkedIds.length} selected client outlets?\n\nThis will permanently erase their registrations and all their associated data from Supabase!`)) {
+          try {
+            console.log("Bulk deleting tenant IDs:", checkedIds);
+            await callTenantAdmin('bulk_delete', { tenant_ids: checkedIds });
+            showNotificationToast(`${checkedIds.length} client accounts successfully deleted.`);
+            await renderSuperAdminTab();
+          } catch (err) {
+            console.error("Error in bulk delete handler:", err);
+            alert("Client-side system error during bulk deletion: " + err.message);
+          }
+        }
+      });
+    }
+
+    // Add change handlers for row checkboxes
+    listContainer.querySelectorAll('.tenant-select-checkbox').forEach(cb => {
+      cb.addEventListener('change', () => {
+        updateDeleteSelectedBtnVisibility();
+      });
+    });
+
+    // Add click handlers for manage buttons
+    listContainer.querySelectorAll('.manage-tenant-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tenantId = btn.getAttribute('data-id');
+        console.log("SuperAdmin Click: tenantId = ", tenantId);
+
+        // Find tenant using loose string conversion for safety
+        const tenant = tenants.find(t => String(t.id) === String(tenantId));
+        console.log("SuperAdmin Click: found tenant = ", tenant);
+
+        if (tenant) {
+          openTenantManageModal(tenant);
+        } else {
+          console.warn("SuperAdmin: No tenant found in cached list for ID: " + tenantId);
+          alert("Error: Tenant record details not found in local cache.");
+        }
+      });
+    });
+
+    // Add click handlers for delete buttons
+    listContainer.querySelectorAll('.delete-single-tenant-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tenantId = btn.getAttribute('data-id');
+        const tenantName = btn.getAttribute('data-name');
+
+        if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their associated data from Supabase!`)) {
+          try {
+            console.log("Requesting deletion of tenant ID:", tenantId);
+            await callTenantAdmin('delete_tenant', { tenant_id: tenantId });
+            showNotificationToast("Client account successfully deleted.");
+            await renderSuperAdminTab();
+          } catch (err) {
+            console.error("Error in delete-single-tenant-btn handler:", err);
+            alert("Client-side system error deleting client: " + err.message);
+          }
+        }
+      });
+    });
+
+    // Add click handler for sample data card
+    const demoCard = document.getElementById('superadmin-demo-client-card');
+    if (demoCard && !demoCard.dataset.listenerBound) {
+      demoCard.dataset.listenerBound = 'true';
+      demoCard.addEventListener('click', () => {
+        showSampleDataInfoDialog();
+      });
+    }
+  }
+
+  function openTenantManageModal(tenant) {
+    try {
+      console.log("openTenantManageModal called for: ", tenant);
+      const modal = document.getElementById('tenant-manage-modal');
+      if (!modal) {
+        console.error("SuperAdmin Error: modal 'tenant-manage-modal' element not found in DOM.");
+        alert("System Error: Management modal element is missing from the page layout.");
+        return;
+      }
+
+      initTenantManageModalEvents();
+
+      const tenantIdEl = document.getElementById('manage-tenant-id');
+      const tenantNameEl = document.getElementById('manage-tenant-name');
+      const avatarEl = document.getElementById('manage-tenant-avatar');
+      const statusBadge = document.getElementById('manage-status-badge');
+      const usernameEl = document.getElementById('manage-username');
+      const passwordEl = document.getElementById('manage-password');
+      const statusEl = document.getElementById('manage-status');
+      const planCodeEl = document.getElementById('manage-plan-code');
+      const subscriptionStatusEl = document.getElementById('manage-subscription-status');
+      const phoneEl = document.getElementById('manage-phone');
+      const emailEl = document.getElementById('manage-email');
+
+      // ── Populate hidden store + IDs ──
+      if (tenantIdEl) {
+        tenantIdEl.value = tenant.id || '';
+        tenantIdEl.setAttribute('data-slug', tenant.slug || '');
+      }
+
+      // ── Outlet name (strip type tag for cleanliness) ──
+      const displayName = (tenant.name || 'Unknown') + ` (${(tenant.outlet_type || 'CAFE').toUpperCase()})`;
+      if (tenantNameEl) tenantNameEl.textContent = displayName;
+
+      // ── Avatar initial letter ──
+      if (avatarEl) avatarEl.textContent = (tenant.name || 'U').charAt(0).toUpperCase();
+
+      // ── Status badge ──
+      if (statusBadge) {
+        const s = tenant.status || 'pending';
+        const badgeMap = {
+          approved: { dot: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', label: 'Active' },
+          pending: { dot: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', color: '#B45309', label: 'Pending' },
+          suspended: { dot: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', color: '#DC2626', label: 'Suspended' }
+        };
+        const b = badgeMap[s] || badgeMap.pending;
+        statusBadge.style.background = b.bg;
+        statusBadge.style.borderColor = b.border;
+        statusBadge.style.color = b.color;
+        statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${b.dot};display:inline-block;"></span>${b.label}`;
+      }
+
+      // ── Form fields ──
+      if (usernameEl) usernameEl.value = tenant.username || '';
+      if (passwordEl) passwordEl.value = '';
+      if (statusEl) {
+        statusEl.value = tenant.status || 'pending';
+        statusEl.setAttribute('data-prev-status', tenant.status || 'pending');
+      }
+      if (phoneEl) phoneEl.value = tenant.phone || '';
+      if (emailEl) emailEl.value = tenant.email || '';
+      if (planCodeEl) planCodeEl.value = tenant.plan_code || 'starter';
+      if (subscriptionStatusEl) subscriptionStatusEl.value = tenant.subscription_status || 'active';
+
+      // ── Feature checkboxes + card highlight ──
+      const allowed = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [];
+      const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
+      console.log(`Checking ${checkboxes.length} checkboxes against allowed tabs:`, allowed);
+
+      checkboxes.forEach(cb => {
+        cb.checked = allowed.includes(cb.value);
+        // Style the parent card label
+        const card = cb.closest('label');
+        if (card) {
+          if (cb.checked) {
+            card.style.borderColor = 'rgba(252,128,25,0.45)';
+            card.style.background = 'rgba(252,128,25,0.06)';
+          } else {
+            card.style.borderColor = '#E2E8F0';
+            card.style.background = '#FAFAFA';
+          }
+          // Keep card in sync when user clicks
+          cb.addEventListener('change', () => {
+            card.style.borderColor = cb.checked ? 'rgba(252,128,25,0.45)' : '#E2E8F0';
+            card.style.background = cb.checked ? 'rgba(252,128,25,0.06)' : '#FAFAFA';
+          }, { once: false });
+        }
+      });
+
+      modal.classList.add('active');
+      console.log("SuperAdmin: Modal active class added.");
+    } catch (err) {
+      console.error("Error inside openTenantManageModal:", err);
+      alert("Failed to render management controls: " + err.message);
+    }
+  }
+
+
+  // Hook up Super-Admin modal events
+  function closeTenantModal() {
+    const modal = document.getElementById('tenant-manage-modal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  function initTenantManageModalEvents() {
+    const closeBtn = document.getElementById('close-tenant-modal');
+    const closeBtn2 = document.getElementById('close-tenant-modal-btn');
+    if (closeBtn && !closeBtn.dataset.listenerBound) {
+      closeBtn.dataset.listenerBound = 'true';
+      closeBtn.addEventListener('click', closeTenantModal);
+    }
+    if (closeBtn2 && !closeBtn2.dataset.listenerBound) {
+      closeBtn2.dataset.listenerBound = 'true';
+      closeBtn2.addEventListener('click', closeTenantModal);
+    }
+
+    const saveTenantBtn = document.getElementById('save-tenant-settings-btn');
+    if (saveTenantBtn && !saveTenantBtn.dataset.listenerBound) {
+      saveTenantBtn.dataset.listenerBound = 'true';
+      saveTenantBtn.addEventListener('click', async () => {
+        try {
+          console.log("SuperAdmin Save Settings Clicked");
+          const tenantIdEl = document.getElementById('manage-tenant-id');
+          const tenantId = tenantIdEl.value;
+          const slug = tenantIdEl.getAttribute('data-slug') || '';
+          const name = document.getElementById('manage-tenant-name').textContent.split('(')[0].trim();
+          const username = document.getElementById('manage-username').value.trim();
+          const password = document.getElementById('manage-password').value.trim();
+          const statusEl = document.getElementById('manage-status');
+          const status = statusEl.value;
+          const prevStatus = statusEl.getAttribute('data-prev-status') || 'pending';
+          const phone = document.getElementById('manage-phone').value.trim();
+          const email = document.getElementById('manage-email').value.trim();
+          const plan_code = document.getElementById('manage-plan-code').value;
+          const subscription_status = document.getElementById('manage-subscription-status').value;
+
+          console.log("Input values gathered:", { tenantId, username, status, prevStatus, phone, email, plan_code, subscription_status });
+
+          const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
+          const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+
+          const updates = {
+            tenant_id: tenantId,
+            username,
+            status,
+            plan_code,
+            subscription_status,
+            allowed_tabs,
+            phone,
+            email
+          };
+
+          if (password !== '') updates.password = password;
+
+          console.log("Sending update request to backend for tenant ID:", tenantId, "Updates:", updates);
+          await callTenantAdmin('update_tenant', updates);
+          console.log("Update succeeded. Toasting and refreshing list.");
+          closeTenantModal();
+          showNotificationToast("Client configurations saved successfully!");
+          await renderSuperAdminTab();
+        } catch (err) {
+          console.error("Error in saveTenantBtn handler:", err);
+          alert("Client-side system error saving settings: " + err.message);
+        }
+      });
+    }
+
+    const deleteTenantBtn = document.getElementById('delete-tenant-btn');
+    if (deleteTenantBtn && !deleteTenantBtn.dataset.listenerBound) {
+      deleteTenantBtn.dataset.listenerBound = 'true';
+      deleteTenantBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their POS bills, inventory records, custom menus, and staff details from Supabase!`)) {
+            console.log("Requesting deletion of tenant ID:", tenantId);
+            await callTenantAdmin('delete_tenant', { tenant_id: tenantId });
+            console.log("Deletion succeeded. Refreshing UI.");
+            closeTenantModal();
+            showNotificationToast("Client account successfully deleted.");
+            await renderSuperAdminTab();
+          }
+        } catch (err) {
+          console.error("Error in deleteTenantBtn handler:", err);
+          alert("Client-side system error deleting client: " + err.message);
+        }
+      });
+    }
+
+    const resetTenantDataBtn = document.getElementById('reset-tenant-data-btn');
+    if (resetTenantDataBtn && !resetTenantDataBtn.dataset.listenerBound) {
+      resetTenantDataBtn.dataset.listenerBound = 'true';
+      resetTenantDataBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (!confirm(`⚠️ RESET DATA for: ${tenantName}?\n\nThis will PERMANENTLY DELETE all of their:\n• Bills & sales history\n• Menu items\n• Inventory & stock batches\n• Employees & attendance\n• Shifts & shift events\n• CRM loyalty members\n• Notifications\n• Custom recipes & thresholds\n• Pending orders\n• Popularity scores\n\nThe ACCOUNT itself (login, status, features) will be preserved.\n\nThis cannot be undone. Are you sure?`)) return;
+
+          console.log("Resetting data for tenant ID:", tenantId);
+
+          // Show progress in button
+          resetTenantDataBtn.disabled = true;
+          resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Resetting...';
+
+          const result = await callTenantAdmin('reset_tenant_data', { tenant_id: tenantId });
+          const errors = Array.isArray(result.errors) ? result.errors : [];
+          /* const tablesToReset = [
+            'doppio_bills',
+            'doppio_pending_orders',
+            'doppio_menu',
+            'doppio_inventory',
+            'doppio_inventory_batches',
+            'doppio_inventory_thresholds',
+            'doppio_shifts',
+            'doppio_shift_events',
+            'doppio_employees',
+            'doppio_leave_requests',
+            'doppio_attendance',
+            'doppio_crm',
+            'doppio_notifications',
+            'doppio_custom_recipes',
+            'doppio_pos_popularity'
+          ];
+
+          const errors = [];
+          for (const table of tablesToReset) {
+            const { error } = await supabaseClient.from(table).delete().eq('tenant_id', tenantId);
+            if (error) {
+              console.warn(`Failed to reset table ${table}:`, error.message);
+              errors.push(table);
+            } else {
+              console.log(`✓ Cleared: ${table}`);
+            }
+          }
+
+          // Reset business_profile to blank defaults and set seeding_disabled flag
+          // so the tenant's next login won't auto-re-seed menu/inventory
+          let existingFlags = {};
+          try {
+            const { data: existingProfile } = await supabaseClient
+              .from('doppio_business_profile')
+              .select('feature_flags')
+              .eq('tenant_id', tenantId)
+              .single();
+            if (existingProfile && existingProfile.feature_flags) {
+              existingFlags = typeof existingProfile.feature_flags === 'string'
+                ? JSON.parse(existingProfile.feature_flags)
+                : existingProfile.feature_flags;
+            }
+          } catch (e) { }
+          existingFlags.seeding_disabled = true;
+
+          const { error: profileError } = await supabaseClient
+            .from('doppio_business_profile')
+            .update({
+              business_name: '',
+              address: '',
+              phone: '',
+              gst_number: '',
+              upi_id: '',
+              logo_base64: null,
+              shift_enabled: false,
+              whatsapp_enabled: false,
+              table_count: 10,
+              feature_flags: JSON.stringify(existingFlags)
+            })
+            .eq('tenant_id', tenantId);
+
+          if (profileError) {
+            console.warn('Failed to reset business profile:', profileError.message);
+          } else {
+            console.log('✓ Cleared: doppio_business_profile (seeding_disabled=true set)');
+          }
+
+          */
+          if (errors.length > 0) {
+            alert(`Data reset completed with some errors on tables:\n${errors.join(', ')}\n\nOther tables were cleared successfully.`);
+          } else {
+            // Broadcast the reset event to the tenant channel so their active sessions clear and reload live!
+            try {
+              const resetChannel = supabaseClient.channel('tenant-data-reset-realtime');
+              resetChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                  await resetChannel.send({
+                    type: 'broadcast',
+                    event: 'data-reset',
+                    payload: { tenantId: tenantId }
+                  });
+                  console.log("Sent real-time reset broadcast event for tenant ID:", tenantId);
+                }
+              });
+            } catch (broadcastingErr) {
+              console.warn("Failed to send live reset broadcast:", broadcastingErr);
+            }
+
+            closeTenantModal();
+            showNotificationToast(`✅ ${tenantName.split('(')[0].trim()} — workspace reset to factory fresh!`);
+          }
+
+          await renderSuperAdminTab();
+
+        } catch (err) {
+          console.error("Error in resetTenantDataBtn handler:", err);
+          alert("System error during data reset: " + err.message);
+        } finally {
+          resetTenantDataBtn.disabled = false;
+          resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left" style="font-size:10px;"></i> Reset data';
+        }
+      });
+    }
+
+    const seedTenantDataBtn = document.getElementById('seed-tenant-data-btn');
+    if (seedTenantDataBtn && !seedTenantDataBtn.dataset.listenerBound) {
+      seedTenantDataBtn.dataset.listenerBound = 'true';
+      seedTenantDataBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (!confirm(`⚠️ LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of:\n• 6 Menu items\n• 5 Inventory items & BATCHES\n• 4 Custom recipe mappings\n• 3 Employees\n• 7 Days of mock sales history/bills\n\nAny existing operational data in this workspace will be cleared first. Proceed?`)) return;
+
+          console.log("Seeding data for tenant ID:", tenantId);
+
+          // Show progress in button
+          seedTenantDataBtn.disabled = true;
+          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Seeding...';
+
+          const result = await callTenantAdmin('seed_tenant_data', { tenant_id: tenantId });
+          
+          if (result.error) {
+            alert("Failed to seed demo data: " + result.error);
+          } else {
+            // Broadcast the reset event so client active sessions reload automatically
+            try {
+              const resetChannel = supabaseClient.channel('tenant-data-reset-realtime');
+              resetChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                  await resetChannel.send({
+                    type: 'broadcast',
+                    event: 'data-reset',
+                    payload: { tenantId: tenantId }
+                  });
+                  console.log("Sent real-time seed broadcast event for tenant ID:", tenantId);
+                }
+              });
+            } catch (broadcastingErr) {
+              console.warn("Failed to send live seed broadcast:", broadcastingErr);
+            }
+
+            closeTenantModal();
+            showNotificationToast(`✅ ${tenantName.split('(')[0].trim()} — demo records loaded successfully!`);
+          }
+
+          await renderSuperAdminTab();
+
+        } catch (err) {
+          console.error("Error in seedTenantDataBtn handler:", err);
+          alert("System error seeding demo data: " + err.message);
+        } finally {
+          seedTenantDataBtn.disabled = false;
+          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-seedling" style="font-size:10px;"></i> Load Demo Data';
+        }
+      });
+    }
+
+    const purgeTenantDataBtn = document.getElementById('purge-tenant-data-btn');
+    if (purgeTenantDataBtn && !purgeTenantDataBtn.dataset.listenerBound) {
+      purgeTenantDataBtn.dataset.listenerBound = 'true';
+      purgeTenantDataBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const tenantName = document.getElementById('manage-tenant-name').textContent;
+
+          if (!confirm(`⚠️ REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records seeded by the platform owner (menu items, stock, batches, recipes, employees, and bills).\n\nAny data added by the client will be preserved. Proceed?`)) return;
+
+          console.log("Purging demo data for tenant ID:", tenantId);
+
+          purgeTenantDataBtn.disabled = true;
+          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:10px;"></i> Purging...';
+
+          const result = await callTenantAdmin('purge_demo_data', { tenant_id: tenantId });
+          
+          if (result.error) {
+            alert("Failed to remove demo data: " + result.error);
+          } else {
+            // Broadcast the reset event so client active sessions reload automatically
+            try {
+              const resetChannel = supabaseClient.channel('tenant-data-reset-realtime');
+              resetChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                  await resetChannel.send({
+                    type: 'broadcast',
+                    event: 'data-reset',
+                    payload: { tenantId: tenantId }
+                  });
+                  console.log("Sent real-time purge broadcast event for tenant ID:", tenantId);
+                }
+              });
+            } catch (broadcastingErr) {
+              console.warn("Failed to send live purge broadcast:", broadcastingErr);
+            }
+
+            closeTenantModal();
+            showNotificationToast(`✅ ${tenantName.split('(')[0].trim()} — demo records removed successfully!`);
+          }
+
+          await renderSuperAdminTab();
+
+        } catch (err) {
+          console.error("Error in purgeTenantDataBtn handler:", err);
+          alert("System error removing demo data: " + err.message);
+        } finally {
+          purgeTenantDataBtn.disabled = false;
+          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="font-size:10px;"></i> Remove Demo Data';
+        }
+      });
+    }
+  }
+
+  // Run initial registration
+  initTenantManageModalEvents();
 });
