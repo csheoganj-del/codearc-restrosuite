@@ -1277,7 +1277,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (dot) {
         dot.className = 'status-dot';
         dot.style.backgroundColor = '#f1c40f';
-        dot.style.animation = 'blink 0.5s infinite';
       }
     }
     if (text) {
@@ -1291,7 +1290,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const dot = badge ? badge.querySelector('.status-dot') : null;
         if (dot) {
           dot.style.backgroundColor = '';
-          dot.style.animation = 'blink 1.5s infinite';
         }
       }
     }, 5000);
@@ -5252,20 +5250,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Add event listeners for export buttons
-  document.getElementById('export-bills-csv').addEventListener('click', () => {
+  // Add event listeners for optional export buttons
+  const exportBillsCsvBtn = document.getElementById('export-bills-csv');
+  const exportBillsExcelBtn = document.getElementById('export-bills-excel');
+  const exportBillsPdfBtn = document.getElementById('export-bills-pdf');
+  const exportBillsGstr1Btn = document.getElementById('export-bills-gstr1');
+
+  if (exportBillsCsvBtn) exportBillsCsvBtn.addEventListener('click', () => {
     const filtered = getFilteredBillsForExport();
     exportBillsCSV(filtered);
   });
-  document.getElementById('export-bills-excel').addEventListener('click', () => {
+  if (exportBillsExcelBtn) exportBillsExcelBtn.addEventListener('click', () => {
     const filtered = getFilteredBillsForExport();
     exportBillsExcel(filtered);
   });
-  document.getElementById('export-bills-pdf').addEventListener('click', () => {
+  if (exportBillsPdfBtn) exportBillsPdfBtn.addEventListener('click', () => {
     const filtered = getFilteredBillsForExport();
     exportBillsPDF(filtered);
   });
-  document.getElementById('export-bills-gstr1').addEventListener('click', () => {
+  if (exportBillsGstr1Btn) exportBillsGstr1Btn.addEventListener('click', () => {
     const filtered = getFilteredBillsForExport();
     exportBillsGSTR1(filtered);
   });
@@ -14558,13 +14561,14 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
     toast.style.position = 'fixed';
     toast.style.top = '20px';
     toast.style.left = '50%';
-    toast.style.transform = 'translateX(-50%) translateY(-100%)';
+    toast.style.transform = 'translateX(-50%)';
     toast.style.zIndex = '999999';
     toast.style.background = gradient;
     toast.style.borderBottom = border;
     toast.style.borderRadius = '30px';
     toast.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
-    toast.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    toast.style.transition = 'opacity 0.2s ease';
+    toast.style.opacity = '0';
     toast.style.width = 'auto';
     toast.style.minWidth = '300px';
     toast.style.animation = 'none';
@@ -14582,14 +14586,12 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
 
     document.body.appendChild(toast);
 
-    // Slide in
     setTimeout(() => {
-      toast.style.transform = 'translateX(-50%) translateY(0)';
+      toast.style.opacity = '1';
     }, 100);
 
-    // Slide out and remove
     setTimeout(() => {
-      toast.style.transform = 'translateX(-50%) translateY(-150%)';
+      toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 500);
     }, 4500);
   }

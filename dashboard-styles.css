@@ -124,15 +124,6 @@ body {
   box-shadow: 0 8px 20px rgba(201, 138, 74, 0.2);
 }
 
-.sidebar-brand:hover img {
-  animation: logoPulse 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes logoPulse {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.05); }
-}
-
 .restrosuite-logo-img {
   display: block;
   width: 100%;
@@ -418,12 +409,6 @@ body {
 
 .status-dot.red {
   background-color: var(--danger-color);
-}
-
-@keyframes blink {
-  0% { opacity: 0.4; }
-  50% { opacity: 1; }
-  100% { opacity: 0.4; }
 }
 
 .bell-icon-wrapper {
@@ -1152,13 +1137,6 @@ body {
   font-size: 34px;
   margin-bottom: 12px;
   color: rgba(255, 90, 31, 0.2);
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-7px); }
-  100% { transform: translateY(0px); }
 }
 
 .empty-cart-state p {
@@ -1176,7 +1154,6 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  animation: fadeInLeft 0.22s ease-out;
   gap: 10px;
 }
 
