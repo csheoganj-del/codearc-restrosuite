@@ -883,11 +883,16 @@
     const tbody = $('#tenant-table-body');
     if(!tbody) return;
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry…</td></tr>';
+    renderPlatformSummary([]);
     try {
       let tenants = [];
       if(window.RS_API) {
-        const out = await RS_API.admin({ action: 'list_tenants' }).catch(()=>({}));
-        if(out && out.tenants) tenants = out.tenants;
+        const out = await Promise.race([
+          RS_API.admin({ action: 'list_tenants' }).catch(err => ({ error: err && err.message ? err.message : String(err), tenants: [] })),
+          new Promise(resolve => setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 8000))
+        ]);
+        if(out && out.error) console.warn('Superadmin tenant registry unavailable:', out.error);
+        if(out && Array.isArray(out.tenants)) tenants = out.tenants;
       }
       
       renderPlatformSummary(tenants);
@@ -1326,7 +1331,8 @@
       }
     } catch(err) {
       if (logsContainer) {
-        logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent dispatch logs found.</div>';
+        const msg = escHtml(err.message || 'Gateway request failed');
+        logsContainer.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--red);"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>Could not load gateway logs: ${msg}</div>`;
       }
     }
   }

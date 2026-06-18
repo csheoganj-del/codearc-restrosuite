@@ -694,9 +694,10 @@
   // marketing slider
   (function(){
     const slides=[...document.querySelectorAll('.story-slide')], dotsWrap=document.getElementById('story-dots');
-    let i=0; slides.forEach((s,k)=>{const b=document.createElement('button');if(!k)b.classList.add('on');b.onclick=()=>go(k);dotsWrap.appendChild(b);});
-    const dots=dotsWrap.children;
-    function go(k){i=(k+slides.length)%slides.length;slides.forEach((s,x)=>s.classList.toggle('on',x===i));[...dots].forEach((d,x)=>d.classList.toggle('on',x===i));}
+    if(!dotsWrap || !slides.length) return;
+    let i=0; slides.forEach((s,k)=>{const b=document.createElement('button');b.type='button';b.title=`Show slide ${k+1}`;b.setAttribute('aria-label',`Show marketing slide ${k+1}`);b.setAttribute('aria-current',k===0?'true':'false');if(!k)b.classList.add('on');b.onclick=()=>go(k);dotsWrap.appendChild(b);});
+    const dots=[...dotsWrap.children];
+    function go(k){i=(k+slides.length)%slides.length;slides.forEach((s,x)=>s.classList.toggle('on',x===i));dots.forEach((d,x)=>{d.classList.toggle('on',x===i);d.setAttribute('aria-current',x===i?'true':'false');});}
     setInterval(()=>go(i+1),4500);
   })();
 
