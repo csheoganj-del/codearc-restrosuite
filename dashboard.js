@@ -4321,6 +4321,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   updatePayPillIndex();
 
   // Complete checkout & Sync
+  let postCheckoutRefreshTimer = null;
+  function schedulePostCheckoutRefresh() {
+    clearTimeout(postCheckoutRefreshTimer);
+    postCheckoutRefreshTimer = setTimeout(() => {
+      postCheckoutRefreshTimer = null;
+      runWhenIdle(() => {
+        updateHeaderSummaryStats();
+        const activeTabId = document.querySelector('.tab-content.active')?.id || '';
+        if (activeTabId === 'bills-tab') renderBills();
+        if (activeTabId === 'inventory-tab') renderInventory();
+        if (activeTabId === 'tax-tab') renderTaxTab();
+      }, 1200);
+    }, 1800);
+  }
+
   function performCheckout(shouldPrint) {
     if (cart.length === 0) {
       alert('Cart is empty! Add items before checking out.');
@@ -4570,8 +4585,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderCart();
     updateHeaderSummaryStats();
-    renderBills();
-    renderInventory();
+    schedulePostCheckoutRefresh();
   }
 
   const checkoutSaveBtn = document.getElementById('checkout-save-btn');
@@ -5435,6 +5449,62 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   // 8. THERMAL RECEIPT EMULATION ENGINE
   // ==========================================
+  function printMarkupInBackground(markup, title = 'Receipt') {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('title', title);
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.position = 'fixed';
+    frame.style.right = '0';
+    frame.style.bottom = '0';
+    frame.style.width = '0';
+    frame.style.height = '0';
+    frame.style.border = '0';
+    frame.style.opacity = '0';
+    frame.style.pointerEvents = 'none';
+    frame.srcdoc = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${escHtml(title)}</title>
+        <style>
+          @page { size: 80mm auto; margin: 3mm; }
+          html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+          body { font-family: "Courier New", Courier, monospace; }
+          pre { font-family: "Courier New", Courier, monospace; font-size: 10px; font-weight: 600; line-height: 1.35; margin: 0; white-space: pre; color: #000; background: #fff; text-shadow: none; }
+        </style>
+      </head>
+      <body>${markup}</body>
+      </html>
+    `;
+
+    const cleanup = () => {
+      setTimeout(() => {
+        if (frame.parentNode) frame.parentNode.removeChild(frame);
+      }, 1000);
+    };
+
+    frame.onload = () => {
+      const printWindow = frame.contentWindow;
+      if (!printWindow) {
+        cleanup();
+        return;
+      }
+      printWindow.onafterprint = cleanup;
+      setTimeout(() => {
+        try {
+          printWindow.focus();
+          printWindow.print();
+        } catch (error) {
+          cleanup();
+        }
+      }, 80);
+      setTimeout(cleanup, 8000);
+    };
+
+    document.body.appendChild(frame);
+  }
+
   function triggerThermalReceiptPrint(bill) {
     const el = document.getElementById('thermal-receipt');
     if (!el) return;
@@ -5545,7 +5615,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.AndroidInterface) {
       window.AndroidInterface.printReceipt(el.innerHTML);
     } else {
-      window.print();
+      printMarkupInBackground(el.innerHTML, `Receipt ${bill.orderId || ''}`.trim());
     }
   }
 
@@ -5672,7 +5742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.AndroidInterface) {
       window.AndroidInterface.printReceipt(el.innerHTML);
     } else {
-      window.print();
+      printMarkupInBackground(el.innerHTML, 'Kitchen Order Ticket');
     }
   }
 
@@ -15299,6 +15369,10 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
   // Wrap performCheckout to broadcast sync
   const originalPerformCheckout = performCheckout;
   performCheckout = function (shouldPrint) {
+    if (!Array.isArray(cart) || cart.length === 0) {
+      originalPerformCheckout(shouldPrint);
+      return;
+    }
     const orderNum = document.getElementById('order-num').value;
     const billIdToSave = editingBillId || orderNum;
 
@@ -15343,33 +15417,37 @@ TRANSACTIONS LOG : ${totalTransactions} Bills
       status: 'Accepted'
     };
 
-    // Add locally to pendingQrOrders so KDS picks it up!
-    pendingQrOrders.push(mockKdsOrder);
-    localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
-
-    // Upload to Supabase to notify KDS in real-time
-    if (supabaseClient) {
-      supabaseClient.from('doppio_pending_orders').insert({
-        orderId: mockKdsOrder.orderId,
-        customerName: mockKdsOrder.customerName,
-        customerPhone: mockKdsOrder.customerPhone,
-        items: JSON.stringify(mockKdsOrder.items),
-        subtotal: mockKdsOrder.subtotal,
-        discount: mockKdsOrder.discount,
-        gst: mockKdsOrder.gst,
-        total: mockKdsOrder.total,
-        paymentMethod: mockKdsOrder.paymentMethod,
-        orderType: mockKdsOrder.orderType,
-        tableNumber: mockKdsOrder.tableNumber,
-        status: mockKdsOrder.status,
-        dateTime: mockKdsOrder.dateTime
-      }).then();
-    }
-
     originalPerformCheckout(shouldPrint);
+    const checkoutSucceeded = bills.some(bill => String(bill.orderId) === String(billIdToSave));
+    if (!checkoutSucceeded) return;
 
-    // Broadcast P2P order
-    window.broadcastP2POrder(billIdToSave, total);
+    setTimeout(() => {
+      if (!pendingQrOrders.some(order => String(order.orderId) === String(mockKdsOrder.orderId))) {
+        pendingQrOrders.push(mockKdsOrder);
+        localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pendingQrOrders));
+      }
+
+      if (supabaseClient && navigator.onLine) {
+        supabaseClient.from('doppio_pending_orders').insert({
+          tenant_id: activeTenantId,
+          orderId: mockKdsOrder.orderId,
+          customerName: mockKdsOrder.customerName,
+          customerPhone: mockKdsOrder.customerPhone,
+          items: JSON.stringify(mockKdsOrder.items),
+          subtotal: mockKdsOrder.subtotal,
+          discount: mockKdsOrder.discount,
+          gst: mockKdsOrder.gst,
+          total: mockKdsOrder.total,
+          paymentMethod: mockKdsOrder.paymentMethod,
+          orderType: mockKdsOrder.orderType,
+          tableNumber: mockKdsOrder.tableNumber,
+          status: mockKdsOrder.status,
+          dateTime: mockKdsOrder.dateTime
+        }).then();
+      }
+
+      window.broadcastP2POrder(billIdToSave, total);
+    }, 2000);
   };
 
   // 4. Interactive Excel Onboarding Wizard (Menu & Recipe Parser)
