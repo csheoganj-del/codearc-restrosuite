@@ -414,7 +414,6 @@ body {
 
 .status-dot.green {
   background-color: var(--success-color);
-  animation: blink 1.5s infinite;
 }
 
 .status-dot.red {

@@ -151,6 +151,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   const validateStoredDashboardSession = sessionManager.validateStoredSession;
   let pendingListTenantsPromise = null;
+  let supabaseSyncInFlight = false;
+  let supabaseSyncQueued = false;
+  let supabaseSyncRetryTimer = null;
+  let lastSupabaseSyncStartedAt = 0;
+  const SUPABASE_SYNC_MIN_GAP_MS = 8000;
 
   // ==========================================
   // SESSION GUARD (Redirect if not logged in)
@@ -1372,6 +1377,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       applyFeatureToggles();
       return;
     }
+    const now = Date.now();
+    if (supabaseSyncInFlight) {
+      supabaseSyncQueued = true;
+      return;
+    }
+    const elapsedSinceLastSync = now - lastSupabaseSyncStartedAt;
+    if (lastSupabaseSyncStartedAt && elapsedSinceLastSync < SUPABASE_SYNC_MIN_GAP_MS) {
+      supabaseSyncQueued = true;
+      clearTimeout(supabaseSyncRetryTimer);
+      supabaseSyncRetryTimer = setTimeout(() => {
+        supabaseSyncRetryTimer = null;
+        if (supabaseSyncQueued) {
+          supabaseSyncQueued = false;
+          syncWithSupabase();
+        }
+      }, SUPABASE_SYNC_MIN_GAP_MS - elapsedSinceLastSync);
+      return;
+    }
+    supabaseSyncInFlight = true;
+    lastSupabaseSyncStartedAt = now;
     try {
       // Sync Business Profile Toggles and Settings Live!
       try {
@@ -1960,6 +1985,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (e) {
       console.warn("Supabase initial sync fallback", e);
+    } finally {
+      supabaseSyncInFlight = false;
+      if (supabaseSyncQueued) {
+        supabaseSyncQueued = false;
+        clearTimeout(supabaseSyncRetryTimer);
+        supabaseSyncRetryTimer = setTimeout(() => {
+          supabaseSyncRetryTimer = null;
+          syncWithSupabase();
+        }, SUPABASE_SYNC_MIN_GAP_MS);
+      }
     }
   }
 
@@ -2106,7 +2141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       tenantDataSyncTimer = setTimeout(() => {
         tenantDataSyncTimer = null;
         syncWithSupabase();
-      }, 150);
+      }, 2500);
     };
 
     if (loggedInRole !== 'superadmin' && activeTenantId) {
@@ -2745,23 +2780,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (laterBtn) laterBtn.onclick = postponeUpdate;
 
-    if (!requiresManualConfirm && !hasActiveWork) {
-      let seconds = 20;
-      const originalText = updateNowBtn ? updateNowBtn.innerHTML : '';
-      const timer = setInterval(() => {
-        seconds -= 1;
-        if (!modal.classList.contains('is-visible')) {
-          if (updateNowBtn) updateNowBtn.innerHTML = originalText;
-          clearInterval(timer);
-          return;
-        }
-        if (updateNowBtn) updateNowBtn.innerHTML = `<i class="fa-solid fa-rotate"></i> Save & Update (${seconds}s)`;
-        if (seconds <= 0) {
-          clearInterval(timer);
-          if (updateNowBtn) updateNowBtn.innerHTML = originalText;
-          applyUpdate();
-        }
-      }, 1000);
+    if (!requiresManualConfirm && !hasActiveWork && updateNowBtn) {
+      updateNowBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Save & Update';
     }
   }
 
@@ -2801,6 +2821,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ];
     let baseline = null;
     let checking = false;
+    let updatePromptVisible = false;
 
     async function readCurrentAssetHashes() {
       const pairs = await Promise.all(assetsToWatch.map(async asset => [asset, await fetchUpdateHash(asset)]));
@@ -2819,7 +2840,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const changed = assetsToWatch.some(asset => latest[asset] && baseline[asset] && latest[asset] !== baseline[asset]);
         if (changed) {
           baseline = latest;
-          reloadIntoLatestVersion();
+          if (!updatePromptVisible) {
+            updatePromptVisible = true;
+            reloadIntoLatestVersion();
+            setTimeout(() => {
+              updatePromptVisible = false;
+            }, 10 * 60 * 1000);
+          }
         }
       } catch (err) {
         console.warn('[Auto Update] Check skipped:', err.message || err);
@@ -2828,8 +2855,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    setTimeout(checkForUpdate, 8000);
-    setInterval(checkForUpdate, 60000);
+    setTimeout(checkForUpdate, 30000);
+    setInterval(checkForUpdate, 5 * 60 * 1000);
     window.addEventListener('online', checkForUpdate);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) checkForUpdate();
