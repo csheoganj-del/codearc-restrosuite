@@ -65,9 +65,21 @@
       "total",
       "paymentMethod"
     ];
+    function valueFor(row, header) {
+      if (!row) return "";
+      if (row[header] !== undefined && row[header] !== null) return row[header];
+      if (header === "orderId") return row.no || row.id || "";
+      if (header === "customerName") return row.customerName || row.customer || "";
+      if (header === "dateTime") return row.time || row.created_at || "";
+      if (header === "items") return row._items || row.items || "";
+      if (header === "subtotal") return row.subtotal || row.sub || "";
+      if (header === "total") return row.total || row.amount || row.grand || "";
+      if (header === "paymentMethod") return row.paymentMethod || row.pay || "";
+      return "";
+    }
     const rows = (Array.isArray(data) ? data : []).map((row) => {
       return headers.map((header) => {
-        let value = row ? row[header] : undefined;
+        let value = valueFor(row, header);
         if (value === null || value === undefined) return '""';
         if (typeof value === "object") value = JSON.stringify(value);
         return `"${String(value).replace(/"/g, '""')}"`;

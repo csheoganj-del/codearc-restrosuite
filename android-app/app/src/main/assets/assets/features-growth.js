@@ -19,8 +19,26 @@
     ];
     const stateDot = {free:'var(--green)',occupied:'var(--orange)',billed:'var(--violet-soft)'};
     const stateTxt = {free:'Available',occupied:'Dining',billed:'Bill printed'};
+    function parseLocalTimestamp(dateStr) {
+      if (!dateStr) return null;
+      const nativeTime = new Date(dateStr).getTime();
+      if (!Number.isNaN(nativeTime)) return nativeTime;
+      const m = String(dateStr).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]m)?$/i);
+      if (!m) return null;
+      let [, d, mo, y, h, mi, s, meridiem] = m;
+      let hour = Number(h);
+      if (meridiem) {
+        const pm = meridiem.toLowerCase() === 'pm';
+        if (pm && hour < 12) hour += 12;
+        if (!pm && hour === 12) hour = 0;
+      }
+      const parsed = new Date(Number(y), Number(mo) - 1, Number(d), hour, Number(mi), Number(s || 0)).getTime();
+      return Number.isNaN(parsed) ? null : parsed;
+    }
     function getElapsedDesc(dateStr) {
-      const elapsed = Date.now() - new Date(dateStr).getTime();
+      const ts = parseLocalTimestamp(dateStr);
+      if (!ts) return 'just now';
+      const elapsed = Date.now() - ts;
       const mins = Math.floor(elapsed / 60000);
       if (mins < 1) return 'just now';
       if (mins < 60) return `${mins}m`;
@@ -32,6 +50,7 @@
       const sec = $('#floor-tab');
       if(!sec) return;
       if (window.RS_DB) {
+        sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
         RS_DB.list('pending_orders').then(rows => {
           TABLES.forEach(t => {
             const activeOrder = rows.find(r => 
@@ -163,6 +182,7 @@
       const sec = $('#customers-tab');
       if(!sec) return;
       if(window.RS_DB){
+        sec.innerHTML = '<div class="sr-empty">Loading customers...</div>';
         RS_DB.list('customers').then(rows => {
           if (rows && rows.length) {
             CUSTOMERS.length = 0;
@@ -210,6 +230,90 @@
         $$('.crm-card',grid).forEach(el=> el.onclick=()=> customerModal(CUSTOMERS[+el.dataset.i]));
       }
       draw(); $('#crm-search').addEventListener('input', e=>draw(e.target.value));
+      const addCustomerBtn = $('#btn-add-customer');
+      if(addCustomerBtn && !$('#btn-import-customers')) {
+        addCustomerBtn.insertAdjacentHTML('beforebegin', '<button class="btn btn-ghost btn-sm" id="btn-import-customers"><i class="fa-solid fa-file-import"></i> Import CSV</button><button class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-file-csv"></i> Export CSV</button>');
+      }
+      const broadcastBtn = $$('.toolbar-row .btn-ghost', sec).find(b => b.textContent.trim() === 'Broadcast');
+      if(broadcastBtn) broadcastBtn.onclick = () => RS.toast('Broadcast campaigns are not connected yet', 'fa-bullhorn');
+
+      const exportCustomers = $('#btn-export-customers');
+      if(exportCustomers) exportCustomers.onclick = () => {
+        if(!CUSTOMERS.length) return RS.toast('No customers to export', 'fa-circle-exclamation');
+        const csv = [
+          'Name,Phone,Email,Visits,TotalSpend,Tier,LastVisit',
+          ...CUSTOMERS.map(c => [c.name,c.phone,c.email||'',c.visits||0,c.spend||0,c.tier||'silver',c.last||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))
+        ].join('\n');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `customers-export-${Date.now()}.csv`);
+        RS.toast('Customers exported as CSV', 'fa-circle-check');
+      };
+
+      const importCustomers = $('#btn-import-customers');
+      if(importCustomers) importCustomers.onclick = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = e => {
+          const file = e.target.files[0];
+          if(!file) return;
+          const reader = new FileReader();
+          reader.onload = async evt => {
+            try {
+              const rows = window.RestroSuite?.imports?.parseCsv ? window.RestroSuite.imports.parseCsv(evt.target.result) : [];
+              if(!rows.length) throw new Error('No rows found in CSV');
+              const cleanKey = v => String(v || '').toLowerCase().replace(/[^a-z0-9]/g,'');
+              const getValue = (row, keys) => {
+                const wanted = keys.map(cleanKey);
+                for(const [key, value] of Object.entries(row || {})) {
+                  if(wanted.includes(cleanKey(key)) && value !== '') return value;
+                }
+                return '';
+              };
+              const records = [];
+              const skipped = [];
+              rows.forEach((row, index) => {
+                const name = String(getValue(row, ['name','customername'])).trim();
+                const phone = String(getValue(row, ['phone','mobile','contact','customerphone'])).replace(/\D/g,'').slice(-10);
+                if(!name || phone.length !== 10) { skipped.push(`Row ${index + 2}: name and valid 10-digit phone required`); return; }
+                records.push({
+                  id:'cust-' + phone,
+                  name,
+                  phone,
+                  email:String(getValue(row, ['email'])).trim(),
+                  visits:Number(getValue(row, ['visits'])) || 0,
+                  spend:Number(getValue(row, ['totalspend','spend'])) || 0,
+                  last:new Date().toISOString(),
+                  tier:'silver'
+                });
+              });
+              if(!records.length) throw new Error('No valid customer rows found');
+              const ok = window.RSModal ? await new Promise(resolve => {
+                RSModal.open({
+                  title:'Import customers CSV', sub:'Review before saving to database', icon:'fa-file-import', size:'sm',
+                  body:`<div class="crm-stats"><div class="cs"><div class="csv">${records.length}</div><div class="csl">Rows ready</div></div><div class="cs"><div class="csv">${skipped.length}</div><div class="csl">Skipped</div></div></div>${skipped.length?`<div class="sr-empty" style="text-align:left;margin-top:12px">First skipped row: ${skipped[0]}</div>`:''}`,
+                  foot:`<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-database"></i> Import</button>`,
+                  onMount(modal, close) {
+                    modal.querySelector('[data-cancel]').onclick = () => { close(); resolve(false); };
+                    modal.querySelector('[data-confirm]').onclick = () => { close(); resolve(true); };
+                  }
+                });
+              }) : window.confirm(`${records.length} customers ready. Continue import?`);
+              if(!ok) return;
+              const before = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+              let saved = 0;
+              for(const c of records) { await RS.saveOne('customers', c); saved++; }
+              const fallback = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time !== before && window.RS_LAST_CLOUD_ERROR.collection === 'customers';
+              RS.toast(fallback ? `${saved} customers saved locally. Cloud sync pending.` : `${saved} customers imported and synced`, fallback ? 'fa-cloud-arrow-up' : 'fa-circle-check');
+              renderCustomers();
+            } catch(err) {
+              console.warn('Customer import failed', err);
+              RS.toast('Import failed: '+err.message, 'fa-circle-exclamation');
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      };
 
       $('#btn-add-customer').onclick = () => {
         RSModal.open({
@@ -243,6 +347,7 @@
                   renderCustomers();
                 } catch(e) {
                   console.warn("Failed saving customer", e);
+                  RS.toast('Customer save failed: '+e.message, 'fa-circle-exclamation');
                 }
               } else {
                 close();
@@ -264,7 +369,14 @@
           <div class="panel-head" style="margin-bottom:10px"><h3 style="font-size:14px">Recent orders</h3></div>
           <table class="data-table"><tbody>${history.length > 0 ? history.map(h=>`<tr><td>${h[0]}</td><td style="color:var(--text-soft)">${h[1]}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-mute)">No order history</td></tr>'}</tbody></table>`,
         foot:`<button class="btn btn-ghost" style="flex:1" data-wa><i class="fa-brands fa-whatsapp"></i> Message</button><button class="btn btn-primary" style="flex:1" data-offer><i class="fa-solid fa-tags"></i> Send offer</button>`,
-        onMount(modal,close){ modal.querySelector('[data-wa]').onclick=()=>{close();RS.toast('WhatsApp opened for '+c.name,'fa-whatsapp');}; modal.querySelector('[data-offer]').onclick=()=>{close();RS.toast('Loyalty offer sent to '+c.name,'fa-tags');}; }});
+        onMount(modal,close){
+          modal.querySelector('[data-wa]').onclick=()=>{
+            window.open(`https://wa.me/${String(c.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent('Hi '+c.name+', thank you for dining with us.')}`, '_blank', 'noopener,noreferrer');
+            close();
+            RS.toast('WhatsApp message ready for '+c.name,'fa-whatsapp');
+          };
+          modal.querySelector('[data-offer]').onclick=()=>{close();RS.toast('Offer campaigns are not connected yet','fa-tags');};
+        }});
     }
     RS.titles['customers-tab']=['Customers','CRM, loyalty & order history']; RS.addRenderer('customers-tab', renderCustomers);
 

@@ -146,6 +146,7 @@
     }
 
     try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
+    wireCartActions();
 
     // Refresh POS Grid to update card badges
     try { renderPOS(); } catch (e) {}
@@ -165,6 +166,46 @@
     }
   }
   function getCustomer(){ return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), gst:($('#cust-gst')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') }; }
+  function runKotAction(){
+    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+    try {
+      if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
+    } catch (err) {
+      console.error('[KOT Error]', err);
+      return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
+    }
+    toast('KOT sent to kitchen','fa-fire');
+  }
+  function runCheckoutAction(){
+    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+    try {
+      if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
+    } catch (err) {
+      console.error('[Checkout Error]', err);
+      return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
+    }
+    toast('Bill printed & WhatsApp sent','fa-print');
+    clearCart();
+  }
+  let cartActionsDelegated = false;
+  function ensureCartActionDelegation(){
+    if (cartActionsDelegated) return;
+    cartActionsDelegated = true;
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('#btn-kot, #btn-checkout');
+      if (!btn) return;
+      e.preventDefault();
+      if (btn.id === 'btn-kot') return runKotAction();
+      runCheckoutAction();
+    });
+  }
+  function wireCartActions(){
+    ensureCartActionDelegation();
+    const kotBtn = $('#btn-kot');
+    if (kotBtn) kotBtn.onclick = null;
+    const checkoutBtn = $('#btn-checkout');
+    if (checkoutBtn) checkoutBtn.onclick = null;
+  }
   // POS init (static parts present in HTML, wire them)
   function initPOS(){
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
@@ -268,8 +309,27 @@
 
   const KDS = [];
 
+  function parseOrderTimestamp(dateStr) {
+    if (!dateStr) return null;
+    const nativeTime = new Date(dateStr).getTime();
+    if (!Number.isNaN(nativeTime)) return nativeTime;
+    const m = String(dateStr).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]m)?$/i);
+    if (!m) return null;
+    let [, d, mo, y, h, mi, s, meridiem] = m;
+    let hour = Number(h);
+    if (meridiem) {
+      const pm = meridiem.toLowerCase() === 'pm';
+      if (pm && hour < 12) hour += 12;
+      if (!pm && hour === 12) hour = 0;
+    }
+    const parsed = new Date(Number(y), Number(mo) - 1, Number(d), hour, Number(mi), Number(s || 0)).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
   function getRelativeTime(dateStr) {
-    const elapsed = Date.now() - new Date(dateStr).getTime();
+    const ts = parseOrderTimestamp(dateStr);
+    if (!ts) return 'just now';
+    const elapsed = Date.now() - ts;
     const mins = Math.floor(elapsed / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins} min ago`;
@@ -288,7 +348,7 @@
           id: r.id,
           tok: r.orderId,
           type: `${r.orderType} Â· ${r.tableNumber}`,
-          start: r.dateTime ? new Date(r.dateTime).getTime() : Date.now(),
+          start: parseOrderTimestamp(r.dateTime) || Date.now(),
           items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
         }));
         replaceArr(KDS, mappedKds);
@@ -299,7 +359,7 @@
           id: r.id,
           orderId: r.orderId,
           table: r.tableNumber,
-          time: r.dateTime ? getRelativeTime(r.dateTime) : 'just now',
+          time: getRelativeTime(r.dateTime),
           status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
           items: (r.items || []).map(it => [`${it.qty}Ã— ${it.name}`, it.price * it.qty]),
           total: r.total
@@ -388,8 +448,11 @@
       }
       toast('Table '+(o.table.split('-')[1]||o.table)+' â†’ '+statusTxt[nextStatus]);
     }));
-    $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>toast('Select another table to merge','fa-code-merge')));
-    $$('#qr-grid [data-bill]').forEach(b=>b.addEventListener('click',()=>toast('Bill generated & sent','fa-receipt')));
+    $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>toast('Table merge is not connected yet','fa-code-merge')));
+    $$('#qr-grid [data-bill]').forEach(b=>b.addEventListener('click',()=>{
+      activateTab('pos-tab');
+      toast('Open the table in POS to settle this bill','fa-receipt');
+    }));
   };
 
   /* ============================================================
@@ -397,6 +460,71 @@
      ============================================================ */
   const BILLS = [];
   const payPill = {UPI:'pill-violet',Cash:'pill-green',Card:'pill-orange'};
+  function receiptPayloadFromBill(b) {
+    const items = Array.isArray(b._items) && b._items.length
+      ? b._items.map(i => ({ name:i.name || 'Item', qty:Number(i.qty || 1), price:Number(i.price || 0) }))
+      : [{ name:'Bill total', qty:1, price:Number(b.amount || 0) }];
+    const sub = Number(b.subtotal || items.reduce((sum, i) => sum + (i.price * i.qty), 0));
+    const gst = Number(b.gst || 0);
+    const grand = Number(b.amount || sub + gst);
+    return {
+      no:b.no || b.id || 'Invoice',
+      time:b.time || '',
+      table:b.table || 'Walk-in / Takeaway',
+      customer:b.customerName || '',
+      customerPhone:b.customerPhone || '',
+      customerGst:b.customerGst || '',
+      items,
+      sub,
+      disc:Number(b.discount || 0),
+      gst,
+      grand,
+      tenders:[{ method:b.pay || b.paymentMethod || 'Cash', amount:grand }],
+      change:Number(b.changeAmount || 0)
+    };
+  }
+  function showBillReceipt(b) {
+    if (window.RSReceipt && typeof RSReceipt.show === 'function') {
+      RSReceipt.show(receiptPayloadFromBill(b));
+      return;
+    }
+    toast('Receipt preview is unavailable on this screen','fa-circle-exclamation');
+  }
+  function shareBillReceipt(b) {
+    const bill = receiptPayloadFromBill(b);
+    const text = window.RSReceipt && typeof RSReceipt.text === 'function'
+      ? RSReceipt.text(bill)
+      : `${bill.no}\nTotal: ${rs(bill.grand)}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    toast('WhatsApp receipt ready','fa-whatsapp');
+  }
+  async function markBillRefunded(b) {
+    if (!b || b.status === 'refunded') return;
+    if (!window.confirm(`Mark ${b.no || b.id} as refunded?`)) return;
+    b.status = 'refunded';
+    let cloudMarked = false;
+    try {
+      if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      if (window.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
+        await RS_API.data({
+          table:'doppio_refund_requests',
+          operation:'insert',
+          data:{
+            order_id:String(b.id || b.no),
+            amount:Number(b.amount || 0),
+            reason:'POS refund',
+            status:'approved'
+          },
+          returning:false
+        });
+        cloudMarked = true;
+      }
+    } catch(e) {
+      console.warn('Refund cloud update failed', e);
+    }
+    renderBills();
+    toast(cloudMarked ? 'Refund recorded' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
+  }
   const renderBills = () => {
     // Dynamically compute stats from BILLS
     const paidBills = BILLS.filter(b => b.status === 'paid');
@@ -423,6 +551,23 @@
         <td>${b.status==='paid'?'<span class="pill pill-green" style="padding:3px 9px">Paid</span>':'<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
         <td><div class="row-actions"><button class="icon-act go" title="Reprint"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger" title="Refund" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button></div></td>
       </tr>`).join('');
+    const billBody = $('#bills-table-body');
+    const visibleBills = BILLS.filter(b=>(b.no||'').toLowerCase().includes(q)||(b.table||'').toLowerCase().includes(q));
+    if (billBody._rsBillActionHandler) billBody.removeEventListener('click', billBody._rsBillActionHandler, true);
+    billBody._rsBillActionHandler = e => {
+      const btn = e.target.closest('.icon-act');
+      if (!btn || !billBody.contains(btn) || btn.disabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const row = btn.closest('tr');
+      const bill = visibleBills[[...billBody.children].indexOf(row)];
+      if (!bill) return;
+      if (btn.classList.contains('go')) return showBillReceipt(bill);
+      if (btn.classList.contains('danger')) return markBillRefunded(bill);
+      return shareBillReceipt(bill);
+    };
+    billBody.addEventListener('click', billBody._rsBillActionHandler, true);
     $$('#bills-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Reprinting billâ€¦','fa-print')));
     $$('#bills-table-body .icon-act .fa-whatsapp').forEach(b=>b.closest('button').addEventListener('click',()=>toast('Bill shared on WhatsApp','fa-whatsapp')));
     $$('#bills-table-body .icon-act.danger:not([disabled])').forEach(b=>b.addEventListener('click',()=>toast('Refund initiated','fa-rotate-left')));
@@ -449,7 +594,7 @@
           <td><span class="stock-dot ${stockCls[st]}">${st==='out'?'Reorder':st==='low'?'Low':'Healthy'}</span></td>
           <td><div class="row-actions"><button class="icon-act go" title="Restock"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit"><i class="fa-solid fa-pen"></i></button></div></td>
         </tr>`; }).join('');
-      $$('#inv-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Purchase order drafted','fa-truck')));
+      $$('#inv-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Purchase order module is not connected yet','fa-truck')));
     }
 
     // render recipe table
@@ -1501,7 +1646,15 @@
     MENU, CATS, stockLabel, stockCls,
     getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
     setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
-    titles, addRenderer:(id,fn)=>{ renderers[id]=fn; }, render:(id)=>{ if(renderers[id]){ renderers[id](); rendered[id]=true; } },
+    titles, addRenderer:(id,fn)=>{
+      renderers[id]=fn;
+      const active = document.querySelector('.tab-content.active')?.id;
+      if(active === id && !rendered[id]) {
+        const meta = titles[id];
+        if(meta){ $('#page-title').textContent = meta[0]; $('#page-sub').textContent = meta[1]; }
+        try { fn(); rendered[id]=true; } catch(e){ console.warn('Renderer failed for '+id, e); }
+      }
+    }, render:(id)=>{ if(renderers[id]){ renderers[id](); rendered[id]=true; } },
     getModalRoot,
     seedToken:()=>{ window.__tok = (window.__tok||122)+1; return 'A-'+window.__tok; },
     BILLS, INVENTORY, EMPLOYEES, QR_ORDERS,
@@ -1531,6 +1684,43 @@
   const NATKEY = { menu:'id', bills:'no', inventory:'name', employees:'email' };
   function ensureId(coll, x){ const k=NATKEY[coll]||'id'; if(x.id==null) x.id = (x[k]!=null?x[k]:(k==='email'?x.name:undefined)); if(x.id==null) x.id = coll+'-'+Math.random().toString(36).slice(2,9); return x; }
   function replaceArr(arr, data){ arr.length=0; data.forEach(d=>arr.push(d)); }
+  const LIVE_COLLECTIONS = {
+    menu:{ table:'doppio_menu', arr:MENU, tabs:['pos-tab','editor-tab'] },
+    inventory:{ table:'doppio_inventory', arr:INVENTORY, tabs:['inventory-tab'] },
+    bills:{ table:'doppio_bills', arr:BILLS, tabs:['bills-tab','reports-tab'] },
+    customers:{ table:'doppio_crm', tabs:['customers-tab'] },
+    notifications:{ table:'doppio_notifications', tabs:[] },
+    employees:{ table:'doppio_employees', arr:EMPLOYEES, tabs:['employees-tab'] }
+  };
+  async function refreshCollectionFromCloud(coll) {
+    if (!window.RS_DB || !RS_DB.isCloud || !LIVE_COLLECTIONS[coll]) return;
+    const cfg = LIVE_COLLECTIONS[coll];
+    const fresh = await RS_DB.listCloud(coll);
+    await RS_DB.writeLocal(coll, fresh || []);
+    if (cfg.arr) replaceArr(cfg.arr, fresh || []);
+    if (coll === 'menu') { try { renderPOS(); } catch(e){} }
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active && cfg.tabs.includes(active) && renderers[active]) {
+      try { renderers[active](); rendered[active] = true; } catch(e){}
+    }
+    document.dispatchEvent(new CustomEvent('rs:collection_synced', { detail:{ collection:coll, count:(fresh||[]).length } }));
+  }
+  function setupTenantDataRealtime() {
+    const api = window.RS_API;
+    if (!api || !api.supabaseClient || !window.RS_DB || !RS_DB.isCloud) return;
+    const activeTenantId = api.session()?.tenant_id || sessionStorage.getItem('tenant_id');
+    if (!activeTenantId || window.__rsTenantRealtimeFor === activeTenantId) return;
+    window.__rsTenantRealtimeFor = activeTenantId;
+    window.__rsTenantRealtimeChannels = window.__rsTenantRealtimeChannels || [];
+    Object.entries(LIVE_COLLECTIONS).forEach(([coll, cfg]) => {
+      const channel = api.supabaseClient.channel(`doppio-${coll}-realtime-${activeTenantId}`)
+        .on('postgres_changes', { event:'*', schema:'public', table:cfg.table, filter:`tenant_id=eq.${activeTenantId}` }, () => {
+          refreshCollectionFromCloud(coll).catch(e => console.warn('Realtime refresh failed for '+coll, e));
+        })
+        .subscribe();
+      window.__rsTenantRealtimeChannels.push(channel);
+    });
+  }
   async function hydrate(){
     if(!window.RS_DB) return;
     const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES};
@@ -1569,6 +1759,7 @@
     try{
       await syncPendingOrders();
       setupSupabaseRealtime();
+      setupTenantDataRealtime();
     }catch(e){ console.warn('sync pending orders/realtime failed', e); }
     document.dispatchEvent(new CustomEvent('rs:hydrated'));
   }
@@ -1616,6 +1807,55 @@
   }
 
   function bindGlobalImportExportEvents() {
+    const escHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    function importPreview({ title, summary, rows, skipped }) {
+      return new Promise(resolve => {
+        const warnings = (skipped || []).slice(0, 6).map(msg => `<li>${escHtml(msg)}</li>`).join('');
+        const body = `<div style="display:flex;flex-direction:column;gap:12px">
+          <div class="crm-stats"><div class="cs"><div class="csv">${rows}</div><div class="csl">Rows ready</div></div><div class="cs"><div class="csv">${(skipped||[]).length}</div><div class="csl">Skipped</div></div></div>
+          <div style="font-size:13px;color:var(--text-soft)">${escHtml(summary)}</div>
+          ${warnings ? `<div class="sr-empty" style="text-align:left;padding:12px"><b>Skipped rows</b><ul style="margin:8px 0 0 18px">${warnings}</ul></div>` : ''}
+        </div>`;
+        if (!window.RSModal) {
+          resolve(window.confirm(`${title}\n\n${rows} rows ready. ${(skipped||[]).length} skipped.\nContinue import?`));
+          return;
+        }
+        RSModal.open({
+          title, sub:'Review before saving to database', icon:'fa-file-import', size:'sm', body,
+          foot:`<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-database"></i> Import</button>`,
+          onMount(modal, close) {
+            modal.querySelector('[data-cancel]').onclick = () => { close(); resolve(false); };
+            modal.querySelector('[data-confirm]').onclick = () => { close(); resolve(true); };
+          }
+        });
+      });
+    }
+    async function saveImportedRecords(collection, records) {
+      const before = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+      const failed = [];
+      let saved = 0;
+      for (const record of records) {
+        try {
+          await RS.saveOne(collection, record);
+          saved++;
+        } catch(e) {
+          failed.push(`${record.name || record.no || record.id || 'Row'}: ${e.message}`);
+        }
+      }
+      const lastError = window.RS_LAST_CLOUD_ERROR;
+      const cloudFallback = !!(lastError && lastError.time !== before && lastError.collection === collection);
+      return { saved, failed, cloudFallback };
+    }
+    function importResultToast(label, result) {
+      if (result.failed.length) {
+        toast(`${result.saved} ${label} imported. ${result.failed.length} failed.`, 'fa-circle-exclamation');
+      } else if (result.cloudFallback) {
+        toast(`${result.saved} ${label} saved locally. Cloud sync pending.`, 'fa-cloud-arrow-up');
+      } else {
+        toast(`${result.saved} ${label} imported and synced`, 'fa-circle-check');
+      }
+    }
+
     // 1. Menu Download Template
     const btnDownloadMenu = document.getElementById('btn-download-menu-template');
     if (btnDownloadMenu) {
@@ -1691,13 +1931,15 @@
                 return '';
               };
 
-              let count = 0;
-              for(const row of rows) {
+              const records = [];
+              const skipped = [];
+              rows.forEach((row, index) => {
                 const name = getValue(row, ['name', 'itemname', 'menuitem', 'item', 'ingredientname', 'ingredient']);
-                if(!name) continue;
+                if(!name) { skipped.push(`Row ${index + 2}: missing item name`); return; }
                 const cat = getValue(row, ['category', 'cat', 'itemcategory']) || 'Mains';
                 const parsedPrice = cleanNumber(getValue(row, ['price', 'sellingprice', 'cost', 'unitcost']));
                 const price = Number.isFinite(parsedPrice) ? parsedPrice : 0;
+                if(price <= 0) { skipped.push(`Row ${index + 2}: ${name} has no valid price`); return; }
                 const desc = getValue(row, ['description', 'desc']) || '';
                 const availableVal = getValue(row, ['available', 'status', 'stock']);
                 const available = String(availableVal || 'YES').toUpperCase() !== 'NO' && String(availableVal || 'YES').toUpperCase() !== 'OUT';
@@ -1712,16 +1954,20 @@
                   stock: available ? 'ok' : 'out',
                   description: String(desc)
                 };
-                await RS.saveOne('menu', item);
-                count++;
-              }
-              toast(`${count} menu items imported successfully`, 'fa-circle-check');
+                records.push(item);
+              });
+              if(!records.length) throw new Error('No valid menu rows found');
+              const proceed = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available.', rows:records.length, skipped });
+              if(!proceed) return;
+              const result = await saveImportedRecords('menu', records);
+              importResultToast('menu items', result);
               if(window.RS_DB) {
                 const items = await RS_DB.list('menu');
                 if(items) {
                   MENU.length = 0;
                   items.forEach(i => MENU.push(i));
                   renderEditor();
+                  renderPOS();
                 }
               }
             } catch(err) {
@@ -1811,10 +2057,11 @@
                 return '';
               };
 
-              let count = 0;
-              for(const row of rows) {
+              const records = [];
+              const skipped = [];
+              rows.forEach((row, index) => {
                 const name = getValue(row, ['ingredientname', 'ingredient', 'name', 'item', 'ingredientkey']);
-                if(!name) continue;
+                if(!name) { skipped.push(`Row ${index + 2}: missing ingredient name`); return; }
                 const cat = getValue(row, ['category', 'cat', 'itemcategory']) || 'General';
                 const parsedStock = cleanNumber(getValue(row, ['instock', 'stock', 'currentstock', 'current', 'quantity']));
                 const parsedMin = cleanNumber(getValue(row, ['minlevel', 'min', 'threshold', 'reorderlevelpercent']));
@@ -1831,10 +2078,13 @@
                   cost: Number.isFinite(parsedCost) ? parsedCost : 0,
                   unit: String(unit)
                 };
-                await RS.saveOne('inventory', item);
-                count++;
-              }
-              toast(`${count} ingredients imported successfully`, 'fa-circle-check');
+                records.push(item);
+              });
+              if(!records.length) throw new Error('No valid inventory rows found');
+              const proceed = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels for this outlet and sync to Supabase when cloud is available.', rows:records.length, skipped });
+              if(!proceed) return;
+              const result = await saveImportedRecords('inventory', records);
+              importResultToast('ingredients', result);
               if(window.RS_DB) {
                 const invs = await RS_DB.list('inventory');
                 if(invs) {
@@ -1923,7 +2173,7 @@
   // Set default landing tab
   const defaultTab = isSuper ? 'super-admin-tab' : 'pos-tab';
   const start = (location.hash || '#' + defaultTab).slice(1);
-  activateTab(titles[start] ? start : defaultTab);
+  activateTab((titles[start] || document.getElementById(start)) ? start : defaultTab);
 
   // Only run hydrate for non-superadmin (superadmin doesn't need tenant data)
   if(!isSuper) hydrate();
@@ -1950,12 +2200,9 @@
 
   // superadmin toggle (role switch demo) â€” only show for non-superadmin users
   if(!isSuper) {
-    $('#role-switch')?.addEventListener('click',()=>{
-      const on = $('#role-switch').classList.toggle('on');
-      $$('.superadmin-only').forEach(el=>el.style.display=on?'':'none');
-      $('#role-switch-label').textContent = on?'Super-Admin':'Outlet Owner';
-      toast(on?'Switched to Super-Admin view':'Switched to Outlet Owner view','fa-user-shield');
-    });
+    const roleSwitch = $('#role-switch');
+    if (roleSwitch) roleSwitch.style.display = 'none';
+    $$('.superadmin-only').forEach(el=>el.style.display='none');
   }
 
   // Security contract test compatibility:

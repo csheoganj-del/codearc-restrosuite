@@ -8,6 +8,32 @@
   function boot(){
     const RS = window.RS;
     const rs = RS.rs;
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const titleCase = s => String(s || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+    const sessionOutletName = () => {
+      const s = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      return s.tenant_name || s.outlet_name || s.business_name || titleCase(s.tenant_slug || s.outlet_id || sessionStorage.getItem('tenant_slug') || 'Outlet');
+    };
+    let receiptProfile = { name: sessionOutletName(), address:'', phone:'', gstin:'' };
+    function normalizeReceiptProfile(settings){
+      const raw = (settings && settings._raw) || {};
+      return {
+        name: settings?.set_restaurant_name || settings?.set_outlet_name || raw.business_name || raw.outlet_name || sessionOutletName(),
+        address: settings?.set_address || raw.address || '',
+        phone: settings?.set_phone || raw.phone || '',
+        gstin: settings?.set_gstin || raw.gstin || ''
+      };
+    }
+    async function loadReceiptProfile(){
+      try {
+        const settings = window.RS && RS.getSettings ? await RS.getSettings() : null;
+        receiptProfile = normalizeReceiptProfile(settings);
+      } catch(e) {
+        receiptProfile.name = receiptProfile.name || sessionOutletName();
+      }
+    }
+    loadReceiptProfile();
+    document.addEventListener('rs:hydrated', loadReceiptProfile);
 
     /* ---------------- shared modal helper ---------------- */
     window.RSModal = window.RSModal || {
@@ -80,21 +106,26 @@
       let custSection = '';
       if(custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
         custSection = `
-          <div class="rcp-meta"><span>Customer:</span><span>${custName}</span></div>
-          ${bill.customerPhone ? `<div class="rcp-meta"><span>Phone:</span><span>${bill.customerPhone}</span></div>` : ''}
-          ${bill.customerGst ? `<div class="rcp-meta"><span>GSTIN:</span><span>${bill.customerGst}</span></div>` : ''}
+          <div class="rcp-meta"><span>Customer:</span><span>${esc(custName)}</span></div>
+          ${bill.customerPhone ? `<div class="rcp-meta"><span>Phone:</span><span>${esc(bill.customerPhone)}</span></div>` : ''}
+          ${bill.customerGst ? `<div class="rcp-meta"><span>GSTIN:</span><span>${esc(bill.customerGst)}</span></div>` : ''}
         `;
       } else {
         custSection = `<div class="rcp-meta"><span>Customer:</span><span>Walk-in</span></div>`;
       }
 
-      return `<div class="rcp-center"><div class="rcp-logo">Royal Dhaba</div><div class="rcp-sub">CodeArc RestroSuite · GSTIN 27AABCR1234M1Z5</div></div>
+      const profileLines = [
+        receiptProfile.address,
+        receiptProfile.phone ? `Phone ${receiptProfile.phone}` : '',
+        receiptProfile.gstin ? `GSTIN ${receiptProfile.gstin}` : ''
+      ].filter(Boolean).map(line => `<div class="rcp-sub">${esc(line)}</div>`).join('');
+      return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div>${profileLines || '<div class="rcp-sub">CodeArc RestroSuite</div>'}</div>
         <hr class="rcp-hr">
         <div class="rcp-meta"><span>${bill.no}</span><span>${bill.time}</span></div>
         <div class="rcp-meta"><span>Table:</span><span>${bill.table}</span></div>
         ${custSection}
         <hr class="rcp-hr">
-        ${bill.items.map(i=>`<div class="rcp-line"><span><span class="q">${i.qty}× </span>${i.name}</span><span>${rs(i.price*i.qty)}</span></div>`).join('')}
+        ${bill.items.map(i=>`<div class="rcp-line"><span><span class="q">${i.qty}× </span>${esc(i.name)}</span><span>${rs(i.price*i.qty)}</span></div>`).join('')}
         <hr class="rcp-hr">
         <div class="rcp-line"><span>Subtotal</span><span>${rs(bill.sub)}</span></div>
         ${bill.disc?`<div class="rcp-line"><span>Discount</span><span>– ${rs(bill.disc)}</span></div>`:''}
@@ -106,6 +137,58 @@
         ${bill.change?`<div class="rcp-line"><span class="q">Change</span><span>${rs(bill.change)}</span></div>`:''}
         <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
     }
+
+    function receiptText(bill){
+      const lines = [
+        receiptProfile.name || 'Outlet',
+        receiptProfile.address,
+        receiptProfile.phone ? `Phone: ${receiptProfile.phone}` : '',
+        receiptProfile.gstin ? `GSTIN: ${receiptProfile.gstin}` : '',
+        `Bill: ${bill.no}`,
+        `${bill.table} | ${bill.time}`,
+        '',
+        ...bill.items.map(i => `${i.qty} x ${i.name} - ${rs(i.price * i.qty)}`),
+        '',
+        `Subtotal: ${rs(bill.sub)}`,
+        bill.disc ? `Discount: - ${rs(bill.disc)}` : '',
+        bill.gst ? `GST: ${rs(bill.gst)}` : '',
+        `Total: ${rs(bill.grand)}`,
+        `Paid by: ${(bill.tenders && bill.tenders[0] && bill.tenders[0].method) || 'Cash'}`,
+        '',
+        'Thank you for dining with us!'
+      ];
+      return lines.filter(Boolean).join('\n');
+    }
+
+    function showReceipt(bill){
+      const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`;
+      RSModal.open({
+        title:'Bill settled', sub:`${bill.no} \u00b7 ${rs(bill.grand)}`, icon:'fa-circle-check', size:'sm',
+        body:`<div class="receipt-paper">${receiptHTML(bill)}</div>`,
+        foot:`<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+              <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
+              <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
+        onMount(modal, close){
+          modal.querySelector('#rc-print').onclick = ()=> RSPrint(printHtml, 'Receipt '+bill.no);
+          modal.querySelector('#rc-wa').onclick = ()=>{
+            const text = encodeURIComponent(receiptText(bill));
+            const url = `https://wa.me/?text=${text}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+            RS.toast('WhatsApp receipt ready','fa-whatsapp');
+          };
+          modal.querySelector('#rc-new').onclick = close;
+        }
+      });
+    }
+
+    window.RSReceipt = {
+      html: receiptHTML,
+      text: receiptText,
+      show: showReceipt,
+      print(bill){
+        RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`, 'Receipt '+bill.no);
+      }
+    };
 
     /* ---------------- inline cart payment ---------------- */
     const paymentState = { method: 'Cash' };
@@ -162,6 +245,7 @@
         tenders: [{ method: payment.method, amount: totals.grand }], change: 0
       };
       try {
+        const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
         const gstHalf = Math.round((totals.gst||0)/2);
         const billRow = { id:bill.no, no:bill.no, time:'Just now', table:bill.table, items: totals.count,
           amount: bill.grand, pay: payment.method, status:'paid',
@@ -169,14 +253,22 @@
           customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
           subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
           _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
-        RS.BILLS.unshift(billRow); RS.saveOne&&RS.saveOne('bills',billRow); RS.render('bills-tab');
-      } catch(e){}
+        RS.BILLS.unshift(billRow);
+        if (RS.saveOne) await RS.saveOne('bills',billRow);
+        const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+        if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
+          RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
+        }
+        RS.render('bills-tab');
+      } catch(e){
+        console.warn('Bill save failed', e);
+        RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
+      }
 
-      RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`,'Receipt '+bill.no);
       RS.clearCart();
       resetCustomerFields();
       resetPayment();
-      RS.toast('Bill printed successfully.','fa-circle-check');
+      showReceipt(bill);
 
       if (window.RS_DB) {
         (async () => {
@@ -238,6 +330,7 @@
                 if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
               } catch(e) {
                 console.warn("KOT save failed", e);
+                RS.toast('KOT saved locally. Cloud sync pending.','fa-cloud-arrow-up');
               }
             }
             markKotSent();
@@ -261,6 +354,17 @@
 
     wirePaymentPanel();
     window.RSPOS = { checkout, kot, refreshPaymentPanel };
+    if (!document.documentElement.dataset.rsPosActionsBound) {
+      document.documentElement.dataset.rsPosActionsBound = '1';
+      document.addEventListener('click', e => {
+        const btn = e.target.closest('#btn-checkout, #btn-kot');
+        if (!btn || btn.disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (btn.id === 'btn-checkout') return checkout();
+        return kot();
+      }, true);
+    }
 
     /* ---------------- HOLD ORDERS / DRAFTS ---------------- */
     const held = [];

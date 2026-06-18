@@ -63,7 +63,9 @@
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
       from: r => ({ id:r.id, no:r.orderId, time:r.dateTime, table:'—',
+                    _items:parseItems(r.items),
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
+                    subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
                     amount:num(r.total), pay:r.paymentMethod, status:'paid',
                     customerName:r.customerName, customerPhone:r.customerPhone }),
       to: o => ({ id:o.id, orderId:o.no, customerName:o.customerName||'Walk-in Guest', customerPhone:o.customerPhone||null,
@@ -85,6 +87,13 @@
                     email:r.email, last:r.last_visit, tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
       to: o => ({ id:o.id, name:o.name, phone:o.phone, visits:num(o.visits)||1, total_spend:num(o.spend),
                   email:o.email||'', marketing_opt_in:true })
+    },
+    notifications: {
+      table:'doppio_notifications', pk:'id', clientId:true, order:{column:'created_at',ascending:false},
+      from: r => ({ id:r.id, title:r.title, message:r.message, type:r.type||'info', role:r.role||'all',
+                    timestamp:r.timestamp||r.created_at||'', isRead:!!r.isRead, createdAt:r.created_at }),
+      to: o => ({ id:o.id, title:o.title||'', message:o.message||'', type:o.type||'info',
+                  role:o.role||'all', timestamp:o.timestamp||new Date().toISOString(), isRead:!!o.isRead })
     },
     employees: {
       table:'doppio_employees', pk:'id', clientId:true,
@@ -281,6 +290,8 @@
     }
     catch(e){
       console.warn(`[RS_DB] cloud ${method} ${c} failed, using local cache:`, e.message);
+      window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
+      window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
       return LS[method](c, ...args);
     }
   }

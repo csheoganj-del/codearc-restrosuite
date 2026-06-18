@@ -6,6 +6,7 @@
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+    const safe = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
     /* ===================== GLOBAL SEARCH ===================== */
     const searchWrap = $('.tb-search'), searchInput = searchWrap && searchWrap.querySelector('input');
@@ -36,25 +37,104 @@
     /* ===================== NOTIFICATIONS ===================== */
     const bell = $('.tb-icon-btn[aria-label="Notifications"]');
     if(bell){
-      const NOTIFS = [
-        {ic:'fa-bowl-rice',bg:'var(--orange-tint)',c:'var(--orange)',t:'New Zomato order #Z8842',d:'Butter Chicken, Naan · ₹512',time:'just now',unread:true},
-        {ic:'fa-triangle-exclamation',bg:'var(--red-tint)',c:'var(--red)',t:'Butter is low on stock',d:'2 kg left · below minimum',time:'8 min ago',unread:true},
-        {ic:'fa-calendar-check',bg:'var(--violet-tint)',c:'var(--violet-soft)',t:'Reservation at 8:30 PM',d:'Corporate dinner · 8 pax · T-08',time:'22 min ago',unread:true},
-        {ic:'fa-rotate-left',bg:'var(--amber-tint)',c:'var(--amber)',t:'Refund requested · INV-2037',d:'₹260 · awaiting your approval',time:'1 hr ago',unread:false},
-        {ic:'fa-star',bg:'var(--green-tint)',c:'var(--green)',t:'New 5★ review from Aarav M.',d:'“Fastest service in town!”',time:'2 hr ago',unread:false}
-      ];
+      let NOTIFS = [];
+      const readKey = 'rs:notif-read';
+      let notifLoading = false;
+      let notifReloadQueued = false;
+      let notifCloudUnavailable = false;
       const panel = document.createElement('div'); panel.className='notif-panel';
+      function readSet(){ try { return new Set(JSON.parse(localStorage.getItem(readKey) || '[]')); } catch(e){ return new Set(); } }
+      function saveRead(set){ try { localStorage.setItem(readKey, JSON.stringify([...set])); } catch(e){} }
+      function relTime(v){
+        const t = v ? new Date(v).getTime() : 0;
+        if(!t || Number.isNaN(t)) return '';
+        const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+        if(mins < 1) return 'just now';
+        if(mins < 60) return mins + ' min ago';
+        const hrs = Math.round(mins / 60);
+        if(hrs < 24) return hrs + ' hr ago';
+        return new Date(t).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+      }
+      function iconFor(type){
+        if(type === 'warning') return ['fa-triangle-exclamation','var(--red-tint)','var(--red)'];
+        if(type === 'success') return ['fa-circle-check','var(--green-tint)','var(--green)'];
+        if(type === 'billing') return ['fa-receipt','var(--amber-tint)','var(--amber)'];
+        if(type === 'order') return ['fa-bowl-rice','var(--orange-tint)','var(--orange)'];
+        return ['fa-bell','var(--orange-tint)','var(--orange)'];
+      }
+      async function loadNotifications(){
+        if(notifLoading){ notifReloadQueued = true; return; }
+        notifLoading = true;
+        const read = readSet();
+        try {
+          const live = [];
+          if(Array.isArray(RS.INVENTORY)){
+            RS.INVENTORY.filter(i=>Number(i.stock) < Number(i.min)).slice(0,4).forEach(i=>{
+              live.push({ id:'low-stock-'+(i.id||i.name), type:'warning', title:`${i.name} is low on stock`, message:`${i.stock || 0} ${i.unit || 'unit'} left, minimum ${i.min || 0}`, timestamp:'', isRead:read.has('low-stock-'+(i.id||i.name)) });
+            });
+          }
+          if(Array.isArray(RS.QR_ORDERS)){
+            RS.QR_ORDERS.filter(o=>String(o.status||'').toLowerCase()==='pending').slice(0,4).forEach(o=>{
+              const id = 'pending-order-'+(o.id||o.orderId||o.table);
+              live.push({ id, type:'order', title:`Pending order ${o.orderId || ''}`.trim(), message:`${o.table || 'Table'} - ${rs(o.total || 0)}`, timestamp:o.time || o.dateTime || '', isRead:read.has(id) });
+            });
+          }
+          if(Array.isArray(RS.BILLS)){
+            RS.BILLS.filter(b=>String(b.status||'').toLowerCase()==='refunded').slice(0,2).forEach(b=>{
+              const id = 'refund-'+(b.id||b.no);
+              live.push({ id, type:'billing', title:`Refund completed ${b.no || ''}`.trim(), message:`${rs(b.amount || 0)} refunded`, timestamp:b.time || '', isRead:read.has(id) });
+            });
+          }
+          if(window.RS_LAST_CLOUD_ERROR){
+            live.push({ id:'cloud-sync-warning', type:'warning', title:'Cloud sync needs attention', message:window.RS_LAST_CLOUD_ERROR.message || 'Latest change is saved locally until sync recovers.', timestamp:window.RS_LAST_CLOUD_ERROR.time, isRead:read.has('cloud-sync-warning') });
+          }
+          let saved = [];
+          if(window.RS_DB){
+            if(RS_DB.isCloud && RS_DB.listCloud && !notifCloudUnavailable) {
+              try {
+                saved = await RS_DB.listCloud('notifications');
+                if(RS_DB.writeLocal) await RS_DB.writeLocal('notifications', saved || []);
+              } catch(e) {
+                notifCloudUnavailable = true;
+                saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
+              }
+            } else {
+              saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
+            }
+          }
+          NOTIFS = [...saved, ...live].map(n=>{
+            const [ic,bg,c] = iconFor(n.type);
+            return { ...n, ic, bg, c, unread: !n.isRead && !read.has(String(n.id)), time:relTime(n.timestamp || n.createdAt) };
+          });
+          draw(); updateDot();
+        } finally {
+          notifLoading = false;
+          if(notifReloadQueued){ notifReloadQueued = false; setTimeout(loadNotifications, 0); }
+        }
+      }
       function draw(){
         const unread = NOTIFS.filter(n=>n.unread).length;
         panel.innerHTML = `<div class="notif-h"><h4>Notifications ${unread?`<span class="pill pill-orange" style="padding:2px 8px;font-size:11px">${unread} new</span>`:''}</h4><button class="btn btn-ghost btn-sm" id="notif-read">Mark all read</button></div>
-          <div class="notif-list">${NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" data-i="${i}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${n.ic}"></i></div><div style="flex:1"><div class="nt">${n.t}</div><div class="nd">${n.d}</div><div class="ntime">${n.time}</div></div></div>`).join('')}</div>`;
-        panel.querySelector('#notif-read').onclick = ()=>{ NOTIFS.forEach(n=>n.unread=false); draw(); updateDot(); };
-        $$('.notif-item',panel).forEach(el=> el.onclick=()=>{ NOTIFS[+el.dataset.i].unread=false; draw(); updateDot(); });
+          <div class="notif-list">${NOTIFS.length ? NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" data-i="${i}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${n.ic}"></i></div><div style="flex:1"><div class="nt">${safe(n.title)}</div><div class="nd">${safe(n.message)}</div><div class="ntime">${safe(n.time)}</div></div></div>`).join('') : '<div class="sr-empty">No live notifications right now.</div>'}</div>`;
+        const markRead = async n => {
+          if(!n || !n.id) return;
+          n.unread = false; n.isRead = true;
+          const read = readSet(); read.add(String(n.id)); saveRead(read);
+          if(window.RS_DB && !String(n.id).startsWith('low-stock-') && !String(n.id).startsWith('pending-order-') && !String(n.id).startsWith('refund-') && n.id !== 'cloud-sync-warning') {
+            try { await RS_DB.put('notifications', n.id, n); } catch(e){}
+          }
+        };
+        panel.querySelector('#notif-read').onclick = async ()=>{ for(const n of NOTIFS) await markRead(n); draw(); updateDot(); };
+        $$('.notif-item',panel).forEach(el=> el.onclick=async()=>{ await markRead(NOTIFS[+el.dataset.i]); draw(); updateDot(); });
       }
       function updateDot(){ const d=bell.querySelector('.dot-notif'); if(d) d.style.display = NOTIFS.some(n=>n.unread)?'':'none'; }
-      document.body.appendChild(panel); draw(); updateDot();
+      document.body.appendChild(panel); loadNotifications();
       bell.addEventListener('click', e=>{ e.stopPropagation(); panel.classList.toggle('show'); });
       document.addEventListener('click', e=>{ if(!panel.contains(e.target) && !bell.contains(e.target)) panel.classList.remove('show'); });
+      document.addEventListener('rs:hydrated', loadNotifications);
+      document.addEventListener('rs:pending_orders_synced', loadNotifications);
+      document.addEventListener('rs:collection_synced', loadNotifications);
+      window.addEventListener('rs:cloud-fallback', loadNotifications);
     }
 
     /* ===================== SETTINGS ===================== */
@@ -63,11 +143,14 @@
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
     function toggle(t,d,on){ return `<div class="set-row"><div class="si"><div class="st">${t}</div><div class="sd">${d}</div></div><label class="toggle"><input type="checkbox" data-skey="${skey(t)}" ${on?'checked':''}><span></span></label></div>`; }
+    const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+    const defaultOutletName = sessionMeta.tenant_name || sessionMeta.business_name || String(sessionMeta.tenant_slug || sessionStorage.getItem('tenant_slug') || 'Outlet').replace(/[-_]+/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
+    const defaultOutletCode = sessionMeta.tenant_slug || sessionMeta.outlet_id || sessionStorage.getItem('tenant_slug') || '';
     const PANES = {
-      profile:`<div class="set-section form-grid-2">${field('Restaurant name','Royal Dhaba')}${field('Outlet code','royal-dhaba')}</div>
-        <div class="set-section">${field('Address','142 MG Road, Bengaluru, KA 560001')}</div>
-        <div class="set-section form-grid-2">${field('Phone','+91 99837 21179')}${field('Email','hello@royaldhaba.in')}</div>
-        <div class="set-section form-grid-2">${field('GSTIN','27AABCR1234M1Z5')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'North Indian')}</div>`,
+      profile:`<div class="set-section form-grid-2">${field('Restaurant name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
+        <div class="set-section">${field('Address','','Outlet address')}</div>
+        <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
+        <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>`,
       tax:`<div class="set-section form-grid-2">${sel('Default GST slab',['5%','12%','18%'],'5%')}${field('Invoice prefix','INV-')}</div>
         ${toggle('Service charge','Add 5% service charge on dine-in',false)}
         ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
@@ -77,21 +160,21 @@
         ${toggle('Auto-print receipt','Print automatically after payment',true)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
         <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}</div>`,
-      gateway:`<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Connected as +91 99837 21179 · uptime 14d</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Online</span></div>
+      gateway:`<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Configure your WhatsApp gateway for this outlet</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Ready</span></div>
         ${toggle('Auto-send receipts','WhatsApp the bill to customer after payment',true)}
         ${toggle('Order updates','Notify customer when order is ready',true)}
         ${toggle('Marketing broadcasts','Allow promotional campaigns',true)}
-        <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining at Royal Dhaba! Your bill is attached. Visit again for 10% off — code REPEAT10.</textarea></div>`,
-      team:`<div class="set-row"><div class="si"><div class="st">Team members</div><div class="sd">6 active · 4 roles configured</div></div><button class="btn btn-ghost btn-sm" id="set-team-go">Manage team</button></div>
+        <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining with us. Your bill is attached.</textarea></div>`,
+      team:`<div class="set-row"><div class="si"><div class="st">Team members</div><div class="sd">Manage staff roles and permissions for this outlet</div></div><button class="btn btn-ghost btn-sm" id="set-team-go">Manage team</button></div>
         ${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
         ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
         ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`,
       plan:`<div class="panel-head" style="margin-bottom:14px"><h3>Current plan</h3></div>
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px">
-          <div style="flex:1;min-width:200px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)"><div style="font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Growth plan</div><div style="font-family:var(--font-display);font-weight:800;font-size:30px;margin:6px 0">₹749<span style="font-size:14px;color:var(--text-mute)">/mo</span></div><div style="font-size:12.5px;color:var(--text-soft)">Renews 1 Jul 2026</div></div>
-          <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">1 / 5</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">1</div><div class="csl">Outlet</div></div><div class="cs"><div class="csv">∞</div><div class="csl">Bills/mo</div></div></div>
+          <div style="flex:1;min-width:200px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)"><div style="font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Current subscription</div><div style="font-family:var(--font-display);font-weight:800;font-size:30px;margin:6px 0">Active</div><div style="font-size:12.5px;color:var(--text-soft)">Plan details sync from account billing</div></div>
+          <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">-</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">-</div><div class="csl">Outlets</div></div><div class="cs"><div class="csv">-</div><div class="csl">Bills/mo</div></div></div>
         </div>
-        <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Upgrade to Chain (₹1,999/mo)</button>`,
+        <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Manage plan</button>`,
       danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
         <div style="border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);border-radius:var(--r-md);padding:20px;margin-bottom:18px">
           <h4 style="color:#ef4444;margin-bottom:8px;font-family:var(--font-display);font-weight:800;font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> Reset Operational Data</h4>
@@ -158,7 +241,7 @@
       const cloud = window.RS_DB && window.RS_DB.isCloud;
       if(pill){ pill.innerHTML = `<span class="dot dot-live"></span> ${cloud?'Cloud':'Local'}`; pill.title = cloud?'Connected to Supabase — data syncs to the cloud':'Local mode — data persists in this browser. Add Supabase keys to sync.'; }
       // reflect signed-in user on the sidebar pill, if any
-      if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'); const name=meta.display_name||meta.name||meta.username; const outlet=s.tenant_name||meta.outlet; const role=s.role||meta.role||'Owner'; if(name && un) un.textContent=name.charAt(0).toUpperCase() + name.slice(1); if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=outlet+' · '+(role.charAt(0).toUpperCase()+role.slice(1)); } } }); }
+      if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
       // route sign-out through the data layer
       const logout = document.querySelector('.sb-foot-btn.logout');
       if(logout){ logout.removeAttribute('onclick'); logout.addEventListener('click', async ()=>{ try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){} location.href='login.html'; }); }
