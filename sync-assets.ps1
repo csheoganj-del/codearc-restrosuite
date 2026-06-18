@@ -1,4 +1,4 @@
-# Doppio Cafe Android POS Assets Synchronization Script
+# RestroSuite Android POS Assets Synchronisation Script
 # Run this script whenever you update your web files to sync them with the Android App assets.
 
 $SourceDir = $PSScriptRoot
@@ -15,11 +15,32 @@ $FilesToCopy = @(
     "index.html",
     "dashboard.html",
     "login.html",
+    "home.html",
+    "kds.html",
+    "qr-order.html",
+    "order.html",
+    "tokens.html",
+    "404.html",
+    "config.js",
+    "supabase_migration.sql",
     "styles.css",
-    "dashboard-styles.css",
     "script.js",
-    "dashboard.js",
-    "recipes.json"
+    "recipes.json",
+    "pwa.js",
+    "service-worker.js",
+    "manifest.webmanifest",
+    "legal.css",
+    "terms.html",
+    "privacy.html",
+    "refund-policy.html",
+    "robots.txt",
+    "sitemap.xml"
+)
+
+$DirectoriesToCopy = @(
+    "src",
+    "api",
+    "assets"
 )
 
 # Copy individual files
@@ -32,6 +53,18 @@ foreach ($File in $FilesToCopy) {
         Write-Host "Synced: $File -> android-app" -ForegroundColor Cyan
     } else {
         Write-Warning "Source file not found: $File"
+    }
+}
+
+foreach ($Directory in $DirectoriesToCopy) {
+    $SrcDirectory = Join-Path $SourceDir $Directory
+    $DstDirectory = Join-Path $DestDir $Directory
+
+    if (Test-Path $SrcDirectory) {
+        Copy-Item -Path $SrcDirectory -Destination $DestDir -Recurse -Force
+        Write-Host "Synced directory: $Directory -> android-app" -ForegroundColor Cyan
+    } else {
+        Write-Warning "Source directory not found: $Directory"
     }
 }
 

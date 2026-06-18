@@ -10,6 +10,7 @@ import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 
+import android.speech.tts.UtteranceProgressListener;
 import java.util.Locale;
 
 public class WebAppInterface {
@@ -17,6 +18,7 @@ public class WebAppInterface {
     private final Context mContext;
     private TextToSpeech tts;
     private boolean ttsInitialized = false;
+    private volatile String mPendingHindiText = null;
 
     public WebAppInterface(Context c) {
         mContext = c;
@@ -34,6 +36,26 @@ public class WebAppInterface {
                         Log.e(TAG, "Hindi language pack is missing or not supported on this device. Falling back to English.");
                         tts.setLanguage(Locale.US);
                     }
+                    
+                    tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                        @Override
+                        public void onStart(String utteranceId) {}
+
+                        @Override
+                        public void onDone(String utteranceId) {
+                            if ("english_announcement".equals(utteranceId)) {
+                                if (mPendingHindiText != null) {
+                                    tts.setLanguage(new Locale("hi", "IN"));
+                                    tts.speak(mPendingHindiText, TextToSpeech.QUEUE_ADD, null, "hindi_announcement");
+                                    mPendingHindiText = null;
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onError(String utteranceId) {}
+                    });
+
                     ttsInitialized = true;
                 } else {
                     Log.e(TAG, "TextToSpeech Initialization failed!");
@@ -53,27 +75,12 @@ public class WebAppInterface {
     public void speakBilingual(final String englishText, final String hindiText) {
         if (tts != null && ttsInitialized) {
             Log.d(TAG, "Speaking Bilingual. Eng: " + englishText + " | Hin: " + hindiText);
-            // 1. Speak English
+            // 1. Queue Hindi Text for UtteranceProgressListener
+            mPendingHindiText = hindiText;
+
+            // 2. Speak English first
             tts.setLanguage(Locale.US);
             tts.speak(englishText, TextToSpeech.QUEUE_FLUSH, null, "english_announcement");
-
-            // 2. Queue Hindi to speak right after English
-            // Using QUEUE_ADD so it waits for English to finish
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        // Small pause to let speech queue latch
-                        Thread.sleep(200);
-                        if (tts != null) {
-                            tts.setLanguage(new Locale("hi", "IN"));
-                            tts.speak(hindiText, TextToSpeech.QUEUE_ADD, null, "hindi_announcement");
-                        }
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }).start();
         }
     }
 
@@ -93,25 +100,27 @@ public class WebAppInterface {
     @JavascriptInterface
     public void playSound(String soundType) {
         Log.d(TAG, "Playing Sound type: " + soundType);
-        // Play native system notification sound as order bell
-        try {
-            // We can also bundle a custom raw sound, but playing a system ringtone is extremely reliable.
-            // Alternatively, we use Android's ToneGenerator or MediaPlayer to play a pleasant POS checkout chime.
-            // Let's play a high-quality success sound
-            // We will play a short pleasant beep using ToneGenerator to be fully self-contained.
-            android.media.ToneGenerator tg = new android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 100);
-            if ("success".equalsIgnoreCase(soundType) || "order_success".equalsIgnoreCase(soundType)) {
-                tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150); // Double chime
-                Thread.sleep(200);
-                tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150);
-            } else if ("alert".equalsIgnoreCase(soundType)) {
-                tg.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 300); // Warning tone
-            } else {
-                tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150); // Single click chime
+        // Play a short chime using ToneGenerator on a background thread to avoid blocking the UI.
+        new Thread(() -> {
+            try {
+                android.media.ToneGenerator tg = new android.media.ToneGenerator(
+                        android.media.AudioManager.STREAM_NOTIFICATION, 100);
+                if ("success".equalsIgnoreCase(soundType) || "order_success".equalsIgnoreCase(soundType)) {
+                    tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150);
+                    Thread.sleep(200);
+                    tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150);
+                } else if ("alert".equalsIgnoreCase(soundType)) {
+                    tg.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 300);
+                } else {
+                    tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150);
+                }
+                // Allow tone to finish before releasing the generator
+                Thread.sleep(400);
+                tg.release();
+            } catch (Exception e) {
+                Log.e(TAG, "Error playing sound tone: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error playing sound tone: " + e.getMessage());
-        }
+        }).start();
     }
 
     @JavascriptInterface

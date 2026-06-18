@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="RestroSuite — Clean, modern, zero-cost restaurant POS, kitchen order display, inventory, and WhatsApp receipts. Deploy free on Supabase and Vercel.">
+  <title>RestroSuite | Reimagined Restaurant Operations</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="sample-styles.css">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a href="#" class="brand">
+        <span class="brand-mark"></span>
+        Restro<span class="brand-product">Suite</span>
+      </a>
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <a href="#hero">Overview</a>
+        <a href="#bento-grid">Modules</a>
+        <a href="#interactive-simulator">Live Demo</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="login.html" class="nav-signin">Sign in</a>
+        <a href="login.html?tab=register" class="btn btn-primary nav-register">Launch POS</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+
+    <!-- Interactive Hero Section -->
+    <section class="hero" id="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="hero-badge">
+            <span class="live-dot"></span> Built for Modern Food Outlets
+          </div>
+          <h1>Run your restaurant on <span>autopilot.</span></h1>
+          <p>RestroSuite connects your billing counter, kitchen display, inventory records, and customer receipts into a single self-hosted SaaS. Completely free to run on your own Vercel and Supabase accounts.</p>
+          
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="login.html?tab=register">
+              Deploy Free (60s Setup)
+              <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <a class="btn btn-secondary" href="#interactive-simulator">
+              Watch operations flow
+            </a>
+          </div>
+
+          <div class="hero-assurances">
+            <span><i class="fa-solid fa-circle-check"></i> Zero hosting costs</span>
+            <span><i class="fa-solid fa-circle-check"></i> Works offline</span>
+            <span><i class="fa-solid fa-circle-check"></i> Complete data control</span>
+          </div>
+        </div>
+
+        <!-- Interactive POS Terminal Simulator -->
+        <div class="product-stage">
+          <div class="dashboard pos-simulator">
+            <div class="dash-topbar">
+              <div class="window-dots"><span></span><span></span><span></span></div>
+              <div class="dash-title">POS Billing Register (Try Clicking Items!)</div>
+              <div class="dash-live">● Active Terminal</div>
+            </div>
+            
+            <div class="simulator-body">
+              <!-- Menu Items Grid -->
+              <div class="menu-selection">
+                <h4>Menu Items</h4>
+                <div class="menu-items-grid">
+                  <button class="sim-menu-item" data-name="Paneer Tikka Roll" data-price="249">
+                    <span class="item-emoji">🫓</span>
+                    <span class="item-details">
+                      <strong>Paneer Roll</strong>
+                      <small>₹249</small>
+                    </span>
+                  </button>
+                  <button class="sim-menu-item" data-name="Butter Chicken Pizza" data-price="349">
+                    <span class="item-emoji">🍕</span>
+                    <span class="item-details">
+                      <strong>Chicken Pizza</strong>
+                      <small>₹349</small>
+                    </span>
+                  </button>
+                  <button class="sim-menu-item" data-name="Garlic Naan Combo" data-price="189">
+                    <span class="item-emoji">🧄</span>
+                    <span class="item-details">
+                      <strong>Garlic Naan</strong>
+                      <small>₹189</small>
+                    </span>
+                  </button>
+                  <button class="sim-menu-item" data-name="Mango Lassi Shake" data-price="99">
+                    <span class="item-emoji">🥭</span>
+                    <span class="item-details">
+                      <strong>Mango Lassi</strong>
+                      <small>₹99</small>
+                    </span>
+                  </button>
+                  <button class="sim-menu-item" data-name="Peri Peri Fries" data-price="149">
+                    <span class="item-emoji">🍟</span>
+                    <span class="item-details">
+                      <strong>Peri Fries</strong>
+                      <small>₹149</small>
+                    </span>
+                  </button>
+                  <button class="sim-menu-item" data-name="Cappuccino Double" data-price="129">
+                    <span class="item-emoji">☕</span>
+                    <span class="item-details">
+                      <strong>Double Shot</strong>
+                      <small>₹129</small>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Order Summary List -->
+              <div class="bill-preview">
+                <div class="panel-head">Active Bill Summary</div>
+                <div class="selected-items" id="bill-items-list">
+                  <div class="empty-bill-message">Click items on the left to add to order</div>
+                </div>
+                
+                <div class="bill-totals">
+                  <div class="totals-row">
+                    <span>Subtotal</span>
+                    <span id="bill-subtotal">₹0.00</span>
+                  </div>
+                  <div class="totals-row">
+                    <span>GST (5%)</span>
+                    <span id="bill-gst">₹0.00</span>
+                  </div>
+                  <div class="order-total">
+                    <span>Grand Total</span>
+                    <span id="bill-grand-total">₹0.00</span>
+                  </div>
+                </div>
+                
+                <button class="pay-bar" id="complete-payment-btn" disabled>
+                  <i class="fa-solid fa-print"></i> Complete Payment
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Floating Notification Alerts -->
+          <div class="simulator-notifications">
+            <div class="flow-chip chip-kitchen" id="kitchen-alert">
+              <span class="chip-icon"><i class="fa-solid fa-utensils"></i> Chef KDS</span> Ticket #1089 sent to Kitchen
+            </div>
+            <div class="flow-chip chip-stock" id="stock-alert">
+              <span class="chip-icon"><i class="fa-solid fa-cubes"></i> Inventory</span> Stock adjusted instantly (-1 qty)
+            </div>
+          </div>
+
+          <!-- WhatsApp Mock Overlay -->
+          <div class="whatsapp-mock" id="whatsapp-receipt-modal">
+            <div class="wa-header">
+              <i class="fa-solid fa-chevron-left"></i>
+              <div class="wa-contact-info">
+                <img src="images/restrosuite-mark.png" alt="RestroSuite Logo" class="wa-avatar" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23ea580c\'><circle cx=\'12\' cy=\'12\' r=\'10\'/></svg>'">
+                <div>
+                  <strong>RestroSuite Notify</strong>
+                  <small>Online</small>
+                </div>
+              </div>
+              <i class="fa-solid fa-phone"></i>
+            </div>
+            <div class="wa-chat-body">
+              <div class="wa-message wa-sent">
+                <div class="wa-receipt-title">🧾 RestroSuite Digital Receipt</div>
+                <p>Hello! Thank you for dining with us. Here is your digital receipt details:</p>
+                <div class="wa-receipt-box">
+                  <strong id="wa-receipt-restaurant">RestroSuite Demo Cafe</strong>
+                  <small id="wa-receipt-time">Just now · Table 04</small>
+                  <hr>
+                  <div id="wa-receipt-items">
+                    <!-- Dynamic receipt items -->
+                  </div>
+                  <hr>
+                  <div class="wa-receipt-total">
+                    <strong>Total Paid:</strong>
+                    <strong id="wa-receipt-total-val">₹0.00</strong>
+                  </div>
+                </div>
+                <div class="wa-receipt-footer">
+                  <span>Feedback link attached</span>
+                  <small>06:35 AM</small>
+                </div>
+              </div>
+            </div>
+            <div class="wa-footer">
+              <input type="text" placeholder="Type a reply..." disabled>
+              <i class="fa-solid fa-paper-plane"></i>
+            </div>
+            <button class="close-wa-btn" id="close-wa-btn"><i class="fa-solid fa-xmark"></i> Close Preview</button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Bento Grid Platform Architecture Section -->
+    <section class="bento-section" id="bento-grid">
+      <div class="container">
+        <div class="section-heading center">
+          <span class="eyebrow">All-in-One Architecture</span>
+          <h2>The complete operating system for kitchens.</h2>
+          <p>No separate database servers, no third-party APIs. Everything runs inside a single, unified database structure.</p>
+        </div>
+
+        <div class="bento-grid">
+          <!-- Card 1: POS Terminal -->
+          <div class="bento-card card-pos">
+            <div class="bento-icon"><i class="fa-solid fa-cash-register"></i></div>
+            <h3>Smart Counter POS</h3>
+            <p>Take orders, modify items, handle cash/UPI, split bills, and print offline invoices in seconds. Zero delays during peak hours.</p>
+          </div>
+
+          <!-- Card 2: Chef KDS Display -->
+          <div class="bento-card card-kds">
+            <div class="bento-icon"><i class="fa-solid fa-fire-burner"></i></div>
+            <h3>Chefs Display (KDS)</h3>
+            <p>Chef monitors update instantly when an order is punched. Keep prep times low, manage orders, and eliminate paper tickets entirely.</p>
+          </div>
+
+          <!-- Card 3: WhatsApp Receipts -->
+          <div class="bento-card card-whatsapp">
+            <div class="bento-icon"><i class="fa-brands fa-whatsapp"></i></div>
+            <h3>WhatsApp Receipts</h3>
+            <p>Auto-dispatch invoice links directly to the customer's WhatsApp numbers. Build customer lists and loyal returning diners for free.</p>
+          </div>
+
+          <!-- Card 4: Inventory Tracking -->
+          <div class="bento-card card-stock">
+            <div class="bento-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+            <h3>Real-time Stock Deductions</h3>
+            <p>Map items to raw ingredients. Selling a burger automatically deducts buns, patties, and cheese slices. Never run out of stock unexpectedly.</p>
+          </div>
+
+          <!-- Card 5: Self-Hosted Cloud -->
+          <div class="bento-card card-cloud">
+            <div class="bento-icon"><i class="fa-solid fa-server"></i></div>
+            <h3>Self-Hosted & Commission Free</h3>
+            <p>Deploy on Vercel and hook into your free-tier Supabase database. You retain 100% data privacy, customer lists, and paying zero software fees.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Step Flow Simulator Section -->
+    <section class="simulator-walkthrough" id="interactive-simulator">
+      <div class="container">
+        <div class="section-heading center">
+          <span class="eyebrow">How Operations Flow</span>
+          <h2>One action. Seamless synchronization.</h2>
+          <p>Observe how data is synchronized across the register, chef monitor, ingredient levels, and consumer channels instantenously.</p>
+        </div>
+
+        <!-- Simulated flow stages -->
+        <div class="flow-tabs-container">
+          <div class="flow-step-bars">
+            <div class="flow-step-bar active" id="flow-bar-1">
+              <span class="flow-num">1</span>
+              <span><strong>Billing POS</strong><small>Cashier punches items</small></span>
+            </div>
+            <div class="flow-step-bar" id="flow-bar-2">
+              <span class="flow-num">2</span>
+              <span><strong>Chefs display</strong><small>Kitchen monitor alerts</small></span>
+            </div>
+            <div class="flow-step-bar" id="flow-bar-3">
+              <span class="flow-num">3</span>
+              <span><strong>Raw Stock</strong><small>Stock levels diminish</small></span>
+            </div>
+            <div class="flow-step-bar" id="flow-bar-4">
+              <span class="flow-num">4</span>
+              <span><strong>Diners mobile</strong><small>Invoice lands in chat</small></span>
+            </div>
+          </div>
+
+          <div class="flow-step-details">
+            <div class="flow-detail-content active" id="flow-detail-1">
+              <div class="detail-illustration"><i class="fa-solid fa-cash-register"></i></div>
+              <h3>Painless order intake</h3>
+              <p>The cashier uses a layout optimized for touch registers. Split orders, merge tables, apply promotions, and take UPI payment details. It stores tickets inside Supabase even if the connection goes offline momentarily.</p>
+            </div>
+            <div class="flow-detail-content" id="flow-detail-2">
+              <div class="detail-illustration"><i class="fa-solid fa-desktop"></i></div>
+              <h3>Kitchen Ticket Dispatch</h3>
+              <p>The system generates real-time chef tickets. Prep timers, item ingredients, modifiers (e.g. "Less Spicy"), and dining preferences are color-coded. Chefs bump finished dishes to clear the boards.</p>
+            </div>
+            <div class="flow-detail-content" id="flow-detail-3">
+              <div class="detail-illustration"><i class="fa-solid fa-cubes"></i></div>
+              <h3>Stock Formula deduction</h3>
+              <p>RestroSuite links menu recipes to raw stock categories. As bills settle, ingredients deduct. Receive instant alerts on your dashboard when stock crosses safety limits so you order raw material on time.</p>
+            </div>
+            <div class="flow-detail-content" id="flow-detail-4">
+              <div class="detail-illustration"><i class="fa-brands fa-whatsapp"></i></div>
+              <h3>Free Notification receipts</h3>
+              <p>Leverage the WhatsApp Gateway API integration. Bills convert to responsive HTML sheets and send to customer mobiles. Safe, environment-friendly, and helps retain guest visit records for analytics.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing-section" id="pricing">
+      <div class="container">
+        <div class="section-heading center">
+          <span class="eyebrow">Fair Pricing</span>
+          <h2>Zero SaaS Subscriptions. Period.</h2>
+          <p>Deploy on your own infrastructure and escape paying recurring software bills. RestroSuite is open-source and free.</p>
+        </div>
+
+        <div class="pricing-grid">
+          <!-- Card 1: Community Core -->
+          <div class="price-card">
+            <h3>Community Core</h3>
+            <div class="price-value">₹0<span class="price-period">/ month</span></div>
+            <p class="price-summary">Complete control. Perfect for single outlets, food trucks, and cafes.</p>
+            <hr>
+            <ul class="price-list">
+              <li><i class="fa-solid fa-circle-check"></i> Unlimited POS billing counters</li>
+              <li><i class="fa-solid fa-circle-check"></i> Unlimited Chef display boards</li>
+              <li><i class="fa-solid fa-circle-check"></i> Complete Inventory tracker</li>
+              <li><i class="fa-solid fa-circle-check"></i> Sales reports & analytics</li>
+              <li><i class="fa-solid fa-circle-check"></i> Run on Supabase Free Tier</li>
+            </ul>
+            <a href="login.html?tab=register" class="btn btn-secondary btn-pricing">Launch Now</a>
+          </div>
+
+          <!-- Card 2: Professional (Recommended) -->
+          <div class="price-card featured">
+            <h3>Professional</h3>
+            <div class="price-value">₹0<span class="price-period">/ month</span></div>
+            <p class="price-summary">Deploy on Vercel with optional automated receipt dispatches.</p>
+            <hr>
+            <ul class="price-list">
+              <li><i class="fa-solid fa-circle-check"></i> All Community Core features</li>
+              <li><i class="fa-solid fa-circle-check"></i> Automated WhatsApp Receipts</li>
+              <li><i class="fa-solid fa-circle-check"></i> Customer loyalty profile builder</li>
+              <li><i class="fa-solid fa-circle-check"></i> Multi-terminal offline sync</li>
+              <li><i class="fa-solid fa-circle-check"></i> Priority deployment runbook</li>
+            </ul>
+            <a href="login.html?tab=register" class="btn btn-primary btn-pricing">Deploy Free</a>
+          </div>
+
+          <!-- Card 3: Custom Integration -->
+          <div class="price-card">
+            <h3>Multi-Outlet SaaS</h3>
+            <div class="price-value">Custom<span class="price-period">/ quote</span></div>
+            <p class="price-summary">Tailored setups for franchises, dark kitchens, and chains.</p>
+            <hr>
+            <ul class="price-list">
+              <li><i class="fa-solid fa-circle-check"></i> Unified multi-outlet analytics</li>
+              <li><i class="fa-solid fa-circle-check"></i> Master ingredient hub</li>
+              <li><i class="fa-solid fa-circle-check"></i> Centralized menu publishing</li>
+              <li><i class="fa-solid fa-circle-check"></i> Custom API connections</li>
+              <li><i class="fa-solid fa-circle-check"></i> SLA support contracts</li>
+            </ul>
+            <a href="mailto:support@codearc.in" class="btn btn-secondary btn-pricing">Email Sales</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Accordion Section -->
+    <section class="faq-section" id="faq">
+      <div class="container faq-container">
+        <div class="section-heading center">
+          <span class="eyebrow">Clear Questions</span>
+          <h2>Frequently Asked Questions</h2>
+          <p>Everything you need to know about the self-hosted zero-cost SaaS model.</p>
+        </div>
+
+        <div class="faq-list">
+          <div class="faq-item">
+            <div class="faq-question">
+              <h3>How is RestroSuite completely free?</h3>
+              <span class="faq-icon"><i class="fa-solid fa-plus"></i></span>
+            </div>
+            <div class="faq-answer">
+              <p>RestroSuite is open-source. Instead of paying a software provider, you host the code on a free-tier Vercel account and connect it to a free-tier Supabase database. These free tiers provide generous limits that easily cover standard restaurant volumes, meaning your software running cost is exactly zero.</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-question">
+              <h3>Will it work if the internet goes offline?</h3>
+              <span class="faq-icon"><i class="fa-solid fa-plus"></i></span>
+            </div>
+            <div class="faq-answer">
+              <p>Yes. The POS billing interface works in your browser cache. If the internet fails, you can continue taking orders and generating receipts. Once connection is restored, the local orders are synced back to the Supabase cloud automatically.</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-question">
+              <h3>What hardware is required for counters and kitchens?</h3>
+              <span class="faq-icon"><i class="fa-solid fa-plus"></i></span>
+            </div>
+            <div class="faq-answer">
+              <p>RestroSuite runs inside standard web browsers. You can use any existing hardware: iPads, Android tablets, old laptops, or dedicated touch POS terminals. You do not need to buy any proprietary hardware to run our POS.</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-question">
+              <h3>How does the WhatsApp Receipt system work?</h3>
+              <span class="faq-icon"><i class="fa-solid fa-plus"></i></span>
+            </div>
+            <div class="faq-answer">
+              <p>We integrate with a local WhatsApp Web gateway script (included in the package) or external APIs. When an order is completed, the receipt converts to a neat digital message and dispatches automatically. This eliminates the need for expensive paper thermal printers.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA Section -->
+    <section class="final-cta">
+      <div class="container">
+        <h2>Modernize your kitchen today.</h2>
+        <p>No card required, no setup charges, no monthly subscriptions. Host it free, retain full data control, and serve your guests faster.</p>
+        <a href="login.html?tab=register" class="btn btn-primary">Launch Your Register Now</a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand-col">
+        <a href="#" class="brand">
+          <span class="brand-mark"></span>
+          Restro<span class="brand-product">Suite</span>
+        </a>
+        <p style="margin-top: 16px; font-size: 14px; max-width: 260px;">The open-source operating system for modern gastronomers. Zero fees, maximum performance.</p>
+      </div>
+      <div>
+        <h4>Modules</h4>
+        <ul style="list-style: none; display: grid; gap: 10px; padding: 0;">
+          <li><a href="#bento-grid">Register POS</a></li>
+          <li><a href="#bento-grid">Kitchen Display</a></li>
+          <li><a href="#bento-grid">Inventory Hub</a></li>
+          <li><a href="#bento-grid">WhatsApp Dispatch</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Self-Host</h4>
+        <ul style="list-style: none; display: grid; gap: 10px; padding: 0;">
+          <li><a href="LOCAL_SETUP.md">Local Setup</a></li>
+          <li><a href="supabase_migration.sql">SQL Migration</a></li>
+          <li><a href="https://github.com/csheoganj-del/codearc-restrosuite">Git Repository</a></li>
+          <li><a href="LAUNCH_RUNBOOK.md">Launch Runbook</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul style="list-style: none; display: grid; gap: 10px; padding: 0;">
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Use</a></li>
+          <li><a href="refund-policy.html">Refund Policy</a></li>
+          <li><a href="mailto:support@codearc.in">Support Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>&copy; 2026 CodeArc RestroSuite. Released under MIT License. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Interactive Demo Logic -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // 1. Interactive POS Simulator Logic
+      const menuButtons = document.querySelectorAll(".sim-menu-item");
+      const billList = document.getElementById("bill-items-list");
+      const subtotalEl = document.getElementById("bill-subtotal");
+      const gstEl = document.getElementById("bill-gst");
+      const grandTotalEl = document.getElementById("bill-grand-total");
+      const payButton = document.getElementById("complete-payment-btn");
+      
+      const kitchenAlert = document.getElementById("kitchen-alert");
+      const stockAlert = document.getElementById("stock-alert");
+      const waReceiptModal = document.getElementById("whatsapp-receipt-modal");
+      const closeWaBtn = document.getElementById("close-wa-btn");
+      
+      const waItemsList = document.getElementById("wa-receipt-items");
+      const waTotalVal = document.getElementById("wa-receipt-total-val");
+
+      let currentOrder = [];
+
+      menuButtons.forEach(button => {
+        button.addEventListener("click", function() {
+          const name = this.dataset.name;
+          const price = parseFloat(this.dataset.price);
+
+          // Add item
+          const existingItem = currentOrder.find(item => item.name === name);
+          if (existingItem) {
+            existingItem.qty += 1;
+          } else {
+            currentOrder.push({ name, price, qty: 1 });
+          }
+
+          updateOrderUI();
+        });
+      });
+
+      function updateOrderUI() {
+        if (currentOrder.length === 0) {
+          billList.innerHTML = '<div class="empty-bill-message">Click items on the left to add to order</div>';
+          subtotalEl.innerText = "₹0.00";
+          gstEl.innerText = "₹0.00";
+          grandTotalEl.innerText = "₹0.00";
+          payButton.disabled = true;
+          return;
+        }
+
+        // Render List
+        billList.innerHTML = "";
+        let subtotal = 0;
+
+        currentOrder.forEach((item, index) => {
+          subtotal += item.price * item.qty;
+          const row = document.createElement("div");
+          row.className = "order-row";
+          row.innerHTML = `
+            <span>${item.qty} × ${item.name}</span>
+            <div>
+              <strong>₹${(item.price * item.qty).toFixed(0)}</strong>
+              <button class="remove-sim-item" data-index="${index}" style="background:none; border:none; color:#ef4444; margin-left:8px; cursor:pointer;"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          `;
+          billList.appendChild(row);
+        });
+
+        // Calculate Totals
+        const gst = subtotal * 0.05;
+        const grandTotal = subtotal + gst;
+
+        subtotalEl.innerText = `₹${subtotal.toFixed(2)}`;
+        gstEl.innerText = `₹${gst.toFixed(2)}`;
+        grandTotalEl.innerText = `₹${grandTotal.toFixed(2)}`;
+        payButton.disabled = false;
+
+        // Hook up delete buttons
+        document.querySelectorAll(".remove-sim-item").forEach(delBtn => {
+          delBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            const index = parseInt(this.dataset.index);
+            currentOrder.splice(index, 1);
+            updateOrderUI();
+          });
+        });
+      }
+
+      // Complete payment action
+      payButton.addEventListener("click", function() {
+        if (currentOrder.length === 0) return;
+
+        // Show Kitchen Alert
+        kitchenAlert.classList.add("show");
+        setTimeout(() => {
+          kitchenAlert.classList.remove("show");
+        }, 3000);
+
+        // Show Stock Alert after 1s
+        setTimeout(() => {
+          stockAlert.classList.add("show");
+          setTimeout(() => {
+            stockAlert.classList.remove("show");
+          }, 3000);
+        }, 8000);
+
+        // Compile and Show WhatsApp Receipt
+        waItemsList.innerHTML = "";
+        let subtotal = 0;
+        currentOrder.forEach(item => {
+          subtotal += item.price * item.qty;
+          const div = document.createElement("div");
+          div.style.display = "flex";
+          div.style.justify = "space-between";
+          div.style.fontSize = "12px";
+          div.style.margin = "4px 0";
+          div.innerHTML = `<span>${item.qty}x ${item.name}</span><span>₹${(item.price * item.qty).toFixed(0)}</span>`;
+          waItemsList.appendChild(div);
+        });
+        
+        const grandTotal = subtotal * 1.05;
+        waTotalVal.innerText = `₹${grandTotal.toFixed(0)}`;
+        
+        setTimeout(() => {
+          waReceiptModal.classList.add("show");
+        }, 1500);
+
+        // Clear Order
+        currentOrder = [];
+        updateOrderUI();
+      });
+
+      closeWaBtn.addEventListener("click", function() {
+        waReceiptModal.classList.remove("show");
+      });
+
+      // 2. Interactive Flow Walkthrough Tabs Logic
+      const flowBars = document.querySelectorAll(".flow-step-bar");
+      const flowDetails = document.querySelectorAll(".flow-detail-content");
+
+      flowBars.forEach((bar, index) => {
+        bar.addEventListener("click", function() {
+          flowBars.forEach(b => b.classList.remove("active"));
+          flowDetails.forEach(d => d.classList.remove("active"));
+
+          this.classList.add("active");
+          flowDetails[index].classList.add("active");
+        });
+      });
+
+      // 3. FAQ Accordion Logic
+      const faqItems = document.querySelectorAll(".faq-item");
+      faqItems.forEach(item => {
+        const question = item.querySelector(".faq-question");
+        question.addEventListener("click", function() {
+          const isActive = item.classList.contains("active");
+          faqItems.forEach(i => i.classList.remove("active"));
+          
+          if (!isActive) {
+            item.classList.add("active");
+          }
+        });
+      });
+      
+      // Auto cycle the walkthrough steps every 5s
+      let activeFlowIndex = 0;
+      const cycleInterval = setInterval(() => {
+        if (document.querySelector(".simulator-walkthrough:hover")) return; // Pause on hover
+        activeFlowIndex = (activeFlowIndex + 1) % flowBars.length;
+        flowBars[activeFlowIndex].click();
+      }, 6000);
+    });
+  </script>
+</body>
+</html>

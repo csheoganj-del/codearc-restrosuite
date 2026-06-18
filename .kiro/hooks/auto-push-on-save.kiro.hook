@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Auto Push to GitHub on File Edit",
+  "description": "After any file is edited in the workspace, automatically stage the changed file, commit with a timestamp message, and push to origin/main so Vercel deploys the latest changes immediately.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd /d \"g:\\Other computers\\My Computer\\Downloads\\codearc-restrosuite\" && git diff --quiet && git diff --cached --quiet || (git add -A && git commit -m \"auto: sync changes [%date% %time%]\" && git push origin HEAD:main)",
+    "timeout": 60
+  }
+}

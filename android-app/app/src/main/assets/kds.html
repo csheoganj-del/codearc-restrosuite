@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FC8019">
+  <title>RestroSuite KDS | Kitchen Display</title>
+  <link rel="stylesheet" href="dashboard-styles.css?v=2.6">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    (function() {
+      var user = sessionStorage.getItem('logged_in_user');
+      var role = sessionStorage.getItem('logged_in_role');
+      if (!user) {
+        window.location.replace('login.html');
+        return;
+      }
+      document.documentElement.classList.add('role-' + (role || 'kitchen'));
+      document.documentElement.classList.add('kds-fullscreen');
+    })();
+  </script>
+  <style>
+    /* KDS Fullscreen Styles */
+    html.kds-fullscreen body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #172033;
+    }
+    html.kds-fullscreen .sidebar,
+    html.kds-fullscreen .mobile-bottom-nav,
+    html.kds-fullscreen .header-container,
+    html.kds-fullscreen .tab-content:not(#kds-tab) {
+      display: none !important;
+    }
+    html.kds-fullscreen #kds-tab {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex !important;
+      flex-direction: column;
+      padding: 16px;
+      background: #172033;
+    }
+    .exit-fullscreen-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9999;
+      padding: 8px 16px;
+      background: rgba(23, 32, 51, 0.9);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .exit-fullscreen-btn:hover {
+      background: rgba(252, 128, 25, 0.9);
+    }
+  </style>
+</head>
+<body class="dark-theme">
+  <button class="exit-fullscreen-btn" onclick="window.location.href='dashboard.html'">
+    <i class="fas fa-times"></i> Exit KDS
+  </button>
+
+  <!-- Inject dashboard content for KDS -->
+  <div id="dashboard-inject"></div>
+
+  <script>
+    // Load the dashboard and extract only the KDS tab
+    fetch('dashboard.html')
+      .then(response => response.text())
+      .then(html => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Copy KDS tab content
+        const kdsTab = doc.getElementById('kds-tab');
+        if (kdsTab) {
+          document.getElementById('dashboard-inject').innerHTML = kdsTab.outerHTML;
+          document.getElementById('kds-tab').classList.add('active');
+        }
+
+        // Copy necessary scripts
+        const scripts = doc.querySelectorAll('script');
+        scripts.forEach(script => {
+          if (script.src && script.src.includes('dashboard')) {
+            const newScript = document.createElement('script');
+            newScript.src = script.src;
+            document.body.appendChild(newScript);
+          }
+        });
+      })
+      .catch(err => {
+        console.error('Failed to load dashboard:', err);
+        window.location.href = 'dashboard.html';
+      });
+  </script>
+</body>
+</html>

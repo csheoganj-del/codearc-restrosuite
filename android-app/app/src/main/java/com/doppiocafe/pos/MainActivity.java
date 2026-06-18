@@ -1,6 +1,9 @@
 package com.doppiocafe.pos;
 
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -41,10 +44,16 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Configure system UI bar styling for premium full-screen immersive feel
+        // Match the WebView mobile shell so Android and browser chrome feel identical.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            getWindow().setStatusBarColor(getResources().getColor(R.color.primary_brand_dark, getTheme()));
-            getWindow().setNavigationBarColor(getResources().getColor(R.color.primary_brand_dark, getTheme()));
+            getWindow().setStatusBarColor(Color.WHITE);
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getWindow().setNavigationBarColor(Color.WHITE);
+            getWindow().getDecorView().setSystemUiVisibility(
+                    getWindow().getDecorView().getSystemUiVisibility()
+                            | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         }
 
         // Initialize UI Elements
@@ -63,24 +72,28 @@ public class MainActivity extends AppCompatActivity {
         // Start Network Monitoring
         setupNetworkMonitoring();
 
-        // Boot loader sequence: Show splash for 2.5 seconds, then fade out
+        // Boot loader sequence: short branded launch, then fade into the app shell.
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
                 fadeOutSplash();
             }
-        }, 2500);
+        }, 1200);
     }
 
     private void setupWebView() {
         WebSettings webSettings = myWebView.getSettings();
+        myWebView.setBackgroundColor(Color.rgb(246, 247, 249));
+        myWebView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         
         // CRITICAL settings for advanced web dashboards and offline local storage
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true); // Persists localStorage bills and menu
         webSettings.setDatabaseEnabled(true);
         webSettings.setAllowFileAccess(true);
-        webSettings.setAllowContentAccess(true);
+        webSettings.setAllowContentAccess(false);
+        webSettings.setAllowUniversalAccessFromFileURLs(false);
+        webSettings.setAllowFileAccessFromFileURLs(false);
         
         // Cache management: Use cache when offline, load normal when online
         webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -90,9 +103,9 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setUseWideViewPort(true);
         webSettings.setSupportZoom(false); // Mobile responsive is perfect, no zoom needed
         
-        // Mixed content (HTTP & HTTPS) - allowed for syncing local Supabase / local printers
+        // The app shell is local, but all remote services must use HTTPS.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
 
         // Setup JS Bridge interface
@@ -109,6 +122,10 @@ public class MainActivity extends AppCompatActivity {
                         view.loadUrl("file:///android_asset/login.html");
                         return true;
                     }
+                    if (!url.startsWith("file:///android_asset/")) {
+                        openExternalUrl(url);
+                        return true;
+                    }
                 }
                 return false;
             }
@@ -117,6 +134,10 @@ public class MainActivity extends AppCompatActivity {
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 if (url.endsWith("index.html")) {
                     view.loadUrl("file:///android_asset/login.html");
+                    return true;
+                }
+                if (!url.startsWith("file:///android_asset/")) {
+                    openExternalUrl(url);
                     return true;
                 }
                 return false;
@@ -167,10 +188,27 @@ public class MainActivity extends AppCompatActivity {
         myWebView.loadUrl("file:///android_asset/login.html");
     }
 
+    private void openExternalUrl(String url) {
+        if (
+            url == null
+            || url.startsWith("javascript:")
+            || url.startsWith("data:")
+            || url.startsWith("content:")
+            || url.startsWith("file:")
+        ) {
+            return;
+        }
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception error) {
+            Log.e(TAG, "Unable to open external URL: " + error.getMessage());
+        }
+    }
+
     private void fadeOutSplash() {
         if (splashView != null && splashView.getVisibility() == View.VISIBLE) {
             AlphaAnimation fade = new AlphaAnimation(1.0f, 0.0f);
-            fade.setDuration(600); // smooth 600ms fade transition
+            fade.setDuration(280);
             fade.setAnimationListener(new android.view.animation.Animation.AnimationListener() {
                 @Override
                 public void onAnimationStart(android.view.animation.Animation animation) {}
@@ -247,36 +285,57 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void printReceipt(final String htmlContent) {
-        Log.d(TAG, "Launching Android PrintManager directly on main WebView...");
+        Log.d(TAG, "Launching Android PrintManager on temporary WebView...");
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    // Use system SERVICE definition safely
-                    PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-                    if (pm != null && myWebView != null) {
-                        String jobName = getString(R.string.app_name) + " Thermal Receipt";
-                        
-                        // Create PrintDocumentAdapter from our main visible WebView
-                        PrintDocumentAdapter printAdapter;
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                            printAdapter = myWebView.createPrintDocumentAdapter(jobName);
-                        } else {
-                            printAdapter = myWebView.createPrintDocumentAdapter();
+                    final PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                    if (pm != null) {
+                        final android.view.ViewGroup rootView = (android.view.ViewGroup) findViewById(android.R.id.content);
+                        final WebView tempWebView = new WebView(MainActivity.this);
+                        tempWebView.setVisibility(View.INVISIBLE);
+                        if (rootView != null) {
+                            rootView.addView(tempWebView);
                         }
                         
-                        // Set monochrome thermal roll attributes optimized for 58mm (2.28 inch width)
-                        PrintAttributes.Builder printBuilder = new PrintAttributes.Builder();
-                        printBuilder.setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME);
-                        
-                        PrintAttributes.MediaSize custom58mm = new PrintAttributes.MediaSize(
-                                "Roll58mm", "58mm Thermal Roll", 2283, 12000);
-                        printBuilder.setMediaSize(custom58mm);
-                        
-                        pm.print(jobName, printAdapter, printBuilder.build());
+                        tempWebView.setWebViewClient(new WebViewClient() {
+                            @Override
+                            public void onPageFinished(WebView view, String url) {
+                                String jobName = getString(R.string.app_name) + " Thermal Receipt";
+                                PrintDocumentAdapter printAdapter;
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                    printAdapter = tempWebView.createPrintDocumentAdapter(jobName);
+                                } else {
+                                    printAdapter = tempWebView.createPrintDocumentAdapter();
+                                }
+                                
+                                PrintAttributes.Builder printBuilder = new PrintAttributes.Builder();
+                                printBuilder.setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME);
+                                
+                                PrintAttributes.MediaSize custom58mm = new PrintAttributes.MediaSize(
+                                        "Roll58mm", "58mm Thermal Roll", 2283, 12000);
+                                printBuilder.setMediaSize(custom58mm);
+                                
+                                pm.print(jobName, printAdapter, printBuilder.build());
+                                
+                                // Schedule cleanup of temporary WebView
+                                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (rootView != null) {
+                                            rootView.removeView(tempWebView);
+                                        }
+                                        tempWebView.destroy();
+                                    }
+                                }, 5000);
+                            }
+                        });
+                        // Load receipt HTML content
+                        tempWebView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "utf-8", null);
                     }
                 } catch (Throwable t) {
-                    Log.e(TAG, "Error printing from main WebView: " + t.getMessage());
+                    Log.e(TAG, "Error printing from temporary WebView: " + t.getMessage());
                     Toast.makeText(MainActivity.this, "Printing failed: " + t.getMessage(), Toast.LENGTH_LONG).show();
                 }
             }

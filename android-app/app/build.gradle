@@ -16,10 +16,38 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildTypes {
+    // -----------------------------------------------------------------------
+    // Release signing configuration
+    // Set these four properties in your local gradle.properties (never commit
+    // the keystore or credentials to version control):
+    //
+    //   RELEASE_STORE_FILE=../release.jks
+    //   RELEASE_STORE_PASSWORD=<keystore-password>
+    //   RELEASE_KEY_ALIAS=<key-alias>
+    //   RELEASE_KEY_PASSWORD=<key-password>
+    //
+    // Generate a new keystore with:
+    //   keytool -genkeypair -v -keystore release.jks -alias <alias> \
+    //           -keyalg RSA -keysize 2048 -validity 10000
+    // -----------------------------------------------------------------------
+    signingConfigs {
         release {
-            minifyEnabled false
+            storeFile     file(project.findProperty("RELEASE_STORE_FILE")     ?: "release.jks")
+            storePassword      project.findProperty("RELEASE_STORE_PASSWORD") ?: ""
+            keyAlias           project.findProperty("RELEASE_KEY_ALIAS")      ?: ""
+            keyPassword        project.findProperty("RELEASE_KEY_PASSWORD")   ?: ""
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Debug builds use the auto-generated debug keystore — no extra config needed.
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {

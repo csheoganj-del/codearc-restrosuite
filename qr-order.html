@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FF6B00">
+  <title>Dine-In Customer Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --brand: #FF6B00;
+      --brand-hover: #E05E00;
+      --bg: #F8F9FB;
+      --surface: #FFFFFF;
+      --text: #111827;
+      --text-muted: #6B7280;
+      --border: rgba(17, 24, 39, 0.08);
+      --shadow: 0 10px 30px rgba(17, 24, 39, 0.04);
+      --r: 20px;
+      --r-sm: 12px;
+      --tr: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px;
+    }
+
+    /* CONTAINER */
+    .portal-container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* HEADER */
+    .portal-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .portal-header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+      background: var(--brand);
+    }
+
+    .brand-logo {
+      font-family: 'Shadows Into Light', cursive;
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--brand);
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .outlet-name {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .table-badge {
+      background: rgba(255, 107, 0, 0.1);
+      color: var(--brand);
+      font-weight: 700;
+      font-size: 14px;
+      padding: 6px 16px;
+      border-radius: 50px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(255, 107, 0, 0.15);
+    }
+
+    /* MENU GRID */
+    .portal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .portal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 20px 16px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: var(--tr);
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .portal-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--brand);
+      box-shadow: 0 12px 28px rgba(255, 107, 0, 0.08);
+    }
+
+    .portal-card:active {
+      transform: scale(0.97);
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--r-sm);
+      background: rgba(255, 107, 0, 0.08);
+      color: var(--brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      transition: var(--tr);
+    }
+
+    .portal-card:hover .card-icon {
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    /* MODAL OVERLAY */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(17, 24, 39, 0.4);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-sheet {
+      width: 100%;
+      max-width: 480px;
+      background: var(--surface);
+      border-radius: var(--r) var(--r) 0 0;
+      padding: 24px;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.15, 0.85, 0.35, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.active .modal-sheet {
+      transform: translateY(0);
+    }
+
+    .modal-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: var(--tr);
+    }
+
+    .modal-close:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    /* SERVICE BUTTONS GRID */
+    .service-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .service-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 18px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 13px;
+      transition: var(--tr);
+      text-align: center;
+    }
+
+    .service-btn:hover {
+      background: #FFF5EE;
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+
+    .service-btn i {
+      font-size: 20px;
+    }
+
+    /* TRACKER LAYOUT */
+    .tracker-box {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      padding-left: 28px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 7px; top: 10px; bottom: 10px;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .timeline-step {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      left: -28px; top: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 3px solid var(--border);
+      transition: var(--tr);
+    }
+
+    .timeline-step.active .timeline-dot {
+      background: var(--brand);
+      border-color: rgba(255, 107, 0, 0.22);
+      box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.22);
+    }
+
+    .timeline-step.done .timeline-dot {
+      background: #10B981;
+      border-color: #10B981;
+    }
+
+    .step-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .timeline-step.active .step-title {
+      color: var(--brand);
+    }
+
+    .timeline-step.done .step-title {
+      color: #10B981;
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* CHECKOUT LAYOUT */
+    .bill-summary {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bill-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+
+    .bill-total {
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--brand);
+    }
+
+    .upi-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin: 12px 0;
+    }
+
+    .qr-container {
+      padding: 10px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qr-img {
+      width: 180px;
+      height: 180px;
+    }
+
+    .utr-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .input-field {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 12px 14px;
+      outline: none;
+      font-family: inherit;
+      font-size: 14px;
+      transition: var(--tr);
+    }
+
+    .input-field:focus {
+      border-color: var(--brand);
+      background: #fff;
+    }
+
+    .btn {
+      width: 100%;
+      background: var(--brand);
+      color: #fff;
+      font-family: inherit;
+      font-weight: 700;
+      border: none;
+      border-radius: var(--r-sm);
+      padding: 14px;
+      cursor: pointer;
+      transition: var(--tr);
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: var(--brand-hover);
+    }
+
+    /* TOAST FEEDBACK */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #111827;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 12px 24px;
+      border-radius: 50px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+      z-index: 2000;
+      opacity: 0;
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .toast i {
+      color: #10B981;
+    }
+
+    /* OFFLINE STATES */
+    .offline-banner {
+      background: #EF4444;
+      color: white;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px;
+      border-radius: 50px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="portal-container">
+    <!-- Offline Banner -->
+    <div class="offline-banner" id="offline-banner">
+      <i class="fa-solid fa-cloud-showers-water"></i> Offline Mode - Verification will retry when connected
+    </div>
+
+    <!-- Header Box -->
+    <div class="portal-header">
+      <div class="brand-logo" id="brand-logo">RESTRONAME</div>
+      <div class="outlet-name" id="outlet-name">Dine-In Operations</div>
+      <div class="table-badge">
+        <i class="fa-solid fa-chair"></i> <span id="table-label">Table --</span>
+      </div>
+    </div>
+
+    <!-- Grid Actions -->
+    <div class="portal-grid">
+      <!-- Menu Order -->
+      <a href="#" class="portal-card" id="menu-btn">
+        <div class="card-icon"><i class="fa-solid fa-utensils"></i></div>
+        <div class="card-title">View Menu & Order</div>
+        <div class="card-desc">Browse dishes, customize and send orders to kitchen</div>
+      </a>
+
+      <!-- Call Waiter -->
+      <div class="portal-card" onclick="openModal('service-modal')">
+        <div class="card-icon"><i class="fa-solid fa-bell"></i></div>
+        <div class="card-title">Service Requests</div>
+        <div class="card-desc">Call captain, request water, cutlery or clear table</div>
+      </div>
+
+      <!-- Live Order Tracker -->
+      <div class="portal-card" onclick="openModal('tracker-modal')">
+        <div class="card-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+        <div class="card-title">Track Live Order</div>
+        <div class="card-desc">Check kitchen status of your table orders</div>
+      </div>
+
+      <!-- Checkout / Pay -->
+      <div class="portal-card" onclick="openModal('checkout-modal')">
+        <div class="card-icon"><i class="fa-solid fa-credit-card"></i></div>
+        <div class="card-title">Pay Bill / Pay Later</div>
+        <div class="card-desc">Check running total and pay using UPI QR</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERVICE REQUESTS MODAL -->
+  <div class="modal-overlay" id="service-modal" onclick="closeModalOnBg(event, 'service-modal')">
+    <div class="modal-sheet">
+      <div class="modal-hdr">
+        <span class="modal-title">Request Table Service</span>
+        <button class="modal-close" onclick="closeModal('service-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="service-grid">
+        <button class="service-btn" onclick="sendServiceRequest('Drinking Water', '💧')">
+          <i class="fa-solid fa-glass-water"></i> Bring Water
+        </button>
+        <button class="service-btn" onclick="sendServiceRequest('Cutlery / Plates', '🍴')">
+          <i class="fa-solid fa-utensils"></i> Need Cutlery
+        </button>
+        <button class="service-btn" onclick="sendServiceRequest('Clear Table', '🧹')">
+          <i class="fa-solid fa-broom"></i> Clear Table
+        </button>
+        <button class="service-btn" onclick="sendServiceRequest('General Assistant', '🙋')">
+          <i class="fa-solid fa-hand"></i> Call Waiter
+        </button>
+        <button class="service-btn" onclick="sendServiceRequest('Request Printed Bill', '🧾')">
+          <i class="fa-solid fa-receipt"></i> Request Bill
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE TRACKER MODAL -->
+  <div class="modal-overlay" id="tracker-modal" onclick="closeModalOnBg(event, 'tracker-modal')">
+    <div class="modal-sheet">
+      <div class="modal-hdr">
+        <span class="modal-title">Live Order Tracker</span>
+        <button class="modal-close" onclick="closeModal('tracker-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="tracker-box" id="tracker-box">
+        <!-- Rendered dynamically -->
+        <p style="color: var(--text-muted); text-align: center; padding: 20px;">No active orders tracked on this phone.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHECKOUT MODAL -->
+  <div class="modal-overlay" id="checkout-modal" onclick="closeModalOnBg(event, 'checkout-modal')">
+    <div class="modal-sheet">
+      <div class="modal-hdr">
+        <span class="modal-title">Table Self-Checkout</span>
+        <button class="modal-close" onclick="closeModal('checkout-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="checkout-box">
+        <!-- Rendered dynamically -->
+        <p style="color: var(--text-muted); text-align: center; padding: 20px;">No running orders found to pay.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback Toast -->
+  <div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check"></i> <span id="toast-message">Request sent successfully!</span>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      const params = new URLSearchParams(window.location.search);
+      const slug = params.get('tenant') || params.get('outlet') || '';
+      const table = params.get('table') || '';
+
+      if (!slug) {
+        document.body.innerHTML = '<div style="text-align:center; padding: 80px 20px; font-family:sans-serif;">' +
+          '<i class="fa-solid fa-qrcode" style="font-size:64px; color:#FF6B00; margin-bottom:16px;"></i>' +
+          '<h2>No Restaurant Context</h2><p style="color:#666; margin-top:8px;">Please scan the table QR code to start dining.</p></div>';
+        return;
+      }
+
+      // Configure Menu Button Redirect
+      document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}`;
+      document.getElementById('table-label').textContent = table ? `Table ${table.padStart(2, '0')}` : 'Takeaway';
+
+      // Load Config variables
+      let SU = '';
+      let SK = '';
+      let FN = '';
+
+      const configPromise = (window.__configReady || Promise.resolve()).then(() => {
+        SU = window.__SUPABASE_URL__ || '';
+        SK = window.__SUPABASE_ANON_KEY__ || '';
+        FN = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+          ? '/functions/v1/tenant-public'
+          : (SU ? SU + '/functions/v1/tenant-public' : '');
+      });
+
+      let upiVpaAddress = "";
+
+      // API Caller helper
+      function apiCall(action, extra) {
+        return configPromise.then(() => {
+          if (!FN) return Promise.reject(new Error('Backend endpoint config missing'));
+          return fetch(FN, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SK,
+              'Authorization': 'Bearer ' + SK
+            },
+            body: JSON.stringify(Object.assign({ action, tenant_slug: slug }, extra || {}))
+          }).then(res => res.json().catch(() => ({})));
+        });
+      }
+
+      // Load business profile brand
+      function initBranding() {
+        apiCall('list_menu')
+          .then(res => {
+            if (res.tenantName) {
+              document.getElementById('brand-logo').textContent = res.tenantName.toUpperCase();
+              document.title = `${res.tenantName} - Dining Portal`;
+            }
+            if (res.upiVpa) {
+              upiVpaAddress = res.upiVpa;
+            }
+          })
+          .catch(err => console.error("Branding failed to fetch:", err));
+      }
+      
+      configPromise.then(() => {
+        initBranding();
+      });
+
+      // Modal management
+      window.openModal = function(id) {
+        document.getElementById(id).classList.add('active');
+        if (id === 'tracker-modal') {
+          pollOrderTrackers();
+        } else if (id === 'checkout-modal') {
+          renderCheckoutSummary();
+        }
+      };
+
+      window.closeModal = function(id) {
+        document.getElementById(id).classList.remove('active');
+      };
+
+      window.closeModalOnBg = function(e, id) {
+        if (e.target.id === id) closeModal(id);
+      };
+
+      // Toast feedback
+      function showToast(msg) {
+        const t = document.getElementById('toast');
+        document.getElementById('toast-message').textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2500);
+      }
+
+      // Send Service Alerts
+      window.sendServiceRequest = function(requestName, icon) {
+        const text = `${requestName} ${icon}`;
+        closeModal('service-modal');
+
+        apiCall('create_notification', {
+          title: `Table ${table} Call`,
+          message: `Dine-in Customer requested: ${requestName}`,
+          type: 'waiter_call'
+        })
+        .then(res => {
+          if (res.success) {
+            showToast(`Paging Waiter for ${requestName}...`);
+          } else {
+            showToast("Server busy. Please call waiter manually.");
+          }
+        })
+        .catch(() => showToast("Connection failed. Try again."));
+      };
+
+      // Track order polling
+      function getPendingOrderList() {
+        try {
+          return JSON.parse(localStorage.getItem('doppio_pending_qr_orders') || '[]');
+        } catch(e) {
+          return [];
+        }
+      }
+
+      function pollOrderTrackers() {
+        const orderList = getPendingOrderList();
+        const box = document.getElementById('tracker-box');
+
+        if (!orderList.length) {
+          box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">No active orders tracked on this phone.</p>`;
+          return;
+        }
+
+        // Fetch the status of the most recent order in list
+        const latestOrder = orderList[orderList.length - 1];
+        box.innerHTML = `<div style="display:flex; justify-content:center; padding:30px;"><div class="spin" style="width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--brand); border-radius:50%; animation:spin 0.8s linear infinite;"></div></div>`;
+
+        apiCall('get_order_status', { orderId: latestOrder.orderId })
+          .then(res => {
+            if (res.error) {
+              box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Could not verify order status. (${res.error})</p>`;
+              return;
+            }
+
+            const ord = res.order;
+            const status = ord.status || 'Pending Review';
+
+            const steps = [
+              { key: 'Pending Review', title: 'Order Placed', desc: 'Received at cashier. Waiting for approval.' },
+              { key: 'Preparing', title: 'Preparing in Kitchen', desc: 'Chef has started cooking your food.' },
+              { key: 'Served', title: 'Served Hot', desc: 'Food is delivered to your table. Enjoy!' },
+              { key: 'Paid', title: 'Paid & Settled', desc: 'Payment received. Thank you!' }
+            ];
+
+            let activeIndex = 0;
+            if (status === 'Preparing') activeIndex = 1;
+            else if (status === 'Served') activeIndex = 2;
+            else if (status === 'Paid') activeIndex = 3;
+
+            let timelineHtml = steps.map((st, idx) => {
+              let cls = '';
+              if (idx < activeIndex) cls = 'done';
+              else if (idx === activeIndex) cls = 'active';
+
+              return `<div class="timeline-step ${cls}">
+                <div class="timeline-dot"></div>
+                <div class="step-title">${st.title}</div>
+                <div class="step-desc">${st.desc}</div>
+              </div>`;
+            }).join('');
+
+            box.innerHTML = `
+              <div style="font-weight:700; font-size:15px; margin-bottom:10px; color:var(--brand);">Order: ${latestOrder.orderId}</div>
+              <div class="timeline">${timelineHtml}</div>
+            `;
+          })
+          .catch(() => {
+            box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Offline. Check connection.</p>`;
+          });
+      }
+
+      // Self Checkout Summary
+      function renderCheckoutSummary() {
+        const orderList = getPendingOrderList();
+        const checkoutBox = document.getElementById('checkout-box');
+
+        if (!orderList.length) {
+          checkoutBox.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">No running orders found to pay.</p>`;
+          return;
+        }
+
+        const runningTotal = orderList.reduce((sum, ord) => sum + Number(ord.total || 0), 0);
+
+        if (runningTotal <= 0) {
+          checkoutBox.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Your bill is settled.</p>`;
+          return;
+        }
+
+        const upiVpa = upiVpaAddress || "merchant@upi"; // Fallback VPA
+        const upiName = document.getElementById('brand-logo').textContent || "Doppio Cafe";
+        const latestOrder = orderList[orderList.length - 1];
+
+        // Format UPI deep link
+        const upiUrl = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${runningTotal.toFixed(2)}&tr=${latestOrder.orderId}&tn=Table%20${table}%20Bill&cu=INR`;
+        const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+
+        checkoutBox.innerHTML = `
+          <div class="bill-summary">
+            <div class="bill-row">
+              <span>Running Bill (Table ${table})</span>
+              <span>₹${runningTotal}</span>
+            </div>
+            <div class="bill-row bill-total">
+              <span>Grand Total</span>
+              <span>₹${runningTotal}</span>
+            </div>
+          </div>
+
+          <div class="upi-box">
+            <p style="font-size:13px; color:var(--text-muted); text-align:center;">Scan below to pay directly via any UPI app</p>
+            <div class="qr-container">
+              <img src="${qrCodeApiUrl}" class="qr-img" alt="UPI QR Code">
+            </div>
+            <a href="${upiUrl}" class="btn" style="text-decoration:none;"><i class="fa-solid fa-mobile-screen-button"></i> Pay via UPI App</a>
+          </div>
+
+          <div class="utr-form">
+            <p style="font-size:12px; font-weight:600; color:var(--text-muted);">After payment, enter the 12-digit UTR/Ref code to auto-verify:</p>
+            <input type="number" class="input-field" id="utr-input" placeholder="e.g. 123456789012" minlength="12" maxlength="12">
+            <button class="btn" onclick="submitUtrCode('${latestOrder.orderId}')" style="background:#111827;"><i class="fa-solid fa-shield-halved"></i> Submit UTR Code</button>
+          </div>
+        `;
+      }
+
+      window.submitUtrCode = function(orderId) {
+        const val = document.getElementById('utr-input').value.trim();
+        if (val.length !== 12) {
+          showToast("Please enter a valid 12-digit UTR/Ref code.");
+          return;
+        }
+
+        apiCall('create_notification', {
+          title: `Table ${table} Payment Check`,
+          message: `UTR submitted: ${val} for Order ID: ${orderId}`,
+          type: 'payment_alert'
+        })
+        .then(res => {
+          if (res.success) {
+            showToast("UTR code submitted. Waiting for cashier approval.");
+            closeModal('checkout-modal');
+          } else {
+            showToast("Failed to submit verification. Try again.");
+          }
+        })
+        .catch(() => showToast("Connection failed. Try again."));
+      };
+
+      // Handle offline status alerts
+      window.addEventListener('online', () => document.getElementById('offline-banner').style.display = 'none');
+      window.addEventListener('offline', () => document.getElementById('offline-banner').style.display = 'flex');
+
+    })();
+  </script>
+</body>
+</html>
