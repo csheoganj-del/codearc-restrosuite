@@ -350,7 +350,7 @@
     }
     if (previous !== signature) {
       const releaseInfo = await fetchUpdateRelease();
-      window.RS_APP_UPDATE = { releaseInfo, signature };
+      window.RS_APP_UPDATE = { releaseInfo, signature, detectedAt: Date.now() };
       document.dispatchEvent(new CustomEvent('rs:app_update_available'));
       if (!silent) {
         showUpdateDialog(releaseInfo, signature);

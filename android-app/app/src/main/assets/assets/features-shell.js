@@ -91,7 +91,8 @@
           }
           if(window.RS_APP_UPDATE){
             const notifId = 'system-update-' + (window.RS_APP_UPDATE.signature ? window.RS_APP_UPDATE.signature.substring(0, 8) : 'latest');
-            live.push({ id:notifId, type:'system', title:'System update is ready', message:`Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} - Click to apply.`, timestamp:window.RS_APP_UPDATE.releaseInfo?.date || '', isRead:read.has(notifId) });
+            const timestamp = window.RS_APP_UPDATE.detectedAt || window.RS_APP_UPDATE.releaseInfo?.date || '';
+            live.push({ id:notifId, type:'system', title:'System update is ready', message:`Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} - Click to apply.`, timestamp, isRead:read.has(notifId) });
           }
           let saved = [];
           if(window.RS_DB){
