@@ -60,6 +60,7 @@
         if(type === 'success') return ['fa-circle-check','var(--green-tint)','var(--green)'];
         if(type === 'billing') return ['fa-receipt','var(--amber-tint)','var(--amber)'];
         if(type === 'order') return ['fa-bowl-rice','var(--orange-tint)','var(--orange)'];
+        if(type === 'system') return ['fa-cloud-arrow-down','var(--violet-tint)','var(--violet-soft)'];
         return ['fa-bell','var(--orange-tint)','var(--orange)'];
       }
       async function loadNotifications(){
@@ -87,6 +88,9 @@
           }
           if(window.RS_LAST_CLOUD_ERROR){
             live.push({ id:'cloud-sync-warning', type:'warning', title:'Cloud sync needs attention', message:window.RS_LAST_CLOUD_ERROR.message || 'Latest change is saved locally until sync recovers.', timestamp:window.RS_LAST_CLOUD_ERROR.time, isRead:read.has('cloud-sync-warning') });
+          }
+          if(window.RS_APP_UPDATE){
+            live.push({ id:'system-update', type:'system', title:'System update is ready', message:`Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} - Click to apply.`, timestamp:window.RS_APP_UPDATE.releaseInfo?.date || '', isRead:read.has('system-update') });
           }
           let saved = [];
           if(window.RS_DB){
@@ -120,8 +124,11 @@
           if(!n || !n.id) return;
           n.unread = false; n.isRead = true;
           const read = readSet(); read.add(String(n.id)); saveRead(read);
-          if(window.RS_DB && !String(n.id).startsWith('low-stock-') && !String(n.id).startsWith('pending-order-') && !String(n.id).startsWith('refund-') && n.id !== 'cloud-sync-warning') {
+          if(window.RS_DB && !String(n.id).startsWith('low-stock-') && !String(n.id).startsWith('pending-order-') && !String(n.id).startsWith('refund-') && n.id !== 'cloud-sync-warning' && n.id !== 'system-update') {
             try { await RS_DB.put('notifications', n.id, n); } catch(e){}
+          }
+          if(n.id === 'system-update' && typeof window.RS_SHOW_UPDATE_DIALOG === 'function') {
+            window.RS_SHOW_UPDATE_DIALOG();
           }
         };
         panel.querySelector('#notif-read').onclick = async ()=>{ for(const n of NOTIFS) await markRead(n); draw(); updateDot(); };
@@ -135,6 +142,7 @@
       document.addEventListener('rs:pending_orders_synced', loadNotifications);
       document.addEventListener('rs:collection_synced', loadNotifications);
       window.addEventListener('rs:cloud-fallback', loadNotifications);
+      document.addEventListener('rs:app_update_available', loadNotifications);
     }
 
     /* ===================== SETTINGS ===================== */

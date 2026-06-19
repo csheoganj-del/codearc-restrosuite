@@ -273,6 +273,13 @@
     };
   }
 
+  // Expose show update dialog globally so the notification bell can trigger it
+  window.RS_SHOW_UPDATE_DIALOG = () => {
+    if (window.RS_APP_UPDATE) {
+      showUpdateDialog(window.RS_APP_UPDATE.releaseInfo, window.RS_APP_UPDATE.signature);
+    }
+  };
+
   async function checkForAppUpdate({ silent = true } = {}) {
     const signature = await buildUpdateSignature();
     if (!signature) return;
@@ -283,7 +290,11 @@
     }
     if (previous !== signature) {
       const releaseInfo = await fetchUpdateRelease();
-      showUpdateDialog(releaseInfo, signature);
+      window.RS_APP_UPDATE = { releaseInfo, signature };
+      document.dispatchEvent(new CustomEvent('rs:app_update_available'));
+      if (!silent) {
+        showUpdateDialog(releaseInfo, signature);
+      }
     } else if (!silent) {
       toast('RestroSuite is already up to date', 'fa-circle-check');
     }
