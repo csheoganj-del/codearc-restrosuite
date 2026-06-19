@@ -370,7 +370,16 @@
     /* ---------------- HOLD ORDERS / DRAFTS ---------------- */
     const held = [];
     const holdBtn = document.getElementById('btn-hold');
-    function updateHeldCount(){ const el=document.getElementById('held-count'); if(el) el.textContent = held.length?`(${held.length})`:''; }
+    const holdBtnM = document.getElementById('btn-m-hold');
+    function updateHeldCount(){
+      const el = document.getElementById('held-count');
+      if(el) el.textContent = held.length ? `(${held.length})` : '';
+      const elM = document.getElementById('held-count-m');
+      if(elM) elM.textContent = held.length ? `(${held.length})` : '';
+      if(holdBtnM) {
+        holdBtnM.style.display = held.length ? '' : 'none';
+      }
+    }
     function holdCurrent(){
       const totals = RS.getTotals();
       if(!totals.count) return RS.toast('Nothing to hold','fa-circle-exclamation');
@@ -402,6 +411,9 @@
     if(holdBtn){
       holdBtn.addEventListener('click', ()=>{ if(RS.getCart().length) holdCurrent(); else openDrafts(); });
       holdBtn.addEventListener('contextmenu', e=>{ e.preventDefault(); openDrafts(); });
+    }
+    if(holdBtnM){
+      holdBtnM.addEventListener('click', () => openDrafts());
     }
     updateHeldCount();
   }
