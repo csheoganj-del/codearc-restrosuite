@@ -10,8 +10,7 @@
 .sb-top { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 14px; }
 .sb-brand { display: flex; align-items: center; gap: 11px; overflow: hidden; }
 .sb-brand .brand-name { white-space: nowrap; }
-.rs-brand-logo-img { width: 172px; max-width: 100%; height: 42px; object-fit: contain; object-position: left center; display: block; }
-.app.collapsed .rs-brand-logo-img { width: 42px; object-fit: cover; object-position: left center; margin: 0 auto; }
+.app.collapsed .brand-logo { width: 42px; height: 42px; margin: 0 auto; }
 .app.collapsed .sb-brand { width: 100%; justify-content: center; }
 .app.collapsed .sb-brand .brand-name, .app.collapsed .hide-collapsed { display: none; }
 .sb-collapse { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--stroke-2); background: var(--glass-2); color: var(--text-soft); display: grid; place-items: center; cursor: pointer; transition: var(--t); flex: none; }
