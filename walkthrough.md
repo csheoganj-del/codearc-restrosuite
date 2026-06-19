@@ -29,7 +29,8 @@ All changes are optimized, styled to match the RestroSuite design system, and sy
 * Replaced the duplicate "Loyalty members" statistics card in the Customers tab with a **"Total Outstanding Dues"** card in [assets/features-growth.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-growth.js).
 * Added a dynamic outstanding dues badge to customer cards in the CRM grid.
 * Added a **"Settle Dues"** banner and footer button inside the customer details modal.
-* Implemented the **`showSettleDuesModal()`** popup to pay off outstanding dues (Cash/UPI/Card), update their credit balance, and record the settlement payment in the bill ledger.
+* Implemented the **`showSettleDuesModal()`** popup to pay off outstanding dues (Cash/UPI/Card), update their credit balance, and record the settlement payment in the bill ledger. 
+* Integrated the **`RSReceipt`** modal to automatically trigger upon successful dues settlement, offering cashiers and customers options to print a formal settlement receipt or share it directly over WhatsApp.
 
 ---
 
