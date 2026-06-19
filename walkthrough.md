@@ -21,7 +21,7 @@ All changes are optimized, styled to match the RestroSuite design system, and sy
 * Added a **"Due"** payment method button next to Cash/UPI/Card in the POS cart.
 * Updated `getCustomer()` in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) to retrieve details from the customer selector.
 * Updated the `checkout()` method in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js) to:
-  * Block dues checkouts if no customer is selected.
+  * Open an interactive **Quick Customer Registration Modal** if a "Due" credit checkout is triggered without selecting a customer. This lets cashiers input a Name & Phone on-the-fly, register the profile in `RS_DB`, select them in the cart dropdown, and complete the sale in one action.
   * Increment the customer's dues balance in the database by the order total when checking out with "Due" payment.
   * Reset the customer selector upon successful checkout or draft parking, and restore selection when resuming drafts.
 
