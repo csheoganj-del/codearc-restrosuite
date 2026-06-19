@@ -243,13 +243,78 @@
 
       if (payment.method === 'Due' && !cust.phone) {
         return RSModal.open({
-          title: 'Customer Required',
-          icon: 'fa-circle-exclamation',
+          title: 'Customer Required for Credit',
+          sub: 'Dues require a registered customer profile',
+          icon: 'fa-user-tag',
           size: 'sm',
-          body: '<p style="font-size:14px;line-height:1.5;">To check out an order as <b>Due (Credit)</b>, you must select a registered customer from the dropdown in the cart header.</p>',
-          foot: '<button class="btn btn-primary" style="flex:1" data-close-modal>Okay</button>',
+          body: `
+            <div style="display:flex;flex-direction:column;gap:12px;font-family:var(--font-body),sans-serif;">
+              <p style="font-size:13px;line-height:1.5;margin:0;color:var(--text-soft)">To check out an order as <b>Due (Credit)</b>, you must select a customer. Register a new customer instantly below:</p>
+              <div class="form-group" style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;font-weight:700;color:var(--text-soft)">Full Name</label>
+                <input type="text" class="form-input" id="quick-cust-name" placeholder="E.g., John Doe" style="padding:8px 10px;font-size:13px;">
+              </div>
+              <div class="form-group" style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;font-weight:700;color:var(--text-soft)">Phone Number</label>
+                <input type="text" class="form-input" id="quick-cust-phone" placeholder="E.g., +91 98765 43210" style="padding:8px 10px;font-size:13px;">
+              </div>
+            </div>
+          `,
+          foot: `
+            <button class="btn btn-ghost" data-close-modal style="flex:1">Cancel</button>
+            <button class="btn btn-primary" id="btn-quick-register-checkout" style="flex:1.5;background:var(--orange);border-color:var(--orange);color:#fff;"><i class="fa-solid fa-user-plus"></i> Register &amp; Pay</button>
+          `,
           onMount(modal, close) {
             modal.querySelector('[data-close-modal]').onclick = close;
+            modal.querySelector('#btn-quick-register-checkout').onclick = async () => {
+              const name = modal.querySelector('#quick-cust-name').value.trim();
+              const phone = modal.querySelector('#quick-cust-phone').value.trim();
+              if (!name || !phone) {
+                RS.toast('Name and phone are required', 'fa-circle-exclamation');
+                return;
+              }
+              if (window.RS_DB) {
+                try {
+                  const newCust = {
+                    id: 'cust-' + Date.now(),
+                    name,
+                    phone,
+                    visits: 0,
+                    spend: 0,
+                    last: new Date().toLocaleDateString('en-CA'),
+                    tier: 'silver',
+                    dues: 0
+                  };
+                  await RS_DB.put('customers', newCust.id, newCust);
+                  
+                  // Reload dropdown and select newly added customer
+                  const csel = document.getElementById('cart-customer-sel');
+                  if (csel) {
+                    csel.value = phone;
+                  }
+                  document.dispatchEvent(new CustomEvent('rs:hydrated'));
+                  
+                  // Brief timeout to let selector populate and update state
+                  setTimeout(() => {
+                    if (csel) {
+                      const opts = Array.from(csel.options);
+                      const opt = opts.find(o => o.value === phone);
+                      if (opt) opt.selected = true;
+                    }
+                    
+                    close();
+                    RS.toast('Customer registered! Completing checkout...', 'fa-circle-check');
+                    setTimeout(checkout, 150);
+                  }, 100);
+                  
+                } catch (e) {
+                  console.warn("Failed saving customer on checkout", e);
+                  RS.toast('Registration failed: ' + e.message, 'fa-circle-exclamation');
+                }
+              } else {
+                close();
+              }
+            };
           }
         });
       }
