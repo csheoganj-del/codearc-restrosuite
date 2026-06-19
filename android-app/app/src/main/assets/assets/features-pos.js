@@ -382,18 +382,81 @@
       if(holdBtnM) {
         holdBtnM.style.display = held.length ? '' : 'none';
       }
+    async function loadHeldFromDB() {
+      if (window.RS_DB) {
+        try {
+          const rows = await RS_DB.list('drafts');
+          held.length = 0;
+          rows.forEach(r => {
+            held.push({
+              id: Number(r.id),
+              draftId: r.draftId || String(r.id),
+              items: r.items || [],
+              table: r.name || r.draftName || 'Walk-in / Takeaway',
+              name: r.customerName || '',
+              phone: r.customerPhone || '',
+              gst: r.customerGst || '',
+              count: (r.items || []).reduce((sum, item) => sum + (item.qty || 1), 0),
+              total: r.total || 0,
+              time: r.time || new Date().toLocaleTimeString('en-IN', {hour: 'numeric', minute: '2-digit', hour12: true})
+            });
+          });
+          updateHeldCount();
+        } catch(e) {
+          console.warn("Failed to load held orders from database", e);
+        }
+      }
     }
-    function holdCurrent(){
+
+    async function holdCurrent(){
       const totals = RS.getTotals();
       if(!totals.count) return RS.toast('Nothing to hold','fa-circle-exclamation');
       const cust = RS.getCustomer();
-      held.push({ id:Date.now(), items:RS.getCart(), table:cust.table, name:cust.name, phone:cust.phone, gst:cust.gst, count:totals.count, total:totals.grand, time:new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}) });
+      const id = Date.now();
+      const draftId = 'D' + id;
+      
+      const newHeld = { 
+        id: id, 
+        draftId: draftId,
+        items: RS.getCart(), 
+        table: cust.table, 
+        name: cust.name, 
+        phone: cust.phone, 
+        gst: cust.gst, 
+        count: totals.count, 
+        total: totals.grand, 
+        time: new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}) 
+      };
+      
+      held.push(newHeld);
+      
+      if (window.RS_DB) {
+        try {
+          const dbRow = {
+            id: id,
+            draftId: draftId,
+            draftName: cust.table || 'Held order',
+            customerName: cust.name || '',
+            customerPhone: cust.phone || '',
+            customerGst: cust.gst || '',
+            items: RS.getCart(),
+            subtotal: totals.sub,
+            gst: totals.gst,
+            total: totals.grand
+          };
+          await RS_DB.put('drafts', id, dbRow);
+        } catch (e) {
+          console.warn("Failed to save draft to database", e);
+        }
+      }
+
       RS.clearCart();
       const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'), cg=document.getElementById('cust-gst'); if(cn)cn.value=''; if(cp)cp.value=''; if(cg)cg.value='';
       const ct = document.getElementById('cart-table'); if(ct) ct.value = 'Walk-in / Takeaway';
       updateHeldCount();
       RS.toast('Order held · '+held.length+' parked','fa-pause');
     }
+
     function openDrafts(){
       RSModal.open({ title:'Held orders', sub:held.length+' parked bills', icon:'fa-pause', size:'sm',
         body: held.length ? `<div style="display:flex;flex-direction:column;gap:10px">${held.map(h=>`
@@ -425,9 +488,32 @@
               ct.value = selected.table;
             }
             
+            // Delete from database
+            if (window.RS_DB) {
+              RS_DB.del('drafts', selected.id).catch(e => console.warn("Failed to delete draft from DB", e));
+            }
+            
             held.splice(idx,1); updateHeldCount(); close(); RS.toast('Order resumed','fa-play');
           }));
-          modal.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', e=>{ e.stopPropagation(); const id=+x.dataset.del; const idx=held.findIndex(h=>h.id===id); if(idx>=0){held.splice(idx,1); updateHeldCount();} x.closest('[data-h]').remove(); if(!held.length){ close(); } }));
+          modal.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', async e=>{ 
+            e.stopPropagation(); 
+            const id=+x.dataset.del; 
+            const idx=held.findIndex(h=>h.id===id); 
+            if(idx>=0){
+              const selected = held[idx];
+              if (window.RS_DB) {
+                try {
+                  await RS_DB.del('drafts', selected.id);
+                } catch(err) {
+                  console.warn("Failed to delete draft from DB", err);
+                }
+              }
+              held.splice(idx,1); 
+              updateHeldCount();
+            } 
+            x.closest('[data-h]').remove(); 
+            if(!held.length){ close(); } 
+          }));
         }});
     }
     if(holdBtn){
@@ -438,6 +524,8 @@
       holdBtnM.addEventListener('click', () => openDrafts());
     }
     updateHeldCount();
+    loadHeldFromDB();
+    document.addEventListener('rs:hydrated', loadHeldFromDB);
   }
 
   if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });

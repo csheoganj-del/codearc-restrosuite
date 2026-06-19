@@ -103,7 +103,7 @@
     },
     drafts: {
       table:'doppio_draft_orders', pk:'id', clientId:true,
-      from: r => ({ id:r.id, draftId:r.draftId, name:r.draftName, customerName:r.customerName, total:num(r.total),
+      from: r => ({ id:r.id, draftId:r.draftId, name:r.draftName, customerName:r.customerName, customerPhone:r.customerPhone, total:num(r.total),
                     items: parseItems(r.items) }),
       to: o => ({ id:o.id, draftId:o.draftId||('D'+Date.now()), draftName:o.name||o.table||'Held order',
                   customerName:o.customerName||'', customerPhone:o.customerPhone||'', paymentMethod:'UPI',
