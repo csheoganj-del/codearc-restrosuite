@@ -210,7 +210,7 @@
   function showAppliedUpdateNotice() {
     const appliedAt = sessionStorage.getItem('rs_update_applied_at');
     if (!appliedAt) return;
-    sessionStorage.removeItem('rs_update_applied_at');
+    // Clear flag is handled by onboarding.js to coordinate guided tour popup
     toast('RestroSuite updated successfully', 'fa-cloud-arrow-down');
   }
 
@@ -270,9 +270,9 @@
     if (document.getElementById('app-update-dialog')) return;
     let info = releaseInfo || {};
     let highlights = Array.isArray(info.highlights) ? info.highlights : [];
-    const isPatch = window.RS_APP_UPDATE && window.RS_APP_UPDATE.isPatchOnly;
 
-    if (isPatch) {
+    // Fallback to generic system patch details ONLY if releaseInfo is missing title or version
+    if (!info.title || !info.version) {
       info = {
         version: 'System patch',
         date: new Date().toLocaleDateString('en-CA'),

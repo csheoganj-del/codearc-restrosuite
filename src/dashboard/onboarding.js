@@ -541,8 +541,9 @@
 
   function endTour() {
     try {
+      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.19-dues';
       if (steps === DUES_TOUR_STEPS) {
-        localStorage.setItem('restrosuite_update_tour_seen:2026.06.19-dues', '1');
+        localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, '1');
       } else {
         localStorage.setItem(tourStorageKey(), '1');
       }
@@ -560,13 +561,27 @@
 
   function openUpdateHistoryModal() {
     if (typeof window.RSModal === 'undefined') return;
+    const justUpdated = sessionStorage.getItem('rs_update_applied_at');
+    const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.19-dues';
+
     window.RSModal.open({
-      title: 'Update History & Releases',
-      sub: 'Detailed release logs of RestroSuite updates',
-      icon: 'fa-clock-rotate-left',
+      title: justUpdated ? 'RestroSuite Updated Successfully!' : 'Update History & Releases',
+      sub: justUpdated ? 'Discover the new features added to your workspace' : 'Detailed release logs of RestroSuite updates',
+      icon: justUpdated ? 'fa-circle-check' : 'fa-clock-rotate-left',
       size: 'md',
       body: `
-        <div class="update-history-container" style="display:flex; flex-direction:column; gap:20px; max-height:450px; overflow-y:auto; padding-right:6px;">
+        ${justUpdated ? `
+          <div style="background:rgba(255,79,0,0.06); border:1px solid rgba(255,79,0,0.18); border-radius:12px; padding:16px; margin-bottom:20px; display:flex; gap:12px; align-items:center;">
+            <div style="width:40px; height:40px; border-radius:50%; background:var(--orange-tint); color:var(--orange); display:grid; place-items:center; font-size:18px; flex-shrink:0;">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <div style="font-family:var(--font-body),sans-serif;">
+              <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:var(--text);">New Version Installed: ${currentVer}</h4>
+              <p style="margin:0; font-size:12px; color:var(--text-soft); line-height:1.4;">We've added new features to your screen. Let's take a quick 30-second tour to see what changed!</p>
+            </div>
+          </div>
+        ` : ''}
+        <div class="update-history-container" style="display:flex; flex-direction:column; gap:20px; max-height:350px; overflow-y:auto; padding-right:6px;">
           ${UPDATES_HISTORY.map(up => `
             <div class="update-version-card" style="border: 1px solid var(--stroke); border-radius: 12px; padding: 16px; background: var(--panel-tint, rgba(0,0,0,0.02));">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
@@ -586,12 +601,31 @@
           `).join('')}
         </div>
       `,
-      foot: `<button class="btn btn-ghost" style="flex:1;" data-close-history>Close</button>`,
+      foot: `
+        <button class="btn btn-ghost" style="flex:1;" data-close-history>Close</button>
+        ${justUpdated ? `<button class="btn btn-primary" style="flex:1.5; background:var(--orange); border-color:var(--orange); color:#fff;" id="modal-start-applied-tour"><i class="fa-solid fa-compass"></i> Start Tour Now</button>` : ''}
+      `,
       onMount(modal, close) {
-        modal.querySelector('[data-close-history]').onclick = close;
+        modal.querySelector('[data-close-history]').onclick = () => {
+          if (justUpdated) {
+            sessionStorage.removeItem('rs_update_applied_at');
+          }
+          close();
+        };
         const tourBtn = modal.querySelector('#start-dues-tour-btn');
         if (tourBtn) {
           tourBtn.onclick = () => {
+            if (justUpdated) {
+              sessionStorage.removeItem('rs_update_applied_at');
+            }
+            close();
+            startUpdateTour();
+          };
+        }
+        const startAppliedTour = modal.querySelector('#modal-start-applied-tour');
+        if (startAppliedTour) {
+          startAppliedTour.onclick = () => {
+            sessionStorage.removeItem('rs_update_applied_at');
             close();
             startUpdateTour();
           };
@@ -636,13 +670,33 @@
     positionCard(target);
   });
 
-  function init() {
+  async function init() {
     injectGuide();
     const backdrop = document.getElementById('onboarding-backdrop');
     if (backdrop) {
       backdrop.addEventListener('click', () => {
         endTour();
       });
+    }
+
+    // Dynamic release note sync
+    let latestRelease = null;
+    try {
+      const res = await fetch(`app-update.json?v=${Date.now()}`);
+      if (res.ok) latestRelease = await res.json();
+    } catch(e) {}
+
+    if (latestRelease && latestRelease.version) {
+      const exists = UPDATES_HISTORY.some(up => up.version === latestRelease.version);
+      if (!exists) {
+        UPDATES_HISTORY.unshift({
+          version: latestRelease.version,
+          date: latestRelease.date || new Date().toLocaleDateString('en-CA'),
+          title: latestRelease.title || "Custom Update",
+          summary: latestRelease.summary || "This update contains hotfixes and stability improvements.",
+          highlights: latestRelease.highlights || ["System stability and codebase security updates."]
+        });
+      }
     }
 
     setTimeout(() => {
@@ -655,10 +709,17 @@
     setTimeout(() => {
       if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
       try {
-        const updateTourSeen = localStorage.getItem('restrosuite_update_tour_seen:2026.06.19-dues');
+        // If we just finished applying an update, automatically trigger the update tour
+        if (sessionStorage.getItem('rs_update_applied_at')) {
+          openUpdateHistoryModal();
+          return;
+        }
+
+        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.19-dues';
+        const updateTourSeen = localStorage.getItem('restrosuite_update_tour_seen:' + currentVer);
         if (!updateTourSeen) {
           openUpdateHistoryModal();
-          localStorage.setItem('restrosuite_update_tour_seen:2026.06.19-dues', 'popup');
+          localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, 'popup');
           return;
         }
         if (!localStorage.getItem(tourStorageKey())) startTour();
