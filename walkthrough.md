@@ -40,6 +40,13 @@ All changes are optimized, styled to match the RestroSuite design system, and sy
 
 ---
 
+## Onboarding & Product Guide UI Layout Fixes (June 19, 2026)
+* **Fixed Unstyled & Transparent Elements**: Added missing layout, overlay, spotlight, and tooltip card CSS styles to [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.css).
+* **CSS Variable Refactoring**: Replaced old theme variables (like `var(--bg-card)`, `var(--text-dark)`, `var(--text-muted)`, `var(--accent-caramel)`) with active design system tokens (like `var(--panel-solid)`, `var(--text)`, `var(--text-soft)`, `var(--orange)`) from `assets/restrosuite.css` to fix transparent panel overlays and ensure full dark/light mode compatibility.
+* **Guide Modal Backdrop Blur**: Implemented a blurred overlay (`backdrop-filter: blur(12px)`) on `.product-guide-backdrop` to cover and isolate the POS screen in the background when the Workspace Guide is open.
+* **Button & Icon Styling**: Styled `#tour-prev-btn`, `#tour-next-btn`, close buttons, and checklist items inside the guide modal to fit the luxe restaurant theme.
+* **Android Sync & Commit**: Ran `sync-assets.ps1` to mirror all styling changes to the Android app assets folder and successfully pushed the changes to the `main` branch.
+
 ## Onboarding Feature Tour & Releases
 
 * Created a **Release History** list in [src/dashboard/onboarding.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/src/dashboard/onboarding.js) tracking system updates and versions.
