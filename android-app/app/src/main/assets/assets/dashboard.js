@@ -2386,6 +2386,119 @@
       };
     }
 
+    // 5b. Print Day Report
+    const btnPrintDayReport = document.getElementById('btn-print-day-report');
+    if (btnPrintDayReport) {
+      btnPrintDayReport.onclick = () => {
+        const paidBills = BILLS.filter(b => b.status === 'paid');
+        if (!paidBills.length) return toast('No sales data for day report', 'fa-circle-exclamation');
+
+        const outletName = document.getElementById('manage-tenant-name')?.textContent || 'RestroSuite Outlet';
+        
+        // Calculate stats
+        const totalRevenue = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+        const totalOrders = paidBills.length;
+        const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+        
+        // Estimate GST collected (assume 5% average)
+        const netTaxableSales = Math.round(totalRevenue / 1.05);
+        const gstCollected = totalRevenue - netTaxableSales;
+
+        // Payment Breakdown
+        const paymentMethods = {};
+        paidBills.forEach(b => {
+          const method = b.pay || b.paymentMethod || 'Cash';
+          paymentMethods[method] = (paymentMethods[method] || 0) + (b.amount || 0);
+        });
+
+        const paymentBreakdownHtml = Object.entries(paymentMethods).map(([method, amount]) => `
+          <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+            <span>${method}:</span>
+            <span>${rs(amount)}</span>
+          </div>
+        `).join('');
+
+        const now = new Date();
+        const formattedDate = now.toLocaleDateString('en-IN');
+        const formattedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+        const html = `
+          <div style="font-family: 'Inter', monospace; max-width: 280px; margin: 0 auto; color: #111; font-size: 13px; line-height: 1.4;">
+            <div style="text-align: center; margin-bottom: 10px;">
+              <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 18px; margin: 0;">${outletName}</h2>
+              <p style="font-size: 11px; color: #555; margin-top: 2px;">DAILY SALES SUMMARY</p>
+            </div>
+            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #555; margin-bottom: 8px;">
+              <span>Date: ${formattedDate}</span>
+              <span>Time: ${formattedTime}</span>
+            </div>
+            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
+            
+            <div style="margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                <span>Total Bills:</span>
+                <strong>${totalOrders}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                <span>Avg Order Value (AOV):</span>
+                <strong>${rs(aov)}</strong>
+              </div>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
+            
+            <div style="margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-weight: 600;">
+                <span>PAYMENT BREAKDOWN</span>
+                <span>AMOUNT</span>
+              </div>
+              ${paymentBreakdownHtml}
+            </div>
+            
+            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
+            
+            <div style="margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                <span>Net Taxable Sales:</span>
+                <span>${rs(netTaxableSales)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                <span>Total GST (5%):</span>
+                <span>${rs(gstCollected)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; border-top: 1px dashed #ccc; margin-top: 4px;">
+                <span>GROSS REVENUE:</span>
+                <span>${rs(totalRevenue)}</span>
+              </div>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
+            
+            <div style="text-align: center; font-size: 11px; color: #777; margin-top: 15px;">
+              *** End of Report ***
+            </div>
+          </div>
+        `;
+
+        if (typeof window.RSPrint === 'function') {
+          window.RSPrint(html, 'Daily Sales Report');
+        } else {
+          const f = document.createElement('iframe');
+          f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+          document.body.appendChild(f);
+          const d = f.contentWindow.document;
+          d.open();
+          d.write(`<!doctype html><html><head><title>Daily Sales Report</title></head><body>${html}</body></html>`);
+          d.close();
+          f.contentWindow.focus();
+          f.contentWindow.print();
+          setTimeout(() => f.remove(), 800);
+        }
+        toast('Day report sent to printer', 'fa-print');
+      };
+    }
+
     // 6. GSTR Download
     const btnGSTR = document.getElementById('btn-download-gstr');
     if (btnGSTR) {
