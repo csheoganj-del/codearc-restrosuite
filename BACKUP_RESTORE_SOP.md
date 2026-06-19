@@ -5,6 +5,7 @@ Backups protect restaurant operations from mistakes, imports, and accidental dat
 ## Backup Types
 
 - Manual JSON export from dashboard.
+- Automated database backups via script: `npm run backup` (saves compressed ZIP snapshots of all core tables to `backups/` directory).
 - Supabase database backups when the project plan supports it.
 - WhatsApp gateway session backup when the optional gateway is enabled.
 - Growth Hub backup snapshot records for readiness tracking.
