@@ -94,7 +94,7 @@
           <span class="lg"><span class="sw" style="background:var(--green)"></span> Available</span>
           <span class="lg"><span class="sw" style="background:var(--orange)"></span> Dining</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><span class="pill"><i class="fa-solid fa-location-dot"></i> Ground floor</span></div>
+        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill"><i class="fa-solid fa-location-dot"></i> Ground floor</span></div>
         <div class="floor-grid">${TABLES.map(t=>`
           <div class="table-card ${t.state}" data-n="${t.n}">
             <span class="tdot" style="background:${stateDot[t.state]}"></span>
@@ -103,6 +103,8 @@
             ${t.amt?`<div class="tamt">${rs(t.amt)}</div><div class="tcap">${t.since}</div>`:'<div class="tcap" style="margin-top:auto">Tap to seat</div>'}
           </div>`).join('')}</div>`;
       $$('.table-card', sec).forEach(c=> c.onclick=()=> tableModal(TABLES.find(t=>t.n===c.dataset.n)));
+      const btnPrint = $('#btn-print-floor-qrs', sec);
+      if (btnPrint) btnPrint.onclick = () => showAllTableQRs();
     }
 
     function tableModal(t){
@@ -110,11 +112,18 @@
         ? `<p style="color:var(--text-soft);font-size:14.5px">Table ${t.n} is available (${t.cap} seats). Seat guests and start a new order on the POS.</p>`
         : `<div class="crm-stats" style="margin-bottom:6px"><div class="cs"><div class="csv">${rs(t.amt)}</div><div class="csl">Running bill</div></div><div class="cs"><div class="csv">${t.since}</div><div class="csl">Seated for</div></div><div class="cs"><div class="csv">${t.cap}</div><div class="csl">Seats</div></div></div>`;
       const foot = t.state==='free'
-        ? `<button class="btn btn-ghost" style="flex:1" data-x>Close</button><button class="btn btn-primary" style="flex:1" data-pos><i class="fa-solid fa-cash-register"></i> Seat & order</button>`
-        : `<button class="btn btn-ghost" style="flex:1" data-pos><i class="fa-solid fa-plus"></i> Add items</button><button class="btn btn-primary" style="flex:1" data-bill><i class="fa-solid fa-print"></i> ${t.state==='billed'?'Settle payment':'Print bill'}</button>`;
+        ? `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px;margin-right:8px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button><button class="btn btn-ghost" style="flex:1" data-x>Close</button><button class="btn btn-primary" style="flex:1" data-pos><i class="fa-solid fa-cash-register"></i> Seat & order</button>`
+        : `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px;margin-right:8px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button><button class="btn btn-ghost" style="flex:1" data-pos><i class="fa-solid fa-plus"></i> Add items</button><button class="btn btn-primary" style="flex:1" data-bill><i class="fa-solid fa-print"></i> ${t.state==='billed'?'Settle payment':'Print bill'}</button>`;
       RSModal.open({ title:'Table '+t.n, sub:stateTxt[t.state], icon:'fa-chair', size:'sm', body, foot,
         onMount(modal,close){ modal.querySelector('[data-x]')&&(modal.querySelector('[data-x]').onclick=close);
           modal.querySelector('[data-pos]').onclick=()=>{ close(); RS.activateTab('pos-tab'); RS.toast('Table '+t.n+' selected on POS','fa-cash-register'); };
+          const qrBtn = modal.querySelector('#tbl-view-qr');
+          if (qrBtn) {
+            qrBtn.onclick = () => {
+              close();
+              showSingleTableQR(t);
+            };
+          }
           const bb=modal.querySelector('[data-bill]'); if(bb) bb.onclick=async ()=>{
             close();
             if (t.state === 'billed' || t.state === 'occupied') {
@@ -133,6 +142,114 @@
           };
         }});
     }
+
+    function showSingleTableQR(t) {
+      if (!window.RSModal) return;
+      const tenantName = sessionStorage.getItem('tenant_name') || 'Doppio Cafe';
+      const tenantSlug = sessionStorage.getItem('tenant_slug') || 'doppiocl';
+      const orderUrl = `https://restrosuite.codearc.co.in/qr-order.html?tenant=${tenantSlug}&table=${t.n}`;
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(orderUrl)}`;
+      
+      const body = `
+        <div style="text-align: center; padding: 10px 0;">
+          <div style="font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px;">${tenantName}</div>
+          <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 16px;">Scan to view menu and place order</div>
+          <div style="display: inline-block; padding: 12px; border: 1px solid var(--stroke-2); border-radius: 12px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 16px;">
+            <img src="${qrCodeUrl}" style="width: 180px; height: 180px; display: block;" alt="Table ${t.n} QR Code">
+          </div>
+          <div style="font-size: 18px; font-weight: 800; color: #FF6B00; margin-bottom: 6px;">Table ${t.n}</div>
+          <div style="font-size: 11px; word-break: break-all; color: var(--text-soft); background: var(--bg-soft); padding: 8px 10px; border-radius: 6px; font-family: monospace; border: 1px solid var(--stroke-2);">${orderUrl}</div>
+        </div>
+      `;
+      
+      const foot = `
+        <button class="btn btn-ghost" style="flex:1" data-x>Close</button>
+        <button class="btn btn-primary" style="flex:1" id="btn-print-single-qr"><i class="fa-solid fa-print"></i> Print Card</button>
+      `;
+      
+      RSModal.open({
+        title: 'Table QR Code',
+        sub: `Table ${t.n} ordering link`,
+        icon: 'fa-qrcode',
+        size: 'sm',
+        body,
+        foot,
+        onMount(modal, close) {
+          modal.querySelector('[data-x]').onclick = close;
+          modal.querySelector('#btn-print-single-qr').onclick = () => {
+            const printHtml = `
+              <div style="max-width: 320px; margin: 20px auto; text-align: center; border: 2px solid #111; padding: 30px 20px; border-radius: 16px; background: #fff;">
+                <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 24px; color: #111; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${tenantName}</div>
+                <div style="font-size: 12px; color: #555; margin-bottom: 24px;">Scan to view menu & order instantly</div>
+                <div style="display: inline-block; padding: 12px; border: 1px solid #ddd; border-radius: 12px; background: #fff; margin-bottom: 24px;">
+                  <img src="${qrCodeUrl}" style="width: 200px; height: 200px; display: block;" />
+                </div>
+                <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 32px; color: #FF6B00; margin-bottom: 8px;">TABLE ${t.n}</div>
+                <div style="font-size: 11px; color: #777;">Powered by RestroSuite</div>
+              </div>
+            `;
+            if (typeof window.RSPrint === 'function') {
+              window.RSPrint(printHtml, `Table ${t.n} QR`);
+            } else {
+              const win = window.open('', '_blank');
+              win.document.write(`<html><head><title>Print Table ${t.n} QR</title></head><body onload="window.print();window.close()">${printHtml}</body></html>`);
+              win.document.close();
+            }
+          };
+        }
+      });
+    }
+
+    function showAllTableQRs() {
+      const tenantName = sessionStorage.getItem('tenant_name') || 'Doppio Cafe';
+      const tenantSlug = sessionStorage.getItem('tenant_slug') || 'doppiocl';
+      
+      const cardsHtml = TABLES.map(t => {
+        const orderUrl = `https://restrosuite.codearc.co.in/qr-order.html?tenant=${tenantSlug}&table=${t.n}`;
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(orderUrl)}`;
+        return `
+          <div class="qr-print-card" style="text-align: center; border: 1.5px solid #111; padding: 24px 15px; border-radius: 12px; background: #fff; page-break-inside: avoid; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 18px; color: #111; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">${tenantName}</div>
+            <div style="font-size: 10px; color: #555; margin-bottom: 15px;">Scan to view menu & order</div>
+            <div style="display: inline-block; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background: #fff; margin-bottom: 15px;">
+              <img src="${qrCodeUrl}" style="width: 140px; height: 140px; display: block;" />
+            </div>
+            <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 24px; color: #FF6B00; margin-bottom: 4px;">TABLE ${t.n}</div>
+            <div style="font-size: 9px; color: #777;">Powered by RestroSuite</div>
+          </div>
+        `;
+      }).join('');
+
+      const printStyle = `
+        <style>
+          @media print {
+            body { padding: 0; margin: 0; background: #fff; }
+          }
+          .qr-print-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            padding: 10px;
+          }
+        </style>
+      `;
+
+      const printHtml = `
+        ${printStyle}
+        <div class="qr-print-grid">
+          ${cardsHtml}
+        </div>
+      `;
+
+      if (typeof window.RSPrint === 'function') {
+        window.RSPrint(printHtml, 'Outlet Table QRs');
+      } else {
+        const win = window.open('', '_blank');
+        win.document.write(`<html><head><title>Print Table QRs</title></head><body onload="window.print();window.close()">${printHtml}</body></html>`);
+        win.document.close();
+      }
+    }
+
     RS.titles['floor-tab']=['Floor & Tables','Live table status & seating']; RS.addRenderer('floor-tab', renderFloor);
 
     /* ===================== ONLINE / AGGREGATOR ORDERS ===================== */
