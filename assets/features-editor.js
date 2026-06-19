@@ -108,7 +108,33 @@
     /* ---------------- right list ---------------- */
     function renderList(){
       const body = $('#editor-list'); if(!body) return;
-      body.innerHTML = RS.MENU.map(m=>`
+
+      const catFil = $('#editor-cat-filter');
+      if (catFil && !catFil._rsListenerBound) {
+        catFil._rsListenerBound = true;
+        catFil.addEventListener('change', renderList);
+      }
+      const stockFil = $('#editor-stock-filter');
+      if (stockFil && !stockFil._rsListenerBound) {
+        stockFil._rsListenerBound = true;
+        stockFil.addEventListener('change', renderList);
+      }
+
+      const catFilter = ($('#editor-cat-filter')?.value || 'All').toLowerCase();
+      const stockFilter = ($('#editor-stock-filter')?.value || 'All').toLowerCase();
+
+      let filtered = RS.MENU;
+      if (catFilter !== 'all') {
+        filtered = filtered.filter(m => m.cat && m.cat.toLowerCase() === catFilter);
+      }
+      if (stockFilter !== 'all') {
+        filtered = filtered.filter(m => {
+          if (stockFilter === 'ok') return m.stock === 'ok' || m.stock === 'low';
+          return m.stock === stockFilter;
+        });
+      }
+
+      body.innerHTML = filtered.map(m=>`
         <tr data-id="${m.id}">
           <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${m.name}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${m.cat}</div></div></div></td>
           <td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td>
@@ -116,7 +142,7 @@
           <td><label class="switch-mini"><input type="checkbox" data-av="${m.id}" ${m.stock!=='out'?'checked':''}><span></span></label></td>
           <td><div class="row-actions"><button class="icon-act go" data-edit="${m.id}" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" data-recipe="${m.id}" title="Recipe & cost"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" data-del="${m.id}" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
         </tr>`).join('');
-      const count = RS.MENU.length, cats=[...new Set(RS.MENU.map(m=>m.cat))].length;
+      const count = filtered.length, cats=[...new Set(filtered.map(m=>m.cat))].length;
       const sub = $('#editor-tab .ph-sub'); if(sub) sub.textContent = `${count} items · ${cats} categories`;
       body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>{ buildForm(); buildForm._load(RS.MENU.find(x=>String(x.id)===String(b.dataset.edit))); $('#editor-tab').scrollIntoView({block:'start'}); });
       body.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=> confirmDelete(b.dataset.del));
@@ -125,13 +151,13 @@
       
       const btnAll = $('#btn-enable-all-menu');
       if (btnAll) {
-        if (RS.MENU.length === 0) {
+        if (filtered.length === 0) {
           btnAll.disabled = true;
           btnAll.innerHTML = '<i class="fa-solid fa-circle-check"></i> Enable All';
           btnAll.onclick = null;
         } else {
           btnAll.disabled = false;
-          const hasDisabled = RS.MENU.some(m => m.stock === 'out');
+          const hasDisabled = filtered.some(m => m.stock === 'out');
           if (hasDisabled) {
             btnAll.innerHTML = '<i class="fa-solid fa-circle-check"></i> Enable All';
             btnAll.title = 'Enable all items at once';
@@ -140,9 +166,9 @@
             btnAll.title = 'Disable all items at once';
           }
           btnAll.onclick = () => {
-            const actionEnable = RS.MENU.some(m => m.stock === 'out');
+            const actionEnable = filtered.some(m => m.stock === 'out');
             const changed = [];
-            for (const m of RS.MENU) {
+            for (const m of filtered) {
               if (actionEnable) {
                 if (m.stock === 'out') {
                   m.stock = 'ok';
