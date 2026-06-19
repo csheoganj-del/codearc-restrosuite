@@ -251,17 +251,18 @@
       sec.appendChild(panes);
 
       document.addEventListener('rs:render-employees', () => {
-        // Redraw on employees update
-        if (RS.EMPLOYEES) {
-          ATT.length = 0;
-          RS.EMPLOYEES.forEach((e,i)=>{
-            ATT.push({
-              name:e.name,role:e.role,rc:e.rc,
-              inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
-              status:['present','present','present','present','late','present'][i%6]
+        // Only rebuild ATT from employees if we have no DB attendance records yet
+        // (DB attendance loaded below takes priority over mock placeholder data)
+        if (ATT.length === 0 && RS.EMPLOYEES && RS.EMPLOYEES.length) {
+          // DB load will populate ATT; this is a fallback for offline/local mode only
+          if (!window.RS_DB || !RS_DB.isCloud) {
+            RS.EMPLOYEES.forEach((e,i)=>{
+              ATT.push({
+                name:e.name, role:e.role, rc:e.rc,
+                inT:'—', outT:'—', status:'present'
+              });
             });
-          });
+          }
         }
         drawPanes();
       });
@@ -270,13 +271,8 @@
         const currentEmployees = RS.EMPLOYEES || [];
 
         if (ATT.length === 0 && currentEmployees.length > 0) {
-          currentEmployees.forEach((e,i)=>{
-            ATT.push({
-              name:e.name,role:e.role,rc:e.rc,
-              inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
-              status:['present','present','present','present','late','present'][i%6]
-            });
+          currentEmployees.forEach((e)=>{
+            ATT.push({ name:e.name, role:e.role, rc:e.rc, inT:'—', outT:'—', status:'present' });
           });
         }
 

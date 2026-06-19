@@ -216,16 +216,36 @@
   };
 
   /* ---------------- CLOUD (tenant-data) ---------------- */
+  // Core business profile columns (saved to doppio_business_profile in Supabase)
   const SETTINGS_MAP = {
     set_restaurant_name:'business_name', set_outlet_name:'business_name', set_address:'address',
-    set_phone:'phone', set_gstin:'gstin', set_gst_state:'gst_state'
+    set_phone:'phone', set_gstin:'gstin', set_gst_state:'gst_state',
+    set_email:'email', set_cuisine:'cuisine_type'
   };
+  // Extended settings stored in localStorage (not in DB — they are device/preference settings
+  // like printer config, GST toggles, team PINs, gateway toggles that don't belong in the
+  // shared business profile table).
+  const LOCAL_SETTINGS_KEYS = [
+    'set_gst','set_default_gst_slab','set_invoice_prefix','set_service_charge',
+    'set_round_off_totals','set_show_hsn_codes','set_inclusive_pricing',
+    'set_receipt_printer','set_paper_size','set_auto_print_receipt','set_auto_print_kot',
+    'set_kot_copies','set_kitchen_printer',
+    'set_auto_send_receipts','set_order_updates','set_marketing_broadcasts','set_receipt_message_template',
+    'set_require_pin_for_refunds','set_cashier_can_edit_prices','set_lock_reports_for_staff'
+  ];
+  const LOCAL_SETTINGS_KEY = 'rs_v2:extended_settings';
   const CLOUD = {
     async list(c){
       const m=MAP[c]; if(!m) return [];
       const rows = await API.select(m.table, { order:m.order||{column:m.pk,ascending:true}, limit:500 });
+      const result = (rows||[]).map(m.from);
       known[c] = new Set((rows||[]).map(r=>String(r[m.pk])));
-      return (rows||[]).map(m.from);
+      // Warn if the result looks truncated (hit the 500-row server cap)
+      if (result.length >= 500) {
+        console.warn(`[RS_DB] ${c}: result capped at 500 rows — reports may be incomplete. Contact support to increase plan limits.`);
+        window.dispatchEvent(new CustomEvent('rs:data-truncated', { detail: { collection: c, count: result.length } }));
+      }
+      return result;
     },
     async put(c,id,obj){
       const m=MAP[c]; if(!m) return obj;
@@ -253,17 +273,34 @@
     },
     async getSettings(){
       const row = await API.select('doppio_business_profile', { maybeSingle:true });
-      if(!row) return null;
-      const out={}; for(const k in SETTINGS_MAP){ if(row[SETTINGS_MAP[k]]!=null) out[k]=row[SETTINGS_MAP[k]]; }
-      out.set_gst = row.gst_enabled ? '5%' : '0%';
-      out._raw = row; return out;
+      const out={};
+      if (row) {
+        for(const k in SETTINGS_MAP){ if(row[SETTINGS_MAP[k]]!=null) out[k]=row[SETTINGS_MAP[k]]; }
+        out.set_gst = row.gst_enabled ? '5%' : '0%';
+        out._raw = row;
+      }
+      // Merge extended (local) settings
+      try {
+        const local = JSON.parse(localStorage.getItem(LOCAL_SETTINGS_KEY) || '{}');
+        for (const k of LOCAL_SETTINGS_KEYS) { if (local[k] !== undefined) out[k] = local[k]; }
+      } catch(e){}
+      return Object.keys(out).length ? out : null;
     },
     async setSettings(o){
-      const body={}; for(const k in o){ if(SETTINGS_MAP[k]) body[SETTINGS_MAP[k]] = o[k]; }
-      if(Object.keys(body).length===0) return o;
-      const existing = await API.select('doppio_business_profile', { maybeSingle:true }).catch(()=>null);
-      if(existing){ await API.update('doppio_business_profile', body, []); }
-      else { body.id = newClientId(); await API.insert('doppio_business_profile', body); }
+      // 1. Persist DB-backed keys to doppio_business_profile
+      const body={};
+      for(const k in o){ if(SETTINGS_MAP[k]) body[SETTINGS_MAP[k]] = o[k]; }
+      if(Object.keys(body).length > 0){
+        const existing = await API.select('doppio_business_profile', { maybeSingle:true }).catch(()=>null);
+        if(existing){ await API.update('doppio_business_profile', body, []); }
+        else { body.id = newClientId(); await API.insert('doppio_business_profile', body); }
+      }
+      // 2. Persist extended (local preference) keys to localStorage
+      try {
+        const current = JSON.parse(localStorage.getItem(LOCAL_SETTINGS_KEY) || '{}');
+        for(const k of LOCAL_SETTINGS_KEYS){ if(o[k] !== undefined) current[k] = o[k]; }
+        localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(current));
+      } catch(e){}
       return o;
     }
   };

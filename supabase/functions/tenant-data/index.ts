@@ -307,15 +307,29 @@ function applyFilters(query: any, filters: unknown[], tenantId: string) {
     const typed = filter as Record<string, unknown>;
     const column = String(typed.column || "");
     if (!column || column === "tenant_id") continue;
-    if (typed.operator === "in" && Array.isArray(typed.value)) {
+    const op = String(typed.operator || "eq");
+    if (op === "in" && Array.isArray(typed.value)) {
       nextQuery = nextQuery.in(column, typed.value);
-    } else if (
-      typed.operator === "not"
-      && typed.comparisonOperator === "in"
-      && typeof typed.value === "string"
-    ) {
+    } else if (op === "not" && typed.comparisonOperator === "in" && typeof typed.value === "string") {
       nextQuery = nextQuery.not(column, "in", typed.value);
+    } else if (op === "gte") {
+      nextQuery = nextQuery.gte(column, typed.value);
+    } else if (op === "lte") {
+      nextQuery = nextQuery.lte(column, typed.value);
+    } else if (op === "gt") {
+      nextQuery = nextQuery.gt(column, typed.value);
+    } else if (op === "lt") {
+      nextQuery = nextQuery.lt(column, typed.value);
+    } else if (op === "ilike") {
+      nextQuery = nextQuery.ilike(column, String(typed.value || ""));
+    } else if (op === "like") {
+      nextQuery = nextQuery.like(column, String(typed.value || ""));
+    } else if (op === "neq") {
+      nextQuery = nextQuery.neq(column, typed.value);
+    } else if (op === "is") {
+      nextQuery = nextQuery.is(column, typed.value);
     } else {
+      // Default: eq
       nextQuery = nextQuery.eq(column, typed.value);
     }
   }

@@ -100,7 +100,42 @@
     };
 
     /* ---------------- receipt builder ---------------- */
-    let billSeq = 2042;
+    // Bill display number: timestamp-based so it's unique across reloads and devices.
+    // Format: INV-YYMMDD-HHMM-SSS  e.g. INV-260619-1423-042
+    function generateBillNo() {
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(2);
+      const mm = String(now.getMonth()+1).padStart(2,'0');
+      const dd = String(now.getDate()).padStart(2,'0');
+      const hh = String(now.getHours()).padStart(2,'0');
+      const mi = String(now.getMinutes()).padStart(2,'0');
+      const ss = String(now.getSeconds()).padStart(2,'0');
+      const ms = String(now.getMilliseconds()).padStart(3,'0');
+      return `INV-${yy}${mm}${dd}-${hh}${mi}-${ss}${ms.slice(0,2)}`;
+    }
+
+    // POS runtime GST/discount flags — loaded from settings on boot and re-read on checkout.
+    // Default false so that hardcoded constants no longer control behaviour.
+    let posGstEnabled = false;
+    let posDiscountEnabled = false;
+    async function loadPosSettings() {
+      try {
+        const settings = window.RS && RS.getSettings ? await RS.getSettings() : null;
+        if (settings) {
+          // set_gst is stored as '5%', '12%', '18%', or '0%'
+          const gstVal = settings.set_gst || settings.set_default_gst_slab || '0%';
+          posGstEnabled = gstVal !== '0%' && !!gstVal;
+          posDiscountEnabled = !!settings.set_cashier_can_edit_prices || false;
+          // Expose GST rate for calculations (default 5% if enabled but no explicit rate)
+          const gstPct = parseFloat(gstVal) || 0;
+          window.__RS_POS_GST_PCT = gstPct / 100;
+        }
+      } catch(e) {
+        console.warn('[POS] Failed to load settings for GST/discount flags:', e.message);
+      }
+    }
+    loadPosSettings();
+    document.addEventListener('rs:hydrated', loadPosSettings);
     function receiptHTML(bill){
       const custName = bill.customer || 'Walk-in';
       let custSection = '';
@@ -239,22 +274,41 @@
       if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
       if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
 
+      // Recalculate totals using live POS settings (GST may have changed since cart was built)
+      const gstRate = posGstEnabled ? (window.__RS_POS_GST_PCT || 0.05) : 0;
+      const sub = totals.sub;
+      const disc = posDiscountEnabled ? totals.disc : 0;
+      const taxable = sub - disc;
+      const gst = posGstEnabled ? Math.round(taxable * gstRate) : 0;
+      const grand = taxable + gst;
+
+      const billNo = generateBillNo();
       const bill = {
-        no:'INV-'+(billSeq++), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
-        table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
-        tenders: [{ method: payment.method, amount: totals.grand }], change: 0
+        no: billNo,
+        time: new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
+        table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'',
+        items: totals.items, sub, disc, gst, grand,
+        tenders: [{ method: payment.method, amount: grand }], change: 0
       };
       try {
         const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-        const gstHalf = Math.round((totals.gst||0)/2);
-        const billRow = { id:bill.no, no:bill.no, time:'Just now', table:bill.table, items: totals.count,
-          amount: bill.grand, pay: payment.method, status:'paid',
-          receivedAmount: payment.received, changeAmount: payment.change,
+        const gstHalf = Math.round(gst/2);
+        // billRow.id is a server-generated bigint from Supabase (clientId:false for bills).
+        // We omit id here so the server assigns it; orderId carries the human-readable number.
+        const billRow = {
+          no: billNo, time: 'Just now', table: bill.table, items: totals.count,
+          amount: grand, pay: payment.method, status: 'paid',
+          receivedAmount: grand, changeAmount: 0,
           customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
-          subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-          _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
+          subtotal: sub, gst, cgst: gstHalf, sgst: gst-gstHalf,
+          _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price }))
+        };
         RS.BILLS.unshift(billRow);
-        if (RS.saveOne) await RS.saveOne('bills',billRow);
+        if (RS.saveOne) {
+          const saved = await RS.saveOne('bills', billRow);
+          // After cloud insert, update in-memory id with server-assigned bigint id
+          if (saved && saved.id != null) billRow.id = saved.id;
+        }
         const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
         if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
           RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');

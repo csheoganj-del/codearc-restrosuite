@@ -1,32 +1,45 @@
 /* ============================================================
-   RestroSuite — Doppio backend API client
-   Talks to the existing Supabase Edge Functions:
+   RestroSuite — backend API client
+   Talks to the Supabase Edge Functions:
      • tenant-access  (login / register / session / recovery)
      • tenant-data    (tenant-scoped CRUD on doppio_* tables)
-   Mirrors the original app's request contract exactly.
    ============================================================ */
 (function(){
   'use strict';
-  let cfg = window.RS_SUPABASE || { url:'', anonKey:'' };
+
+  // ── Runtime config bootstrap ──────────────────────────────
+  // If supabase-config.js left credentials blank (recommended),
+  // fetch them asynchronously from /api/config (Vercel env vars).
+  // All API calls are deferred until the config promise resolves.
+  let cfg = (window.RS_SUPABASE && window.RS_SUPABASE.url && window.RS_SUPABASE.anonKey)
+    ? { url: window.RS_SUPABASE.url, anonKey: window.RS_SUPABASE.anonKey }
+    : { url: '', anonKey: '' };
   let enableDemoTools = false;
   let zeroCostLaunchMode = false;
-  if (!cfg.url || !cfg.anonKey) {
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', '/api/config', false);
-      xhr.send(null);
-      if (xhr.status === 200) {
-        const res = JSON.parse(xhr.responseText);
-        if (res.supabaseUrl && res.supabaseAnonKey) {
-          cfg = { url: res.supabaseUrl, anonKey: res.supabaseAnonKey };
-          enableDemoTools = res.enableDemoTools === true;
-          zeroCostLaunchMode = res.zeroCostLaunchMode === true;
-        }
-      }
-    } catch(e) {
-      console.warn('[rs-api] Synchronous fetch /api/config failed:', e.message);
-    }
-  }
+
+  // Promise that resolves once config is ready. If creds are already present
+  // (e.g. local dev with supabase-config.js filled in), resolves immediately.
+  const _configReady = (cfg.url && cfg.anonKey)
+    ? Promise.resolve()
+    : fetch('/api/config', { method: 'GET', credentials: 'same-origin' })
+        .then(r => { if (!r.ok) throw new Error('Config endpoint returned ' + r.status); return r.json(); })
+        .then(res => {
+          if (res.supabaseUrl && res.supabaseAnonKey) {
+            cfg = { url: res.supabaseUrl, anonKey: res.supabaseAnonKey };
+            enableDemoTools = res.enableDemoTools === true;
+            zeroCostLaunchMode = res.zeroCostLaunchMode === true;
+          }
+        })
+        .catch(e => {
+          console.warn('[rs-api] Async fetch /api/config failed:', e.message, '— running in local demo mode');
+        });
+
+  // Expose so other scripts (e.g. script.js) can await config before running
+  window.__configReady = _configReady;
+  // Defer API initialisation until config is ready
+  _configReady.then(initApi);
+
+  function initApi() {
   // Normalise: accept either the bare project URL or one with a /rest/v1 or /functions/v1 suffix.
   const REMOTE_BASE = String(cfg.url || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');
   const BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '' : REMOTE_BASE;
@@ -301,4 +314,5 @@
   };
 
   window.RS_API = api;
+  } // end initApi
 })();

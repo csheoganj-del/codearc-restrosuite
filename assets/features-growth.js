@@ -9,16 +9,16 @@
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
     /* ===================== FLOOR & TABLES ===================== */
-    const TABLES = [
-      {n:'01',cap:2,state:'free'},{n:'02',cap:4,state:'free'},
-      {n:'03',cap:4,state:'free'},{n:'04',cap:2,state:'free'},
-      {n:'05',cap:6,state:'free'},{n:'06',cap:4,state:'free'},
-      {n:'07',cap:2,state:'free'},{n:'08',cap:8,state:'free'},
-      {n:'09',cap:4,state:'free'},{n:'10',cap:2,state:'free'},
-      {n:'11',cap:4,state:'free'},{n:'12',cap:6,state:'free'}
+    // Static fallback table layout used when doppio_table_layout has no rows yet.
+    const DEFAULT_TABLES = [
+      {n:'01',cap:2},{n:'02',cap:4},{n:'03',cap:4},{n:'04',cap:2},
+      {n:'05',cap:6},{n:'06',cap:4},{n:'07',cap:2},{n:'08',cap:8},
+      {n:'09',cap:4},{n:'10',cap:2},{n:'11',cap:4},{n:'12',cap:6}
     ];
+    let TABLES = DEFAULT_TABLES.map(t => ({ ...t, state:'free', amt:0, since:'', orderId:null, dbId:null, layoutId:null }));
     const stateDot = {free:'var(--green)',occupied:'var(--orange)',billed:'var(--violet-soft)'};
     const stateTxt = {free:'Available',occupied:'Dining',billed:'Bill printed'};
+
     function parseLocalTimestamp(dateStr) {
       if (!dateStr) return null;
       const nativeTime = new Date(dateStr).getTime();
@@ -27,58 +27,82 @@
       if (!m) return null;
       let [, d, mo, y, h, mi, s, meridiem] = m;
       let hour = Number(h);
-      if (meridiem) {
-        const pm = meridiem.toLowerCase() === 'pm';
-        if (pm && hour < 12) hour += 12;
-        if (!pm && hour === 12) hour = 0;
-      }
-      const parsed = new Date(Number(y), Number(mo) - 1, Number(d), hour, Number(mi), Number(s || 0)).getTime();
+      if (meridiem) { const pm = meridiem.toLowerCase() === 'pm'; if (pm && hour < 12) hour += 12; if (!pm && hour === 12) hour = 0; }
+      const parsed = new Date(Number(y), Number(mo)-1, Number(d), hour, Number(mi), Number(s||0)).getTime();
       return Number.isNaN(parsed) ? null : parsed;
     }
     function getElapsedDesc(dateStr) {
-      const ts = parseLocalTimestamp(dateStr);
-      if (!ts) return 'just now';
-      const elapsed = Date.now() - ts;
-      const mins = Math.floor(elapsed / 60000);
-      if (mins < 1) return 'just now';
-      if (mins < 60) return `${mins}m`;
-      const hrs = Math.floor(mins / 60);
-      return `${hrs}h ${mins % 60}m`;
+      const ts = parseLocalTimestamp(dateStr); if (!ts) return 'just now';
+      const elapsed = Date.now() - ts; const mins = Math.floor(elapsed/60000);
+      if (mins < 1) return 'just now'; if (mins < 60) return `${mins}m`;
+      const hrs = Math.floor(mins/60); return `${hrs}h ${mins%60}m`;
     }
 
-    function renderFloor(){
+    async function renderFloor(){
       const sec = $('#floor-tab');
       if(!sec) return;
+      sec.innerHTML = '<div class="sr-empty" style="padding:40px 0"><i class="fa-solid fa-rotate fa-spin" style="font-size:22px;color:var(--orange)"></i></div>';
+
       if (window.RS_DB) {
-        sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
-        RS_DB.list('pending_orders').then(rows => {
-          TABLES.forEach(t => {
-            const activeOrder = rows.find(r => 
-              (r.tableNumber === `Table ${t.n}` || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}`) &&
-              (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review')
-            );
-            if (activeOrder) {
-              t.state = 'occupied';
-              t.amt = activeOrder.total || 0;
-              t.since = activeOrder.dateTime ? getElapsedDesc(activeOrder.dateTime) : 'just now';
-              t.orderId = activeOrder.orderId;
-              t.dbId = activeOrder.id;
-            } else {
-              t.state = 'free';
-              t.amt = 0;
-              t.since = '';
-              t.orderId = null;
-              t.dbId = null;
+        try {
+          // Try to load real table layout from doppio_table_layout first
+          const session = window.RS_API && RS_API.session && RS_API.session();
+          const tablesModule = window.RestroSuite && window.RestroSuite.tables;
+          let layoutRows = [];
+          if (tablesModule && session && session.tenant_id && RS_DB.isCloud) {
+            try {
+              const tm = tablesModule.create({ db: RS_DB, tenantId: session.tenant_id });
+              layoutRows = await tm.listTables();
+            } catch(e) {
+              console.warn('[Floor] table_layout load failed, using pending_orders approach:', e.message);
             }
-          });
-          drawFloorUI(sec);
-        }).catch(e => {
-          console.warn("Failed loading floor tables from DB", e);
-          drawFloorUI(sec);
-        });
-      } else {
-        drawFloorUI(sec);
+          }
+
+          // Load pending orders to overlay live status on tables
+          const pendingRows = await RS_DB.list('pending_orders');
+
+          if (layoutRows.length > 0) {
+            // Use real DB table layout
+            TABLES = layoutRows.map(row => {
+              const activeOrder = pendingRows.find(r =>
+                (r.tableNumber === row.label || r.tableNumber === row.table_number ||
+                 r.tableNumber === `Table ${row.table_number}`) &&
+                ['DineIn Active','Accepted','preparing','Pending Review'].includes(r.status)
+              );
+              return {
+                n: row.table_number,
+                cap: row.capacity || 4,
+                layoutId: row.id,
+                state: row.status === 'occupied' ? 'occupied' : row.status === 'reserved' ? 'billed' : 'free',
+                amt: activeOrder ? (activeOrder.total || 0) : 0,
+                since: activeOrder ? getElapsedDesc(activeOrder.dateTime) : '',
+                orderId: activeOrder ? activeOrder.orderId : null,
+                dbId: activeOrder ? activeOrder.id : null
+              };
+            });
+          } else {
+            // Fallback: static layout + pending order overlay
+            TABLES = DEFAULT_TABLES.map(t => {
+              const activeOrder = pendingRows.find(r =>
+                (r.tableNumber === `Table ${t.n}` || r.tableNumber === t.n ||
+                 r.tableNumber === `0${parseInt(t.n)}`) &&
+                ['DineIn Active','Accepted','preparing','Pending Review'].includes(r.status)
+              );
+              return {
+                ...t, layoutId: null,
+                state: activeOrder ? 'occupied' : 'free',
+                amt: activeOrder ? (activeOrder.total||0) : 0,
+                since: activeOrder ? getElapsedDesc(activeOrder.dateTime) : '',
+                orderId: activeOrder ? activeOrder.orderId : null,
+                dbId: activeOrder ? activeOrder.id : null
+              };
+            });
+          }
+        } catch(e) {
+          console.warn('[Floor] load failed:', e.message);
+        }
       }
+      drawFloorUI(sec);
     }
 
     function drawFloorUI(sec){

@@ -1,4 +1,4 @@
-package com.doppiocafe.pos;
+package com.codearc.restrosuite;
 
 import android.content.Context;
 import android.content.Intent;

@@ -16,7 +16,14 @@
    Leave blank to run in LOCAL demo mode (data persists in the browser).
    ============================================================ */
 
+// Credentials are intentionally blank here.
+// They are served at runtime by /api/config (Vercel serverless function)
+// which reads SUPABASE_URL and SUPABASE_ANON_KEY from environment variables.
+// rs-api.js fetches /api/config asynchronously on startup and populates
+// window.__RS_RUNTIME_CONFIG before initialising the API client.
+// To run locally: set SUPABASE_URL and SUPABASE_ANON_KEY in .env.local
+// and start with `vercel dev`.  Never hardcode credentials here.
 window.RS_SUPABASE = {
-  url:     "https://htkauiibuejetimfiavs.supabase.co/rest/v1/",   // your Supabase Project URL (e.g. "https://abcdxyz.supabase.co")
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk"    // your Supabase anon public key
+  url:     "",   // populated at runtime from /api/config
+  anonKey: ""    // populated at runtime from /api/config
 };

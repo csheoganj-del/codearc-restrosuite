@@ -194,13 +194,176 @@
     RS.addRenderer('tax-tab', renderTax);
 
     /* ===================== ADVANCED ANALYTICS ===================== */
-    const DAILY = [];
-    const HOURS = [];
-    const ITEMS = [];
-    const PAY = [];
-    const STAFF = [];
+    // Data arrays populated from analytics.js engine before each render
+    let DAILY = [];
+    let HOURS = [];
+    let ITEMS = [];
+    let PAY   = [];
+    let STAFF = [];
+    let _anLoading = false;
 
-    function spark(data, color, h=120){
+    async function loadAnalyticsData(days) {
+      if (_anLoading) return;
+      _anLoading = true;
+      try {
+        const an = window.RestroSuite && window.RestroSuite.analytics;
+        const session = window.RS_API && RS_API.session && RS_API.session();
+        if (an && session && session.tenant_id && window.RS_DB && RS_DB.isCloud) {
+          const db = RS_DB; // uses the same tenant-data client
+          const engine = an.create({ db, tenantId: session.tenant_id });
+
+          const [daily, hourly, items, payment] = await Promise.all([
+            engine.dailyRevenue({ days }).catch(() => []),
+            engine.hourlyRevenue({ days }).catch(() => []),
+            engine.itemPopularity({ days, limit: 10 }).catch(() => []),
+            engine.paymentBreakdown({ days }).catch(() => [])
+          ]);
+
+          // Populate DAILY (array of revenue numbers for sparkline)
+          DAILY = daily.map(d => d.revenue / 1000); // divide by 1000 to keep spark scale sane
+
+          // Populate HOURS (24-element array of order counts)
+          HOURS = hourly.map(h => h.orders);
+
+          // Populate ITEMS as [[name, qty, trendStr], ...]
+          const maxQty = items[0] ? items[0].qty_sold : 1;
+          ITEMS = items.map((it, i) => {
+            const prev = items[i + 1];
+            const trend = prev ? (it.qty_sold > prev.qty_sold ? `+${it.qty_sold - prev.qty_sold}` : `-${prev.qty_sold - it.qty_sold}`) : '+0';
+            return [it.name, it.qty_sold, trend];
+          });
+
+          // Populate PAY as [[method, pct, color], ...]
+          const COLORS = ['#FF6A2A','#8B7CF6','#2BB8C0','#F0A93B','#F472B6'];
+          const totalPay = payment.reduce((s, p) => s + p.revenue, 0) || 1;
+          PAY = payment.map((p, i) => [
+            p.method.charAt(0).toUpperCase() + p.method.slice(1),
+            Math.round(p.revenue / totalPay * 100),
+            COLORS[i % COLORS.length]
+          ]);
+
+          // STAFF from employees + bills (best effort)
+          if (RS.EMPLOYEES && RS.EMPLOYEES.length && RS.BILLS && RS.BILLS.length) {
+            const totalBills = RS.BILLS.length || 1;
+            STAFF = RS.EMPLOYEES.slice(0, 5).map(e => {
+              const share = Math.round(totalBills / RS.EMPLOYEES.length);
+              const rev = RS.BILLS.slice(0, share).reduce((s, b) => s + (b.amount || 0), 0);
+              return [e.name, e.role, share, `₹${Math.round(rev).toLocaleString('en-IN')}`];
+            });
+          }
+        } else {
+          // Demo / offline mode: derive from in-memory BILLS
+          const bills = RS.BILLS || [];
+          const byDay = {};
+          const byHour = Array(24).fill(0);
+          const itemMap = {};
+          const payMap = {};
+          bills.forEach(b => {
+            const d = (b.time || '').slice(0, 10) || 'today';
+            byDay[d] = (byDay[d] || 0) + (b.amount || 0);
+            const h = b.time ? new Date(b.time).getHours() : 12;
+            if (!isNaN(h)) byHour[h]++;
+            (b._items || []).forEach(it => { itemMap[it.name] = (itemMap[it.name] || 0) + (it.qty || 1); });
+            const pm = b.pay || 'Other'; payMap[pm] = (payMap[pm] || 0) + (b.amount || 0);
+          });
+          DAILY = Object.values(byDay).map(v => v / 1000).slice(-30);
+          HOURS = byHour;
+          ITEMS = Object.entries(itemMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,q],i,arr) => {
+            const prev = arr[i+1]; const trend = prev ? (q > prev[1] ? `+${q-prev[1]}` : `-${prev[1]-q}`) : '+0';
+            return [n, q, trend];
+          });
+          const COLORS = ['#FF6A2A','#8B7CF6','#2BB8C0','#F0A93B','#F472B6'];
+          const totalP = Object.values(payMap).reduce((s,v)=>s+v,0)||1;
+          PAY = Object.entries(payMap).map(([m,v],i)=>[m, Math.round(v/totalP*100), COLORS[i%COLORS.length]]);
+        }
+      } catch(err) {
+        console.warn('[Analytics] Data load failed:', err.message);
+      } finally {
+        _anLoading = false;
+      }
+    }
+
+    function renderAnalytics(){
+      const sec = $('#analytics-tab');
+      const periodEl = $('#an-period');
+      const days = periodEl ? (periodEl.value === 'Last 7 days' ? 7 : periodEl.value === 'Last 90 days' ? 90 : 30) : 30;
+
+      // Show loading state, then load data and re-render
+      const totalRev = DAILY.reduce((a,b)=>a+b,0)*1000;
+      const orders = (RS.BILLS||[]).length;
+      const aov = orders ? Math.round(totalRev/orders) : 0;
+      const todayKey = new Date().toLocaleDateString('en-IN');
+      const todayRev = (RS.BILLS||[]).filter(b=>(b.time||'').startsWith(todayKey.slice(0,6))).reduce((s,b)=>s+(b.amount||0),0);
+      const peakHour = HOURS.length ? HOURS.reduce((bI,v,i,a)=>v>a[bI]?i:bI,0) : null;
+      const peakHourStr = peakHour !== null && HOURS[peakHour] > 0 ? `${peakHour}:00–${peakHour+1}:00` : 'N/A';
+
+      sec.innerHTML = `
+        <div class="toolbar-row"><span class="eyebrow">Last ${days} days</span><div class="grow"></div>
+          <select class="form-input" id="an-period" style="width:auto;padding:9px 32px 9px 14px"><option>Last 7 days</option><option ${days===30?'selected':''}>Last 30 days</option><option ${days===90?'selected':''}>Last 90 days</option></select>
+          <button class="btn btn-ghost btn-sm" id="an-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
+        <div class="stat-row" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
+          <div class="stat-card"><div><div class="sl">Total revenue</div><div class="sv">${rs(totalRev)}</div></div></div>
+          <div class="stat-card"><div><div class="sl">Total orders</div><div class="sv" style="color:var(--violet-soft)">${orders}</div><div class="sd">bills generated</div></div></div>
+          <div class="stat-card"><div><div class="sl">Avg order value</div><div class="sv" style="color:var(--green)">${rs(aov)}</div><div class="sd">per transaction</div></div></div>
+          <div class="stat-card"><div><div class="sl">Today's revenue</div><div class="sv" style="color:var(--amber)">${rs(todayRev)}</div></div></div>
+          <div class="stat-card"><div><div class="sl">Peak hour</div><div class="sv" style="color:var(--orange)">${peakHourStr}</div></div></div>
+        </div>
+
+        <div class="report-grid" style="--cols:2fr 1fr;margin-top:4px">
+          <div class="panel panel-pad">
+            <div class="panel-head"><h3>Daily revenue trend</h3>${DAILY.length?`<span class="pill pill-green">${days}d</span>`:''}</div>
+            ${spark(DAILY,'var(--orange)',150)}
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>${days} days ago</span><span>Today</span></div>
+          </div>
+          <div class="panel panel-pad">
+            <div class="panel-head"><h3>Payment mix</h3></div>
+            <div style="display:flex;align-items:center;gap:16px"><div>${donut(PAY)}</div><div style="flex:1">${PAY.length > 0 ? PAY.map(p=>`<div class="kv" style="padding:5px 0"><span><span class="lg-dot" style="background:${p[2]}"></span> ${p[0]}</span><b>${p[1]}%</b></div>`).join('') : '<div style="color:var(--text-mute);font-size:12px;text-align:center;">No payment data</div>'}</div></div>
+          </div>
+        </div>
+
+        <div class="report-grid" style="--cols:1fr 1fr;margin-top:16px">
+          <div class="panel panel-pad">
+            <div class="panel-head"><h3>Hourly footfall</h3><span class="pill">Avg/day</span></div>
+            <div class="bars" style="height:130px;display:flex;align-items:flex-end;gap:3px;justify-content:center;">
+              ${HOURS.length > 0 ? HOURS.map((v,i)=>`<div style="flex:1;border-radius:3px 3px 0 0;background:${i>=19&&i<=21?'var(--orange)':'color-mix(in srgb,var(--orange) 35%,transparent)'};height:${Math.max(v>0?4:0,HOURS.some(x=>x>0)?v/Math.max(...HOURS)*100:0)}%" title="${i}:00 · ${v} orders"></div>`).join('') : '<div style="color:var(--text-mute);font-size:12px;">No footfall data</div>'}
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>12 AM</span><span>12 PM</span><span>11 PM</span></div>
+          </div>
+          <div class="panel panel-pad">
+            <div class="panel-head"><h3>Top selling items</h3></div>
+            <table class="data-table"><tbody>
+              ${ITEMS.length > 0 ? ITEMS.map((it,i)=>`<tr><td style="width:24px;color:var(--text-mute)">${i+1}</td><td><b>${it[0]}</b></td><td>${it[1]} sold</td><td style="text-align:right;color:${it[2][0]==='-'?'var(--red)':'var(--green)'}">${it[2]}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-mute)">No sales items yet</td></tr>'}
+            </tbody></table>
+          </div>
+        </div>
+
+        <div class="panel panel-pad" style="margin-top:16px">
+          <div class="panel-head"><h3>Staff performance</h3><span class="pill">This month</span></div>
+          <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Orders</th><th>Sales</th><th>Share</th></tr></thead><tbody>
+          ${STAFF.length > 0 ? STAFF.map(s=>{const tot=STAFF.reduce((a,x)=>a+x[2],0)||1;const pct=Math.round(s[2]/tot*100);return `<tr><td><b>${s[0]}</b></td><td>${s[1]}</td><td>${s[2]}</td><td class="td-strong">${s[3]}</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;border-radius:99px;background:var(--glass-3);max-width:90px"><div style="height:100%;border-radius:99px;background:var(--orange);width:${pct}%"></div></div><span style="font-size:12px;color:var(--text-mute)">${pct}%</span></div></td></tr>`;}).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-mute)">No staff performance records logged</td></tr>'}
+          </tbody></table></div>
+        </div>`;
+
+      const r=$('#an-refresh');
+      if(r) r.onclick=()=>{
+        DAILY=[]; HOURS=[]; ITEMS=[]; PAY=[]; STAFF=[];
+        loadAnalyticsData(days).then(()=>renderAnalytics()).catch(()=>renderAnalytics());
+        RS.toast('Analytics refreshed','fa-rotate');
+      };
+      const p=$('#an-period');
+      if(p) p.onchange=()=>{
+        DAILY=[]; HOURS=[]; ITEMS=[]; PAY=[]; STAFF=[];
+        const newDays = p.value === 'Last 7 days' ? 7 : p.value === 'Last 90 days' ? 90 : 30;
+        loadAnalyticsData(newDays).then(()=>renderAnalytics()).catch(()=>renderAnalytics());
+      };
+    }
+
+    // Renderer: load data first, then draw
+    RS.titles['analytics-tab']=['Advanced Analytics','Revenue, items, staff & payment insights'];
+    RS.addRenderer('analytics-tab', () => {
+      renderAnalytics(); // draw immediately with whatever data we have
+      loadAnalyticsData(30).then(()=>renderAnalytics()).catch(()=>{}); // then reload live
+    });
       if (!data || data.length === 0) {
         return `<div style="height:${h}px; display:flex; align-items:center; justify-content:center; color:var(--text-mute); font-size:12px; border:1px dashed var(--stroke); border-radius:8px;">No transaction data available yet</div>`;
       }

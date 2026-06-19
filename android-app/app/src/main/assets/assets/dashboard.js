@@ -87,8 +87,21 @@
      POS
      ============================================================ */
   let activeCat='All', cart=[], discountPct=0;
-  const posGstEnabled = false;
-  const posDiscountEnabled = false;
+  // posGstEnabled and posDiscountEnabled are set at runtime from outlet settings.
+  // features-pos.js manages the authoritative copies for checkout; these control
+  // the cart display totals in dashboard.js.
+  let posGstEnabled = false;
+  let posDiscountEnabled = false;
+  // Load from settings once DB is ready
+  function applyPosSettingsFromStore(settings) {
+    if (!settings) return;
+    const gstVal = settings.set_gst || settings.set_default_gst_slab || '0%';
+    posGstEnabled = gstVal !== '0%' && !!gstVal;
+    posDiscountEnabled = !!settings.set_cashier_can_edit_prices || false;
+  }
+  document.addEventListener('rs:hydrated', () => {
+    if (window.RS && RS.getSettings) RS.getSettings().then(applyPosSettingsFromStore).catch(()=>{});
+  });
   const renderPOS = () => {
     const grid = $('#pos-grid');
     const q = ($('#pos-search-input')?.value||'').toLowerCase();

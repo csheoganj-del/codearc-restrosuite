@@ -138,54 +138,40 @@
     }
 
     /**
-     * Fetch new orders from Swiggy Partner API.
-     * NOTE: Swiggy Partner API requires whitelisted IP + approved integration.
-     * Replace this stub with real credentials from your Swiggy Partner dashboard.
+     * Fetch new orders from Swiggy via the server-side aggregator-proxy Edge Function.
+     *
+     * SECURITY: Direct browser→Swiggy calls are intentionally disabled.
+     * Partner API credentials (api_key, api_secret) stored in doppio_aggregator_config
+     * must NEVER be read and forwarded by the browser — they would be exposed in
+     * network inspector to anyone with dashboard access.
+     *
+     * Architecture: browser → tenant-data (reads doppio_aggregator_config config IDs
+     * only, never the raw keys) → aggregator-proxy Edge Function (server-side, has
+     * access to credentials via Supabase secrets, calls Swiggy on behalf of the tenant).
+     *
+     * Until aggregator-proxy is deployed, this function throws a descriptive error
+     * so failures are visible rather than silent.
      */
-    async function fetchSwiggyOrders(cfg) {
-      // Real endpoint: POST https://partner.swiggy.com/api/v1/orders/list
-      // Auth: Bearer token obtained via OAuth from cfg.api_key + cfg.api_secret
-      const response = await fetch(
-        `https://partner.swiggy.com/api/v1/orders/list`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":  "application/json",
-            "Authorization": `Bearer ${cfg.api_key}`,
-            "X-Store-Id":    cfg.store_id
-          },
-          body: JSON.stringify({ status: "new", limit: 50 })
-        }
+    async function fetchSwiggyOrders(_cfg) {
+      throw new Error(
+        "Swiggy integration requires the aggregator-proxy Edge Function. " +
+        "Direct browser API calls to partner.swiggy.com are disabled for security. " +
+        "Deploy supabase/functions/aggregator-proxy and set SWIGGY_CLIENT_ID + " +
+        "SWIGGY_CLIENT_SECRET as Supabase secrets."
       );
-      if (!response.ok) {
-        const msg = await response.text().catch(() => response.statusText);
-        throw new Error(`Swiggy API error ${response.status}: ${msg}`);
-      }
-      const json = await response.json();
-      return (json.orders || json.data || []).map(normalizeSwiggy);
     }
 
     /**
-     * Fetch new orders from Zomato Partner API.
-     * NOTE: Requires approved Zomato partner account + API credentials.
+     * Fetch new orders from Zomato via the server-side aggregator-proxy Edge Function.
+     * Same security rationale as fetchSwiggyOrders above.
      */
-    async function fetchZomatoOrders(cfg) {
-      // Real endpoint: GET https://api.zomato.com/partner/v1/orders
-      const response = await fetch(
-        `https://api.zomato.com/partner/v1/orders?status=placed&restaurant_id=${cfg.store_id}`,
-        {
-          headers: {
-            "Authorization": `Bearer ${cfg.api_key}`,
-            "Content-Type":  "application/json"
-          }
-        }
+    async function fetchZomatoOrders(_cfg) {
+      throw new Error(
+        "Zomato integration requires the aggregator-proxy Edge Function. " +
+        "Direct browser API calls to api.zomato.com are disabled for security. " +
+        "Deploy supabase/functions/aggregator-proxy and set ZOMATO_CLIENT_ID + " +
+        "ZOMATO_CLIENT_SECRET as Supabase secrets."
       );
-      if (!response.ok) {
-        const msg = await response.text().catch(() => response.statusText);
-        throw new Error(`Zomato API error ${response.status}: ${msg}`);
-      }
-      const json = await response.json();
-      return (json.orders || []).map(normalizeZomato);
     }
 
     async function upsertOrders(orders) {

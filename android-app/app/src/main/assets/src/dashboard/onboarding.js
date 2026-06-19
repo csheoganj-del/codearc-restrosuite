@@ -158,17 +158,40 @@
 
   function setupTasks() {
     const enabled = new Set(enabledFeatures().map(feature => feature.tabId));
-    const profile = readJson('doppio_business_profile', {});
-    const menu = readJson('doppio_menu', []);
-    const inventory = readJson('doppio_inventory', {});
-    const employees = readJson('doppio_employees', []);
-    const bills = readJson('doppio_bills', []);
-    const pendingOrders = readJson('doppio_pending_qr_orders', []);
+    // Derive completion state from in-memory RS data (populated by RS_DB.list on hydration)
+    // rather than localStorage keys that are stale in cloud mode.
+    const menuLoaded    = window.RS && Array.isArray(window.RS.MENU) && window.RS.MENU.length > 0;
+    const inventoryLoaded = window.RS && Array.isArray(window.RS.INVENTORY) && window.RS.INVENTORY.length > 0;
+    const employeesLoaded = window.RS && Array.isArray(window.RS.EMPLOYEES) && window.RS.EMPLOYEES.length > 0;
+    const billsLoaded   = window.RS && Array.isArray(window.RS.BILLS) && window.RS.BILLS.length > 0;
+    const qrOrdersLoaded = window.RS && Array.isArray(window.RS.QR_ORDERS) && window.RS.QR_ORDERS.length > 0;
+
+    // For business profile, check in-memory settings first, localStorage as fallback
+    let profileDone = false;
+    try {
+      const s = window.RS_DB && RS_DB.isCloud
+        ? null  // async — will be checked via localStorage mirror below
+        : JSON.parse(localStorage.getItem('rs_v2:settings') || 'null');
+      profileDone = !!(s && (s.set_restaurant_name || s.set_outlet_name));
+    } catch(e) {}
+    // Also accept session tenant_name as a signal that profile exists
+    if (!profileDone) {
+      const tn = sessionStorage.getItem('tenant_name') || '';
+      profileDone = tn.length > 0 && tn !== 'Restaurant';
+    }
+
+    // GST configured if the extended settings key has a non-zero GST value
+    let gstDone = false;
+    try {
+      const ext = JSON.parse(localStorage.getItem('rs_v2:extended_settings') || '{}');
+      gstDone = !!(ext.set_gstin || ext.set_gst || ext.set_default_gst_slab);
+    } catch(e) {}
+
     const tasks = [
       {
         label: 'Complete Business Profile',
         detail: 'Business name, address, contact, receipt and payment information',
-        done: Boolean(profile && (profile.name || profile.businessName)),
+        done: profileDone,
         action: () => document.getElementById('open-profile-btn')?.click()
       }
     ];
@@ -176,7 +199,7 @@
       tasks.push({
         label: 'Publish menu and recipes',
         detail: 'Use Menu Editor or the Excel Setup Wizard',
-        done: Array.isArray(menu) && menu.length > 0,
+        done: menuLoaded,
         tabId: enabled.has('editor-tab') ? 'editor-tab' : 'inventory-tab'
       });
     }
@@ -184,7 +207,7 @@
       tasks.push({
         label: 'Configure inventory',
         detail: 'Stock levels, units, capacities, thresholds, batches, and expiry',
-        done: inventory && Object.keys(inventory).length > 0,
+        done: inventoryLoaded,
         tabId: 'inventory-tab'
       });
     }
@@ -192,7 +215,7 @@
       tasks.push({
         label: 'Verify tax settings',
         detail: 'Confirm GST registration and rates before live billing',
-        done: Boolean(profile && (profile.gstin || profile.gstNumber)),
+        done: gstDone,
         tabId: 'tax-tab'
       });
     }
@@ -200,7 +223,7 @@
       tasks.push({
         label: 'Add staff and test permissions',
         detail: 'Create only the access each employee needs',
-        done: Array.isArray(employees) && employees.length > 0,
+        done: employeesLoaded,
         tabId: 'employees-tab'
       });
     }
@@ -208,9 +231,7 @@
       tasks.push({
         label: 'Test one table QR order',
         detail: 'Scan, submit, approve, prepare, and mark ready',
-        done: Array.isArray(pendingOrders) && pendingOrders.some(order =>
-          order && (order.orderType === 'Dine-In' || String(order.tableNumber || '').match(/^\d+$/))
-        ),
+        done: qrOrdersLoaded,
         tabId: 'qr-orders-tab'
       });
     }
@@ -218,7 +239,7 @@
       tasks.push({
         label: 'Complete one test bill',
         detail: 'Check item price, tax, payment, receipt, inventory, and reports',
-        done: Array.isArray(bills) && bills.length > 0,
+        done: billsLoaded,
         tabId: 'pos-tab'
       });
     }
