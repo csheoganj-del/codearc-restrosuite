@@ -201,7 +201,10 @@
     const isDineIn = () => orderType().toLowerCase().includes('dine');
     const isKotSent = () => kotSentKey && kotSentKey === cartKey();
     const markKotSent = () => { kotSentKey = cartKey(); };
-    const resetCustomerFields = () => {};
+    const resetCustomerFields = () => {
+      const ct = document.getElementById('cart-table');
+      if (ct) ct.value = 'Walk-in / Takeaway';
+    };
     function getPaymentDetails(){
       const totals = RS.getTotals();
       const method = paymentState.method || 'Cash';
@@ -384,9 +387,10 @@
       const totals = RS.getTotals();
       if(!totals.count) return RS.toast('Nothing to hold','fa-circle-exclamation');
       const cust = RS.getCustomer();
-      held.push({ id:Date.now(), items:RS.getCart(), table:cust.table, name:cust.name, count:totals.count, total:totals.grand, time:new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}) });
+      held.push({ id:Date.now(), items:RS.getCart(), table:cust.table, name:cust.name, phone:cust.phone, gst:cust.gst, count:totals.count, total:totals.grand, time:new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}) });
       RS.clearCart();
       const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'), cg=document.getElementById('cust-gst'); if(cn)cn.value=''; if(cp)cp.value=''; if(cg)cg.value='';
+      const ct = document.getElementById('cart-table'); if(ct) ct.value = 'Walk-in / Takeaway';
       updateHeldCount();
       RS.toast('Order held · '+held.length+' parked','fa-pause');
     }
@@ -402,8 +406,26 @@
           modal.querySelectorAll('[data-h]').forEach(row=> row.addEventListener('click', e=>{
             if(e.target.closest('[data-del]')) return;
             const id=+row.dataset.h; const idx=held.findIndex(x=>x.id===id); if(idx<0) return;
-            if(RS.getCart().length){ RS.toast('Finish or hold the current bill first','fa-circle-exclamation'); return; }
-            RS.setCart(held[idx].items); held.splice(idx,1); updateHeldCount(); close(); RS.toast('Order resumed','fa-play');
+            
+            // Clear current cart first
+            RS.clearCart();
+            
+            const selected = held[idx];
+            RS.setCart(selected.items);
+            
+            // Restore customer details & table selection
+            const cn = document.getElementById('cust-name');
+            const cp = document.getElementById('cust-phone');
+            const cg = document.getElementById('cust-gst');
+            const ct = document.getElementById('cart-table');
+            if (cn) cn.value = selected.name || '';
+            if (cp) cp.value = selected.phone || '';
+            if (cg) cg.value = selected.gst || '';
+            if (ct && selected.table) {
+              ct.value = selected.table;
+            }
+            
+            held.splice(idx,1); updateHeldCount(); close(); RS.toast('Order resumed','fa-play');
           }));
           modal.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', e=>{ e.stopPropagation(); const id=+x.dataset.del; const idx=held.findIndex(h=>h.id===id); if(idx>=0){held.splice(idx,1); updateHeldCount();} x.closest('[data-h]').remove(); if(!held.length){ close(); } }));
         }});
