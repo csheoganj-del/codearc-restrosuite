@@ -524,8 +524,11 @@
               }
               
               // Log settlement transaction in bills
-              const billNo = 'RS-SETTLE-' + Date.now();
-              const billTime = new Date().toLocaleString('en-IN', {
+              const now = new Date();
+              const yyyymmdd = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+              const hhmmss = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0') + String(now.getSeconds()).padStart(2, '0');
+              const billNo = `RS-SETTLE-${yyyymmdd}-${hhmmss}`;
+              const billTime = now.toLocaleString('en-IN', {
                 day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true
               });
               const billRow = {
