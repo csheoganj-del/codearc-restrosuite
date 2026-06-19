@@ -51,41 +51,27 @@ header {
   border-bottom: 1px solid rgba(44, 27, 24, 0.06);
 }
 
-/* Recreated Sign Logo from Image */
 .logo {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: #FAF4EE;
-  border: 2px solid #2C1B18;
-  padding: 6px 18px;
-  border-radius: 2px;
-  box-shadow: 0 4px 10px rgba(44, 27, 24, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  padding: 0;
   transition: var(--transition);
   position: relative;
 }
 
 .logo:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(44, 27, 24, 0.2);
 }
 
-.logo-doppio {
-  font-family: 'Shadows Into Light', cursive;
-  font-size: 24px;
-  font-weight: 700;
-  color: #2C1B18;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-right: 8px;
-}
-
-.logo-cafe {
-  font-family: 'Caveat', cursive;
-  font-size: 26px;
-  font-weight: 700;
-  color: #2C1B18;
+.brand-logo-img {
+  display: block;
+  width: clamp(148px, 13vw, 210px);
+  height: auto;
+  max-height: 52px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(44, 27, 24, 0.16));
 }
 
 nav {
@@ -885,6 +871,13 @@ section {
 
 .login-logo {
   margin-bottom: 24px;
+  width: 100%;
+}
+
+.login-logo .brand-logo-img {
+  width: 190px;
+  max-height: none;
+  margin: 0 auto;
 }
 
 .login-title {

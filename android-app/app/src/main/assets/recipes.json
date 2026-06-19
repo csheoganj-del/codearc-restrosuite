@@ -1,0 +1,577 @@
+{
+  "item name": {
+    "original_name": "Item name",
+    "category": "Sheet1",
+    "ingredients": {
+      "raw__materials": "Qty",
+      "raw_material": "Raw material"
+    }
+  },
+  "doppio": {
+    "original_name": "Doppio",
+    "category": "Hot coffee",
+    "ingredients": {
+      "double_shot_espresso": "60 ml"
+    }
+  },
+  "espresso": {
+    "original_name": "Espresso",
+    "category": "Hot coffee",
+    "ingredients": {
+      "single_shot_espresso": "30 ml"
+    }
+  },
+  "cappuccino": {
+    "original_name": "Cappuccino",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "30ml",
+      "250_ml_hot_cup": "Milk"
+    }
+  },
+  "cafe latte": {
+    "original_name": "Cafe latte",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "250_ml_hot_cup": "Milk"
+    }
+  },
+  "flat white": {
+    "original_name": "Flat white",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "250_ml_hot_cup": "Milk"
+    }
+  },
+  "affogato": {
+    "original_name": "Affogato",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "60ml",
+      "250_ml_hot_cup": "Ice cream"
+    }
+  },
+  "americano": {
+    "original_name": "Americano",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "250_ml_hot_cup": "Water"
+    }
+  },
+  "cortardo": {
+    "original_name": "Cortardo",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "60ml",
+      "250_ml_hot_cup": "Milk"
+    }
+  },
+  "caramel machhiato": {
+    "original_name": "Caramel machhiato",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "30ml",
+      "250_ml_hot_cup": "Milk foam",
+      "100_ml": "Caramel syrup"
+    }
+  },
+  "cafe mocha": {
+    "original_name": "Cafe mocha",
+    "category": "Hot coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "250_ml_hot_cup": "Milk",
+      "120_ml": "Chocolate syrup"
+    }
+  },
+  "iced americano": {
+    "original_name": "Iced americano",
+    "category": "Iced coffee",
+    "ingredients": {
+      "coffee_shot": "30ml",
+      "350_ml_cold_cup": "Ice",
+      "7-8_peice": "Water"
+    }
+  },
+  "iced latte": {
+    "original_name": "Iced latte",
+    "category": "Iced coffee",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "350_ml_cold_cup": "Ice",
+      "7-8peice": "Milk"
+    }
+  },
+  "espresso ginger ale": {
+    "original_name": "Espresso ginger ale",
+    "category": "Iced coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "350_ml_cold_cup": "Ice",
+      "7-8_p": "Ginger ale can"
+    }
+  },
+  "cranberry espresso": {
+    "original_name": "Cranberry espresso",
+    "category": "Iced coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "350_ml_cold_cup": "Ice",
+      "7-8_peice": "Cranberry Juice"
+    }
+  },
+  "americano sunset": {
+    "original_name": "Americano sunset",
+    "category": "Iced coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "350_ml_cold_cup": "Ice",
+      "7-8_peice": "Orange juice"
+    }
+  },
+  "tonic water espresso": {
+    "original_name": "Tonic water espresso",
+    "category": "Iced coffee",
+    "ingredients": {
+      "coffee_shot": "30 ml",
+      "350_ml_cold_cup": "Ice",
+      "7-8_peice": "Tonic water"
+    }
+  },
+  "vietnamese": {
+    "original_name": "Vietnamese",
+    "category": "Iced coffee",
+    "ingredients": {
+      "coffee_shot": "60ml",
+      "350_ml_cold_cup": "Ice",
+      "7-8_peice": "Condensed milk",
+      "60ml": "Milk"
+    }
+  },
+  "hot matcha latte": {
+    "original_name": "Hot matcha latte",
+    "category": "Matcha",
+    "ingredients": {
+      "matcha": "3gm",
+      "hot_cup": "Milk",
+      "50_ml": "Hot water"
+    }
+  },
+  "ice matcha latte": {
+    "original_name": "Ice matcha latte",
+    "category": "Matcha",
+    "ingredients": {
+      "matcha": "3gm",
+      "cold_cup": "Milk",
+      "150ml": "Ice",
+      "7-8_pc": "Hot water"
+    }
+  },
+  "flavoured iced matcha": {
+    "original_name": "Flavoured iced matcha",
+    "category": "Matcha",
+    "ingredients": {
+      "matcha": "3gm",
+      "cold_cup": "Flavouring",
+      "30ml": "Milk",
+      "7-8_pc": "Hot water"
+    }
+  },
+  "mango matcha": {
+    "original_name": "Mango matcha",
+    "category": "Matcha",
+    "ingredients": {
+      "matcha": "3gm",
+      "cold_cup": "Milk",
+      "120_ml": "Mango crush",
+      "60_ml": "Hot water",
+      "30ml": "Ice"
+    }
+  },
+  "strawberry matcha": {
+    "original_name": "Strawberry matcha",
+    "category": "Matcha",
+    "ingredients": {
+      "matcha": "3gm",
+      "cold_cup": "Milk",
+      "120_ml": "Strawberry crush",
+      "60ml": "Hot water",
+      "30ml": "Ice"
+    }
+  },
+  "class frappe": {
+    "original_name": "Class frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110 gm",
+      "milk": "90 ml"
+    }
+  },
+  "hazelnut frappe": {
+    "original_name": "Hazelnut frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110 gm",
+      "hazelnut_syrup": "30 ml",
+      "milk": "90 ml"
+    }
+  },
+  "irish frappe": {
+    "original_name": "Irish frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110 gm",
+      "irish_syrup": "30 ml",
+      "milk": "90 ml"
+    }
+  },
+  "mocha frappe": {
+    "original_name": "Mocha frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110 gm",
+      "chocolate_syrup": "60 ml",
+      "milk": "90 ml"
+    }
+  },
+  "nutella frappe": {
+    "original_name": "Nutella frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110 gm",
+      "nutella": "40gm",
+      "milk": "90ml",
+      "whipped_cream": "20ml"
+    }
+  },
+  "biscoff frappe": {
+    "original_name": "Biscoff frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110 gm",
+      "biscoff_spread": "30ml",
+      "milk": "90ml",
+      "biscuit": "4pc",
+      "whipped_cream": "20ml"
+    }
+  },
+  "caramel frappe": {
+    "original_name": "Caramel frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110 gm",
+      "caramel": "30 ml",
+      "milk": "90 ml"
+    }
+  },
+  "doppio signature frappe": {
+    "original_name": "Doppio signature frappe",
+    "category": "Frappe",
+    "ingredients": {
+      "coffee_shot": "60 ml",
+      "vanilla_ice_cream": "110gm",
+      "chocolate_syrup": "60ml",
+      "milk": "90 ml",
+      "whipped_cream": "20 ml"
+    }
+  },
+  "nutella thick shake": {
+    "original_name": "Nutella thick shake",
+    "category": "Thick shakes",
+    "ingredients": {
+      "vanilla_ice_cream": "135ml",
+      "nutella": "60gm",
+      "whipped_cream": "20ml",
+      "milk": "120 ml"
+    }
+  },
+  "oreo cookies thick shake": {
+    "original_name": "Oreo cookies thick shake",
+    "category": "Thick shakes",
+    "ingredients": {
+      "vanilla_ice_cream": "135ml",
+      "oreo": "5 pc",
+      "whipped_cream": "20ml",
+      "milk": "120 ml",
+      "chocolate_sauce": "20ml"
+    }
+  },
+  "biscoff thick shake": {
+    "original_name": "Biscoff thick shake",
+    "category": "Thick shakes",
+    "ingredients": {
+      "vanilla_ice_cream": "135ml",
+      "biscoff_spread": "60 gm",
+      "whipped_cream": "20ml",
+      "milk": "120 ml",
+      "biscoff_biscuit": "4pc"
+    }
+  },
+  "strawberry thick shake": {
+    "original_name": "Strawberry thick shake",
+    "category": "Thick shakes",
+    "ingredients": {
+      "vanilla_ice_cream": "135ml",
+      "strawberry_crush": "60 ml",
+      "whipped_cream": "20ml",
+      "milk": "120 ml"
+    }
+  },
+  "mango smoothie": {
+    "original_name": "Mango smoothie",
+    "category": "Thick shakes",
+    "ingredients": {
+      "vanilla_ice_cream": "135ml",
+      "mango_crush": "60 ml",
+      "whipped_cream": "20ml",
+      "milk": "120 ml"
+    }
+  },
+  "choco chips": {
+    "original_name": "Choco chips",
+    "category": "Thick shakes",
+    "ingredients": {
+      "vanilla_ice_cream": "135ml",
+      "choco_chip": "60 gm",
+      "whipped_cream": "20ml",
+      "milk": "120 ml",
+      "chocolate_sauce": "20ml"
+    }
+  },
+  "brownie thick shake": {
+    "original_name": "Brownie thick shake",
+    "category": "Thick shakes",
+    "ingredients": {
+      "vanilla_ice_cream": "135 ml",
+      "brownie": "60 gm",
+      "whipped_cream": "20ml",
+      "milk": "120 ml",
+      "chocolate_sauce": "20ml"
+    }
+  },
+  "mojito": {
+    "original_name": "Mojito",
+    "category": "Mocktail",
+    "ingredients": {
+      "mojito_syrup": "30ml",
+      "ice": "7-8 pcs",
+      "soda": "100ml",
+      "sprite": "100 ml",
+      "cold__cup": "Lemon"
+    }
+  },
+  "grean apple soda": {
+    "original_name": "Grean apple soda",
+    "category": "Mocktail",
+    "ingredients": {
+      "green_apple_syrup": "30ml",
+      "ice": "7-8 pcs",
+      "soda": "200 ml",
+      "lemon": "15ml"
+    }
+  },
+  "blue lagoon": {
+    "original_name": "Blue lagoon",
+    "category": "Mocktail",
+    "ingredients": {
+      "blue_curacao": "30ml",
+      "ice": "7-8 pcs",
+      "soda": "100 ml",
+      "sprite": "100 ml",
+      "cold_cup": "Lemon"
+    }
+  },
+  "spicy guava mojito": {
+    "original_name": "Spicy guava mojito",
+    "category": "Mocktail",
+    "ingredients": {
+      "guava_juice": "60 ml",
+      "ice": "7-8 pcs",
+      "soda": "100 ml",
+      "mohito_syrup": "20 ml",
+      "cold_cup": "Lemon",
+      "15ml": "Chilly powder",
+      "1gm": "Tobasco",
+      "1ml": "Sprite"
+    }
+  },
+  "lemon iced tea": {
+    "original_name": "Lemon iced tea",
+    "category": "Mocktail",
+    "ingredients": {
+      "tea_bag": "2 bag",
+      "ice": "7-8 pcs",
+      "sugar_syrup": "30 ml",
+      "icea_tea_syrup": "60 ml",
+      "cold_cup": "Lemon",
+      "15ml": "Hot water"
+    }
+  },
+  "litchi and lime granita": {
+    "original_name": "Litchi and lime granita",
+    "category": "Mocktail",
+    "ingredients": {
+      "litchi_crush": "60 ml",
+      "ice": "12-15 pcs",
+      "soda": "100 ml",
+      "cold_cup": "Lemon"
+    }
+  },
+  "strawberry granita": {
+    "original_name": "Strawberry granita",
+    "category": "Mocktail",
+    "ingredients": {
+      "strawberry_crush": "60ml",
+      "ice": "12-15 pcs",
+      "soda": "100 ml",
+      "cold_cup": "Lemon"
+    }
+  },
+  "spicy mango martini": {
+    "original_name": "Spicy mango martini",
+    "category": "Mocktail",
+    "ingredients": {
+      "mango_crush": "60 ml",
+      "ice": "7-8 pcs",
+      "soda": "100 ml",
+      "sprite": "100 ml",
+      "cold_cup": "Lemon",
+      "15ml": "Chilly powder",
+      "1gm": "Tobasco",
+      "1ml": "Mohito syrup"
+    }
+  },
+  "doppio hot chocolate": {
+    "original_name": "Doppio hot chocolate",
+    "category": "Mocktail",
+    "ingredients": {}
+  },
+  "hot chocolate": {
+    "original_name": "Hot chocolate",
+    "category": "Mocktail",
+    "ingredients": {
+      "chocolate_powder": "30 gm",
+      "chocolate_sauce": "20 ml",
+      "hot_cup": "Milk"
+    }
+  },
+  "nutella": {
+    "original_name": "Nutella",
+    "category": "Mocktail",
+    "ingredients": {
+      "chocolate_powder": "30 gm",
+      "nutella": "30 gm",
+      "hot_cup": "Milk"
+    }
+  },
+  "brownie": {
+    "original_name": "Brownie",
+    "category": "Mocktail",
+    "ingredients": {
+      "chocolate_powder": "30 gm",
+      "brownie": "30 gm",
+      "hot_cup": "Milk"
+    }
+  },
+  "flavoured": {
+    "original_name": "Flavoured",
+    "category": "Mocktail",
+    "ingredients": {
+      "chocolate_powder": "30 gm",
+      "any_flavour": "30 ml",
+      "hot_cup": "Milk"
+    }
+  },
+  "ginger ale": {
+    "original_name": "Ginger ale",
+    "category": "Cold brew",
+    "ingredients": {
+      "ginger_ale_can": "1 can",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice"
+    }
+  },
+  "orange bumble": {
+    "original_name": "Orange bumble",
+    "category": "Cold brew",
+    "ingredients": {
+      "orange_crush": "30 ml",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice",
+      "7-8_pcs": "Soda"
+    }
+  },
+  "tonic water": {
+    "original_name": "Tonic water",
+    "category": "Cold brew",
+    "ingredients": {
+      "tonic_water": "1can",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice"
+    }
+  },
+  "cranberry": {
+    "original_name": "Cranberry",
+    "category": "Cold brew",
+    "ingredients": {
+      "cranberry_syrup": "30 ml",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice",
+      "7-8_pcs": "Soda"
+    }
+  },
+  "passion fruit": {
+    "original_name": "Passion fruit",
+    "category": "Cold brew",
+    "ingredients": {
+      "passion_fruit_syrup": "30 ml",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice",
+      "7-8_pcs": "Lemon juice",
+      "15_ml": "Soda"
+    }
+  },
+  "peach": {
+    "original_name": "Peach",
+    "category": "Cold brew",
+    "ingredients": {
+      "peach_syrup": "30 ml",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice",
+      "7-8_pcs": "Soda"
+    }
+  },
+  "basil": {
+    "original_name": "Basil",
+    "category": "Cold brew",
+    "ingredients": {
+      "basil_syrup": "30 ml",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice",
+      "7-8_pcs": "Ginger ale"
+    }
+  },
+  "mint": {
+    "original_name": "Mint",
+    "category": "Cold brew",
+    "ingredients": {
+      "mint_syrup": "20 ml",
+      "cold_brew": "60 ml",
+      "cold_cup": "Ice",
+      "7-8_pcs": "Lemon juice",
+      "15_ml": "Mint leaves",
+      "7-8leaves": "Soda",
+      "100_ml": "Sprite"
+    }
+  }
+}
