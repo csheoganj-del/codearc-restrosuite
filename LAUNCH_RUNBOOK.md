@@ -35,6 +35,8 @@ Use this runbook before every production launch or major release. It assumes the
   - `ADMIN_ALERT_EMAIL`
   - `ZERO_COST_EMAILS_DISABLED=false`
   - `ALLOWED_ORIGIN=https://codearc-restrosuite.vercel.app`
+  - `RAZORPAY_WEBHOOK_SECRET`
+  - `AGGREGATOR_WEBHOOK_SECRET`
 - Deploy these Edge Functions:
   - `tenant-access`
   - `tenant-admin`
@@ -43,6 +45,8 @@ Use this runbook before every production launch or major release. It assumes the
   - `tenant-users`
   - `notify-registration`
   - `app-observability`
+  - `razorpay-webhook`
+  - `aggregator-webhook`
 - Create the `saas_tenants` INSERT/UPDATE database webhook described in
   `EMAIL_NOTIFICATION_SETUP.md`.
 

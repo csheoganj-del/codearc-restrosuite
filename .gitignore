@@ -57,3 +57,5 @@ res.txt
 *.log
 .thumbnail
 uploads/
+backups/
+temp_backup/
