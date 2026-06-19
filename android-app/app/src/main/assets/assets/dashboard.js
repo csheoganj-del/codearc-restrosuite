@@ -86,7 +86,27 @@
 
   /* ---------- TOAST ---------- */
   let toastT;
-  function toast(msg, icon='fa-circle-check'){ const el=$('#toast'); el.innerHTML=`<i class="fa-solid ${icon}"></i> ${msg}`; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),2600); }
+  function toast(msg, icon='fa-circle-check', onClick=null){
+    const el=$('#toast');
+    el.innerHTML=`<i class="fa-solid ${icon}"></i> ${msg}`;
+    el.classList.add('show');
+    if (onClick) {
+      el.style.cursor = 'pointer';
+      el.onclick = (e) => {
+        e.preventDefault();
+        onClick();
+        el.classList.remove('show');
+      };
+    } else {
+      el.style.cursor = '';
+      el.onclick = null;
+    }
+    clearTimeout(toastT);
+    toastT=setTimeout(()=>{
+      el.classList.remove('show');
+      if (onClick) el.onclick = null;
+    }, onClick ? 8000 : 2600);
+  }
   window.__toast = toast;
 
   const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || '20260619-restrosuite';
@@ -207,9 +227,19 @@
   async function buildUpdateSignature() {
     const files = [
       'dashboard.html',
+      'assets/restrosuite.css',
       'assets/dashboard.css',
+      'assets/features.css',
+      'assets/supabase-config.js',
+      'assets/doppio-api.js',
+      'assets/db.js',
       'assets/dashboard.js',
       'assets/features-pos.js',
+      'assets/features-editor.js',
+      'assets/features-manage.js',
+      'assets/features-growth.js',
+      'assets/features-extra.js',
+      'assets/features-shell.js',
       'app-update.json'
     ];
     const parts = [];
@@ -324,6 +354,8 @@
       document.dispatchEvent(new CustomEvent('rs:app_update_available'));
       if (!silent) {
         showUpdateDialog(releaseInfo, signature);
+      } else {
+        toast('New update is ready. Click to apply.', 'fa-cloud-arrow-down', () => showUpdateDialog(releaseInfo, signature));
       }
     } else if (!silent) {
       toast('RestroSuite is already up to date', 'fa-circle-check');
@@ -2791,8 +2823,8 @@
   // Bind globally when document loads
   bindGlobalImportExportEvents();
   showAppliedUpdateNotice();
-  window.setTimeout(() => checkForAppUpdate({ silent: true }), 30000);
-  window.setInterval(() => checkForAppUpdate({ silent: true }), 5 * 60 * 1000);
+  window.setTimeout(() => checkForAppUpdate({ silent: true }), 5000);
+  window.setInterval(() => checkForAppUpdate({ silent: true }), 2 * 60 * 1000);
 
   // Set default landing tab
   const defaultTab = isSuper ? 'super-admin-tab' : 'pos-tab';
