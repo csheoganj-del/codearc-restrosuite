@@ -287,8 +287,16 @@
         await new Promise(r => setTimeout(r, 220));
       }
       
-      localStorage.setItem(updateSignatureKey, signature || '');
-      sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
+      try {
+        localStorage.setItem(updateSignatureKey, signature || '');
+      } catch (e) {
+        console.warn('[Update Warning] Failed to write signature:', e);
+      }
+      try {
+        sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
+      } catch (e) {
+        console.warn('[Update Warning] Failed to write session flag:', e);
+      }
       const url = new URL(window.location.href);
       url.searchParams.set('appv', (info.version || Date.now()).toString().replace(/[^a-zA-Z0-9._-]/g, ''));
       window.location.replace(url.toString());
