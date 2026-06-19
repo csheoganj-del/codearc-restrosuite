@@ -182,6 +182,185 @@
           });
         }
 
+        const btnAddSup = $('#add-sup');
+        if (btnAddSup) {
+          btnAddSup.onclick = () => {
+            if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
+            const body = `
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Supplier Name</label>
+                    <input type="text" id="sup-name" class="form-control" placeholder="e.g. Fresh Veggies Ltd." style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Category</label>
+                    <input type="text" id="sup-cat" class="form-control" placeholder="e.g. Vegetables" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                </div>
+                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Contact Email/Phone</label>
+                    <input type="text" id="sup-contact" class="form-control" placeholder="e.g. contact@fresh.com" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Payment Terms</label>
+                    <input type="text" id="sup-terms" class="form-control" value="Net 30" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Rating (1-5)</label>
+                  <select id="sup-rating" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    <option value="5">⭐⭐⭐⭐⭐ (5)</option>
+                    <option value="4" selected>⭐⭐⭐⭐ (4)</option>
+                    <option value="3">⭐⭐⭐ (3)</option>
+                    <option value="2">⭐⭐ (2)</option>
+                    <option value="1">⭐ (1)</option>
+                  </select>
+                </div>
+              </div>
+            `;
+            RSModal.open({
+              title: 'Add New Supplier',
+              sub: 'Register a wholesale vendor',
+              icon: 'fa-truck',
+              size: 'sm',
+              body,
+              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Add Supplier</button>`,
+              onMount(modal, close) {
+                modal.querySelector('[data-cancel]').onclick = close;
+                modal.querySelector('[data-confirm]').onclick = async () => {
+                  const name = modal.querySelector('#sup-name').value || '';
+                  if (!name) return RS.toast('Supplier name is required', 'fa-circle-exclamation');
+                  const category = modal.querySelector('#sup-cat').value || 'General';
+                  const contact = modal.querySelector('#sup-contact').value || '';
+                  const terms = modal.querySelector('#sup-terms').value || 'Net 30';
+                  const rating = Number(modal.querySelector('#sup-rating').value) || 4;
+
+                  const supId = 'sup_' + Date.now().toString().slice(-6);
+                  const newSup = { id: supId, name, category, contact, terms, rating, itemsCount: 0 };
+                  close();
+                  if (RS.saveOne) {
+                    await RS.saveOne('vendors', newSup);
+                    RS.toast('Supplier added successfully', 'fa-circle-check');
+                    if (RS.render) RS.render('inventory-tab');
+                  }
+                };
+              }
+            });
+          };
+        }
+
+        const btnAddPo = $('#add-po');
+        if (btnAddPo) {
+          btnAddPo.onclick = () => {
+            if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
+            const supplierOptions = SUPPLIERS.map(s => `<option value="${s.name}">${s.name}</option>`).join('') || `<option value="General Supplier">General Supplier Ltd.</option>`;
+            const body = `
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Select Supplier</label>
+                  <select id="po-add-supplier" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    ${supplierOptions}
+                  </select>
+                </div>
+                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Items Description</label>
+                    <input type="text" id="po-add-items" class="form-control" placeholder="e.g. 50kg Sugar, 20L Oil" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Total Value (₹)</label>
+                    <input type="number" id="po-add-value" class="form-control" value="1000" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                </div>
+              </div>
+            `;
+            RSModal.open({
+              title: 'Raise Purchase Order',
+              sub: 'Draft a new supply order',
+              icon: 'fa-file-invoice',
+              size: 'sm',
+              body,
+              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Raise PO</button>`,
+              onMount(modal, close) {
+                modal.querySelector('[data-cancel]').onclick = close;
+                modal.querySelector('[data-confirm]').onclick = async () => {
+                  const supplier = modal.querySelector('#po-add-supplier').value || 'General Supplier';
+                  const items = modal.querySelector('#po-add-items').value || 'Supply items';
+                  const value = Number(modal.querySelector('#po-add-value').value) || 0;
+
+                  const poNum = 'PO-' + Date.now().toString().slice(-6);
+                  const newPo = {
+                    id: poNum,
+                    poNumber: poNum,
+                    supplier,
+                    items,
+                    value,
+                    date: new Date().toISOString(),
+                    status: 'pending'
+                  };
+                  close();
+                  if (RS.saveOne) {
+                    await RS.saveOne('purchase_orders', newPo);
+                    RS.toast('Purchase order raised successfully', 'fa-circle-check');
+                    if (RS.render) RS.render('inventory-tab');
+                  }
+                };
+              }
+            });
+          };
+        }
+
+        const btnAddWaste = $('#add-waste');
+        if (btnAddWaste) {
+          btnAddWaste.onclick = () => {
+            if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
+            const body = `
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Ingredient/Item</label>
+                    <input type="text" id="waste-item" class="form-control" placeholder="e.g. Tomato" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                  <div>
+                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Quantity Wasted</label>
+                    <input type="text" id="waste-qty" class="form-control" placeholder="e.g. 2 kg" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Reason for Waste</label>
+                  <select id="waste-reason" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    <option value="Spoiled">Spoiled / Expired</option>
+                    <option value="Dropped">Dropped / Spilled</option>
+                    <option value="Incorrect prep">Incorrect preparation</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+            `;
+            RSModal.open({
+              title: 'Log Kitchen Waste',
+              sub: 'Track inventory loss and spoilage',
+              icon: 'fa-trash-can',
+              size: 'sm',
+              body,
+              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-circle-check"></i> Log Loss</button>`,
+              onMount(modal, close) {
+                modal.querySelector('[data-cancel]').onclick = close;
+                modal.querySelector('[data-confirm]').onclick = () => {
+                  const item = modal.querySelector('#waste-item').value || '';
+                  if (!item) return RS.toast('Item name is required', 'fa-circle-exclamation');
+                  const qty = modal.querySelector('#waste-qty').value || '';
+                  const reason = modal.querySelector('#waste-reason').value || '';
+                  close();
+                  RS.toast(`Logged waste: ${qty} of ${item} (${reason})`, 'fa-circle-check');
+                };
+              }
+            });
+          };
+        }
+
         const activeBtn = sec.querySelector('.seg button.active');
         if (activeBtn) {
           const tabName = activeBtn.textContent.trim().toLowerCase();
@@ -189,7 +368,6 @@
           const activePane = paneMap[tabName] || 'stock';
           $$('.subtab-pane', sec).forEach(p => p.classList.toggle('active', p.dataset.pane === activePane));
         }
-        ['add-sup','add-po','add-waste'].forEach(id=>{ const b=$('#'+id); if(b) b.onclick=()=>RS.toast('Opening form…','fa-plus'); });
       }
 
       // Load from DB

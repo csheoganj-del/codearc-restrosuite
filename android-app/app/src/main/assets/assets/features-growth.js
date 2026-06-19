@@ -397,34 +397,234 @@
       $$('.hub-card',grid).forEach(c=> c.onclick=()=> hubScreen(HUB[+c.dataset.i].t));
     }
     function table(head, rows){ return `<div class="table-scroll"><table class="data-table"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`; }
-    function hubScreen(name){
+    async function hubScreen(name){
       let body='', size='md', icon='fa-rocket', sub='';
-      if(name==='Reservations'){ icon='fa-calendar-check'; sub='Today’s bookings'; size='lg';
-        const R=[];
-        body = R.length ? table(['Time','Guest','Pax','Table','Status'], R.map(r=>`<tr><td class="td-strong">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td><span class="pill ${r[4]==='confirmed'?'pill-green':r[4]==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${r[4]}</span></td></tr>`).join('')) : '<div class="sr-empty">No reservations for today</div>'; }
-      else if(name==='Support Tickets'){ icon='fa-headset'; sub='Open customer issues';
-        const T=[];
-        body = T.length ? table(['Ticket','Subject','Customer','Priority','Status'], T.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><span class="pill ${r[3]==='high'?'pill-red':r[3]==='medium'?'pill-amber':''}" style="padding:3px 10px;text-transform:capitalize">${r[3]}</span></td><td><span class="pill ${r[4]==='open'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${r[4]}</span></td></tr>`).join('')) : '<div class="sr-empty">No open support tickets</div>'; }
-      else if(name==='Recipe Costing'){ icon='fa-flask-vial'; sub='Plate cost & margin across the menu'; size='lg';
-        const rows = RS.MENU.slice(0,10).map(m=>{ const ing=m.ingredients||[]; const cost=ing.reduce((a,g)=>{const inv=(RS.INVENTORY||[]).find(x=>x.name===g.name);return a+(inv?g.qty*inv.cost:0);},0); const c=cost||Math.round(m.price*0.32); const margin=Math.round((1-c/m.price)*100); return `<tr><td><b>${m.name}</b></td><td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td><td>${rs(c)}</td><td style="color:var(--green)">${margin}%</td></tr>`; }).join('');
-        body = rows.length ? table(['Item','Category','Sells at','Plate cost','Margin'], rows) : '<div class="sr-empty">No menu items to calculate costing</div>'; }
-      else if(name==='Offers & Coupons'){ icon='fa-tags'; sub='Active promotions';
-        const O=[];
-        body = O.length ? table(['Code','Offer','Usage','Status'], O.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><span class="pill ${r[3]==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${r[3]}</span></td></tr>`).join('')) : '<div class="sr-empty">No active coupons or offers</div>'; }
-      else if(name==='Loyalty Program'){ icon='fa-gift'; sub='Members & rewards';
-        body = `<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">0</div><div class="csl">Members</div></div><div class="cs"><div class="csv">0</div><div class="csl">Points issued</div></div><div class="cs"><div class="csv">0</div><div class="csl">Rewards claimed</div></div></div>`
-          + table(['Tier','Members','Earn rate','Perk'], [['VIP','0','3× points','Free dessert monthly'],['Gold','0','2× points','Priority seating'],['Silver','0','1× point','Birthday treat']].map(r=>`<tr><td><span class="tier-badge ${r[0]==='VIP'?'tier-vip':r[0]==='Gold'?'tier-gold':'tier-silver'}">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td style="color:var(--text-soft)">${r[3]}</td></tr>`).join('')); }
-      else if(name==='WhatsApp Campaigns'){ icon='fa-bullhorn'; sub='Broadcast performance';
-        const C=[];
-        body = C.length ? table(['Campaign','Reach','Open rate','Status'], C.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><span class="pill ${r[3]==='active'?'pill-green':''}" style="padding:3px 10px;text-transform:capitalize">${r[3]}</span></td></tr>`).join('')) : '<div class="sr-empty">No campaigns run yet</div>'; }
-      else if(name==='Feedback & Reviews'){ icon='fa-star'; sub='Recent ratings';
-        const F=[];
-        body = F.length ? F.map(r=>`<div class="set-row"><div class="si"><div class="st">${r[0]} <span style="color:var(--amber)">${'★'.repeat(r[1])}${'☆'.repeat(5-r[1])}</span></div><div class="sd">${r[2]}</div></div></div>`).join('') : '<div class="sr-empty">No reviews collected yet</div>'; }
-      else if(name==='Purchase Orders'){ RSModal && RS.activateTab('inventory-tab'); setTimeout(()=>{ const b=$$('#inventory-tab .seg button')[2]; b&&b.click(); },80); RS.toast('Opening purchase orders','fa-truck-ramp-box'); return; }
+      let records = [];
+
+      if(name==='Reservations'){ 
+        icon='fa-calendar-check'; sub='Today’s bookings'; size='lg';
+        if (window.RS_DB) {
+          try { records = await RS_DB.list('reservations'); } catch(e){}
+        }
+        body = records && records.length 
+          ? table(['Time','Guest','Pax','Table','Status'], records.map(r=>`<tr><td class="td-strong">${r.time || '—'}</td><td>${r.guestName || '—'}</td><td>${r.pax || 2}</td><td>${r.tableNumber || '—'}</td><td><span class="pill ${r.status==='confirmed'?'pill-green':r.status==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${r.status || 'confirmed'}</span></td></tr>`).join('')) 
+          : '<div class="sr-empty">No reservations for today</div>'; 
+      }
+      else if(name==='Support Tickets'){ 
+        icon='fa-headset'; sub='Open customer issues';
+        if (window.RS_DB) {
+          try { records = await RS_DB.list('support_tickets'); } catch(e){}
+        }
+        body = records && records.length 
+          ? table(['Ticket','Subject','Customer','Priority','Status'], records.map(r=>`<tr><td><b>${r.ticketNumber}</b></td><td>${r.subject}</td><td>${r.customerName}</td><td><span class="pill ${r.priority==='high'?'pill-red':r.priority==='medium'?'pill-amber':''}" style="padding:3px 10px;text-transform:capitalize">${r.priority}</span></td><td><span class="pill ${r.status==='open'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${r.status}</span></td></tr>`).join('')) 
+          : '<div class="sr-empty">No open support tickets</div>'; 
+      }
+      else if(name==='Recipe Costing'){ 
+        icon='fa-flask-vial'; sub='Plate cost & margin across the menu'; size='lg';
+        const rows = RS.MENU.slice(0,10).map(m=>{ 
+          const ing=m.ingredients||[]; 
+          const cost=ing.reduce((a,g)=>{const inv=(RS.INVENTORY||[]).find(x=>x.name===g.name);return a+(inv?g.qty*inv.cost:0);},0); 
+          const c=cost||Math.round(m.price*0.32); 
+          const margin=Math.round((1-c/m.price)*100); 
+          return `<tr><td><b>${m.name}</b></td><td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td><td>${rs(c)}</td><td style="color:var(--green)">${margin}%</td></tr>`; 
+        }).join('');
+        body = rows.length ? table(['Item','Category','Sells at','Plate cost','Margin'], rows) : '<div class="sr-empty">No menu items to calculate costing</div>'; 
+      }
+      else if(name==='Offers & Coupons'){ 
+        icon='fa-tags'; sub='Active promotions';
+        if (window.RS_DB) {
+          try { records = await RS_DB.list('offers'); } catch(e){}
+        }
+        body = records && records.length 
+          ? table(['Code','Offer','Usage','Status'], records.map(r=>`<tr><td><b>${r.code}</b></td><td>${r.description || 'Discount'}</td><td>${r.usageCount || 0}</td><td><span class="pill ${r.status==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${r.status}</span></td></tr>`).join('')) 
+          : '<div class="sr-empty">No active coupons or offers</div>'; 
+      }
+      else if(name==='Loyalty Program'){ 
+        icon='fa-gift'; sub='Members & rewards';
+        const crm = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+        const totalMembers = crm.length;
+        const totalPoints = crm.reduce((sum, c) => sum + (c.points || 0), 0);
+        body = `<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${totalMembers}</div><div class="csl">Members</div></div><div class="cs"><div class="csv">${totalPoints}</div><div class="csl">Points issued</div></div><div class="cs"><div class="csv">${Math.round(totalPoints * 0.1)}</div><div class="csl">Rewards claimed</div></div></div>`
+          + table(['Tier','Members','Earn rate','Perk'], [
+              ['VIP', crm.filter(c => c.spend >= 10000).length, '3× points', 'Free dessert monthly'],
+              ['Gold', crm.filter(c => c.spend >= 5000 && c.spend < 10000).length, '2× points', 'Priority seating'],
+              ['Silver', crm.filter(c => c.spend < 5000).length, '1× point', 'Birthday treat']
+            ].map(r=>`<tr><td><span class="tier-badge ${r[0]==='VIP'?'tier-vip':r[0]==='Gold'?'tier-gold':'tier-silver'}">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td style="color:var(--text-soft)">${r[3]}</td></tr>`).join('')); 
+      }
+      else if(name==='WhatsApp Campaigns'){ 
+        icon='fa-bullhorn'; sub='Broadcast performance';
+        body = '<div class="sr-empty">No campaigns run yet</div>'; 
+      }
+      else if(name==='Feedback & Reviews'){ 
+        icon='fa-star'; sub='Recent ratings';
+        body = '<div class="sr-empty">No reviews collected yet</div>'; 
+      }
+      else if(name==='Purchase Orders'){ 
+        RS.activateTab('inventory-tab'); 
+        setTimeout(()=>{ const b=$$('#inventory-tab .seg button')[2]; b&&b.click(); },80); 
+        RS.toast('Opening purchase orders','fa-truck-ramp-box'); 
+        return; 
+      }
       else { body = `<p style="color:var(--text-soft)">${name} module.</p>`; }
+
+      const hideNewBtn = ['Recipe Costing', 'Loyalty Program', 'WhatsApp Campaigns', 'Feedback & Reviews'].includes(name);
+
       RSModal.open({ title:name, sub, icon, size, body,
-        foot:`<div class="grow"></div><button class="btn btn-primary" data-x><i class="fa-solid fa-plus"></i> New</button>`,
-        onMount(modal,close){ modal.querySelector('[data-x]').onclick=()=>{close();RS.toast('Opening '+name+' form…','fa-plus');}; }});
+        foot: hideNewBtn ? `<div class="grow"></div><button class="btn btn-ghost" data-cancel>Close</button>` : `<div class="grow"></div><button class="btn btn-primary" data-x><i class="fa-solid fa-plus"></i> New</button>`,
+        onMount(modal,close){ 
+          const cancelBtn = modal.querySelector('[data-cancel]');
+          if (cancelBtn) cancelBtn.onclick = close;
+
+          const newBtn = modal.querySelector('[data-x]');
+          if (newBtn) {
+            newBtn.onclick = () => {
+              close();
+              if (name === 'Reservations') {
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Guest Name</label>
+                        <input type="text" id="res-guest" class="form-control" placeholder="e.g. John Doe" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Time</label>
+                        <input type="text" id="res-time" class="form-control" value="07:30 PM" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                    </div>
+                    <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Pax (Guests)</label>
+                        <input type="number" id="res-pax" class="form-control" value="4" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Table Number</label>
+                        <input type="text" id="res-table" class="form-control" value="Table 05" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                    </div>
+                  </div>
+                `;
+                RSModal.open({
+                  title: 'New Reservation',
+                  sub: 'Create a table booking',
+                  icon: 'fa-calendar-check',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Book Table</button>`,
+                  onMount(resModal, resClose) {
+                    resModal.querySelector('[data-cancel]').onclick = resClose;
+                    resModal.querySelector('[data-confirm]').onclick = async () => {
+                      const guestName = resModal.querySelector('#res-guest').value || '';
+                      if (!guestName) return RS.toast('Guest name is required', 'fa-circle-exclamation');
+                      const time = resModal.querySelector('#res-time').value || '07:30 PM';
+                      const pax = Number(resModal.querySelector('#res-pax').value) || 2;
+                      const tableNumber = resModal.querySelector('#res-table').value || '';
+
+                      const id = 'res_' + Date.now().toString().slice(-6);
+                      const resRow = { id, time, guestName, pax, tableNumber, status: 'confirmed' };
+                      resClose();
+                      if (RS.saveOne) {
+                        await RS.saveOne('reservations', resRow);
+                        RS.toast('Reservation booked successfully', 'fa-circle-check');
+                        hubScreen('Reservations');
+                      }
+                    };
+                  }
+                });
+              } else if (name === 'Support Tickets') {
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Customer Name</label>
+                      <input type="text" id="tkt-cust" class="form-control" placeholder="e.g. Jane Smith" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    </div>
+                    <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Subject</label>
+                        <input type="text" id="tkt-subject" class="form-control" placeholder="e.g. Double charged" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Priority</label>
+                        <select id="tkt-priority" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                          <option value="high">High</option>
+                          <option value="medium" selected>Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                `;
+                RSModal.open({
+                  title: 'New Support Ticket',
+                  sub: 'Log a customer issue',
+                  icon: 'fa-headset',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Open Ticket</button>`,
+                  onMount(tktModal, tktClose) {
+                    tktModal.querySelector('[data-cancel]').onclick = tktClose;
+                    tktModal.querySelector('[data-confirm]').onclick = async () => {
+                      const customerName = tktModal.querySelector('#tkt-cust').value || 'Guest';
+                      const subject = tktModal.querySelector('#tkt-subject').value || '';
+                      if (!subject) return RS.toast('Subject is required', 'fa-circle-exclamation');
+                      const priority = tktModal.querySelector('#tkt-priority').value || 'medium';
+
+                      const tktNum = 'TKT-' + Date.now().toString().slice(-6);
+                      const tktRow = { id: tktNum, ticketNumber: tktNum, subject, customerName, priority, status: 'open' };
+                      tktClose();
+                      if (RS.saveOne) {
+                        await RS.saveOne('support_tickets', tktRow);
+                        RS.toast('Support ticket opened successfully', 'fa-circle-check');
+                        hubScreen('Support Tickets');
+                      }
+                    };
+                  }
+                });
+              } else if (name === 'Offers & Coupons') {
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Coupon Code</label>
+                        <input type="text" id="off-code" class="form-control" placeholder="e.g. WELCOME100" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Description</label>
+                        <input type="text" id="off-desc" class="form-control" placeholder="e.g. ₹100 discount" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                    </div>
+                  </div>
+                `;
+                RSModal.open({
+                  title: 'New Offer Coupon',
+                  sub: 'Create a discount code',
+                  icon: 'fa-tags',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Create Offer</button>`,
+                  onMount(offModal, offClose) {
+                    offModal.querySelector('[data-cancel]').onclick = offClose;
+                    offModal.querySelector('[data-confirm]').onclick = async () => {
+                      const code = offModal.querySelector('#off-code').value || '';
+                      if (!code) return RS.toast('Coupon code is required', 'fa-circle-exclamation');
+                      const description = offModal.querySelector('#off-desc').value || 'Discount Coupon';
+
+                      const id = 'off_' + Date.now().toString().slice(-6);
+                      const offRow = { id, code, description, usageCount: 0, status: 'active' };
+                      offClose();
+                      if (RS.saveOne) {
+                        await RS.saveOne('offers', offRow);
+                        RS.toast('Offer coupon created successfully', 'fa-circle-check');
+                        hubScreen('Offers & Coupons');
+                      }
+                    };
+                  }
+                });
+              }
+            };
+          }
+        }
+      });
     }
     RS.addRenderer('growth-hub-tab', renderHub);
   }

@@ -41,6 +41,11 @@
   try{ if(localStorage.getItem('rs-collapsed')==='true') app.classList.add('collapsed'); }catch(e){}
 
   /* ---------- TAB SWITCHING ---------- */
+  const isSuperAdmin = () => {
+    const sess = window.RS_API ? RS_API.session() : null;
+    return !!(sess && sess.role === 'superadmin');
+  };
+
   const titles = {
     'pos-tab':['Point of Sale','Ring up takeaway & dine-in orders'],
     'qr-orders-tab':['QR Table Orders','Live orders from QR-scanning guests'],
@@ -56,6 +61,17 @@
   };
   const rendered = {};
   function activateTab(id){
+    const isSuper = isSuperAdmin();
+    if (isSuper) {
+      if (id !== 'super-admin-tab' && id !== 'gateway-monitor-tab') {
+        id = 'super-admin-tab';
+      }
+    } else {
+      if (id === 'super-admin-tab' || id === 'gateway-monitor-tab') {
+        id = 'pos-tab';
+      }
+    }
+
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
     $$('.sidebar-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
@@ -804,6 +820,47 @@
     $('#inv-banner').style.display = low.length?'flex':'none';
     $('#inv-low-count').textContent = low.length;
 
+    const btnAutoDraft = $('#btn-auto-draft-pos');
+    if (btnAutoDraft) {
+      btnAutoDraft.onclick = async () => {
+        const lowItems = INVENTORY.filter(i => i.stock < i.min);
+        if (!lowItems.length) return toast('All inventory levels are healthy', 'fa-circle-check');
+        
+        setOperationStatus('Auto-drafting POs...');
+        try {
+          const byCat = {};
+          lowItems.forEach(i => {
+            if (!byCat[i.cat]) byCat[i.cat] = [];
+            byCat[i.cat].push(i);
+          });
+
+          let draftedCount = 0;
+          for (const [cat, items] of Object.entries(byCat)) {
+            const poNum = 'PO-' + Date.now().toString().slice(-6) + '-' + cat.substring(0, 3).toUpperCase();
+            const value = items.reduce((sum, i) => sum + ((i.min * 2 - i.stock) * i.cost), 0);
+            const poRow = {
+              id: poNum,
+              poNumber: poNum,
+              supplier: cat + ' Supplier Ltd.',
+              items: items.map(i => `${Math.round(i.min * 2 - i.stock)} ${i.unit} ${i.name}`).join(', '),
+              value: Math.round(value),
+              date: new Date().toISOString(),
+              status: 'pending'
+            };
+            if (RS.saveOne) await RS.saveOne('purchase_orders', poRow);
+            draftedCount++;
+          }
+          finishOperationStatus(`Drafted ${draftedCount} POs`);
+          toast(`Auto-drafted ${draftedCount} POs successfully`, 'fa-truck');
+          renderInventory();
+          if (window.RS && RS.render) RS.render('inventory-tab');
+        } catch (e) {
+          console.warn('Auto-draft POs failed', e);
+          finishOperationStatus('Auto-draft failed', 'error');
+        }
+      };
+    }
+
     // render stock table
     const invBody = $('#inv-table-body');
     if (invBody) {
@@ -816,7 +873,86 @@
           <td><span class="stock-dot ${stockCls[st]}">${st==='out'?'Reorder':st==='low'?'Low':'Healthy'}</span></td>
           <td><div class="row-actions"><button class="icon-act go" title="Restock"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit"><i class="fa-solid fa-pen"></i></button></div></td>
         </tr>`; }).join('');
-      $$('#inv-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Purchase order module is not connected yet','fa-truck')));
+
+      $$('#inv-table-body .icon-act.go').forEach(b => {
+        b.addEventListener('click', () => {
+          const row = b.closest('tr');
+          const name = row.querySelector('b').textContent;
+          const inv = INVENTORY.find(x => x.name === name);
+          if (!inv) return;
+          const qtyToOrder = Math.max(1, Math.round(inv.min * 2 - inv.stock));
+          const estimatedCost = Math.round(qtyToOrder * inv.cost);
+          
+          if (!window.RSModal) {
+            toast('Modal module is unavailable', 'fa-circle-exclamation');
+            return;
+          }
+
+          const body = `
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="font-size:13px;color:var(--text-soft)">
+                Create a purchase order to restock <b>${inv.name}</b> (current: ${inv.stock} ${inv.unit}, min: ${inv.min} ${inv.unit}).
+              </div>
+              <div class="form-grid-2" style="margin-top:8px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Order Qty (${inv.unit})</label>
+                  <input type="number" id="po-qty" class="form-control" value="${qtyToOrder}" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                </div>
+                <div>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Supplier</label>
+                  <input type="text" id="po-supplier" class="form-control" value="${inv.cat} Supplier Ltd." style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                </div>
+              </div>
+              <div style="font-size:12px;color:var(--text-mute);margin-top:4px">
+                Estimated Value: <strong style="color:var(--orange)" id="po-cost-preview">${rs(estimatedCost)}</strong>
+              </div>
+            </div>
+          `;
+
+          RSModal.open({
+            title: 'Raise Purchase Order',
+            sub: 'Restock ' + inv.name,
+            icon: 'fa-truck',
+            size: 'sm',
+            body,
+            foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-file-invoice"></i> Create PO</button>`,
+            onMount(modal, close) {
+              const qtyInput = modal.querySelector('#po-qty');
+              qtyInput.oninput = () => {
+                const q = Math.max(0, Number(qtyInput.value) || 0);
+                modal.querySelector('#po-cost-preview').textContent = rs(Math.round(q * inv.cost));
+              };
+              modal.querySelector('[data-cancel]').onclick = close;
+              modal.querySelector('[data-confirm]').onclick = async () => {
+                const qty = Math.max(1, Number(qtyInput.value) || 1);
+                const supplier = modal.querySelector('#po-supplier').value || 'Default Supplier';
+                const poNum = 'PO-' + Date.now().toString().slice(-6);
+                const poRow = {
+                  id: poNum,
+                  poNumber: poNum,
+                  supplier,
+                  items: `${qty} ${inv.unit} ${inv.name}`,
+                  value: Math.round(qty * inv.cost),
+                  date: new Date().toISOString(),
+                  status: 'pending'
+                };
+                close();
+                setOperationStatus('Creating PO...');
+                try {
+                  if (RS.saveOne) await RS.saveOne('purchase_orders', poRow);
+                  finishOperationStatus('PO created');
+                  toast('Purchase order raised successfully', 'fa-circle-check');
+                  renderInventory();
+                  if (window.RS && RS.render) RS.render('inventory-tab');
+                } catch (e) {
+                  console.warn('Failed to save PO', e);
+                  finishOperationStatus('Failed to create PO', 'error');
+                }
+              };
+            }
+          });
+        });
+      });
     }
 
     // render recipe table
