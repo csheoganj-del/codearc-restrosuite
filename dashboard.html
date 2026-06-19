@@ -208,7 +208,33 @@
             <button class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print day report</button>
           </div>
           <div class="table-scroll"><table class="data-table">
-            <thead><tr><th>Bill No.</th><th>Time</th><th>Table</th><th>Items</th><th>Payment</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Bill No.</th>
+                <th>Time</th>
+                <th>Table</th>
+                <th>Items</th>
+                <th>
+                  Payment
+                  <select id="bills-pay-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                    <option value="All">All</option>
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Card">Card</option>
+                  </select>
+                </th>
+                <th>Amount</th>
+                <th>
+                  Status
+                  <select id="bills-status-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                    <option value="All">All</option>
+                    <option value="paid">Paid</option>
+                    <option value="refunded">Refunded</option>
+                  </select>
+                </th>
+                <th>Actions</th>
+              </tr>
+            </thead>
             <tbody id="bills-table-body"></tbody>
           </table></div>
         </div>
@@ -234,7 +260,35 @@
         </div>
         <!-- Stock panel -->
         <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table">
-          <thead><tr><th>Ingredient</th><th>Category</th><th>In stock</th><th>Min level</th><th>Unit cost</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th>
+                Category
+                <select id="inv-cat-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                  <option value="All">All</option>
+                  <option value="veg">veg</option>
+                  <option value="dairy">dairy</option>
+                  <option value="grocery">grocery</option>
+                  <option value="meat">meat</option>
+                  <option value="dry-goods">dry-goods</option>
+                </select>
+              </th>
+              <th>In stock</th>
+              <th>Min level</th>
+              <th>Unit cost</th>
+              <th>
+                Status
+                <select id="inv-status-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                  <option value="All">All</option>
+                  <option value="ok">Healthy</option>
+                  <option value="low">Low</option>
+                  <option value="out">Reorder</option>
+                </select>
+              </th>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody id="inv-table-body"></tbody>
         </table></div></div>
         <!-- Recipes panel -->
@@ -275,7 +329,39 @@
               </div>
             </div>
             <div class="table-scroll"><table class="data-table">
-               <thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Stock</th><th><div style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;">Available <button class="btn btn-ghost btn-sm" id="btn-enable-all-menu" style="padding: 3px 8px; font-size: 10px; line-height: 1.2; text-transform: none;" title="Enable all items at once"><i class="fa-solid fa-circle-check"></i> Enable All</button></div></th><th>Actions</th></tr></thead>
+               <thead>
+                 <tr>
+                   <th>Item</th>
+                   <th>
+                     Category
+                     <select id="editor-cat-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                       <option value="All">All</option>
+                       <option value="Starters">Starters</option>
+                       <option value="Mains">Mains</option>
+                       <option value="Breads">Breads</option>
+                       <option value="Beverages">Beverages</option>
+                       <option value="Desserts">Desserts</option>
+                     </select>
+                   </th>
+                   <th>Price</th>
+                   <th>
+                     Stock
+                     <select id="editor-stock-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                       <option value="All">All</option>
+                       <option value="ok">In stock</option>
+                       <option value="low">Low</option>
+                       <option value="out">Out</option>
+                     </select>
+                   </th>
+                   <th>
+                     <div style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;">
+                       Available 
+                       <button class="btn btn-ghost btn-sm" id="btn-enable-all-menu" style="padding: 3px 8px; font-size: 10px; line-height: 1.2; text-transform: none;" title="Enable all items at once"><i class="fa-solid fa-circle-check"></i> Enable All</button>
+                     </div>
+                   </th>
+                   <th>Actions</th>
+                 </tr>
+               </thead>
               <tbody id="editor-list"></tbody>
             </table></div>
           </div>

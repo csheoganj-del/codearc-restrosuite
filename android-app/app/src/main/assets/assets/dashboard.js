@@ -349,7 +349,7 @@
   const renderPOS = () => {
     const grid = $('#pos-grid');
     const q = ($('#pos-search-input')?.value||'').toLowerCase();
-    const items = MENU.filter(m=>(activeCat==='All'||m.cat===activeCat) && m.name.toLowerCase().includes(q));
+    const items = MENU.filter(m=>(activeCat==='All'||m.cat.toLowerCase()===activeCat.toLowerCase()) && m.name.toLowerCase().includes(q));
     grid.innerHTML = items.map(m=>{
       const inCart = cart.find(c=>String(c.id)===String(m.id));
       return `
@@ -822,7 +822,18 @@
     if (refundsEl) refundsEl.textContent = refunds;
 
     const q=($('#bills-search')?.value||'').toLowerCase();
-    $('#bills-table-body').innerHTML = BILLS.filter(b=>String(b.no || b.orderId || '').toLowerCase().includes(q)||String(b.table || '').toLowerCase().includes(q)).map(b=>`
+    const payFilter = ($('#bills-pay-filter')?.value || 'All').toLowerCase();
+    const statusFilter = ($('#bills-status-filter')?.value || 'All').toLowerCase();
+
+    let filtered = BILLS.filter(b=>String(b.no || b.orderId || '').toLowerCase().includes(q)||String(b.table || '').toLowerCase().includes(q));
+    if (payFilter !== 'all') {
+      filtered = filtered.filter(b => b.pay && b.pay.toLowerCase() === payFilter);
+    }
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(b => b.status && b.status.toLowerCase() === statusFilter);
+    }
+
+    $('#bills-table-body').innerHTML = filtered.map(b=>`
       <tr>
         <td><b>${b.no || b.orderId || b.id || '-'}</b></td><td>${b.time || b.dateTime || '-'}</td><td>${b.table || '-'}</td><td>${b.items}</td>
         <td><span class="pill ${payPill[b.pay]}" style="padding:3px 9px">${b.pay}</span></td>
@@ -831,7 +842,7 @@
         <td><div class="row-actions"><button class="icon-act go" title="Reprint"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger" title="Refund" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button></div></td>
       </tr>`).join('');
     const billBody = $('#bills-table-body');
-    const visibleBills = BILLS.filter(b=>(b.no||'').toLowerCase().includes(q)||(b.table||'').toLowerCase().includes(q));
+    const visibleBills = filtered;
     if (billBody._rsBillActionHandler) billBody.removeEventListener('click', billBody._rsBillActionHandler, true);
     billBody._rsBillActionHandler = e => {
       const btn = e.target.closest('.icon-act');
@@ -905,7 +916,32 @@
     // render stock table
     const invBody = $('#inv-table-body');
     if (invBody) {
-      invBody.innerHTML = INVENTORY.map(i=>{
+      const catFil = $('#inv-cat-filter');
+      if (catFil && !catFil._rsListenerBound) {
+        catFil._rsListenerBound = true;
+        catFil.addEventListener('change', renderInventory);
+      }
+      const statusFil = $('#inv-status-filter');
+      if (statusFil && !statusFil._rsListenerBound) {
+        statusFil._rsListenerBound = true;
+        statusFil.addEventListener('change', renderInventory);
+      }
+
+      const catFilter = ($('#inv-cat-filter')?.value || 'All').toLowerCase();
+      const statusFilter = ($('#inv-status-filter')?.value || 'All').toLowerCase();
+
+      let filtered = INVENTORY;
+      if (catFilter !== 'all') {
+        filtered = filtered.filter(i => i.cat && i.cat.toLowerCase() === catFilter);
+      }
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(i => {
+          const st = i.stock<i.min?'out':(i.stock<i.min*1.4?'low':'ok');
+          return st === statusFilter;
+        });
+      }
+
+      invBody.innerHTML = filtered.map(i=>{
         const st = i.stock<i.min?'out':(i.stock<i.min*1.4?'low':'ok'); const pct=Math.min(100,Math.round(i.stock/(i.min*2)*100));
         return `<tr>
           <td><b>${i.name}</b></td><td>${i.cat}</td>
@@ -2032,7 +2068,25 @@
 
   /* ---------- renderers map ---------- */
   const renderers = {
-    'pos-tab':initPOS,'qr-orders-tab':renderQR,'bills-tab':()=>{renderBills(); $('#bills-search')?.addEventListener('input',renderBills);},
+    'pos-tab':initPOS,'qr-orders-tab':renderQR,
+    'bills-tab':()=>{
+      renderBills();
+      const search = $('#bills-search');
+      if (search && !search._rsListenerBound) {
+        search._rsListenerBound = true;
+        search.addEventListener('input', renderBills);
+      }
+      const payFil = $('#bills-pay-filter');
+      if (payFil && !payFil._rsListenerBound) {
+        payFil._rsListenerBound = true;
+        payFil.addEventListener('change', renderBills);
+      }
+      const statusFil = $('#bills-status-filter');
+      if (statusFil && !statusFil._rsListenerBound) {
+        statusFil._rsListenerBound = true;
+        statusFil.addEventListener('change', renderBills);
+      }
+    },
     'inventory-tab':renderInventory,'editor-tab':renderEditor,'reports-tab':renderReports,'kds-tab':renderKDS,
     'growth-hub-tab':renderHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'gateway-monitor-tab':renderGateway
   };

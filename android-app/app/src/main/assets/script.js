@@ -417,7 +417,7 @@ window.addEventListener('DOMContentLoaded', () => {
     menuGrid.innerHTML = '';
 
     const filteredItems = menuData.filter(item => {
-      const matchesCategory = activeCategory === 'ALL' || item.category === activeCategory;
+      const matchesCategory = activeCategory === 'ALL' || item.category.toUpperCase() === activeCategory.toUpperCase();
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             item.description.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
