@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
@@ -8,7 +8,7 @@ function read(relativePath) {
   if (relativePath === "dashboard.js") {
     const files = [
       "assets/supabase-config.js",
-      "assets/doppio-api.js",
+      "assets/rs-api.js",
       "assets/db.js",
       "src/dashboard/observability.js",
       "assets/features-shell.js",
@@ -119,3 +119,4 @@ test("zero-cost retention migration guards every optional table", () => {
   }
   assert.doesNotMatch(migration, /DROP TRIGGER IF EXISTS[^;]+ ON public\.(app_error_reports|tenant_audit_logs);/);
 });
+

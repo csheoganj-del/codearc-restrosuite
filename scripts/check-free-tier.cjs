@@ -1,4 +1,4 @@
-const fs = require("node:fs");
+﻿const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
@@ -7,7 +7,7 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
-const dashboard = read("assets/doppio-api.js");
+const dashboard = read("assets/rs-api.js");
 const vercel = read("vercel.json");
 const tenantData = read("supabase/functions/tenant-data/index.ts");
 const tenantPublic = read("supabase/functions/tenant-public/index.ts");
@@ -32,3 +32,4 @@ if (failed.length) {
 }
 
 console.log("Free-tier guardrails passed.");
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Launch readiness checker.
  *
  * The frontend uses RUNTIME config (config.js -> /api/config -> Vercel env vars).
@@ -40,7 +40,7 @@ function normalizeSupabaseUrl(value) {
     .replace(/\/+$/, "");
 }
 
-// ── 1. Frontend must use runtime config, never hardcoded credentials ─────────
+// â”€â”€ 1. Frontend must use runtime config, never hardcoded credentials â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const frontendFiles = ["login.html", "assets/dashboard.js", "script.js", "home.html", "dashboard.html"];
 const jwtPattern = /eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}/;
 const projectUrlPattern = /https:\/\/[a-z0-9]{16,}\.supabase\.co/;
@@ -66,12 +66,12 @@ for (const file of ["login.html", "script.js"]) {
   }
 }
 
-const apiSource = read("assets/doppio-api.js");
+const apiSource = read("assets/rs-api.js");
 if (!apiSource.includes("/api/config")) {
-  fail("assets/doppio-api.js does not fetch /api/config.");
+  fail("assets/rs-api.js does not fetch /api/config.");
 }
 
-// ── 2. Runtime config plumbing must exist ─────────────────────────────────────
+// â”€â”€ 2. Runtime config plumbing must exist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (!fs.existsSync(path.join(root, "config.js"))) {
   fail("Missing config.js runtime loader.");
 } else if (!read("config.js").includes("/api/config")) {
@@ -86,7 +86,7 @@ if (!fs.existsSync(path.join(root, "api", "config.js"))) {
   }
 }
 
-// ── 3. Edge Functions present + gateway JWT verification disabled ────────────
+// â”€â”€ 3. Edge Functions present + gateway JWT verification disabled â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const requiredFunctions = [
   "tenant-access",
   "tenant-admin",
@@ -110,11 +110,11 @@ for (const functionName of requiredFunctions) {
 for (const functionName of ["tenant-access", "tenant-admin", "tenant-data", "tenant-users", "app-observability"]) {
   const source = read(path.join("supabase", "functions", functionName, "index.ts"));
   if (source.includes('origin.endsWith(".vercel.app")')) {
-    fail(`${functionName} uses a suffix-matched CORS origin — exact-match allowlist required.`);
+    fail(`${functionName} uses a suffix-matched CORS origin â€” exact-match allowlist required.`);
   }
 }
 
-// ── 4. Core schema reproducibility ───────────────────────────────────────────
+// â”€â”€ 4. Core schema reproducibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const coreTables = [
   "doppio_business_profile",
   "doppio_menu",
@@ -148,7 +148,7 @@ for (const table of coreTables) {
   }
 }
 
-// ── 5. Live backend checks ────────────────────────────────────────────────────
+// â”€â”€ 5. Live backend checks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function resolveLiveConfig() {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
     return {
@@ -159,7 +159,7 @@ async function resolveLiveConfig() {
   }
   const response = await fetch(LIVE_CONFIG_URL);
   if (!response.ok) {
-    fail(`Live /api/config returned HTTP ${response.status} — Vercel env vars missing or deploy broken.`);
+    fail(`Live /api/config returned HTTP ${response.status} â€” Vercel env vars missing or deploy broken.`);
     return null;
   }
   const cfg = await response.json();
@@ -254,3 +254,4 @@ async function main() {
 }
 
 main();
+

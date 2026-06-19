@@ -1,4 +1,4 @@
-const { spawnSync } = require("node:child_process");
+﻿const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -10,7 +10,7 @@ const javascriptFiles = [
   "service-worker.js",
   "assets/dashboard.js",
   "assets/db.js",
-  "assets/doppio-api.js",
+  "assets/rs-api.js",
   "assets/features-editor.js",
   "assets/features-extra.js",
   "assets/features-growth.js",
@@ -36,7 +36,7 @@ const javascriptFiles = [
   "android-app/app/src/main/assets/pwa.js",
   "android-app/app/src/main/assets/assets/dashboard.js",
   "android-app/app/src/main/assets/assets/db.js",
-  "android-app/app/src/main/assets/assets/doppio-api.js",
+  "android-app/app/src/main/assets/assets/rs-api.js",
   "android-app/app/src/main/assets/assets/features-editor.js",
   "android-app/app/src/main/assets/assets/features-extra.js",
   "android-app/app/src/main/assets/assets/features-growth.js",
@@ -100,7 +100,7 @@ const mirroredFiles = [
   "src/dashboard/whatsapp.js",
   "assets/dashboard.js",
   "assets/db.js",
-  "assets/doppio-api.js",
+  "assets/rs-api.js",
   "assets/features-editor.js",
   "assets/features-extra.js",
   "assets/features-growth.js",
@@ -125,3 +125,4 @@ for (const relativePath of mirroredFiles) {
 }
 
 console.log("Project checks passed.");
+

@@ -1,4 +1,4 @@
-const test = require("node:test");
+﻿const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -9,7 +9,7 @@ function read(relativePath) {
   if (relativePath === "dashboard.js") {
     const files = [
       "assets/supabase-config.js",
-      "assets/doppio-api.js",
+      "assets/rs-api.js",
       "assets/db.js",
       "src/dashboard/observability.js",
       "assets/features-shell.js",
@@ -27,7 +27,7 @@ function read(relativePath) {
 
 test("login uses the tenant access backend", () => {
   const login = read("login.html");
-  const api = read("assets/doppio-api.js");
+  const api = read("assets/rs-api.js");
   assert.match(login, /RS_API\.login/);
   assert.match(api, /'tenant-access'/);
   assert.doesNotMatch(login, /superadmin.*admin.*bypass/i);
@@ -167,7 +167,7 @@ test("tenant administrators can manage staff without exposing password hashes", 
 });
 
 test("browser sessions retain staff identity fields", () => {
-  const api = read("assets/doppio-api.js");
+  const api = read("assets/rs-api.js");
   assert.match(api, /role:\s*['"]logged_in_role['"]/);
   assert.match(api, /display:\s*['"]logged_in_display['"]/);
 });
@@ -179,7 +179,7 @@ test("tenant administrators have a complete staff access dashboard", () => {
   assert.match(dashboard, /id="employees-tab"/);
   assert.match(manage, /enhanceEmployees/);
   assert.match(manage, /Weekly shift roster/);
-  assert.match(manage, /Today’s attendance/);
+  assert.match(manage, /Todayâ€™s attendance/);
   assert.match(staffUi, /role !== "admin"/);
   assert.match(staffUi, /callStaff\("create_user"/);
   assert.match(staffUi, /callStaff\("update_user"/);
@@ -514,3 +514,4 @@ test("credential recovery uses expiring one-time tokens and separates privileged
   assert.match(migration, /FORCE ROW LEVEL SECURITY/);
   assert.match(guide, /Superadmin recovery is intentionally not exposed/);
 });
+

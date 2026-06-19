@@ -24,7 +24,7 @@
         }
       }
     } catch(e) {
-      console.warn('[doppio-api] Synchronous fetch /api/config failed:', e.message);
+      console.warn('[rs-api] Synchronous fetch /api/config failed:', e.message);
     }
   }
   // Normalise: accept either the bare project URL or one with a /rest/v1 or /functions/v1 suffix.
