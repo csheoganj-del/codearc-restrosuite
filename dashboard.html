@@ -117,7 +117,13 @@
         <div class="pos-wrap">
           <div class="pos-left">
             <div class="pos-toolbar">
-              <div class="pos-search"><i class="fa-solid fa-magnifying-glass"></i><input id="pos-search-input" placeholder="Search menu…"></div>
+              <div class="pos-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="pos-search-input" placeholder="Search menu…">
+                <button class="mobile-only-inline" id="btn-m-hold" style="display:none; align-items:center; gap:5px; background:var(--orange-tint); color:var(--orange); border:none; padding: 6px 10px; border-radius: var(--r-pill); font-size: 12.5px; font-weight:600; cursor:pointer;" title="Held orders">
+                  <i class="fa-solid fa-pause"></i> Parked <span id="held-count-m"></span>
+                </button>
+              </div>
               <div class="pos-size-control">
                 <button id="btn-grid-dec" title="Decrease item size"><i class="fa-solid fa-minus"></i></button>
                 <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Adjust item size">
