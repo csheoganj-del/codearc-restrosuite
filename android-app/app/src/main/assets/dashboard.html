@@ -15,9 +15,9 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>RestroSuite Console</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="assets/restrosuite.css?v=20260619-restrosuite">
+<link rel="stylesheet" href="assets/restrosuite.css?v=20260619-dues">
 <script>
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || '20260619-restrosuite';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || '20260619-dues';
   document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
 </script>
 <script>
@@ -145,8 +145,9 @@
               <h3>Current Order</h3>
               <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
             </div>
-            <div class="cart-table-sel">
+            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+              <select class="form-input" id="cart-customer-sel"><option value="">Walk-in Customer</option></select>
             </div>
             <div class="cart-items" id="cart-items"></div>
             <div class="cart-foot">
@@ -160,6 +161,7 @@
                   <button type="button" class="active" data-pay-method="Cash">Cash</button>
                   <button type="button" data-pay-method="UPI">UPI</button>
                   <button type="button" data-pay-method="Card">Card</button>
+                  <button type="button" data-pay-method="Due">Due</button>
                 </div>
               </div>
               <div class="cart-actions">
@@ -883,6 +885,7 @@
 <script src="assets/features-manage.js"></script>
 <script src="assets/features-growth.js?v=20260618-importsync3"></script>
 <script src="assets/features-extra.js"></script>
+<script src="src/dashboard/onboarding.js?v=20260619-duestour"></script>
 <script src="assets/features-shell.js?v=20260618-realdata2"></script>
 </body>
 </html>

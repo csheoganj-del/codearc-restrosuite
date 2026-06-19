@@ -84,9 +84,9 @@
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
       from: r => ({ id:r.id, name:r.name, phone:r.phone, visits:num(r.visits), spend:num(r.total_spend),
-                    email:r.email, last:r.last_visit, tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
+                    email:r.email, last:r.last_visit, dues:num(r.dues), tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
       to: o => ({ id:o.id, name:o.name, phone:o.phone, visits:num(o.visits)||1, total_spend:num(o.spend),
-                  email:o.email||'', marketing_opt_in:true })
+                  email:o.email||'', dues:num(o.dues), marketing_opt_in:true })
     },
     notifications: {
       table:'doppio_notifications', pk:'id', clientId:true, order:{column:'created_at',ascending:false},

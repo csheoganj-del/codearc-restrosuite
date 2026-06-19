@@ -117,6 +117,84 @@
     firstAction: 'Start with Business Profile, import your menu and inventory, configure tax and staff access, then run one complete test order.'
   };
 
+  const UPDATES_HISTORY = [
+    {
+      version: "2026.06.19-dues",
+      date: "2026-06-19",
+      title: "Customer Dues & QR Printing Update",
+      summary: "This update introduces customer credit (dues) management, QR code generation/printing for tables, and persistent POS drafts.",
+      highlights: [
+        "Credit Payment: cashiers can now select 'Due' as a payment method for registered customers.",
+        "CRM Dues Tracking: customer profiles in CRM now display outstanding dues and allow quick settlements.",
+        "POS Customer Selector: easily assign customers to POS orders for loyalty and dues tracking.",
+        "Table QR Printing: generate and print QR codes directly from the Floor & Tables toolbar.",
+        "Persistent POS Drafts: parked/held orders are saved to the database and survive reloads."
+      ]
+    },
+    {
+      version: "2026.06.19-restrosuite",
+      date: "2026-06-19",
+      title: "RestroSuite dashboard reliability update",
+      summary: "This update improves billing clarity, import/export feedback, logo consistency, update safety, and background sync smoothness.",
+      highlights: [
+        "Bills now use date-wise numbers like RS-20260619-001.",
+        "Bill, tax, menu, inventory, and tenant exports use date-wise filenames.",
+        "Import and export work now shows a clear progress/status bar.",
+        "The dashboard checks for updates in the background and prompts with release notes."
+      ]
+    },
+    {
+      version: "2026.06.18",
+      date: "2026-06-18",
+      title: "Menu Import/Export & KDS Optimization",
+      summary: "Introduced bulk menu importing via Excel templates and enhanced kitchen display responsiveness.",
+      highlights: [
+        "Bulk menu setup using Excel templates.",
+        "KDS screen responsiveness improvements and color coding.",
+        "Multi-station kitchen routing."
+      ]
+    }
+  ];
+
+  const DUES_TOUR_STEPS = [
+    {
+      tabId: 'pos-tab',
+      label: 'Customer Selection',
+      icon: 'fa-address-book',
+      subtitle: 'Assign Customers to POS Orders',
+      description: 'We have added a customer dropdown in the cart header. Select a registered customer to track their loyalty, visits, and outstanding dues.',
+      firstAction: 'Choose any registered customer (or leave as Walk-in Customer for guest orders).',
+      targetSelector: '#cart-customer-sel'
+    },
+    {
+      tabId: 'pos-tab',
+      label: 'Due Payment Method',
+      icon: 'fa-hand-holding-dollar',
+      subtitle: 'Record Sales on Credit',
+      description: 'Use the new "Due" payment method next to Cash/UPI/Card to checkout orders on credit. Credit checkouts require selecting a registered customer.',
+      firstAction: 'Click on the "Due" payment button in the POS cart to see how it works.',
+      targetSelector: 'button[data-pay-method="Due"]'
+    },
+    {
+      tabId: 'customers-tab',
+      label: 'Track Outstanding Dues',
+      icon: 'fa-address-book',
+      subtitle: 'CRM Dues & Loyalty Dashboard',
+      description: 'Outstanding dues accumulate on the customer\'s profile automatically. The total store dues are tracked in the top stats cards.',
+      firstAction: 'Look at the "Total Outstanding Dues" card and the "Due" indicator badges on customer cards.',
+      targetSelector: '.sidebar-link[data-tab="customers-tab"]'
+    },
+    {
+      tabId: 'customers-tab',
+      label: 'Settle Dues',
+      icon: 'fa-indian-rupee-sign',
+      subtitle: 'Quick Payments & Settlements',
+      description: 'Open a customer\'s card, then click "Settle Dues" to record a cash, card, or UPI payment to pay off their balance. It writes to billing history automatically.',
+      firstAction: 'Click any customer card, then choose "Settle now" or "Settle Dues" from the footer.',
+      targetSelector: '#crm-grid'
+    }
+  ];
+
   let steps = [];
   let currentStep = 0;
 
@@ -249,9 +327,10 @@
           </div>
           <button type="button" class="product-guide-close" data-guide-close aria-label="Close help guide">&times;</button>
         </header>
-        <div class="product-guide-toolbar">
+        <div class="product-guide-toolbar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <button type="button" class="btn btn-primary" id="guide-start-tour"><i class="fa-solid fa-compass"></i> Start Feature Tour</button>
-          <input type="search" id="guide-search" placeholder="Search enabled features..." aria-label="Search enabled features">
+          <button type="button" class="btn btn-ghost" id="guide-view-updates" style="border:1px solid var(--stroke-2); color:var(--text-soft); padding:8px 12px; font-size:12px; font-weight:700;"><i class="fa-solid fa-clock-rotate-left"></i> What's New</button>
+          <input type="search" id="guide-search" placeholder="Search enabled features..." aria-label="Search enabled features" style="flex:1;">
         </div>
         <div id="guide-setup-summary"></div>
         <div class="product-guide-section-heading">
@@ -398,6 +477,10 @@
   }
 
   function tourTarget(step) {
+    if (step.targetSelector) {
+      const el = document.querySelector(step.targetSelector);
+      if (el) return el;
+    }
     if (!step.tabId) return null;
     if (window.innerWidth <= 768) {
       return document.querySelector(`.mobile-bottom-nav [data-tab="${step.tabId}"]`)
@@ -444,9 +527,25 @@
     goToStep(0);
   }
 
+  function startUpdateTour() {
+    steps = DUES_TOUR_STEPS;
+    currentStep = 0;
+    closeGuide();
+    const overlay = document.getElementById('onboarding-overlay');
+    if (!overlay) return;
+    document.body.classList.add('onboarding-active');
+    overlay.style.display = 'block';
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+    goToStep(0);
+  }
+
   function endTour() {
     try {
-      localStorage.setItem(tourStorageKey(), '1');
+      if (steps === DUES_TOUR_STEPS) {
+        localStorage.setItem('restrosuite_update_tour_seen:2026.06.19-dues', '1');
+      } else {
+        localStorage.setItem(tourStorageKey(), '1');
+      }
     } catch (error) {
       console.warn('[Onboarding] Tour completion could not be stored:', error);
     }
@@ -459,6 +558,48 @@
     document.querySelector('.sidebar')?.classList.remove('reveal');
   }
 
+  function openUpdateHistoryModal() {
+    if (typeof window.RSModal === 'undefined') return;
+    window.RSModal.open({
+      title: 'Update History & Releases',
+      sub: 'Detailed release logs of RestroSuite updates',
+      icon: 'fa-clock-rotate-left',
+      size: 'md',
+      body: `
+        <div class="update-history-container" style="display:flex; flex-direction:column; gap:20px; max-height:450px; overflow-y:auto; padding-right:6px;">
+          ${UPDATES_HISTORY.map(up => `
+            <div class="update-version-card" style="border: 1px solid var(--stroke); border-radius: 12px; padding: 16px; background: var(--panel-tint, rgba(0,0,0,0.02));">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:var(--orange);">${up.title}</h4>
+                <span class="pill" style="font-size:11px; font-weight:600; padding:2px 8px;">Version ${up.version} · ${up.date}</span>
+              </div>
+              <p style="margin:0 0 10px 0; font-size:12.5px; line-height:1.5; color:var(--text-soft);">${up.summary}</p>
+              <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6; color:var(--text-soft);">
+                ${up.highlights.map(h => `<li>${h}</li>`).join('')}
+              </ul>
+              ${up.version === '2026.06.19-dues' ? `
+                <button type="button" class="btn btn-sm btn-primary" id="start-dues-tour-btn" style="margin-top:12px; background:var(--orange); border-color:var(--orange); font-size:11px;">
+                  <i class="fa-solid fa-compass"></i> Take Feature Tour
+                </button>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `,
+      foot: `<button class="btn btn-ghost" style="flex:1;" data-close-history>Close</button>`,
+      onMount(modal, close) {
+        modal.querySelector('[data-close-history]').onclick = close;
+        const tourBtn = modal.querySelector('#start-dues-tour-btn');
+        if (tourBtn) {
+          tourBtn.onclick = () => {
+            close();
+            startUpdateTour();
+          };
+        }
+      }
+    });
+  }
+
   window.tourNavigate = direction => {
     if (direction > 0 && currentStep === steps.length - 1) {
       endTour();
@@ -469,8 +610,10 @@
   };
   window.endOnboardingTour = endTour;
   window.startOnboardingTour = startTour;
+  window.startUpdateTour = startUpdateTour;
   window.openProductGuide = openGuide;
   window.closeProductGuide = closeGuide;
+  window.openUpdateHistoryModal = openUpdateHistoryModal;
 
   document.addEventListener('keydown', event => {
     const overlayOpen = document.getElementById('onboarding-overlay')?.classList.contains('is-visible');
@@ -493,7 +636,7 @@
     positionCard(target);
   });
 
-  window.addEventListener('load', () => {
+  function init() {
     injectGuide();
     const backdrop = document.getElementById('onboarding-backdrop');
     if (backdrop) {
@@ -501,13 +644,33 @@
         endTour();
       });
     }
+
+    setTimeout(() => {
+      const guideViewUpdates = document.getElementById('guide-view-updates');
+      if (guideViewUpdates) {
+        guideViewUpdates.onclick = openUpdateHistoryModal;
+      }
+    }, 1000);
+
     setTimeout(() => {
       if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
       try {
+        const updateTourSeen = localStorage.getItem('restrosuite_update_tour_seen:2026.06.19-dues');
+        if (!updateTourSeen) {
+          openUpdateHistoryModal();
+          localStorage.setItem('restrosuite_update_tour_seen:2026.06.19-dues', 'popup');
+          return;
+        }
         if (!localStorage.getItem(tourStorageKey())) startTour();
       } catch (error) {
         startTour();
       }
     }, 1400);
-  });
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    init();
+  } else {
+    window.addEventListener('load', init);
+  }
 })();
