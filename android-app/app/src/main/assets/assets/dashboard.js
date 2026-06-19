@@ -315,47 +315,63 @@
     document.body.appendChild(modal);
     modal.querySelector('#app-update-later-btn').onclick = () => modal.remove();
     modal.querySelector('#app-update-now-btn').onclick = async () => {
-      const btnNow = modal.querySelector('#app-update-now-btn');
-      const btnLater = modal.querySelector('#app-update-later-btn');
-      btnNow.disabled = true;
-      btnLater.disabled = true;
-      
-      const track = modal.querySelector('.app-update-progress-track');
-      const bar = modal.querySelector('#app-update-progress-bar');
-      const status = modal.querySelector('#app-update-save-status');
-      
-      if(track) track.style.display = 'block';
-      
-      const steps = [
-        { pct: 20, text: 'Securing active session...' },
-        { pct: 40, text: 'Backing up active cart items...' },
-        { pct: 60, text: 'Archiving current layout state...' },
-        { pct: 80, text: 'Writing snapshot to secure storage...' },
-        { pct: 100, text: 'Applying system updates...' }
-      ];
-      
-      for (const step of steps) {
-        status.textContent = step.text;
-        if(bar) bar.style.width = step.pct + '%';
-        if (step.pct === 80) {
-          savePreUpdateSnapshot();
+      try {
+        const btnNow = modal.querySelector('#app-update-now-btn');
+        const btnLater = modal.querySelector('#app-update-later-btn');
+        btnNow.disabled = true;
+        btnLater.disabled = true;
+        
+        const track = modal.querySelector('.app-update-progress-track');
+        const bar = modal.querySelector('#app-update-progress-bar');
+        const status = modal.querySelector('#app-update-save-status');
+        
+        if(track) track.style.display = 'block';
+        
+        const steps = [
+          { pct: 20, text: 'Securing active session...' },
+          { pct: 40, text: 'Backing up active cart items...' },
+          { pct: 60, text: 'Archiving current layout state...' },
+          { pct: 80, text: 'Writing snapshot to secure storage...' },
+          { pct: 100, text: 'Applying system updates...' }
+        ];
+        
+        for (const step of steps) {
+          status.textContent = step.text;
+          if(bar) bar.style.width = step.pct + '%';
+          if (step.pct === 80) {
+            try {
+              savePreUpdateSnapshot();
+            } catch (e) {
+              console.warn('[Update Warning] Snapshot failed:', e);
+            }
+          }
+          await new Promise(r => setTimeout(r, 220));
         }
-        await new Promise(r => setTimeout(r, 220));
+        
+        try {
+          localStorage.setItem(updateSignatureKey, signature || '');
+        } catch (e) {
+          console.warn('[Update Warning] Failed to write signature:', e);
+        }
+        try {
+          sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
+        } catch (e) {
+          console.warn('[Update Warning] Failed to write session flag:', e);
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('appv', (info.version || Date.now()).toString().replace(/[^a-zA-Z0-9._-]/g, ''));
+        
+        // Fail-safe reload fallback (triggers after 1.5 seconds if location.replace hangs)
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+
+        window.location.replace(url.toString());
+      } catch (err) {
+        console.error('[Update Fatal Error] Failed during update:', err);
+        window.location.reload();
       }
-      
-      try {
-        localStorage.setItem(updateSignatureKey, signature || '');
-      } catch (e) {
-        console.warn('[Update Warning] Failed to write signature:', e);
-      }
-      try {
-        sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
-      } catch (e) {
-        console.warn('[Update Warning] Failed to write session flag:', e);
-      }
-      const url = new URL(window.location.href);
-      url.searchParams.set('appv', (info.version || Date.now()).toString().replace(/[^a-zA-Z0-9._-]/g, ''));
-      window.location.replace(url.toString());
     };
   }
 
