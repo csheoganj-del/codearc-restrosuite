@@ -13,9 +13,9 @@
 .rs-modal {
   width: 100%; background: var(--panel-solid); border: 1px solid var(--stroke-2); border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg); max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden;
-  transform: translateY(16px) scale(.98); transition: transform .3s var(--ease-spring); position: relative;
+  opacity: 0; transition: opacity .2s ease; position: relative;
 }
-.rs-overlay.show .rs-modal { transform: none; }
+.rs-overlay.show .rs-modal { opacity: 1; }
 .rs-modal.sm { max-width: 460px; } .rs-modal.md { max-width: 680px; } .rs-modal.lg { max-width: 940px; } .rs-modal.xl { max-width: 1100px; }
 .rs-mhead { display: flex; align-items: center; gap: 12px; padding: 20px 24px; border-bottom: 1px solid var(--stroke); flex: none; }
 .rs-mhead h3 { font-size: 18px; }
@@ -254,9 +254,9 @@
   background: var(--panel-solid); border: 1px solid var(--stroke-2); border-radius: 16px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.03); max-height: calc(100vh - 48px);
   display: flex; flex-direction: column; overflow: hidden; width: 100%; max-width: 600px;
-  transform: translateY(16px) scale(.98); transition: transform .3s var(--ease-spring);
+  opacity: 0; transition: opacity .2s ease;
 }
-.modal-backdrop.active .glass-modal { transform: none; }
+.modal-backdrop.active .glass-modal { opacity: 1; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; }
 .close-modal-btn {
   width: 30px; height: 30px; border-radius: 8px; background: var(--panel); border: 1px solid var(--stroke);
@@ -315,4 +315,3 @@
   color: var(--text); font-size: 11px; font-weight: 600; cursor: pointer; transition: var(--t);
 }
 .staff-secondary-btn:hover { background: var(--glass-2); border-color: var(--stroke-hi); }
-

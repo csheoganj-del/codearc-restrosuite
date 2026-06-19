@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,9 +15,14 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>RestroSuite Console</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="assets/restrosuite.css">
-<link rel="stylesheet" href="assets/dashboard.css?v=20260618-mobilecart">
-<link rel="stylesheet" href="assets/features.css">
+<link rel="stylesheet" href="assets/restrosuite.css?v=20260619-restrosuite">
+<script>
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || '20260619-restrosuite';
+  document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
+</script>
+<script>
+  document.write('<link rel="stylesheet" href="assets/features.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
+</script>
 <style>
   /* mini switch for menu editor */
   .switch-mini { position: relative; display: inline-block; width: 38px; height: 22px; }
@@ -38,8 +46,7 @@
     <!-- Workspace Menu -->
     <div class="sb-top">
       <a class="sb-brand brand" href="index.html">
-        <span class="brand-mark"><i class="fa-solid fa-bowl-food"></i></span>
-        <span class="brand-name"><span class="codearc">CodeArc</span>Restro<b>Suite</b></span>
+        <img class="rs-brand-logo-img" src="assets/restrosuite_logo.png" alt="CodeArc RestroSuite">
       </a>
       <button class="sb-collapse" id="sb-collapse" aria-label="Collapse sidebar"><i class="fa-solid fa-angles-left"></i></button>
     </div>
@@ -772,8 +779,10 @@
 <script src="src/dashboard/observability.js"></script>
 <script src="src/dashboard/imports.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/bills.js?v=20260618-importsync3"></script>
-<script src="assets/dashboard.js?v=20260618-realdata"></script>
-<script src="assets/features-pos.js?v=20260618-realdata"></script>
+<script>
+  document.write('<script src="assets/dashboard.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  document.write('<script src="assets/features-pos.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+</script>
 <script src="assets/features-editor.js"></script>
 <script src="assets/features-manage.js"></script>
 <script src="assets/features-growth.js?v=20260618-importsync3"></script>
