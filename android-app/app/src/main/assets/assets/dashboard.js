@@ -224,6 +224,16 @@
     }
   }
 
+  function getFileHashFromSignature(sig, filename) {
+    if (!sig) return null;
+    const parts = sig.split('|');
+    for (const part of parts) {
+      const sub = part.split(':');
+      if (sub[0] === filename) return sub[2] || null;
+    }
+    return null;
+  }
+
   async function buildUpdateSignature() {
     const files = [
       'dashboard.html',
@@ -258,8 +268,24 @@
 
   function showUpdateDialog(releaseInfo, signature) {
     if (document.getElementById('app-update-dialog')) return;
-    const info = releaseInfo || {};
-    const highlights = Array.isArray(info.highlights) ? info.highlights : [];
+    let info = releaseInfo || {};
+    let highlights = Array.isArray(info.highlights) ? info.highlights : [];
+    const isPatch = window.RS_APP_UPDATE && window.RS_APP_UPDATE.isPatchOnly;
+
+    if (isPatch) {
+      info = {
+        version: 'System patch',
+        date: new Date().toLocaleDateString('en-CA'),
+        title: 'System stability hotfix',
+        summary: 'This update applies under-the-hood code improvements to enhance security, responsiveness, and dashboard stability.'
+      };
+      highlights = [
+        'Codebase reliability and security updates',
+        'Performance enhancements and database synchronization tuning',
+        'Real-time update check and notification fixes'
+      ];
+    }
+
     const modal = document.createElement('div');
     modal.id = 'app-update-dialog';
     modal.className = 'app-update-dialog is-visible';
@@ -350,7 +376,16 @@
     }
     if (previous !== signature) {
       const releaseInfo = await fetchUpdateRelease();
-      window.RS_APP_UPDATE = { releaseInfo, signature, detectedAt: Date.now() };
+      const prevJsonHash = getFileHashFromSignature(previous, 'app-update.json');
+      const currJsonHash = getFileHashFromSignature(signature, 'app-update.json');
+      const isJsonUpdated = prevJsonHash && currJsonHash && prevJsonHash !== currJsonHash;
+
+      window.RS_APP_UPDATE = { 
+        releaseInfo, 
+        signature, 
+        detectedAt: Date.now(),
+        isPatchOnly: !isJsonUpdated
+      };
       document.dispatchEvent(new CustomEvent('rs:app_update_available'));
       if (!silent) {
         showUpdateDialog(releaseInfo, signature);
