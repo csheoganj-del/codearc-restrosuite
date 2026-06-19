@@ -73,6 +73,206 @@
   function toast(msg, icon='fa-circle-check'){ const el=$('#toast'); el.innerHTML=`<i class="fa-solid ${icon}"></i> ${msg}`; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),2600); }
   window.__toast = toast;
 
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || '20260619-restrosuite';
+  const updateSignatureKey = 'rs_update_signature';
+  const updateSnapshotKey = 'rs_pre_update_snapshot';
+
+  function pad2(value) { return String(value).padStart(2, '0'); }
+  function dateKey(date = new Date()) { return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`; }
+  function fileDate(date = new Date()) { return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`; }
+  function nextBillNo(existingBills = []) {
+    const key = dateKey();
+    const prefix = `RS-${key}-`;
+    const max = existingBills.reduce((highest, bill) => {
+      const no = String((bill && (bill.no || bill.orderId || bill.id)) || '');
+      if (!no.startsWith(prefix)) return highest;
+      const seq = Number.parseInt(no.slice(prefix.length), 10);
+      return Number.isFinite(seq) ? Math.max(highest, seq) : highest;
+    }, 0);
+    return `${prefix}${String(max + 1).padStart(3, '0')}`;
+  }
+
+  function ensureOperationStatusBar() {
+    let bar = document.getElementById('global-operation-status');
+    if (bar) return bar;
+    bar = document.createElement('div');
+    bar.id = 'global-operation-status';
+    bar.className = 'operation-status-bar';
+    bar.innerHTML = `
+      <div class="operation-status-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
+      <div class="operation-status-copy">
+        <div class="operation-status-title">Working...</div>
+        <div class="operation-status-track"><span></span></div>
+      </div>`;
+    document.body.appendChild(bar);
+    return bar;
+  }
+
+  function setOperationStatus(message, state = 'running') {
+    const bar = ensureOperationStatusBar();
+    const icon = bar.querySelector('.operation-status-icon i');
+    const title = bar.querySelector('.operation-status-title');
+    title.textContent = message;
+    icon.className = state === 'success'
+      ? 'fa-solid fa-circle-check'
+      : state === 'error'
+        ? 'fa-solid fa-circle-exclamation'
+        : 'fa-solid fa-spinner fa-spin';
+    bar.className = `operation-status-bar is-visible is-${state}`;
+    return bar;
+  }
+
+  function finishOperationStatus(message, state = 'success') {
+    const bar = setOperationStatus(message, state);
+    window.setTimeout(() => bar.classList.remove('is-visible'), state === 'error' ? 4200 : 2300);
+  }
+
+  async function runWithOperation(message, action, button) {
+    const oldHtml = button ? button.innerHTML : '';
+    const oldDisabled = button ? button.disabled : false;
+    try {
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Working';
+      }
+      setOperationStatus(message);
+      const result = await action();
+      finishOperationStatus('Done');
+      return result;
+    } catch (error) {
+      finishOperationStatus(error.message || 'Work failed', 'error');
+      throw error;
+    } finally {
+      if (button) {
+        button.disabled = oldDisabled;
+        button.innerHTML = oldHtml;
+      }
+    }
+  }
+
+  function savePreUpdateSnapshot() {
+    const snapshot = {
+      savedAt: new Date().toISOString(),
+      version: appVersion,
+      tenant: {
+        id: sessionStorage.getItem('tenant_id') || '',
+        slug: sessionStorage.getItem('tenant_slug') || '',
+        role: sessionStorage.getItem('logged_in_role') || ''
+      },
+      activeTab: document.querySelector('.tab-content.active')?.id || '',
+      cart: typeof cart !== 'undefined' ? cart : [],
+      discountPct: typeof discountPct !== 'undefined' ? discountPct : 0,
+      menu: typeof MENU !== 'undefined' ? MENU : [],
+      bills: typeof BILLS !== 'undefined' ? BILLS : [],
+      inventory: typeof INVENTORY !== 'undefined' ? INVENTORY : [],
+      employees: typeof EMPLOYEES !== 'undefined' ? EMPLOYEES : []
+    };
+    try {
+      const localKeys = {};
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key && (/^(rs-|doppio_|restrosuite_)/.test(key))) {
+          localKeys[key] = localStorage.getItem(key);
+        }
+      }
+      snapshot.localKeys = localKeys;
+    } catch (_) {}
+    localStorage.setItem(updateSnapshotKey, JSON.stringify(snapshot));
+    return snapshot;
+  }
+
+  function showAppliedUpdateNotice() {
+    const appliedAt = sessionStorage.getItem('rs_update_applied_at');
+    if (!appliedAt) return;
+    sessionStorage.removeItem('rs_update_applied_at');
+    toast('RestroSuite updated successfully', 'fa-cloud-arrow-down');
+  }
+
+  async function fetchUpdateRelease() {
+    try {
+      const response = await fetch(`app-update.json?v=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function buildUpdateSignature() {
+    const files = [
+      'dashboard.html',
+      'assets/dashboard.css',
+      'assets/dashboard.js',
+      'assets/features-pos.js',
+      'app-update.json'
+    ];
+    const parts = [];
+    for (const file of files) {
+      try {
+        const response = await fetch(`${file}?check=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) continue;
+        const text = await response.text();
+        let hash = 0;
+        for (let i = 0; i < text.length; i += 1) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+        parts.push(`${file}:${text.length}:${hash}`);
+      } catch (_) {}
+    }
+    return parts.join('|');
+  }
+
+  function showUpdateDialog(releaseInfo, signature) {
+    if (document.getElementById('app-update-dialog')) return;
+    const info = releaseInfo || {};
+    const highlights = Array.isArray(info.highlights) ? info.highlights : [];
+    const modal = document.createElement('div');
+    modal.id = 'app-update-dialog';
+    modal.className = 'app-update-dialog is-visible';
+    modal.innerHTML = `
+      <div class="app-update-card" role="dialog" aria-modal="true" aria-labelledby="app-update-title">
+        <div class="app-update-eyebrow">System update</div>
+        <h2 id="app-update-title">New RestroSuite update is ready</h2>
+        <div class="app-update-version">${info.version || 'Latest version'}${info.date ? ' - ' + info.date : ''}</div>
+        <p>Your active work will be saved on this device before the update is applied.</p>
+        <div class="app-update-release">
+          <div class="app-update-release-title">${info.title || 'Workflow improvements'}</div>
+          <p>${info.summary || 'This update improves billing, importing, exports, sync, and dashboard stability.'}</p>
+          <ul>${highlights.map(item => `<li>${item}</li>`).join('')}</ul>
+        </div>
+        <div class="app-update-save-row"><i class="fa-solid fa-shield-halved"></i><span id="app-update-save-status">Ready to save current dashboard data.</span></div>
+        <div class="app-update-actions">
+          <button type="button" class="btn btn-ghost" id="app-update-later-btn">Later</button>
+          <button type="button" class="btn btn-primary" id="app-update-now-btn"><i class="fa-solid fa-rotate"></i> Save & Update</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#app-update-later-btn').onclick = () => modal.remove();
+    modal.querySelector('#app-update-now-btn').onclick = () => {
+      modal.querySelector('#app-update-save-status').textContent = 'Saving local dashboard data...';
+      savePreUpdateSnapshot();
+      localStorage.setItem(updateSignatureKey, signature || '');
+      sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
+      const url = new URL(window.location.href);
+      url.searchParams.set('appv', (info.version || Date.now()).toString().replace(/[^a-zA-Z0-9._-]/g, ''));
+      window.location.replace(url.toString());
+    };
+  }
+
+  async function checkForAppUpdate({ silent = true } = {}) {
+    const signature = await buildUpdateSignature();
+    if (!signature) return;
+    const previous = localStorage.getItem(updateSignatureKey);
+    if (!previous) {
+      localStorage.setItem(updateSignatureKey, signature);
+      return;
+    }
+    if (previous !== signature) {
+      const releaseInfo = await fetchUpdateRelease();
+      showUpdateDialog(releaseInfo, signature);
+    } else if (!silent) {
+      toast('RestroSuite is already up to date', 'fa-circle-check');
+    }
+  }
+
   /* ============================================================
      MENU DATA
      ============================================================ */
@@ -337,7 +537,25 @@
     return `${hrs}h ${mins % 60}m ago`;
   }
 
+  let pendingOrdersSyncInFlight = false;
+  let pendingOrdersSyncQueued = false;
+  let lastPendingOrdersSyncAt = 0;
+  const pendingOrdersSyncMinGapMs = 3000;
+
   async function syncPendingOrders() {
+    const elapsed = Date.now() - lastPendingOrdersSyncAt;
+    if (pendingOrdersSyncInFlight || elapsed < pendingOrdersSyncMinGapMs) {
+      if (!pendingOrdersSyncQueued) {
+        pendingOrdersSyncQueued = true;
+        window.setTimeout(() => {
+          pendingOrdersSyncQueued = false;
+          syncPendingOrders();
+        }, Math.max(500, pendingOrdersSyncMinGapMs - elapsed));
+      }
+      return;
+    }
+    pendingOrdersSyncInFlight = true;
+    lastPendingOrdersSyncAt = Date.now();
     if (window.RS_DB) {
       try {
         const rows = await RS_DB.list('pending_orders');
@@ -372,7 +590,11 @@
         document.dispatchEvent(new CustomEvent('rs:pending_orders_synced'));
       } catch(e) {
         console.warn("syncPendingOrders failed", e);
+      } finally {
+        pendingOrdersSyncInFlight = false;
       }
+    } else {
+      pendingOrdersSyncInFlight = false;
     }
   }
 
@@ -543,9 +765,9 @@
     if (refundsEl) refundsEl.textContent = refunds;
 
     const q=($('#bills-search')?.value||'').toLowerCase();
-    $('#bills-table-body').innerHTML = BILLS.filter(b=>b.no.toLowerCase().includes(q)||b.table.toLowerCase().includes(q)).map(b=>`
+    $('#bills-table-body').innerHTML = BILLS.filter(b=>String(b.no || b.orderId || '').toLowerCase().includes(q)||String(b.table || '').toLowerCase().includes(q)).map(b=>`
       <tr>
-        <td><b>${b.no}</b></td><td>${b.time}</td><td>${b.table}</td><td>${b.items}</td>
+        <td><b>${b.no || b.orderId || b.id || '-'}</b></td><td>${b.time || b.dateTime || '-'}</td><td>${b.table || '-'}</td><td>${b.items}</td>
         <td><span class="pill ${payPill[b.pay]}" style="padding:3px 9px">${b.pay}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
         <td>${b.status==='paid'?'<span class="pill pill-green" style="padding:3px 9px">Paid</span>':'<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
@@ -1643,6 +1865,7 @@
   function getModalRoot(){ if(!modalRoot){ modalRoot = document.getElementById('rs-modal-root') || (()=>{ const d=document.createElement('div'); d.id='rs-modal-root'; document.body.appendChild(d); return d; })(); } return modalRoot; }
   window.RS = {
     toast, activateTab, rs, initials, avatarColors, catColor,
+    nextBillNo, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
     MENU, CATS, stockLabel, stockCls,
     getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
     setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
@@ -1860,6 +2083,7 @@
     const btnDownloadMenu = document.getElementById('btn-download-menu-template');
     if (btnDownloadMenu) {
       btnDownloadMenu.onclick = () => {
+        setOperationStatus('Preparing menu CSV template...');
         const headers = ['Name', 'Category', 'Price', 'Description', 'PrepTimeMinutes', 'Available', 'Bestseller'];
         const sampleRows = [
           ['Cappuccino', 'HOT COFFEE', '180', 'Espresso with steamed milk and foam', '4', 'YES', 'YES'],
@@ -1869,7 +2093,8 @@
           headers.join(','),
           ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         ].join('\n');
-        RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'menu-template.csv');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `menu-template-${fileDate()}.csv`);
+        finishOperationStatus('Menu template downloaded');
         toast('Menu CSV template downloaded', 'fa-circle-check');
       };
     }
@@ -1884,14 +2109,19 @@
         input.onchange = e => {
           const file = e.target.files[0];
           if(!file) return;
+          const oldImportMenuHtml = btnImportMenu.innerHTML;
+          btnImportMenu.disabled = true;
+          btnImportMenu.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing';
           const reader = new FileReader();
           reader.onload = async evt => {
             try {
+              setOperationStatus('Reading menu import file...');
               const text = evt.target.result;
               const rows = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.parseCsv
                 ? window.RestroSuite.imports.parseCsv(text)
                 : [];
               if(!rows || !rows.length) throw new Error('No rows found in CSV');
+              setOperationStatus(`Importing ${rows.length} menu rows...`);
 
               const cleanNumber = (val) => {
                 if (val === undefined || val === null || val === '') return NaN;
@@ -1958,8 +2188,13 @@
               });
               if(!records.length) throw new Error('No valid menu rows found');
               const proceed = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available.', rows:records.length, skipped });
-              if(!proceed) return;
+              if(!proceed) {
+                finishOperationStatus('Menu import cancelled', 'error');
+                return;
+              }
+              setOperationStatus(`Importing ${records.length} menu rows...`);
               const result = await saveImportedRecords('menu', records);
+              finishOperationStatus(`${result.saved} menu items imported`);
               importResultToast('menu items', result);
               if(window.RS_DB) {
                 const items = await RS_DB.list('menu');
@@ -1972,7 +2207,11 @@
               }
             } catch(err) {
               console.error(err);
+              finishOperationStatus('Menu import failed', 'error');
               toast('Import failed: ' + err.message, 'fa-circle-exclamation');
+            } finally {
+              btnImportMenu.disabled = false;
+              btnImportMenu.innerHTML = oldImportMenuHtml;
             }
           };
           reader.readAsText(file);
@@ -1985,6 +2224,7 @@
     const btnDownloadInventory = document.getElementById('btn-download-inventory-template');
     if (btnDownloadInventory) {
       btnDownloadInventory.onclick = () => {
+        setOperationStatus('Preparing inventory CSV template...');
         const headers = ['IngredientKey', 'IngredientName', 'Category', 'CurrentStock', 'MaxStock', 'Unit', 'ReorderLevelPercent', 'ExpiryDate'];
         const sampleRows = [
           ['espresso_shot', 'Espresso Shot', 'drinks', '3000', '6000', 'ml', '20', ''],
@@ -1995,7 +2235,8 @@
           headers.join(','),
           ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         ].join('\n');
-        RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'inventory-template.csv');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `inventory-template-${fileDate()}.csv`);
+        finishOperationStatus('Inventory template downloaded');
         toast('Inventory CSV template downloaded', 'fa-circle-check');
       };
     }
@@ -2010,14 +2251,19 @@
         input.onchange = e => {
           const file = e.target.files[0];
           if(!file) return;
+          const oldImportInventoryHtml = btnImportInventory.innerHTML;
+          btnImportInventory.disabled = true;
+          btnImportInventory.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing';
           const reader = new FileReader();
           reader.onload = async evt => {
             try {
+              setOperationStatus('Reading inventory import file...');
               const text = evt.target.result;
               const rows = window.RestroSuite && window.RestroSuite.imports && window.RestroSuite.imports.parseCsv
                 ? window.RestroSuite.imports.parseCsv(text)
                 : [];
               if(!rows || !rows.length) throw new Error('No rows found in CSV');
+              setOperationStatus(`Importing ${rows.length} inventory rows...`);
 
               const cleanNumber = (val) => {
                 if (val === undefined || val === null || val === '') return NaN;
@@ -2082,8 +2328,13 @@
               });
               if(!records.length) throw new Error('No valid inventory rows found');
               const proceed = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels for this outlet and sync to Supabase when cloud is available.', rows:records.length, skipped });
-              if(!proceed) return;
+              if(!proceed) {
+                finishOperationStatus('Inventory import cancelled', 'error');
+                return;
+              }
+              setOperationStatus(`Importing ${records.length} inventory rows...`);
               const result = await saveImportedRecords('inventory', records);
+              finishOperationStatus(`${result.saved} inventory items imported`);
               importResultToast('ingredients', result);
               if(window.RS_DB) {
                 const invs = await RS_DB.list('inventory');
@@ -2095,7 +2346,11 @@
               }
             } catch(err) {
               console.error(err);
+              finishOperationStatus('Inventory import failed', 'error');
               toast('Import failed: ' + err.message, 'fa-circle-exclamation');
+            } finally {
+              btnImportInventory.disabled = false;
+              btnImportInventory.innerHTML = oldImportInventoryHtml;
             }
           };
           reader.readAsText(file);
@@ -2109,10 +2364,24 @@
     if (btnExportBills) {
       btnExportBills.onclick = () => {
         if (!BILLS || !BILLS.length) return toast('No bills to export', 'fa-circle-exclamation');
-        const csv = window.RestroSuite && window.RestroSuite.bills && window.RestroSuite.bills.convertToCSV
-          ? window.RestroSuite.bills.convertToCSV(BILLS)
-          : BILLS.map(b => `${b.no},${b.time},${b.table},${b.amount},${b.pay},${b.status}`).join('\n');
-        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-export-${Date.now()}.csv`);
+        setOperationStatus('Exporting bills...');
+        const headers = ['Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone', 'Subtotal', 'GST', 'Total', 'Payment', 'Status'];
+        const rows = BILLS.map(b => [
+          b.no || b.orderId || b.id || '',
+          b.dateTime || b.time || '',
+          b.table || '',
+          b.items || '',
+          b.customerName || '',
+          b.customerPhone || '',
+          b.subtotal || '',
+          b.gst || '',
+          b.amount || b.total || '',
+          b.pay || b.paymentMethod || '',
+          b.status || ''
+        ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
+        const csv = [headers.join(','), ...rows].join('\n');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
+        finishOperationStatus('Bills exported');
         toast('Bills exported successfully', 'fa-circle-check');
       };
     }
@@ -2123,6 +2392,7 @@
       btnGSTR.onclick = () => {
         const paidBills = BILLS.filter(b => b.status === 'paid');
         if(!paidBills.length) return toast('No sales data for GSTR report', 'fa-circle-exclamation');
+        setOperationStatus('Preparing GSTR report...');
         const headers = ['Invoice Number', 'Invoice Date', 'Invoice Value', 'Taxable Value', 'CGST (2.5%)', 'SGST (2.5%)', 'Total Tax', 'Payment Method'];
         const csv = [
           headers.join(','),
@@ -2134,7 +2404,8 @@
             return `"${b.no}","${b.time}",${total},${taxable},${halfTax},${halfTax},${tax},"${b.pay}"`;
           })
         ].join('\n');
-        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `gstr1-report-${Date.now()}.csv`);
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `gstr1-report-${fileDate()}.csv`);
+        finishOperationStatus('GSTR report downloaded');
         toast('GSTR CSV downloaded successfully', 'fa-circle-check');
       };
     }
@@ -2144,12 +2415,16 @@
     if (btnExportTenants) {
       btnExportTenants.onclick = async () => {
         try {
+          setOperationStatus('Exporting tenant list...');
           let tenants = [];
           if(window.RS_API) {
             const out = await RS_API.admin({ action: 'list_tenants' }).catch(()=>({}));
             if(out && out.tenants) tenants = out.tenants;
           }
-          if (!tenants || !tenants.length) return toast('No tenants to export', 'fa-circle-exclamation');
+          if (!tenants || !tenants.length) {
+            finishOperationStatus('No tenants to export', 'error');
+            return toast('No tenants to export', 'fa-circle-exclamation');
+          }
           const headers = ['ID', 'Name', 'Slug', 'Outlet Type', 'Email', 'Phone', 'Username', 'Status', 'Plan Code', 'Subscription Status', 'MRR', 'Created At'];
           const csv = [
             headers.join(','),
@@ -2157,10 +2432,12 @@
               return `"${t.id || ''}","${(t.name || t.tenant_name || '').replace(/"/g, '""')}","${t.slug || ''}","${t.outlet_type || ''}","${t.email || ''}","${t.phone || ''}","${t.username || ''}","${t.status || ''}","${t.plan_code || ''}","${t.subscription_status || ''}",${t.mrr || 0},"${t.created_at || ''}"`;
             })
           ].join('\n');
-          RS.downloadFile(csv, 'text/csv;charset=utf-8;', `tenants-export-${Date.now()}.csv`);
+          RS.downloadFile(csv, 'text/csv;charset=utf-8;', `tenants-export-${fileDate()}.csv`);
+          finishOperationStatus('Tenant export downloaded');
           toast('Tenants exported successfully', 'fa-circle-check');
         } catch (e) {
           console.error(e);
+          finishOperationStatus('Tenant export failed', 'error');
           toast('Export failed: ' + e.message, 'fa-circle-exclamation');
         }
       };
@@ -2169,6 +2446,9 @@
 
   // Bind globally when document loads
   bindGlobalImportExportEvents();
+  showAppliedUpdateNotice();
+  window.setTimeout(() => checkForAppUpdate({ silent: true }), 30000);
+  window.setInterval(() => checkForAppUpdate({ silent: true }), 5 * 60 * 1000);
 
   // Set default landing tab
   const defaultTab = isSuper ? 'super-admin-tab' : 'pos-tab';

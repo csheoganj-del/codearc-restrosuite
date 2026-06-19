@@ -100,7 +100,6 @@
     };
 
     /* ---------------- receipt builder ---------------- */
-    let billSeq = 2042;
     function receiptHTML(bill){
       const custName = bill.customer || 'Walk-in';
       let custSection = '';
@@ -240,15 +239,15 @@
       if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
 
       const bill = {
-        no:'INV-'+(billSeq++), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
+        no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
         table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
-        tenders: [{ method: payment.method, amount: totals.grand }], change: 0
+        tenders: [{ method: payment.method, amount: totals.grand }], change: payment.change || 0
       };
       try {
         const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
         const gstHalf = Math.round((totals.gst||0)/2);
-        const billRow = { id:bill.no, no:bill.no, time:'Just now', table:bill.table, items: totals.count,
-          amount: bill.grand, pay: payment.method, status:'paid',
+        const billRow = { id:bill.no, orderId:bill.no, no:bill.no, time:bill.time, dateTime:new Date().toISOString(), table:bill.table, items: totals.count,
+          amount: bill.grand, pay: payment.method, paymentMethod: payment.method, total: bill.grand, status:'paid',
           receivedAmount: payment.received, changeAmount: payment.change,
           customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
           subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
@@ -259,7 +258,9 @@
         if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
           RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
         }
-        RS.render('bills-tab');
+        const refreshBills = () => RS.render && RS.render('bills-tab');
+        if (window.requestIdleCallback) window.requestIdleCallback(refreshBills, { timeout: 1200 });
+        else window.setTimeout(refreshBills, 350);
       } catch(e){
         console.warn('Bill save failed', e);
         RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
