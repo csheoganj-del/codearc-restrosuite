@@ -2130,7 +2130,60 @@
       };
     }
 
-    // 6. GSTR Download
+    // 6. Print Day Report
+    const btnPrintDayReport = document.getElementById('btn-print-day-report');
+    if (btnPrintDayReport) {
+      btnPrintDayReport.onclick = () => {
+        if (!BILLS || !BILLS.length) return toast('No bills to print', 'fa-circle-exclamation');
+        const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        let rows = '';
+        let totalAmount = 0;
+        BILLS.forEach(b => {
+          const amt = parseFloat(b.amount) || 0;
+          totalAmount += amt;
+          rows += `<tr>
+            <td>${b.no || ''}</td>
+            <td>${b.time || ''}</td>
+            <td>${b.table || ''}</td>
+            <td>${Array.isArray(b.items) ? b.items.map(i => `${i.name} x${i.qty}`).join(', ') : (b.items || '')}</td>
+            <td>${b.pay || ''}</td>
+            <td style="text-align:right">₹${amt.toFixed(2)}</td>
+            <td>${b.status || ''}</td>
+          </tr>`;
+        });
+        const printContent = `
+          <html>
+            <head>
+              <title>Day Report – ${today}</title>
+              <style>
+                body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; color: #111; }
+                h2 { margin-bottom: 4px; } p { margin: 0 0 12px; color: #555; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+                th { background: #f0f0f0; }
+                tfoot td { font-weight: bold; background: #fafafa; }
+                @media print { button { display: none; } }
+              </style>
+            </head>
+            <body>
+              <h2>Day Report</h2>
+              <p>${today}</p>
+              <table>
+                <thead><tr><th>Bill No.</th><th>Time</th><th>Table</th><th>Items</th><th>Payment</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>${rows}</tbody>
+                <tfoot><tr><td colspan="5" style="text-align:right">Total</td><td style="text-align:right">₹${totalAmount.toFixed(2)}</td><td></td></tr></tfoot>
+              </table>
+            </body>
+          </html>`;
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+      };
+    }
+
+    // 7. GSTR Download
     const btnGSTR = document.getElementById('btn-download-gstr');
     if (btnGSTR) {
       btnGSTR.onclick = () => {
