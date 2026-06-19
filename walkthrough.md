@@ -49,15 +49,11 @@ All changes are optimized, styled to match the RestroSuite design system, and sy
 * **Android Sync & Commit**: Ran `sync-assets.ps1` to mirror all styling changes to the Android app assets folder and successfully pushed the changes to the `main` branch.
 
 ## Onboarding Feature Tour & Releases
-
-* Created a **Release History** list in [src/dashboard/onboarding.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/src/dashboard/onboarding.js) tracking system updates and versions.
-* Added a **"What's New"** history button to the Help & Setup guide modal toolbar.
-* Created a step-by-step **Guided Spotlight Tour** for the Customer Dues update that highlights:
-  1. POS Customer Dropdown
-  2. "Due" Payment Option
-  3. Customers CRM Tab
-  4. Outstanding Dues and Settlement flow
-* Configured the tour coordinator to automatically display the "What's New" version update modal and prompt for the tour on dashboard load, and persist the seen state in `localStorage` so it does not repeat.
+* **Dynamic Release Notes Sync**: Refactored [src/dashboard/onboarding.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/src/dashboard/onboarding.js) to fetch `app-update.json` on boot and dynamically prepend the latest release details to the top of the history list if not already present. This ensures release logs are never generic.
+* **Release Modal Variable Fixes**: Refactored `showUpdateDialog` in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) to prioritize actual `releaseInfo` attributes over generic fallback labels.
+* **Auto-Trigger Tour Post-Update**: Configured the tour system to detect an applied update (via `rs_update_applied_at` flag) on page load and automatically open the **"What's New"** modal with a personalized sprinkles banner prompting users to take the guided tour.
+* **Versioned Tour Seen Flags**: Replaced hardcoded tour seen flags in `localStorage` with a dynamic key mapped to `window.__RESTROSUITE_ASSET_VERSION__` (e.g., `restrosuite_update_tour_seen:2026.06.19-dues`) to ensure a tour is shown once for every new version release.
+* **Date-Wise Dues Bill Numbers**: Formatted dues settlement bill numbers inside [assets/features-growth.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-growth.js) as `RS-SETTLE-YYYYMMDD-HHMMSS` (e.g. `RS-SETTLE-20260619-200218`) for easy chronological indexing and lookup.
 * Linked `onboarding.js` script tag in [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html).
 
 ---
