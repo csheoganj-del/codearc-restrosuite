@@ -1,16 +1,14 @@
 {
-  "version": "2026.06.19-restrosuite",
+  "version": "2026.06.19-dues",
   "date": "2026-06-19",
-  "title": "RestroSuite dashboard reliability update",
-  "summary": "This update improves billing clarity, import/export feedback, logo consistency, update safety, and background sync smoothness in the RestroSuite dashboard.",
+  "title": "Customer Dues & QR Printing Update",
+  "summary": "This update introduces customer credit (dues) management, QR code generation/printing for tables, and persistent POS drafts.",
   "highlights": [
-    "Bills now use date-wise numbers like RS-20260619-001.",
-    "Bill, tax, menu, inventory, and tenant exports use date-wise filenames.",
-    "Import and export work now shows a clear progress/status bar.",
-    "The dashboard checks for new updates in the background and prompts with guided release notes.",
-    "Current local dashboard data is saved before applying an update.",
-    "Inventory and Recipe Maker sync is safer for multi-branch/outlet data.",
-    "Pending-order sync is throttled so realtime updates do not repeatedly shake or refresh the desktop screen.",
-    "The RestroSuite dashboard sidebar now uses the real RestroSuite logo."
+    "Credit Payment: cashiers can now select 'Due' as a payment method for registered customers.",
+    "CRM Dues Tracking: customer profiles in CRM now display outstanding dues and allow quick settlements.",
+    "POS Customer Selector: easily assign customers to POS orders for loyalty and dues tracking.",
+    "Table QR Printing: generate and print QR codes directly from the Floor & Tables toolbar.",
+    "Persistent POS Drafts: parked/held orders are saved to the database and survive reloads.",
+    "Guided Feature Tour: interactive onboarding highlights new dues features for every client."
   ]
 }

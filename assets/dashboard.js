@@ -109,7 +109,7 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || '20260619-restrosuite';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || '20260619-dues';
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 
@@ -505,7 +505,19 @@
       }
     }
   }
-  function getCustomer(){ return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), gst:($('#cust-gst')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') }; }
+  function getCustomer(){
+    const sel = $('#cart-customer-sel');
+    if (sel && sel.value) {
+      const opt = sel.options[sel.selectedIndex];
+      return {
+        name: opt.getAttribute('data-name') || '',
+        phone: sel.value,
+        gst: opt.getAttribute('data-gst') || '',
+        table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
+      };
+    }
+    return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), gst:($('#cust-gst')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+  }
   function runKotAction(){
     if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
     try {

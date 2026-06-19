@@ -200,10 +200,11 @@
     };
     const isDineIn = () => orderType().toLowerCase().includes('dine');
     const isKotSent = () => kotSentKey && kotSentKey === cartKey();
-    const markKotSent = () => { kotSentKey = cartKey(); };
     const resetCustomerFields = () => {
       const ct = document.getElementById('cart-table');
       if (ct) ct.value = 'Walk-in / Takeaway';
+      const csel = document.getElementById('cart-customer-sel');
+      if (csel) csel.value = '';
     };
     function getPaymentDetails(){
       const totals = RS.getTotals();
@@ -239,7 +240,38 @@
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
       const payment = getPaymentDetails();
       if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
+
+      if (payment.method === 'Due' && !cust.phone) {
+        return RSModal.open({
+          title: 'Customer Required',
+          icon: 'fa-circle-exclamation',
+          size: 'sm',
+          body: '<p style="font-size:14px;line-height:1.5;">To check out an order as <b>Due (Credit)</b>, you must select a registered customer from the dropdown in the cart header.</p>',
+          foot: '<button class="btn btn-primary" style="flex:1" data-close-modal>Okay</button>',
+          onMount(modal, close) {
+            modal.querySelector('[data-close-modal]').onclick = close;
+          }
+        });
+      }
+
       if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
+
+      if (payment.method === 'Due' && cust.phone) {
+        try {
+          const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+          const matched = customers.find(c => c.phone === cust.phone);
+          if (matched) {
+            matched.dues = (matched.dues || 0) + totals.grand;
+            matched.spend = (matched.spend || 0) + totals.grand;
+            matched.visits = (matched.visits || 0) + 1;
+            matched.last = new Date().toLocaleDateString('en-CA');
+            await RS_DB.put('customers', matched.id, matched);
+            RS.toast('Customer credit (due) updated', 'fa-address-book');
+          }
+        } catch (e) {
+          console.warn("Failed to update customer dues on checkout", e);
+        }
+      }
 
       const bill = {
         no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
@@ -482,11 +514,15 @@
             const cp = document.getElementById('cust-phone');
             const cg = document.getElementById('cust-gst');
             const ct = document.getElementById('cart-table');
+            const csel = document.getElementById('cart-customer-sel');
             if (cn) cn.value = selected.name || '';
             if (cp) cp.value = selected.phone || '';
             if (cg) cg.value = selected.gst || '';
             if (ct && selected.table) {
               ct.value = selected.table;
+            }
+            if (csel) {
+              csel.value = selected.phone || '';
             }
             
             // Delete from database
@@ -527,6 +563,27 @@
     updateHeldCount();
     loadHeldFromDB();
     document.addEventListener('rs:hydrated', loadHeldFromDB);
+
+    async function loadCustomersForPos() {
+      const sel = document.getElementById('cart-customer-sel');
+      if (!sel) return;
+      const currentVal = sel.value;
+      try {
+        const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+        sel.innerHTML = '<option value="">Walk-in Customer</option>' + 
+          customers.map(c => `<option value="${esc(c.phone)}" data-name="${esc(c.name)}" data-gst="${esc(c.email||'')}" ${c.phone === currentVal ? 'selected' : ''}>${esc(c.name)} (${esc(c.phone)})</option>`).join('');
+      } catch(e) {
+        console.warn("Failed to load customers for POS", e);
+      }
+    }
+    loadCustomersForPos();
+    document.addEventListener('rs:hydrated', loadCustomersForPos);
+    
+    // Also reload when selector gets focus to pick up any new customers added in CRM
+    const csel = document.getElementById('cart-customer-sel');
+    if (csel) {
+      csel.addEventListener('focus', loadCustomersForPos);
+    }
   }
 
   if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });

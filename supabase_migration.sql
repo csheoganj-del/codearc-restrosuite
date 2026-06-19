@@ -144,3 +144,7 @@ BEGIN
         EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.saas_tenants';
     END IF;
 END $$;
+
+-- 6. Add dues column to customer table
+ALTER TABLE public.doppio_crm ADD COLUMN IF NOT EXISTS dues numeric NOT NULL DEFAULT 0;
+

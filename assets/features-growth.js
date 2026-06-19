@@ -328,12 +328,13 @@
       const total = CUSTOMERS.length || 1;
       const repeat = Math.round(CUSTOMERS.filter(c=>c.visits>1).length/total*100);
       const totalSpend = CUSTOMERS.reduce((a,c)=>a+(c.spend||0),0);
+      const totalDues = CUSTOMERS.reduce((a,c)=>a+(c.dues||0),0);
       sec.innerHTML = `
         <div class="stat-row">
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Total customers</div><div class="sd" style="display:none"></div></div></div>
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(Math.round(totalSpend/total))}</div><div class="sl">Avg lifetime spend</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-gift"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Loyalty members</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a" style="background: rgba(255, 79, 0, 0.1); color: var(--orange);"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="crm-total-dues">${rs(totalDues)}</div><div class="sl">Total Outstanding Dues</div></div></div>
         </div>
         <div class="toolbar-row"><div class="pos-search grow" style="max-width:320px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone…"></div><div class="grow"></div><button class="btn btn-ghost btn-sm"><i class="fa-brands fa-whatsapp"></i> Broadcast</button><button class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button></div>
         <div class="crm-grid" id="crm-grid"></div>`;
@@ -341,7 +342,7 @@
       function draw(q=''){ const t=q.toLowerCase();
         grid.innerHTML = CUSTOMERS.filter(c=>c.name.toLowerCase().includes(t)||c.phone.includes(t)).map((c,i)=>`
           <div class="crm-card" data-i="${CUSTOMERS.indexOf(c)}">
-            <div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[c.name.length%RS.avatarColors.length]}">${RS.initials(c.name)}</div><div style="flex:1"><div class="crm-name">${c.name} <span class="tier-badge ${tierCls[c.tier||'silver']}">${c.tier||'silver'}</span></div><div class="crm-phone">${c.phone}</div></div></div>
+            <div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[c.name.length%RS.avatarColors.length]}">${RS.initials(c.name)}</div><div style="flex:1"><div class="crm-name">${c.name} <span class="tier-badge ${tierCls[c.tier||'silver']}">${c.tier||'silver'}</span>${c.dues > 0 ? `<span class="pill pill-orange" style="margin-left:6px; font-size:10px; padding: 2px 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Due: ${rs(c.dues)}</span>` : ''}</div><div class="crm-phone">${c.phone}</div></div></div>
             <div class="crm-stats"><div class="cs"><div class="csv">${c.visits||0}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend||0)}</div><div class="csl">Spent</div></div><div class="cs"><div class="csv" style="font-size:12px">${c.last||'never'}</div><div class="csl">Last order</div></div></div>
           </div>`).join('') || '<div class="sr-empty">No customers found</div>';
         $$('.crm-card',grid).forEach(el=> el.onclick=()=> customerModal(CUSTOMERS[+el.dataset.i]));
@@ -474,6 +475,103 @@
         });
       };
     }
+    function showSettleDuesModal(c, closeParentModal) {
+      RSModal.open({
+        title: 'Settle Dues',
+        sub: `${c.name} · Outstanding: ${rs(c.dues || 0)}`,
+        icon: 'fa-hand-holding-dollar',
+        size: 'sm',
+        body: `
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div class="form-group">
+              <label style="font-weight:700; font-size:13px; color:var(--text-soft); display:block; margin-bottom:6px;">Settlement Amount</label>
+              <input type="number" class="form-input" id="settle-amount" value="${c.dues || 0}" min="1" max="${c.dues || 0}" step="any" style="width:100%;">
+            </div>
+            <div class="form-group">
+              <label style="font-weight:700; font-size:13px; color:var(--text-soft); display:block; margin-bottom:6px;">Payment Method</label>
+              <select class="form-input" id="settle-method" style="width:100%;">
+                <option>Cash</option>
+                <option>UPI</option>
+                <option>Card</option>
+              </select>
+            </div>
+          </div>
+        `,
+        foot: `
+          <button class="btn btn-ghost" style="flex:1" data-close-settle>Cancel</button>
+          <button class="btn btn-primary" style="flex:1; background:var(--orange); border-color:var(--orange);" id="btn-confirm-settle">Confirm Payment</button>
+        `,
+        onMount(modal, closeSettle) {
+          modal.querySelector('[data-close-settle]').onclick = closeSettle;
+          modal.querySelector('#btn-confirm-settle').onclick = async () => {
+            const amountInput = modal.querySelector('#settle-amount');
+            const methodSelect = modal.querySelector('#settle-method');
+            const settleAmt = parseFloat(amountInput.value);
+            const method = methodSelect.value;
+            
+            if (isNaN(settleAmt) || settleAmt <= 0) {
+              return RS.toast('Please enter a valid amount', 'fa-circle-exclamation');
+            }
+            if (settleAmt > (c.dues || 0)) {
+              return RS.toast('Settlement amount cannot exceed outstanding dues', 'fa-circle-exclamation');
+            }
+            
+            try {
+              // Update customer dues
+              c.dues = Math.max(0, (c.dues || 0) - settleAmt);
+              if (window.RS_DB) {
+                await RS_DB.put('customers', c.id, c);
+              }
+              
+              // Log settlement transaction in bills
+              const billNo = 'RS-SETTLE-' + Date.now();
+              const billTime = new Date().toLocaleString('en-IN', {
+                day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true
+              });
+              const billRow = {
+                id: billNo,
+                orderId: billNo,
+                no: billNo,
+                time: billTime,
+                dateTime: new Date().toISOString(),
+                table: 'Dues Settlement',
+                items: 1,
+                amount: settleAmt,
+                pay: method,
+                paymentMethod: method,
+                total: settleAmt,
+                status: 'paid',
+                customerName: c.name,
+                customerPhone: c.phone,
+                subtotal: settleAmt,
+                gst: 0,
+                cgst: 0,
+                sgst: 0,
+                _items: [{ name: 'Dues Settlement Payment', qty: 1, price: settleAmt }]
+              };
+              
+              if (window.RS && Array.isArray(RS.BILLS)) {
+                RS.BILLS.unshift(billRow);
+              }
+              if (window.RS_DB && RS_DB.put) {
+                await RS_DB.put('bills', billNo, billRow);
+              }
+              
+              RS.toast(`Settled ${rs(settleAmt)} dues successfully`, 'fa-circle-check');
+              
+              // Refresh views
+              closeSettle();
+              closeParentModal();
+              renderCustomers();
+            } catch (err) {
+              console.error("Failed to settle dues", err);
+              RS.toast('Error settling dues', 'fa-circle-exclamation');
+            }
+          };
+        }
+      });
+    }
+
     function customerModal(c){
       const custBills = (RS.BILLS || []).filter(b => b.customerPhone === c.phone || (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name));
       const history = custBills.map(b => [b.time, (b._items || []).map(i => `${i.name} x${i.qty}`).join(', '), b.amount]);
@@ -483,9 +581,16 @@
 
       RSModal.open({ title:c.name, sub:c.phone+' · '+c.tier.toUpperCase()+' member', icon:'fa-user', size:'md',
         body:`<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${c.visits}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend)}</div><div class="csl">Lifetime</div></div><div class="cs"><div class="csv">${rs(avgVisit)}</div><div class="csl">Avg ₹/visit</div></div><div class="cs"><div class="csv" style="color:var(--orange)">${points}</div><div class="csl">Points</div></div></div>
+          ${c.dues > 0 ? `
+          <div style="background:var(--orange-tint); border:1px solid rgba(255,107,0,0.3); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:13px; color:var(--text); font-weight:700;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--orange); margin-right:6px;"></i> Outstanding dues: <span style="color:var(--orange); font-size:15px; font-weight:800;">${rs(c.dues)}</span></div>
+            <button class="btn btn-sm btn-primary" style="background:var(--orange); border-color:var(--orange); font-size:11px;" id="modal-settle-dues-btn">Settle now</button>
+          </div>` : ''}
           <div class="panel-head" style="margin-bottom:10px"><h3 style="font-size:14px">Recent orders</h3></div>
           <table class="data-table"><tbody>${history.length > 0 ? history.map(h=>`<tr><td>${h[0]}</td><td style="color:var(--text-soft)">${h[1]}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-mute)">No order history</td></tr>'}</tbody></table>`,
-        foot:`<button class="btn btn-ghost" style="flex:1" data-wa><i class="fa-brands fa-whatsapp"></i> Message</button><button class="btn btn-primary" style="flex:1" data-offer><i class="fa-solid fa-tags"></i> Send offer</button>`,
+        foot:`<button class="btn btn-ghost" style="flex:1" data-wa><i class="fa-brands fa-whatsapp"></i> Message</button>
+              ${c.dues > 0 ? `<button class="btn btn-primary" style="flex:1; background:var(--orange); border-color:var(--orange);" id="modal-settle-dues-foot"><i class="fa-solid fa-hand-holding-dollar"></i> Settle Dues</button>` : ''}
+              <button class="btn btn-ghost" style="flex:1; border:1px solid var(--stroke-2)" data-offer><i class="fa-solid fa-tags"></i> Send offer</button>`,
         onMount(modal,close){
           modal.querySelector('[data-wa]').onclick=()=>{
             window.open(`https://wa.me/${String(c.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent('Hi '+c.name+', thank you for dining with us.')}`, '_blank', 'noopener,noreferrer');
@@ -493,6 +598,18 @@
             RS.toast('WhatsApp message ready for '+c.name,'fa-whatsapp');
           };
           modal.querySelector('[data-offer]').onclick=()=>{close();RS.toast('Offer campaigns are not connected yet','fa-tags');};
+          const settleBtn = modal.querySelector('#modal-settle-dues-btn');
+          if (settleBtn) {
+            settleBtn.onclick = () => {
+              showSettleDuesModal(c, close);
+            };
+          }
+          const settleFoot = modal.querySelector('#modal-settle-dues-foot');
+          if (settleFoot) {
+            settleFoot.onclick = () => {
+              showSettleDuesModal(c, close);
+            };
+          }
         }});
     }
     RS.titles['customers-tab']=['Customers','CRM, loyalty & order history']; RS.addRenderer('customers-tab', renderCustomers);
