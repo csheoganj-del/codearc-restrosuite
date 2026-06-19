@@ -554,16 +554,16 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 .tour-first-action {
   margin: -8px 0 18px;
   padding: 10px 12px;
-  border: 1px solid rgba(252, 128, 25, 0.2);
+  border: 1px solid rgba(255, 79, 0, 0.18);
   border-radius: 9px;
-  background: rgba(252, 128, 25, 0.06);
-  color: var(--text-dark);
+  background: rgba(255, 79, 0, 0.04);
+  color: var(--text);
   font-size: 11.5px;
   line-height: 1.5;
 }
 
 .tour-first-action strong {
-  color: var(--accent-caramel);
+  color: var(--orange);
 }
 
 .tour-dot {
@@ -572,14 +572,14 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(28, 28, 28, 0.16);
+  background: rgba(255, 255, 255, 0.16);
   cursor: pointer;
   transition: width 0.2s ease, background 0.2s ease;
 }
 
 .tour-dot.is-active {
   width: 20px;
-  background: var(--accent-caramel);
+  background: var(--orange);
 }
 
 #onboarding-overlay {
@@ -597,7 +597,7 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   z-index: 100100;
   pointer-events: none;
   border-radius: 12px;
-  box-shadow: 0 0 0 9999px rgba(17, 24, 39, 0.58); /* Dim dashboard */
+  box-shadow: 0 0 0 9999px rgba(8, 8, 11, 0.58); /* Dim dashboard */
   border: 3px solid var(--orange, #FF4F00);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -609,10 +609,10 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   width: 380px;
   max-width: calc(100vw - 40px);
   padding: 24px;
-  background: var(--bg-card, #ffffff);
-  border: 1px solid rgba(28, 28, 28, 0.08);
+  background: var(--panel-solid, #ffffff);
+  border: 1px solid var(--stroke-2);
   border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(17, 24, 39, 0.15);
+  box-shadow: var(--shadow-lg);
   pointer-events: all;
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
@@ -624,7 +624,7 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   gap: 6px;
   padding: 4px 10px;
   border-radius: 99px;
-  background: rgba(255, 79, 0, 0.1);
+  background: var(--orange-tint);
   color: var(--orange, #FF4F00);
   font-size: 11px;
   font-weight: 700;
@@ -637,14 +637,14 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   background: transparent;
   font-size: 24px;
   line-height: 1;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-soft, #6B7280);
   cursor: pointer;
   padding: 4px;
   transition: color 0.2s;
 }
 
 #tour-skip-btn:hover {
-  color: var(--text-dark, #111827);
+  color: var(--text);
 }
 
 #tour-feature-icon {
@@ -653,7 +653,7 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: rgba(255, 79, 0, 0.1);
+  background: var(--orange-tint);
   color: var(--orange, #FF4F00);
   font-size: 18px;
   flex-shrink: 0;
@@ -667,9 +667,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-  border: 1px solid rgba(28, 28, 28, 0.12);
-  background: var(--bg-card, #ffffff);
-  color: var(--text-dark, #111827);
+  border: 1px solid var(--stroke-2);
+  background: var(--panel-solid, #ffffff);
+  color: var(--text);
 }
 
 #tour-next-btn {
@@ -679,12 +679,12 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 }
 
 #tour-next-btn:hover {
-  background: #e04500;
-  border-color: #e04500;
+  background: var(--orange-deep);
+  border-color: var(--orange-deep);
 }
 
 #tour-prev-btn:hover:not(:disabled) {
-  background: rgba(28, 28, 28, 0.04);
+  background: var(--glass-2);
 }
 
 #tour-prev-btn:disabled {
@@ -693,11 +693,12 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 }
 
 #tour-next-btn.is-finish {
-  background: #16803c;
-  border-color: #16803c;
-  box-shadow: 0 4px 14px rgba(22, 128, 60, 0.24);
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: var(--shadow-sm);
 }
 
+/* Premium Product Guide Modal */
 .product-guide-modal {
   position: fixed;
   inset: 0;
@@ -712,7 +713,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 .product-guide-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(17, 24, 39, 0.58);
+  background: rgba(8, 8, 11, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .product-guide-panel {
@@ -720,12 +723,14 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   inset: 24px;
   width: min(1080px, calc(100vw - 48px));
   margin: auto;
-  padding: 24px;
+  padding: 28px 24px;
   overflow-y: auto;
-  border: 1px solid rgba(28, 28, 28, 0.08);
-  border-radius: 16px;
-  background: var(--bg-card);
-  box-shadow: 0 24px 80px rgba(17, 24, 39, 0.3);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-md, 16px);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-body), sans-serif;
+  color: var(--text);
 }
 
 .product-guide-header,
@@ -740,21 +745,22 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 
 .product-guide-header h2 {
   margin: 4px 0;
-  color: var(--text-dark);
-  font-family: var(--font-heading);
+  color: var(--text);
+  font-family: var(--font-display), sans-serif;
   font-size: 24px;
+  font-weight: 800;
 }
 
 .product-guide-header p {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-soft);
   font-size: 12px;
 }
 
 .product-guide-eyebrow,
 .product-guide-section-heading span,
 .product-guide-progress-copy span {
-  color: var(--accent-caramel);
+  color: var(--orange);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -764,12 +770,18 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   width: 38px;
   height: 38px;
   flex: 0 0 auto;
-  border: 1px solid rgba(28, 28, 28, 0.08);
-  border-radius: 10px;
-  background: var(--bg-cream-light);
-  color: var(--text-dark);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-xs, 8px);
+  background: var(--glass);
+  color: var(--text);
   font-size: 22px;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.product-guide-close:hover {
+  background: var(--glass-3);
+  border-color: var(--stroke-hi);
 }
 
 .product-guide-toolbar {
@@ -780,28 +792,36 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   width: min(360px, 100%);
   min-height: 40px;
   padding: 9px 12px;
-  border: 1px solid rgba(28, 28, 28, 0.12);
-  border-radius: 9px;
-  background: var(--bg-cream-light);
-  color: var(--text-dark);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-xs, 8px);
+  background: var(--glass);
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+  transition: all 0.2s;
+}
+
+.product-guide-toolbar input:focus {
+  border-color: var(--orange);
+  outline: none;
+  background: var(--glass-2);
 }
 
 .product-guide-setup {
   padding: 18px;
-  border: 1px solid rgba(252, 128, 25, 0.18);
-  border-radius: 12px;
-  background: rgba(252, 128, 25, 0.035);
+  border: 1px solid rgba(255, 79, 0, 0.16);
+  border-radius: var(--r-sm, 12px);
+  background: rgba(255, 79, 0, 0.04);
 }
 
 .product-guide-progress-copy strong {
   display: block;
   margin-top: 3px;
-  color: var(--text-dark);
+  color: var(--text);
   font-size: 13px;
 }
 
 .product-guide-progress-copy b {
-  color: var(--accent-caramel);
+  color: var(--orange);
   font-size: 20px;
 }
 
@@ -809,15 +829,15 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   height: 7px;
   margin: 12px 0 16px;
   overflow: hidden;
-  border-radius: 999px;
-  background: rgba(28, 28, 28, 0.08);
+  border-radius: var(--r-pill, 999px);
+  background: var(--stroke);
 }
 
 .product-guide-progress span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent-caramel);
+  background: var(--orange);
 }
 
 .product-guide-task-grid,
@@ -832,21 +852,27 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 11px;
-  border: 1px solid rgba(28, 28, 28, 0.08);
-  border-radius: 9px;
-  background: var(--bg-card);
-  color: var(--text-dark);
+  padding: 12px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-xs, 8px);
+  background: var(--glass);
+  color: var(--text);
   text-align: left;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.product-guide-task:hover {
+  border-color: var(--stroke-hi);
+  background: var(--glass-2);
 }
 
 .product-guide-task > i:first-child {
-  color: #9CA3AF;
+  color: var(--text-faint);
 }
 
 .product-guide-task.is-done > i:first-child {
-  color: #16803c;
+  color: var(--green);
 }
 
 .product-guide-task span {
@@ -859,13 +885,14 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 }
 
 .product-guide-task strong {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .product-guide-task small {
   margin-top: 2px;
-  color: var(--text-muted);
-  font-size: 9.5px;
+  color: var(--text-soft);
+  font-size: 10px;
   line-height: 1.35;
 }
 
@@ -875,23 +902,34 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 
 .product-guide-section-heading h3 {
   margin: 3px 0 0;
-  color: var(--text-dark);
+  color: var(--text);
+  font-family: var(--font-display), sans-serif;
   font-size: 17px;
+  font-weight: 700;
 }
 
 .product-guide-count {
   padding: 5px 8px;
-  border-radius: 999px;
-  background: rgba(252, 128, 25, 0.09);
+  border-radius: var(--r-pill, 999px);
+  background: var(--orange-tint);
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .product-guide-card {
   display: flex;
   gap: 14px;
   padding: 16px;
-  border: 1px solid rgba(28, 28, 28, 0.08);
-  border-radius: 12px;
-  background: var(--bg-card);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-sm, 12px);
+  background: var(--glass);
+  transition: all 0.2s;
+}
+
+.product-guide-card:hover {
+  border-color: var(--stroke-hi);
+  background: var(--glass-2);
 }
 
 .product-guide-card-icon {
@@ -900,13 +938,18 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   height: 40px;
   flex: 0 0 40px;
   place-items: center;
-  border-radius: 10px;
-  background: rgba(252, 128, 25, 0.09);
-  color: var(--accent-caramel);
+  border-radius: var(--r-xs, 8px);
+  background: var(--orange-tint);
+  color: var(--orange);
+  font-size: 16px;
+}
+
+.product-guide-card-copy {
+  flex: 1;
 }
 
 .product-guide-card-copy > span {
-  color: var(--accent-caramel);
+  color: var(--orange);
   font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
@@ -914,22 +957,25 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 
 .product-guide-card h4 {
   margin: 3px 0 7px;
-  color: var(--text-dark);
+  color: var(--text);
+  font-family: var(--font-display), sans-serif;
   font-size: 14px;
+  font-weight: 700;
 }
 
 .product-guide-card p,
 .product-guide-first-action {
-  color: var(--text-muted);
-  font-size: 10.5px;
+  color: var(--text-soft);
+  font-size: 11px;
   line-height: 1.5;
 }
 
 .product-guide-first-action {
   margin-top: 9px;
-  padding: 8px;
-  border-radius: 7px;
-  background: var(--bg-cream-light);
+  padding: 8px 10px;
+  border-radius: var(--r-xs, 8px);
+  background: var(--glass-2);
+  border-left: 3px solid var(--orange);
 }
 
 .product-guide-card button {
@@ -937,8 +983,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--accent-caramel);
-  font-size: 10.5px;
+  color: var(--orange);
+  font-family: var(--font-display), sans-serif;
+  font-size: 11px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -946,7 +993,7 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 .product-guide-empty {
   grid-column: 1 / -1;
   padding: 28px;
-  color: var(--text-muted);
+  color: var(--text-soft);
   text-align: center;
 }
 
