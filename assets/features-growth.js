@@ -559,6 +559,25 @@
               
               RS.toast(`Settled ${rs(settleAmt)} dues successfully`, 'fa-circle-check');
               
+              // Auto-trigger Receipt preview/print/WhatsApp modal
+              if (window.RSReceipt && typeof window.RSReceipt.show === 'function') {
+                const receiptBill = {
+                  no: billRow.no,
+                  time: billRow.time,
+                  table: billRow.table,
+                  customer: billRow.customerName,
+                  customerPhone: billRow.customerPhone,
+                  items: billRow._items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+                  sub: billRow.subtotal,
+                  disc: 0,
+                  gst: 0,
+                  grand: billRow.total,
+                  tenders: [{ method: billRow.paymentMethod, amount: billRow.total }],
+                  change: 0
+                };
+                window.RSReceipt.show(receiptBill);
+              }
+              
               // Refresh views
               closeSettle();
               closeParentModal();
