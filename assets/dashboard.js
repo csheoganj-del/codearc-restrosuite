@@ -177,23 +177,13 @@
       },
       activeTab: document.querySelector('.tab-content.active')?.id || '',
       cart: typeof cart !== 'undefined' ? cart : [],
-      discountPct: typeof discountPct !== 'undefined' ? discountPct : 0,
-      menu: typeof MENU !== 'undefined' ? MENU : [],
-      bills: typeof BILLS !== 'undefined' ? BILLS : [],
-      inventory: typeof INVENTORY !== 'undefined' ? INVENTORY : [],
-      employees: typeof EMPLOYEES !== 'undefined' ? EMPLOYEES : []
+      discountPct: typeof discountPct !== 'undefined' ? discountPct : 0
     };
     try {
-      const localKeys = {};
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i);
-        if (key && (/^(rs-|doppio_|restrosuite_)/.test(key))) {
-          localKeys[key] = localStorage.getItem(key);
-        }
-      }
-      snapshot.localKeys = localKeys;
-    } catch (_) {}
-    localStorage.setItem(updateSnapshotKey, JSON.stringify(snapshot));
+      localStorage.setItem(updateSnapshotKey, JSON.stringify(snapshot));
+    } catch (e) {
+      console.warn('[Snapshot Warning] Failed to save pre-update snapshot:', e);
+    }
     return snapshot;
   }
 
@@ -254,7 +244,13 @@
           <p>${info.summary || 'This update improves billing, importing, exports, sync, and dashboard stability.'}</p>
           <ul>${highlights.map(item => `<li>${item}</li>`).join('')}</ul>
         </div>
-        <div class="app-update-save-row"><i class="fa-solid fa-shield-halved"></i><span id="app-update-save-status">Ready to save current dashboard data.</span></div>
+        <div class="app-update-save-row">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span id="app-update-save-status">Ready to save current dashboard data.</span>
+        </div>
+        <div class="app-update-progress-track" style="display:none; width:100%; height:4px; background:var(--stroke-2); border-radius:99px; margin-top:8px; overflow:hidden;">
+          <div id="app-update-progress-bar" style="width:0%; height:100%; background:var(--orange); transition:width .2s var(--ease);"></div>
+        </div>
         <div class="app-update-actions">
           <button type="button" class="btn btn-ghost" id="app-update-later-btn">Later</button>
           <button type="button" class="btn btn-primary" id="app-update-now-btn"><i class="fa-solid fa-rotate"></i> Save & Update</button>
@@ -262,9 +258,35 @@
       </div>`;
     document.body.appendChild(modal);
     modal.querySelector('#app-update-later-btn').onclick = () => modal.remove();
-    modal.querySelector('#app-update-now-btn').onclick = () => {
-      modal.querySelector('#app-update-save-status').textContent = 'Saving local dashboard data...';
-      savePreUpdateSnapshot();
+    modal.querySelector('#app-update-now-btn').onclick = async () => {
+      const btnNow = modal.querySelector('#app-update-now-btn');
+      const btnLater = modal.querySelector('#app-update-later-btn');
+      btnNow.disabled = true;
+      btnLater.disabled = true;
+      
+      const track = modal.querySelector('.app-update-progress-track');
+      const bar = modal.querySelector('#app-update-progress-bar');
+      const status = modal.querySelector('#app-update-save-status');
+      
+      if(track) track.style.display = 'block';
+      
+      const steps = [
+        { pct: 20, text: 'Securing active session...' },
+        { pct: 40, text: 'Backing up active cart items...' },
+        { pct: 60, text: 'Archiving current layout state...' },
+        { pct: 80, text: 'Writing snapshot to secure storage...' },
+        { pct: 100, text: 'Applying system updates...' }
+      ];
+      
+      for (const step of steps) {
+        status.textContent = step.text;
+        if(bar) bar.style.width = step.pct + '%';
+        if (step.pct === 80) {
+          savePreUpdateSnapshot();
+        }
+        await new Promise(r => setTimeout(r, 220));
+      }
+      
       localStorage.setItem(updateSignatureKey, signature || '');
       sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
       const url = new URL(window.location.href);
