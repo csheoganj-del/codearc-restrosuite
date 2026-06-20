@@ -241,6 +241,76 @@
       const payment = getPaymentDetails();
       if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
 
+      async function finalizeBill(payMethod, receivedVal, changeVal) {
+        if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
+
+        if (payMethod === 'Due' && cust.phone) {
+          try {
+            const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+            const matched = customers.find(c => c.phone === cust.phone);
+            if (matched) {
+              matched.dues = (matched.dues || 0) + totals.grand;
+              matched.spend = (matched.spend || 0) + totals.grand;
+              matched.visits = (matched.visits || 0) + 1;
+              matched.last = new Date().toLocaleDateString('en-CA');
+              await RS_DB.put('customers', matched.id, matched);
+              RS.toast('Customer credit (due) updated', 'fa-address-book');
+            }
+          } catch (e) {
+            console.warn("Failed to update customer dues on checkout", e);
+          }
+        }
+
+        const bill = {
+          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
+          table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
+          tenders: [{ method: payMethod, amount: receivedVal }], change: changeVal || 0
+        };
+        try {
+          const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+          const gstHalf = Math.round((totals.gst||0)/2);
+          const billRow = { id:bill.no, orderId:bill.no, no:bill.no, time:bill.time, dateTime:new Date().toISOString(), table:bill.table, items: totals.count,
+            amount: bill.grand, pay: payMethod, paymentMethod: payMethod, total: bill.grand, status:'paid',
+            receivedAmount: receivedVal, changeAmount: changeVal,
+            customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
+            subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
+            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
+          RS.BILLS.unshift(billRow);
+          if (RS.saveOne) await RS.saveOne('bills',billRow);
+          const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+          if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
+            RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
+          }
+          const refreshBills = () => RS.render && RS.render('bills-tab');
+          if (window.requestIdleCallback) window.requestIdleCallback(refreshBills, { timeout: 1200 });
+          else window.setTimeout(refreshBills, 350);
+        } catch(e){
+          console.warn('Bill save failed', e);
+          RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
+        }
+
+        RS.clearCart();
+        resetCustomerFields();
+        resetPayment();
+        showReceipt(bill);
+
+        if (window.RS_DB) {
+          try {
+            const rows = await RS_DB.list('pending_orders');
+            const matched = rows.find(r =>
+              (r.tableNumber === cust.table || r.tableNumber === cust.table.replace('Table ', '')) &&
+              (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
+            );
+            if (matched) {
+              await RS_DB.del('pending_orders', matched.id);
+              if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
+            }
+          } catch(e) {
+            console.warn("Failed to clear pending order on checkout", e);
+          }
+        }
+      }
+
       if (payment.method === 'Due' && !cust.phone) {
         return RSModal.open({
           title: 'Customer Required for Credit',
@@ -287,14 +357,12 @@
                   };
                   await RS_DB.put('customers', newCust.id, newCust);
                   
-                  // Reload dropdown and select newly added customer
                   const csel = document.getElementById('cart-customer-sel');
                   if (csel) {
                     csel.value = phone;
                   }
                   document.dispatchEvent(new CustomEvent('rs:hydrated'));
                   
-                  // Brief timeout to let selector populate and update state
                   setTimeout(() => {
                     if (csel) {
                       const opts = Array.from(csel.options);
@@ -319,75 +387,104 @@
         });
       }
 
-      if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
-
-      if (payment.method === 'Due' && cust.phone) {
-        try {
-          const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
-          const matched = customers.find(c => c.phone === cust.phone);
-          if (matched) {
-            matched.dues = (matched.dues || 0) + totals.grand;
-            matched.spend = (matched.spend || 0) + totals.grand;
-            matched.visits = (matched.visits || 0) + 1;
-            matched.last = new Date().toLocaleDateString('en-CA');
-            await RS_DB.put('customers', matched.id, matched);
-            RS.toast('Customer credit (due) updated', 'fa-address-book');
-          }
-        } catch (e) {
-          console.warn("Failed to update customer dues on checkout", e);
-        }
-      }
-
-      const bill = {
-        no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
-        table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
-        tenders: [{ method: payment.method, amount: totals.grand }], change: payment.change || 0
-      };
-      try {
-        const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-        const gstHalf = Math.round((totals.gst||0)/2);
-        const billRow = { id:bill.no, orderId:bill.no, no:bill.no, time:bill.time, dateTime:new Date().toISOString(), table:bill.table, items: totals.count,
-          amount: bill.grand, pay: payment.method, paymentMethod: payment.method, total: bill.grand, status:'paid',
-          receivedAmount: payment.received, changeAmount: payment.change,
-          customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
-          subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-          _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
-        RS.BILLS.unshift(billRow);
-        if (RS.saveOne) await RS.saveOne('bills',billRow);
-        const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-        if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
-          RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
-        }
-        const refreshBills = () => RS.render && RS.render('bills-tab');
-        if (window.requestIdleCallback) window.requestIdleCallback(refreshBills, { timeout: 1200 });
-        else window.setTimeout(refreshBills, 350);
-      } catch(e){
-        console.warn('Bill save failed', e);
-        RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
-      }
-
-      RS.clearCart();
-      resetCustomerFields();
-      resetPayment();
-      showReceipt(bill);
-
-      if (window.RS_DB) {
-        (async () => {
-          try {
-            const rows = await RS_DB.list('pending_orders');
-            const matched = rows.find(r =>
-              (r.tableNumber === cust.table || r.tableNumber === cust.table.replace('Table ', '')) &&
-              (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
-            );
-            if (matched) {
-              await RS_DB.del('pending_orders', matched.id);
-              if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
+      if (payment.method === 'Cash') {
+        return RSModal.open({
+          title: 'Cash Payment Calculator',
+          sub: 'Calculate change amount and note breakdown',
+          icon: 'fa-cash-register',
+          size: 'sm',
+          body: `
+            <div style="font-family:var(--font-body),sans-serif; display:flex; flex-direction:column; gap:16px;">
+              <div style="background:var(--orange-tint); border:1px solid var(--stroke-2); border-radius:12px; padding:14px; text-align:center;">
+                <span style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">Total Amount Due</span>
+                <h2 style="font-size:28px; font-weight:900; color:var(--orange); margin:4px 0 0 0;">\${RS.rs(totals.grand)}</h2>
+              </div>
+              
+              <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
+                <label style="font-size:12px; font-weight:700; color:var(--text); display:flex; justify-content:space-between;">
+                  <span>Cash Received (₹)</span>
+                  <span id="cash-calc-error" style="color:var(--orange); font-weight:700; display:none;">Insufficient cash</span>
+                </label>
+                <input type="number" id="cash-received-input" class="form-input" value="\${totals.grand}" min="\${totals.grand}" style="font-size:20px; font-weight:900; padding:10px; text-align:center; color:var(--text); background:var(--panel); border:1px solid var(--stroke-hi);">
+              </div>
+              
+              <div>
+                <label style="font-size:12px; font-weight:700; color:var(--text-soft); margin-bottom:8px; display:block;">Quick Denominations / Notes</label>
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+                  <button type="button" class="btn btn-ghost den-btn" data-val="\${totals.grand}" style="font-size:11px; font-weight:700; border:1px solid var(--orange); color:var(--orange); padding:8px 0;">Exact</button>
+                  <button type="button" class="btn btn-ghost den-btn" data-val="10" style="font-size:11px; font-weight:700; padding:8px 0;">₹10</button>
+                  <button type="button" class="btn btn-ghost den-btn" data-val="20" style="font-size:11px; font-weight:700; padding:8px 0;">₹20</button>
+                  <button type="button" class="btn btn-ghost den-btn" data-val="50" style="font-size:11px; font-weight:700; padding:8px 0;">₹50</button>
+                  <button type="button" class="btn btn-ghost den-btn" data-val="100" style="font-size:11px; font-weight:700; padding:8px 0;">₹100</button>
+                  <button type="button" class="btn btn-ghost den-btn" data-val="200" style="font-size:11px; font-weight:700; padding:8px 0;">₹200</button>
+                  <button type="button" class="btn btn-ghost den-btn" data-val="500" style="font-size:11px; font-weight:700; padding:8px 0;">₹500</button>
+                  <button type="button" class="btn btn-ghost den-btn" data-val="2000" style="font-size:11px; font-weight:700; padding:8px 0;">₹2000</button>
+                </div>
+              </div>
+              
+              <div style="background:rgba(37,211,102,0.08); border:1px solid rgba(37,211,102,0.2); border-radius:12px; padding:14px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13px; font-weight:700; color:var(--text-soft);">Change to Return:</span>
+                <h3 id="cash-change-amount" style="font-size:24px; font-weight:900; color:#25d366; margin:0;">₹0</h3>
+              </div>
+            </div>
+          `,
+          foot: `
+            <button class="btn btn-ghost" data-close-modal style="flex:1">Cancel</button>
+            <button class="btn btn-primary" id="btn-cash-pay" style="flex:1.5;background:var(--orange);border-color:var(--orange);color:#fff;"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
+          `,
+          onMount(modal, close) {
+            const receivedInput = modal.querySelector('#cash-received-input');
+            const changeEl = modal.querySelector('#cash-change-amount');
+            const errorEl = modal.querySelector('#cash-calc-error');
+            const payBtn = modal.querySelector('#btn-cash-pay');
+            
+            function updateChange() {
+              const received = Number(receivedInput.value) || 0;
+              const change = Math.max(0, received - totals.grand);
+              if (changeEl) changeEl.textContent = RS.rs(change);
+              
+              if (received < totals.grand) {
+                if (errorEl) errorEl.style.display = 'inline';
+                if (payBtn) payBtn.disabled = true;
+              } else {
+                if (errorEl) errorEl.style.display = 'none';
+                if (payBtn) payBtn.disabled = false;
+              }
             }
-          } catch(e) {
-            console.warn("Failed to clear pending order on checkout", e);
+            
+            receivedInput.addEventListener('input', updateChange);
+            modal.querySelector('[data-close-modal]').onclick = close;
+            
+            modal.querySelectorAll('.den-btn').forEach(btn => {
+              btn.onclick = () => {
+                const val = Number(btn.dataset.val);
+                if (btn.textContent === 'Exact') {
+                  receivedInput.value = val;
+                } else {
+                  let current = Number(receivedInput.value) || 0;
+                  if (current === totals.grand) {
+                    receivedInput.value = val;
+                  } else {
+                    receivedInput.value = current + val;
+                  }
+                }
+                updateChange();
+              };
+            });
+            
+            updateChange();
+            
+            payBtn.onclick = async () => {
+              const cashReceived = Number(receivedInput.value) || totals.grand;
+              const changeAmount = Math.max(0, cashReceived - totals.grand);
+              close();
+              await finalizeBill('Cash', cashReceived, changeAmount);
+            };
           }
-        })();
+        });
       }
+
+      await finalizeBill(payment.method, totals.grand, 0);
     }
 
     /* ---------------- KOT ---------------- */
