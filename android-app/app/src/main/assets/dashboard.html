@@ -330,42 +330,44 @@
                 <button class="btn btn-ghost btn-sm" id="btn-import-menu" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
               </div>
             </div>
+                        <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; background:rgba(0,0,0,0.02); padding:8px 12px; border-radius:6px; border:1px solid var(--stroke-2);">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; color:var(--text-mute); font-weight:500;">Category:</span>
+                <select id="editor-cat-filter" style="background:var(--panel, #fff); border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:3px 6px; border-radius:4px; outline:none; cursor:pointer; font-weight:600; font-family:inherit;">
+                  <option value="All">All</option>
+                  <option value="Starters">Starters</option>
+                  <option value="Mains">Mains</option>
+                  <option value="Breads">Breads</option>
+                  <option value="Beverages">Beverages</option>
+                  <option value="Desserts">Desserts</option>
+                </select>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; color:var(--text-mute); font-weight:500;">Stock:</span>
+                <select id="editor-stock-filter" style="background:var(--panel, #fff); border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:3px 6px; border-radius:4px; outline:none; cursor:pointer; font-weight:600; font-family:inherit;">
+                  <option value="All">All</option>
+                  <option value="ok">In stock</option>
+                  <option value="low">Low</option>
+                  <option value="out">Out</option>
+                </select>
+              </div>
+              <div style="margin-left:auto;">
+                <button class="btn btn-ghost btn-sm" id="btn-enable-all-menu" style="padding: 4px 8px; font-size: 11px; text-transform: none; display: inline-flex; align-items: center; gap: 4px;" title="Enable all items at once"><i class="fa-solid fa-circle-check"></i> Enable All</button>
+              </div>
+            </div>
             <div class="table-scroll"><table class="data-table">
                <thead>
                  <tr>
                    <th>Item</th>
-                   <th>
-                     Category
-                     <select id="editor-cat-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
-                       <option value="All">All</option>
-                       <option value="Starters">Starters</option>
-                       <option value="Mains">Mains</option>
-                       <option value="Breads">Breads</option>
-                       <option value="Beverages">Beverages</option>
-                       <option value="Desserts">Desserts</option>
-                     </select>
-                   </th>
+                   <th>Category</th>
                    <th>Price</th>
-                   <th>
-                     Stock
-                     <select id="editor-stock-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
-                       <option value="All">All</option>
-                       <option value="ok">In stock</option>
-                       <option value="low">Low</option>
-                       <option value="out">Out</option>
-                     </select>
-                   </th>
-                   <th>
-                     <div style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;">
-                       Available 
-                       <button class="btn btn-ghost btn-sm" id="btn-enable-all-menu" style="padding: 3px 8px; font-size: 10px; line-height: 1.2; text-transform: none;" title="Enable all items at once"><i class="fa-solid fa-circle-check"></i> Enable All</button>
-                     </div>
-                   </th>
+                   <th>Stock</th>
+                   <th>Available</th>
                    <th>Actions</th>
                  </tr>
                </thead>
-              <tbody id="editor-list"></tbody>
-            </table></div>
+               <tbody id="editor-list"></tbody>
+             </table></div>
           </div>
         </div>
       </section>
