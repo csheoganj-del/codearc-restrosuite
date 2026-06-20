@@ -1037,3 +1037,153 @@ body.product-guide-open {
   }
 }
 
+/* ================================================================
+   RESTROSUITE — MOBILE & TABLET RESPONSIVE FIXES
+   Fixes: 1(sidebar) 2(POS grid) 3(touch) 4(iOS zoom) 6(header) 7(tablet)
+   ================================================================ */
+
+/* Fix 1 — Hamburger button & overlay */
+.sidebar-hamburger {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 200;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--white, #fff);
+  border: 1px solid var(--stroke-2, #E5E7EB);
+  box-shadow: 0 2px 8px rgba(0,0,0,.10);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--text, #111827);
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+.sidebar-hamburger:hover,
+.sidebar-hamburger:focus-visible {
+  background: var(--glass-2, #F6F7F9);
+  box-shadow: 0 4px 14px rgba(0,0,0,.14);
+  outline: 2px solid var(--orange, #FF6B00);
+}
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 140;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+@media (max-width: 1024px) {
+  .sidebar-hamburger { display: flex; }
+  .sidebar-overlay.active { display: block; }
+  
+  /* Sidebar drawer behavior for mobile/tablet */
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 150;
+    transform: translateX(-100%);
+    transition: transform 0.3s var(--ease);
+    display: flex !important; /* overrides display: none at max-width: 760px */
+    width: 264px !important;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.25);
+  }
+  .sidebar.reveal {
+    transform: translateX(0) !important;
+  }
+  
+  /* Fix 7 — Tablet breakpoint: ensure full-width content area */
+  .main-content, .main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* Fix 2 — POS layout: tablet gets narrower cart, phone gets stacked */
+@media (max-width: 1024px) and (min-width: 641px) {
+  .pos-wrap {
+    grid-template-columns: 1fr 300px !important;
+  }
+}
+@media (max-width: 640px) {
+  .pos-wrap {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Fix 3 — Touch targets >= 44px on tablet/mobile */
+@media (max-width: 1024px) {
+  .pos-cat-btn {
+    height: 44px !important;
+    padding: 0 20px !important;
+  }
+  .pos-search input {
+    height: 44px !important;
+    padding: 0 14px 0 38px !important;
+  }
+  .pos-customize-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    opacity: 1 !important;
+  }
+  .cust-qty-btn {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .cart-qty-btn {
+    min-width: 36px !important;
+    min-height: 36px !important;
+  }
+  .sidebar-link {
+    min-height: 44px !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+}
+
+/* Fix 4 — Input font-size >= 16px (prevents iOS auto-zoom on focus) */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Fix 6 — Reduce dashboard header padding on small screens */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 10px 14px !important;
+    gap: 6px;
+  }
+  .header-meta,
+  .header-date,
+  .header-secondary {
+    display: none !important;
+  }
+}
+
+/* Fix 7 — Phone: stack multi-column views */
+@media (max-width: 768px) {
+  .staff-access-view.active {
+    grid-template-columns: 1fr !important;
+  }
+  .kds-grid,
+  .orders-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .view-panel,
+  .tab-panel,
+  .section-inner {
+    padding: 12px !important;
+  }
+}
+

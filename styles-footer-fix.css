@@ -1,0 +1,27 @@
+/* ================================================================
+   RESTROSUITE — styles.css Fix 8: Footer grid tablet breakpoint
+   ================================================================
+   In styles.css, FIND and REMOVE the existing block:
+
+     @media (max-width: 768px) {
+       .footer-grid {
+         grid-template-columns: 1fr;
+         gap: 40px;
+       }
+     }
+
+   REPLACE it with these two blocks:
+*/
+
+@media (max-width: 1024px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+  }
+}
+@media (max-width: 640px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
