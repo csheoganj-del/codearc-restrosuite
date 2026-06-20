@@ -37,16 +37,25 @@
   #role-switch.on .rs-track { background: var(--violet-tint); border-color: oklch(0.66 0.17 285 / 0.4); }
   #role-switch.on .rs-track::before { transform: translateX(15px); background: var(--violet-soft); }
 
-  /* Support Button Styling */
-  .tb-support-group { display: inline-flex; align-items: center; gap: 8px; }
-  .support-btn { text-decoration: none; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
-  .support-btn.call { color: var(--text-soft); background: var(--glass); border: 1px solid var(--stroke-2); }
-  .support-btn.call:hover { color: var(--orange); border-color: var(--orange); background: var(--orange-tint); transform: translateY(-1px); }
-  .support-btn.whatsapp { color: #25d366; background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.3); }
-  .support-btn.whatsapp:hover { color: #ffffff; background: #25d366; border-color: #25d366; transform: translateY(-1px); }
+  /* Support Dropdown Styling */
+  .support-dropdown { position: relative; display: inline-block; }
+  .support-dropdown .dropdown-trigger { cursor: pointer; font-weight: 700; color: var(--text-soft); background: var(--glass); border: 1px solid var(--stroke-2); display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px; transition: var(--t); }
+  .support-dropdown .dropdown-trigger:hover, .support-dropdown.active .dropdown-trigger { color: var(--text); border-color: var(--stroke-hi); background: var(--glass-2); }
+  .support-menu { position: absolute; top: calc(100% + 8px); right: 0; width: 220px; background: var(--panel-solid, var(--panel)); border: 1px solid var(--stroke); border-radius: var(--r-md); box-shadow: var(--shadow-lg); display: none; flex-direction: column; padding: 6px; z-index: 999; animation: dropdownFade 0.2s var(--ease); }
+  .support-dropdown.active .support-menu { display: flex; }
+  @keyframes dropdownFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .support-menu .dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-sm); color: var(--text-soft); text-decoration: none; transition: var(--t); text-align: left; }
+  .support-menu .dropdown-item:hover { background: var(--glass-2); color: var(--text); }
+  .support-menu .dropdown-item i { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+  .support-menu .dropdown-item.call i { color: var(--orange); }
+  .support-menu .dropdown-item.whatsapp i { color: #25d366; }
+  .support-menu .dropdown-item div { display: flex; flex-direction: column; }
+  .support-menu .dropdown-item strong { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .support-menu .dropdown-item span { font-size: 11px; color: var(--text-mute); margin-top: 2px; }
   @media (max-width: 1024px) {
-    .tb-support-group span { display: none; }
-    .support-btn { padding: 8px; width: 36px; height: 36px; justify-content: center; border-radius: 50%; }
+    .support-dropdown .dropdown-trigger span { display: none; }
+    .support-dropdown .dropdown-trigger { padding: 8px; width: 36px; height: 36px; justify-content: center; border-radius: 50%; }
+    .support-dropdown .dropdown-trigger i:last-child { display: none; }
   }
 </style>
 </head>
@@ -124,15 +133,28 @@
       <div class="tb-title"><h1 id="page-title">Point of Sale</h1><p id="page-sub">Ring up takeaway & dine-in orders</p></div>
       <div class="tb-spacer"></div>
       <div class="tb-search"><i class="fa-solid fa-magnifying-glass"></i><input placeholder="Search anything…"></div>
-      <div class="tb-support-group">
-        <a href="tel:+919983721179" class="tb-pill support-btn call" title="Call Support (+91 99837 21179)">
-          <i class="fa-solid fa-phone"></i>
-          <span>Call Support</span>
-        </a>
-        <a href="https://wa.me/919983721179" target="_blank" class="tb-pill support-btn whatsapp" title="WhatsApp Support (+91 99837 21179)">
-          <i class="fa-brands fa-whatsapp"></i>
-          <span>WhatsApp</span>
-        </a>
+      <div class="tb-dropdown support-dropdown">
+        <button class="tb-pill dropdown-trigger" id="support-trigger" aria-label="Support Options">
+          <i class="fa-solid fa-headset"></i>
+          <span>Support</span>
+          <i class="fa-solid fa-chevron-down" style="font-size: 10px; margin-left: 2px; opacity: 0.7;"></i>
+        </button>
+        <div class="dropdown-menu support-menu" id="support-menu">
+          <a href="tel:+919983721179" class="dropdown-item call">
+            <i class="fa-solid fa-phone"></i>
+            <div>
+              <strong>Call Support</strong>
+              <span>+91 99837 21179</span>
+            </div>
+          </a>
+          <a href="https://wa.me/919983721179" target="_blank" class="dropdown-item whatsapp">
+            <i class="fa-brands fa-whatsapp"></i>
+            <div>
+              <strong>WhatsApp Support</strong>
+              <span>Chat online with us</span>
+            </div>
+          </a>
+        </div>
       </div>
       <span class="tb-pill sync txt" id="db-mode-pill"><span class="dot dot-live"></span> Local</span>
       <span class="tb-pill txt"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
