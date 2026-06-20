@@ -110,15 +110,35 @@
     async login({ slug, username, password, remember }){
       if(!CONFIGURED) {
         await new Promise(r=>setTimeout(r,600));
+        let role = 'admin';
+        let tenantId = slug || 'demo-tenant';
+        let tenantSlug = slug || 'demo-tenant';
+        let tenantName = 'Demo Restaurant';
+        let allowedTabs = ['pos-tab', 'qr-orders-tab', 'bills-tab', 'inventory-tab', 'editor-tab', 'reports-tab', 'kds-tab', 'growth-hub-tab', 'employees-tab'];
+
+        if (slug === 'superadmin') {
+          role = 'superadmin';
+          tenantId = 'superadmin';
+          tenantSlug = 'superadmin';
+          tenantName = 'SaaS Platform Owner';
+          allowedTabs = ['super-admin-tab', 'gateway-monitor-tab'];
+        } else if (slug === 'brand-admin' || slug === 'brandadmin') {
+          role = 'brand_admin';
+          tenantId = 'brand-admin';
+          tenantSlug = 'brand-admin';
+          tenantName = 'Corporate Brand HQ';
+          allowedTabs = ['chain-dashboard-tab'];
+        }
+
         const mockSession = {
-          tenant_id: slug === 'superadmin' ? 'superadmin' : (slug || 'demo-tenant'),
-          tenant_slug: slug === 'superadmin' ? 'superadmin' : (slug || 'demo-tenant'),
-          tenant_name: slug === 'superadmin' ? 'SaaS Platform Owner' : 'Demo Restaurant',
+          tenant_id: tenantId,
+          tenant_slug: tenantSlug,
+          tenant_name: tenantName,
           username: username || 'demo',
-          role: slug === 'superadmin' ? 'superadmin' : 'admin',
-          allowed_tabs: slug === 'superadmin' ? ['super-admin-tab', 'gateway-monitor-tab'] : ['pos-tab', 'qr-orders-tab', 'bills-tab', 'inventory-tab', 'editor-tab', 'reports-tab', 'kds-tab', 'growth-hub-tab', 'employees-tab'],
-          session_token: slug === 'superadmin' ? '' : 'demo-session-token',
-          admin_token: slug === 'superadmin' ? 'demo-admin-token' : ''
+          role: role,
+          allowed_tabs: allowedTabs,
+          session_token: role === 'superadmin' ? '' : 'demo-session-token',
+          admin_token: role === 'superadmin' ? 'demo-admin-token' : ''
         };
         storeSession(mockSession, remember !== false);
         return mockSession;

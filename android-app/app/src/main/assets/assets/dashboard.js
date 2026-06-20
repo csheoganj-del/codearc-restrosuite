@@ -4,6 +4,35 @@
 (function () {
   'use strict';
   
+  // Self-Healing Boot Recovery
+  (function () {
+    try {
+      const sigKey = 'rs_update_signature';
+      const stableKey = 'rs_last_stable_signature';
+      const currentSig = localStorage.getItem(sigKey);
+      const stableSig = localStorage.getItem(stableKey);
+      
+      // If we boot successfully for 10 seconds, mark this version/signature as stable
+      window.setTimeout(() => {
+        if (currentSig) {
+          localStorage.setItem(stableKey, currentSig);
+        }
+      }, 10000);
+
+      window.addEventListener('error', function (event) {
+        if (!event.message || event.message.includes('Extension')) return;
+        if (stableSig && currentSig && stableSig !== currentSig) {
+          console.error('[Self-Healing] Fatal error detected post-update. Rolling back to stable signature:', stableSig);
+          localStorage.setItem(sigKey, stableSig);
+          localStorage.removeItem('rs_pre_update_snapshot');
+          window.location.reload();
+        }
+      });
+    } catch (e) {
+      console.warn('[Self-Healing Setup Failed]:', e);
+    }
+  })();
+  
   // Observability / Incident Reporting
   const observabilityDomain = window.RestroSuite && window.RestroSuite.observability;
   if (observabilityDomain) {
@@ -48,26 +77,34 @@
 
   const titles = {
     'pos-tab':['Point of Sale','Ring up takeaway & dine-in orders'],
-    'qr-orders-tab':['QR Table Orders','Live orders from QR-scanning guests'],
-    'bills-tab':['Bills Management','Search, reprint, export & refund bills'],
-    'inventory-tab':['Inventory Control','Track stock, suppliers & low-stock alerts'],
-    'editor-tab':['Menu Editor','Add, edit & cost your menu items'],
+    'qr-orders-tab':['QR Orders','Incoming orders from tables & delivery'],
+    'bills-tab':['Bill History','Search, filter & refund completed transactions'],
+    'inventory-tab':['Inventory','Stock levels, batch expiry & ordering thresholds'],
+    'editor-tab':['Menu Editor','Add, modify & organize catalog categories & items'],
     'reports-tab':['Sales Reports','Revenue, payments & tax analytics'],
     'kds-tab':['Kitchen Display','Live cooking queue & prep timers'],
     'growth-hub-tab':['Growth Hub','Reservations, offers, support & more'],
     'employees-tab':['Employee Ledger','Team, roles, shifts & payroll'],
     'super-admin-tab':['SaaS Super-Admin','Platform-wide tenants & metrics'],
-    'gateway-monitor-tab':['Gateway Monitor','WhatsApp gateway health & logs']
+    'gateway-monitor-tab':['Gateway Monitor','WhatsApp gateway health & logs'],
+    'chain-dashboard-tab':['Chain Dashboard','Consolidated reporting, catalog & logistics']
   };
   const rendered = {};
   function activateTab(id){
-    const isSuper = isSuperAdmin();
+    const sess = window.RS_API ? RS_API.session() : null;
+    const isSuper = sess && sess.role === 'superadmin';
+    const isBrandAdmin = sess && sess.role === 'brand_admin';
+
     if (isSuper) {
       if (id !== 'super-admin-tab' && id !== 'gateway-monitor-tab') {
         id = 'super-admin-tab';
       }
+    } else if (isBrandAdmin) {
+      if (id !== 'chain-dashboard-tab') {
+        id = 'chain-dashboard-tab';
+      }
     } else {
-      if (id === 'super-admin-tab' || id === 'gateway-monitor-tab') {
+      if (id === 'super-admin-tab' || id === 'gateway-monitor-tab' || id === 'chain-dashboard-tab') {
         id = 'pos-tab';
       }
     }
@@ -490,6 +527,15 @@
 
     // Refresh POS Grid to update card badges
     try { renderPOS(); } catch (e) {}
+
+    // Auto-save active cart to localStorage
+    try {
+      localStorage.setItem('rs_active_cart', JSON.stringify(cart));
+      localStorage.setItem('rs_active_cart_discount', String(discountPct));
+      localStorage.setItem('rs_active_cart_customer', JSON.stringify(getCustomer()));
+    } catch (e) {
+      console.warn('[Cart Persistence Warning] Failed to persist active cart:', e);
+    }
   }
   function getTotals(){ const sub=cart.reduce((a,c)=>a+c.price*c.qty,0); const disc=posDiscountEnabled ? Math.round(sub*discountPct/100) : 0; const taxed=sub-disc; const gst=posGstEnabled ? Math.round(taxed*0.05) : 0; return {sub,disc,gst,grand:taxed+gst,count:cart.reduce((a,c)=>a+c.qty,0),discountPct:posDiscountEnabled?discountPct:0,items:cart.map(c=>({...c}))}; }
   function clearCart(){
@@ -1136,7 +1182,7 @@
           const ings = m.ingredients || [];
           const cost = ings.reduce((a,g)=>a+g.qty*invCost(g.name),0);
           const margin = m.price && cost ? Math.round((1-cost/m.price)*100) : (m.price?100:0);
-          const ingText = ings.length ? ings.map(g=>`${g.qty}${g.unit} ${g.name}`).join(', ') : '<span style="color:var(--text-mute)">No recipe â€” click âœ to define</span>';
+          const ingText = ings.length ? ings.map(g=>`${g.qty}${g.unit} ${g.name}`).join(', ') : '<span style="color:var(--text-mute)">No recipe â€” click âœ  to define</span>';
           return `<tr>
             <td><div style="display:flex;align-items:center;gap:9px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${m.name}</b></div></td>
             <td>${m.cat}</td>
@@ -1811,7 +1857,7 @@
           const tenantId = document.getElementById('manage-tenant-id').value;
           const tenantName = document.getElementById('manage-tenant-name').textContent;
 
-          if (!confirm(`âš ï¸ RESET DATA for: ${tenantName}?\n\nThis will PERMANENTLY DELETE all of their operations data (bills, menus, inventory, staff, CRM, recipes).\n\nThe account credentials and options will be kept. Proceed?`)) return;
+          if (!confirm(`âš ï¸  RESET DATA for: ${tenantName}?\n\nThis will PERMANENTLY DELETE all of their operations data (bills, menus, inventory, staff, CRM, recipes).\n\nThe account credentials and options will be kept. Proceed?`)) return;
 
           resetTenantDataBtn.disabled = true;
           resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
@@ -1838,7 +1884,7 @@
           const tenantId = document.getElementById('manage-tenant-id').value;
           const tenantName = document.getElementById('manage-tenant-name').textContent;
 
-          if (!confirm(`âš ï¸ LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of menu, inventory, recipes, staff, and bills history. Operational data will be reset. Proceed?`)) return;
+          if (!confirm(`âš ï¸  LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of menu, inventory, recipes, staff, and bills history. Operational data will be reset. Proceed?`)) return;
 
           seedTenantDataBtn.disabled = true;
           seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
@@ -1865,7 +1911,7 @@
           const tenantId = document.getElementById('manage-tenant-id').value;
           const tenantName = document.getElementById('manage-tenant-name').textContent;
 
-          if (!confirm(`âš ï¸ REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records. Client-added data will remain intact. Proceed?`)) return;
+          if (!confirm(`âš ï¸  REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records. Client-added data will remain intact. Proceed?`)) return;
 
           purgeTenantDataBtn.disabled = true;
           purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging...';
@@ -2183,7 +2229,8 @@
       }
     },
     'inventory-tab':renderInventory,'editor-tab':renderEditor,'reports-tab':renderReports,'kds-tab':renderKDS,
-    'growth-hub-tab':renderHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'gateway-monitor-tab':renderGateway
+    'growth-hub-tab':renderHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'gateway-monitor-tab':renderGateway,
+    'chain-dashboard-tab':() => { if(window.RestroSuite && RestroSuite.chain) RestroSuite.chain.init(window.RS_API); }
   };
 
   /* ---------- public API for feature modules ---------- */
@@ -2282,6 +2329,67 @@
       } catch(e){}
     }
     try{ renderPOS(); }catch(e){}
+
+    // Restore persistent cart state / pre-update snapshot
+    try {
+      const savedCart = localStorage.getItem('rs_active_cart');
+      const savedDisc = localStorage.getItem('rs_active_cart_discount');
+      const savedCust = localStorage.getItem('rs_active_cart_customer');
+      const snapshot = localStorage.getItem('rs_pre_update_snapshot');
+      
+      let cartToRestore = null;
+      let discToRestore = 0;
+      let custToRestore = null;
+      let tabToRestore = null;
+      
+      if (snapshot) {
+        const parsedSnap = JSON.parse(snapshot);
+        if (parsedSnap) {
+          cartToRestore = parsedSnap.cart;
+          discToRestore = parsedSnap.discountPct || 0;
+          tabToRestore = parsedSnap.activeTab;
+          if (parsedSnap.tenant) {
+            if (parsedSnap.tenant.id) sessionStorage.setItem('tenant_id', parsedSnap.tenant.id);
+            if (parsedSnap.tenant.slug) sessionStorage.setItem('tenant_slug', parsedSnap.tenant.slug);
+            if (parsedSnap.tenant.role) sessionStorage.setItem('logged_in_role', parsedSnap.tenant.role);
+          }
+        }
+        localStorage.removeItem('rs_pre_update_snapshot');
+      } else if (savedCart) {
+        cartToRestore = JSON.parse(savedCart);
+        discToRestore = Number(savedDisc) || 0;
+        if (savedCust) custToRestore = JSON.parse(savedCust);
+      }
+      
+      if (cartToRestore && Array.isArray(cartToRestore) && cartToRestore.length > 0) {
+        cart = cartToRestore;
+        discountPct = discToRestore;
+        
+        if (custToRestore) {
+          const cn = document.getElementById('cust-name');
+          const cp = document.getElementById('cust-phone');
+          const cg = document.getElementById('cust-gst');
+          const ct = document.getElementById('cart-table');
+          const csel = document.getElementById('cart-customer-sel');
+          
+          if (cn) cn.value = custToRestore.name || '';
+          if (cp) cp.value = custToRestore.phone || '';
+          if (cg) cg.value = custToRestore.gst || '';
+          if (ct && custToRestore.table) ct.value = custToRestore.table;
+          if (csel && custToRestore.phone) {
+            csel.value = custToRestore.phone;
+          }
+        }
+        renderCart();
+      }
+      
+      if (tabToRestore) {
+        activateTab(tabToRestore);
+      }
+    } catch (e) {
+      console.warn('[Cart Restore Warning] Failed to restore active cart state:', e);
+    }
+
     const curTab=document.querySelector('.tab-content.active'); if(curTab && renderers[curTab.id]) { try{ renderers[curTab.id](); }catch(e){} }
     
     // 2. Fetch fresh data from the cloud in parallel (non-blocking)
@@ -2319,6 +2427,34 @@
 
   const sess = window.RS_API ? RS_API.session() : null;
   const isSuper = sess && sess.role === 'superadmin';
+  const isBrandAdmin = sess && sess.role === 'brand_admin';
+
+  // ── Apply role-specific UI lockdown before first render ──
+  if (isBrandAdmin) {
+    // 1. Show brandadmin-only elements
+    $$('.brandadmin-only').forEach(el => {
+      el.style.display = el.classList.contains('sidebar-link') ? 'flex' : '';
+    });
+    // 2. Hide all other sidebar links
+    $$('.sidebar-link').forEach(link => {
+      if (link.dataset.tab !== 'chain-dashboard-tab') {
+        link.style.display = 'none';
+      }
+    });
+    // 3. Update user pill
+    const userNameEl = document.querySelector('.user-pill .un');
+    const userRoleEl = document.querySelector('.user-pill .ur');
+    if (userNameEl && sess.username) userNameEl.textContent = sess.username.charAt(0).toUpperCase() + sess.username.slice(1);
+    if (userRoleEl) userRoleEl.textContent = 'Corporate HQ Admin';
+    // 4. Hide non-brandadmin metrics
+    const headerCenter = document.querySelector('.header-center-metrics');
+    if (headerCenter) headerCenter.style.display = 'none';
+    // 5. Hide role switch
+    const roleSwitch = $('#role-switch');
+    if (roleSwitch) roleSwitch.style.display = 'none';
+  } else {
+    $$('.brandadmin-only').forEach(el => el.style.display = 'none');
+  }
 
   // â”€â”€ Apply superadmin-specific UI lockdown before first render â”€â”€
   if (isSuper) {
@@ -2890,12 +3026,12 @@
   window.setInterval(() => checkForAppUpdate({ silent: true }), 2 * 60 * 1000);
 
   // Set default landing tab
-  const defaultTab = isSuper ? 'super-admin-tab' : 'pos-tab';
+  const defaultTab = isSuper ? 'super-admin-tab' : (isBrandAdmin ? 'chain-dashboard-tab' : 'pos-tab');
   const start = (location.hash || '#' + defaultTab).slice(1);
   activateTab((titles[start] || document.getElementById(start)) ? start : defaultTab);
 
-  // Only run hydrate for non-superadmin (superadmin doesn't need tenant data)
-  if(!isSuper) hydrate();
+  // Only run hydrate for outlet-level users (not superadmin or brandadmin)
+  if(!isSuper && !isBrandAdmin) hydrate();
 
   // validate the stored session against the backend; only bounce if server explicitly rejects it
   if(window.RS_API && RS_API.configured){
@@ -2905,6 +3041,8 @@
     }).catch(() => {
       // Network error / Supabase offline â€” keep user on dashboard, don't log them out
       console.warn('[RS] validateSession network error â€” keeping local session alive.');
+      // Network error / Supabase offline — keep user on dashboard, don't log them out
+      console.warn('[RS] validateSession network error — keeping local session alive.');
     });
   }
 
@@ -2917,11 +3055,14 @@
     });
   });
 
-  // superadmin toggle (role switch demo) â€” only show for non-superadmin users
+  // superadmin toggle (role switch demo) — only show for non-superadmin users
   if(!isSuper) {
     const roleSwitch = $('#role-switch');
     if (roleSwitch) roleSwitch.style.display = 'none';
     $$('.superadmin-only').forEach(el=>el.style.display='none');
+  }
+  if (!isBrandAdmin) {
+    $$('.brandadmin-only').forEach(el=>el.style.display='none');
   }
 
   // Security contract test compatibility:

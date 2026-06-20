@@ -1,3 +1,33 @@
+# Walkthrough - RestroSuite Multi-Outlet Chain & Brand Dashboard (June 20, 2026)
+
+We have successfully implemented the Multi-Outlet Chain features, allowing corporate brand administrators to centrally manage menus, analyze cross-store inventory, and coordinate stock transfers.
+
+---
+
+## 1. Database Migrations
+* Created the [supabase_chain_migration.sql](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/supabase_chain_migration.sql) migration script.
+* Created the parent brand configuration `saas_brands` and corporate user profiling `doppio_brand_users`.
+* Modified the core outlet directory `saas_tenants` to link to their respective corporate brands.
+* Created the `doppio_master_menu` table for brand-wide recipe catalogs, and updated local outlet menu tables to support regional pricing overrides and local special additions.
+* Created the inter-store inventory transshipment table `doppio_stock_transfers` and items table `doppio_stock_transfer_items`.
+
+## 2. Brand Dashboard Front-End Layout
+* Injected a new **Chain Management** sidebar section and a **Chain Dashboard** tab panel into [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html).
+* Designed dynamic widgets:
+  * **Brand Performance Metrics**: Live totals for total brand revenue, order counts, average ticket value, and alerting outlets.
+  * **Revenue Trend Chart**: High-fidelity SVG-based smooth area curve visualizing daily sales trends across the entire outlet network.
+  * **Top Performing Outlets**: Rankings table showing real-time revenues and growth margins per branch.
+  * **Cross-Outlet Inventory Heatmap**: Color-coded status table indicating which ingredients are OK, low, or critically out of stock at each outlet location.
+  * **Inter-Outlet Stock Transfers Manager**: Request new stock movements or approve pending transfers between branches on-the-fly.
+  * **Central Master Menu Catalog**: Allows corporate to manage the central item list, SKU associations, categories, and default pricing.
+
+## 3. JavaScript Controller Logic
+* Created the modular controller [src/dashboard/chain.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/src/dashboard/chain.js) to manage the rendering logic, simulation states (mock local stores), and action handlers for adding master catalog items and managing stock transfers.
+* Integrated the module in the main controller [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js), specifying security route locks so only `brand_admin` users can load or interact with this view.
+* Updated local login simulations in [assets/doppio-api.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/doppio-api.js) to support logging in with the slug `brand-admin` to test the entire workflow.
+
+---
+
 # Walkthrough - RestroSuite Customer Dues, Table QRs, and Onboarding Tour
 
 We have successfully implemented:
