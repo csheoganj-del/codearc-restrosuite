@@ -109,7 +109,7 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || '20260619-dues';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || '20260620-onboarding';
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 

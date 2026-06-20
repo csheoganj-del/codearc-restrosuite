@@ -1,14 +1,12 @@
 {
-  "version": "2026.06.19-dues",
-  "date": "2026-06-19",
-  "title": "Customer Dues & QR Printing Update",
-  "summary": "This update introduces customer credit (dues) management, QR code generation/printing for tables, and persistent POS drafts.",
+  "version": "2026.06.20-onboarding",
+  "date": "2026-06-20",
+  "title": "Onboarding Usability & Tour Update",
+  "summary": "This update resolves tooltip layout overlapping, makes the 'What's New' history button responsive, and fixes settings tab setup task redirects.",
   "highlights": [
-    "Credit Payment: cashiers can now select 'Due' as a payment method for registered customers.",
-    "CRM Dues Tracking: customer profiles in CRM now display outstanding dues and allow quick settlements.",
-    "POS Customer Selector: easily assign customers to POS orders for loyalty and dues tracking.",
-    "Table QR Printing: generate and print QR codes directly from the Floor & Tables toolbar.",
-    "Persistent POS Drafts: parked/held orders are saved to the database and survive reloads.",
-    "Guided Feature Tour: interactive onboarding highlights new dues features for every client."
+    "Collision-Free Tooltips: Tooltip card dynamically shifts to the side with more space (left/right) to keep highlighted elements fully visible.",
+    "What's New Button: Resolved the click event handler on the What's New history button.",
+    "Redirect & Input Focus: Setup task checklist buttons now route directly to settings sub-sections and auto-focus fields.",
+    "Mobile View Centering: Centered tooltip cards on narrow viewports using translate transforms."
   ]
 }
