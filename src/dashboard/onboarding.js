@@ -236,18 +236,44 @@
 
   function setupTasks() {
     const enabled = new Set(enabledFeatures().map(feature => feature.tabId));
-    const profile = readJson('doppio_business_profile', {});
+    const profile = readJson('doppio_business_profile', {}) || {};
+    const localSettings = readJson('rs_v2:settings', {}) || {};
     const menu = readJson('doppio_menu', []);
     const inventory = readJson('doppio_inventory', {});
     const employees = readJson('doppio_employees', []);
     const bills = readJson('doppio_bills', []);
     const pendingOrders = readJson('doppio_pending_qr_orders', []);
+
+    const hasProfile = Boolean(
+      profile.name || profile.businessName || profile.restaurantName ||
+      localSettings.set_restaurant_name || localSettings.set_outlet_name
+    );
+    const hasTax = Boolean(
+      profile.gstin || profile.gstNumber || profile.gst_number ||
+      localSettings.set_gstin || localSettings.set_invoice_prefix
+    );
+
     const tasks = [
       {
         label: 'Complete Business Profile',
         detail: 'Business name, address, contact, receipt and payment information',
-        done: Boolean(profile && (profile.name || profile.businessName)),
-        action: () => document.getElementById('open-profile-btn')?.click()
+        done: hasProfile,
+        action: () => {
+          if (window.RS && typeof window.RS.activateTab === 'function') {
+            window.RS.activateTab('settings-tab');
+          } else {
+            const openSettings = document.getElementById('open-settings');
+            if (openSettings) openSettings.click();
+          }
+          setTimeout(() => {
+            const btn = document.querySelector(`.set-nav button[data-s="profile"]`);
+            if (btn) btn.click();
+            setTimeout(() => {
+              const input = document.querySelector('[data-skey="set_restaurant_name"]');
+              if (input) input.focus();
+            }, 50);
+          }, 50);
+        }
       }
     ];
     if (enabled.has('editor-tab') || enabled.has('pos-tab')) {
@@ -266,12 +292,27 @@
         tabId: 'inventory-tab'
       });
     }
-    if (enabled.has('tax-tab')) {
+    if (enabled.has('tax-tab') || enabled.has('settings-tab')) {
       tasks.push({
         label: 'Verify tax settings',
         detail: 'Confirm GST registration and rates before live billing',
-        done: Boolean(profile && (profile.gstin || profile.gstNumber)),
-        tabId: 'tax-tab'
+        done: hasTax,
+        action: () => {
+          if (window.RS && typeof window.RS.activateTab === 'function') {
+            window.RS.activateTab('settings-tab');
+          } else {
+            const openSettings = document.getElementById('open-settings');
+            if (openSettings) openSettings.click();
+          }
+          setTimeout(() => {
+            const btn = document.querySelector(`.set-nav button[data-s="tax"]`);
+            if (btn) btn.click();
+            setTimeout(() => {
+              const select = document.querySelector('[data-skey="set_default_gst_slab"]');
+              if (select) select.focus();
+            }, 50);
+          }, 50);
+        }
       });
     }
     if (enabled.has('employees-tab')) {
@@ -304,6 +345,10 @@
   }
 
   function activateTab(tabId) {
+    if (window.RS && typeof window.RS.activateTab === 'function') {
+      window.RS.activateTab(tabId);
+      return;
+    }
     const link = document.querySelector(`.sidebar-link[data-tab="${tabId}"]`)
       || document.querySelector(`.mobile-bottom-nav [data-tab="${tabId}"]`)
       || document.querySelector(`.more-sheet-link[data-tab="${tabId}"]`);
@@ -345,6 +390,10 @@
     modal.querySelector('#guide-start-tour').addEventListener('click', () => {
       closeGuide();
       startTour();
+    });
+    modal.querySelector('#guide-view-updates').addEventListener('click', () => {
+      closeGuide();
+      openUpdateHistoryModal();
     });
     modal.querySelector('#guide-search').addEventListener('input', event => renderGuide(event.target.value));
   }
@@ -459,10 +508,13 @@
     const mobile = window.innerWidth <= 768;
     if (mobile) {
       card.style.left = '50%';
+      card.style.transform = 'translateX(-50%)';
       card.style.top = target && target.getBoundingClientRect().top > window.innerHeight / 2 ? '72px' : 'auto';
       card.style.bottom = card.style.top === 'auto' ? '76px' : 'auto';
       return;
     }
+    
+    card.style.transform = 'none';
     card.style.bottom = 'auto';
     const width = card.offsetWidth || 380;
     const height = card.offsetHeight || 390;
@@ -471,9 +523,41 @@
       card.style.top = `${Math.max(20, (window.innerHeight - height) / 2)}px`;
       return;
     }
+    
     const rect = target.getBoundingClientRect();
-    card.style.left = `${Math.min(window.innerWidth - width - 20, rect.right + 20)}px`;
-    card.style.top = `${Math.max(20, Math.min(rect.top, window.innerHeight - height - 20))}px`;
+    const spaceLeft = rect.left;
+    const spaceRight = window.innerWidth - rect.right;
+    
+    // Choose the side with more available space
+    if (spaceLeft > spaceRight) {
+      // Try to place to the left of the target
+      if (rect.left - width - 20 >= 10) {
+        card.style.left = `${rect.left - width - 20}px`;
+        card.style.top = `${Math.max(10, Math.min(rect.top, window.innerHeight - height - 10))}px`;
+      } else {
+        // If not enough room to the left, place below or above
+        if (window.innerHeight - rect.bottom - 20 >= height) {
+          card.style.top = `${rect.bottom + 20}px`;
+        } else {
+          card.style.top = `${Math.max(10, rect.top - height - 20)}px`;
+        }
+        card.style.left = `${Math.max(10, Math.min(rect.left, window.innerWidth - width - 10))}px`;
+      }
+    } else {
+      // Try to place to the right of the target
+      if (spaceRight - width - 20 >= 10) {
+        card.style.left = `${rect.right + 20}px`;
+        card.style.top = `${Math.max(10, Math.min(rect.top, window.innerHeight - height - 10))}px`;
+      } else {
+        // If not enough room to the right, place below or above
+        if (window.innerHeight - rect.bottom - 20 >= height) {
+          card.style.top = `${rect.bottom + 20}px`;
+        } else {
+          card.style.top = `${Math.max(10, rect.top - height - 20)}px`;
+        }
+        card.style.left = `${Math.max(10, Math.min(rect.left, window.innerWidth - width - 10))}px`;
+      }
+    }
   }
 
   function tourTarget(step) {
@@ -699,12 +783,7 @@
       }
     }
 
-    setTimeout(() => {
-      const guideViewUpdates = document.getElementById('guide-view-updates');
-      if (guideViewUpdates) {
-        guideViewUpdates.onclick = openUpdateHistoryModal;
-      }
-    }, 1000);
+    // What's New button click listener is now bound directly inside injectGuide()
 
     setTimeout(() => {
       if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
