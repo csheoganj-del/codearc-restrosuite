@@ -2,7 +2,7 @@
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -42,6 +42,11 @@
 <div class="app" id="app">
 
   <!-- ===================== SIDEBAR ===================== -->
+  <!-- Fix 1: Hamburger sidebar toggle for mobile/tablet -->
+  <button class="sidebar-hamburger" id="sidebarToggle" aria-label="Open navigation menu" aria-expanded="false">
+    <i class="fa fa-bars"></i>
+  </button>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <aside class="sidebar">
     <!-- Workspace Menu -->
     <div class="sb-top">
@@ -889,5 +894,40 @@
 <script src="assets/features-extra.js"></script>
 <script src="src/dashboard/onboarding.js?v=20260619-duestour"></script>
 <script src="assets/features-shell.js?v=20260618-realdata2"></script>
+
+<script>
+/* Fix 1: Sidebar hamburger toggle — mobile/tablet */
+(function () {
+  var btn     = document.getElementById("sidebarToggle");
+  var sidebar = document.querySelector(".sidebar");
+  var overlay = document.getElementById("sidebarOverlay");
+  if (!btn || !sidebar || !overlay) return;
+  function openNav()  {
+    sidebar.classList.add("reveal");
+    overlay.classList.add("active");
+    btn.setAttribute("aria-expanded", "true");
+    btn.innerHTML = '<i class="fa-solid fa-times"></i>';
+  }
+  function closeNav() {
+    sidebar.classList.remove("reveal");
+    overlay.classList.remove("active");
+    btn.setAttribute("aria-expanded", "false");
+    btn.innerHTML = '<i class="fa-solid fa-bars"></i>';
+  }
+  btn.addEventListener("click", function () {
+    sidebar.classList.contains("reveal") ? closeNav() : openNav();
+  });
+  overlay.addEventListener("click", closeNav);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeNav();
+  });
+  // Auto-close when a nav link is tapped on mobile
+  sidebar.querySelectorAll(".sidebar-link").forEach(function(el) {
+    el.addEventListener("click", function() {
+      if (window.innerWidth < 1025) closeNav();
+    });
+  });
+}());
+</script>
 </body>
 </html>
