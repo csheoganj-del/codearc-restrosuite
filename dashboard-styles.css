@@ -7440,7 +7440,7 @@ body.product-guide-open {
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
-@media (max-width: 1024px) {
+@media (min-width: 761px) and (max-width: 1024px) {
   .sidebar-hamburger { display: flex; }
   .sidebar-overlay.active { display: block; }
 }
