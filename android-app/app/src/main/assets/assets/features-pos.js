@@ -291,10 +291,10 @@
           const receivedInput = document.getElementById('inline-cash-received');
           if (!receivedInput) return;
           
-          receivedInput.dataset.userInteracted = '1';
           const val = btn.dataset.val;
           if (val === 'exact') {
             receivedInput.value = totals.grand;
+            delete receivedInput.dataset.userInteracted;
           } else {
             const increment = Number(val) || 0;
             let current = Number(receivedInput.value) || 0;
@@ -303,6 +303,7 @@
             } else {
               receivedInput.value = current + increment;
             }
+            receivedInput.dataset.userInteracted = '1';
           }
           updateInlineChange();
         };
