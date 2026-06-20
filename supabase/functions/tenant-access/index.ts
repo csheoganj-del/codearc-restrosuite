@@ -784,49 +784,50 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   const username = normalizeUsername(String(payload.username || ""));
   const password = String(payload.password || "");
   const planCode = String(payload.plan_code || "starter").trim().toLowerCase();
+  const country = String(payload.country || "India").trim();
 
   if (!name || !slug || !username || !password) {
     return jsonResponse({ error: "Outlet name, outlet ID, username, and password are required." }, 400, req);
   }
-
+ 
   if (password.length < 10) {
     return jsonResponse({ error: "Password must be at least 10 characters." }, 400, req);
   }
-
+ 
   if (!/^[a-z0-9-]+$/.test(slug)) {
     return jsonResponse({ error: "Slug can only contain lowercase letters, numbers, and hyphens." }, 400, req);
   }
-
+ 
   const { data: existingSlug, error: slugErr } = await supabaseAdmin
     .from("saas_tenants")
     .select("slug")
     .eq("slug", slug)
     .maybeSingle();
-
+ 
   if (slugErr) {
     console.error("register slug check failed:", slugErr);
     return jsonResponse({ error: "Failed to validate unique slug." }, 500, req);
   }
-
+ 
   if (existingSlug) {
     return jsonResponse({ error: `The Outlet ID "${slug}" is already taken. Try another unique slug.` }, 409, req);
   }
-
+ 
   const { data: existingUsername, error: userErr } = await supabaseAdmin
     .from("saas_tenants")
     .select("username")
     .eq("username", username)
     .maybeSingle();
-
+ 
   if (userErr) {
     console.error("register username check failed:", userErr);
     return jsonResponse({ error: "Failed to validate username uniqueness." }, 500, req);
   }
-
+ 
   if (existingUsername) {
     return jsonResponse({ error: `The username "${username}" is already in use. Choose another username.` }, 409, req);
   }
-
+ 
   const passwordHash = await hashPassword(password);
   const { error: insertErr } = await supabaseAdmin.from("saas_tenants").insert({
     name,
@@ -839,6 +840,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
     status: "pending",
     plan_code: planCode,
     allowed_tabs: planFor(planCode).allowedTabs,
+    country,
   });
 
   if (insertErr) {
