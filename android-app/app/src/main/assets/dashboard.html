@@ -195,7 +195,10 @@
             <div class="cart-head">
               <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" style="margin-right:8px; padding: 4px 8px; font-size:12px; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> Back</button>
               <h3>Current Order</h3>
-              <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
+                <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
+              </div>
             </div>
             <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
@@ -214,6 +217,27 @@
                   <button type="button" data-pay-method="UPI">UPI</button>
                   <button type="button" data-pay-method="Card">Card</button>
                   <button type="button" data-pay-method="Due">Due</button>
+                </div>
+                <!-- Inline Cash Calculator -->
+                <div id="cash-calc-inline" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); flex-direction: column; gap: 8px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--text-soft);">Received (₹)</span>
+                    <input type="number" id="inline-cash-received" class="form-input" style="width: 100px; height: 26px; padding: 2px 6px; font-size: 12px; font-weight: 700; text-align: right; margin: 0;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="exact" style="font-size: 10px; font-weight: 700; padding: 4px 0; border: 1px solid var(--orange); color: var(--orange); border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">Exact</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="10" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹10</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="20" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹20</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="50" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹50</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="100" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹100</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="200" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹200</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="500" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹500</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="2000" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹2000</button>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(37,211,102,0.06); border: 1px solid rgba(37,211,102,0.15); border-radius: 6px; padding: 4px 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--text-soft);">Change Due:</span>
+                    <strong id="inline-cash-change" style="font-size: 14px; font-weight: 800; color: #25d366;">₹0</strong>
+                  </div>
                 </div>
               </div>
               <div class="cart-actions">
