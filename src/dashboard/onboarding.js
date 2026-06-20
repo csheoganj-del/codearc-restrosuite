@@ -119,6 +119,18 @@
 
   const UPDATES_HISTORY = [
     {
+      version: "2026.06.20-onboarding",
+      date: "2026-06-20",
+      title: "Onboarding Usability & Tour Update",
+      summary: "This update resolves tooltip layout overlapping, makes the 'What's New' history button responsive, and fixes settings tab setup task redirects.",
+      highlights: [
+        "Collision-Free Tooltips: Tooltip card dynamically shifts to the side with more space (left/right) to keep highlighted elements fully visible.",
+        "What's New Button: Resolved the click event handler on the What's New history button.",
+        "Redirect & Input Focus: Setup task checklist buttons now route directly to settings sub-sections and auto-focus fields.",
+        "Mobile View Centering: Centered tooltip cards on narrow viewports using translate transforms."
+      ]
+    },
+    {
       version: "2026.06.19-dues",
       date: "2026-06-19",
       title: "Customer Dues & QR Printing Update",
@@ -625,7 +637,7 @@
 
   function endTour() {
     try {
-      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.19-dues';
+      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.20-onboarding';
       if (steps === DUES_TOUR_STEPS) {
         localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, '1');
       } else {
@@ -646,7 +658,7 @@
   function openUpdateHistoryModal() {
     if (typeof window.RSModal === 'undefined') return;
     const justUpdated = sessionStorage.getItem('rs_update_applied_at');
-    const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.19-dues';
+    const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.20-onboarding';
 
     window.RSModal.open({
       title: justUpdated ? 'RestroSuite Updated Successfully!' : 'Update History & Releases',
@@ -676,7 +688,7 @@
               <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6; color:var(--text-soft);">
                 ${up.highlights.map(h => `<li>${h}</li>`).join('')}
               </ul>
-              ${up.version === '2026.06.19-dues' ? `
+              ${up.version === '2026.06.20-onboarding' || up.version === '2026.06.19-dues' ? `
                 <button type="button" class="btn btn-sm btn-primary" id="start-dues-tour-btn" style="margin-top:12px; background:var(--orange); border-color:var(--orange); font-size:11px;">
                   <i class="fa-solid fa-compass"></i> Take Feature Tour
                 </button>
@@ -794,7 +806,7 @@
           return;
         }
 
-        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.19-dues';
+        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || '2026.06.20-onboarding';
         const updateTourSeen = localStorage.getItem('restrosuite_update_tour_seen:' + currentVer);
         if (!updateTourSeen) {
           openUpdateHistoryModal();
