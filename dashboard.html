@@ -217,6 +217,32 @@
                   <button type="button" data-pay-method="UPI">UPI</button>
                   <button type="button" data-pay-method="Card">Card</button>
                   <button type="button" data-pay-method="Due">Due</button>
+                  <button type="button" data-pay-method="Split">Split</button>
+                </div>
+                <!-- Inline Split Payment Calculator -->
+                <div id="split-calc-inline" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); flex-direction: column; gap: 6px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Cash (₹)</span>
+                      <input type="number" id="split-cash" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">UPI (₹)</span>
+                      <input type="number" id="split-upi" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Card (₹)</span>
+                      <input type="number" id="split-card" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Due (₹)</span>
+                      <input type="number" id="split-due" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; font-size: 10px;">
+                    <span id="split-status-text" style="font-weight: 700; color: var(--text-soft);">Remaining: ₹0</span>
+                    <strong id="split-total-text" style="font-weight: 800; color: var(--orange);">Paid: ₹0</strong>
+                  </div>
                 </div>
                 <!-- Inline Cash Calculator -->
                 <div id="cash-calc-inline" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); flex-direction: column; gap: 8px;">

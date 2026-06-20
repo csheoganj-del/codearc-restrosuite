@@ -192,6 +192,7 @@
     /* ---------------- inline cart payment ---------------- */
     const paymentState = { method: 'Cash' };
     let kotSentKey = '';
+    let isSplitPaymentActive = false;
     const orderType = () => (document.querySelector('.order-type-btn.active')?.textContent || 'Takeaway').trim();
     const cartKey = () => {
       const totals = RS.getTotals();
@@ -209,11 +210,32 @@
     function getPaymentDetails(){
       const totals = RS.getTotals();
       const method = paymentState.method || 'Cash';
+      if (method === 'Split') {
+        const splitCash = document.getElementById('split-cash');
+        const splitUpi = document.getElementById('split-upi');
+        const splitCard = document.getElementById('split-card');
+        const splitDue = document.getElementById('split-due');
+        const cash = Math.max(0, Number(splitCash?.value) || 0);
+        const upi = Math.max(0, Number(splitUpi?.value) || 0);
+        const card = Math.max(0, Number(splitCard?.value) || 0);
+        const due = Math.max(0, Number(splitDue?.value) || 0);
+        const totalPaid = cash + upi + card + due;
+        const change = Math.max(0, totalPaid - totals.grand);
+        return { method, received: totalPaid, change, valid: totals.count > 0 && totalPaid >= totals.grand };
+      }
       return { method, received: totals.grand, change: 0, valid: totals.count > 0 };
     }
     function resetPayment(){
       paymentState.method = 'Cash';
       kotSentKey = '';
+      const splitCash = document.getElementById('split-cash');
+      const splitUpi = document.getElementById('split-upi');
+      const splitCard = document.getElementById('split-card');
+      const splitDue = document.getElementById('split-due');
+      if (splitCash) splitCash.value = '';
+      if (splitUpi) splitUpi.value = '';
+      if (splitCard) splitCard.value = '';
+      if (splitDue) splitDue.value = '';
       refreshPaymentPanel();
     }
     function updateInlineChange() {
@@ -234,6 +256,61 @@
         } else {
           checkoutBtn.disabled = totals.count < 1;
           receivedInput.style.borderColor = '';
+        }
+      }
+    }
+
+    function updateSplitChange() {
+      const totals = RS.getTotals();
+      const splitCash = document.getElementById('split-cash');
+      const splitUpi = document.getElementById('split-upi');
+      const splitCard = document.getElementById('split-card');
+      const splitDue = document.getElementById('split-due');
+      const statusText = document.getElementById('split-status-text');
+      const totalText = document.getElementById('split-total-text');
+      const checkoutBtn = document.getElementById('btn-checkout');
+      if (!splitCash || !splitUpi || !splitCard || !splitDue || !statusText || !totalText) return;
+
+      const cash = Math.max(0, Number(splitCash.value) || 0);
+      const upi = Math.max(0, Number(splitUpi.value) || 0);
+      const card = Math.max(0, Number(splitCard.value) || 0);
+      const due = Math.max(0, Number(splitDue.value) || 0);
+
+      const totalPaid = cash + upi + card + due;
+      const remaining = totals.grand - totalPaid;
+
+      totalText.textContent = `Paid: ₹${totalPaid}`;
+
+      if (remaining === 0) {
+        statusText.textContent = 'Balanced!';
+        statusText.style.color = '#25d366';
+        if (checkoutBtn) {
+          checkoutBtn.disabled = totals.count < 1;
+        }
+        [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
+      } else if (remaining > 0) {
+        statusText.textContent = `Remaining: ₹${remaining}`;
+        statusText.style.color = 'var(--orange)';
+        if (checkoutBtn) {
+          checkoutBtn.disabled = true;
+        }
+        [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
+      } else {
+        const overpaid = totalPaid - totals.grand;
+        if (cash >= overpaid) {
+          statusText.textContent = `Change Due: ₹${overpaid}`;
+          statusText.style.color = '#25d366';
+          if (checkoutBtn) {
+            checkoutBtn.disabled = totals.count < 1;
+          }
+          [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
+        } else {
+          statusText.textContent = `Overpaid by ₹${overpaid}`;
+          statusText.style.color = 'var(--red)';
+          if (checkoutBtn) {
+            checkoutBtn.disabled = true;
+          }
+          [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = 'var(--red)');
         }
       }
     }
@@ -266,6 +343,37 @@
           inlineCalc.style.display = 'none';
         }
       }
+
+      // Handle inline split calculator
+      const inlineSplit = document.getElementById('split-calc-inline');
+      if (inlineSplit) {
+        if (paymentState.method === 'Split' && totals.count > 0) {
+          inlineSplit.style.display = 'flex';
+          isSplitPaymentActive = true;
+
+          const splitCash = document.getElementById('split-cash');
+          const splitUpi = document.getElementById('split-upi');
+          const splitCard = document.getElementById('split-card');
+          const splitDue = document.getElementById('split-due');
+
+          // Pre-fill default if all are empty/zero
+          const cashVal = Number(splitCash?.value) || 0;
+          const upiVal = Number(splitUpi?.value) || 0;
+          const cardVal = Number(splitCard?.value) || 0;
+          const dueVal = Number(splitDue?.value) || 0;
+          if (cashVal === 0 && upiVal === 0 && cardVal === 0 && dueVal === 0) {
+            if (splitCash) splitCash.value = totals.grand;
+            if (splitUpi) splitUpi.value = '';
+            if (splitCard) splitCard.value = '';
+            if (splitDue) splitDue.value = '';
+          }
+
+          updateSplitChange();
+        } else {
+          inlineSplit.style.display = 'none';
+          isSplitPaymentActive = false;
+        }
+      }
     }
 
     function wirePaymentPanel(){
@@ -284,6 +392,14 @@
           updateInlineChange();
         });
       }
+
+      // Wire inline split calculator events
+      ['split-cash', 'split-upi', 'split-card', 'split-due'].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp) {
+          inp.addEventListener('input', updateSplitChange);
+        }
+      });
 
       document.querySelectorAll('.inline-den-btn').forEach(btn => {
         btn.onclick = () => {
@@ -318,16 +434,24 @@
       const payment = getPaymentDetails();
       if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
 
-      async function finalizeBill(payMethod, receivedVal, changeVal) {
+      async function finalizeBill(payMethod, receivedVal, changeVal, customTenders) {
         if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
 
-        if (payMethod === 'Due' && cust.phone) {
+        let dueAmount = 0;
+        if (customTenders) {
+          const dueTender = customTenders.find(t => t.method === 'Due');
+          if (dueTender) dueAmount = dueTender.amount;
+        } else if (payMethod === 'Due') {
+          dueAmount = totals.grand;
+        }
+
+        if (dueAmount > 0 && cust.phone) {
           try {
             const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
             const matched = customers.find(c => c.phone === cust.phone);
             if (matched) {
-              matched.dues = (matched.dues || 0) + totals.grand;
-              matched.spend = (matched.spend || 0) + totals.grand;
+              matched.dues = (matched.dues || 0) + dueAmount;
+              matched.spend = (matched.spend || 0) + dueAmount;
               matched.visits = (matched.visits || 0) + 1;
               matched.last = new Date().toLocaleDateString('en-CA');
               await RS_DB.put('customers', matched.id, matched);
@@ -341,7 +465,7 @@
         const bill = {
           no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
           table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
-          tenders: [{ method: payMethod, amount: receivedVal }], change: changeVal || 0
+          tenders: customTenders || [{ method: payMethod, amount: receivedVal }], change: changeVal || 0
         };
         try {
           const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
@@ -462,6 +586,113 @@
             };
           }
         });
+      }
+
+      if (payment.method === 'Split') {
+        const splitCash = document.getElementById('split-cash');
+        const splitUpi = document.getElementById('split-upi');
+        const splitCard = document.getElementById('split-card');
+        const splitDue = document.getElementById('split-due');
+
+        const cash = Math.max(0, Number(splitCash?.value) || 0);
+        const upi = Math.max(0, Number(splitUpi?.value) || 0);
+        const card = Math.max(0, Number(splitCard?.value) || 0);
+        const due = Math.max(0, Number(splitDue?.value) || 0);
+
+        const totalPaid = cash + upi + card + due;
+        if (totalPaid < totals.grand) {
+          return RS.toast('Insufficient total amount paid', 'fa-circle-exclamation');
+        }
+
+        const changeAmount = Math.max(0, totalPaid - totals.grand);
+        if (changeAmount > cash) {
+          return RS.toast('Change can only be returned from cash', 'fa-circle-exclamation');
+        }
+
+        if (due > 0 && !cust.phone) {
+          return RSModal.open({
+            title: 'Customer Required for Credit',
+            sub: 'Dues require a registered customer profile',
+            icon: 'fa-user-tag',
+            size: 'sm',
+            body: `
+              <div style="display:flex;flex-direction:column;gap:12px;font-family:var(--font-body),sans-serif;">
+                <p style="font-size:13px;line-height:1.5;margin:0;color:var(--text-soft)">To check out an order with a <b>Due (Credit)</b> split, you must select a customer. Register a new customer instantly below:</p>
+                <div class="form-group" style="display:flex;flex-direction:column;gap:4px;">
+                  <label style="font-size:11px;font-weight:700;color:var(--text-soft)">Full Name</label>
+                  <input type="text" class="form-input" id="quick-cust-name" placeholder="E.g., John Doe" style="padding:8px 10px;font-size:13px;">
+                </div>
+                <div class="form-group" style="display:flex;flex-direction:column;gap:4px;">
+                  <label style="font-size:11px;font-weight:700;color:var(--text-soft)">Phone Number</label>
+                  <input type="text" class="form-input" id="quick-cust-phone" placeholder="E.g., +91 98765 43210" style="padding:8px 10px;font-size:13px;">
+                </div>
+              </div>
+            `,
+            foot: `
+              <button class="btn btn-ghost" data-close-modal style="flex:1">Cancel</button>
+              <button class="btn btn-primary" id="btn-quick-register-checkout" style="flex:1.5;background:var(--orange);border-color:var(--orange);color:#fff;"><i class="fa-solid fa-user-plus"></i> Register &amp; Pay</button>
+            `,
+            onMount(modal, close) {
+              modal.querySelector('[data-close-modal]').onclick = close;
+              modal.querySelector('#btn-quick-register-checkout').onclick = async () => {
+                const name = modal.querySelector('#quick-cust-name').value.trim();
+                const phone = modal.querySelector('#quick-cust-phone').value.trim();
+                if (!name || !phone) {
+                  RS.toast('Name and phone are required', 'fa-circle-exclamation');
+                  return;
+                }
+                if (window.RS_DB) {
+                  try {
+                    const newCust = {
+                      id: 'cust-' + Date.now(),
+                      name,
+                      phone,
+                      visits: 0,
+                      spend: 0,
+                      last: new Date().toLocaleDateString('en-CA'),
+                      tier: 'silver',
+                      dues: 0
+                    };
+                    await RS_DB.put('customers', newCust.id, newCust);
+                    
+                    const csel = document.getElementById('cart-customer-sel');
+                    if (csel) {
+                      csel.value = phone;
+                    }
+                    document.dispatchEvent(new CustomEvent('rs:hydrated'));
+                    
+                    setTimeout(() => {
+                      if (csel) {
+                        const opts = Array.from(csel.options);
+                        const opt = opts.find(o => o.value === phone);
+                        if (opt) opt.selected = true;
+                      }
+                      
+                      close();
+                      RS.toast('Customer registered! Completing checkout...', 'fa-circle-check');
+                      setTimeout(checkout, 150);
+                    }, 100);
+                    
+                  } catch (e) {
+                    console.warn("Failed saving customer on checkout", e);
+                    RS.toast('Registration failed: ' + e.message, 'fa-circle-exclamation');
+                  }
+                } else {
+                  close();
+                }
+              };
+            }
+          });
+        }
+
+        const tenders = [];
+        if (cash > 0) tenders.push({ method: 'Cash', amount: cash - changeAmount });
+        if (upi > 0) tenders.push({ method: 'UPI', amount: upi });
+        if (card > 0) tenders.push({ method: 'Card', amount: card });
+        if (due > 0) tenders.push({ method: 'Due', amount: due });
+
+        await finalizeBill('Split', totalPaid, changeAmount, tenders);
+        return;
       }
 
       if (payment.method === 'Cash') {
