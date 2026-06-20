@@ -605,6 +605,13 @@
     buildDots();
     setTimeout(() => {
       const target = tourTarget(step);
+      if (target) {
+        try {
+          target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+        } catch (e) {
+          try { target.scrollIntoView(); } catch (err) {}
+        }
+      }
       positionSpotlight(target);
       positionCard(target);
     }, 100);
