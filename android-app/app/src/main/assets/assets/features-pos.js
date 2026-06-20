@@ -216,6 +216,28 @@
       kotSentKey = '';
       refreshPaymentPanel();
     }
+    function updateInlineChange() {
+      const totals = RS.getTotals();
+      const receivedInput = document.getElementById('inline-cash-received');
+      const changeEl = document.getElementById('inline-cash-change');
+      const checkoutBtn = document.getElementById('btn-checkout');
+      if (!receivedInput || !changeEl) return;
+
+      const received = Number(receivedInput.value) || 0;
+      const change = Math.max(0, received - totals.grand);
+      changeEl.textContent = RS.rs(change);
+
+      if (checkoutBtn) {
+        if (paymentState.method === 'Cash' && received < totals.grand) {
+          checkoutBtn.disabled = true;
+          receivedInput.style.borderColor = 'var(--orange)';
+        } else {
+          checkoutBtn.disabled = totals.count < 1;
+          receivedInput.style.borderColor = '';
+        }
+      }
+    }
+
     function refreshPaymentPanel(){
       const totals = RS.getTotals();
       const note = document.getElementById('pay-method-note');
@@ -224,7 +246,28 @@
       document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.classList.toggle('active', btn.dataset.payMethod === paymentState.method));
       if(note) note.textContent = paymentState.method;
       checkoutBtn.disabled = totals.count < 1;
+
+      // Handle inline cash calculator
+      const inlineCalc = document.getElementById('cash-calc-inline');
+      if (inlineCalc) {
+        if (paymentState.method === 'Cash' && totals.count > 0) {
+          inlineCalc.style.display = 'flex';
+          const receivedInput = document.getElementById('inline-cash-received');
+          if (receivedInput) {
+            const currentVal = Number(receivedInput.value) || 0;
+            if (!receivedInput.dataset.userInteracted || currentVal <= 0 || receivedInput.dataset.grandTotal !== String(totals.grand)) {
+              receivedInput.value = totals.grand;
+              receivedInput.dataset.grandTotal = totals.grand;
+              delete receivedInput.dataset.userInteracted;
+            }
+          }
+          updateInlineChange();
+        } else {
+          inlineCalc.style.display = 'none';
+        }
+      }
     }
+
     function wirePaymentPanel(){
       const methods = document.getElementById('cart-pay-methods');
       if(methods) methods.addEventListener('click', e=>{
@@ -232,6 +275,39 @@
         paymentState.method = btn.dataset.payMethod;
         refreshPaymentPanel();
       });
+
+      // Wire inline cash calculator events
+      const receivedInput = document.getElementById('inline-cash-received');
+      if (receivedInput) {
+        receivedInput.addEventListener('input', () => {
+          receivedInput.dataset.userInteracted = '1';
+          updateInlineChange();
+        });
+      }
+
+      document.querySelectorAll('.inline-den-btn').forEach(btn => {
+        btn.onclick = () => {
+          const totals = RS.getTotals();
+          const receivedInput = document.getElementById('inline-cash-received');
+          if (!receivedInput) return;
+          
+          receivedInput.dataset.userInteracted = '1';
+          const val = btn.dataset.val;
+          if (val === 'exact') {
+            receivedInput.value = totals.grand;
+          } else {
+            const increment = Number(val) || 0;
+            let current = Number(receivedInput.value) || 0;
+            if (current === totals.grand && !receivedInput.dataset.userInteracted) {
+              receivedInput.value = increment;
+            } else {
+              receivedInput.value = current + increment;
+            }
+          }
+          updateInlineChange();
+        };
+      });
+
       refreshPaymentPanel();
     }
     async function checkout(){
@@ -388,100 +464,14 @@
       }
 
       if (payment.method === 'Cash') {
-        return RSModal.open({
-          title: 'Cash Payment Calculator',
-          sub: 'Calculate change amount and note breakdown',
-          icon: 'fa-cash-register',
-          size: 'sm',
-          body: `
-            <div style="font-family:var(--font-body),sans-serif; display:flex; flex-direction:column; gap:16px;">
-              <div style="background:var(--orange-tint); border:1px solid var(--stroke-2); border-radius:12px; padding:14px; text-align:center;">
-                <span style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">Total Amount Due</span>
-                <h2 style="font-size:28px; font-weight:900; color:var(--orange); margin:4px 0 0 0;">\${RS.rs(totals.grand)}</h2>
-              </div>
-              
-              <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
-                <label style="font-size:12px; font-weight:700; color:var(--text); display:flex; justify-content:space-between;">
-                  <span>Cash Received (₹)</span>
-                  <span id="cash-calc-error" style="color:var(--orange); font-weight:700; display:none;">Insufficient cash</span>
-                </label>
-                <input type="number" id="cash-received-input" class="form-input" value="\${totals.grand}" min="\${totals.grand}" style="font-size:20px; font-weight:900; padding:10px; text-align:center; color:var(--text); background:var(--panel); border:1px solid var(--stroke-hi);">
-              </div>
-              
-              <div>
-                <label style="font-size:12px; font-weight:700; color:var(--text-soft); margin-bottom:8px; display:block;">Quick Denominations / Notes</label>
-                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
-                  <button type="button" class="btn btn-ghost den-btn" data-val="\${totals.grand}" style="font-size:11px; font-weight:700; border:1px solid var(--orange); color:var(--orange); padding:8px 0;">Exact</button>
-                  <button type="button" class="btn btn-ghost den-btn" data-val="10" style="font-size:11px; font-weight:700; padding:8px 0;">₹10</button>
-                  <button type="button" class="btn btn-ghost den-btn" data-val="20" style="font-size:11px; font-weight:700; padding:8px 0;">₹20</button>
-                  <button type="button" class="btn btn-ghost den-btn" data-val="50" style="font-size:11px; font-weight:700; padding:8px 0;">₹50</button>
-                  <button type="button" class="btn btn-ghost den-btn" data-val="100" style="font-size:11px; font-weight:700; padding:8px 0;">₹100</button>
-                  <button type="button" class="btn btn-ghost den-btn" data-val="200" style="font-size:11px; font-weight:700; padding:8px 0;">₹200</button>
-                  <button type="button" class="btn btn-ghost den-btn" data-val="500" style="font-size:11px; font-weight:700; padding:8px 0;">₹500</button>
-                  <button type="button" class="btn btn-ghost den-btn" data-val="2000" style="font-size:11px; font-weight:700; padding:8px 0;">₹2000</button>
-                </div>
-              </div>
-              
-              <div style="background:rgba(37,211,102,0.08); border:1px solid rgba(37,211,102,0.2); border-radius:12px; padding:14px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:13px; font-weight:700; color:var(--text-soft);">Change to Return:</span>
-                <h3 id="cash-change-amount" style="font-size:24px; font-weight:900; color:#25d366; margin:0;">₹0</h3>
-              </div>
-            </div>
-          `,
-          foot: `
-            <button class="btn btn-ghost" data-close-modal style="flex:1">Cancel</button>
-            <button class="btn btn-primary" id="btn-cash-pay" style="flex:1.5;background:var(--orange);border-color:var(--orange);color:#fff;"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
-          `,
-          onMount(modal, close) {
-            const receivedInput = modal.querySelector('#cash-received-input');
-            const changeEl = modal.querySelector('#cash-change-amount');
-            const errorEl = modal.querySelector('#cash-calc-error');
-            const payBtn = modal.querySelector('#btn-cash-pay');
-            
-            function updateChange() {
-              const received = Number(receivedInput.value) || 0;
-              const change = Math.max(0, received - totals.grand);
-              if (changeEl) changeEl.textContent = RS.rs(change);
-              
-              if (received < totals.grand) {
-                if (errorEl) errorEl.style.display = 'inline';
-                if (payBtn) payBtn.disabled = true;
-              } else {
-                if (errorEl) errorEl.style.display = 'none';
-                if (payBtn) payBtn.disabled = false;
-              }
-            }
-            
-            receivedInput.addEventListener('input', updateChange);
-            modal.querySelector('[data-close-modal]').onclick = close;
-            
-            modal.querySelectorAll('.den-btn').forEach(btn => {
-              btn.onclick = () => {
-                const val = Number(btn.dataset.val);
-                if (btn.textContent === 'Exact') {
-                  receivedInput.value = val;
-                } else {
-                  let current = Number(receivedInput.value) || 0;
-                  if (current === totals.grand) {
-                    receivedInput.value = val;
-                  } else {
-                    receivedInput.value = current + val;
-                  }
-                }
-                updateChange();
-              };
-            });
-            
-            updateChange();
-            
-            payBtn.onclick = async () => {
-              const cashReceived = Number(receivedInput.value) || totals.grand;
-              const changeAmount = Math.max(0, cashReceived - totals.grand);
-              close();
-              await finalizeBill('Cash', cashReceived, changeAmount);
-            };
-          }
-        });
+        const receivedInput = document.getElementById('inline-cash-received');
+        const cashReceived = receivedInput ? (Number(receivedInput.value) || totals.grand) : totals.grand;
+        const changeAmount = Math.max(0, cashReceived - totals.grand);
+        if (cashReceived < totals.grand) {
+          return RS.toast('Insufficient cash received', 'fa-circle-exclamation');
+        }
+        await finalizeBill('Cash', cashReceived, changeAmount);
+        return;
       }
 
       await finalizeBill(payment.method, totals.grand, 0);
@@ -555,12 +545,21 @@
     if (!document.documentElement.dataset.rsPosActionsBound) {
       document.documentElement.dataset.rsPosActionsBound = '1';
       document.addEventListener('click', e => {
-        const btn = e.target.closest('#btn-checkout, #btn-kot');
+        const btn = e.target.closest('#btn-checkout, #btn-kot, #btn-clear-cart');
         if (!btn || btn.disabled) return;
         e.preventDefault();
         e.stopPropagation();
         if (btn.id === 'btn-checkout') return checkout();
-        return kot();
+        if (btn.id === 'btn-kot') return kot();
+        if (btn.id === 'btn-clear-cart') {
+          const totals = RS.getTotals();
+          if (totals.count > 0 && confirm("Clear current cart?")) {
+            RS.clearCart();
+            resetCustomerFields();
+            resetPayment();
+          }
+          return;
+        }
       }, true);
     }
 
