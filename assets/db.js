@@ -256,12 +256,40 @@
       if(!row) return null;
       const out={}; for(const k in SETTINGS_MAP){ if(row[SETTINGS_MAP[k]]!=null) out[k]=row[SETTINGS_MAP[k]]; }
       out.set_gst = row.gst_enabled ? '5%' : '0%';
+      
+      // Load UI settings from feature_flags.ui_settings
+      let flags = {};
+      try {
+        flags = typeof row.feature_flags === 'string' ? JSON.parse(row.feature_flags) : (row.feature_flags || {});
+      } catch(e) {}
+      const uiSettings = flags.ui_settings || {};
+      for (const k in uiSettings) {
+        out[k] = uiSettings[k];
+      }
+      
       out._raw = row; return out;
     },
     async setSettings(o){
       const body={}; for(const k in o){ if(SETTINGS_MAP[k]) body[SETTINGS_MAP[k]] = o[k]; }
-      if(Object.keys(body).length===0) return o;
       const existing = await API.select('doppio_business_profile', { maybeSingle:true }).catch(()=>null);
+      
+      let flags = {};
+      if (existing) {
+        try {
+          flags = typeof existing.feature_flags === 'string' ? JSON.parse(existing.feature_flags) : (existing.feature_flags || {});
+        } catch(e) {}
+      }
+      
+      // Store all UI settings in feature_flags.ui_settings
+      flags.ui_settings = { ...o };
+      // Delete duplicate columns
+      for (const k in SETTINGS_MAP) {
+        delete flags.ui_settings[k];
+      }
+      delete flags.ui_settings.set_gst;
+      
+      body.feature_flags = flags;
+      
       if(existing){ await API.update('doppio_business_profile', body, []); }
       else { body.id = newClientId(); await API.insert('doppio_business_profile', body); }
       return o;
