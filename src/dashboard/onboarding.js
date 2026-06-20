@@ -203,7 +203,7 @@
       subtitle: 'Quick Payments & Settlements',
       description: 'Open a customer\'s card, then click "Settle Dues" to record a cash, card, or UPI payment to pay off their balance. It writes to billing history automatically.',
       firstAction: 'Click any customer card, then choose "Settle now" or "Settle Dues" from the footer.',
-      targetSelector: '#crm-grid'
+      targetSelector: '.crm-card, #crm-grid'
     }
   ];
 
@@ -553,7 +553,7 @@
         } else {
           card.style.top = `${Math.max(10, rect.top - height - 20)}px`;
         }
-        card.style.left = `${Math.max(10, Math.min(rect.left, window.innerWidth - width - 10))}px`;
+        card.style.left = `${Math.max(10, Math.min(rect.left + (rect.width - width) / 2, window.innerWidth - width - 10))}px`;
       }
     } else {
       // Try to place to the right of the target
@@ -567,7 +567,7 @@
         } else {
           card.style.top = `${Math.max(10, rect.top - height - 20)}px`;
         }
-        card.style.left = `${Math.max(10, Math.min(rect.left, window.innerWidth - width - 10))}px`;
+        card.style.left = `${Math.max(10, Math.min(rect.left + (rect.width - width) / 2, window.innerWidth - width - 10))}px`;
       }
     }
   }
