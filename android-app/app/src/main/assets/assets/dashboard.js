@@ -121,6 +121,22 @@
   }
   $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
 
+  /* ---------- SUPPORT DROPDOWN ---------- */
+  const supportTrigger = $('#support-trigger');
+  const supportDropdown = supportTrigger ? supportTrigger.closest('.support-dropdown') : null;
+  if (supportTrigger && supportDropdown) {
+    supportTrigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      supportDropdown.classList.toggle('active');
+    });
+    document.addEventListener('click', (e) => {
+      if (!supportDropdown.contains(e.target)) {
+        supportDropdown.classList.remove('active');
+      }
+    });
+  }
+
   /* ---------- TOAST ---------- */
   let toastT;
   function toast(msg, icon='fa-circle-check', onClick=null){
