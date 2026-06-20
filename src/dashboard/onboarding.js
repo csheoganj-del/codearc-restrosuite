@@ -695,11 +695,22 @@
               <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6; color:var(--text-soft);">
                 ${up.highlights.map(h => `<li>${h}</li>`).join('')}
               </ul>
-              ${up.version === '2026.06.20-onboarding' || up.version === '2026.06.19-dues' ? `
-                <button type="button" class="btn btn-sm btn-primary" id="start-dues-tour-btn" style="margin-top:12px; background:var(--orange); border-color:var(--orange); font-size:11px;">
-                  <i class="fa-solid fa-compass"></i> Take Feature Tour
-                </button>
-              ` : ''}
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+                ${up.version === '2026.06.20-onboarding' || up.version === '2026.06.19-dues' ? `
+                  <button type="button" class="btn btn-sm btn-primary" id="start-dues-tour-btn" style="background:var(--orange); border-color:var(--orange); font-size:11px; margin:0;">
+                    <i class="fa-solid fa-compass"></i> Take Feature Tour
+                  </button>
+                ` : ''}
+                ${up.version !== currentVer ? `
+                  <button type="button" class="btn btn-sm btn-ghost rollback-btn" data-rollback-version="${up.version}" style="border:1px dashed var(--stroke-hi); color:var(--text-soft); font-size:11px; margin:0;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Rollback to this version
+                  </button>
+                ` : `
+                  <span class="pill pill-success" style="font-size:11px; display:inline-flex; align-items:center; gap:5px; background:rgba(16,185,129,0.08); color:#10b981; border:1px solid rgba(16,185,129,0.2); padding:3px 10px; border-radius:12px;">
+                    <i class="fa-solid fa-circle-check"></i> Active Version
+                  </span>
+                `}
+              </div>
             </div>
           `).join('')}
         </div>
@@ -733,6 +744,23 @@
             startUpdateTour();
           };
         }
+        modal.querySelectorAll('.rollback-btn').forEach(btn => {
+          btn.onclick = () => {
+            const targetVer = btn.dataset.rollbackVersion;
+            if (confirm(`Are you sure you want to rollback to version ${targetVer}? This will secure your active cart session and reload the application.`)) {
+              try {
+                if (typeof window.RS !== 'undefined' && window.RS.savePreUpdateSnapshot) {
+                  window.RS.savePreUpdateSnapshot();
+                }
+              } catch(e) {}
+              const url = new URL(window.location.href);
+              url.searchParams.set('appv', targetVer.replace(/[^a-zA-Z0-9._-]/g, ''));
+              close();
+              sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
+              window.location.replace(url.toString());
+            }
+          };
+        });
       }
     });
   }

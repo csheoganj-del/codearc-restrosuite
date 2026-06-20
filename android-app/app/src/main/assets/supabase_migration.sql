@@ -148,3 +148,7 @@ END $$;
 -- 6. Add dues column to customer table
 ALTER TABLE public.doppio_crm ADD COLUMN IF NOT EXISTS dues numeric NOT NULL DEFAULT 0;
 
+-- 7. Add country column to saas_tenants and tenders/change to doppio_bills
+ALTER TABLE public.saas_tenants ADD COLUMN IF NOT EXISTS country text;
+ALTER TABLE public.doppio_bills ADD COLUMN IF NOT EXISTS tenders jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.doppio_bills ADD COLUMN IF NOT EXISTS change numeric DEFAULT 0;

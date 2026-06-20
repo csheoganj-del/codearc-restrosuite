@@ -36,6 +36,18 @@
   #role-switch .rs-track::before { content:""; position:absolute; width:16px;height:16px;border-radius:50%;left:3px;top:2px;background:var(--text-mute);transition:var(--t); }
   #role-switch.on .rs-track { background: var(--violet-tint); border-color: oklch(0.66 0.17 285 / 0.4); }
   #role-switch.on .rs-track::before { transform: translateX(15px); background: var(--violet-soft); }
+
+  /* Support Button Styling */
+  .tb-support-group { display: inline-flex; align-items: center; gap: 8px; }
+  .support-btn { text-decoration: none; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+  .support-btn.call { color: var(--text-soft); background: var(--glass); border: 1px solid var(--stroke-2); }
+  .support-btn.call:hover { color: var(--orange); border-color: var(--orange); background: var(--orange-tint); transform: translateY(-1px); }
+  .support-btn.whatsapp { color: #25d366; background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.3); }
+  .support-btn.whatsapp:hover { color: #ffffff; background: #25d366; border-color: #25d366; transform: translateY(-1px); }
+  @media (max-width: 1024px) {
+    .tb-support-group span { display: none; }
+    .support-btn { padding: 8px; width: 36px; height: 36px; justify-content: center; border-radius: 50%; }
+  }
 </style>
 </head>
 <body>
@@ -87,6 +99,9 @@
       <a class="sidebar-link" data-tab="analytics-tab"><i class="fa-solid fa-chart-mixed"></i><span>Advanced Analytics</span></a>
       <a class="sidebar-link" id="sidebar-growth-hub-link" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
 
+      <div class="sb-section brandadmin-only" style="display:none">Chain Management</div>
+      <a class="sidebar-link brandadmin-only" data-tab="chain-dashboard-tab" style="display:none"><i class="fa-solid fa-network-wired"></i><span>Chain Dashboard</span></a>
+
       <div class="sb-section superadmin-only" style="display:none">Platform</div>
       <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
       <a class="sidebar-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none"><i class="fa-solid fa-server"></i><span>Gateway Monitor</span></a>
@@ -109,6 +124,16 @@
       <div class="tb-title"><h1 id="page-title">Point of Sale</h1><p id="page-sub">Ring up takeaway & dine-in orders</p></div>
       <div class="tb-spacer"></div>
       <div class="tb-search"><i class="fa-solid fa-magnifying-glass"></i><input placeholder="Search anything…"></div>
+      <div class="tb-support-group">
+        <a href="tel:+919983721179" class="tb-pill support-btn call" title="Call Support (+91 99837 21179)">
+          <i class="fa-solid fa-phone"></i>
+          <span>Call Support</span>
+        </a>
+        <a href="https://wa.me/919983721179" target="_blank" class="tb-pill support-btn whatsapp" title="WhatsApp Support (+91 99837 21179)">
+          <i class="fa-brands fa-whatsapp"></i>
+          <span>WhatsApp</span>
+        </a>
+      </div>
       <span class="tb-pill sync txt" id="db-mode-pill"><span class="dot dot-live"></span> Local</span>
       <span class="tb-pill txt"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
       <button class="tb-icon-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
@@ -454,6 +479,81 @@
           <button class="btn btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Add team member</button>
         </div>
         <div class="emp-grid" id="emp-grid"></div>
+      </section>
+
+      <!-- ============ CHAIN DASHBOARD ============ -->
+      <section class="tab-content" id="chain-dashboard-tab" data-screen-label="Chain Dashboard">
+        <div class="stat-row" id="chain-platform-summary">
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="chain-total-revenue">₹0.00</div><div class="sl">Total Brand Revenue</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="chain-total-orders">0</div><div class="sl">Total Order Count</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-ticket"></i></div><div><div class="sv" id="chain-avg-ticket">₹0.00</div><div class="sl">Avg Ticket Value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-r"><i class="fa-solid fa-triangle-exclamation"></i></div><div><div class="sv" id="chain-alerting-stores">0</div><div class="sl">Alerting Outlets</div></div></div>
+        </div>
+
+        <div class="report-grid" style="--cols: 1.8fr 1fr; margin-bottom: 20px; gap: 16px;">
+          <!-- Left: Revenue Trend Chart -->
+          <div class="panel panel-pad">
+            <div class="panel-head"><h3>Revenue Trend Across Outlets</h3></div>
+            <div style="height: 180px; display: flex; align-items: flex-end; justify-content: space-between; padding-top: 10px; position: relative;">
+              <svg viewBox="0 0 500 150" style="width: 100%; height: 100%; overflow: visible;">
+                <defs>
+                  <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.3"></stop>
+                    <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.05"></stop>
+                  </linearGradient>
+                </defs>
+                <path d="M 0 130 C 50 110, 100 70, 150 90 C 200 110, 250 30, 300 40 C 350 50, 400 70, 450 55 C 475 47, 500 20, 500 20 L 500 150 L 0 150 Z" fill="url(#chart-grad)"></path>
+                <path d="M 0 130 C 50 110, 100 70, 150 90 C 200 110, 250 30, 300 40 C 350 50, 400 70, 450 55 C 475 47, 500 20, 500 20" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round"></path>
+                <circle cx="150" cy="90" r="5" fill="var(--primary)" stroke="var(--panel)" stroke-width="2"></circle>
+                <circle cx="300" cy="40" r="5" fill="var(--primary)" stroke="var(--panel)" stroke-width="2"></circle>
+                <circle cx="500" cy="20" r="5" fill="var(--primary)" stroke="var(--panel)" stroke-width="2"></circle>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Right: Leaderboard -->
+          <div class="panel panel-pad">
+            <div class="panel-head"><h3>Top Performing Outlets</h3></div>
+            <div class="table-scroll"><table class="data-table">
+              <thead><tr><th>Outlet Name</th><th>Revenue</th><th>Growth</th></tr></thead>
+              <tbody id="chain-leaderboard-tbody"></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- Inventory Heatmap & Transshipment -->
+        <div class="report-grid" style="--cols: 1.2fr 1fr; margin-bottom: 20px; gap: 16px;">
+          <div class="panel panel-pad">
+            <div class="panel-head"><h3>Cross-Outlet Inventory Heatmap</h3></div>
+            <div class="table-scroll"><table class="data-table">
+              <thead><tr><th>Ingredient</th><th>Nagpur CP</th><th>Delhi North</th><th>Noida Sec 18</th></tr></thead>
+              <tbody id="chain-inventory-heatmap-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <div class="panel panel-pad">
+            <div class="panel-head">
+              <h3>Inter-Outlet Stock Transfers</h3>
+              <button class="btn btn-ghost btn-sm" id="btn-request-transfer" style="background: rgba(252, 128, 25, 0.1); color: var(--primary); border: 1px solid rgba(252, 128, 25, 0.2);"><i class="fa-solid fa-plus"></i> Request</button>
+            </div>
+            <div class="table-scroll"><table class="data-table">
+              <thead><tr><th>From</th><th>To</th><th>Item (SKU)</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="chain-transfers-tbody"></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- Central Master Catalog Panel -->
+        <div class="panel panel-pad">
+          <div class="panel-head">
+            <h3>Central Master Menu Catalog</h3>
+            <button class="btn btn-primary btn-sm" id="btn-add-master-item"><i class="fa-solid fa-plus"></i> Add Master Item</button>
+          </div>
+          <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>SKU</th><th>Item Name</th><th>Category</th><th>Default Price</th><th>Veg/Non-veg</th><th>Status</th></tr></thead>
+            <tbody id="chain-master-menu-tbody"></tbody>
+          </table></div>
+        </div>
       </section>
 
       <!-- ============ SUPER-ADMIN ============ -->
@@ -884,6 +984,7 @@
 <script src="src/dashboard/observability.js"></script>
 <script src="src/dashboard/imports.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/bills.js?v=20260618-importsync3"></script>
+<script src="src/dashboard/chain.js"></script>
 <script>
   document.write('<script src="assets/dashboard.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
   document.write('<script src="assets/features-pos.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
