@@ -436,6 +436,14 @@
   };
 
   async function checkForAppUpdate({ silent = true } = {}) {
+    const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:';
+    if (isLocalDev) {
+      if (!silent) {
+        toast('Local development: Update checking bypassed', 'fa-circle-info');
+      }
+      return;
+    }
+
     const signature = await buildUpdateSignature();
     if (!signature) return;
     const previous = localStorage.getItem(updateSignatureKey);
@@ -445,6 +453,16 @@
     }
     if (previous !== signature) {
       const releaseInfo = await fetchUpdateRelease();
+      const normFetched = String(releaseInfo && releaseInfo.version || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normCurrent = String(appVersion || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normFetched && normCurrent && normFetched === normCurrent) {
+        localStorage.setItem(updateSignatureKey, signature);
+        if (!silent) {
+          toast('RestroSuite is already up to date', 'fa-circle-check');
+        }
+        return;
+      }
+
       const prevJsonHash = getFileHashFromSignature(previous, 'app-update.json');
       const currJsonHash = getFileHashFromSignature(signature, 'app-update.json');
       const isJsonUpdated = prevJsonHash && currJsonHash && prevJsonHash !== currJsonHash;
