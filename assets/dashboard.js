@@ -163,7 +163,7 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v22-20260621';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v23-20260621';
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 

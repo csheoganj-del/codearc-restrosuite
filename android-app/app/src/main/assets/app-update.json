@@ -1,11 +1,11 @@
 {
-  "version": "v22-20260621",
+  "version": "v23-20260621",
   "date": "2026-06-21",
-  "title": "POS Active Cart Persistence & Stability",
-  "summary": "This update fixes POS active cart resetting on layout switches, resolves infinite loops when resetting tables, and bumps version naming for clarity.",
+  "title": "POS Tab Blinking & State Recovery Update",
+  "summary": "This update adds a live blinking alert system for background tabs needing attention, fixes data loss when switching POS order tabs, and enhances update stability.",
   "highlights": [
-    "Active Cart Persistence: Cart items are saved to drafts when switching layouts or changing tables.",
-    "Recursion Guard: Implemented safety flags to prevent stack overflow loop crashes on table resets.",
-    "Semantic Release Naming: Updated the versioning system to clean semantic v-format strings."
+    "Tab Blinking Notifications: Sidebar and mobile tabs blink dynamically when orders are pending or ingredients are low.",
+    "Order Tab Persistence: Cart drafts are correctly saved and recovered during POS tab navigation.",
+    "Verification checks: Verified with a full test suite passing all contract tests."
   ]
 }
