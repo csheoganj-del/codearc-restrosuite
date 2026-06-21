@@ -1241,6 +1241,18 @@
         sel.value = '';
         const tempOpt = sel.querySelector('option[data-temp="true"]');
         if (tempOpt) tempOpt.remove();
+        
+        if (deliveryAddress) deliveryAddress.value = '';
+        if (deliveryCharge) deliveryCharge.value = '';
+        if (deliveryRider) deliveryRider.value = '';
+        
+        const currentCart = window.RS.getCart();
+        const deliveryItemIndex = currentCart.findIndex(item => item.id === 'delivery-charge-item');
+        if (deliveryItemIndex >= 0) {
+          currentCart.splice(deliveryItemIndex, 1);
+          window.RS.setCart(currentCart);
+        }
+        
         sel.dispatchEvent(new Event('change'));
         dropdown.classList.remove('show');
         widgetContainer.classList.remove('active');
@@ -1255,6 +1267,135 @@
           syncWidgetWithHiddenSelect();
         }
       }, 500);
+
+      // Delivery charges dynamic cart integration
+      const deliveryAddress = document.getElementById('delivery-address');
+      const deliveryCharge = document.getElementById('delivery-charge');
+      const deliveryRider = document.getElementById('delivery-rider');
+      
+      function updateDeliveryChargeInCart() {
+        if (!deliveryCharge) return;
+        const chargeAmount = Math.max(0, Number(deliveryCharge.value) || 0);
+        const currentCart = window.RS.getCart();
+        const deliveryItemIndex = currentCart.findIndex(item => item.id === 'delivery-charge-item');
+        
+        if (chargeAmount > 0) {
+          const deliveryItem = {
+            id: 'delivery-charge-item',
+            name: 'Delivery Charge',
+            price: chargeAmount,
+            qty: 1,
+            cat: 'Delivery',
+            veg: true
+          };
+          if (deliveryItemIndex >= 0) {
+            if (currentCart[deliveryItemIndex].price !== chargeAmount) {
+              currentCart[deliveryItemIndex] = deliveryItem;
+              window.RS.setCart(currentCart);
+            }
+          } else {
+            currentCart.push(deliveryItem);
+            window.RS.setCart(currentCart);
+          }
+        } else {
+          if (deliveryItemIndex >= 0) {
+            currentCart.splice(deliveryItemIndex, 1);
+            window.RS.setCart(currentCart);
+          }
+        }
+      }
+
+      if (deliveryCharge) {
+        deliveryCharge.addEventListener('input', updateDeliveryChargeInCart);
+      }
+      
+      function updateTableFieldForDelivery() {
+        const tableSelect = document.getElementById('cart-table');
+        if (!tableSelect) return;
+        
+        const activeBtn = document.querySelector('.order-type-btn.active');
+        const typeText = activeBtn ? activeBtn.textContent.trim().toLowerCase() : 'takeaway';
+        
+        if (typeText.includes('delivery')) {
+          const address = deliveryAddress ? deliveryAddress.value.trim() : '';
+          let deliveryOpt = tableSelect.querySelector('option[data-delivery="true"]');
+          if (!deliveryOpt) {
+            deliveryOpt = document.createElement('option');
+            deliveryOpt.setAttribute('data-delivery', 'true');
+            tableSelect.appendChild(deliveryOpt);
+          }
+          const val = address ? `Delivery - ${address}` : 'Delivery';
+          deliveryOpt.value = val;
+          deliveryOpt.innerText = val;
+          tableSelect.value = val;
+        } else {
+          const deliveryOpt = tableSelect.querySelector('option[data-delivery="true"]');
+          if (deliveryOpt) deliveryOpt.remove();
+          if (tableSelect.value.startsWith('Delivery')) {
+            tableSelect.value = 'Walk-in / Takeaway';
+          }
+        }
+      }
+      
+      if (deliveryAddress) {
+        deliveryAddress.addEventListener('input', updateTableFieldForDelivery);
+      }
+      
+      function syncCartLayoutWithOrderType() {
+        const activeBtn = document.querySelector('.order-type-btn.active');
+        if (!activeBtn) return;
+        
+        const typeText = activeBtn.textContent.trim().toLowerCase();
+        const tableSelContainer = document.querySelector('.cart-table-sel');
+        const tableSelect = document.getElementById('cart-table');
+        const deliveryDetails = document.getElementById('cart-delivery-details');
+        
+        if (!tableSelContainer || !tableSelect || !deliveryDetails) return;
+        
+        if (typeText.includes('dine')) {
+          tableSelContainer.style.display = 'grid';
+          tableSelContainer.style.gridTemplateColumns = '1fr 1fr';
+          tableSelect.style.display = 'block';
+          deliveryDetails.style.display = 'none';
+          
+          const deliveryItemIndex = window.RS.getCart().findIndex(item => item.id === 'delivery-charge-item');
+          if (deliveryItemIndex >= 0) {
+            const currentCart = window.RS.getCart();
+            currentCart.splice(deliveryItemIndex, 1);
+            window.RS.setCart(currentCart);
+          }
+          
+          updateTableFieldForDelivery();
+        } else if (typeText.includes('delivery')) {
+          tableSelContainer.style.display = 'block';
+          tableSelect.style.display = 'none';
+          deliveryDetails.style.display = 'flex';
+          
+          updateDeliveryChargeInCart();
+          updateTableFieldForDelivery();
+        } else {
+          tableSelContainer.style.display = 'block';
+          tableSelect.style.display = 'none';
+          deliveryDetails.style.display = 'none';
+          
+          const deliveryItemIndex = window.RS.getCart().findIndex(item => item.id === 'delivery-charge-item');
+          if (deliveryItemIndex >= 0) {
+            const currentCart = window.RS.getCart();
+            currentCart.splice(deliveryItemIndex, 1);
+            window.RS.setCart(currentCart);
+          }
+          
+          updateTableFieldForDelivery();
+        }
+      }
+      
+      document.querySelectorAll('.order-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setTimeout(syncCartLayoutWithOrderType, 50);
+        });
+      });
+      
+      syncCartLayoutWithOrderType();
     }
     
     // Initialize the custom customer selector widget
