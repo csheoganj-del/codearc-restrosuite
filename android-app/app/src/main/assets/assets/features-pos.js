@@ -1341,7 +1341,237 @@
         deliveryAddress.addEventListener('input', updateTableFieldForDelivery);
       }
       
-      function syncCartLayoutWithOrderType() {
+      // Save current table's cart to drafts
+      async function saveActiveTableDraft() {
+        const tableSelect = document.getElementById('cart-table');
+        if (!tableSelect) return;
+        const currentTable = tableSelect.value;
+        if (!currentTable || currentTable === 'Walk-in / Takeaway' || currentTable.startsWith('Delivery')) return;
+        
+        const cartItems = window.RS.getCart();
+        const drafts = window.RS_DB ? await window.RS_DB.list('drafts').catch(() => []) : [];
+        const existingDraft = drafts.find(d => d.draftName === currentTable);
+        
+        if (cartItems.length > 0) {
+          const id = existingDraft ? existingDraft.id : Date.now();
+          const totals = window.RS.getTotals();
+          const dbRow = {
+            id: id,
+            draftId: existingDraft ? existingDraft.draftId : 'D' + Date.now(),
+            draftName: currentTable,
+            customerName: nameInput.value.trim(),
+            customerPhone: phoneInput.value.trim(),
+            customerGst: '',
+            items: cartItems,
+            subtotal: totals.sub,
+            gst: totals.gst,
+            total: totals.grand
+          };
+          if (window.RS_DB) {
+            await window.RS_DB.put('drafts', id, dbRow).catch(e => console.warn(e));
+          }
+        } else {
+          if (existingDraft && window.RS_DB) {
+            await window.RS_DB.del('drafts', existingDraft.id).catch(e => console.warn(e));
+          }
+        }
+      }
+
+      // Sync customer details from order/draft
+      function syncCustomerFromOrder(order) {
+        if (!sel) return;
+        const phone = order.customerPhone || '';
+        const name = order.customerName || 'Walk-in Guest';
+        if (phone) {
+          let opt = sel.querySelector(`option[value="${phone}"]`);
+          if (!opt) {
+            opt = document.createElement('option');
+            opt.value = phone;
+            opt.setAttribute('data-name', name);
+            sel.appendChild(opt);
+          }
+          sel.value = phone;
+          sel.dispatchEvent(new Event('change'));
+        } else {
+          sel.value = '';
+          sel.dispatchEvent(new Event('change'));
+        }
+      }
+
+      // Render the seating grid in the POS main tab
+      async function renderPosTableGrid() {
+        const container = document.getElementById('pos-tables-grid');
+        if (!container) return;
+        
+        const TABLES = [
+          {n:'01',cap:2}, {n:'02',cap:4}, {n:'03',cap:4}, {n:'04',cap:2},
+          {n:'05',cap:6}, {n:'06',cap:4}, {n:'07',cap:2}, {n:'08',cap:8},
+          {n:'09',cap:4}, {n:'10',cap:2}, {n:'11',cap:4}, {n:'12',cap:6}
+        ];
+        
+        const stateDot = {free:'var(--green)', occupied:'var(--orange)', billed:'var(--violet-soft)'};
+        const stateTxt = {free:'Available', occupied:'Dining', billed:'Bill printed'};
+        
+        try {
+          const pendingRows = window.RS_DB ? await window.RS_DB.list('pending_orders').catch(() => []) : [];
+          const drafts = window.RS_DB ? await window.RS_DB.list('drafts').catch(() => []) : [];
+          
+          container.innerHTML = TABLES.map(t => {
+            const tableName = `Table ${t.n}`;
+            const activeOrder = pendingRows.find(r => 
+              (r.tableNumber === tableName || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}`) &&
+              (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'Billed')
+            );
+            const activeDraft = drafts.find(d => d.draftName === tableName);
+            
+            let state = 'free';
+            let amt = 0;
+            let label = 'Available';
+            
+            if (activeOrder) {
+              state = activeOrder.status === 'Billed' ? 'billed' : 'occupied';
+              amt = activeOrder.total || 0;
+              label = activeOrder.status === 'Billed' ? 'Bill printed' : 'Dining';
+            } else if (activeDraft) {
+              state = 'occupied';
+              amt = activeDraft.total || 0;
+              label = 'Draft saved';
+            }
+            
+            return `
+              <div class="pos-table-card" data-table="${tableName}" data-state="${state}" style="border: 1px solid var(--stroke-2); padding: 16px 12px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: var(--glass); transition: var(--t); position: relative;">
+                <span style="position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: ${stateDot[state]};"></span>
+                <div style="font-weight: 700; font-size: 13.5px; color: var(--text);">Table ${t.n}</div>
+                <div style="font-size: 11px; color: var(--text-soft);"><i class="fa-solid fa-user-group" style="font-size: 9px;"></i> ${t.cap} seats</div>
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-top: 4px;">${label}</div>
+                ${amt > 0 ? `<div style="font-size: 13px; font-weight: 800; color: var(--text); margin-top: auto; padding-top: 6px;">₹${amt}</div>` : `<div style="font-size: 11px; color: var(--text-faint); margin-top: auto; padding-top: 6px;">Tap to select</div>`}
+              </div>
+            `;
+          }).join('');
+          
+          container.querySelectorAll('.pos-table-card').forEach(card => {
+            card.onclick = async () => {
+              const tableName = card.dataset.table;
+              const tableSelect = document.getElementById('cart-table');
+              if (tableSelect) {
+                let opt = tableSelect.querySelector(`option[value="${tableName}"]`) || [...tableSelect.options].find(o => o.text === tableName);
+                if (!opt) {
+                  const newOpt = document.createElement('option');
+                  newOpt.value = tableName;
+                  newOpt.innerText = tableName;
+                  tableSelect.appendChild(newOpt);
+                }
+                tableSelect.value = tableName;
+                tableSelect.dispatchEvent(new Event('change'));
+              }
+              await showMenuGridForTable(tableName);
+            };
+          });
+          
+        } catch(e) {
+          console.warn("Error rendering POS table grid", e);
+        }
+      }
+
+      // Show Menu categories/items for a selected table and load existing draft/order
+      async function showMenuGridForTable(tableName) {
+        const posCats = document.getElementById('pos-cats');
+        const posGrid = document.getElementById('pos-grid');
+        const posTableView = document.getElementById('pos-table-grid-view');
+        
+        if (posTableView) posTableView.style.display = 'none';
+        if (posCats) posCats.style.display = 'flex';
+        if (posGrid) posGrid.style.display = 'grid';
+        
+        const banner = document.getElementById('pos-active-table-banner');
+        const bannerText = document.getElementById('pos-banner-text');
+        const bannerDot = document.getElementById('pos-banner-status-dot');
+        
+        if (banner && bannerText && bannerDot) {
+          banner.style.display = 'flex';
+          
+          const pendingRows = window.RS_DB ? await window.RS_DB.list('pending_orders').catch(() => []) : [];
+          const drafts = window.RS_DB ? await window.RS_DB.list('drafts').catch(() => []) : [];
+          
+          const activeOrder = pendingRows.find(r => 
+            (r.tableNumber === tableName || r.tableNumber === tableName.replace('Table ', '') || r.tableNumber === `0${parseInt(tableName.replace('Table ', ''))}`) &&
+            (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'Billed')
+          );
+          const activeDraft = drafts.find(d => d.draftName === tableName);
+          
+          let statusText = 'Available';
+          let dotColor = 'var(--green)';
+          
+          if (activeOrder) {
+            statusText = activeOrder.status === 'Billed' ? `Bill printed (₹${activeOrder.total})` : `Dining (₹${activeOrder.total})`;
+            dotColor = activeOrder.status === 'Billed' ? 'var(--violet-soft)' : 'var(--orange)';
+            window.RS.setCart(activeOrder.items);
+            syncCustomerFromOrder(activeOrder);
+          } else if (activeDraft) {
+            statusText = `Draft saved (₹${activeDraft.total})`;
+            dotColor = 'var(--orange)';
+            window.RS.setCart(activeDraft.items);
+            syncCustomerFromOrder(activeDraft);
+          } else {
+            window.RS.clearCart();
+            if (nameInput) nameInput.value = '';
+            if (phoneInput) phoneInput.value = '';
+            const tempOpt = sel.querySelector('option[data-temp="true"]');
+            if (tempOpt) tempOpt.remove();
+            sel.value = '';
+            sel.dispatchEvent(new Event('change'));
+          }
+          
+          bannerText.innerText = `Table: ${tableName} · ${statusText}`;
+          bannerDot.style.background = dotColor;
+        }
+      }
+
+      // Handle change table button
+      const btnChangeTable = document.getElementById('btn-change-table');
+      if (btnChangeTable) {
+        btnChangeTable.onclick = async (e) => {
+          e.preventDefault();
+          await saveActiveTableDraft();
+          
+          const tableSelect = document.getElementById('cart-table');
+          if (tableSelect) {
+            tableSelect.value = 'Walk-in / Takeaway';
+            tableSelect.dispatchEvent(new Event('change'));
+          }
+          
+          const posCats = document.getElementById('pos-cats');
+          const posGrid = document.getElementById('pos-grid');
+          const posTableView = document.getElementById('pos-table-grid-view');
+          const activeTableBanner = document.getElementById('pos-active-table-banner');
+          
+          if (posCats) posCats.style.display = 'none';
+          if (posGrid) posGrid.style.display = 'none';
+          if (posTableView) posTableView.style.display = 'block';
+          if (activeTableBanner) activeTableBanner.style.display = 'none';
+          
+          window.RS.clearCart();
+          await renderPosTableGrid();
+        };
+      }
+      
+      // Handle manual table select dropdown changes
+      const tblSelectEl = document.getElementById('cart-table');
+      if (tblSelectEl) {
+        tblSelectEl.addEventListener('change', () => {
+          const val = tblSelectEl.value;
+          const activeBtn = document.querySelector('.order-type-btn.active');
+          if (activeBtn && activeBtn.textContent.trim().toLowerCase().includes('dine')) {
+            if (val === 'Walk-in / Takeaway') {
+              if (btnChangeTable) btnChangeTable.click();
+            } else {
+              showMenuGridForTable(val);
+            }
+          }
+        });
+      }
+      
+      async function syncCartLayoutWithOrderType() {
         const activeBtn = document.querySelector('.order-type-btn.active');
         if (!activeBtn) return;
         
@@ -1349,6 +1579,11 @@
         const tableSelContainer = document.querySelector('.cart-table-sel');
         const tableSelect = document.getElementById('cart-table');
         const deliveryDetails = document.getElementById('cart-delivery-details');
+        
+        const posCats = document.getElementById('pos-cats');
+        const posGrid = document.getElementById('pos-grid');
+        const posTableView = document.getElementById('pos-table-grid-view');
+        const activeTableBanner = document.getElementById('pos-active-table-banner');
         
         if (!tableSelContainer || !tableSelect || !deliveryDetails) return;
         
@@ -1364,12 +1599,28 @@
             currentCart.splice(deliveryItemIndex, 1);
             window.RS.setCart(currentCart);
           }
-          
           updateTableFieldForDelivery();
+          
+          const currentTableVal = tableSelect.value;
+          if (!currentTableVal || currentTableVal === 'Walk-in / Takeaway' || currentTableVal.startsWith('Delivery')) {
+            if (posCats) posCats.style.display = 'none';
+            if (posGrid) posGrid.style.display = 'none';
+            if (posTableView) posTableView.style.display = 'block';
+            if (activeTableBanner) activeTableBanner.style.display = 'none';
+            await renderPosTableGrid();
+          } else {
+            await showMenuGridForTable(currentTableVal);
+          }
+          
         } else if (typeText.includes('delivery')) {
           tableSelContainer.style.display = 'block';
           tableSelect.style.display = 'none';
           deliveryDetails.style.display = 'flex';
+          
+          if (posCats) posCats.style.display = 'flex';
+          if (posGrid) posGrid.style.display = 'grid';
+          if (posTableView) posTableView.style.display = 'none';
+          if (activeTableBanner) activeTableBanner.style.display = 'none';
           
           updateDeliveryChargeInCart();
           updateTableFieldForDelivery();
@@ -1378,13 +1629,17 @@
           tableSelect.style.display = 'none';
           deliveryDetails.style.display = 'none';
           
+          if (posCats) posCats.style.display = 'flex';
+          if (posGrid) posGrid.style.display = 'grid';
+          if (posTableView) posTableView.style.display = 'none';
+          if (activeTableBanner) activeTableBanner.style.display = 'none';
+          
           const deliveryItemIndex = window.RS.getCart().findIndex(item => item.id === 'delivery-charge-item');
           if (deliveryItemIndex >= 0) {
             const currentCart = window.RS.getCart();
             currentCart.splice(deliveryItemIndex, 1);
             window.RS.setCart(currentCart);
           }
-          
           updateTableFieldForDelivery();
         }
       }
