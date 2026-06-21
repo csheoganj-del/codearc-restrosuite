@@ -1182,6 +1182,36 @@ body.product-guide-open {
   .tab-panel,
   .section-inner {
     padding: 12px !important;
+
+}
+
+/* Tab blinking/pulse attention effect */
+@keyframes tab-attention-pulse {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(255, 79, 0, 0.15);
+  }
+  100% {
+    background-color: transparent;
   }
 }
+
+.sidebar-link.attention-blink {
+  animation: tab-attention-pulse 1.5s infinite ease-in-out;
+  color: var(--orange) !important;
+  box-shadow: inset 3px 0 0 var(--orange) !important;
+}
+
+.mnav-link.attention-blink {
+  animation: tab-attention-pulse 1.5s infinite ease-in-out;
+  color: var(--orange) !important;
+  box-shadow: inset 0 -3px 0 var(--orange) !important;
+}
+
+.sidebar-link.attention-blink i, .mnav-link.attention-blink i {
+  color: var(--orange) !important;
+}
+
 

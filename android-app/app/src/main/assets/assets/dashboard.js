@@ -112,6 +112,7 @@
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
     $$('.sidebar-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
+    try { updateTabAttentionBlinking(); } catch(e){}
     const meta = titles[id]; if(meta){ $('#page-title').textContent = meta[0]; $('#page-sub').textContent = meta[1]; }
     $('.content').scrollTop = 0; window.scrollTo(0,0);
     if(!rendered[id] && renderers[id]){ renderers[id](); rendered[id]=true; }
@@ -874,6 +875,7 @@
         try { renderKDS(); } catch(e){}
         try { renderQR(); } catch(e){}
         document.dispatchEvent(new CustomEvent('rs:pending_orders_synced'));
+        try { updateTabAttentionBlinking(); } catch(e){}
       } catch(e) {
         console.warn("syncPendingOrders failed", e);
       } finally {
@@ -882,6 +884,38 @@
     } else {
       pendingOrdersSyncInFlight = false;
     }
+  }
+
+  function updateTabAttentionBlinking() {
+    const activeTabId = document.querySelector('.tab-content.active')?.id || document.querySelector('.sidebar-link.active')?.dataset.tab || document.querySelector('.mnav-link.active')?.dataset.tab;
+    
+    const hasPendingQr = (typeof QR_ORDERS !== 'undefined' && Array.isArray(QR_ORDERS))
+      ? QR_ORDERS.some(o => String(o.status || '').toLowerCase() === 'pending')
+      : false;
+      
+    const hasKdsOrders = (typeof KDS !== 'undefined' && Array.isArray(KDS))
+      ? KDS.length > 0
+      : false;
+      
+    const hasLowStock = (typeof INVENTORY !== 'undefined' && Array.isArray(INVENTORY))
+      ? INVENTORY.some(i => Number(i.stock) < Number(i.min))
+      : false;
+      
+    document.querySelectorAll('.sidebar-link, .mnav-link').forEach(el => {
+      const tab = el.dataset.tab;
+      if (!tab) return;
+      
+      let shouldBlink = false;
+      if (tab === 'qr-orders-tab' && hasPendingQr && activeTabId !== 'qr-orders-tab') {
+        shouldBlink = true;
+      } else if (tab === 'kds-tab' && hasKdsOrders && activeTabId !== 'kds-tab') {
+        shouldBlink = true;
+      } else if (tab === 'inventory-tab' && hasLowStock && activeTabId !== 'inventory-tab') {
+        shouldBlink = true;
+      }
+      
+      el.classList.toggle('attention-blink', shouldBlink);
+    });
   }
 
   function setupSupabaseRealtime() {
@@ -1358,6 +1392,7 @@
 
     // Dispatch custom event to notify other modules
     document.dispatchEvent(new CustomEvent('rs:render-inventory'));
+    try { updateTabAttentionBlinking(); } catch(e){}
   };
 
   /* ============================================================
@@ -3167,6 +3202,11 @@
   if (!isBrandAdmin) {
     $$('.brandadmin-only').forEach(el=>el.style.display='none');
   }
+
+  // Start periodic tab attention blinking check
+  setInterval(() => {
+    try { updateTabAttentionBlinking(); } catch(e) {}
+  }, 2000);
 
   // Security contract test compatibility:
   // const FAST_INTERACTION_MODE = true;
