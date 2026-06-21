@@ -1751,22 +1751,19 @@
             } else {
               lsSaveTabCart('Delivery');
             }
-          } else if (!_prevOrderType.includes('dine')) {
+          } else if (_prevOrderType.includes('dine')) {
+            // Dine-in: save to the active table
+            const tableVal = tableSelect ? tableSelect.value : '';
+            if (tableVal && tableVal !== 'Walk-in / Takeaway' && !tableVal.startsWith('Delivery')) {
+              await saveActiveTableDraft(tableVal).catch(e => console.warn('[Tab save]', e));
+            }
+          } else {
             // Takeaway
-            const prevTableVal = tableSelect.value;
             if (window.RS_DB) {
-              await saveActiveTableDraft(prevTableVal || 'Walk-in / Takeaway').catch(e => console.warn('[Tab save]', e));
+              await saveActiveTableDraft('Takeaway').catch(e => console.warn('[Tab save]', e));
             } else {
               lsSaveTabCart('Takeaway');
             }
-          }
-          // Dine-in is handled via saveActiveTableDraft(prevVal) below for the table case
-        }
-        
-        if (tableSelect) {
-          const prevVal = tableSelect.value;
-          if (prevVal && !isBootCall) {
-            await saveActiveTableDraft(prevVal);
           }
         }
         if (lastActiveTable) {
@@ -1904,12 +1901,7 @@
 
       document.querySelectorAll('.order-type-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          // Capture the PREVIOUS type synchronously before the active class flips,
-          // then run the sync after the class has been updated by dashboard.js handler.
-          const prevBtn = document.querySelector('.order-type-btn.active');
-          const capturedPrev = prevBtn ? prevBtn.textContent.trim().toLowerCase() : null;
           setTimeout(() => {
-            if (capturedPrev !== null) _prevOrderType = capturedPrev;
             syncCartLayoutWithOrderType(false);
           }, 50);
         });
