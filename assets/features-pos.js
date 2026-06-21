@@ -872,16 +872,7 @@
 
     // Update held counts for all order types
     function updateHeldCount() {
-      // Calculate total held orders
-      const totalHeld = Object.values(heldOrders).reduce((sum, arr) => sum + arr.length, 0);
-      const currentTypeKey = getCurrentOrderTypeKey();
-      const currentTypeCount = heldOrders[currentTypeKey].length;
-
-      // Update new single hold button count
-      const singleCountEl = document.getElementById('held-count');
-      if (singleCountEl) singleCountEl.textContent = totalHeld ? `(${totalHeld})` : '';
-
-      // Update each type's count and blinking state (for backward compatibility)
+      // Update each type's count and blinking state
       Object.keys(heldOrders).forEach(key => {
         const count = heldOrders[key].length;
         // Update desktop button badge
@@ -1108,19 +1099,8 @@
       const btnMHoldTakeaway = document.getElementById('btn-m-hold-takeaway');
       const btnMHoldDinein = document.getElementById('btn-m-hold-dinein');
       const btnMHoldDelivery = document.getElementById('btn-m-hold-delivery');
-      const btnHold = document.getElementById('btn-hold');
 
-      // Handle new single hold button
-      if (e.target.closest('#btn-hold')) {
-        const orderTypeKey = getCurrentOrderTypeKey();
-        if (RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts(orderTypeKey);
-        }
-      }
-
-      // Handle hold current order (backward compatible)
+      // Handle hold current order
       if (e.target.closest('#btn-hold-takeaway')) {
         if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) {
           holdCurrent();
