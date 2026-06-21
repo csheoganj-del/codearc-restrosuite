@@ -187,8 +187,32 @@
                 <button class="order-type-btn"><i class="fa-solid fa-motorcycle"></i> Delivery</button>
               </div>
             </div>
+            <!-- Active Table Status Banner (Dine-in Only) -->
+            <div class="pos-active-table-banner" id="pos-active-table-banner" style="display: none; align-items: center; justify-content: space-between; padding: 10px 14px; margin: 0 10px 14px 10px; background: var(--orange-tint); border: 1px dashed rgba(255,107,0,0.35); border-radius: var(--r-sm);">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--text);">
+                <span class="table-status-dot" id="pos-banner-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--green);"></span>
+                <span id="pos-banner-text">Active Table: None</span>
+              </div>
+              <button type="button" class="btn btn-sm btn-ghost" id="btn-change-table" style="color: var(--orange); font-weight: 700; font-size: 11px; padding: 4px 8px; height: 26px; border: 1px solid rgba(255,107,0,0.25);">
+                <i class="fa-solid fa-chair"></i> Change Table
+              </button>
+            </div>
             <div class="pos-cats" id="pos-cats"></div>
             <div class="pos-grid" id="pos-grid"></div>
+            <!-- Interactive Seating Layout Selections Grid -->
+            <div class="pos-table-grid-view" id="pos-table-grid-view" style="display: none; padding: 0 12px 20px 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <h3 style="font-size: 14px; font-weight: 700; color: var(--text);">POS Seating Layout - Select Table</h3>
+                <div style="display: flex; gap: 12px; font-size: 11px; color: var(--text-soft); font-weight: 600;">
+                  <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--green);"></span> Free</span>
+                  <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--orange);"></span> Occupied</span>
+                  <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--violet-soft);"></span> Billed</span>
+                </div>
+              </div>
+              <div class="pos-tables-grid" id="pos-tables-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;">
+                <!-- Tables rendered by JS -->
+              </div>
+            </div>
           </div>
 
           <aside class="pos-cart">
