@@ -1477,8 +1477,9 @@
                 }
                 tableSelect.value = tableName;
                 tableSelect.dispatchEvent(new Event('change'));
+              } else {
+                await showMenuGridForTable(tableName);
               }
-              await showMenuGridForTable(tableName);
             };
           });
           
@@ -1541,31 +1542,39 @@
         }
       }
 
+      let isChangingTable = false;
+
       // Handle change table button
       const btnChangeTable = document.getElementById('btn-change-table');
       if (btnChangeTable) {
         btnChangeTable.onclick = async (e) => {
           e.preventDefault();
-          await saveActiveTableDraft();
-          
-          const tableSelect = document.getElementById('cart-table');
-          if (tableSelect) {
-            tableSelect.value = 'Walk-in / Takeaway';
-            tableSelect.dispatchEvent(new Event('change'));
+          if (isChangingTable) return;
+          isChangingTable = true;
+          try {
+            await saveActiveTableDraft();
+            
+            const tableSelect = document.getElementById('cart-table');
+            if (tableSelect) {
+              tableSelect.value = 'Walk-in / Takeaway';
+              tableSelect.dispatchEvent(new Event('change'));
+            }
+            
+            const posCats = document.getElementById('pos-cats');
+            const posGrid = document.getElementById('pos-grid');
+            const posTableView = document.getElementById('pos-table-grid-view');
+            const activeTableBanner = document.getElementById('pos-active-table-banner');
+            
+            if (posCats) posCats.style.display = 'none';
+            if (posGrid) posGrid.style.display = 'none';
+            if (posTableView) posTableView.style.display = 'block';
+            if (activeTableBanner) activeTableBanner.style.display = 'none';
+            
+            window.RS.clearCart();
+            await renderPosTableGrid();
+          } finally {
+            isChangingTable = false;
           }
-          
-          const posCats = document.getElementById('pos-cats');
-          const posGrid = document.getElementById('pos-grid');
-          const posTableView = document.getElementById('pos-table-grid-view');
-          const activeTableBanner = document.getElementById('pos-active-table-banner');
-          
-          if (posCats) posCats.style.display = 'none';
-          if (posGrid) posGrid.style.display = 'none';
-          if (posTableView) posTableView.style.display = 'block';
-          if (activeTableBanner) activeTableBanner.style.display = 'none';
-          
-          window.RS.clearCart();
-          await renderPosTableGrid();
         };
       }
       
@@ -1573,6 +1582,7 @@
       const tblSelectEl = document.getElementById('cart-table');
       if (tblSelectEl) {
         tblSelectEl.addEventListener('change', () => {
+          if (isChangingTable) return;
           const val = tblSelectEl.value;
           const activeBtn = document.querySelector('.order-type-btn.active');
           if (activeBtn && activeBtn.textContent.trim().toLowerCase().includes('dine')) {
