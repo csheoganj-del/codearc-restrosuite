@@ -206,6 +206,12 @@
       if (ct) ct.value = 'Walk-in / Takeaway';
       const csel = document.getElementById('cart-customer-sel');
       if (csel) csel.value = '';
+      const da = document.getElementById('delivery-address');
+      if (da) da.value = '';
+      const dc = document.getElementById('delivery-charge');
+      if (dc) dc.value = '';
+      const dr = document.getElementById('delivery-rider');
+      if (dr) dr.value = '';
     };
     function getPaymentDetails(){
       const totals = RS.getTotals();
@@ -497,7 +503,20 @@
 
         if (window.RS_DB) {
           try {
-            const rows = await RS_DB.list('pending_orders');
+            const tableVal = cust.table || 'Walk-in / Takeaway';
+            let draftName = tableVal;
+            if (tableVal === 'Walk-in / Takeaway') {
+              draftName = 'Takeaway';
+            } else if (tableVal.startsWith('Delivery')) {
+              draftName = 'Delivery';
+            }
+            const draftsList = await RS_DB.list('drafts').catch(() => []);
+            const draftToDel = draftsList.find(d => d.draftName === draftName);
+            if (draftToDel) {
+              await RS_DB.del('drafts', draftToDel.id).catch(() => {});
+            }
+
+            const rows = await RS_DB.list('pending_orders').catch(() => []);
             const matched = rows.find(r =>
               (r.tableNumber === cust.table || r.tableNumber === cust.table.replace('Table ', '')) &&
               (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
@@ -507,7 +526,7 @@
               if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
             }
           } catch(e) {
-            console.warn("Failed to clear pending order on checkout", e);
+            console.warn("Failed to clear pending order or draft on checkout", e);
           }
         }
       }
@@ -776,7 +795,7 @@
     window.RSPOS = { checkout, kot, refreshPaymentPanel };
     if (!document.documentElement.dataset.rsPosActionsBound) {
       document.documentElement.dataset.rsPosActionsBound = '1';
-      document.addEventListener('click', e => {
+      document.addEventListener('click', async e => {
         const btn = e.target.closest('#btn-checkout, #btn-kot, #btn-clear-cart');
         if (!btn || btn.disabled) return;
         e.preventDefault();
@@ -786,9 +805,30 @@
         if (btn.id === 'btn-clear-cart') {
           const totals = RS.getTotals();
           if (totals.count > 0 && confirm("Clear current cart?")) {
+            const tableSelect = document.getElementById('cart-table');
+            const tableVal = tableSelect ? tableSelect.value : 'Walk-in / Takeaway';
+
             RS.clearCart();
             resetCustomerFields();
             resetPayment();
+
+            if (window.RS_DB) {
+              try {
+                let draftName = tableVal;
+                if (tableVal === 'Walk-in / Takeaway') {
+                  draftName = 'Takeaway';
+                } else if (tableVal.startsWith('Delivery')) {
+                  draftName = 'Delivery';
+                }
+                const draftsList = await window.RS_DB.list('drafts').catch(() => []);
+                const draftToDel = draftsList.find(d => d.draftName === draftName);
+                if (draftToDel) {
+                  await window.RS_DB.del('drafts', draftToDel.id).catch(() => {});
+                }
+              } catch(e) {
+                console.warn("Failed to delete draft on clear cart", e);
+              }
+            }
           }
           return;
         }
@@ -1348,26 +1388,41 @@
       async function saveActiveTableDraft(tableName) {
         const tableSelect = document.getElementById('cart-table');
         const currentTable = tableName || (tableSelect ? tableSelect.value : '');
-        if (!currentTable || currentTable === 'Walk-in / Takeaway' || currentTable.startsWith('Delivery')) return;
+        if (!currentTable) return;
+        
+        let draftName = currentTable;
+        if (currentTable === 'Walk-in / Takeaway') {
+          draftName = 'Takeaway';
+        } else if (currentTable.startsWith('Delivery')) {
+          draftName = 'Delivery';
+        }
         
         const cartItems = window.RS.getCart();
         const drafts = window.RS_DB ? await window.RS_DB.list('drafts').catch(() => []) : [];
-        const existingDraft = drafts.find(d => d.draftName === currentTable);
+        const existingDraft = drafts.find(d => d.draftName === draftName);
         
         if (cartItems.length > 0) {
           const id = existingDraft ? existingDraft.id : Date.now();
           const totals = window.RS.getTotals();
+          
+          const deliveryAddress = document.getElementById('delivery-address');
+          const deliveryCharge = document.getElementById('delivery-charge');
+          const deliveryRider = document.getElementById('delivery-rider');
+          
           const dbRow = {
             id: id,
             draftId: existingDraft ? existingDraft.draftId : 'D' + Date.now(),
-            draftName: currentTable,
+            draftName: draftName,
             customerName: nameInput ? nameInput.value.trim() : '',
             customerPhone: phoneInput ? phoneInput.value.trim() : '',
             customerGst: '',
             items: cartItems,
             subtotal: totals.sub,
             gst: totals.gst,
-            total: totals.grand
+            total: totals.grand,
+            deliveryAddress: deliveryAddress ? deliveryAddress.value.trim() : '',
+            deliveryCharge: deliveryCharge ? deliveryCharge.value.trim() : '',
+            deliveryRider: deliveryRider ? deliveryRider.value.trim() : ''
           };
           if (window.RS_DB) {
             await window.RS_DB.put('drafts', id, dbRow).catch(e => console.warn(e));
@@ -1377,6 +1432,15 @@
             await window.RS_DB.del('drafts', existingDraft.id).catch(e => console.warn(e));
           }
         }
+      }
+
+      function syncDeliveryFieldsFromDraft(draft) {
+        const da = document.getElementById('delivery-address');
+        const dc = document.getElementById('delivery-charge');
+        const dr = document.getElementById('delivery-rider');
+        if (da) da.value = draft ? (draft.deliveryAddress || '') : '';
+        if (dc) dc.value = draft ? (draft.deliveryCharge || '') : '';
+        if (dr) dr.value = draft ? (draft.deliveryRider || '') : '';
       }
 
       // Sync customer details from order/draft
@@ -1529,13 +1593,16 @@
             dotColor = activeOrder.status === 'Billed' ? 'var(--violet-soft)' : 'var(--orange)';
             window.RS.setCart(activeOrder.items);
             syncCustomerFromOrder(activeOrder);
+            syncDeliveryFieldsFromDraft(null);
           } else if (activeDraft) {
             statusText = `Draft saved (₹${activeDraft.total})`;
             dotColor = 'var(--orange)';
             window.RS.setCart(activeDraft.items);
             syncCustomerFromOrder(activeDraft);
+            syncDeliveryFieldsFromDraft(activeDraft);
           } else {
             window.RS.clearCart();
+            syncDeliveryFieldsFromDraft(null);
             if (nameInput) nameInput.value = '';
             if (phoneInput) phoneInput.value = '';
             const tempOpt = sel.querySelector('option[data-temp="true"]');
@@ -1619,8 +1686,13 @@
         
         if (!tableSelContainer || !tableSelect || !deliveryDetails) return;
         
+        if (tableSelect) {
+          const prevVal = tableSelect.value;
+          if (prevVal) {
+            await saveActiveTableDraft(prevVal);
+          }
+        }
         if (lastActiveTable) {
-          await saveActiveTableDraft(lastActiveTable);
           lastActiveTable = '';
         }
         
@@ -1645,16 +1717,13 @@
             if (posTableView) posTableView.style.display = 'block';
             if (activeTableBanner) activeTableBanner.style.display = 'none';
             window.RS.clearCart();
+            syncDeliveryFieldsFromDraft(null);
             await renderPosTableGrid();
           } else {
             await showMenuGridForTable(currentTableVal);
           }
           
         } else if (typeText.includes('delivery')) {
-          if (tableSelect.value !== 'Walk-in / Takeaway' && !tableSelect.value.startsWith('Delivery')) {
-            window.RS.clearCart();
-          }
-
           tableSelContainer.style.display = 'block';
           tableSelect.style.display = 'none';
           deliveryDetails.style.display = 'flex';
@@ -1664,13 +1733,25 @@
           if (posTableView) posTableView.style.display = 'none';
           if (activeTableBanner) activeTableBanner.style.display = 'none';
           
+          if (window.RS_DB) {
+            const draftsList = await window.RS_DB.list('drafts').catch(() => []);
+            const activeDraft = draftsList.find(d => d.draftName === 'Delivery');
+            if (activeDraft) {
+              window.RS.setCart(activeDraft.items);
+              syncCustomerFromOrder(activeDraft);
+              syncDeliveryFieldsFromDraft(activeDraft);
+            } else {
+              window.RS.clearCart();
+              syncDeliveryFieldsFromDraft(null);
+            }
+          } else {
+            window.RS.clearCart();
+            syncDeliveryFieldsFromDraft(null);
+          }
+          
           updateDeliveryChargeInCart();
           updateTableFieldForDelivery();
         } else {
-          if (tableSelect.value !== 'Walk-in / Takeaway' && !tableSelect.value.startsWith('Delivery')) {
-            window.RS.clearCart();
-          }
-
           tableSelContainer.style.display = 'block';
           tableSelect.style.display = 'none';
           deliveryDetails.style.display = 'none';
@@ -1679,6 +1760,21 @@
           if (posGrid) posGrid.style.display = 'grid';
           if (posTableView) posTableView.style.display = 'none';
           if (activeTableBanner) activeTableBanner.style.display = 'none';
+          
+          if (window.RS_DB) {
+            const draftsList = await window.RS_DB.list('drafts').catch(() => []);
+            const activeDraft = draftsList.find(d => d.draftName === 'Takeaway');
+            if (activeDraft) {
+              window.RS.setCart(activeDraft.items);
+              syncCustomerFromOrder(activeDraft);
+            } else {
+              window.RS.clearCart();
+            }
+          } else {
+            window.RS.clearCart();
+          }
+          
+          syncDeliveryFieldsFromDraft(null);
           
           const deliveryItemIndex = window.RS.getCart().findIndex(item => item.id === 'delivery-charge-item');
           if (deliveryItemIndex >= 0) {
