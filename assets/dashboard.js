@@ -560,9 +560,12 @@
 
     // Auto-save active cart to localStorage
     try {
+      const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+      const activeOrderType = activeOrderTypeBtn ? activeOrderTypeBtn.textContent.trim() : 'Takeaway';
       localStorage.setItem('rs_active_cart', JSON.stringify(cart));
       localStorage.setItem('rs_active_cart_discount', String(discountPct));
       localStorage.setItem('rs_active_cart_customer', JSON.stringify(getCustomer()));
+      localStorage.setItem('rs_active_order_type', activeOrderType);
     } catch (e) {
       console.warn('[Cart Persistence Warning] Failed to persist active cart:', e);
     }
@@ -667,7 +670,34 @@
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{ activeCat=b.dataset.cat; $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b)); renderPOS(); }));
     $('#pos-search-input').addEventListener('input', renderPOS);
-    $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{ $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }));
+    $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
+      // Snapshot the outgoing tab's cart to localStorage before the active class changes,
+      // so the per-tab fallback always has the latest data even without RS_DB.
+      try {
+        const curActiveBtn = document.querySelector('.order-type-btn.active');
+        if (curActiveBtn && curActiveBtn !== b) {
+          const outType = curActiveBtn.textContent.trim().toLowerCase();
+          const tabKey = outType.includes('delivery') ? 'Delivery' : outType.includes('dine') ? ('Dine_' + (document.getElementById('cart-table')?.value || 'table')) : 'Takeaway';
+          const da = document.getElementById('delivery-address');
+          const dc = document.getElementById('delivery-charge');
+          const dr = document.getElementById('delivery-rider');
+          localStorage.setItem('rs_tab_cart_' + tabKey, JSON.stringify({
+            items: cart.map(c=>({...c})),
+            total: cart.reduce((a,c)=>a+c.price*c.qty,0),
+            deliveryAddress: da ? da.value : '',
+            deliveryCharge: dc ? dc.value : '',
+            deliveryRider: dr ? dr.value : ''
+          }));
+          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+          localStorage.setItem('rs_tab_cust_' + tabKey, JSON.stringify({
+            name: nameEl ? nameEl.value.trim() : '',
+            phone: phoneEl ? phoneEl.value.trim() : ''
+          }));
+        }
+      } catch(e) {}
+      $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    }));
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {
       if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -2417,6 +2447,21 @@
         cartToRestore = JSON.parse(savedCart);
         discToRestore = Number(savedDisc) || 0;
         if (savedCust) custToRestore = JSON.parse(savedCust);
+        // Restore which order-type tab was active
+        try {
+          const savedOrderType = localStorage.getItem('rs_active_order_type');
+          if (savedOrderType) {
+            const btns = document.querySelectorAll('.order-type-btn');
+            let matched = false;
+            btns.forEach(b => {
+              const match = b.textContent.trim().toLowerCase() === savedOrderType.toLowerCase();
+              b.classList.toggle('active', match);
+              if (match) matched = true;
+            });
+            // fallback: activate first if nothing matched
+            if (!matched && btns.length) btns[0].classList.add('active');
+          }
+        } catch(e) {}
       }
       
       if (cartToRestore && Array.isArray(cartToRestore) && cartToRestore.length > 0) {

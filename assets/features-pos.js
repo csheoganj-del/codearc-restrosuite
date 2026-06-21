@@ -1670,7 +1670,63 @@
         });
       }
       
-      async function syncCartLayoutWithOrderType() {
+      // --- Per-tab localStorage fallback helpers (used when RS_DB is unavailable) ---
+      const LS_CART_PREFIX = 'rs_tab_cart_';
+      const LS_CUST_PREFIX = 'rs_tab_cust_';
+      function lsSaveTabCart(tabName) {
+        try {
+          const items = window.RS.getCart();
+          const totals = window.RS.getTotals();
+          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+          const da = document.getElementById('delivery-address');
+          const dc = document.getElementById('delivery-charge');
+          const dr = document.getElementById('delivery-rider');
+          localStorage.setItem(LS_CART_PREFIX + tabName, JSON.stringify({
+            items,
+            total: totals.grand,
+            deliveryAddress: da ? da.value : '',
+            deliveryCharge: dc ? dc.value : '',
+            deliveryRider: dr ? dr.value : ''
+          }));
+          localStorage.setItem(LS_CUST_PREFIX + tabName, JSON.stringify({
+            name: nameEl ? nameEl.value.trim() : '',
+            phone: phoneEl ? phoneEl.value.trim() : ''
+          }));
+        } catch(e) { console.warn('[Tab Cart LS Save]', e); }
+      }
+      function lsLoadTabCart(tabName) {
+        try {
+          const raw = localStorage.getItem(LS_CART_PREFIX + tabName);
+          const custRaw = localStorage.getItem(LS_CUST_PREFIX + tabName);
+          return { cart: raw ? JSON.parse(raw) : null, cust: custRaw ? JSON.parse(custRaw) : null };
+        } catch(e) { return { cart: null, cust: null }; }
+      }
+      function lsApplyTabCart(tabName) {
+        const { cart, cust } = lsLoadTabCart(tabName);
+        if (cart && cart.items && cart.items.length > 0) {
+          window.RS.setCart(cart.items);
+          const da = document.getElementById('delivery-address');
+          const dc = document.getElementById('delivery-charge');
+          const dr = document.getElementById('delivery-rider');
+          if (da) da.value = cart.deliveryAddress || '';
+          if (dc) dc.value = cart.deliveryCharge || '';
+          if (dr) dr.value = cart.deliveryRider || '';
+        } else {
+          window.RS.clearCart();
+        }
+        if (cust) {
+          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+          if (nameEl) nameEl.value = cust.name || '';
+          if (phoneEl) phoneEl.value = cust.phone || '';
+        }
+      }
+
+      // Track the previous order type so we can save before switching
+      let _prevOrderType = null;
+
+      async function syncCartLayoutWithOrderType(isBootCall) {
         const activeBtn = document.querySelector('.order-type-btn.active');
         if (!activeBtn) return;
         
@@ -1685,16 +1741,41 @@
         const activeTableBanner = document.getElementById('pos-active-table-banner');
         
         if (!tableSelContainer || !tableSelect || !deliveryDetails) return;
+
+        // --- Save current tab's cart BEFORE switching ---
+        // On the boot call we skip saving so we don't overwrite a fresh restore
+        if (!isBootCall && _prevOrderType !== null && _prevOrderType !== typeText) {
+          if (_prevOrderType.includes('delivery')) {
+            if (window.RS_DB) {
+              await saveActiveTableDraft('Delivery').catch(e => console.warn('[Tab save]', e));
+            } else {
+              lsSaveTabCart('Delivery');
+            }
+          } else if (!_prevOrderType.includes('dine')) {
+            // Takeaway
+            const prevTableVal = tableSelect.value;
+            if (window.RS_DB) {
+              await saveActiveTableDraft(prevTableVal || 'Walk-in / Takeaway').catch(e => console.warn('[Tab save]', e));
+            } else {
+              lsSaveTabCart('Takeaway');
+            }
+          }
+          // Dine-in is handled via saveActiveTableDraft(prevVal) below for the table case
+        }
         
         if (tableSelect) {
           const prevVal = tableSelect.value;
-          if (prevVal) {
+          if (prevVal && !isBootCall) {
             await saveActiveTableDraft(prevVal);
           }
         }
         if (lastActiveTable) {
           lastActiveTable = '';
         }
+
+        // Persist the active order type for page-reload restoration
+        try { localStorage.setItem('rs_active_order_type', typeText.includes('dine') ? 'Dine-in' : typeText.includes('delivery') ? 'Delivery' : 'Takeaway'); } catch(e) {}
+        _prevOrderType = typeText;
         
         if (typeText.includes('dine')) {
           tableSelContainer.style.display = 'grid';
@@ -1741,17 +1822,20 @@
               syncCustomerFromOrder(activeDraft);
               syncDeliveryFieldsFromDraft(activeDraft);
             } else {
-              window.RS.clearCart();
+              // Fall back to localStorage snapshot if DB has no draft
+              lsApplyTabCart('Delivery');
               syncDeliveryFieldsFromDraft(null);
             }
           } else {
-            window.RS.clearCart();
+            // No DB at all — use localStorage per-tab snapshot
+            lsApplyTabCart('Delivery');
             syncDeliveryFieldsFromDraft(null);
           }
           
           updateDeliveryChargeInCart();
           updateTableFieldForDelivery();
         } else {
+          // Takeaway
           tableSelContainer.style.display = 'block';
           tableSelect.style.display = 'none';
           deliveryDetails.style.display = 'none';
@@ -1766,12 +1850,14 @@
             const activeDraft = draftsList.find(d => d.draftName === 'Takeaway');
             if (activeDraft) {
               window.RS.setCart(activeDraft.items);
-              syncCustomerFromOrder(activeDraft);
+              syncCustomerFromOrder(activeDraft); // Fix: was missing customer restore for Takeaway
             } else {
-              window.RS.clearCart();
+              // Fall back to localStorage snapshot if DB has no draft
+              lsApplyTabCart('Takeaway');
             }
           } else {
-            window.RS.clearCart();
+            // No DB at all — use localStorage per-tab snapshot
+            lsApplyTabCart('Takeaway');
           }
           
           syncDeliveryFieldsFromDraft(null);
@@ -1818,11 +1904,19 @@
 
       document.querySelectorAll('.order-type-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          setTimeout(syncCartLayoutWithOrderType, 50);
+          // Capture the PREVIOUS type synchronously before the active class flips,
+          // then run the sync after the class has been updated by dashboard.js handler.
+          const prevBtn = document.querySelector('.order-type-btn.active');
+          const capturedPrev = prevBtn ? prevBtn.textContent.trim().toLowerCase() : null;
+          setTimeout(() => {
+            if (capturedPrev !== null) _prevOrderType = capturedPrev;
+            syncCartLayoutWithOrderType(false);
+          }, 50);
         });
       });
       
-      syncCartLayoutWithOrderType();
+      // On boot: initialise layout but don't wipe an already-restored cart
+      syncCartLayoutWithOrderType(true);
     }
     
     // Initialize the custom customer selector widget
