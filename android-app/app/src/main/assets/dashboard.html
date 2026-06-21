@@ -200,9 +200,57 @@
                 <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative;">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
-              <select class="form-input" id="cart-customer-sel"><option value="">Walk-in Customer</option></select>
+              <div class="custom-customer-widget" id="custom-customer-widget">
+                <div class="cust-widget-trigger" id="cust-widget-trigger">
+                  <i class="fa-solid fa-user-tag"></i>
+                  <span id="cust-trigger-text">Walk-in</span>
+                  <i class="fa-solid fa-chevron-down caret"></i>
+                </div>
+                <div class="cust-widget-dropdown" id="cust-widget-dropdown">
+                  <div class="cust-fields-row">
+                    <div class="field-group">
+                      <label>Name</label>
+                      <input type="text" id="cust-input-name" placeholder="John Doe" autocomplete="off" class="form-input">
+                    </div>
+                    <div class="field-group">
+                      <label>Phone</label>
+                      <input type="text" id="cust-input-phone" placeholder="9876543210" autocomplete="off" class="form-input">
+                    </div>
+                  </div>
+                  
+                  <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
+                  
+                  <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
+                    <div class="insight-item">
+                      <span class="insight-label">Visits</span>
+                      <span class="insight-val" id="insight-visits">0</span>
+                    </div>
+                    <div class="insight-item">
+                      <span class="insight-label">Spent</span>
+                      <span class="insight-val" id="insight-spend">₹0</span>
+                    </div>
+                    <div class="insight-item" style="grid-column: span 2; border-top: 1px solid var(--stroke); padding-top: 4px; margin-top: 4px;">
+                      <span class="insight-label">Favorite</span>
+                      <span class="insight-val" id="insight-favorite">None</span>
+                    </div>
+                  </div>
+
+                  <div class="cust-action-row" id="cust-action-row" style="display: none; margin-top: 6px;">
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-save-new-cust" style="width: 100%; justify-content: center; font-size:11px; padding: 6px 8px;">
+                      <i class="fa-solid fa-plus"></i> Add New Customer
+                    </button>
+                  </div>
+                  
+                  <div class="cust-reset-row" style="margin-top: 6px; border-top: 1px solid var(--stroke); padding-top: 6px;">
+                    <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-cust" style="width: 100%; justify-content: center; font-size:11px; color: var(--text-soft); padding: 6px 8px;">
+                      <i class="fa-solid fa-user-slash"></i> Reset to Walk-in
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
             </div>
             <div class="cart-items" id="cart-items"></div>
             <div class="cart-foot">
