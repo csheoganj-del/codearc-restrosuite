@@ -813,7 +813,9 @@
     // Dynamic release note sync
     let latestRelease = null;
     try {
-      const res = await fetch(`app-update.json?v=${Date.now()}`);
+      const isFile = location.protocol === 'file:';
+      const url = isFile ? 'app-update.json' : `app-update.json?v=${Date.now()}`;
+      const res = await fetch(url);
       if (res.ok) latestRelease = await res.json();
     } catch(e) {}
 

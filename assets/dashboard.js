@@ -269,7 +269,9 @@
 
   async function fetchUpdateRelease() {
     try {
-      const response = await fetch(`app-update.json?v=${Date.now()}`, { cache: 'no-store' });
+      const isFile = location.protocol === 'file:';
+      const url = isFile ? 'app-update.json' : `app-update.json?v=${Date.now()}`;
+      const response = await fetch(url, isFile ? {} : { cache: 'no-store' });
       if (!response.ok) return null;
       return await response.json();
     } catch (_) {
@@ -308,7 +310,9 @@
     const parts = [];
     for (const file of files) {
       try {
-        const response = await fetch(`${file}?check=${Date.now()}`, { cache: 'no-store' });
+        const isFile = location.protocol === 'file:';
+        const url = isFile ? file : `${file}?check=${Date.now()}`;
+        const response = await fetch(url, isFile ? {} : { cache: 'no-store' });
         if (!response.ok) continue;
         const text = await response.text();
         let hash = 0;
@@ -436,14 +440,6 @@
   };
 
   async function checkForAppUpdate({ silent = true } = {}) {
-    const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:';
-    if (isLocalDev) {
-      if (!silent) {
-        toast('Local development: Update checking bypassed', 'fa-circle-info');
-      }
-      return;
-    }
-
     const signature = await buildUpdateSignature();
     if (!signature) return;
     const previous = localStorage.getItem(updateSignatureKey);
