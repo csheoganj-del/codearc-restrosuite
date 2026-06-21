@@ -15,7 +15,7 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>RestroSuite Console</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="assets/restrosuite.css?v=v2.1.0-20260621">
+<link rel="stylesheet" href="assets/restrosuite.css?v=v22-20260621">
 <script>
   window.onerror = function(msg, url, line, col, error) {
     var div = document.getElementById('debug-error-banner');
@@ -37,7 +37,7 @@
     }
     div.innerHTML += '<div><b>Promise Rejection:</b> ' + (event.reason ? event.reason.message || event.reason : event) + '</div>';
   };
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v2.1.0-20260621';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v22-20260621';
   document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
 </script>
 <script>

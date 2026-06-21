@@ -1,5 +1,5 @@
 {
-  "version": "v2.1.0-20260621",
+  "version": "v22-20260621",
   "date": "2026-06-21",
   "title": "POS Active Cart Persistence & Stability",
   "summary": "This update fixes POS active cart resetting on layout switches, resolves infinite loops when resetting tables, and bumps version naming for clarity.",
