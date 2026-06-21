@@ -119,6 +119,20 @@
     else if(rendered[id] && id === 'gateway-monitor-tab') { if(typeof startSaaSGatewayPolling === 'function') startSaaSGatewayPolling(); }
     if(id !== 'gateway-monitor-tab') { if(typeof stopSaaSGatewayPolling === 'function') stopSaaSGatewayPolling(); }
     try{ history.replaceState(null,'','#'+id); }catch(e){}
+    // Save active tab to localStorage
+    try { localStorage.setItem('rs_active_tab', id); } catch(e){}
+  }
+
+  // Load saved active tab on startup
+  function loadSavedTab() {
+    try {
+      const savedTab = localStorage.getItem('rs_active_tab');
+      const hashTab = window.location.hash.slice(1);
+      const initialTab = hashTab || savedTab || 'pos-tab';
+      activateTab(initialTab);
+    } catch(e){
+      activateTab('pos-tab');
+    }
   }
   $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
 
@@ -559,14 +573,34 @@
     // Refresh POS Grid to update card badges
     try { renderPOS(); } catch (e) {}
 
-    // Auto-save active cart to localStorage
+    // Auto-save active cart to localStorage (per order type)
     try {
       const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
       const activeOrderType = activeOrderTypeBtn ? activeOrderTypeBtn.textContent.trim() : 'Takeaway';
+      // Helper function to get tab key (same as in initPOS)
+      const getTabKeyForOrderType = (orderTypeText) => {
+        const lowerText = orderTypeText.toLowerCase();
+        if (lowerText.includes('delivery')) return 'Delivery';
+        if (lowerText.includes('dine')) return 'Dine-in';
+        return 'Takeaway';
+      };
+      const tabKey = getTabKeyForOrderType(activeOrderType);
+      const da = document.getElementById('delivery-address');
+      const dc = document.getElementById('delivery-charge');
+      const dr = document.getElementById('delivery-rider');
+      // Save per-order-type cart
+      localStorage.setItem('rs_tab_cart_' + tabKey, JSON.stringify({
+        items: cart.map(c=>({...c})),
+        total: cart.reduce((a,c)=>a+c.price*c.qty,0),
+        deliveryAddress: da ? da.value : '',
+        deliveryCharge: dc ? dc.value : '',
+        deliveryRider: dr ? dr.value : ''
+      }));
+      // Also save to old key for backwards compatibility
       localStorage.setItem('rs_active_cart', JSON.stringify(cart));
       localStorage.setItem('rs_active_cart_discount', String(discountPct));
       localStorage.setItem('rs_active_cart_customer', JSON.stringify(getCustomer()));
-      localStorage.setItem('rs_active_order_type', activeOrderType);
+      localStorage.setItem('rs_active_order_type', activeOrderType.toLowerCase());
     } catch (e) {
       console.warn('[Cart Persistence Warning] Failed to persist active cart:', e);
     }
@@ -640,11 +674,66 @@
   }
   // POS init (static parts present in HTML, wire them)
   function initPOS(){
-    // Load saved cart, discount, and customer from localStorage
+    // Helper function to get tab key for an order type (fixed, not dependent on table number)
+    function getTabKeyForOrderType(orderTypeText) {
+      const lowerText = orderTypeText.toLowerCase();
+      if (lowerText.includes('delivery')) return 'Delivery';
+      if (lowerText.includes('dine')) return 'Dine-in';
+      return 'Takeaway';
+    }
+
+    // Load saved active order type and corresponding cart
     try {
-      const savedCart = localStorage.getItem('rs_active_cart');
-      if (savedCart) {
-        cart = JSON.parse(savedCart);
+      // Load saved active order type
+      let savedOrderType = localStorage.getItem('rs_active_order_type');
+      let activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+      
+      // If we have a saved order type, activate that button first
+      if (savedOrderType) {
+        const btns = document.querySelectorAll('.order-type-btn');
+        let matched = false;
+        btns.forEach(b => {
+          const match = b.textContent.trim().toLowerCase() === savedOrderType.toLowerCase();
+          b.classList.toggle('active', match);
+          if (match) {
+            activeOrderTypeBtn = b;
+            matched = true;
+          }
+        });
+        // Fallback: activate first button if no match
+        if (!matched && btns.length) {
+          btns[0].classList.add('active');
+          activeOrderTypeBtn = btns[0];
+        }
+      } else if (!activeOrderTypeBtn) {
+        // No active button and no saved type, activate first button
+        const btns = document.querySelectorAll('.order-type-btn');
+        if (btns.length) {
+          btns[0].classList.add('active');
+          activeOrderTypeBtn = btns[0];
+        }
+      }
+
+      // Now load the cart for the active order type
+      const activeOrderType = activeOrderTypeBtn ? activeOrderTypeBtn.textContent.trim() : 'Takeaway';
+      const initialTabKey = getTabKeyForOrderType(activeOrderType);
+      const savedTabCart = localStorage.getItem('rs_tab_cart_' + initialTabKey);
+      if (savedTabCart) {
+        const tabData = JSON.parse(savedTabCart);
+        cart = tabData.items || [];
+        // Also load delivery-specific fields if applicable
+        const da = document.getElementById('delivery-address');
+        const dc = document.getElementById('delivery-charge');
+        const dr = document.getElementById('delivery-rider');
+        if (da) da.value = tabData.deliveryAddress || '';
+        if (dc) dc.value = tabData.deliveryCharge || '';
+        if (dr) dr.value = tabData.deliveryRider || '';
+      } else {
+        // Fall back to the old active cart key if no tab-specific cart exists
+        const savedCart = localStorage.getItem('rs_active_cart');
+        if (savedCart) {
+          cart = JSON.parse(savedCart);
+        }
       }
       const savedDiscount = localStorage.getItem('rs_active_cart_discount');
       if (savedDiscount) {
@@ -678,7 +767,7 @@
         const curActiveBtn = document.querySelector('.order-type-btn.active');
         if (curActiveBtn && curActiveBtn !== b) {
           const outType = curActiveBtn.textContent.trim().toLowerCase();
-          const tabKey = outType.includes('delivery') ? 'Delivery' : outType.includes('dine') ? ('Dine_' + (document.getElementById('cart-table')?.value || 'table')) : 'Takeaway';
+          const tabKey = getTabKeyForOrderType(curActiveBtn.textContent.trim());
           const da = document.getElementById('delivery-address');
           const dc = document.getElementById('delivery-charge');
           const dr = document.getElementById('delivery-rider');
@@ -695,8 +784,43 @@
             name: nameEl ? nameEl.value.trim() : '',
             phone: phoneEl ? phoneEl.value.trim() : ''
           }));
+
+          // Now load the new tab's cart!
+          const newTabKey = getTabKeyForOrderType(b.textContent.trim());
+          // Save new active order type
+          localStorage.setItem('rs_active_order_type', b.textContent.trim().toLowerCase());
+          const savedNewTabCart = localStorage.getItem('rs_tab_cart_' + newTabKey);
+          if (savedNewTabCart) {
+            const newTabData = JSON.parse(savedNewTabCart);
+            cart = newTabData.items || [];
+            // Load delivery fields if applicable
+            if (da) da.value = newTabData.deliveryAddress || '';
+            if (dc) dc.value = newTabData.deliveryCharge || '';
+            if (dr) dr.value = newTabData.deliveryRider || '';
+          } else {
+            cart = []; // If no saved cart for new tab, start fresh!
+            // Clear delivery fields too
+            if (da) da.value = '';
+            if (dc) dc.value = '';
+            if (dr) dr.value = '';
+          }
+
+          // Load the new tab's customer data
+          const savedNewTabCust = localStorage.getItem('rs_tab_cust_' + newTabKey);
+          if (savedNewTabCust) {
+            const newCustData = JSON.parse(savedNewTabCust);
+            const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+            const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+            if (nameEl) nameEl.value = newCustData.name || '';
+            if (phoneEl) phoneEl.value = newCustData.phone || '';
+          }
+
+          // Re-render the cart!
+          renderCart();
         }
-      } catch(e) {}
+      } catch(e) {
+        console.error('[Order Type Switch Error]', e);
+      }
       $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
     }));
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
@@ -2523,9 +2647,13 @@
       
       if (tabToRestore) {
         activateTab(tabToRestore);
+      } else {
+        // Load saved active tab if no snapshot
+        loadSavedTab();
       }
     } catch (e) {
       console.warn('[Cart Restore Warning] Failed to restore active cart state:', e);
+      loadSavedTab();
     }
 
     const curTab=document.querySelector('.tab-content.active'); if(curTab && renderers[curTab.id]) { try{ renderers[curTab.id](); }catch(e){} }
