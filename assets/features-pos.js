@@ -836,74 +836,25 @@
     }
 
     /* ---------------- HOLD ORDERS / DRAFTS ---------------- */
-    // Separate held orders per order type
-    const heldOrders = {
-      takeaway: [],
-      dinein: [],
-      delivery: []
-    };
-
-    // Helper to get current order type key
-    function getCurrentOrderTypeKey() {
-      const activeBtn = document.querySelector('.order-type-btn.active');
-      const typeText = activeBtn ? activeBtn.textContent.trim().toLowerCase() : 'takeaway';
-      if (typeText.includes('dine')) return 'dinein';
-      if (typeText.includes('delivery')) return 'delivery';
-      return 'takeaway';
+    const held = [];
+    const holdBtn = document.getElementById('btn-hold');
+    const holdBtnM = document.getElementById('btn-m-hold');
+    function updateHeldCount(){
+      const el = document.getElementById('held-count');
+      if(el) el.textContent = held.length ? `(${held.length})` : '';
+      const elM = document.getElementById('held-count-m');
+      if(elM) elM.textContent = held.length ? `(${held.length})` : '';
+      if(holdBtnM) {
+        holdBtnM.style.display = held.length ? '' : 'none';
+      }
     }
-
-    // Helper to get order type key from text
-    function getOrderTypeKeyFromText(typeText) {
-      typeText = typeText.toLowerCase();
-      if (typeText.includes('dine')) return 'dinein';
-      if (typeText.includes('delivery')) return 'delivery';
-      return 'takeaway';
-    }
-
-    // Helper to get order type display name
-    function getOrderTypeDisplayName(key) {
-      const names = {
-        takeaway: 'Takeaway Active Holds',
-        dinein: 'Dine-in Active Holds',
-        delivery: 'Delivery Active Holds'
-      };
-      return names[key] || 'Held Orders';
-    }
-
-    // Update held counts for all order types
-    function updateHeldCount() {
-      // Update each type's count and blinking state
-      Object.keys(heldOrders).forEach(key => {
-        const count = heldOrders[key].length;
-        // Update desktop button badge
-        const countEl = document.getElementById(`held-count-${key}`);
-        if (countEl) countEl.textContent = count ? `(${count})` : '';
-        // Update mobile button badge
-        const countElM = document.getElementById(`held-count-${key}-m`);
-        if (countElM) countElM.textContent = count ? `(${count})` : '';
-        // Toggle blinking animation
-        const btn = document.getElementById(`btn-hold-${key}`);
-        if (btn) btn.classList.toggle('hold-btn-blinking', count > 0);
-        const btnM = document.getElementById(`btn-m-hold-${key}`);
-        if (btnM) btnM.classList.toggle('hold-btn-blinking', count > 0);
-      });
-
-      // Show/hide mobile hold buttons group
-      const hasAnyHeld = Object.values(heldOrders).some(arr => arr.length > 0);
-      const mobileHoldGroup = document.getElementById('pos-m-hold-buttons');
-      if (mobileHoldGroup) mobileHoldGroup.style.display = hasAnyHeld ? 'flex' : 'none';
-    }
-
-    // Load all held orders from DB and split by type
     async function loadHeldFromDB() {
       if (window.RS_DB) {
         try {
           const rows = await RS_DB.list('drafts');
-          // Reset all arrays
-          Object.keys(heldOrders).forEach(key => heldOrders[key].length = 0);
+          held.length = 0;
           rows.forEach(r => {
-            const orderTypeKey = r.orderType ? getOrderTypeKeyFromText(r.orderType) : getOrderTypeKeyFromText(r.draftName || 'Takeaway');
-            heldOrders[orderTypeKey].push({
+            held.push({
               id: Number(r.id),
               draftId: r.draftId || String(r.id),
               items: r.items || [],
@@ -913,8 +864,7 @@
               gst: r.customerGst || '',
               count: (r.items || []).reduce((sum, item) => sum + (item.qty || 1), 0),
               total: r.total || 0,
-              time: r.time || new Date().toLocaleTimeString('en-IN', {hour: 'numeric', minute: '2-digit', hour12: true}),
-              orderType: r.orderType || orderTypeKey
+              time: r.time || new Date().toLocaleTimeString('en-IN', {hour: 'numeric', minute: '2-digit', hour12: true})
             });
           });
           updateHeldCount();
@@ -927,11 +877,9 @@
     async function holdCurrent(){
       const totals = RS.getTotals();
       if(!totals.count) return RS.toast('Nothing to hold','fa-circle-exclamation');
-      
       const cust = RS.getCustomer();
       const id = Date.now();
       const draftId = 'D' + id;
-      const orderTypeKey = getCurrentOrderTypeKey();
       
       const newHeld = { 
         id: id, 
@@ -943,19 +891,13 @@
         gst: cust.gst, 
         count: totals.count, 
         total: totals.grand, 
-        time: new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}),
-        orderType: orderTypeKey
+        time: new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}) 
       };
       
-      heldOrders[orderTypeKey].push(newHeld);
+      held.push(newHeld);
       
       if (window.RS_DB) {
         try {
-          // Save delivery fields as well
-          const da = document.getElementById('delivery-address');
-          const dc = document.getElementById('delivery-charge');
-          const dr = document.getElementById('delivery-rider');
-          
           const dbRow = {
             id: id,
             draftId: draftId,
@@ -966,11 +908,7 @@
             items: RS.getCart(),
             subtotal: totals.sub,
             gst: totals.gst,
-            total: totals.grand,
-            orderType: orderTypeKey,
-            deliveryAddress: da ? da.value : '',
-            deliveryCharge: dc ? dc.value : '',
-            deliveryRider: dr ? dr.value : ''
+            total: totals.grand
           };
           await RS_DB.put('drafts', id, dbRow);
         } catch (e) {
@@ -979,55 +917,29 @@
       }
 
       RS.clearCart();
-      // Reset fields
-      const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'), cg=document.getElementById('cust-gst'); 
-      if(cn) cn.value=''; 
-      if(cp) cp.value=''; 
-      if(cg) cg.value='';
-      const ct = document.getElementById('cart-table'); 
-      if(ct) ct.value = 'Walk-in / Takeaway';
-      // Reset delivery fields
-      const da = document.getElementById('delivery-address');
-      const dc = document.getElementById('delivery-charge');
-      const dr = document.getElementById('delivery-rider');
-      if (da) da.value = '';
-      if (dc) dc.value = '';
-      if (dr) dr.value = '';
-      
+      const cn=document.getElementById('cust-name'), cp=document.getElementById('cust-phone'), cg=document.getElementById('cust-gst'); if(cn)cn.value=''; if(cp)cp.value=''; if(cg)cg.value='';
+      const ct = document.getElementById('cart-table'); if(ct) ct.value = 'Walk-in / Takeaway';
       updateHeldCount();
-      RS.toast('Order held · ' + heldOrders[orderTypeKey].length + ' parked','fa-pause');
-      // Update table grid to reflect occupied status
-      await renderPosTableGrid();
+      RS.toast('Order held · '+held.length+' parked','fa-pause');
     }
 
-    function openDrafts(orderTypeKey) {
-      if (!orderTypeKey) orderTypeKey = getCurrentOrderTypeKey();
-      const orders = heldOrders[orderTypeKey];
-      const displayName = getOrderTypeDisplayName(orderTypeKey);
-      
-      RSModal.open({ 
-        title: displayName, 
-        sub: orders.length + ' parked bills', 
-        icon: orderTypeKey === 'dinein' ? 'fa-utensils' : orderTypeKey === 'delivery' ? 'fa-motorcycle' : 'fa-bag-shopping', 
-        size: 'sm',
-        body: orders.length ? `<div style="display:flex;flex-direction:column;gap:10px">${orders.map(h=>`
-          <div class="tender-row" data-h="${h.id}" data-type="${orderTypeKey}" style="cursor:pointer">
+    function openDrafts(){
+      RSModal.open({ title:'Held orders', sub:held.length+' parked bills', icon:'fa-pause', size:'sm',
+        body: held.length ? `<div style="display:flex;flex-direction:column;gap:10px">${held.map(h=>`
+          <div class="tender-row" data-h="${h.id}" style="cursor:pointer">
             <div><div style="font-weight:700;font-size:14px">${h.table}${h.name?' · '+h.name:''}</div><div style="font-size:12px;color:var(--text-mute)">${h.count} items · held ${h.time}</div></div>
-            <div style="display:flex;align-items:center;gap:10px"><b>${rs(h.total)}</b><span class="tx" data-del="${h.id}" data-type="${orderTypeKey}" title="Discard"><i class="fa-solid fa-trash"></i></span></div>
+            <div style="display:flex;align-items:center;gap:10px"><b>${rs(h.total)}</b><span class="tx" data-del="${h.id}" title="Discard"><i class="fa-solid fa-trash"></i></span></div>
           </div>`).join('')}</div>`
-          : '<div class="sr-empty">No held orders for this type. Use Hold to park a bill and start another.</div>',
+          : '<div class="sr-empty">No held orders. Use Hold to park a bill and start another.</div>',
         onMount(modal, close){
-          modal.querySelectorAll('[data-h]').forEach(row=> row.addEventListener('click', async e=>{
+          modal.querySelectorAll('[data-h]').forEach(row=> row.addEventListener('click', e=>{
             if(e.target.closest('[data-del]')) return;
-            const id = +row.dataset.h; 
-            const type = row.dataset.type;
-            const idx = heldOrders[type].findIndex(x => x.id === id); 
-            if(idx < 0) return;
+            const id=+row.dataset.h; const idx=held.findIndex(x=>x.id===id); if(idx<0) return;
             
             // Clear current cart first
             RS.clearCart();
             
-            const selected = heldOrders[type][idx];
+            const selected = held[idx];
             RS.setCart(selected.items);
             
             // Restore customer details & table selection
@@ -1045,32 +957,20 @@
             if (csel) {
               csel.value = selected.phone || '';
             }
-            // Restore delivery fields
-            const da = document.getElementById('delivery-address');
-            const dc = document.getElementById('delivery-charge');
-            const dr = document.getElementById('delivery-rider');
-            if (da) da.value = selected.deliveryAddress || '';
-            if (dc) dc.value = selected.deliveryCharge || '';
-            if (dr) dr.value = selected.deliveryRider || '';
             
             // Delete from database
             if (window.RS_DB) {
               RS_DB.del('drafts', selected.id).catch(e => console.warn("Failed to delete draft from DB", e));
             }
             
-            heldOrders[type].splice(idx,1); 
-            updateHeldCount(); 
-            close(); 
-            RS.toast('Order resumed','fa-play');
-            await renderPosTableGrid();
+            held.splice(idx,1); updateHeldCount(); close(); RS.toast('Order resumed','fa-play');
           }));
           modal.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', async e=>{ 
             e.stopPropagation(); 
-            const id = +x.dataset.del; 
-            const type = x.dataset.type;
-            const idx = heldOrders[type].findIndex(h => h.id === id); 
-            if(idx >= 0){
-              const selected = heldOrders[type][idx];
+            const id=+x.dataset.del; 
+            const idx=held.findIndex(h=>h.id===id); 
+            if(idx>=0){
+              const selected = held[idx];
               if (window.RS_DB) {
                 try {
                   await RS_DB.del('drafts', selected.id);
@@ -1078,70 +978,21 @@
                   console.warn("Failed to delete draft from DB", err);
                 }
               }
-              heldOrders[type].splice(idx,1); 
+              held.splice(idx,1); 
               updateHeldCount();
-              x.closest('[data-h]').remove(); 
-              await renderPosTableGrid();
-              if(!heldOrders[type].length){ close(); } 
             } 
+            x.closest('[data-h]').remove(); 
+            if(!held.length){ close(); } 
           }));
         }});
     }
-
-    // Add click listeners to hold buttons (will add them to HTML next)
-    document.addEventListener('click', async (e) => {
-      const btnHoldTakeaway = document.getElementById('btn-hold-takeaway');
-      const btnHoldDinein = document.getElementById('btn-hold-dinein');
-      const btnHoldDelivery = document.getElementById('btn-hold-delivery');
-      const btnMHoldTakeaway = document.getElementById('btn-m-hold-takeaway');
-      const btnMHoldDinein = document.getElementById('btn-m-hold-dinein');
-      const btnMHoldDelivery = document.getElementById('btn-m-hold-delivery');
-
-      // Handle hold current order
-      if (e.target.closest('#btn-hold-takeaway')) {
-        if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('takeaway');
-        }
-      }
-      if (e.target.closest('#btn-hold-dinein')) {
-        if (getCurrentOrderTypeKey() === 'dinein' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('dinein');
-        }
-      }
-      if (e.target.closest('#btn-hold-delivery')) {
-        if (getCurrentOrderTypeKey() === 'delivery' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('delivery');
-        }
-      }
-
-      // Handle mobile hold buttons
-      if (e.target.closest('#btn-m-hold-takeaway')) openDrafts('takeaway');
-      if (e.target.closest('#btn-m-hold-dinein')) openDrafts('dinein');
-      if (e.target.closest('#btn-m-hold-delivery')) openDrafts('delivery');
-    });
-
-    // Add contextmenu listeners to hold buttons to always open drafts
-    document.addEventListener('contextmenu', (e) => {
-      if (e.target.closest('#btn-hold-takeaway')) {
-        e.preventDefault();
-        openDrafts('takeaway');
-      }
-      if (e.target.closest('#btn-hold-dinein')) {
-        e.preventDefault();
-        openDrafts('dinein');
-      }
-      if (e.target.closest('#btn-hold-delivery')) {
-        e.preventDefault();
-        openDrafts('delivery');
-      }
-    });
-
+    if(holdBtn){
+      holdBtn.addEventListener('click', ()=>{ if(RS.getCart().length) holdCurrent(); else openDrafts(); });
+      holdBtn.addEventListener('contextmenu', e=>{ e.preventDefault(); openDrafts(); });
+    }
+    if(holdBtnM){
+      holdBtnM.addEventListener('click', () => openDrafts());
+    }
     updateHeldCount();
     loadHeldFromDB();
     document.addEventListener('rs:hydrated', loadHeldFromDB);
@@ -1168,24 +1019,24 @@
     }
 
     // --- Custom Customer Search & Insights Widget ---
+    const nameInput = document.getElementById('cust-input-name');
+    const phoneInput = document.getElementById('cust-input-phone');
+    const sel = document.getElementById('cart-customer-sel');
+    const tableSelectInit = document.getElementById('cart-table');
+    let lastActiveTable = (tableSelectInit && tableSelectInit.value !== 'Walk-in / Takeaway' && !tableSelectInit.value.startsWith('Delivery')) ? tableSelectInit.value : '';
+
     function initCustomCustomerWidget() {
       const widgetContainer = document.getElementById('custom-customer-widget');
       const trigger = document.getElementById('cust-widget-trigger');
       const triggerText = document.getElementById('cust-trigger-text');
       const dropdown = document.getElementById('cust-widget-dropdown');
-      const nameInput = document.getElementById('cust-input-name');
-      const phoneInput = document.getElementById('cust-input-phone');
       const searchResults = document.getElementById('cust-search-results');
       const insightsPanel = document.getElementById('cust-insights-panel');
       const actionRow = document.getElementById('cust-action-row');
       const btnSaveNew = document.getElementById('btn-save-new-cust');
       const btnReset = document.getElementById('btn-reset-cust');
-      const sel = document.getElementById('cart-customer-sel');
       
       if (!widgetContainer || !sel) return;
-      
-      const tableSelectInit = document.getElementById('cart-table');
-      let lastActiveTable = (tableSelectInit && tableSelectInit.value !== 'Walk-in / Takeaway' && !tableSelectInit.value.startsWith('Delivery')) ? tableSelectInit.value : '';
       
       // Helper to calculate favorite item
       async function getFavoriteItem(c) {
@@ -1300,6 +1151,7 @@
       trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('show');
+        trigger.setAttribute('aria-expanded', !isOpen);
         if (isOpen) {
           dropdown.classList.remove('show');
           widgetContainer.classList.remove('active');
@@ -1307,6 +1159,13 @@
           dropdown.classList.add('show');
           widgetContainer.classList.add('active');
           syncWidgetWithHiddenSelect();
+        }
+      });
+      
+      trigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          trigger.click();
         }
       });
       
@@ -1459,6 +1318,7 @@
           syncWidgetWithHiddenSelect();
         }
       }, 500);
+    }
 
       // Delivery charges dynamic cart integration
       const deliveryAddress = document.getElementById('delivery-address');
@@ -1581,8 +1441,6 @@
             await window.RS_DB.del('drafts', existingDraft.id).catch(e => console.warn(e));
           }
         }
-        // Update table grid status
-        await renderPosTableGrid();
       }
 
       function syncDeliveryFieldsFromDraft(draft) {
@@ -1670,7 +1528,7 @@
             }
             
             return `
-              <div class="pos-table-card" data-table="${tableName}" data-state="${state}" style="border: 1px solid var(--stroke-2); padding: 16px 12px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: var(--glass); transition: var(--t); position: relative;">
+              <div class="pos-table-card" tabindex="0" role="button" aria-label="${tableName}, ${t.cap} seats, Status: ${label}${amt > 0 ? `, Current Bill: ₹${amt}` : ''}" data-table="${tableName}" data-state="${state}" style="border: 1px solid var(--stroke-2); padding: 16px 12px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: var(--glass); transition: var(--t); position: relative;">
                 <span style="position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: ${stateDot[state]};"></span>
                 <div style="font-weight: 700; font-size: 13.5px; color: var(--text);">Table ${t.n}</div>
                 <div style="font-size: 11px; color: var(--text-soft);"><i class="fa-solid fa-user-group" style="font-size: 9px;"></i> ${t.cap} seats</div>
@@ -1681,7 +1539,7 @@
           }).join('');
           
           container.querySelectorAll('.pos-table-card').forEach(card => {
-            card.onclick = async () => {
+            const selectAction = async () => {
               const tableName = card.dataset.table;
               const tableSelect = document.getElementById('cart-table');
               if (tableSelect) {
@@ -1696,6 +1554,14 @@
                 tableSelect.dispatchEvent(new Event('change'));
               } else {
                 await showMenuGridForTable(tableName);
+              }
+            };
+
+            card.onclick = selectAction;
+            card.onkeydown = async (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                await selectAction();
               }
             };
           });
@@ -2060,11 +1926,49 @@
       
       // On boot: initialise layout but don't wipe an already-restored cart
       syncCartLayoutWithOrderType(true);
+      
+      // Keyboard shortcuts for zero-cost cashier speedup
+      document.addEventListener('keydown', (e) => {
+        // F2: Focus Customer Search
+        if (e.key === 'F2') {
+          e.preventDefault();
+          const widgetTrigger = document.getElementById('cust-widget-trigger');
+          const dropdown = document.getElementById('cust-widget-dropdown');
+          const nameInput = document.getElementById('cust-input-name');
+          if (widgetTrigger && dropdown && nameInput) {
+            if (!dropdown.classList.contains('show')) {
+              widgetTrigger.click();
+            }
+            setTimeout(() => nameInput.focus(), 50);
+          }
+        }
+        // F4: Cycle Order Type Tab
+        else if (e.key === 'F4') {
+          e.preventDefault();
+          const btns = Array.from(document.querySelectorAll('.order-type-btn'));
+          if (btns.length > 0) {
+            const activeIdx = btns.findIndex(btn => btn.classList.contains('active'));
+            const nextIdx = (activeIdx + 1) % btns.length;
+            btns[nextIdx].click();
+          }
+        }
+        // Ctrl+S: KOT Print
+        else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          const kotBtn = document.getElementById('btn-kot');
+          if (kotBtn) kotBtn.click();
+        }
+        // Ctrl+Enter: Checkout / Settle
+        else if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          const checkoutBtn = document.getElementById('btn-checkout');
+          if (checkoutBtn) checkoutBtn.click();
+        }
+      });
+      
+      // Initialize the custom customer selector widget
+      initCustomCustomerWidget();
     }
-    
-    // Initialize the custom customer selector widget
-    initCustomCustomerWidget();
-  }
 
   if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });
 

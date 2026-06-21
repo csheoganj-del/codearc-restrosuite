@@ -6,6 +6,10 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -247,7 +251,7 @@
             <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative;">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
               <div class="custom-customer-widget" id="custom-customer-widget">
-                <div class="cust-widget-trigger" id="cust-widget-trigger">
+                <div class="cust-widget-trigger" id="cust-widget-trigger" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Customer Selector">
                   <i class="fa-solid fa-user-tag"></i>
                   <span id="cust-trigger-text">Walk-in</span>
                   <i class="fa-solid fa-chevron-down caret"></i>

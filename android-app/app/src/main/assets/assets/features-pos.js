@@ -1019,24 +1019,24 @@
     }
 
     // --- Custom Customer Search & Insights Widget ---
+    const nameInput = document.getElementById('cust-input-name');
+    const phoneInput = document.getElementById('cust-input-phone');
+    const sel = document.getElementById('cart-customer-sel');
+    const tableSelectInit = document.getElementById('cart-table');
+    let lastActiveTable = (tableSelectInit && tableSelectInit.value !== 'Walk-in / Takeaway' && !tableSelectInit.value.startsWith('Delivery')) ? tableSelectInit.value : '';
+
     function initCustomCustomerWidget() {
       const widgetContainer = document.getElementById('custom-customer-widget');
       const trigger = document.getElementById('cust-widget-trigger');
       const triggerText = document.getElementById('cust-trigger-text');
       const dropdown = document.getElementById('cust-widget-dropdown');
-      const nameInput = document.getElementById('cust-input-name');
-      const phoneInput = document.getElementById('cust-input-phone');
       const searchResults = document.getElementById('cust-search-results');
       const insightsPanel = document.getElementById('cust-insights-panel');
       const actionRow = document.getElementById('cust-action-row');
       const btnSaveNew = document.getElementById('btn-save-new-cust');
       const btnReset = document.getElementById('btn-reset-cust');
-      const sel = document.getElementById('cart-customer-sel');
       
       if (!widgetContainer || !sel) return;
-      
-      const tableSelectInit = document.getElementById('cart-table');
-      let lastActiveTable = (tableSelectInit && tableSelectInit.value !== 'Walk-in / Takeaway' && !tableSelectInit.value.startsWith('Delivery')) ? tableSelectInit.value : '';
       
       // Helper to calculate favorite item
       async function getFavoriteItem(c) {
@@ -1151,6 +1151,7 @@
       trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('show');
+        trigger.setAttribute('aria-expanded', !isOpen);
         if (isOpen) {
           dropdown.classList.remove('show');
           widgetContainer.classList.remove('active');
@@ -1158,6 +1159,13 @@
           dropdown.classList.add('show');
           widgetContainer.classList.add('active');
           syncWidgetWithHiddenSelect();
+        }
+      });
+      
+      trigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          trigger.click();
         }
       });
       
@@ -1310,6 +1318,7 @@
           syncWidgetWithHiddenSelect();
         }
       }, 500);
+    }
 
       // Delivery charges dynamic cart integration
       const deliveryAddress = document.getElementById('delivery-address');
@@ -1519,7 +1528,7 @@
             }
             
             return `
-              <div class="pos-table-card" data-table="${tableName}" data-state="${state}" style="border: 1px solid var(--stroke-2); padding: 16px 12px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: var(--glass); transition: var(--t); position: relative;">
+              <div class="pos-table-card" tabindex="0" role="button" aria-label="${tableName}, ${t.cap} seats, Status: ${label}${amt > 0 ? `, Current Bill: ₹${amt}` : ''}" data-table="${tableName}" data-state="${state}" style="border: 1px solid var(--stroke-2); padding: 16px 12px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: var(--glass); transition: var(--t); position: relative;">
                 <span style="position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: ${stateDot[state]};"></span>
                 <div style="font-weight: 700; font-size: 13.5px; color: var(--text);">Table ${t.n}</div>
                 <div style="font-size: 11px; color: var(--text-soft);"><i class="fa-solid fa-user-group" style="font-size: 9px;"></i> ${t.cap} seats</div>
@@ -1530,7 +1539,7 @@
           }).join('');
           
           container.querySelectorAll('.pos-table-card').forEach(card => {
-            card.onclick = async () => {
+            const selectAction = async () => {
               const tableName = card.dataset.table;
               const tableSelect = document.getElementById('cart-table');
               if (tableSelect) {
@@ -1545,6 +1554,14 @@
                 tableSelect.dispatchEvent(new Event('change'));
               } else {
                 await showMenuGridForTable(tableName);
+              }
+            };
+
+            card.onclick = selectAction;
+            card.onkeydown = async (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                await selectAction();
               }
             };
           });
@@ -1909,11 +1926,49 @@
       
       // On boot: initialise layout but don't wipe an already-restored cart
       syncCartLayoutWithOrderType(true);
+      
+      // Keyboard shortcuts for zero-cost cashier speedup
+      document.addEventListener('keydown', (e) => {
+        // F2: Focus Customer Search
+        if (e.key === 'F2') {
+          e.preventDefault();
+          const widgetTrigger = document.getElementById('cust-widget-trigger');
+          const dropdown = document.getElementById('cust-widget-dropdown');
+          const nameInput = document.getElementById('cust-input-name');
+          if (widgetTrigger && dropdown && nameInput) {
+            if (!dropdown.classList.contains('show')) {
+              widgetTrigger.click();
+            }
+            setTimeout(() => nameInput.focus(), 50);
+          }
+        }
+        // F4: Cycle Order Type Tab
+        else if (e.key === 'F4') {
+          e.preventDefault();
+          const btns = Array.from(document.querySelectorAll('.order-type-btn'));
+          if (btns.length > 0) {
+            const activeIdx = btns.findIndex(btn => btn.classList.contains('active'));
+            const nextIdx = (activeIdx + 1) % btns.length;
+            btns[nextIdx].click();
+          }
+        }
+        // Ctrl+S: KOT Print
+        else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          const kotBtn = document.getElementById('btn-kot');
+          if (kotBtn) kotBtn.click();
+        }
+        // Ctrl+Enter: Checkout / Settle
+        else if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          const checkoutBtn = document.getElementById('btn-checkout');
+          if (checkoutBtn) checkoutBtn.click();
+        }
+      });
+      
+      // Initialize the custom customer selector widget
+      initCustomCustomerWidget();
     }
-    
-    // Initialize the custom customer selector widget
-    initCustomCustomerWidget();
-  }
 
   if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });
 
