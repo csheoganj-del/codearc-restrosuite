@@ -977,6 +977,288 @@
     if (csel) {
       csel.addEventListener('focus', loadCustomersForPos);
     }
+
+    // --- Custom Customer Search & Insights Widget ---
+    function initCustomCustomerWidget() {
+      const widgetContainer = document.getElementById('custom-customer-widget');
+      const trigger = document.getElementById('cust-widget-trigger');
+      const triggerText = document.getElementById('cust-trigger-text');
+      const dropdown = document.getElementById('cust-widget-dropdown');
+      const nameInput = document.getElementById('cust-input-name');
+      const phoneInput = document.getElementById('cust-input-phone');
+      const searchResults = document.getElementById('cust-search-results');
+      const insightsPanel = document.getElementById('cust-insights-panel');
+      const actionRow = document.getElementById('cust-action-row');
+      const btnSaveNew = document.getElementById('btn-save-new-cust');
+      const btnReset = document.getElementById('btn-reset-cust');
+      const sel = document.getElementById('cart-customer-sel');
+      
+      if (!widgetContainer || !sel) return;
+      
+      // Helper to calculate favorite item
+      async function getFavoriteItem(c) {
+        try {
+          const bills = window.RS?.BILLS || [];
+          const custBills = bills.filter(b => b.customerPhone === c.phone || (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name));
+          if (!custBills.length) return 'None';
+          
+          const itemCounts = {};
+          custBills.forEach(b => {
+            if (Array.isArray(b._items)) {
+              b._items.forEach(item => {
+                const name = item.name;
+                const qty = Number(item.qty) || 1;
+                itemCounts[name] = (itemCounts[name] || 0) + qty;
+              });
+            }
+          });
+          
+          let favoriteItem = 'None';
+          let maxQty = 0;
+          for (const [name, qty] of Object.entries(itemCounts)) {
+            if (qty > maxQty) {
+              maxQty = qty;
+              favoriteItem = name;
+            }
+          }
+          return favoriteItem;
+        } catch(e) {
+          console.warn("Error getting favorite item", e);
+          return 'None';
+        }
+      }
+      
+      // Update temporary option for customer details if typing custom info without database matching
+      function updateTemporaryCustomer(name, phone) {
+        let tempOpt = sel.querySelector('option[data-temp="true"]');
+        if (!name && !phone) {
+          if (tempOpt) {
+            tempOpt.remove();
+            if (sel.value.startsWith('temp-') || sel.value === '') {
+              sel.value = '';
+            }
+          }
+          return;
+        }
+        if (!tempOpt) {
+          tempOpt = document.createElement('option');
+          tempOpt.setAttribute('data-temp', 'true');
+          sel.appendChild(tempOpt);
+        }
+        const tempVal = phone || 'temp-' + Date.now();
+        tempOpt.value = tempVal;
+        tempOpt.setAttribute('data-name', name || 'Guest');
+        tempOpt.setAttribute('data-gst', '');
+        tempOpt.innerText = `${name || 'Guest'} (${phone || 'No Phone'})`;
+        sel.value = tempVal;
+      }
+      
+      // Sync widget displays to current hidden select state
+      async function syncWidgetWithHiddenSelect() {
+        const currentPhone = sel.value;
+        
+        // Don't override inputs while user is typing a temporary customer
+        if (dropdown.classList.contains('show') && (nameInput === document.activeElement || phoneInput === document.activeElement)) {
+          return;
+        }
+        
+        if (!currentPhone) {
+          nameInput.value = '';
+          phoneInput.value = '';
+          triggerText.innerText = 'Walk-in';
+          insightsPanel.style.display = 'none';
+          actionRow.style.display = 'none';
+          return;
+        }
+        
+        const customers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
+        const c = customers.find(x => x.phone === currentPhone);
+        if (c) {
+          nameInput.value = c.name || '';
+          phoneInput.value = c.phone || '';
+          triggerText.innerText = c.name || c.phone;
+          
+          const visits = c.visits || 0;
+          const spend = c.spend || 0;
+          const favorite = await getFavoriteItem(c);
+          
+          document.getElementById('insight-visits').innerText = visits;
+          document.getElementById('insight-spend').innerText = '₹' + spend;
+          document.getElementById('insight-favorite').innerText = favorite;
+          insightsPanel.style.display = 'grid';
+          actionRow.style.display = 'none';
+        } else {
+          // Check if temp option exists
+          const opt = sel.options[sel.selectedIndex];
+          const name = opt ? (opt.getAttribute('data-name') || '') : '';
+          nameInput.value = name;
+          phoneInput.value = currentPhone.startsWith('temp-') ? '' : currentPhone;
+          triggerText.innerText = name || currentPhone;
+          insightsPanel.style.display = 'none';
+          
+          if (name && currentPhone && !currentPhone.startsWith('temp-')) {
+            actionRow.style.display = 'block';
+          } else {
+            actionRow.style.display = 'none';
+          }
+        }
+      }
+      
+      // Toggle dropdown
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('show');
+        if (isOpen) {
+          dropdown.classList.remove('show');
+          widgetContainer.classList.remove('active');
+        } else {
+          dropdown.classList.add('show');
+          widgetContainer.classList.add('active');
+          syncWidgetWithHiddenSelect();
+        }
+      });
+      
+      // Prevent closing when clicking inside the dropdown
+      dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      
+      // Close dropdown when clicking outside
+      document.addEventListener('click', () => {
+        dropdown.classList.remove('show');
+        widgetContainer.classList.remove('active');
+      });
+      
+      // Live search input handling
+      const handleInput = async () => {
+        const nameVal = nameInput.value.trim();
+        const phoneVal = phoneInput.value.trim();
+        
+        updateTemporaryCustomer(nameVal, phoneVal);
+        
+        if (!nameVal && !phoneVal) {
+          searchResults.style.display = 'none';
+          insightsPanel.style.display = 'none';
+          actionRow.style.display = 'none';
+          triggerText.innerText = 'Walk-in';
+          return;
+        }
+        
+        triggerText.innerText = nameVal || phoneVal;
+        
+        const allCustomers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
+        const matches = allCustomers.filter(c => {
+          const matchName = nameVal ? (c.name || '').toLowerCase().includes(nameVal.toLowerCase()) : true;
+          const matchPhone = phoneVal ? (c.phone || '').includes(phoneVal) : true;
+          return matchName && matchPhone;
+        });
+        
+        if (matches.length > 0) {
+          searchResults.innerHTML = matches.map(c => `
+            <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}">
+              <span class="res-name">${esc(c.name)}</span>
+              <span class="res-phone">${esc(c.phone)}</span>
+            </div>
+          `).join('');
+          searchResults.style.display = 'flex';
+          
+          searchResults.querySelectorAll('.search-result-item').forEach(item => {
+            item.onclick = async () => {
+              const selectedPhone = item.dataset.phone;
+              const selectedName = item.dataset.name;
+              
+              let opt = sel.querySelector(`option[value="${selectedPhone}"]`);
+              if (!opt) {
+                opt = document.createElement('option');
+                opt.value = selectedPhone;
+                opt.setAttribute('data-name', selectedName);
+                sel.appendChild(opt);
+              }
+              
+              // Remove temporary option if exists
+              const tempOpt = sel.querySelector('option[data-temp="true"]');
+              if (tempOpt) tempOpt.remove();
+              
+              sel.value = selectedPhone;
+              sel.dispatchEvent(new Event('change'));
+              
+              searchResults.style.display = 'none';
+              await syncWidgetWithHiddenSelect();
+            };
+          });
+        } else {
+          searchResults.style.display = 'none';
+          insightsPanel.style.display = 'none';
+        }
+        
+        const exactMatch = allCustomers.find(c => c.phone === phoneVal);
+        if (!exactMatch && nameVal && phoneVal && phoneVal.length >= 10) {
+          actionRow.style.display = 'block';
+        } else {
+          actionRow.style.display = 'none';
+        }
+      };
+      
+      nameInput.addEventListener('input', handleInput);
+      phoneInput.addEventListener('input', handleInput);
+      
+      // Save new customer action
+      btnSaveNew.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        const phone = phoneInput.value.trim();
+        if (!name || !phone) {
+          RS.toast('Name and phone are required', 'fa-circle-exclamation');
+          return;
+        }
+        if (window.RS_DB) {
+          try {
+            const newCust = {
+              id: 'cust-' + Date.now(),
+              name, phone, email: '',
+              visits: 1, spend: 0, last: new Date().toLocaleDateString('en-CA'), tier: 'silver'
+            };
+            await RS_DB.put('customers', newCust.id, newCust);
+            
+            // Reload standard customer select options
+            await loadCustomersForPos();
+            
+            // Sync selection to new customer
+            sel.value = phone;
+            sel.dispatchEvent(new Event('change'));
+            
+            RS.toast('Customer saved successfully', 'fa-circle-check');
+            actionRow.style.display = 'none';
+            await syncWidgetWithHiddenSelect();
+          } catch(e) {
+            console.warn("Failed saving customer", e);
+            RS.toast('Save failed: ' + e.message, 'fa-circle-exclamation');
+          }
+        }
+      });
+      
+      // Reset action
+      btnReset.addEventListener('click', () => {
+        sel.value = '';
+        const tempOpt = sel.querySelector('option[data-temp="true"]');
+        if (tempOpt) tempOpt.remove();
+        sel.dispatchEvent(new Event('change'));
+        dropdown.classList.remove('show');
+        widgetContainer.classList.remove('active');
+        syncWidgetWithHiddenSelect();
+      });
+      
+      // Background interval to watch for value modifications from outer scripts (like draft load)
+      let lastKnownSelValue = null;
+      setInterval(() => {
+        if (sel.value !== lastKnownSelValue) {
+          lastKnownSelValue = sel.value;
+          syncWidgetWithHiddenSelect();
+        }
+      }, 500);
+    }
+    
+    // Initialize the custom customer selector widget
+    initCustomCustomerWidget();
   }
 
   if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });
