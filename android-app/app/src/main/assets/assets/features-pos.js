@@ -1657,6 +1657,7 @@
           updateTableFieldForDelivery();
         }
       async function loadTableSelectOptions() {
+        const tableSelect = document.getElementById('cart-table');
         if (!tableSelect) return;
         const currentVal = tableSelect.value;
         const TABLES = await loadTablesList();
