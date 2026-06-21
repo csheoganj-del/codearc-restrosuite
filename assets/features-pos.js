@@ -996,6 +996,8 @@
       
       updateHeldCount();
       RS.toast('Order held · ' + heldOrders[orderTypeKey].length + ' parked','fa-pause');
+      // Update table grid to reflect occupied status
+      await renderPosTableGrid();
     }
 
     function openDrafts(orderTypeKey) {
@@ -1015,7 +1017,7 @@
           </div>`).join('')}</div>`
           : '<div class="sr-empty">No held orders for this type. Use Hold to park a bill and start another.</div>',
         onMount(modal, close){
-          modal.querySelectorAll('[data-h]').forEach(row=> row.addEventListener('click', e=>{
+          modal.querySelectorAll('[data-h]').forEach(row=> row.addEventListener('click', async e=>{
             if(e.target.closest('[data-del]')) return;
             const id = +row.dataset.h; 
             const type = row.dataset.type;
@@ -1060,6 +1062,7 @@
             updateHeldCount(); 
             close(); 
             RS.toast('Order resumed','fa-play');
+            await renderPosTableGrid();
           }));
           modal.querySelectorAll('[data-del]').forEach(x=> x.addEventListener('click', async e=>{ 
             e.stopPropagation(); 
@@ -1078,6 +1081,7 @@
               heldOrders[type].splice(idx,1); 
               updateHeldCount();
               x.closest('[data-h]').remove(); 
+              await renderPosTableGrid();
               if(!heldOrders[type].length){ close(); } 
             } 
           }));
@@ -1577,6 +1581,8 @@
             await window.RS_DB.del('drafts', existingDraft.id).catch(e => console.warn(e));
           }
         }
+        // Update table grid status
+        await renderPosTableGrid();
       }
 
       function syncDeliveryFieldsFromDraft(draft) {
