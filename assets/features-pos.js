@@ -995,6 +995,9 @@
       
       if (!widgetContainer || !sel) return;
       
+      const tableSelectInit = document.getElementById('cart-table');
+      let lastActiveTable = (tableSelectInit && tableSelectInit.value !== 'Walk-in / Takeaway' && !tableSelectInit.value.startsWith('Delivery')) ? tableSelectInit.value : '';
+      
       // Helper to calculate favorite item
       async function getFavoriteItem(c) {
         try {
@@ -1342,10 +1345,9 @@
       }
       
       // Save current table's cart to drafts
-      async function saveActiveTableDraft() {
+      async function saveActiveTableDraft(tableName) {
         const tableSelect = document.getElementById('cart-table');
-        if (!tableSelect) return;
-        const currentTable = tableSelect.value;
+        const currentTable = tableName || (tableSelect ? tableSelect.value : '');
         if (!currentTable || currentTable === 'Walk-in / Takeaway' || currentTable.startsWith('Delivery')) return;
         
         const cartItems = window.RS.getCart();
@@ -1359,8 +1361,8 @@
             id: id,
             draftId: existingDraft ? existingDraft.draftId : 'D' + Date.now(),
             draftName: currentTable,
-            customerName: nameInput.value.trim(),
-            customerPhone: phoneInput.value.trim(),
+            customerName: nameInput ? nameInput.value.trim() : '',
+            customerPhone: phoneInput ? phoneInput.value.trim() : '',
             customerGst: '',
             items: cartItems,
             subtotal: totals.sub,
@@ -1498,6 +1500,11 @@
         if (posCats) posCats.style.display = 'flex';
         if (posGrid) posGrid.style.display = 'grid';
         
+        if (lastActiveTable && lastActiveTable !== tableName) {
+          await saveActiveTableDraft(lastActiveTable);
+        }
+        lastActiveTable = tableName;
+        
         const banner = document.getElementById('pos-active-table-banner');
         const bannerText = document.getElementById('pos-banner-text');
         const bannerDot = document.getElementById('pos-banner-status-dot');
@@ -1552,7 +1559,8 @@
           if (isChangingTable) return;
           isChangingTable = true;
           try {
-            await saveActiveTableDraft();
+            await saveActiveTableDraft(lastActiveTable);
+            lastActiveTable = '';
             
             const tableSelect = document.getElementById('cart-table');
             if (tableSelect) {
@@ -1611,6 +1619,11 @@
         
         if (!tableSelContainer || !tableSelect || !deliveryDetails) return;
         
+        if (lastActiveTable) {
+          await saveActiveTableDraft(lastActiveTable);
+          lastActiveTable = '';
+        }
+        
         if (typeText.includes('dine')) {
           tableSelContainer.style.display = 'grid';
           tableSelContainer.style.gridTemplateColumns = '1fr 1fr';
@@ -1631,12 +1644,17 @@
             if (posGrid) posGrid.style.display = 'none';
             if (posTableView) posTableView.style.display = 'block';
             if (activeTableBanner) activeTableBanner.style.display = 'none';
+            window.RS.clearCart();
             await renderPosTableGrid();
           } else {
             await showMenuGridForTable(currentTableVal);
           }
           
         } else if (typeText.includes('delivery')) {
+          if (tableSelect.value !== 'Walk-in / Takeaway' && !tableSelect.value.startsWith('Delivery')) {
+            window.RS.clearCart();
+          }
+
           tableSelContainer.style.display = 'block';
           tableSelect.style.display = 'none';
           deliveryDetails.style.display = 'flex';
@@ -1649,6 +1667,10 @@
           updateDeliveryChargeInCart();
           updateTableFieldForDelivery();
         } else {
+          if (tableSelect.value !== 'Walk-in / Takeaway' && !tableSelect.value.startsWith('Delivery')) {
+            window.RS.clearCart();
+          }
+
           tableSelContainer.style.display = 'block';
           tableSelect.style.display = 'none';
           deliveryDetails.style.display = 'none';

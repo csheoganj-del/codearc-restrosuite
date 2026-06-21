@@ -15,7 +15,7 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>RestroSuite Console</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="assets/restrosuite.css?v=20260620-onboarding">
+<link rel="stylesheet" href="assets/restrosuite.css?v=v2.1.0-20260621">
 <script>
   window.onerror = function(msg, url, line, col, error) {
     var div = document.getElementById('debug-error-banner');
@@ -25,7 +25,7 @@
       div.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;z-index:999999;background:#ef4444;color:#fff;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);line-height:1.5;';
       document.documentElement.appendChild(div);
     }
-    div.innerHTML += '<div><b>Error:</b> ' + msg + ' at ' + url + ':' + line + ':' + col + '</div>';
+    div.innerHTML += '<div><b>JavaScript Error:</b> ' + msg + ' at <small>' + url + ':' + line + ':' + col + '</small></div>';
   };
   window.onunhandledrejection = function(event) {
     var div = document.getElementById('debug-error-banner');
@@ -37,7 +37,7 @@
     }
     div.innerHTML += '<div><b>Promise Rejection:</b> ' + (event.reason ? event.reason.message || event.reason : event) + '</div>';
   };
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || '20260620-onboarding';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v2.1.0-20260621';
   document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
 </script>
 <script>
