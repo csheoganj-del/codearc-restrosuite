@@ -636,6 +636,34 @@
   }
   // POS init (static parts present in HTML, wire them)
   function initPOS(){
+    // Load saved cart, discount, and customer from localStorage
+    try {
+      const savedCart = localStorage.getItem('rs_active_cart');
+      if (savedCart) {
+        cart = JSON.parse(savedCart);
+      }
+      const savedDiscount = localStorage.getItem('rs_active_cart_discount');
+      if (savedDiscount) {
+        discountPct = Number(savedDiscount) || 0;
+        const discInput = $('#disc-input');
+        if (discInput) discInput.value = discountPct;
+      }
+      const savedCustomer = localStorage.getItem('rs_active_cart_customer');
+      if (savedCustomer) {
+        const customer = JSON.parse(savedCustomer);
+        const cartTable = $('#cart-table');
+        if (cartTable && customer.table) cartTable.value = customer.table;
+        const custName = $('#cust-name');
+        if (custName && customer.name) custName.value = customer.name;
+        const custPhone = $('#cust-phone');
+        if (custPhone && customer.phone) custPhone.value = customer.phone;
+        const custGst = $('#cust-gst');
+        if (custGst && customer.gst) custGst.value = customer.gst;
+      }
+    } catch (e) {
+      console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
+    }
+
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{ activeCat=b.dataset.cat; $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b)); renderPOS(); }));
     $('#pos-search-input').addEventListener('input', renderPOS);
