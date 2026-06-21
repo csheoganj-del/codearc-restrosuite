@@ -119,7 +119,7 @@
 
   const UPDATES_HISTORY = [
     {
-      version: "v2.1.0-20260621",
+      version: "v22-20260621",
       date: "2026-06-21",
       title: "POS Active Cart Persistence & Stability",
       summary: "This update fixes POS active cart resetting on layout switches, resolves infinite loops when resetting tables, and bumps version naming for clarity.",
@@ -655,7 +655,7 @@
 
   function endTour() {
     try {
-      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v2.1.0-20260621';
+      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v22-20260621';
       if (steps === DUES_TOUR_STEPS) {
         localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, '1');
       } else {
@@ -676,7 +676,7 @@
   function openUpdateHistoryModal() {
     if (typeof window.RSModal === 'undefined') return;
     const justUpdated = sessionStorage.getItem('rs_update_applied_at');
-    const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v2.1.0-20260621';
+    const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v22-20260621';
 
     window.RSModal.open({
       title: justUpdated ? 'RestroSuite Updated Successfully!' : 'Update History & Releases',
@@ -854,7 +854,7 @@
           return;
         }
 
-        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v2.1.0-20260621';
+        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v22-20260621';
         const updateTourSeen = localStorage.getItem('restrosuite_update_tour_seen:' + currentVer);
         if (!updateTourSeen) {
           openUpdateHistoryModal();
