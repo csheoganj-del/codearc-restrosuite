@@ -311,153 +311,144 @@
               <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" style="margin-right:8px; padding: 4px 8px; font-size:12px; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> Back</button>
               <h3>Current Order</h3>
               <div style="display:flex; align-items:center; gap:6px;">
-                <span class="pill pill-orange" id="cart-count-pill" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
-                <button class="btn btn-icon" id="btn-clear-cart" title="Clear Cart" style="padding:4px; height:30px; width:30px; color:var(--text-soft);"><i class="fa-solid fa-trash-can"></i></button>
+                <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
+                <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <div class="cart-context" style="display: flex; flex-direction: column; gap: 8px; padding: 0 14px; margin-bottom: 8px;">
-              <div class="cart-context-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <select class="form-input cart-context-input" id="cart-table" style="height: 36px; font-size:13px;">
-                  <option>Walk-in / Takeaway</option>
-                  <option>Table 01</option>
-                  <option>Table 02</option>
-                  <option>Table 04</option>
-                  <option>Table 08</option>
-                </select>
-                <div class="custom-customer-widget" id="custom-customer-widget" style="flex: 1;">
-                  <div class="cust-widget-trigger" id="cust-widget-trigger" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Customer Selector" style="height: 36px; font-size:13px;">
-                    <i class="fa-solid fa-user-tag"></i>
-                    <span id="cust-trigger-text">Walk-in</span>
-                    <i class="fa-solid fa-chevron-down caret"></i>
+            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative;">
+              <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+              <div class="custom-customer-widget" id="custom-customer-widget">
+                <div class="cust-widget-trigger" id="cust-widget-trigger" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Customer Selector">
+                  <i class="fa-solid fa-user-tag"></i>
+                  <span id="cust-trigger-text">Walk-in</span>
+                  <i class="fa-solid fa-chevron-down caret"></i>
+                </div>
+                <div class="cust-widget-dropdown" id="cust-widget-dropdown">
+                  <div class="cust-fields-row">
+                    <div class="field-group">
+                      <label>Name</label>
+                      <input type="text" id="cust-input-name" placeholder="John Doe" autocomplete="off" class="form-input">
+                    </div>
+                    <div class="field-group">
+                      <label>Phone</label>
+                      <input type="text" id="cust-input-phone" placeholder="9876543210" autocomplete="off" class="form-input">
+                    </div>
                   </div>
-                  <div class="cust-widget-dropdown" id="cust-widget-dropdown">
-                    <div class="cust-fields-row">
-                      <div class="field-group">
-                        <label>Name</label>
-                        <input type="text" id="cust-input-name" placeholder="John Doe" autocomplete="off" class="form-input">
-                      </div>
-                      <div class="field-group">
-                        <label>Phone</label>
-                        <input type="text" id="cust-input-phone" placeholder="9876543210" autocomplete="off" class="form-input">
-                      </div>
+                  
+                  <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
+                  
+                  <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
+                    <div class="insight-item">
+                      <span class="insight-label">Visits</span>
+                      <span class="insight-val" id="insight-visits">0</span>
                     </div>
-                    <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
-                    <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
-                      <div class="insight-item">
-                        <span class="insight-label">Visits</span>
-                        <span class="insight-val" id="insight-visits">0</span>
-                      </div>
-                      <div class="insight-item">
-                        <span class="insight-label">Spent</span>
-                        <span class="insight-val" id="insight-spend">₹0</span>
-                      </div>
-                      <div class="insight-item" style="grid-column: span 2; border-top: 1px solid var(--stroke); padding-top: 4px; margin-top: 4px;">
-                        <span class="insight-label">Favorite</span>
-                        <span class="insight-val" id="insight-favorite">None</span>
-                      </div>
+                    <div class="insight-item">
+                      <span class="insight-label">Spent</span>
+                      <span class="insight-val" id="insight-spend">₹0</span>
                     </div>
-                    <div class="cust-action-row" id="cust-action-row" style="display: none; margin-top: 6px;">
-                      <button type="button" class="btn btn-sm btn-primary" id="btn-save-new-cust" style="width: 100%; justify-content: center; font-size:11px; padding: 6px 8px;">
-                        <i class="fa-solid fa-plus"></i> Add New Customer
-                      </button>
+                    <div class="insight-item" style="grid-column: span 2; border-top: 1px solid var(--stroke); padding-top: 4px; margin-top: 4px;">
+                      <span class="insight-label">Favorite</span>
+                      <span class="insight-val" id="insight-favorite">None</span>
                     </div>
-                    <div class="cust-reset-row" style="margin-top: 6px; border-top: 1px solid var(--stroke); padding-top: 6px;">
-                      <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-cust" style="width: 100%; justify-content: center; font-size:11px; color: var(--text-soft); padding: 6px 8px;">
-                        <i class="fa-solid fa-user-slash"></i> Reset to Walk-in
-                      </button>
-                    </div>
+                  </div>
+
+                  <div class="cust-action-row" id="cust-action-row" style="display: none; margin-top: 6px;">
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-save-new-cust" style="width: 100%; justify-content: center; font-size:11px; padding: 6px 8px;">
+                      <i class="fa-solid fa-plus"></i> Add New Customer
+                    </button>
+                  </div>
+                  
+                  <div class="cust-reset-row" style="margin-top: 6px; border-top: 1px solid var(--stroke); padding-top: 6px;">
+                    <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-cust" style="width: 100%; justify-content: center; font-size:11px; color: var(--text-soft); padding: 6px 8px;">
+                      <i class="fa-solid fa-user-slash"></i> Reset to Walk-in
+                    </button>
                   </div>
                 </div>
               </div>
               <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
             </div>
-            <div class="cart-delivery-details" id="cart-delivery-details" style="display: none; flex-direction: column; gap: 6px; margin: 0 14px 8px 14px; padding: 10px; background: var(--glass-2); border: 1px solid var(--stroke-2); border-radius: var(--r-sm);">
+            <!-- Delivery Details Row (hidden by default) -->
+            <div class="cart-delivery-details" id="cart-delivery-details" style="display: none; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px; background: var(--glass-2); border: 1px solid var(--stroke-2); border-radius: var(--r-sm);">
               <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-soft); letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                 <i class="fa-solid fa-truck-ramp-box"></i> Delivery Details
               </div>
-              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 6px;">
-                <input type="text" id="delivery-address" placeholder="Delivery Address" class="form-input" style="height: 32px; font-size: 12px; padding: 6px 8px;">
-                <input type="number" id="delivery-charge" placeholder="Charge" class="form-input" style="height: 32px; font-size: 12px; padding: 6px 8px;" min="0">
+              <div style="display: flex; gap: 6px;">
+                <input type="text" id="delivery-address" placeholder="Delivery Address" class="form-input" style="flex: 2; height: 32px; font-size: 12px; padding: 6px 8px;">
+                <input type="number" id="delivery-charge" placeholder="Charge" class="form-input" style="flex: 1; height: 32px; font-size: 12px; padding: 6px 8px;" min="0">
               </div>
-              <input type="text" id="delivery-rider" placeholder="Rider Name / Notes" class="form-input" style="height: 32px; font-size: 12px; padding: 6px 8px;">
+              <input type="text" id="delivery-rider" placeholder="Rider Name / Notes" class="form-input" style="width: 100%; height: 32px; font-size: 12px; padding: 6px 8px;">
             </div>
-            <div class="cart-items" id="cart-items" style="padding: 0 14px;"></div>
-            <div class="cart-foot" style="padding: 0 14px 14px 14px;">
-              <div class="totals" style="padding: 10px 0;">
+            <div class="cart-items" id="cart-items"></div>
+            <div class="cart-foot">
+              <div class="totals">
                 <div class="tr"><span>Subtotal</span><b id="t-sub">₹0</b></div>
                 <div class="tr grand"><span class="lbl">Total</span><span class="amt" id="t-grand">₹0</span></div>
               </div>
-              <details class="cart-section" open>
-                <summary class="cart-section-title" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding: 8px 0; font-size:13px; font-weight:700;">
-                  <span>Payment</span>
-                  <span id="pay-method-note" style="color:var(--text-soft);">Cash</span>
-                </summary>
-                <div class="cart-section-content">
-                  <div class="cpay-methods" id="cart-pay-methods" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;">
-                    <button type="button" class="active" data-pay-method="Cash" style="font-size:11px; padding:6px;">Cash</button>
-                    <button type="button" data-pay-method="UPI" style="font-size:11px; padding:6px;">UPI</button>
-                    <button type="button" data-pay-method="Card" style="font-size:11px; padding:6px;">Card</button>
-                    <button type="button" data-pay-method="Due" style="font-size:11px; padding:6px;">Due</button>
-                    <button type="button" data-pay-method="Split" style="font-size:11px; padding:6px;">Split</button>
-                  </div>
-                  <div id="split-calc-inline" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); flex-direction: column; gap: 6px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
-                        <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Cash (₹)</span>
-                        <input type="number" id="split-cash" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
-                      </div>
-                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
-                        <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">UPI (₹)</span>
-                        <input type="number" id="split-upi" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
-                      </div>
-                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
-                        <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Card (₹)</span>
-                        <input type="number" id="split-card" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
-                      </div>
-                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
-                        <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Due (₹)</span>
-                        <input type="number" id="split-due" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
-                      </div>
+              <div class="cart-payment" id="cart-payment">
+                <div class="cpay-head"><span>Payment</span><span id="pay-method-note">Cash</span></div>
+                <div class="cpay-methods" id="cart-pay-methods">
+                  <button type="button" class="active" data-pay-method="Cash">Cash</button>
+                  <button type="button" data-pay-method="UPI">UPI</button>
+                  <button type="button" data-pay-method="Card">Card</button>
+                  <button type="button" data-pay-method="Due">Due</button>
+                  <button type="button" data-pay-method="Split">Split</button>
+                </div>
+                <!-- Inline Split Payment Calculator -->
+                <div id="split-calc-inline" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); flex-direction: column; gap: 6px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Cash (₹)</span>
+                      <input type="number" id="split-cash" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; font-size: 10px;">
-                      <span id="split-status-text" style="font-weight: 700; color: var(--text-soft);">Remaining: ₹0</span>
-                      <strong id="split-total-text" style="font-weight: 800; color: var(--orange);">Paid: ₹0</strong>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">UPI (₹)</span>
+                      <input type="number" id="split-upi" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Card (₹)</span>
+                      <input type="number" id="split-card" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--glass-2); border: 1px solid var(--stroke-2); padding: 4px 6px; border-radius: 4px;">
+                      <span style="font-size: 10px; font-weight: 700; color: var(--text-soft);">Due (₹)</span>
+                      <input type="number" id="split-due" class="form-input" style="width: 55px; height: 22px; padding: 2px 4px; font-size: 11px; font-weight: 700; text-align: right; margin: 0; border-radius: 3px;">
                     </div>
                   </div>
-                  <div id="cash-calc-inline" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); flex-direction: column; gap: 8px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                      <span style="font-size: 11px; font-weight: 700; color: var(--text-soft);">Received (₹)</span>
-                      <input type="number" id="inline-cash-received" class="form-input" style="width: 100px; height: 26px; padding: 2px 6px; font-size: 12px; font-weight: 700; text-align: right; margin: 0;">
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="exact" style="font-size: 10px; font-weight: 700; padding: 4px 0; border: 1px solid var(--orange); color: var(--orange); border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">Exact</button>
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="10" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹10</button>
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="20" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹20</button>
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="50" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹50</button>
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="100" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹100</button>
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="200" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹200</button>
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="500" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹500</button>
-                      <button type="button" class="btn btn-ghost inline-den-btn" data-val="2000" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹2000</button>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(37,211,102,0.06); border: 1px solid rgba(37,211,102,0.15); border-radius: 6px; padding: 4px 8px;">
-                      <span style="font-size: 11px; font-weight: 700; color: var(--text-soft);">Change Due:</span>
-                      <strong id="inline-cash-change" style="font-size: 14px; font-weight: 800; color: #25d366;">₹0</strong>
-                    </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; font-size: 10px;">
+                    <span id="split-status-text" style="font-weight: 700; color: var(--text-soft);">Remaining: ₹0</span>
+                    <strong id="split-total-text" style="font-weight: 800; color: var(--orange);">Paid: ₹0</strong>
                   </div>
                 </div>
-              </details>
-              <details class="cart-section">
-                <summary class="cart-section-title" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding: 8px 0; font-size:13px; font-weight:700;">
-                  <span>Actions</span>
-                </summary>
-                <div class="cart-section-content">
-                  <div class="cart-actions" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
-                    <button class="btn btn-ghost" id="btn-hold" style="font-size:12px; padding:8px;"><i class="fa-solid fa-pause"></i> Hold <span id="held-count"></span></button>
-                    <button class="btn btn-ghost" id="btn-kot" style="font-size:12px; padding:8px;"><i class="fa-solid fa-fire"></i> Send KOT</button>
-                    <button class="btn btn-primary" id="btn-checkout" style="grid-column:1 / -1; font-size:13px; padding:10px;"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
+                <!-- Inline Cash Calculator -->
+                <div id="cash-calc-inline" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); flex-direction: column; gap: 8px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--text-soft);">Received (₹)</span>
+                    <input type="number" id="inline-cash-received" class="form-input" style="width: 100px; height: 26px; padding: 2px 6px; font-size: 12px; font-weight: 700; text-align: right; margin: 0;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="exact" style="font-size: 10px; font-weight: 700; padding: 4px 0; border: 1px solid var(--orange); color: var(--orange); border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">Exact</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="10" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹10</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="20" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹20</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="50" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹50</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="100" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹100</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="200" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹200</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="500" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹500</button>
+                    <button type="button" class="btn btn-ghost inline-den-btn" data-val="2000" style="font-size: 10px; padding: 4px 0; border-radius: 4px; height: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center;">₹2000</button>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(37,211,102,0.06); border: 1px solid rgba(37,211,102,0.15); border-radius: 6px; padding: 4px 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--text-soft);">Change Due:</span>
+                    <strong id="inline-cash-change" style="font-size: 14px; font-weight: 800; color: #25d366;">₹0</strong>
                   </div>
                 </div>
-              </details>
+              </div>
+              <div class="cart-actions">
+                <div class="hold-buttons-group">
+                  <button class="hold-btn hold-btn-takeaway" id="btn-hold-takeaway"><i class="fa-solid fa-bag-shopping"></i> Hold <span id="held-count-takeaway"></span></button>
+                  <button class="hold-btn hold-btn-dinein" id="btn-hold-dinein"><i class="fa-solid fa-utensils"></i> Hold <span id="held-count-dinein"></span></button>
+                  <button class="hold-btn hold-btn-delivery" id="btn-hold-delivery"><i class="fa-solid fa-motorcycle"></i> Hold <span id="held-count-delivery"></span></button>
+                </div>
+                <button class="btn btn-ghost" id="btn-kot"><i class="fa-solid fa-fire"></i> Send KOT</button>
+                <button class="btn btn-primary" id="btn-checkout" style="grid-column:1 / -1"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
+              </div>
             </div>
           </aside>
         </div>
