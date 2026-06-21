@@ -162,7 +162,7 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || '20260620-onboarding';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v2.1.0-20260621';
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 
