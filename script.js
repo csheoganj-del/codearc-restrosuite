@@ -853,6 +853,17 @@ window.addEventListener('DOMContentLoaded', () => {
   // 5. CUSTOMER QR SELF-ORDER ENGINE & BROADCAST SYNC
   // ==========================================================
   let custCart = [];
+  // Load saved customer cart from localStorage
+  try {
+    const savedCustCart = localStorage.getItem('cust_self_cart');
+    if (savedCustCart) {
+      custCart = JSON.parse(savedCustCart);
+      // Update the floating badge to reflect the saved cart
+      updateCustomerFloatingBadge();
+    }
+  } catch (e) {
+    console.warn('[Customer Cart Persistence Warning] Failed to load saved cart:', e);
+  }
   // Scope the BroadcastChannel per-tenant so orders never leak between restaurants
   const _tenantChannelKey = (window.__tenantSlug || 'shared') + '_qr_orders';
   const broadcastChannel = new BroadcastChannel(_tenantChannelKey);
@@ -1077,6 +1088,14 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function saveCustomerCart() {
+    try {
+      localStorage.setItem('cust_self_cart', JSON.stringify(custCart));
+    } catch (e) {
+      console.warn('[Customer Cart Persistence Warning] Failed to save cart:', e);
+    }
+  }
+
   function updateCustomerFloatingBadge() {
     const totalQty = custCart.reduce((sum, item) => sum + item.qty, 0);
     const subtotal = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -1088,6 +1107,8 @@ window.addEventListener('DOMContentLoaded', () => {
     } else {
       if (floatCartBtn) floatCartBtn.classList.remove('active');
     }
+    // Save cart whenever badge is updated (which is after any cart change)
+    saveCustomerCart();
   }
 
   function updateCustomerCartQty(name, delta) {
@@ -1280,6 +1301,13 @@ window.addEventListener('DOMContentLoaded', () => {
     const tableVal = custOrderTable.value;
     const subtotal = custCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const gst = Math.round(subtotal * 0.1525);
+    
+    // Clear saved cart since order is placed
+    try {
+      localStorage.removeItem('cust_self_cart');
+    } catch (e) {
+      console.warn('[Customer Cart Persistence Warning] Failed to clear saved cart:', e);
+    }
 
     const randomIdSuffix = crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
     const generatedOrderId = `DO-QR-${Date.now().toString(36).toUpperCase()}-${randomIdSuffix}`;
