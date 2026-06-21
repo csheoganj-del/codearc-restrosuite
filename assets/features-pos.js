@@ -1398,16 +1398,30 @@
         }
       }
 
+      // Helper to load tables list from settings dynamically
+      async function loadTablesList() {
+        const DEFAULT_TABLES = [
+          {n:'01',cap:2}, {n:'02',cap:4}, {n:'03',cap:4}, {n:'04',cap:2},
+          {n:'05',cap:6}, {n:'06',cap:4}, {n:'07',cap:2}, {n:'08',cap:8},
+          {n:'09',cap:4}, {n:'10',cap:2}, {n:'11',cap:4}, {n:'12',cap:6}
+        ];
+        try {
+          const settings = window.RS_DB ? await window.RS_DB.getSettings().catch(() => null) : null;
+          if (settings && Array.isArray(settings.custom_tables)) {
+            return settings.custom_tables;
+          }
+        } catch(e) {
+          console.warn("Failed to load custom tables from settings", e);
+        }
+        return DEFAULT_TABLES;
+      }
+
       // Render the seating grid in the POS main tab
       async function renderPosTableGrid() {
         const container = document.getElementById('pos-tables-grid');
         if (!container) return;
         
-        const TABLES = [
-          {n:'01',cap:2}, {n:'02',cap:4}, {n:'03',cap:4}, {n:'04',cap:2},
-          {n:'05',cap:6}, {n:'06',cap:4}, {n:'07',cap:2}, {n:'08',cap:8},
-          {n:'09',cap:4}, {n:'10',cap:2}, {n:'11',cap:4}, {n:'12',cap:6}
-        ];
+        const TABLES = await loadTablesList();
         
         const stateDot = {free:'var(--green)', occupied:'var(--orange)', billed:'var(--violet-soft)'};
         const stateTxt = {free:'Available', occupied:'Dining', billed:'Bill printed'};
@@ -1642,8 +1656,36 @@
           }
           updateTableFieldForDelivery();
         }
+      async function loadTableSelectOptions() {
+        if (!tableSelect) return;
+        const currentVal = tableSelect.value;
+        const TABLES = await loadTablesList();
+        
+        tableSelect.innerHTML = '<option value="Walk-in / Takeaway">Walk-in / Takeaway</option>' + 
+          TABLES.map(t => {
+            const label = `Table ${t.name || t.n}`;
+            const isSelected = currentVal === label || currentVal === (t.name || t.n);
+            return `<option value="${label}" ${isSelected ? 'selected' : ''}>${label}</option>`;
+          }).join('');
+        
+        if (currentVal) {
+          if ([...tableSelect.options].some(o => o.value === currentVal)) {
+            tableSelect.value = currentVal;
+          } else if ([...tableSelect.options].some(o => o.value === `Table ${currentVal}`)) {
+            tableSelect.value = `Table ${currentVal}`;
+          }
+        }
       }
+      loadTableSelectOptions();
       
+      document.addEventListener('rs:tables-updated', async () => {
+        await loadTableSelectOptions();
+        const activeBtn = document.querySelector('.order-type-btn.active');
+        if (activeBtn && activeBtn.textContent.trim().toLowerCase().includes('dine')) {
+          await renderPosTableGrid();
+        }
+      });
+
       document.querySelectorAll('.order-type-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           setTimeout(syncCartLayoutWithOrderType, 50);

@@ -9,14 +9,25 @@
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
     /* ===================== FLOOR & TABLES ===================== */
-    const TABLES = [
-      {n:'01',cap:2,state:'free'},{n:'02',cap:4,state:'free'},
-      {n:'03',cap:4,state:'free'},{n:'04',cap:2,state:'free'},
-      {n:'05',cap:6,state:'free'},{n:'06',cap:4,state:'free'},
-      {n:'07',cap:2,state:'free'},{n:'08',cap:8,state:'free'},
-      {n:'09',cap:4,state:'free'},{n:'10',cap:2,state:'free'},
-      {n:'11',cap:4,state:'free'},{n:'12',cap:6,state:'free'}
+    const DEFAULT_TABLES = [
+      {n:'01',cap:2}, {n:'02',cap:4}, {n:'03',cap:4}, {n:'04',cap:2},
+      {n:'05',cap:6}, {n:'06',cap:4}, {n:'07',cap:2}, {n:'08',cap:8},
+      {n:'09',cap:4}, {n:'10',cap:2}, {n:'11',cap:4}, {n:'12',cap:6}
     ];
+    let TABLES = [];
+
+    async function loadTablesList() {
+      try {
+        const settings = window.RS_DB ? await window.RS_DB.getSettings().catch(() => null) : null;
+        if (settings && Array.isArray(settings.custom_tables)) {
+          return settings.custom_tables.map(t => ({ ...t, state: t.state || 'free' }));
+        }
+      } catch(e) {
+        console.warn("Failed to load custom tables from settings", e);
+      }
+      return DEFAULT_TABLES.map(t => ({ ...t, state: 'free' }));
+    }
+
     const stateDot = {free:'var(--green)',occupied:'var(--orange)',billed:'var(--violet-soft)'};
     const stateTxt = {free:'Available',occupied:'Dining',billed:'Bill printed'};
     function parseLocalTimestamp(dateStr) {
@@ -46,19 +57,22 @@
       return `${hrs}h ${mins % 60}m`;
     }
 
-    function renderFloor(){
+    async function renderFloor(){
       const sec = $('#floor-tab');
       if(!sec) return;
+      
+      TABLES = await loadTablesList();
+      
       if (window.RS_DB) {
         sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
         RS_DB.list('pending_orders').then(rows => {
           TABLES.forEach(t => {
             const activeOrder = rows.find(r => 
-              (r.tableNumber === `Table ${t.n}` || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}`) &&
-              (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review')
+              (r.tableNumber === `Table ${t.n}` || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}` || r.tableNumber === t.name) &&
+              (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'Billed')
             );
             if (activeOrder) {
-              t.state = 'occupied';
+              t.state = activeOrder.status === 'Billed' ? 'billed' : 'occupied';
               t.amt = activeOrder.total || 0;
               t.since = activeOrder.dateTime ? getElapsedDesc(activeOrder.dateTime) : 'just now';
               t.orderId = activeOrder.orderId;
@@ -94,7 +108,7 @@
           <span class="lg"><span class="sw" style="background:var(--green)"></span> Available</span>
           <span class="lg"><span class="sw" style="background:var(--orange)"></span> Dining</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill"><i class="fa-solid fa-location-dot"></i> Ground floor</span></div>
+        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill"><i class="fa-solid fa-location-dot"></i> Ground floor</span></div>
         <div class="floor-grid">${TABLES.map(t=>`
           <div class="table-card ${t.state}" data-n="${t.n}">
             <span class="tdot" style="background:${stateDot[t.state]}"></span>
@@ -105,6 +119,113 @@
       $$('.table-card', sec).forEach(c=> c.onclick=()=> tableModal(TABLES.find(t=>t.n===c.dataset.n)));
       const btnPrint = $('#btn-print-floor-qrs', sec);
       if (btnPrint) btnPrint.onclick = () => showAllTableQRs();
+      const btnManage = $('#btn-manage-seating', sec);
+      if (btnManage) btnManage.onclick = () => openManageSeatingModal();
+    }
+
+    function openManageSeatingModal() {
+      const modalBody = `
+        <div style="display:flex; flex-direction:column; gap:10px; max-height:380px; overflow-y:auto; padding:4px;" id="seating-manage-list">
+          ${TABLES.map((t, idx) => `
+            <div class="seating-manage-row" style="display:flex; align-items:center; gap:8px; background:var(--glass); border:1px solid var(--stroke-2); padding:8px; border-radius:var(--r-sm);">
+              <div style="flex:2; display:flex; flex-direction:column; gap:2px;">
+                <label style="font-size:10px; font-weight:700; color:var(--text-soft)">Table Name/No</label>
+                <input type="text" class="form-input table-manage-name" value="${t.name || t.n}" style="height:32px; font-size:12px; padding:4px 8px;">
+              </div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+                <label style="font-size:10px; font-weight:700; color:var(--text-soft)">Seats</label>
+                <input type="number" class="form-input table-manage-cap" value="${t.cap}" style="height:32px; font-size:12px; padding:4px 8px;" min="1">
+              </div>
+              <button class="btn btn-ghost btn-sm btn-delete-table" style="color:var(--red); padding:4px 8px; margin-top:16px; border:1px solid rgba(239, 68, 68, 0.25);" title="Delete Table">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      
+      const modalFoot = `
+        <button class="btn btn-ghost" id="btn-add-manage-table"><i class="fa-solid fa-plus"></i> Add Table</button>
+        <button class="btn btn-primary" id="btn-save-seating" style="margin-left:auto;"><i class="fa-solid fa-check"></i> Save Layout</button>
+      `;
+      
+      RSModal.open({
+        title: 'Manage Seating Layout',
+        sub: 'Add, edit or remove dine-in tables',
+        icon: 'fa-chair',
+        size: 'sm',
+        body: modalBody,
+        foot: modalFoot,
+        onMount(modal, close) {
+          const list = modal.querySelector('#seating-manage-list');
+          
+          list.addEventListener('click', e => {
+            const btn = e.target.closest('.btn-delete-table');
+            if (btn) {
+              btn.closest('.seating-manage-row').remove();
+            }
+          });
+          
+          modal.querySelector('#btn-add-manage-table').onclick = () => {
+            const count = list.children.length + 1;
+            const newRowHtml = `
+              <div class="seating-manage-row" style="display:flex; align-items:center; gap:8px; background:var(--glass); border:1px solid var(--stroke-2); padding:8px; border-radius:var(--r-sm);">
+                <div style="flex:2; display:flex; flex-direction:column; gap:2px;">
+                  <label style="font-size:10px; font-weight:700; color:var(--text-soft)">Table Name/No</label>
+                  <input type="text" class="form-input table-manage-name" value="${count < 10 ? '0' + count : count}" style="height:32px; font-size:12px; padding:4px 8px;">
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+                  <label style="font-size:10px; font-weight:700; color:var(--text-soft)">Seats</label>
+                  <input type="number" class="form-input table-manage-cap" value="4" style="height:32px; font-size:12px; padding:4px 8px;" min="1">
+                </div>
+                <button class="btn btn-ghost btn-sm btn-delete-table" style="color:var(--red); padding:4px 8px; margin-top:16px; border:1px solid rgba(239, 68, 68, 0.25);" title="Delete Table">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            `;
+            list.insertAdjacentHTML('beforeend', newRowHtml);
+            list.scrollTop = list.scrollHeight;
+          };
+          
+          modal.querySelector('#btn-save-seating').onclick = async () => {
+            const rows = list.querySelectorAll('.seating-manage-row');
+            const newTables = [];
+            rows.forEach(row => {
+              const nameInput = row.querySelector('.table-manage-name');
+              const capInput = row.querySelector('.table-manage-cap');
+              if (nameInput && capInput) {
+                const name = nameInput.value.trim();
+                const cap = Number(capInput.value) || 4;
+                if (name) {
+                  newTables.push({
+                    n: name,
+                    name: name,
+                    cap: cap,
+                    state: 'free'
+                  });
+                }
+              }
+            });
+            
+            if (window.RS_DB) {
+              try {
+                const settings = await window.RS_DB.getSettings().catch(() => ({})) || {};
+                settings.custom_tables = newTables;
+                await window.RS_DB.setSettings(settings);
+                
+                RS.toast('Seating layout updated', 'fa-circle-check');
+                close();
+                
+                renderFloor();
+                document.dispatchEvent(new Event('rs:tables-updated'));
+              } catch(e) {
+                console.warn("Failed saving seating settings", e);
+                RS.toast('Save failed', 'fa-circle-exclamation');
+              }
+            }
+          };
+        }
+      });
     }
 
     function tableModal(t){
