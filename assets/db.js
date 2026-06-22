@@ -19,6 +19,41 @@
    ============================================================ */
 (function(){
   'use strict';
+  /* --- Scope localStorage per Tenant to Prevent Cross-Tenant Data Leaks --- */
+  (function scopeLocalStorage() {
+    const originalGet = localStorage.getItem;
+    const originalSet = localStorage.setItem;
+    const originalRemove = localStorage.removeItem;
+
+    function getTenantId() {
+      try {
+        const sLocal = JSON.parse(originalGet.call(localStorage, 'rs:session') || 'null');
+        if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
+        if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
+      } catch(e) {}
+      return 'local-demo';
+    }
+
+    function scopeKey(key) {
+      const prefixes = ['rs_v2:', 'rs_active_cart', 'rs_active_order_type', 'rs_tab_cart_', 'rs_tab_cust_', 'rs_pre_update_'];
+      if (prefixes.some(p => key.startsWith(p))) {
+        const tenant = getTenantId();
+        return `rs:${tenant}:${key}`;
+      }
+      return key;
+    }
+
+    localStorage.getItem = function(key) {
+      return originalGet.call(localStorage, scopeKey(key));
+    };
+    localStorage.setItem = function(key, val) {
+      return originalSet.call(localStorage, scopeKey(key), val);
+    };
+    localStorage.removeItem = function(key) {
+      return originalRemove.call(localStorage, scopeKey(key));
+    };
+  })();
+
   const API = window.RS_API;
   const cloudConfigured = !!(API && API.configured);
   function signedIn(){ return cloudConfigured && !!API.session(); }
@@ -232,8 +267,8 @@
       LS.write(c, LS.read(c).filter(x=>String(x.id)!==String(cleanId)));
       return true;
     },
-    async getSettings(){ try{ return JSON.parse(localStorage.getItem('rs_v2:settings'))||null; }catch(e){ return null; } },
-    async setSettings(o){ try{ localStorage.setItem('rs_v2:settings', JSON.stringify(o)); }catch(e){} return o; }
+    async getSettings(){ try{ return JSON.parse(localStorage.getItem(LS.key('settings')))||null; }catch(e){ return null; } },
+    async setSettings(o){ try{ localStorage.setItem(LS.key('settings'), JSON.stringify(o)); }catch(e){} return o; }
   };
 
   /* ---------------- CLOUD (tenant-data) ---------------- */
@@ -428,6 +463,22 @@
       for (const k in lastListFetchTime) delete lastListFetchTime[k];
       cachedSettingsMap = {};
       cachedSettings = null;
+
+      try {
+        const tenant = getActiveTenantId();
+        localStorage.removeItem('rs_active_cart');
+        localStorage.removeItem('rs_active_cart_discount');
+        localStorage.removeItem('rs_active_cart_customer');
+        localStorage.removeItem('rs_active_order_type');
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const rawKey = localStorage.key(i);
+          if (rawKey && rawKey.startsWith(`rs:${tenant}:rs_tab_`)) {
+            keysToRemove.push(rawKey);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch(e) {}
 
       localStorage.removeItem('rs:session');
       return true;

@@ -1001,6 +1001,7 @@
       const takeawayPhone = document.getElementById('takeaway-cust-phone');
       const custNameInput = document.getElementById('cust-input-name');
       const custPhoneInput = document.getElementById('cust-input-phone');
+      const cartTable = document.getElementById('cart-table');
 
       if (widgetContainer) {
         widgetContainer.style.display = isTakeaway ? 'none' : 'block';
@@ -1010,6 +1011,9 @@
       }
       if (triggerText) {
         triggerText.innerText = isTakeaway ? 'Customer' : 'Walk-in';
+      }
+      if (cartTable) {
+        cartTable.style.display = isTakeaway ? 'none' : 'block';
       }
       
       // Sync fields if needed
