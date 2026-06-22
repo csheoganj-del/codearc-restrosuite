@@ -1970,6 +1970,8 @@ body.rs-drawer-dragging {
   transition: border-color .2s;
   overflow: hidden;
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 .phone-combo:focus-within { border-color: var(--orange); }
 .phone-combo .phone-flag-btn {
