@@ -164,7 +164,8 @@
       profile:`<div class="set-section form-grid-2">${field('Restaurant name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
         <div class="set-section">${field('Address','','Outlet address')}</div>
         <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
-        <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>`,
+        <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
+        <div class="set-section form-grid-2">${field('Country','India','Outlet country')}${sel('Currency',['INR (₹)','EUR (€)','USD ($)','GBP (£)','AED (AED)','SAR (SAR)','SGD ($)','AUD ($)','CAD ($)','NZD ($)','ZAR (R)'],'INR (₹)')}</div>`,
       tax:`<div class="set-section form-grid-2">${sel('Default GST slab',['5%','12%','18%'],'5%')}${field('Invoice prefix','INV-')}</div>
         ${toggle('Service charge','Add 5% service charge on dine-in',false)}
         ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
@@ -241,7 +242,7 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check')); };
+      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); try{ if (window.renderPOS) renderPOS(); } catch(e){} }); };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }

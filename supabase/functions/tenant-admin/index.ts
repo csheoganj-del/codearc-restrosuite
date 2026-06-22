@@ -450,7 +450,7 @@ async function seedTenantData(payload: Record<string, unknown>, req: Request) {
   // 1. Check if tenant exists
   const { data: tenant, error: tenantError } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name")
+    .select("id, name, phone, country")
     .eq("id", tenantId)
     .maybeSingle();
 
@@ -468,18 +468,35 @@ async function seedTenantData(payload: Record<string, unknown>, req: Request) {
     }
   }
 
+  const isIreland = tenant.country === "Ireland";
+  const defaultAddress = isIreland ? "Dublin, Ireland" : "12, Commercial Road, Nagpur";
+  const defaultPhone = tenant.phone || (isIreland ? "353871234567" : "919983721179");
+  const defaultGstNumber = isIreland ? "" : "27AAAAA1111A1Z1";
+  const defaultUpiId = isIreland ? "" : "doppio@upi";
+
+  const defaultUiSettings = {
+    set_country: tenant.country || (isIreland ? "Ireland" : "India"),
+    set_currency: isIreland ? "EUR (€)" : "INR (₹)"
+  };
+
+  const featureFlags = {
+    seeding_disabled: true,
+    demo_loaded: true,
+    ui_settings: defaultUiSettings
+  };
+
   // 3. Seed doppio_business_profile
   await supabaseAdmin.from("doppio_business_profile").insert({
     tenant_id: tenantId,
     business_name: tenant.name,
-    address: "12, Commercial Road, Nagpur",
-    phone: "919983721179",
-    gst_number: "27AAAAA1111A1Z1",
-    upi_id: "doppio@upi",
+    address: defaultAddress,
+    phone: defaultPhone,
+    gst_number: defaultGstNumber,
+    upi_id: defaultUpiId,
     shift_enabled: true,
     whatsapp_enabled: false,
     table_count: 12,
-    feature_flags: JSON.stringify({ seeding_disabled: true, demo_loaded: true })
+    feature_flags: JSON.stringify(featureFlags)
   });
 
   // 4. Seed doppio_menu

@@ -335,6 +335,40 @@
               <input type="text" id="reg-address" class="form-input" placeholder="Shop no., street, city, PIN" autocomplete="street-address" required>
             </div>
           </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="reg-country">Business Country</label>
+              <select id="reg-country" class="form-input no-icon">
+                <option value="Ireland">Ireland</option>
+                <option value="India" selected>India</option>
+                <option value="United States">United States</option>
+                <option value="United Kingdom">United Kingdom</option>
+                <option value="United Arab Emirates">United Arab Emirates</option>
+                <option value="Saudi Arabia">Saudi Arabia</option>
+                <option value="Singapore">Singapore</option>
+                <option value="Australia">Australia</option>
+                <option value="Canada">Canada</option>
+                <option value="New Zealand">New Zealand</option>
+                <option value="South Africa">South Africa</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="reg-currency">Currency</label>
+              <select id="reg-currency" class="form-input no-icon">
+                <option value="EUR (€)">EUR (€)</option>
+                <option value="INR (₹)" selected>INR (₹)</option>
+                <option value="USD ($)">USD ($)</option>
+                <option value="GBP (£)">GBP (£)</option>
+                <option value="AED (AED)">AED (AED)</option>
+                <option value="SAR (SAR)">SAR (SAR)</option>
+                <option value="SGD ($)">SGD ($)</option>
+                <option value="AUD ($)">AUD ($)</option>
+                <option value="CAD ($)">CAD ($)</option>
+                <option value="NZD ($)">NZD ($)</option>
+                <option value="ZAR (R)">ZAR (R)</option>
+              </select>
+            </div>
+          </div>
           <div class="form-group full">
             <label>Choose your plan</label>
             <div class="plan-pick" id="plan-pick">
@@ -694,6 +728,39 @@
       });
       ccSel.innerHTML = '';
       ccSel.appendChild(fragment);
+
+      ccSel.addEventListener('change', (e) => {
+        const code = e.target.value;
+        const countrySel = document.getElementById('reg-country');
+        const currencySel = document.getElementById('reg-currency');
+        if (!countrySel || !currencySel) return;
+        
+        if (code === '353') {
+          countrySel.value = 'Ireland';
+          currencySel.value = 'EUR (€)';
+        } else if (code === '91') {
+          countrySel.value = 'India';
+          currencySel.value = 'INR (₹)';
+        } else if (code === '44') {
+          countrySel.value = 'United Kingdom';
+          currencySel.value = 'GBP (£)';
+        } else if (code === '971') {
+          countrySel.value = 'United Arab Emirates';
+          currencySel.value = 'AED (AED)';
+        } else if (code === '966') {
+          countrySel.value = 'Saudi Arabia';
+          currencySel.value = 'SAR (SAR)';
+        } else if (code === '65') {
+          countrySel.value = 'Singapore';
+          currencySel.value = 'SGD ($)';
+        } else if (code === '61') {
+          countrySel.value = 'Australia';
+          currencySel.value = 'AUD ($)';
+        } else if (code === '1') {
+          countrySel.value = 'United States';
+          currencySel.value = 'USD ($)';
+        }
+      });
     }
   })();
 
@@ -824,6 +891,7 @@
     const phone = ccVal + phoneVal;
     const payload={ name:document.getElementById('reg-name').value.trim(), slug:slug.value.trim(),
                     outlet_type:document.getElementById('reg-type').value, plan_code:document.getElementById('reg-plan').value,
+                    country:document.getElementById('reg-country').value,
                     email, phone, username:email, password:pass };
     try{
       if(window.RS_API && RS_API.configured){
@@ -832,6 +900,16 @@
         // Registration creates a PENDING outlet — it must be approved before login. Send them to the sign-in tab, prefilled.
         setTimeout(()=>{ tabLogin.click(); const t=document.getElementById('tenant-id'); if(t)t.value=payload.slug; const un=document.getElementById('username'); if(un)un.value=email; }, 2200);
       } else {
+        const tenantId = payload.slug;
+        const activeKey = 'rs_v2:' + tenantId + ':settings';
+        const localSettings = {
+          set_restaurant_name: payload.name,
+          set_outlet_name: payload.name,
+          set_country: document.getElementById('reg-country').value,
+          set_currency: document.getElementById('reg-currency').value
+        };
+        try { localStorage.setItem(activeKey, JSON.stringify(localSettings)); } catch(e) {}
+
         showOk('Outlet created! Redirecting to your new console…');
         setTimeout(()=>location.href='dashboard.html',900);
       }

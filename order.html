@@ -507,7 +507,10 @@
       if (cachedData.tenantName) {
         applyLogoBranding(cachedData.tenantName);
       }
+      window.currencySymbol = cachedData.currencySymbol || '₹';
       buildUI();
+    } else {
+      window.currencySymbol = '₹';
     }
 
     if(sc){
@@ -524,9 +527,12 @@
 
         var menuChanged = JSON.stringify(items) !== JSON.stringify(newItems);
         var nameChanged = res.tenantName && res.tenantName !== 'Doppio Cafe' && (!cachedData || cachedData.tenantName !== res.tenantName);
+        var currencySymbol = res.currencySymbol || '₹';
+        var currencyChanged = window.currencySymbol !== currencySymbol;
 
-        if (menuChanged || nameChanged || !cachedData) {
+        if (menuChanged || nameChanged || currencyChanged || !cachedData) {
           items = newItems;
+          window.currencySymbol = currencySymbol;
           if(res.tenantName && res.tenantName !== 'Doppio Cafe'){
             applyLogoBranding(res.tenantName);
           }
@@ -534,7 +540,8 @@
           try {
             localStorage.setItem(cacheKey, JSON.stringify({
               menu: items,
-              tenantName: res.tenantName || restName
+              tenantName: res.tenantName || restName,
+              currencySymbol: currencySymbol
             }));
           } catch(e) {}
 
@@ -615,7 +622,7 @@
           '<div class="card-name">'+item.name+'</div>'+
           (item.description ? '<div class="card-desc">'+item.description+'</div>' : '')+
           '<div class="card-footer">'+
-            '<span class="card-price">&#8377;'+item.price+'</span>'+
+            '<span class="card-price">'+(window.currencySymbol || '₹')+item.price+'</span>'+
             (qty>0
               ? '<div class="qty-row" onclick="event.stopPropagation()">'+
                   '<button class="q-btn" onclick="chQty(\''+sn+'\',-1)">&#8722;</button>'+
@@ -653,7 +660,7 @@
     if(tq>0){
       btn.classList.add('show');
       document.getElementById('float-lbl').textContent = tq+' item'+(tq>1?'s':'');
-      document.getElementById('float-tot').textContent = '\u20B9'+tt;
+      document.getElementById('float-tot').textContent = (window.currencySymbol || '₹')+tt;
     } else {
       btn.classList.remove('show');
     }
@@ -688,23 +695,23 @@
       return '<div class="cart-row">'+
         '<div class="cart-info">'+
           '<div class="cart-name">'+item.name+'</div>'+
-          '<div class="cart-unit">&#8377;'+item.price+' each</div>'+
+          '<div class="cart-unit">'+(window.currencySymbol || '₹')+item.price+' each</div>'+
         '</div>'+
         '<div class="cart-ctrl">'+
           '<button class="cc-btn" onclick="chQty(\''+sn+'\',-1)">&#8722;</button>'+
           '<span class="cc-qty">'+item.qty+'</span>'+
           '<button class="cc-btn p" onclick="chQty(\''+sn+'\',1)">+</button>'+
         '</div>'+
-        '<div class="cart-total">&#8377;'+(item.price*item.qty)+'</div>'+
+        '<div class="cart-total">'+(window.currencySymbol || '₹')+(item.price*item.qty)+'</div>'+
       '</div>';
     }).join('');
   }
   function calcSummary(){
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);
-    document.getElementById('s-sub').textContent = '\u20B9'+(sub-gst);
-    document.getElementById('s-gst').textContent = '\u20B9'+gst;
-    document.getElementById('s-tot').textContent = '\u20B9'+sub;
+    document.getElementById('s-sub').textContent = (window.currencySymbol || '₹')+(sub-gst);
+    document.getElementById('s-gst').textContent = (window.currencySymbol || '₹')+gst;
+    document.getElementById('s-tot').textContent = (window.currencySymbol || '₹')+sub;
   }
 
   window.placeOrder = function(){
@@ -742,9 +749,9 @@
     var pd = tNum && parseInt(tNum)<10 ? '0'+tNum : tNum;
     document.getElementById('r-table').textContent = tNum ? 'Table '+pd : 'Takeaway';
     document.getElementById('r-id').textContent = 'Order ID: '+order.orderId;
-    document.getElementById('r-total').textContent = '\u20B9'+order.total;
+    document.getElementById('r-total').textContent = (window.currencySymbol || '₹')+order.total;
     document.getElementById('r-items').innerHTML = order.items.map(function(i){
-      return '<div class="r-item"><span>'+i.name+' x'+i.qty+'</span><span>\u20B9'+(i.price*i.qty)+'</span></div>';
+      return '<div class="r-item"><span>'+i.name+' x'+i.qty+'</span><span>'+(window.currencySymbol || '₹')+(i.price*i.qty)+'</span></div>';
     }).join('');
     document.getElementById('success').classList.add('on');
     confetti();

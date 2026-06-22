@@ -414,6 +414,7 @@
             </div>
             <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative;">
               <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+              <!-- Custom Customer Widget (for Dine-in/Delivery) -->
               <div class="custom-customer-widget" id="custom-customer-widget">
                 <div class="cust-widget-trigger" id="cust-widget-trigger" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Customer Selector">
                   <i class="fa-solid fa-user-tag"></i>
@@ -460,6 +461,17 @@
                       <i class="fa-solid fa-user-slash"></i> Reset to Walk-in
                     </button>
                   </div>
+                </div>
+              </div>
+              <!-- Direct Fields for Takeaway -->
+              <div class="takeaway-customer-fields" id="takeaway-customer-fields" style="display: none; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div class="field-group" style="margin: 0;">
+                  <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-bottom: 4px;">Name</label>
+                  <input type="text" id="takeaway-cust-name" placeholder="John Doe" autocomplete="off" class="form-input" style="height: 34px; font-size: 12px;">
+                </div>
+                <div class="field-group" style="margin: 0;">
+                  <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-bottom: 4px;">Phone</label>
+                  <input type="text" id="takeaway-cust-phone" placeholder="9876543210" autocomplete="off" class="form-input" style="height: 34px; font-size: 12px;">
                 </div>
               </div>
               <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>

@@ -139,16 +139,34 @@ serve(async (req) => {
 
       const { data: profileData } = await supabaseAdmin
         .from("doppio_business_profile")
-        .select("name, address, phone, upi_vpa")
+        .select("name, address, phone, upi_vpa, feature_flags")
         .eq("tenant_id", tenant.id)
         .maybeSingle();
+
+      let currencySymbol = "₹";
+      let featureFlags = {};
+      if (profileData?.feature_flags) {
+        try {
+          featureFlags = typeof profileData.feature_flags === "string"
+            ? JSON.parse(profileData.feature_flags)
+            : profileData.feature_flags;
+          const uiSettings = (featureFlags as Record<string, any>).ui_settings || {};
+          const currencyVal = uiSettings.set_currency || "INR (₹)";
+          const match = currencyVal.match(/\(([^)]+)\)/);
+          if (match) currencySymbol = match[1];
+        } catch (e) {
+          console.warn("Failed to parse feature flags for currency:", e);
+        }
+      }
 
       return jsonResponse({
         menu: data || [],
         tenantName: profileData?.name || tenant.name || "Doppio Cafe",
         tenantAddress: profileData?.address || "",
         tenantPhone: profileData?.phone || "",
-        upiVpa: profileData?.upi_vpa || ""
+        upiVpa: profileData?.upi_vpa || "",
+        currencySymbol,
+        feature_flags: featureFlags
       }, 200, req);
     }
 

@@ -130,3 +130,30 @@ We have successfully resolved the layout overflow on laptop screens, the order t
    - Synchronized all updated files to Android assets folder (`android-app/app/src/main/assets/`) via `powershell -File .\sync-assets.ps1`.
 
 
+# Walkthrough - Dynamic Currency, Country, and Address Support (June 22, 2026)
+
+We have successfully implemented dynamic currency, country, and regional address support across the RestroSuite platform (onboarding/registration, settings, database, POS dashboard, and customer public portals):
+
+1. **Onboarding & Registration (`login.html`)**:
+   - Added dropdowns for **Business Country** and **Currency** to Step 1 of the Outlet Registration Form.
+   - Implemented an automatic listener on the WhatsApp number prefix: typing or selecting Ireland prefix (`+353`) automatically selects Ireland as the Country and Euro (`€`) as the Currency.
+
+2. **Seeding & Provisioning (`tenant-admin/index.ts` edge function)**:
+   - Updated the backend seeding flow so that when an Irish outlet is provisioned, the database automatically initializes with local defaults (Dublin address, Euros currency, blank GSTIN/UPI details).
+
+3. **Public API & Features (`tenant-public/index.ts` edge function)**:
+   - Modified `list_menu` to retrieve the tenant's `feature_flags` from the database.
+   - Dynamically parse the selected currency string (e.g. `EUR (€)`) and return `currencySymbol` as a root field in the API JSON response.
+
+4. **Outlet Settings Dashboard (`features-shell.js` & `dashboard.js`)**:
+   - Added Country and Currency profile fields to the settings panel. Saving updates the database profile instantly and updates the cached symbol.
+   - Refactored `window.RS.rs(n)` to dynamically format amounts using the correct locale format and active currency symbol.
+   - Refactored `features-pos.js` to scan and replace hardcoded static label elements with the dynamic symbol on dashboard load.
+
+5. **Customer-Facing Menu & Bills (`order.html` & `qr-order.html`)**:
+   - Integrated the dynamic `currencySymbol` returned from the menu endpoint into all cart subtotals, item price cards, and printing summaries.
+   - In `qr-order.html`, conditionally display the UPI QR Code/UTR submission forms **only** when the currency is set to Indian Rupee (`₹`). For other regional currencies, render a clean, professional "Pay at Counter" summary instruction.
+
+6. **Validation**:
+   - Ran `npm test` to verify complete test suite passes without regressions.
+   - Synchronized web files to Android app assets.
