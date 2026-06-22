@@ -6,7 +6,19 @@
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s);
-    const CATS = ['Starters','Mains','Breads','Beverages','Desserts'];
+    const getEditorCats = () => {
+      const menu = RS.MENU || [];
+      const fromMenu = [...new Set(menu.map(m => (m.cat || '').trim()).filter(Boolean))];
+      const defaults = ['Starters','Mains','Breads','Beverages','Desserts'];
+      const merged = [...new Set([...fromMenu, ...defaults])].sort((a, b) => {
+        const order = ['Starters','Mains','Breads','Beverages','Desserts'];
+        const ia = order.indexOf(a), ib = order.indexOf(b);
+        if (ia !== -1 && ib !== -1) return ia - ib;
+        if (ia !== -1) return -1; if (ib !== -1) return 1;
+        return a.localeCompare(b);
+      });
+      return merged;
+    };
     const GST = ['5%','12%','18%'];
     let editingId = null;
 
@@ -32,7 +44,9 @@
           <div><label class="fl">Item name</label><input class="form-input" id="ed-name" placeholder="e.g. Paneer Tikka"></div>
           <div class="form-grid-2">
             <div><label class="fl">Price (₹)</label><input class="form-input" id="ed-price" type="number" min="0" placeholder="199"></div>
-            <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
+            <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select></div>
+          </div>
+          <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups…"></div>
           </div>
           <div class="form-grid-2">
             <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
@@ -68,13 +82,24 @@
             q.addEventListener('input',draw); draw(); q.focus();
           }});
       }
+      // Wire "new category" reveal
+      const edCatSel = $('#ed-cat');
+      const edNewCatRow = $('#ed-new-cat-row');
+      if (edCatSel && edNewCatRow) {
+        edCatSel.addEventListener('change', () => {
+          edNewCatRow.style.display = edCatSel.value === '__new__' ? 'block' : 'none';
+        });
+      }
       $('#ed-reset').onclick = resetForm;
       $('#ed-save').onclick = async ()=>{
         const name = $('#ed-name').value.trim();
         const price = +$('#ed-price').value;
         if(!name) return RS.toast('Enter an item name','fa-circle-exclamation');
         if(!price||price<=0) return RS.toast('Enter a valid price','fa-circle-exclamation');
-        const data = { name, price, cat:$('#ed-cat').value, veg:$('#ed-type').value==='veg', gst:$('#ed-gst').value, ingredients:draftIngs.slice() };
+        const catSel = $('#ed-cat'); const newCatInput = $('#ed-new-cat');
+        let cat = catSel ? catSel.value : 'Starters';
+        if (cat === '__new__') { cat = (newCatInput ? newCatInput.value.trim() : '') || 'Other'; }
+        const data = { name, price, cat, veg:$('#ed-type').value==='veg', gst:$('#ed-gst').value, ingredients:draftIngs.slice() };
         if(editingId){
           const m=RS.MENU.find(x=>String(x.id)===String(editingId));
           Object.assign(m,data);
@@ -94,7 +119,7 @@
           }
           RS.toast('“'+name+'” added to menu','fa-circle-plus');
         }
-        resetForm(); renderList(); try{ RS.renderPOS(); }catch(e){}
+        resetForm(); renderList(); try{ RS.renderPOS(); if(window.refreshPosCats) window.refreshPosCats(); }catch(e){}
       };
       // expose for edit
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
