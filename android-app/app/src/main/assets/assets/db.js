@@ -464,6 +464,22 @@
       cachedSettingsMap = {};
       cachedSettings = null;
 
+      try {
+        const tenant = getActiveTenantId();
+        localStorage.removeItem('rs_active_cart');
+        localStorage.removeItem('rs_active_cart_discount');
+        localStorage.removeItem('rs_active_cart_customer');
+        localStorage.removeItem('rs_active_order_type');
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const rawKey = localStorage.key(i);
+          if (rawKey && rawKey.startsWith(`rs:${tenant}:rs_tab_`)) {
+            keysToRemove.push(rawKey);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch(e) {}
+
       localStorage.removeItem('rs:session');
       return true;
     },
