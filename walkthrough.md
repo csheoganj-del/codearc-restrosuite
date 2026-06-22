@@ -90,3 +90,43 @@ All changes are optimized, styled to match the RestroSuite design system, and sy
 
 ## Code Synchronization
 * Ran `sync-assets.ps1` to fully copy all modified files, directories, and configuration settings to the Android app assets folder (`android-app/app/src/main/assets/`).
+
+---
+
+# Walkthrough - POS Tab-Switching Lag Fix & Payment Methods Fix (June 22, 2026)
+
+We have successfully resolved:
+1. **POS Tab Switching Lag/Freezing**: When switching between Takeaway, Dine-in, and Delivery tabs, the interface no longer stutters or freezes. We implemented a local-cache-first reading system in `assets/db.js` where `list()` calls return data immediately from fast local storage, while launching non-blocking Supabase Edge Function synchronizations in the background with rate-limiting and deduplication.
+2. **Draft Mapping / Seating Status occupied indicator**: Added `draftName` mapping to the `from()` mapper of drafts database collection inside `assets/db.js`. This resolves the mismatch where drafts were ignored and seating tables failed to update to occupied (orange) status.
+3. **Cash & Split Buttons Integration**: Checked and verified event listener attachments, corrected received cash calculations, and fixed headless testing dialog blocks. The compact calculators, coins quick denomination modal, and split modal work flawlessly.
+4. **Automated Verification**: Created and successfully ran an automated Puppeteer test suite (`test-compact-sidebar-flow.js`) that simulates cart additions, toggles sidebar payment selectors, opens quick cash and split calculators, validates changes, and settles checkout. All tests pass with 100% success.
+
+---
+
+# Walkthrough - POS Layout Overflow, Mobile View Order Type, & Category Auto-Centering Scroll Fixes (June 22, 2026)
+
+We have successfully resolved the layout overflow on laptop screens, the order type selection access issue in mobile view, and implemented category auto-centering scrolling:
+1. **Resolved POS Toolbar Overflow**:
+   - On desktop/laptop screens, the order type switcher (`#pos-menu-order-types`) in the menu toolbar is now hidden. It is replaced by a duplicate, beautifully-designed switcher (`#pos-cart-order-types`) placed directly at the top of the **Cart Sidebar**.
+   - This frees up 350px+ of horizontal space in the menu toolbar. The remaining controls (Search, Sort Select, Size Slider) now fit perfectly on all laptop and medium desktop screens without causing any overflow or requiring horizontal scrolling.
+2. **Improved Mobile View Accessibility**:
+   - On mobile/tablet screens, the order type selector is shown on **both** the menu screen (`#pos-menu-order-types`) and the cart screen (`#pos-cart-order-types`).
+   - This allows mobile cashiers to view or change the order type (Takeaway, Dine-in, Delivery) directly while reviewing the cart, without needing to go back to the menu screen.
+3. **Two-Way Synchronization**:
+   - Added two-way event listener syncing in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js) so that changing the order type in the cart switcher automatically updates the menu switcher (and vice-versa) and performs the proper state changes.
+   - Restructured the F4 keyboard shortcut listener to cycle only the 3 unique order types to prevent double-indexing.
+4. **Category Auto-Centering Scroll**:
+   - Configured `.pos-cats` in [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.css) as a relative container with `scroll-behavior: smooth`.
+   - Added auto-scroll logic in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) so that when any category button is clicked, it calculates the horizontal offset and scrolls the button directly to the horizontal center of the scrollable container. This keeps the active category focused with context buttons visible on both sides.
+5. **Custom premium Sort Select Dropdown**:
+   - Replaced the unstyled browser-native HTML `<select>` sorting dropdown in [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html) with a custom premium dropdown widget (`#pos-sort-widget`) styled to match the RestroSuite design system.
+   - The custom dropdown is styled in [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.css) with glassmorphism effects, a custom scrollable list container, smooth transition states, custom hover highlights, and orange accent branding.
+   - Built a custom controller synchronization in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js) which binds select/change event handlers to the custom menu items, updates the hidden native select element value, and fires the change event. This preserves 100% compatibility with the Puppeteer test suite (which interacts with native select elements) while giving users a flawless premium experience.
+6. **Favicon Configuration**:
+   - Configured the custom RestroSuite logo mark (`assets/restrosuite-mark.png`) as the official site favicon.
+   - Inserted `<link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">` into the `<head>` of all operational pages: [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html), [login.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/login.html), [kds.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/kds.html), [tokens.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/tokens.html), [qr-order.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/qr-order.html), [order.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/order.html), [home.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/home.html), [index.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/index.html), and [404.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/404.html).
+   - Appended the `?v=3` query parameter to force-bust browser favicon cache so the correct logo is updated immediately in browser tabs.
+7. **Synchronized Assets**:
+   - Synchronized all updated files to Android assets folder (`android-app/app/src/main/assets/`) via `powershell -File .\sync-assets.ps1`.
+
+

@@ -86,7 +86,7 @@
     async function fetchBills(sinceIso) {
       let query = db
         .from("doppio_bills")
-        .select("id, created_at, total, items, payment_method, customer_name")
+        .select("id, created_at, total, items, paymentMethod, customerName, tenders")
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: true });
       const { data, error } = await query;
@@ -251,11 +251,32 @@
 
     async function paymentBreakdown({ days = 30 } = {}) {
       const bills  = await fetchBills(daysAgo(days));
-      const byMode = groupBy(bills, (b) => String(b.payment_method || "other").toLowerCase());
-      return Object.entries(byMode).map(([method, rows]) => ({
+      const payCounts = {};
+      const orderCounts = {};
+      
+      bills.forEach(b => {
+        let tenders = b.tenders;
+        if (tenders && typeof tenders === 'string') {
+          try { tenders = JSON.parse(tenders); } catch(e) { tenders = null; }
+        }
+        
+        if (tenders && Array.isArray(tenders) && tenders.length) {
+          tenders.forEach(t => {
+            const m = String(t.method || "other").toLowerCase();
+            payCounts[m] = (payCounts[m] || 0) + num(t.amount);
+            orderCounts[m] = (orderCounts[m] || 0) + 1;
+          });
+        } else {
+          const m = String(b.paymentMethod || b.payment_method || "other").toLowerCase();
+          payCounts[m] = (payCounts[m] || 0) + num(b.total);
+          orderCounts[m] = (orderCounts[m] || 0) + 1;
+        }
+      });
+      
+      return Object.entries(payCounts).map(([method, revenue]) => ({
         method,
-        orders:  rows.length,
-        revenue: rows.reduce((s, b) => s + num(b.total), 0)
+        orders:  orderCounts[method] || 0,
+        revenue
       })).sort((a, b) => b.revenue - a.revenue);
     }
 

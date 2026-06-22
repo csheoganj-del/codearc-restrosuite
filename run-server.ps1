@@ -287,6 +287,7 @@ try {
             
             # Resolve real file path on disk
             $filePath = Join-Path $PSScriptRoot $urlPath.Replace("/", "\")
+            Write-Host "[HTTP] Request: $($request.HttpMethod) $urlPath$($request.Url.Query)" -ForegroundColor Cyan
             
             if (Test-Path $filePath -PathType Leaf) {
                 $bytes = [System.IO.File]::ReadAllBytes($filePath)

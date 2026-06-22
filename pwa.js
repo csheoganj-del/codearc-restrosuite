@@ -2,7 +2,13 @@
   "use strict";
 
   if (!("serviceWorker" in navigator)) return;
-  if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+
+  // Disable service worker on localhost/127.0.0.1 for local development
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    return;
+  }
+
+  if (location.protocol !== "https:") {
     return;
   }
 

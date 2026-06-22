@@ -177,7 +177,7 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v23-20260621';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v24-20260622';
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 
@@ -758,8 +758,20 @@
     }
 
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
-    $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{ activeCat=b.dataset.cat; $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b)); renderPOS(); }));
+    $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
+      activeCat=b.dataset.cat;
+      $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
+      renderPOS();
+      const container = document.getElementById('pos-cats');
+      if (container) {
+        container.scrollTo({
+          left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
+          behavior: 'smooth'
+        });
+      }
+    }));
     $('#pos-search-input').addEventListener('input', renderPOS);
+    $('#pos-sort-select').addEventListener('change', renderPOS);
     $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
       // Snapshot the outgoing tab's cart to localStorage before the active class changes,
       // so the per-tab fallback always has the latest data even without RS_DB.
@@ -1125,7 +1137,7 @@
      BILLS
      ============================================================ */
   const BILLS = [];
-  const payPill = {UPI:'pill-violet',Cash:'pill-green',Card:'pill-orange'};
+  const payPill = {UPI:'pill-violet',Cash:'pill-green',Card:'pill-orange',Split:'pill-amber',Due:'pill-red'};
   function receiptPayloadFromBill(b) {
     const items = Array.isArray(b._items) && b._items.length
       ? b._items.map(i => ({ name:i.name || 'Item', qty:Number(i.qty || 1), price:Number(i.price || 0) }))
@@ -1145,8 +1157,8 @@
       disc:Number(b.discount || 0),
       gst,
       grand,
-      tenders:[{ method:b.pay || b.paymentMethod || 'Cash', amount:grand }],
-      change:Number(b.changeAmount || 0)
+      tenders:(Array.isArray(b.tenders) && b.tenders.length) ? b.tenders : [{ method:b.pay || b.paymentMethod || 'Cash', amount:grand }],
+      change:Number(b.changeAmount || b.change || 0)
     };
   }
   function showBillReceipt(b) {
@@ -1594,31 +1606,45 @@
     }
     
     // Payment mix donut
-    const payCounts = { UPI: 0, Cash: 0, Card: 0 };
+    const payCounts = { UPI: 0, Cash: 0, Card: 0, Due: 0 };
     paidBills.forEach(b => {
-      if (payCounts[b.pay] !== undefined) {
-        payCounts[b.pay] += b.amount || 0;
+      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
+        b.tenders.forEach(t => {
+          const method = t.method || 'Cash';
+          if (payCounts[method] !== undefined) {
+            payCounts[method] += Number(t.amount || 0);
+          }
+        });
+      } else {
+        const method = b.pay || b.paymentMethod || 'Cash';
+        if (payCounts[method] !== undefined) {
+          payCounts[method] += b.amount || 0;
+        }
       }
     });
-    const payTotal = payCounts.UPI + payCounts.Cash + payCounts.Card;
+    const payTotal = payCounts.UPI + payCounts.Cash + payCounts.Card + payCounts.Due;
     
     if (payTotal === 0) {
       $('#donut-pay').style.background = 'var(--glass-2)';
       $('#donut-pay .donut-center .dc-v').textContent = '₹0';
       $('#legend-pay').innerHTML = `<div style="color:var(--text-mute); font-size:12px; margin-top:10px; text-align:center;">No payments recorded</div>`;
     } else {
-      const upiPct = Math.round(payCounts.UPI / payTotal * 100);
-      const cashPct = Math.round(payCounts.Cash / payTotal * 100);
-      const cardPct = 100 - upiPct - cashPct;
+      const keys = ['UPI', 'Cash', 'Card', 'Due'];
+      const colors = { UPI: 'var(--violet)', Cash: 'var(--green)', Card: 'var(--orange)', Due: 'var(--red)' };
       
-      const payMix = [
-        ['UPI', upiPct, 'var(--violet)'],
-        ['Cash', cashPct, 'var(--green)'],
-        ['Card', cardPct, 'var(--orange)']
-      ];
+      let pcts = keys.map(k => Math.round((payCounts[k] / payTotal) * 100));
+      const sum = pcts.reduce((a,b)=>a+b, 0);
+      if (sum !== 100) {
+        let adjustIdx = pcts.findIndex(p => p > 0);
+        if (adjustIdx !== -1) {
+          pcts[adjustIdx] += (100 - sum);
+        }
+      }
+      
+      const payMix = keys.map((k, i) => [k, pcts[i], colors[k]]).filter(p => p[1] > 0);
       
       let acc=0; const seg=payMix.map(p=>{const s=`${p[2]} ${acc}% ${acc+p[1]}%`;acc+=p[1];return s;}).join(',');
-      $('#donut-pay').style.background=`conic-gradient(${seg})`;
+      $('#donut-pay').style.background=seg ? `conic-gradient(${seg})` : 'var(--glass-2)';
       $('#donut-pay .donut-center .dc-v').textContent = totalRevenue > 0 ? rs(totalRevenue) : '₹0';
       $('#legend-pay').innerHTML=payMix.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${p[0]}<span class="lg-val">${p[1]}%</span></div>`).join('');
     }
@@ -3135,8 +3161,15 @@
         // Payment Breakdown
         const paymentMethods = {};
         paidBills.forEach(b => {
-          const method = b.pay || b.paymentMethod || 'Cash';
-          paymentMethods[method] = (paymentMethods[method] || 0) + (b.amount || 0);
+          if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
+            b.tenders.forEach(t => {
+              const method = t.method || 'Cash';
+              paymentMethods[method] = (paymentMethods[method] || 0) + Number(t.amount || 0);
+            });
+          } else {
+            const method = b.pay || b.paymentMethod || 'Cash';
+            paymentMethods[method] = (paymentMethods[method] || 0) + (b.amount || 0);
+          }
         });
 
         const paymentBreakdownHtml = Object.entries(paymentMethods).map(([method, amount]) => `

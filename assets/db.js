@@ -27,6 +27,11 @@
   /* ---------------- field mappers (app shape <-> doppio columns) ---------------- */
   const num = v => (v==null||v==='') ? 0 : Number(v);
   const parseItems = t => { try { const a=JSON.parse(t); return Array.isArray(a)?a:[]; } catch(e){ return []; } };
+  const parseTenders = t => {
+    if (!t) return [];
+    if (typeof t !== 'string') return Array.isArray(t) ? t : [];
+    try { const a=JSON.parse(t); return Array.isArray(a)?a:[]; } catch(e){ return []; }
+  };
 
   function stableNumericId(str) {
     let hash = 5381;
@@ -67,11 +72,14 @@
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
                     subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
                     amount:num(r.total), pay:r.paymentMethod, status:'paid',
-                    customerName:r.customerName, customerPhone:r.customerPhone }),
+                    customerName:r.customerName, customerPhone:r.customerPhone,
+                    tenders:parseTenders(r.tenders), change:num(r.change) }),
       to: o => ({ id:o.id, orderId:o.no, customerName:o.customerName||'Walk-in Guest', customerPhone:o.customerPhone||null,
                   items: JSON.stringify(o._items||[]), subtotal:num(o.subtotal), gst:num(o.gst),
                   cgst:num(o.cgst), sgst:num(o.sgst), igst:0, total:num(o.amount),
-                  paymentMethod:o.pay||'UPI', dateTime:o.time||new Date().toISOString(), transaction_type:'intra' })
+                  paymentMethod:o.pay||'UPI', dateTime:o.time||new Date().toISOString(), transaction_type:'intra',
+                  tenders: Array.isArray(o.tenders) ? JSON.stringify(o.tenders) : o.tenders || '[]',
+                  change: num(o.change || 0) })
     },
     inventory: {
       table:'doppio_inventory', pk:'id', clientId:true,
@@ -103,9 +111,9 @@
     },
     drafts: {
       table:'doppio_draft_orders', pk:'id', clientId:true,
-      from: r => ({ id:r.id, draftId:r.draftId, name:r.draftName, customerName:r.customerName, customerPhone:r.customerPhone, total:num(r.total),
+      from: r => ({ id:r.id, draftId:r.draftId, name:r.draftName, draftName:r.draftName, customerName:r.customerName, customerPhone:r.customerPhone, total:num(r.total),
                     items: parseItems(r.items) }),
-      to: o => ({ id:o.id, draftId:o.draftId||('D'+Date.now()), draftName:o.name||o.table||'Held order',
+      to: o => ({ id:o.id, draftId:o.draftId||('D'+Date.now()), draftName:o.draftName||o.name||o.table||'Held order',
                   customerName:o.customerName||'', customerPhone:o.customerPhone||'', paymentMethod:'UPI',
                   items: JSON.stringify(o.items||[]), subtotal:num(o.subtotal), gst:num(o.gst), total:num(o.total) })
     },
@@ -296,6 +304,9 @@
     }
   };
 
+  const activeListRequests = {};
+  const lastListFetchTime = {};
+
   const back = () => signedIn() ? CLOUD : LS;
   // Resilient wrapper: if a cloud call throws, log + fall back to local cache so the UI still works.
   async function guard(method, c, ...args){
@@ -303,6 +314,39 @@
     if(method === 'put' || method === 'bulkPut' || method === 'del') {
       try { await LS[method](c, ...args); } catch(e){}
     }
+
+    if (method === 'list') {
+      const localData = await LS.list(c, ...args);
+      const now = Date.now();
+      const lastFetch = lastListFetchTime[c] || 0;
+
+      // Rate limit background sync to once every 5 seconds per collection, and deduplicate concurrent requests
+      if (!activeListRequests[c] && (now - lastFetch > 5000)) {
+        activeListRequests[c] = (async () => {
+          try {
+            const res = await CLOUD.list(c, ...args);
+            if (res) {
+              LS.write(c, res);
+              lastListFetchTime[c] = Date.now();
+
+              // Dispatch database sync event
+              window.dispatchEvent(new CustomEvent('rs:db-sync', { detail: { collection: c, data: res } }));
+
+              // Refresh seating grid if drafts, pending_orders or settings changed
+              if (c === 'drafts' || c === 'pending_orders' || c === 'settings') {
+                document.dispatchEvent(new Event('rs:tables-updated'));
+              }
+            }
+          } catch(e) {
+            console.warn(`[RS_DB] background list ${c} sync failed:`, e.message);
+          } finally {
+            delete activeListRequests[c];
+          }
+        })();
+      }
+      return localData;
+    }
+
     try {
       const res = await CLOUD[method](c, ...args);
       if (res && (method === 'put' || method === 'bulkPut')) {
