@@ -411,10 +411,9 @@
                 <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
                 <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
-            </div>
             <div class="cart-table-sel" style="display: flex; flex-direction: column; gap: 8px; position: relative; padding: 10px 12px; border-bottom: 1px solid var(--stroke);">
-              <select class="form-input" id="cart-table" style="display: none !important;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
-              <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
+              <select id="cart-table" style="display: none !important;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+              <select id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
 
               <!-- Simple, clean always-visible Customer fields -->
               <div class="pos-customer-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
