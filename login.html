@@ -717,35 +717,45 @@
         const countrySel = document.getElementById('reg-country');
         const currencySel = document.getElementById('reg-currency');
         if (!countrySel || !currencySel) return;
-        
-        if (code === '353') {
-          countrySel.value = 'Ireland';
-          currencySel.value = 'EUR (€)';
-        } else if (code === '91') {
-          countrySel.value = 'India';
-          currencySel.value = 'INR (₹)';
-        } else if (code === '44') {
-          countrySel.value = 'United Kingdom';
-          currencySel.value = 'GBP (£)';
-        } else if (code === '971') {
-          countrySel.value = 'United Arab Emirates';
-          currencySel.value = 'AED (AED)';
-        } else if (code === '966') {
-          countrySel.value = 'Saudi Arabia';
-          currencySel.value = 'SAR (SAR)';
-        } else if (code === '65') {
-          countrySel.value = 'Singapore';
-          currencySel.value = 'SGD ($)';
-        } else if (code === '61') {
-          countrySel.value = 'Australia';
-          currencySel.value = 'AUD ($)';
-        } else if (code === '1') {
-          countrySel.value = 'United States';
-          currencySel.value = 'USD ($)';
+        // Smart lookup from shared RS_COUNTRIES data
+        const entry = window.RS_getCountryByDial ? window.RS_getCountryByDial(code) : null;
+        if (entry) {
+          countrySel.value = entry.name;
+          currencySel.value = entry.currency;
+        } else {
+          // Minimal fallback for the most common codes
+          const fallback = {'353':['Ireland','EUR (€)'],'91':['India','INR (₹)'],'44':['United Kingdom','GBP (£)'],'971':['United Arab Emirates','AED (د.إ)'],'966':['Saudi Arabia','SAR (ر.س)'],'65':['Singapore','SGD ($)'],'61':['Australia','AUD ($)'],'1':['United States','USD ($)']};
+          if (fallback[code]) { countrySel.value = fallback[code][0]; currencySel.value = fallback[code][1]; }
         }
       });
     }
+
+    // Populate reg-country and reg-currency from the full RS_COUNTRIES list
+    (function populateCountryCurrencySelects() {
+      const regCountrySel  = document.getElementById('reg-country');
+      const regCurrencySel = document.getElementById('reg-currency');
+      if (regCountrySel && window.RS_COUNTRIES && window.RS_COUNTRIES.length > 1) {
+        const saved = regCountrySel.value || 'India';
+        regCountrySel.innerHTML = window.RS_COUNTRIES
+          .map(c => `<option value="${c.name}"${c.name === saved ? ' selected' : ''}>${c.name}</option>`)
+          .join('');
+      }
+      if (regCurrencySel && window.RS_getCurrencies) {
+        const savedCur = regCurrencySel.value || 'INR (₹)';
+        regCurrencySel.innerHTML = window.RS_getCurrencies()
+          .map(c => `<option value="${c.currency}"${c.currency === savedCur ? ' selected' : ''}>${c.currency}</option>`)
+          .join('');
+      }
+      // Country → currency auto-link on direct country select change
+      if (regCountrySel && regCurrencySel) {
+        regCountrySel.addEventListener('change', () => {
+          const entry = window.RS_getCountryByName && window.RS_getCountryByName(regCountrySel.value);
+          if (entry) regCurrencySel.value = entry.currency;
+        });
+      }
+    })();
   })();
+
 
   // counters
   const fmt = n => n%1?n.toFixed(1):Math.round(n);

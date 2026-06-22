@@ -141,6 +141,68 @@
   border-color: var(--orange);
 }
 
+/* ── filter-select: premium styled native select for table/panel headers ── */
+.filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--glass-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-pill);
+  color: var(--text-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 4px 26px 4px 10px;
+  outline: none;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+  min-width: 68px;
+  height: 26px;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+.filter-select:hover {
+  border-color: var(--orange);
+  color: var(--orange);
+  background-color: var(--orange-tint);
+}
+.filter-select:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--orange) 18%, transparent);
+  color: var(--text);
+}
+
+/* ── Custom-dropdown in settings/form context: looks like a form-input ── */
+.set-pane .custom-dropdown-widget {
+  width: 100%;
+  display: block;
+}
+.set-pane .custom-dropdown-widget .dropdown-trigger {
+  border-radius: var(--r-sm);
+  height: 40px;
+  background: var(--glass);
+  border-color: var(--stroke-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 10px 14px;
+}
+.set-pane .custom-dropdown-widget .dropdown-trigger:hover,
+.set-pane .custom-dropdown-widget.active .dropdown-trigger {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--orange) 16%, transparent);
+}
+.set-pane .custom-dropdown-widget .dropdown-menu {
+  min-width: 100%;
+  max-height: 240px;
+  overflow-y: auto;
+  border-radius: var(--r-sm);
+  z-index: 2000;
+}
+.set-pane .custom-dropdown-widget .dropdown-menu::-webkit-scrollbar { width: 4px; }
+.set-pane .custom-dropdown-widget .dropdown-menu::-webkit-scrollbar-thumb { background: var(--stroke-2); border-radius: 4px; }
+
 /* Custom Select Dropdown Widget */
 .custom-dropdown-widget {
   position: relative;
