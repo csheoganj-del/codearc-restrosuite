@@ -556,7 +556,23 @@
      MENU DATA
      ============================================================ */
   const MENU = [];
-  const CATS = ['All','Starters','Mains','Breads','Beverages','Desserts'];
+  // CATS is derived dynamically from loaded menu items — never hardcoded
+  // so each client sees their own categories, not a global default.
+  const DEFAULT_CATS = ['Starters','Mains','Breads','Beverages','Desserts'];
+  const CAT_ORDER = ['All','Starters','Mains','Breads','Beverages','Desserts','Soups','Salads','Sandwiches','Pizza','Burgers','Pasta','Rice','Biryani','Wraps','Rolls','Snacks','Sides','Sauces','Starters','Mocktails','Cocktails','Juices','Coffee','Tea','Shakes','Desserts'];
+  function getMenuCats() {
+    if (!MENU.length) return ['All', ...DEFAULT_CATS];
+    const unique = [...new Set(MENU.map(m => (m.cat || 'Other').trim()).filter(Boolean))];
+    // Sort by CAT_ORDER preference, then alphabetically for unknowns
+    unique.sort((a, b) => {
+      const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    return ['All', ...unique];
+  }
   const CAT_COLOR = { Starters:'#FF6A2A', Mains:'#8B7CF6', Breads:'#F0A93B', Beverages:'#2BB8C0', Desserts:'#F472B6' };
   const catColor = c => CAT_COLOR[c] || 'var(--orange)';
   const stockLabel = {ok:'In stock',low:'Low',out:'Out'};
@@ -1089,19 +1105,32 @@
     // Initialize visibility
     updateCustomerWidgetVisibility();
 
-    $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
-    $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
-      activeCat=b.dataset.cat;
-      $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
-      renderPOS();
-      const container = document.getElementById('pos-cats');
-      if (container) {
-        container.scrollTo({
-          left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
-          behavior: 'smooth'
-        });
-      }
-    }));
+    function refreshPosCats() {
+      const cats = getMenuCats();
+      const posCatsEl = document.getElementById('pos-cats');
+      if (!posCatsEl) return;
+      const currentActive = activeCat;
+      const newActive = cats.includes(currentActive) ? currentActive : 'All';
+      activeCat = newActive;
+      posCatsEl.innerHTML = cats.map(c =>
+        `<button class="pos-cat-btn ${c === newActive ? 'active' : ''}" data-cat="${c}">${c}</button>`
+      ).join('');
+      $$('#pos-cats .pos-cat-btn').forEach(b => b.addEventListener('click', () => {
+        activeCat = b.dataset.cat;
+        $$('#pos-cats .pos-cat-btn').forEach(x => x.classList.toggle('active', x === b));
+        renderPOS();
+        const container = document.getElementById('pos-cats');
+        if (container) {
+          container.scrollTo({
+            left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
+            behavior: 'smooth'
+          });
+        }
+      }));
+    }
+    window.refreshPosCats = refreshPosCats;
+    refreshPosCats();
+
     $('#pos-search-input').addEventListener('input', renderPOS);
     $('#pos-sort-select').addEventListener('change', renderPOS);
     $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
@@ -2986,7 +3015,7 @@
         if(cached && cached.length){ replaceArr(map[coll], cached); }
       } catch(e){}
     }
-    try{ renderPOS(); }catch(e){}
+    try{ renderPOS(); if (window.refreshPosCats) window.refreshPosCats(); }catch(e){}
 
     // Restore persistent cart state / pre-update snapshot
     try {
@@ -3405,6 +3434,7 @@
                   items.forEach(i => MENU.push(i));
                   renderEditor();
                   renderPOS();
+                  if (window.refreshPosCats) window.refreshPosCats();
                 }
               }
             } catch(err) {
