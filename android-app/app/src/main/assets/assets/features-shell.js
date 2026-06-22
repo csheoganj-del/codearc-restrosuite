@@ -258,7 +258,14 @@
       if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
       // route sign-out through the data layer
       const logout = document.querySelector('.sb-foot-btn.logout');
-      if(logout){ logout.removeAttribute('onclick'); logout.addEventListener('click', async ()=>{ try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){} location.href='login.html'; }); }
+      if(logout){
+        logout.removeAttribute('onclick');
+        logout.addEventListener('click', async ()=>{
+          if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
+          try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
+          location.href='login.html';
+        });
+      }
     })();
 
     /* ===================== MOBILE "MORE" SHEET ===================== */
@@ -287,6 +294,7 @@
           onMount(modal, close){
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
+                if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
                 close();
                 if(window.RS_DB) {
                   RS_DB.signOut().then(()=>{ location.href='login.html'; });

@@ -834,6 +834,26 @@
         console.error('[Order Type Switch Error]', e);
       }
       $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+      
+      // Update trigger text based on order type
+      const triggerText = document.getElementById('cust-trigger-text');
+      if (triggerText) {
+        if (b.textContent.trim() === 'Takeaway') {
+          triggerText.innerText = 'Customer';
+        } else {
+          triggerText.innerText = 'Walk-in';
+        }
+      }
+      
+      // If Takeaway is selected, open the customer widget
+      if (b.textContent.trim() === 'Takeaway') {
+        const widgetContainer = document.getElementById('custom-customer-widget');
+        const trigger = document.getElementById('cust-widget-trigger');
+        const dropdown = document.getElementById('cust-widget-dropdown');
+        if (widgetContainer && trigger && dropdown) {
+          trigger.click();
+        }
+      }
     }));
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {

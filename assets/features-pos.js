@@ -1697,7 +1697,9 @@
         if (!currentPhone) {
           nameInput.value = '';
           phoneInput.value = '';
-          triggerText.innerText = 'Walk-in';
+          const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+          const isTakeaway = activeOrderTypeBtn && activeOrderTypeBtn.textContent.trim() === 'Takeaway';
+          triggerText.innerText = isTakeaway ? 'Customer' : 'Walk-in';
           insightsPanel.style.display = 'none';
           actionRow.style.display = 'none';
           return;
@@ -1780,7 +1782,9 @@
           searchResults.style.display = 'none';
           insightsPanel.style.display = 'none';
           actionRow.style.display = 'none';
-          triggerText.innerText = 'Walk-in';
+          const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+          const isTakeaway = activeOrderTypeBtn && activeOrderTypeBtn.textContent.trim() === 'Takeaway';
+          triggerText.innerText = isTakeaway ? 'Customer' : 'Walk-in';
           return;
         }
         

@@ -201,82 +201,39 @@
 
   /* ---------------- LOCAL (localStorage) ---------------- */
   const LS = {
-    key: c => {
-      const tenantId = getActiveTenantId();
-      return 'rs_v2:' + tenantId + ':' + c;
-    },
-    read: c => {
-      try {
-        const activeKey = LS.key(c);
-        const val = localStorage.getItem(activeKey);
-        if (val !== null) {
-          return JSON.parse(val) || [];
-        }
-        // Migration from old un-prefixed key
-        const oldKey = 'rs_v2:' + c;
-        const oldVal = localStorage.getItem(oldKey);
-        if (oldVal !== null) {
-          localStorage.setItem(activeKey, oldVal);
-          return JSON.parse(oldVal) || [];
-        }
-        return [];
-      } catch (e) {
-        return [];
-      }
-    },
-    write: (c, a) => {
-      try {
-        localStorage.setItem(LS.key(c), JSON.stringify(a));
-      } catch (e) {}
-    },
-    async list(c) { return LS.read(c); },
-    async put(c, id, obj) {
+    key:c=>'rs_v2:'+c,
+    read:c=>{ try{ return JSON.parse(localStorage.getItem(LS.key(c)))||[]; }catch(e){ return []; } },
+    write:(c,a)=>{ try{ localStorage.setItem(LS.key(c), JSON.stringify(a)); }catch(e){} },
+    async list(c){ return LS.read(c); },
+    async put(c,id,obj){
       const cleanId = cleanIdForCollection(c, id);
-      const a = LS.read(c);
-      const rec = { ...obj, id: cleanId };
-      const i = a.findIndex(x => String(x.id) === String(cleanId));
-      if (i >= 0) a[i] = rec; else a.push(rec);
-      LS.write(c, a);
+      const a=LS.read(c);
+      const rec={...obj,id:cleanId};
+      const i=a.findIndex(x=>String(x.id)===String(cleanId));
+      if(i>=0)a[i]=rec; else a.push(rec);
+      LS.write(c,a);
       return rec;
     },
-    async bulkPut(c, arr) {
-      const a = LS.read(c);
+    async bulkPut(c,arr){
+      const a=LS.read(c);
       const cleanedArr = arr.map(o => {
         const cleanId = cleanIdForCollection(c, o.id);
         return { ...o, id: cleanId };
       });
-      cleanedArr.forEach(o => {
-        const i = a.findIndex(x => String(x.id) === String(o.id));
-        if (i >= 0) a[i] = o; else a.push(o);
+      cleanedArr.forEach(o=>{
+        const i=a.findIndex(x=>String(x.id)===String(o.id));
+        if(i>=0)a[i]=o; else a.push(o);
       });
-      LS.write(c, a);
+      LS.write(c,a);
       return cleanedArr;
     },
-    async del(c, id) {
+    async del(c,id){
       const cleanId = cleanIdForCollection(c, id);
-      LS.write(c, LS.read(c).filter(x => String(x.id) !== String(cleanId)));
+      LS.write(c, LS.read(c).filter(x=>String(x.id)!==String(cleanId)));
       return true;
     },
-    async getSettings() {
-      const tenantId = getActiveTenantId();
-      const activeKey = 'rs_v2:' + tenantId + ':settings';
-      try {
-        const val = localStorage.getItem(activeKey);
-        if (val !== null) return JSON.parse(val) || null;
-        const oldVal = localStorage.getItem('rs_v2:settings');
-        if (oldVal !== null) {
-          localStorage.setItem(activeKey, oldVal);
-          return JSON.parse(oldVal) || null;
-        }
-      } catch (e) {}
-      return null;
-    },
-    async setSettings(o) {
-      const tenantId = getActiveTenantId();
-      const activeKey = 'rs_v2:' + tenantId + ':settings';
-      try { localStorage.setItem(activeKey, JSON.stringify(o)); } catch (e) {}
-      return o;
-    }
+    async getSettings(){ try{ return JSON.parse(localStorage.getItem('rs_v2:settings'))||null; }catch(e){ return null; } },
+    async setSettings(o){ try{ localStorage.setItem('rs_v2:settings', JSON.stringify(o)); }catch(e){} return o; }
   };
 
   /* ---------------- CLOUD (tenant-data) ---------------- */
@@ -471,18 +428,6 @@
       for (const k in lastListFetchTime) delete lastListFetchTime[k];
       cachedSettingsMap = {};
       cachedSettings = null;
-
-      // Clear all rs_ and rs- keys in localStorage to prevent leaks to the next user
-      try {
-        const keys = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && (k.startsWith('rs_') || k.startsWith('rs-'))) {
-            keys.push(k);
-          }
-        }
-        keys.forEach(k => localStorage.removeItem(k));
-      } catch(e) {}
 
       localStorage.removeItem('rs:session');
       return true;
