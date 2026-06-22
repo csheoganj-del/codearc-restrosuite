@@ -910,31 +910,16 @@
   }
 
   function getCustomer(){
-    const sel = $('#cart-customer-sel');
-    if (sel && sel.value) {
-      const opt = sel.options[sel.selectedIndex];
-      return {
-        name: opt.getAttribute('data-name') || '',
-        phone: sel.value,
-        gst: opt.getAttribute('data-gst') || '',
-        table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
-      };
-    }
-    // Determine active phone combo based on order type visibility
-    const isTakeaway = document.getElementById('takeaway-customer-fields')?.style.display !== 'none';
-    const phoneComboId = isTakeaway ? 'tw-phone-combo' : 'cust-phone-combo';
-    const phoneCombo = document.getElementById(phoneComboId);
-    const phoneInputId = isTakeaway ? 'takeaway-cust-phone' : 'cust-input-phone';
+    const phoneCombo = document.getElementById('cust-phone-combo');
     let fullPhone = '';
     if (phoneCombo && phoneCombo._getFullNumber) {
       fullPhone = phoneCombo._getFullNumber();
     } else {
-      const phoneEl = document.getElementById(phoneInputId);
+      const phoneEl = document.getElementById('cust-input-phone');
       fullPhone = phoneEl ? phoneEl.value.trim() : '';
     }
-    const nameId = isTakeaway ? 'takeaway-cust-name' : 'cust-input-name';
     return {
-      name: (document.getElementById(nameId)?.value || $('[id^=cust-name]')?.value || '').trim(),
+      name: (document.getElementById('cust-input-name')?.value || '').trim(),
       phone: fullPhone,
       gst: ($('#cust-gst')?.value || '').trim(),
       table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
@@ -992,38 +977,7 @@
 
     // Helper to update customer widget/fields visibility
     function updateCustomerWidgetVisibility() {
-      const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
-      const isTakeaway = activeOrderTypeBtn && activeOrderTypeBtn.textContent.trim() === 'Takeaway';
-      const widgetContainer = document.getElementById('custom-customer-widget');
-      const takeawayFields = document.getElementById('takeaway-customer-fields');
-      const triggerText = document.getElementById('cust-trigger-text');
-      const takeawayName = document.getElementById('takeaway-cust-name');
-      const takeawayPhone = document.getElementById('takeaway-cust-phone');
-      const custNameInput = document.getElementById('cust-input-name');
-      const custPhoneInput = document.getElementById('cust-input-phone');
-      const cartTable = document.getElementById('cart-table');
-
-      if (widgetContainer) {
-        widgetContainer.style.display = isTakeaway ? 'none' : 'block';
-      }
-      if (takeawayFields) {
-        takeawayFields.style.display = isTakeaway ? 'grid' : 'none';
-      }
-      if (triggerText) {
-        triggerText.innerText = isTakeaway ? 'Customer' : 'Walk-in';
-      }
-      if (cartTable) {
-        cartTable.style.display = isTakeaway ? 'none' : 'block';
-      }
-      
-      // Sync fields if needed
-      if (isTakeaway) {
-        if (takeawayName && custNameInput) takeawayName.value = custNameInput.value;
-        if (takeawayPhone && custPhoneInput) takeawayPhone.value = custPhoneInput.value;
-      } else {
-        if (custNameInput && takeawayName) custNameInput.value = takeawayName.value;
-        if (custPhoneInput && takeawayPhone) custPhoneInput.value = takeawayPhone.value;
-      }
+      // Customer inputs are now always visible and unified in POS customer fields
     }
 
     // Load saved active order type and corresponding cart
@@ -1090,17 +1044,12 @@
         const customer = JSON.parse(savedCustomer);
         const cartTable = $('#cart-table');
         if (cartTable && customer.table) cartTable.value = customer.table;
-        const custName = $('#cust-name');
+        const custName = $('#cust-name') || document.getElementById('cust-input-name');
         if (custName && customer.name) custName.value = customer.name;
-        const custPhone = $('#cust-phone');
+        const custPhone = $('#cust-phone') || document.getElementById('cust-input-phone');
         if (custPhone && customer.phone) custPhone.value = customer.phone;
         const custGst = $('#cust-gst');
         if (custGst && customer.gst) custGst.value = customer.gst;
-        // Also populate takeaway fields if needed
-        const takeawayName = document.getElementById('takeaway-cust-name');
-        const takeawayPhone = document.getElementById('takeaway-cust-phone');
-        if (takeawayName && customer.name) takeawayName.value = customer.name;
-        if (takeawayPhone && customer.phone) takeawayPhone.value = customer.phone;
       }
     } catch (e) {
       console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
@@ -1210,30 +1159,7 @@
 
     // Sync takeaway fields with widget fields
     function syncTakeawayFields() {
-      const takeawayName = document.getElementById('takeaway-cust-name');
-      const takeawayPhone = document.getElementById('takeaway-cust-phone');
-      const custNameInput = document.getElementById('cust-input-name');
-      const custPhoneInput = document.getElementById('cust-input-phone');
-      
-      if (takeawayName && custNameInput) {
-        takeawayName.addEventListener('input', () => {
-          custNameInput.value = takeawayName.value;
-          // Trigger any widget events if needed
-          if (typeof custNameInput.oninput === 'function') {
-            custNameInput.oninput();
-          }
-          custNameInput.dispatchEvent(new Event('input'));
-        });
-      }
-      if (takeawayPhone && custPhoneInput) {
-        takeawayPhone.addEventListener('input', () => {
-          custPhoneInput.value = takeawayPhone.value;
-          if (typeof custPhoneInput.oninput === 'function') {
-            custPhoneInput.oninput();
-          }
-          custPhoneInput.dispatchEvent(new Event('input'));
-        });
-      }
+      // No takeaway fields to sync anymore
     }
     syncTakeawayFields();
     initAllPhoneCombos();

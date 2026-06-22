@@ -412,91 +412,34 @@
                 <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative;">
-              <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
-              <!-- Custom Customer Widget (for Dine-in/Delivery) -->
-              <div class="custom-customer-widget" id="custom-customer-widget">
-                <div class="cust-widget-trigger" id="cust-widget-trigger" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Customer Selector">
-                  <i class="fa-solid fa-user-tag"></i>
-                  <span id="cust-trigger-text">Walk-in</span>
-                  <i class="fa-solid fa-chevron-down caret"></i>
-                </div>
-                <div class="cust-widget-dropdown" id="cust-widget-dropdown">
-                  <div class="cust-fields-row">
-                    <div class="field-group">
-                      <label>Name</label>
-                      <input type="text" id="cust-input-name" placeholder="John Doe" autocomplete="off" class="form-input">
-                    </div>
-                    <div class="field-group">
-                       <label>Phone</label>
-                       <div class="phone-combo" id="cust-phone-combo">
-                         <button type="button" class="phone-flag-btn" id="cust-flag-btn" title="Change country code">
-                           <span class="flag-emoji" id="cust-flag-emoji">🇮🇳</span>
-                           <span class="dial-code" id="cust-dial-code">+91</span>
-                           <i class="fa-solid fa-chevron-down pfb-caret"></i>
-                         </button>
-                         <input type="tel" id="cust-input-phone" placeholder="98765 43210" autocomplete="off" inputmode="tel">
-                         <div class="phone-country-picker hidden" id="cust-country-picker">
-                           <div class="pcp-search"><input type="text" id="cust-pcp-search" placeholder="Search country…"></div>
-                           <div class="pcp-list" id="cust-pcp-list"></div>
-                         </div>
-                       </div>
-                     </div>
-                  </div>
-                  
-                  <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
-                  
-                  <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
-                    <div class="insight-item">
-                      <span class="insight-label">Visits</span>
-                      <span class="insight-val" id="insight-visits">0</span>
-                    </div>
-                    <div class="insight-item">
-                      <span class="insight-label">Spent</span>
-                      <span class="insight-val" id="insight-spend">₹0</span>
-                    </div>
-                    <div class="insight-item" style="grid-column: span 2; border-top: 1px solid var(--stroke); padding-top: 4px; margin-top: 4px;">
-                      <span class="insight-label">Favorite</span>
-                      <span class="insight-val" id="insight-favorite">None</span>
-                    </div>
-                  </div>
-
-                  <div class="cust-action-row" id="cust-action-row" style="display: none; margin-top: 6px;">
-                    <button type="button" class="btn btn-sm btn-primary" id="btn-save-new-cust" style="width: 100%; justify-content: center; font-size:11px; padding: 6px 8px;">
-                      <i class="fa-solid fa-plus"></i> Add New Customer
-                    </button>
-                  </div>
-                  
-                  <div class="cust-reset-row" style="margin-top: 6px; border-top: 1px solid var(--stroke); padding-top: 6px;">
-                    <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-cust" style="width: 100%; justify-content: center; font-size:11px; color: var(--text-soft); padding: 6px 8px;">
-                      <i class="fa-solid fa-user-slash"></i> Reset to Walk-in
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <!-- Direct Fields for Takeaway -->
-              <div class="takeaway-customer-fields" id="takeaway-customer-fields" style="display: none; grid-template-columns: 1fr; gap: 6px; grid-column: span 2;">
-                <div class="field-group" style="margin: 0;">
-                  <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-bottom: 4px;">Name</label>
-                  <input type="text" id="takeaway-cust-name" placeholder="John Doe" autocomplete="off" class="form-input" style="height: 34px; font-size: 12px;">
-                </div>
-                <div class="field-group" style="margin: 0;">
-                   <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-bottom: 4px;">Phone</label>
-                   <div class="phone-combo" id="tw-phone-combo" style="height: 34px;">
-                     <button type="button" class="phone-flag-btn" id="tw-flag-btn" title="Change country code">
-                       <span class="flag-emoji" id="tw-flag-emoji">🇮🇳</span>
-                       <span class="dial-code" id="tw-dial-code">+91</span>
-                       <i class="fa-solid fa-chevron-down pfb-caret"></i>
-                     </button>
-                     <input type="tel" id="takeaway-cust-phone" placeholder="98765 43210" autocomplete="off" inputmode="tel">
-                     <div class="phone-country-picker hidden" id="tw-country-picker">
-                       <div class="pcp-search"><input type="text" id="tw-pcp-search" placeholder="Search country…"></div>
-                       <div class="pcp-list" id="tw-pcp-list"></div>
-                     </div>
-                   </div>
-                 </div>
-              </div>
+            <div class="cart-table-sel" style="display: flex; flex-direction: column; gap: 8px; position: relative; padding: 10px 12px; border-bottom: 1px solid var(--stroke);">
+              <select class="form-input" id="cart-table" style="display: none !important;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
               <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
+
+              <!-- Simple, clean always-visible Customer fields -->
+              <div class="pos-customer-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+                <div class="field-group" style="margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <label style="font-size: 11px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.05em;">Name</label>
+                  <input type="text" id="cust-input-name" placeholder="John Doe" autocomplete="off" class="form-input" style="height: 34px; font-size: 12px; padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid var(--stroke-2); background: var(--glass); color: var(--text); outline: none;">
+                </div>
+                <div class="field-group" style="margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; position: relative;">
+                  <label style="font-size: 11px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.05em;">Phone</label>
+                  <div class="phone-combo" id="cust-phone-combo" style="height: 34px;">
+                    <button type="button" class="phone-flag-btn" id="cust-flag-btn" title="Change country code" style="padding: 0 4px 0 8px;">
+                      <span class="flag-emoji" id="cust-flag-emoji">🇮🇳</span>
+                      <span class="dial-code" id="cust-dial-code">+91</span>
+                      <i class="fa-solid fa-chevron-down pfb-caret" style="font-size: 8px; margin-left: 2px;"></i>
+                    </button>
+                    <input type="tel" id="cust-input-phone" placeholder="98765 43210" autocomplete="off" inputmode="tel" style="padding-left: 4px; font-size: 12px;">
+                    <div class="phone-country-picker hidden" id="cust-country-picker" style="top: 36px; left: 0; right: 0; z-index: 100;">
+                      <div class="pcp-search" style="padding: 4px;"><input type="text" id="cust-pcp-search" placeholder="Search country…"></div>
+                      <div class="pcp-list" id="cust-pcp-list" style="max-height: 150px;"></div>
+                    </div>
+                  </div>
+                  <!-- Autocomplete suggestions container -->
+                  <div class="cust-search-results" id="cust-search-results" style="display: none; flex-direction: column; position: absolute; top: 56px; left: 0; right: 0; background: var(--panel-solid); border: 1px solid var(--stroke); border-radius: var(--r-sm); z-index: 101; max-height: 180px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+                </div>
+              </div>
             </div>
             <!-- Delivery Details Row (hidden by default) -->
             <div class="cart-delivery-details" id="cart-delivery-details" style="display: none; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px; background: var(--glass-2); border: 1px solid var(--stroke-2); border-radius: var(--r-sm);">
