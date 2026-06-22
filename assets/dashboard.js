@@ -676,6 +676,223 @@
       }
     }
   }
+  // ---- Phone prefix combo system ----
+  const RS_COUNTRIES = [
+    {name:'Afghanistan',code:'AF',dial:'+93',flag:'🇦🇫'},
+    {name:'Albania',code:'AL',dial:'+355',flag:'🇦🇱'},
+    {name:'Algeria',code:'DZ',dial:'+213',flag:'🇩🇿'},
+    {name:'Argentina',code:'AR',dial:'+54',flag:'🇦🇷'},
+    {name:'Australia',code:'AU',dial:'+61',flag:'🇦🇺'},
+    {name:'Austria',code:'AT',dial:'+43',flag:'🇦🇹'},
+    {name:'Bahrain',code:'BH',dial:'+973',flag:'🇧🇭'},
+    {name:'Bangladesh',code:'BD',dial:'+880',flag:'🇧🇩'},
+    {name:'Belgium',code:'BE',dial:'+32',flag:'🇧🇪'},
+    {name:'Brazil',code:'BR',dial:'+55',flag:'🇧🇷'},
+    {name:'Canada',code:'CA',dial:'+1',flag:'🇨🇦'},
+    {name:'China',code:'CN',dial:'+86',flag:'🇨🇳'},
+    {name:'Denmark',code:'DK',dial:'+45',flag:'🇩🇰'},
+    {name:'Egypt',code:'EG',dial:'+20',flag:'🇪🇬'},
+    {name:'Finland',code:'FI',dial:'+358',flag:'🇫🇮'},
+    {name:'France',code:'FR',dial:'+33',flag:'🇫🇷'},
+    {name:'Germany',code:'DE',dial:'+49',flag:'🇩🇪'},
+    {name:'Ghana',code:'GH',dial:'+233',flag:'🇬🇭'},
+    {name:'Greece',code:'GR',dial:'+30',flag:'🇬🇷'},
+    {name:'Hong Kong',code:'HK',dial:'+852',flag:'🇭🇰'},
+    {name:'Hungary',code:'HU',dial:'+36',flag:'🇭🇺'},
+    {name:'India',code:'IN',dial:'+91',flag:'🇮🇳'},
+    {name:'Indonesia',code:'ID',dial:'+62',flag:'🇮🇩'},
+    {name:'Iran',code:'IR',dial:'+98',flag:'🇮🇷'},
+    {name:'Iraq',code:'IQ',dial:'+964',flag:'🇮🇶'},
+    {name:'Ireland',code:'IE',dial:'+353',flag:'🇮🇪'},
+    {name:'Israel',code:'IL',dial:'+972',flag:'🇮🇱'},
+    {name:'Italy',code:'IT',dial:'+39',flag:'🇮🇹'},
+    {name:'Japan',code:'JP',dial:'+81',flag:'🇯🇵'},
+    {name:'Jordan',code:'JO',dial:'+962',flag:'🇯🇴'},
+    {name:'Kenya',code:'KE',dial:'+254',flag:'🇰🇪'},
+    {name:'Kuwait',code:'KW',dial:'+965',flag:'🇰🇼'},
+    {name:'Lebanon',code:'LB',dial:'+961',flag:'🇱🇧'},
+    {name:'Malaysia',code:'MY',dial:'+60',flag:'🇲🇾'},
+    {name:'Maldives',code:'MV',dial:'+960',flag:'🇲🇻'},
+    {name:'Mexico',code:'MX',dial:'+52',flag:'🇲🇽'},
+    {name:'Morocco',code:'MA',dial:'+212',flag:'🇲🇦'},
+    {name:'Nepal',code:'NP',dial:'+977',flag:'🇳🇵'},
+    {name:'Netherlands',code:'NL',dial:'+31',flag:'🇳🇱'},
+    {name:'New Zealand',code:'NZ',dial:'+64',flag:'🇳🇿'},
+    {name:'Nigeria',code:'NG',dial:'+234',flag:'🇳🇬'},
+    {name:'Norway',code:'NO',dial:'+47',flag:'🇳🇴'},
+    {name:'Oman',code:'OM',dial:'+968',flag:'🇴🇲'},
+    {name:'Pakistan',code:'PK',dial:'+92',flag:'🇵🇰'},
+    {name:'Philippines',code:'PH',dial:'+63',flag:'🇵🇭'},
+    {name:'Poland',code:'PL',dial:'+48',flag:'🇵🇱'},
+    {name:'Portugal',code:'PT',dial:'+351',flag:'🇵🇹'},
+    {name:'Qatar',code:'QA',dial:'+974',flag:'🇶🇦'},
+    {name:'Romania',code:'RO',dial:'+40',flag:'🇷🇴'},
+    {name:'Russia',code:'RU',dial:'+7',flag:'🇷🇺'},
+    {name:'Saudi Arabia',code:'SA',dial:'+966',flag:'🇸🇦'},
+    {name:'Singapore',code:'SG',dial:'+65',flag:'🇸🇬'},
+    {name:'South Africa',code:'ZA',dial:'+27',flag:'🇿🇦'},
+    {name:'South Korea',code:'KR',dial:'+82',flag:'🇰🇷'},
+    {name:'Spain',code:'ES',dial:'+34',flag:'🇪🇸'},
+    {name:'Sri Lanka',code:'LK',dial:'+94',flag:'🇱🇰'},
+    {name:'Sweden',code:'SE',dial:'+46',flag:'🇸🇪'},
+    {name:'Switzerland',code:'CH',dial:'+41',flag:'🇨🇭'},
+    {name:'Taiwan',code:'TW',dial:'+886',flag:'🇹🇼'},
+    {name:'Tanzania',code:'TZ',dial:'+255',flag:'🇹🇿'},
+    {name:'Thailand',code:'TH',dial:'+66',flag:'🇹🇭'},
+    {name:'Turkey',code:'TR',dial:'+90',flag:'🇹🇷'},
+    {name:'Uganda',code:'UG',dial:'+256',flag:'🇺🇬'},
+    {name:'Ukraine',code:'UA',dial:'+380',flag:'🇺🇦'},
+    {name:'United Arab Emirates',code:'AE',dial:'+971',flag:'🇦🇪'},
+    {name:'United Kingdom',code:'GB',dial:'+44',flag:'🇬🇧'},
+    {name:'United States',code:'US',dial:'+1',flag:'🇺🇸'},
+    {name:'Vietnam',code:'VN',dial:'+84',flag:'🇻🇳'},
+    {name:'Zimbabwe',code:'ZW',dial:'+263',flag:'🇿🇼'}
+  ];
+
+  function getDefaultCountry() {
+    const settings = window.RS_SETTINGS || {};
+    const countryName = (settings.set_country || 'India').trim().toLowerCase();
+    // Map currency to country as fallback
+    const currencyMap = {
+      'inr':{ name:'India', code:'IN', dial:'+91', flag:'🇮🇳' },
+      'eur':{ name:'Ireland', code:'IE', dial:'+353', flag:'🇮🇪' },
+      'usd':{ name:'United States', code:'US', dial:'+1', flag:'🇺🇸' },
+      'gbp':{ name:'United Kingdom', code:'GB', dial:'+44', flag:'🇬🇧' },
+      'aed':{ name:'United Arab Emirates', code:'AE', dial:'+971', flag:'🇦🇪' },
+      'sar':{ name:'Saudi Arabia', code:'SA', dial:'+966', flag:'🇸🇦' },
+      'sgd':{ name:'Singapore', code:'SG', dial:'+65', flag:'🇸🇬' },
+      'aud':{ name:'Australia', code:'AU', dial:'+61', flag:'🇦🇺' },
+      'cad':{ name:'Canada', code:'CA', dial:'+1', flag:'🇨🇦' },
+      'nzd':{ name:'New Zealand', code:'NZ', dial:'+64', flag:'🇳🇿' },
+      'zar':{ name:'South Africa', code:'ZA', dial:'+27', flag:'🇿🇦' }
+    };
+    // Try name match first
+    const byName = RS_COUNTRIES.find(c => c.name.toLowerCase() === countryName
+      || countryName.includes(c.name.toLowerCase())
+      || c.name.toLowerCase().includes(countryName));
+    if (byName) return byName;
+    // Fallback to currency
+    const currVal = (settings.set_currency || 'INR (₹)').toLowerCase();
+    for (const [key, val] of Object.entries(currencyMap)) {
+      if (currVal.startsWith(key)) return val;
+    }
+    return RS_COUNTRIES.find(c => c.code === 'IN');
+  }
+
+  // Initialise a phone combo widget.
+  // comboId: wrapper div id, btnId: flag button id, flagId: flag span id,
+  // dialId: dial code span id, inputId: phone input id, pickerId: picker div id,
+  // searchId: search input id, listId: list div id
+  function initPhoneCombo({ comboId, btnId, flagId, dialId, inputId, pickerId, searchId, listId }) {
+    const comboEl    = document.getElementById(comboId);
+    const flagBtn    = document.getElementById(btnId);
+    const flagEl     = document.getElementById(flagId);
+    const dialEl     = document.getElementById(dialId);
+    const phoneInput = document.getElementById(inputId);
+    const pickerEl   = document.getElementById(pickerId);
+    const searchEl   = document.getElementById(searchId);
+    const listEl     = document.getElementById(listId);
+    if (!comboEl || !flagBtn || !pickerEl || !listEl) return;
+
+    let activeCountry = getDefaultCountry();
+    // Try to restore saved selection
+    try {
+      const saved = localStorage.getItem('rs_phone_country_' + inputId);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const found = RS_COUNTRIES.find(c => c.code === parsed.code);
+        if (found) activeCountry = found;
+      }
+    } catch(e){}
+
+    function applyCountry(c) {
+      activeCountry = c;
+      if (flagEl) flagEl.textContent = c.flag;
+      if (dialEl) dialEl.textContent = c.dial;
+      try { localStorage.setItem('rs_phone_country_' + inputId, JSON.stringify({code:c.code, dial:c.dial})); } catch(e){}
+    }
+    applyCountry(activeCountry);
+
+    function renderList(filter) {
+      const q = (filter || '').toLowerCase();
+      const items = q ? RS_COUNTRIES.filter(c =>
+        c.name.toLowerCase().includes(q) || c.dial.includes(q) || c.code.toLowerCase().includes(q)
+      ) : RS_COUNTRIES;
+      listEl.innerHTML = items.map(c => `
+        <div class="pcp-item${c.code === activeCountry.code ? ' active' : ''}" data-code="${c.code}">
+          <span class="pcp-flag">${c.flag}</span>
+          <span class="pcp-name">${c.name}</span>
+          <span class="pcp-dial">${c.dial}</span>
+        </div>`).join('');
+      listEl.querySelectorAll('.pcp-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const found = RS_COUNTRIES.find(c => c.code === el.dataset.code);
+          if (found) { applyCountry(found); closePicker(); }
+        });
+      });
+    }
+
+    function openPicker() {
+      pickerEl.classList.remove('hidden');
+      renderList('');
+      if (searchEl) { searchEl.value = ''; searchEl.focus(); }
+    }
+    function closePicker() {
+      pickerEl.classList.add('hidden');
+    }
+
+    flagBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      pickerEl.classList.contains('hidden') ? openPicker() : closePicker();
+    });
+    if (searchEl) {
+      searchEl.addEventListener('input', () => renderList(searchEl.value));
+      searchEl.addEventListener('keydown', e => { if(e.key === 'Escape') closePicker(); });
+    }
+    document.addEventListener('click', e => {
+      if (!comboEl.contains(e.target)) closePicker();
+    }, true);
+
+    // Expose getter for full number
+    comboEl._getFullNumber = () => {
+      const raw = (phoneInput ? phoneInput.value.trim() : '');
+      if (!raw) return '';
+      // If user already typed the dial code, don't double-prefix
+      if (raw.startsWith('+')) return raw;
+      return activeCountry.dial + raw;
+    };
+    comboEl._getDialCode = () => activeCountry.dial;
+    comboEl._getCountry = () => ({ ...activeCountry });
+    comboEl._setCountry = (code) => {
+      const found = RS_COUNTRIES.find(c => c.code === code);
+      if (found) applyCountry(found);
+    };
+  }
+
+  function initAllPhoneCombos() {
+    initPhoneCombo({
+      comboId: 'cust-phone-combo', btnId: 'cust-flag-btn', flagId: 'cust-flag-emoji',
+      dialId: 'cust-dial-code', inputId: 'cust-input-phone',
+      pickerId: 'cust-country-picker', searchId: 'cust-pcp-search', listId: 'cust-pcp-list'
+    });
+    initPhoneCombo({
+      comboId: 'tw-phone-combo', btnId: 'tw-flag-btn', flagId: 'tw-flag-emoji',
+      dialId: 'tw-dial-code', inputId: 'takeaway-cust-phone',
+      pickerId: 'tw-country-picker', searchId: 'tw-pcp-search', listId: 'tw-pcp-list'
+    });
+  }
+
+  // Helper: get full phone number from a combo (or plain input as fallback)
+  function getFullPhoneFromInput(inputId) {
+    const combo = document.getElementById(
+      inputId === 'cust-input-phone' ? 'cust-phone-combo' :
+      inputId === 'takeaway-cust-phone' ? 'tw-phone-combo' : null
+    );
+    if (combo && combo._getFullNumber) return combo._getFullNumber();
+    const el = document.getElementById(inputId);
+    return el ? el.value.trim() : '';
+  }
+
   function getCustomer(){
     const sel = $('#cart-customer-sel');
     if (sel && sel.value) {
@@ -687,7 +904,25 @@
         table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
       };
     }
-    return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), gst:($('#cust-gst')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+    // Determine active phone combo based on order type visibility
+    const isTakeaway = document.getElementById('takeaway-customer-fields')?.style.display !== 'none';
+    const phoneComboId = isTakeaway ? 'tw-phone-combo' : 'cust-phone-combo';
+    const phoneCombo = document.getElementById(phoneComboId);
+    const phoneInputId = isTakeaway ? 'takeaway-cust-phone' : 'cust-input-phone';
+    let fullPhone = '';
+    if (phoneCombo && phoneCombo._getFullNumber) {
+      fullPhone = phoneCombo._getFullNumber();
+    } else {
+      const phoneEl = document.getElementById(phoneInputId);
+      fullPhone = phoneEl ? phoneEl.value.trim() : '';
+    }
+    const nameId = isTakeaway ? 'takeaway-cust-name' : 'cust-input-name';
+    return {
+      name: (document.getElementById(nameId)?.value || $('[id^=cust-name]')?.value || '').trim(),
+      phone: fullPhone,
+      gst: ($('#cust-gst')?.value || '').trim(),
+      table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
+    };
   }
   function runKotAction(){
     if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -968,6 +1203,7 @@
       }
     }
     syncTakeawayFields();
+    initAllPhoneCombos();
 
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {

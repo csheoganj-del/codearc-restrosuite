@@ -428,9 +428,20 @@
                       <input type="text" id="cust-input-name" placeholder="John Doe" autocomplete="off" class="form-input">
                     </div>
                     <div class="field-group">
-                      <label>Phone</label>
-                      <input type="text" id="cust-input-phone" placeholder="9876543210" autocomplete="off" class="form-input">
-                    </div>
+                       <label>Phone</label>
+                       <div class="phone-combo" id="cust-phone-combo">
+                         <button type="button" class="phone-flag-btn" id="cust-flag-btn" title="Change country code">
+                           <span class="flag-emoji" id="cust-flag-emoji">🇮🇳</span>
+                           <span class="dial-code" id="cust-dial-code">+91</span>
+                           <i class="fa-solid fa-chevron-down pfb-caret"></i>
+                         </button>
+                         <input type="tel" id="cust-input-phone" placeholder="98765 43210" autocomplete="off" inputmode="tel">
+                         <div class="phone-country-picker hidden" id="cust-country-picker">
+                           <div class="pcp-search"><input type="text" id="cust-pcp-search" placeholder="Search country…"></div>
+                           <div class="pcp-list" id="cust-pcp-list"></div>
+                         </div>
+                       </div>
+                     </div>
                   </div>
                   
                   <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
@@ -470,9 +481,20 @@
                   <input type="text" id="takeaway-cust-name" placeholder="John Doe" autocomplete="off" class="form-input" style="height: 34px; font-size: 12px;">
                 </div>
                 <div class="field-group" style="margin: 0;">
-                  <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-bottom: 4px;">Phone</label>
-                  <input type="text" id="takeaway-cust-phone" placeholder="9876543210" autocomplete="off" class="form-input" style="height: 34px; font-size: 12px;">
-                </div>
+                   <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-bottom: 4px;">Phone</label>
+                   <div class="phone-combo" id="tw-phone-combo" style="height: 34px;">
+                     <button type="button" class="phone-flag-btn" id="tw-flag-btn" title="Change country code">
+                       <span class="flag-emoji" id="tw-flag-emoji">🇮🇳</span>
+                       <span class="dial-code" id="tw-dial-code">+91</span>
+                       <i class="fa-solid fa-chevron-down pfb-caret"></i>
+                     </button>
+                     <input type="tel" id="takeaway-cust-phone" placeholder="98765 43210" autocomplete="off" inputmode="tel">
+                     <div class="phone-country-picker hidden" id="tw-country-picker">
+                       <div class="pcp-search"><input type="text" id="tw-pcp-search" placeholder="Search country…"></div>
+                       <div class="pcp-list" id="tw-pcp-list"></div>
+                     </div>
+                   </div>
+                 </div>
               </div>
               <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
             </div>

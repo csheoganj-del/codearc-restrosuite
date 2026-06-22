@@ -157,6 +157,20 @@
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
     function toggle(t,d,on){ return `<div class="set-row"><div class="si"><div class="st">${t}</div><div class="sd">${d}</div></div><label class="toggle"><input type="checkbox" data-skey="${skey(t)}" ${on?'checked':''}><span></span></label></div>`; }
+    // Country & currency helpers — populated from shared RS_COUNTRIES data
+    function countrySelect(cur) {
+      const countries = (window.RS_COUNTRIES || []).map(c => c.name);
+      if (!countries.length) return `<div><label class="fl">Country</label><input class="form-input" id="set-country" data-skey="set_country" value="${cur||'India'}" placeholder="Outlet country"></div>`;
+      const opts = countries.map(n => `<option ${n===(cur||'India')?'selected':''}>${n}</option>`).join('');
+      return `<div><label class="fl">Country</label><select class="form-input" id="set-country" data-skey="set_country">${opts}</select></div>`;
+    }
+    function currencySelect(cur) {
+      const currencies = window.RS_getCurrencies ? window.RS_getCurrencies() : [];
+      const defaults = ['INR (₹)','EUR (€)','USD ($)','GBP (£)','AED (د.إ)','SAR (ر.س)','SGD ($)','AUD ($)','CAD ($)','NZD ($)','ZAR (R)'];
+      const opts = (currencies.length ? currencies.map(c => c.currency) : defaults)
+        .map(c => `<option ${c===(cur||'INR (₹)')?'selected':''}>${c}</option>`).join('');
+      return `<div><label class="fl">Currency</label><select class="form-input" id="set-currency" data-skey="set_currency">${opts}</select></div>`;
+    }
     const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
     const defaultOutletName = sessionMeta.tenant_name || sessionMeta.business_name || String(sessionMeta.tenant_slug || sessionStorage.getItem('tenant_slug') || 'Outlet').replace(/[-_]+/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
     const defaultOutletCode = sessionMeta.tenant_slug || sessionMeta.outlet_id || sessionStorage.getItem('tenant_slug') || '';
@@ -165,7 +179,7 @@
         <div class="set-section">${field('Address','','Outlet address')}</div>
         <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
         <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
-        <div class="set-section form-grid-2">${field('Country','India','Outlet country')}${sel('Currency',['INR (₹)','EUR (€)','USD ($)','GBP (£)','AED (AED)','SAR (SAR)','SGD ($)','AUD ($)','CAD ($)','NZD ($)','ZAR (R)'],'INR (₹)')}</div>`,
+        <div class="set-section form-grid-2" id="set-country-currency-row"></div>`,
       tax:`<div class="set-section form-grid-2">${sel('Default GST slab',['5%','12%','18%'],'5%')}${field('Invoice prefix','INV-')}</div>
         ${toggle('Service charge','Add 5% service charge on dine-in',false)}
         ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
@@ -209,7 +223,41 @@
       let SET_STORE = {};
       function applyStore(){ $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; }); }
       function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
-      function show(key){ if(body.querySelector('[data-skey]')) collect(); body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`; applyStore(); $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
+      function show(key){
+        if(body.querySelector('[data-skey]')) collect();
+        body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`;
+        // If profile pane: inject country/currency selects dynamically using stored values
+        if (key === 'profile') {
+          const row = body.querySelector('#set-country-currency-row');
+          if (row) {
+            const curCountry  = SET_STORE['set_country']  || 'India';
+            const curCurrency = SET_STORE['set_currency'] || 'INR (₹)';
+            row.innerHTML = countrySelect(curCountry) + currencySelect(curCurrency);
+            // Country → currency auto-link
+            const countrySel  = body.querySelector('#set-country');
+            const currencySel = body.querySelector('#set-currency');
+            if (countrySel && currencySel) {
+              countrySel.addEventListener('change', () => {
+                const entry = window.RS_getCountryByName && window.RS_getCountryByName(countrySel.value);
+                if (entry && entry.currency) {
+                  currencySel.value = entry.currency;
+                  // sync custom dropdown label if wrapped
+                  const cdLabel = currencySel.parentNode && currencySel.parentNode.nextSibling &&
+                    currencySel.parentNode.nextSibling.querySelector('.dropdown-trigger-label');
+                  if (cdLabel) cdLabel.textContent = entry.currency;
+                  // Dispatch change so any wrapper widget can react
+                  currencySel.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              });
+            }
+          }
+        }
+        applyStore();
+        // Upgrade all native selects to custom dropdown widgets for visual consistency
+        if (typeof window.RS_wrapAllSelects === 'function') {
+          window.RS_wrapAllSelects(body, ['set-country', 'set-currency']);
+        }
+        $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
         const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
         const btnReset = $('#btn-client-reset-data');
         if(btnReset) {
