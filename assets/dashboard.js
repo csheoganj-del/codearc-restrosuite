@@ -757,6 +757,17 @@
       console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
     }
 
+    // Set initial trigger text based on active order type
+    const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+    const triggerText = document.getElementById('cust-trigger-text');
+    if (activeOrderTypeBtn && triggerText) {
+      if (activeOrderTypeBtn.textContent.trim() === 'Takeaway') {
+        triggerText.innerText = 'Customer';
+      } else {
+        triggerText.innerText = 'Walk-in';
+      }
+    }
+
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
       activeCat=b.dataset.cat;
@@ -834,6 +845,26 @@
         console.error('[Order Type Switch Error]', e);
       }
       $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+      
+      // Update trigger text based on order type
+      const triggerText = document.getElementById('cust-trigger-text');
+      if (triggerText) {
+        if (b.textContent.trim() === 'Takeaway') {
+          triggerText.innerText = 'Customer';
+        } else {
+          triggerText.innerText = 'Walk-in';
+        }
+      }
+      
+      // If Takeaway is selected, open the customer widget
+      if (b.textContent.trim() === 'Takeaway') {
+        const widgetContainer = document.getElementById('custom-customer-widget');
+        const trigger = document.getElementById('cust-widget-trigger');
+        const dropdown = document.getElementById('cust-widget-dropdown');
+        if (widgetContainer && trigger && dropdown) {
+          trigger.click();
+        }
+      }
     }));
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {
