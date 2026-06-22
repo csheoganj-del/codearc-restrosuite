@@ -317,6 +317,7 @@
 .cart-head { padding: 8px 12px; border-bottom: 1px solid var(--stroke); display: flex; align-items: center; justify-content: space-between; }
 .cart-head h3 { font-size: 13px; }
 .cart-table-sel { display: flex; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--stroke); }
+#cart-table { display: none !important; }
 .cart-table-sel select { flex: 1; padding: 4px 6px; font-size: 11.5px; height: 30px; }
 .cust-row { display: flex; gap: 6px; padding: 6px 12px 0; }
 .cust-row .form-input { padding: 4px 8px; font-size: 11px; border-radius: var(--r-sm); }
