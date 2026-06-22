@@ -2911,7 +2911,7 @@
   window.RS = {
     toast, activateTab, rs, initials, avatarColors, catColor,
     nextBillNo, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
-    MENU, CATS, stockLabel, stockCls,
+    MENU, get CATS(){ return getMenuCats(); }, stockLabel, stockCls,
     getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
     setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
     titles, addRenderer:(id,fn)=>{
