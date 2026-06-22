@@ -159,7 +159,11 @@
                 const data = JSON.parse(evt.target.result);
                 const list = Array.isArray(data) ? data : [data];
                 let count = 0;
-                for(const item of list) {
+                if (window.RS && RS.setOperationStatus) {
+                  RS.setOperationStatus(`Importing 1/${list.length} invoices...`, 'running', (1 / list.length) * 100);
+                }
+                for(let i = 0; i < list.length; i++) {
+                  const item = list[i];
                   if(item.no && item.taxable) {
                     const bill = {
                       id: 'bill_' + item.no,
@@ -176,6 +180,12 @@
                     await RS.saveOne('bills', item);
                     count++;
                   }
+                  if (window.RS && RS.setOperationStatus) {
+                    RS.setOperationStatus(`Importing ${i + 1}/${list.length} invoices...`, 'running', ((i + 1) / list.length) * 100);
+                  }
+                }
+                if (window.RS && RS.finishOperationStatus) {
+                  RS.finishOperationStatus(`${count} invoices imported`);
                 }
                 RS.toast(`${count} invoices imported successfully`, 'fa-circle-check');
                 setTimeout(() => window.location.reload(), 1200);

@@ -510,12 +510,15 @@
               };
               const records = [];
               const skipped = [];
+              let duplicatesCount = 0;
               rows.forEach((row, index) => {
                 const name = String(getValue(row, ['name','customername'])).trim();
                 const phone = String(getValue(row, ['phone','mobile','contact','customerphone'])).replace(/\D/g,'').slice(-10);
                 if(!name || phone.length !== 10) { skipped.push(`Row ${index + 2}: name and valid 10-digit phone required`); return; }
+                const existing = CUSTOMERS.find(x => String(x.phone) === String(phone));
+                if (existing) duplicatesCount++;
                 records.push({
-                  id:'cust-' + phone,
+                  _existing: existing,
                   name,
                   phone,
                   email:String(getValue(row, ['email'])).trim(),
@@ -526,21 +529,56 @@
                 });
               });
               if(!records.length) throw new Error('No valid customer rows found');
-              const ok = window.RSModal ? await new Promise(resolve => {
-                RSModal.open({
-                  title:'Import customers CSV', sub:'Review before saving to database', icon:'fa-file-import', size:'sm',
-                  body:`<div class="crm-stats"><div class="cs"><div class="csv">${records.length}</div><div class="csl">Rows ready</div></div><div class="cs"><div class="csv">${skipped.length}</div><div class="csl">Skipped</div></div></div>${skipped.length?`<div class="sr-empty" style="text-align:left;margin-top:12px">First skipped row: ${skipped[0]}</div>`:''}`,
-                  foot:`<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-database"></i> Import</button>`,
-                  onMount(modal, close) {
-                    modal.querySelector('[data-cancel]').onclick = () => { close(); resolve(false); };
-                    modal.querySelector('[data-confirm]').onclick = () => { close(); resolve(true); };
+              const res = await (RS.importPreview ? RS.importPreview({ 
+                title: 'Import customers CSV', 
+                summary: 'Customer rows will update loyalty profiles for this outlet and sync to Supabase when cloud is available.', 
+                rows: records.length, 
+                skipped, 
+                duplicatesCount 
+              }) : Promise.resolve({ proceed: window.confirm(`${records.length} customers ready. Continue import?`), behavior: 'overwrite' }));
+              
+              if(!res || !res.proceed) return;
+
+              const finalRecords = [];
+              records.forEach(item => {
+                if (item._existing) {
+                  if (res.behavior === 'skip') {
+                    return;
+                  } else if (res.behavior === 'keep') {
+                    item.id = 'cust-' + item.phone + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+                    // Suffix phone dynamically to allow unique database insertion
+                    item.phone = item.phone.slice(0, 7) + Math.floor(100 + Math.random() * 900);
+                  } else {
+                    item.id = item._existing.id;
                   }
-                });
-              }) : window.confirm(`${records.length} customers ready. Continue import?`);
-              if(!ok) return;
+                } else {
+                  item.id = 'cust-' + item.phone;
+                }
+                delete item._existing;
+                finalRecords.push(item);
+              });
+
+              if(!finalRecords.length) {
+                RS.toast('No new customers imported (duplicates skipped)', 'fa-circle-check');
+                return;
+              }
+
               const before = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
               let saved = 0;
-              for(const c of records) { await RS.saveOne('customers', c); saved++; }
+              if (window.RS && RS.setOperationStatus) {
+                RS.setOperationStatus(`Importing 1/${finalRecords.length} customers...`, 'running', (1 / finalRecords.length) * 100);
+              }
+              for(let i = 0; i < finalRecords.length; i++) {
+                const c = finalRecords[i];
+                await RS.saveOne('customers', c);
+                saved++;
+                if (window.RS && RS.setOperationStatus) {
+                  RS.setOperationStatus(`Importing ${saved}/${finalRecords.length} customers...`, 'running', (saved / finalRecords.length) * 100);
+                }
+              }
+              if (window.RS && RS.finishOperationStatus) {
+                RS.finishOperationStatus(`${saved} customers imported`);
+              }
               const fallback = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time !== before && window.RS_LAST_CLOUD_ERROR.collection === 'customers';
               RS.toast(fallback ? `${saved} customers saved locally. Cloud sync pending.` : `${saved} customers imported and synced`, fallback ? 'fa-cloud-arrow-up' : 'fa-circle-check');
               renderCustomers();

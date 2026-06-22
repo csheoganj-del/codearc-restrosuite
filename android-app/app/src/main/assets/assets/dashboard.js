@@ -54,7 +54,11 @@
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const rs = n => '\u20b9' + Math.round(n).toLocaleString('en-IN');
+  const rs = n => {
+    const symbol = window.RS && window.RS.getCurrencySymbol ? window.RS.getCurrencySymbol() : '₹';
+    const locale = symbol === '₹' ? 'en-IN' : 'en-US';
+    return symbol + Math.round(n).toLocaleString(locale);
+  };
   const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
@@ -212,10 +216,11 @@
     return bar;
   }
 
-  function setOperationStatus(message, state = 'running') {
+  function setOperationStatus(message, state = 'running', progress = null) {
     const bar = ensureOperationStatusBar();
     const icon = bar.querySelector('.operation-status-icon i');
     const title = bar.querySelector('.operation-status-title');
+    const progressSpan = bar.querySelector('.operation-status-track span');
     title.textContent = message;
     icon.className = state === 'success'
       ? 'fa-solid fa-circle-check'
@@ -223,12 +228,64 @@
         ? 'fa-solid fa-circle-exclamation'
         : 'fa-solid fa-spinner fa-spin';
     bar.className = `operation-status-bar is-visible is-${state}`;
+    
+    if (progressSpan) {
+      if (progress !== null && progress !== undefined) {
+        progressSpan.style.animation = 'none';
+        progressSpan.style.transform = 'none';
+        progressSpan.style.width = `${progress}%`;
+      } else {
+        progressSpan.style.animation = '';
+        progressSpan.style.transform = '';
+        progressSpan.style.width = '';
+      }
+    }
     return bar;
+  }
+
+  function showSuccessCelebration(message) {
+    let overlay = document.getElementById('rs-success-celebration-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'rs-success-celebration-overlay';
+      overlay.className = 'rs-success-overlay';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `
+      <div class="rs-success-card">
+        <div class="rs-success-icon-wrapper">
+          <svg class="rs-success-svg" viewBox="0 0 52 52">
+            <circle class="rs-success-circle" cx="26" cy="26" r="25" fill="none"/>
+            <path class="rs-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+          </svg>
+        </div>
+        <div class="rs-success-message">${message}</div>
+      </div>`;
+    
+    // Force reflow
+    overlay.offsetHeight;
+    
+    overlay.classList.add('is-active');
+    
+    window.setTimeout(() => {
+      overlay.classList.remove('is-active');
+    }, 2000);
   }
 
   function finishOperationStatus(message, state = 'success') {
     const bar = setOperationStatus(message, state);
-    window.setTimeout(() => bar.classList.remove('is-visible'), state === 'error' ? 4200 : 2300);
+    if (state === 'success') {
+      showSuccessCelebration(message);
+    }
+    window.setTimeout(() => {
+      bar.classList.remove('is-visible');
+      const progressSpan = bar.querySelector('.operation-status-track span');
+      if (progressSpan) {
+        progressSpan.style.animation = '';
+        progressSpan.style.transform = '';
+        progressSpan.style.width = '';
+      }
+    }, state === 'error' ? 4200 : 2300);
   }
 
   async function runWithOperation(message, action, button) {
@@ -682,6 +739,38 @@
       return 'Takeaway';
     }
 
+    // Helper to update customer widget/fields visibility
+    function updateCustomerWidgetVisibility() {
+      const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+      const isTakeaway = activeOrderTypeBtn && activeOrderTypeBtn.textContent.trim() === 'Takeaway';
+      const widgetContainer = document.getElementById('custom-customer-widget');
+      const takeawayFields = document.getElementById('takeaway-customer-fields');
+      const triggerText = document.getElementById('cust-trigger-text');
+      const takeawayName = document.getElementById('takeaway-cust-name');
+      const takeawayPhone = document.getElementById('takeaway-cust-phone');
+      const custNameInput = document.getElementById('cust-input-name');
+      const custPhoneInput = document.getElementById('cust-input-phone');
+
+      if (widgetContainer) {
+        widgetContainer.style.display = isTakeaway ? 'none' : 'block';
+      }
+      if (takeawayFields) {
+        takeawayFields.style.display = isTakeaway ? 'grid' : 'none';
+      }
+      if (triggerText) {
+        triggerText.innerText = isTakeaway ? 'Customer' : 'Walk-in';
+      }
+      
+      // Sync fields if needed
+      if (isTakeaway) {
+        if (takeawayName && custNameInput) takeawayName.value = custNameInput.value;
+        if (takeawayPhone && custPhoneInput) takeawayPhone.value = custPhoneInput.value;
+      } else {
+        if (custNameInput && takeawayName) custNameInput.value = takeawayName.value;
+        if (custPhoneInput && takeawayPhone) custPhoneInput.value = takeawayPhone.value;
+      }
+    }
+
     // Load saved active order type and corresponding cart
     try {
       // Load saved active order type
@@ -752,10 +841,18 @@
         if (custPhone && customer.phone) custPhone.value = customer.phone;
         const custGst = $('#cust-gst');
         if (custGst && customer.gst) custGst.value = customer.gst;
+        // Also populate takeaway fields if needed
+        const takeawayName = document.getElementById('takeaway-cust-name');
+        const takeawayPhone = document.getElementById('takeaway-cust-phone');
+        if (takeawayName && customer.name) takeawayName.value = customer.name;
+        if (takeawayPhone && customer.phone) takeawayPhone.value = customer.phone;
       }
     } catch (e) {
       console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
     }
+
+    // Initialize visibility
+    updateCustomerWidgetVisibility();
 
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
@@ -790,8 +887,8 @@
             deliveryCharge: dc ? dc.value : '',
             deliveryRider: dr ? dr.value : ''
           }));
-          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
-          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name') || document.getElementById('takeaway-cust-name');
+          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone') || document.getElementById('takeaway-cust-phone');
           localStorage.setItem('rs_tab_cust_' + tabKey, JSON.stringify({
             name: nameEl ? nameEl.value.trim() : '',
             phone: phoneEl ? phoneEl.value.trim() : ''
@@ -821,10 +918,14 @@
           const savedNewTabCust = localStorage.getItem('rs_tab_cust_' + newTabKey);
           if (savedNewTabCust) {
             const newCustData = JSON.parse(savedNewTabCust);
-            const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
-            const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
-            if (nameEl) nameEl.value = newCustData.name || '';
-            if (phoneEl) phoneEl.value = newCustData.phone || '';
+            const nameElWidget = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+            const phoneElWidget = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+            const nameElTakeaway = document.getElementById('takeaway-cust-name');
+            const phoneElTakeaway = document.getElementById('takeaway-cust-phone');
+            if (nameElWidget) nameElWidget.value = newCustData.name || '';
+            if (phoneElWidget) phoneElWidget.value = newCustData.phone || '';
+            if (nameElTakeaway) nameElTakeaway.value = newCustData.name || '';
+            if (phoneElTakeaway) phoneElTakeaway.value = newCustData.phone || '';
           }
 
           // Re-render the cart!
@@ -835,26 +936,39 @@
       }
       $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
       
-      // Update trigger text based on order type
-      const triggerText = document.getElementById('cust-trigger-text');
-      if (triggerText) {
-        if (b.textContent.trim() === 'Takeaway') {
-          triggerText.innerText = 'Customer';
-        } else {
-          triggerText.innerText = 'Walk-in';
-        }
-      }
-      
-      // If Takeaway is selected, open the customer widget
-      if (b.textContent.trim() === 'Takeaway') {
-        const widgetContainer = document.getElementById('custom-customer-widget');
-        const trigger = document.getElementById('cust-widget-trigger');
-        const dropdown = document.getElementById('cust-widget-dropdown');
-        if (widgetContainer && trigger && dropdown) {
-          trigger.click();
-        }
-      }
+      // Update visibility based on new order type
+      updateCustomerWidgetVisibility();
     }));
+
+    // Sync takeaway fields with widget fields
+    function syncTakeawayFields() {
+      const takeawayName = document.getElementById('takeaway-cust-name');
+      const takeawayPhone = document.getElementById('takeaway-cust-phone');
+      const custNameInput = document.getElementById('cust-input-name');
+      const custPhoneInput = document.getElementById('cust-input-phone');
+      
+      if (takeawayName && custNameInput) {
+        takeawayName.addEventListener('input', () => {
+          custNameInput.value = takeawayName.value;
+          // Trigger any widget events if needed
+          if (typeof custNameInput.oninput === 'function') {
+            custNameInput.oninput();
+          }
+          custNameInput.dispatchEvent(new Event('input'));
+        });
+      }
+      if (takeawayPhone && custPhoneInput) {
+        takeawayPhone.addEventListener('input', () => {
+          custPhoneInput.value = takeawayPhone.value;
+          if (typeof custPhoneInput.oninput === 'function') {
+            custPhoneInput.oninput();
+          }
+          custPhoneInput.dispatchEvent(new Event('input'));
+        });
+      }
+    }
+    syncTakeawayFields();
+
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {
       if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -2551,8 +2665,14 @@
     save(coll){ const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES}; const arr=map[coll]; if(window.RS_DB&&arr) return RS_DB.bulkPut(coll, arr.map(x=>({...x}))); return Promise.resolve(); },
     saveOne(coll,obj){ if(window.RS_DB) return RS_DB.put(coll, obj.id, {...obj}); return Promise.resolve(); },
     removeOne(coll,id){ if(window.RS_DB) return RS_DB.del(coll, id); return Promise.resolve(); },
-    saveSettings(obj){ if(window.RS_DB) return RS_DB.setSettings(obj); return Promise.resolve(); },
+    saveSettings(obj){ if(window.RS_DB) { window.RS_SETTINGS = obj; return RS_DB.setSettings(obj); } return Promise.resolve(); },
     getSettings(){ if(window.RS_DB) return RS_DB.getSettings(); return Promise.resolve(null); },
+    getCurrencySymbol() {
+      const settings = window.RS_SETTINGS || {};
+      const val = settings.set_currency || 'INR (₹)';
+      const match = val.match(/\(([^)]+)\)/);
+      return match ? match[1] : '₹';
+    },
     dbMode:()=> (window.RS_DB && window.RS_DB.mode) || 'local',
     downloadFile(content, mimeType, filename) {
       const blob = new Blob([content], { type: mimeType });
@@ -2612,6 +2732,15 @@
   }
   async function hydrate(){
     if(!window.RS_DB) return;
+    try {
+      window.RS_SETTINGS = await RS_DB.getSettings();
+      if (window.RS && window.RS.updateStaticCurrencyLabels) {
+        window.RS.updateStaticCurrencyLabels();
+      }
+    } catch(e) {
+      console.warn('Failed to load settings in hydrate', e);
+      window.RS_SETTINGS = {};
+    }
     const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES};
     
     // 1. Instantly load from local storage cache
@@ -2805,16 +2934,40 @@
 
   function bindGlobalImportExportEvents() {
     const escHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    function importPreview({ title, summary, rows, skipped }) {
+    function importPreview({ title, summary, rows, skipped, duplicatesCount = 0 }) {
       return new Promise(resolve => {
         const warnings = (skipped || []).slice(0, 6).map(msg => `<li>${escHtml(msg)}</li>`).join('');
+        const duplicateSelector = duplicatesCount > 0 ? `
+          <div class="form-group" style="margin-top: 12px; text-align: left; background: var(--glass-1); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+            <label style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+              <i class="fa-solid fa-clone" style="color: var(--orange);"></i> ${duplicatesCount} duplicates detected
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin: 0;">
+                <input type="radio" name="duplicate-behavior" value="overwrite" checked style="accent-color: var(--orange); margin: 0; width: auto; height: auto;">
+                <span><b>Overwrite</b> existing items</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin: 0;">
+                <input type="radio" name="duplicate-behavior" value="skip" style="accent-color: var(--orange); margin: 0; width: auto; height: auto;">
+                <span><b>Skip</b> duplicates (Ignore)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin: 0;">
+                <input type="radio" name="duplicate-behavior" value="keep" style="accent-color: var(--orange); margin: 0; width: auto; height: auto;">
+                <span><b>Keep both</b> (Create new item copy)</span>
+              </label>
+            </div>
+          </div>
+        ` : '';
+
         const body = `<div style="display:flex;flex-direction:column;gap:12px">
           <div class="crm-stats"><div class="cs"><div class="csv">${rows}</div><div class="csl">Rows ready</div></div><div class="cs"><div class="csv">${(skipped||[]).length}</div><div class="csl">Skipped</div></div></div>
           <div style="font-size:13px;color:var(--text-soft)">${escHtml(summary)}</div>
+          ${duplicateSelector}
           ${warnings ? `<div class="sr-empty" style="text-align:left;padding:12px"><b>Skipped rows</b><ul style="margin:8px 0 0 18px">${warnings}</ul></div>` : ''}
         </div>`;
         if (!window.RSModal) {
-          resolve(window.confirm(`${title}\n\n${rows} rows ready. ${(skipped||[]).length} skipped.\nContinue import?`));
+          const ok = window.confirm(`${title}\n\n${rows} rows ready. ${(skipped||[]).length} skipped.\nContinue import?`);
+          resolve(ok ? { proceed: true, behavior: 'overwrite' } : false);
           return;
         }
         RSModal.open({
@@ -2822,21 +2975,34 @@
           foot:`<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-database"></i> Import</button>`,
           onMount(modal, close) {
             modal.querySelector('[data-cancel]').onclick = () => { close(); resolve(false); };
-            modal.querySelector('[data-confirm]').onclick = () => { close(); resolve(true); };
+            modal.querySelector('[data-confirm]').onclick = () => {
+              let behavior = 'overwrite';
+              const selected = modal.querySelector('input[name="duplicate-behavior"]:checked');
+              if (selected) {
+                behavior = selected.value;
+              }
+              close();
+              resolve({ proceed: true, behavior });
+            };
           }
         });
       });
     }
-    async function saveImportedRecords(collection, records) {
+    window.RS.importPreview = importPreview;
+    async function saveImportedRecords(collection, records, onProgress) {
       const before = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
       const failed = [];
       let saved = 0;
-      for (const record of records) {
+      for (let i = 0; i < records.length; i++) {
+        const record = records[i];
         try {
           await RS.saveOne(collection, record);
           saved++;
         } catch(e) {
           failed.push(`${record.name || record.no || record.id || 'Row'}: ${e.message}`);
+        }
+        if (onProgress) {
+          onProgress(i + 1, records.length);
         }
       }
       const lastError = window.RS_LAST_CLOUD_ERROR;
@@ -2937,6 +3103,7 @@
 
               const records = [];
               const skipped = [];
+              let duplicatesCount = 0;
               rows.forEach((row, index) => {
                 const name = getValue(row, ['name', 'itemname', 'menuitem', 'item', 'ingredientname', 'ingredient']);
                 if(!name) { skipped.push(`Row ${index + 2}: missing item name`); return; }
@@ -2950,7 +3117,7 @@
                 
                 const existing = MENU.find(x => String(x.name).toLowerCase() === String(name).toLowerCase());
                 const item = {
-                  id: existing ? existing.id : 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                  _existing: existing,
                   name: String(name),
                   cat: String(cat),
                   price: price,
@@ -2958,16 +3125,41 @@
                   stock: available ? 'ok' : 'out',
                   description: String(desc)
                 };
+                if (existing) duplicatesCount++;
                 records.push(item);
               });
               if(!records.length) throw new Error('No valid menu rows found');
-              const proceed = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available.', rows:records.length, skipped });
-              if(!proceed) {
+              const res = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available.', rows:records.length, skipped, duplicatesCount });
+              if(!res || !res.proceed) {
                 finishOperationStatus('Menu import cancelled', 'error');
                 return;
               }
-              setOperationStatus(`Importing ${records.length} menu rows...`);
-              const result = await saveImportedRecords('menu', records);
+              const finalRecords = [];
+              records.forEach(item => {
+                if (item._existing) {
+                  if (res.behavior === 'skip') {
+                    return;
+                  } else if (res.behavior === 'keep') {
+                    item.id = 'menu_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                    item.name = item.name + ' (Copy)';
+                  } else {
+                    item.id = item._existing.id;
+                  }
+                } else {
+                  item.id = 'menu_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                }
+                delete item._existing;
+                finalRecords.push(item);
+              });
+              if(!finalRecords.length) {
+                finishOperationStatus('No new menu items imported (duplicates skipped)');
+                return;
+              }
+              setOperationStatus(`Importing 1/${finalRecords.length} menu rows...`, 'running', (1 / finalRecords.length) * 100);
+              const result = await saveImportedRecords('menu', finalRecords, (current, total) => {
+                const percentage = (current / total) * 100;
+                setOperationStatus(`Importing ${current}/${total} menu rows...`, 'running', percentage);
+              });
               finishOperationStatus(`${result.saved} menu items imported`);
               importResultToast('menu items', result);
               if(window.RS_DB) {
@@ -3079,6 +3271,7 @@
 
               const records = [];
               const skipped = [];
+              let duplicatesCount = 0;
               rows.forEach((row, index) => {
                 const name = getValue(row, ['ingredientname', 'ingredient', 'name', 'item', 'ingredientkey']);
                 if(!name) { skipped.push(`Row ${index + 2}: missing ingredient name`); return; }
@@ -3090,7 +3283,7 @@
                 
                 const existing = INVENTORY.find(x => String(x.name).toLowerCase() === String(name).toLowerCase() || String(x.key).toLowerCase() === String(name).toLowerCase());
                 const item = {
-                  id: existing ? existing.id : 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                  _existing: existing,
                   name: String(name),
                   cat: String(cat),
                   stock: Number.isFinite(parsedStock) ? parsedStock : 0,
@@ -3098,16 +3291,41 @@
                   cost: Number.isFinite(parsedCost) ? parsedCost : 0,
                   unit: String(unit)
                 };
+                if (existing) duplicatesCount++;
                 records.push(item);
               });
               if(!records.length) throw new Error('No valid inventory rows found');
-              const proceed = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels for this outlet and sync to Supabase when cloud is available.', rows:records.length, skipped });
-              if(!proceed) {
+              const res = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels for this outlet and sync to Supabase when cloud is available.', rows:records.length, skipped, duplicatesCount });
+              if(!res || !res.proceed) {
                 finishOperationStatus('Inventory import cancelled', 'error');
                 return;
               }
-              setOperationStatus(`Importing ${records.length} inventory rows...`);
-              const result = await saveImportedRecords('inventory', records);
+              const finalRecords = [];
+              records.forEach(item => {
+                if (item._existing) {
+                  if (res.behavior === 'skip') {
+                    return;
+                  } else if (res.behavior === 'keep') {
+                    item.id = 'inv_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                    item.name = item.name + ' (Copy)';
+                  } else {
+                    item.id = item._existing.id;
+                  }
+                } else {
+                  item.id = 'inv_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                }
+                delete item._existing;
+                finalRecords.push(item);
+              });
+              if(!finalRecords.length) {
+                finishOperationStatus('No new inventory items imported (duplicates skipped)');
+                return;
+              }
+              setOperationStatus(`Importing 1/${finalRecords.length} inventory rows...`, 'running', (1 / finalRecords.length) * 100);
+              const result = await saveImportedRecords('inventory', finalRecords, (current, total) => {
+                const percentage = (current / total) * 100;
+                setOperationStatus(`Importing ${current}/${total} inventory rows...`, 'running', percentage);
+              });
               finishOperationStatus(`${result.saved} inventory items imported`);
               importResultToast('ingredients', result);
               if(window.RS_DB) {

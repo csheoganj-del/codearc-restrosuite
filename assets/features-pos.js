@@ -24,6 +24,81 @@
         gstin: settings?.set_gstin || raw.gstin || ''
       };
     }
+    RS.updateStaticCurrencyLabels = function() {
+      const symbol = RS.getCurrencySymbol ? RS.getCurrencySymbol() : '₹';
+      
+      // Update labels like "Price (₹)"
+      document.querySelectorAll('label').forEach(el => {
+        if (el.textContent.includes('(₹)')) {
+          el.textContent = el.textContent.replace(/\(₹\)/g, `(${symbol})`);
+        } else if (el.textContent.includes('(€)') || el.textContent.includes('($)') || el.textContent.includes('(£)')) {
+          el.textContent = el.textContent.replace(/\((.*?)\)/g, `(${symbol})`);
+        }
+      });
+
+      // Update span tags containing "(₹)"
+      document.querySelectorAll('span').forEach(el => {
+        if (el.textContent.includes('(₹)')) {
+          el.textContent = el.textContent.replace(/\(₹\)/g, `(${symbol})`);
+        } else if (el.textContent.includes('(€)') || el.textContent.includes('($)') || el.textContent.includes('(£)')) {
+          el.textContent = el.textContent.replace(/\((.*?)\)/g, `(${symbol})`);
+        }
+      });
+
+      // Update fa-indian-rupee-sign
+      document.querySelectorAll('.fa-indian-rupee-sign').forEach(el => {
+        el.className = 'custom-currency-icon';
+        el.style.fontStyle = 'normal';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '16px';
+        el.textContent = symbol;
+      });
+      
+      document.querySelectorAll('.custom-currency-icon').forEach(el => {
+        el.textContent = symbol;
+      });
+
+      // Update cash denomination buttons in checkout modal
+      document.querySelectorAll('.btn-den.csd-den-btn').forEach(btn => {
+        const val = btn.dataset.val;
+        if (val) {
+          if (val >= 1000) {
+            btn.textContent = symbol + (val / 1000) + 'k';
+          } else {
+            btn.textContent = symbol + val;
+          }
+        }
+      });
+      
+      document.querySelectorAll('.inline-den-btn').forEach(btn => {
+        const val = btn.dataset.val;
+        if (val && val !== 'exact') {
+          btn.textContent = symbol + val;
+        }
+      });
+      
+      // Replace static text nodes in total sections
+      const targets = [
+        '#inline-cash-change',
+        '#split-status-text',
+        '#split-total-text',
+        '#insight-spend',
+        '#t-sub',
+        '#t-grand',
+        '#bills-stat-sales',
+        '#bills-stat-aov',
+        '#chain-total-revenue',
+        '#chain-avg-ticket',
+        '#pos-m-cart-bar-total'
+      ];
+      targets.forEach(selector => {
+        const el = document.querySelector(selector);
+        if (el) {
+          el.textContent = el.textContent.replace(/[₹€$£]/g, symbol);
+        }
+      });
+    };
+
     async function loadReceiptProfile(){
       try {
         const settings = window.RS && RS.getSettings ? await RS.getSettings() : null;
@@ -31,6 +106,9 @@
       } catch(e) {
         receiptProfile.name = receiptProfile.name || sessionOutletName();
       }
+      try {
+        RS.updateStaticCurrencyLabels();
+      } catch(e){}
     }
     loadReceiptProfile();
     document.addEventListener('rs:hydrated', loadReceiptProfile);

@@ -622,6 +622,7 @@
       });
 
       let upiVpaAddress = "";
+      window.currencySymbol = '₹';
 
       // API Caller helper
       function apiCall(action, extra) {
@@ -649,6 +650,9 @@
             }
             if (res.upiVpa) {
               upiVpaAddress = res.upiVpa;
+            }
+            if (res.currencySymbol) {
+              window.currencySymbol = res.currencySymbol;
             }
           })
           .catch(err => console.error("Branding failed to fetch:", err));
@@ -787,6 +791,8 @@
           return;
         }
 
+        const symbol = window.currencySymbol || '₹';
+        const isUpiSupported = (symbol === '₹');
         const upiVpa = upiVpaAddress || "merchant@upi"; // Fallback VPA
         const upiName = document.getElementById('brand-logo').textContent || "Doppio Cafe";
         const latestOrder = orderList[orderList.length - 1];
@@ -795,31 +801,45 @@
         const upiUrl = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${runningTotal.toFixed(2)}&tr=${latestOrder.orderId}&tn=Table%20${table}%20Bill&cu=INR`;
         const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
 
+        let paymentMethodHtml = '';
+        if (isUpiSupported) {
+          paymentMethodHtml = `
+            <div class="upi-box">
+              <p style="font-size:13px; color:var(--text-muted); text-align:center;">Scan below to pay directly via any UPI app</p>
+              <div class="qr-container">
+                <img src="${qrCodeApiUrl}" class="qr-img" alt="UPI QR Code">
+              </div>
+              <a href="${upiUrl}" class="btn" style="text-decoration:none;"><i class="fa-solid fa-mobile-screen-button"></i> Pay via UPI App</a>
+            </div>
+
+            <div class="utr-form">
+              <p style="font-size:12px; font-weight:600; color:var(--text-muted);">After payment, enter the 12-digit UTR/Ref code to auto-verify:</p>
+              <input type="number" class="input-field" id="utr-input" placeholder="e.g. 123456789012" minlength="12" maxlength="12">
+              <button class="btn" onclick="submitUtrCode('${latestOrder.orderId}')" style="background:#111827;"><i class="fa-solid fa-shield-halved"></i> Submit UTR Code</button>
+            </div>
+          `;
+        } else {
+          paymentMethodHtml = `
+            <div style="text-align: center; margin-top: 20px; padding: 20px; border-radius: var(--r-sm); background: rgba(17,24,39,0.03); border: 1px solid var(--border);">
+              <i class="fa-solid fa-credit-card" style="font-size: 28px; color: var(--brand); margin-bottom: 8px;"></i>
+              <p style="font-size: 15px; font-weight: 700; color: var(--text);">Pay at Counter</p>
+              <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Please present this bill summary to the waiter or cashier to complete your payment.</p>
+            </div>
+          `;
+        }
+
         checkoutBox.innerHTML = `
           <div class="bill-summary">
             <div class="bill-row">
               <span>Running Bill (Table ${table})</span>
-              <span>₹${runningTotal}</span>
+              <span>${symbol}${runningTotal}</span>
             </div>
             <div class="bill-row bill-total">
               <span>Grand Total</span>
-              <span>₹${runningTotal}</span>
+              <span>${symbol}${runningTotal}</span>
             </div>
           </div>
-
-          <div class="upi-box">
-            <p style="font-size:13px; color:var(--text-muted); text-align:center;">Scan below to pay directly via any UPI app</p>
-            <div class="qr-container">
-              <img src="${qrCodeApiUrl}" class="qr-img" alt="UPI QR Code">
-            </div>
-            <a href="${upiUrl}" class="btn" style="text-decoration:none;"><i class="fa-solid fa-mobile-screen-button"></i> Pay via UPI App</a>
-          </div>
-
-          <div class="utr-form">
-            <p style="font-size:12px; font-weight:600; color:var(--text-muted);">After payment, enter the 12-digit UTR/Ref code to auto-verify:</p>
-            <input type="number" class="input-field" id="utr-input" placeholder="e.g. 123456789012" minlength="12" maxlength="12">
-            <button class="btn" onclick="submitUtrCode('${latestOrder.orderId}')" style="background:#111827;"><i class="fa-solid fa-shield-halved"></i> Submit UTR Code</button>
-          </div>
+          ${paymentMethodHtml}
         `;
       }
 
