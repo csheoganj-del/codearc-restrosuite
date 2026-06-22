@@ -321,76 +321,458 @@
       }
     }
 
-    function refreshPaymentPanel(){
+    function openDrawer(drawerId) {
+      const backdrop = document.getElementById('cpay-drawer-backdrop');
+      const drawer   = document.getElementById(drawerId);
+      if (!drawer) return;
+      document.querySelectorAll('.cpay-side-drawer').forEach(d => d.classList.remove('csd-open'));
+      drawer.classList.add('csd-open');
+      if (backdrop) backdrop.style.display = 'block';
+    }
+    function closeAllDrawers() {
+      document.querySelectorAll('.cpay-side-drawer').forEach(d => d.classList.remove('csd-open'));
+      const backdrop = document.getElementById('cpay-drawer-backdrop');
+      if (backdrop) backdrop.style.display = 'none';
+    }
+
+    /* ─── Draggable drawer system ─────────────────────────────────────────────
+       Drag handle = .csd-header  (the title bar of each drawer)
+       Position saved in localStorage as rs_drawer_pos_<id>  { left, top }
+       On restore the saved left/top override the CSS right/bottom defaults.
+    ──────────────────────────────────────────────────────────────────────── */
+    function makeDrawerDraggable(drawer) {
+      if (!drawer) return;
+      const id     = drawer.id;
+      const handle = drawer.querySelector('.csd-header');
+      if (!handle) return;
+
+      const STORAGE_KEY = 'rs_drawer_pos_' + id;
+      let isDragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
+
+      /* ── Restore saved position ── */
+      function applyStoredPos() {
+        try {
+          const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+          if (!stored) return;
+          /* Clamp to keep drawer fully inside viewport */
+          const vw = window.innerWidth,  vh = window.innerHeight;
+          const dw = drawer.offsetWidth || 220, dh = drawer.offsetHeight || 300;
+          const left = Math.min(Math.max(0, stored.left), vw - dw);
+          const top  = Math.min(Math.max(0, stored.top),  vh - dh);
+          setPos(left, top);
+        } catch(e) {}
+      }
+
+      function setPos(left, top) {
+        /* Switch from right/bottom anchoring to top/left */
+        drawer.style.right  = 'auto';
+        drawer.style.bottom = 'auto';
+        drawer.style.left   = left + 'px';
+        drawer.style.top    = top  + 'px';
+      }
+
+      function savePos() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            left: parseFloat(drawer.style.left) || 0,
+            top:  parseFloat(drawer.style.top)  || 0
+          }));
+        } catch(e) {}
+      }
+
+      function getClientXY(e) {
+        if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        return { x: e.clientX, y: e.clientY };
+      }
+
+      function onStart(e) {
+        /* Ignore clicks on the close button itself */
+        if (e.target.closest('.csd-close')) return;
+        isDragging = true;
+        drawer.classList.add('csd-dragging');
+        document.body.classList.add('rs-drawer-dragging');
+
+        /* If no stored position yet, snapshot current rendered position */
+        if (!drawer.style.left || drawer.style.left === 'auto' || drawer.style.left === '') {
+          const rect = drawer.getBoundingClientRect();
+          origLeft = rect.left;
+          origTop  = rect.top;
+          setPos(origLeft, origTop);
+        }
+
+        const { x, y } = getClientXY(e);
+        startX = x - parseFloat(drawer.style.left);
+        startY = y - parseFloat(drawer.style.top);
+
+        e.preventDefault();
+      }
+
+      function onMove(e) {
+        if (!isDragging) return;
+        const { x, y } = getClientXY(e);
+        const vw = window.innerWidth,  vh = window.innerHeight;
+        const dw = drawer.offsetWidth, dh = drawer.offsetHeight;
+        const newLeft = Math.min(Math.max(0, x - startX), vw - dw);
+        const newTop  = Math.min(Math.max(0, y - startY), vh - dh);
+        setPos(newLeft, newTop);
+        e.preventDefault();
+      }
+
+      function onEnd() {
+        if (!isDragging) return;
+        isDragging = false;
+        drawer.classList.remove('csd-dragging');
+        document.body.classList.remove('rs-drawer-dragging');
+        savePos();
+      }
+
+      /* Mouse events */
+      handle.addEventListener('mousedown',  onStart);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup',   onEnd);
+
+      /* Touch events */
+      handle.addEventListener('touchstart',  onStart, { passive: false });
+      document.addEventListener('touchmove', onMove,  { passive: false });
+      document.addEventListener('touchend',  onEnd);
+
+      /* Restore on load */
+      applyStoredPos();
+
+      /* Re-apply after each open (in case drawer was hidden and DOM rearranged) */
+      const observer = new MutationObserver(() => {
+        if (drawer.classList.contains('csd-open')) applyStoredPos();
+      });
+      observer.observe(drawer, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    /* ─── Resizable drawer system (v2 – transform:scale) ────────────────────────
+       HOW IT WORKS
+       ════════════
+       1.  A  .csd-scale-wrap  div is injected inside the drawer, wrapping the
+           header + body.  It always renders at BASE_W (220 px) so content NEVER
+           reflows or clips as you resize.
+       2.  `transform: scale(ratio)` on the wrap shrinks/grows everything visually.
+       3.  The outer drawer is set to  BASE_W × ratio  (width) and
+           BASE_H × ratio  (height, measured after first open).
+       4.  `overflow: hidden` on the drawer acts as a perfect viewport — no clip,
+           no scrollbar, no cut content.
+       5.  Sizes saved to localStorage as rs_drawer_size_<id> { w, h }.
+    ─────────────────────────────────────────────────────────────────────────── */
+    function makeDrawerResizable(drawer) {
+      if (!drawer) return;
+      const id       = drawer.id;
+      const SIZE_KEY = 'rs_drawer_size_' + id;
+      const BASE_W   = 220;
+      const MIN_W = 140, MAX_W = 560;
+      const MIN_H = 100, MAX_H = 800;
+
+      /* ── 1.  Wrap header + body in a scale container ── */
+      const hEl = drawer.querySelector('.csd-header');
+      const bEl = drawer.querySelector('.csd-body');
+      if (!hEl || !bEl) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'csd-scale-wrap';
+      wrap.style.cssText = `
+        width: ${BASE_W}px;
+        transform-origin: 0 0;
+        flex-shrink: 0;
+      `;
+      // Insert before any existing handles
+      drawer.insertBefore(wrap, drawer.firstChild);
+      wrap.appendChild(hEl);
+      wrap.appendChild(bEl);
+
+      /* ── 2.  Inject resize handles ── */
+      [
+        ['csd-rh-e',  'e' ],
+        ['csd-rh-s',  's' ],
+        ['csd-rh-se', 'se'],
+        ['csd-rh-w',  'w' ],
+        ['csd-rh-sw', 'sw'],
+      ].forEach(([cls, dir]) => {
+        const el = document.createElement('div');
+        el.className = 'csd-resize-handle ' + cls;
+        el.dataset.dir = dir;
+        drawer.appendChild(el);
+      });
+
+      /* ── 3.  Measure natural content height ────────────────────────────────
+         Called once after the first open.
+         Strips every height constraint (max-height, transform, explicit height)
+         so scrollHeight gives the TRUE content height, not a clipped value.
+      ──────────────────────────────────────────────────────────────────────── */
+      let BASE_H = null;
+      function measureBaseH() {
+        if (BASE_H !== null) return;
+
+        // Save current inline styles
+        const saved = {
+          height:    drawer.style.height,
+          maxHeight: drawer.style.maxHeight,
+          overflow:  drawer.style.overflow,
+          wrapH:     wrap.style.height,
+          wrapT:     wrap.style.transform,
+        };
+
+        // Strip everything so the layout expands to its true natural height
+        drawer.style.height    = 'auto';
+        drawer.style.maxHeight = 'none';
+        drawer.style.overflow  = 'visible';
+        wrap.style.height    = 'auto';
+        wrap.style.transform = 'none';   // ← critical: remove scale so offsetHeight is unscaled
+
+        // Force a synchronous layout flush
+        void wrap.offsetHeight;
+
+        BASE_H = wrap.scrollHeight || wrap.offsetHeight || 350;
+
+        // Restore inline styles
+        drawer.style.height    = saved.height;
+        drawer.style.maxHeight = saved.maxHeight;
+        drawer.style.overflow  = saved.overflow;
+        wrap.style.height    = saved.wrapH;
+        wrap.style.transform = saved.wrapT;
+      }
+
+      /* ── 4.  Core: apply a scale ratio to the whole drawer ── */
+      function applySize(targetW, targetH) {
+        const w     = Math.min(Math.max(targetW, MIN_W), MAX_W);
+        const scale = w / BASE_W;
+
+        // Outer drawer = viewport
+        drawer.style.width      = w + 'px';
+        drawer.style.overflow   = 'hidden';
+        drawer.style.maxHeight  = 'none';        // never let CSS max-height clip
+        drawer.style.borderRadius = '12px';
+
+        // Inner wrap always rendered at BASE_W pixels, scaled visually
+        wrap.style.width     = BASE_W + 'px';
+        wrap.style.transform = `scale(${scale})`;
+
+        if (targetH != null) {
+          // Explicit height drag — respect user's chosen height
+          const h = Math.min(Math.max(targetH, MIN_H), MAX_H);
+          drawer.style.height  = h + 'px';
+          // Give the wrap enough internal height (in content space) to fill the viewport
+          wrap.style.height    = (h / scale) + 'px';
+          bEl.style.overflowY  = 'auto';          // scroll if content overflows
+        } else if (BASE_H !== null) {
+          // Width-only resize: scale height proportionally with content
+          const h = Math.round(BASE_H * scale);
+          drawer.style.height  = h + 'px';
+          wrap.style.height    = BASE_H + 'px';   // wrap stays at unscaled content height
+          bEl.style.overflowY  = 'auto';           // auto not hidden — denominations never vanish
+        } else {
+          // BASE_H not yet measured — let drawer auto-size this render
+          drawer.style.height  = '';
+          wrap.style.height    = '';
+        }
+      }
+
+      /* ── 5.  Save / restore ── */
+      function saveSize() {
+        try {
+          localStorage.setItem(SIZE_KEY, JSON.stringify({
+            w: parseFloat(drawer.style.width) || BASE_W,
+            h: drawer.style.height ? parseFloat(drawer.style.height) : null
+          }));
+        } catch(e) {}
+      }
+
+      function restoreSize() {
+        try {
+          const s = JSON.parse(localStorage.getItem(SIZE_KEY) || 'null');
+          if (s) applySize(s.w, s.h);
+        } catch(e) {}
+      }
+
+      /* ── 6.  Resize drag tracking ── */
+      let isResizing = false, rDir = '';
+      let rStartX, rStartY, rStartW, rStartH, rStartLeft;
+
+      function getXY(e) {
+        return e.touches && e.touches.length
+          ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+          : { x: e.clientX,            y: e.clientY            };
+      }
+
+      function onResizeStart(e) {
+        const handle = e.target.closest('.csd-resize-handle');
+        if (!handle) return;
+        e.preventDefault();
+        e.stopPropagation();    // don't accidentally start a drag-move
+
+        measureBaseH();         // ensure we have BASE_H before resizing
+
+        isResizing = true;
+        rDir       = handle.dataset.dir;
+        const { x, y } = getXY(e);
+        rStartX    = x;
+        rStartY    = y;
+        rStartW    = drawer.offsetWidth;
+        rStartH    = drawer.offsetHeight;
+        rStartLeft = parseFloat(drawer.style.left) || drawer.getBoundingClientRect().left;
+
+        document.body.classList.add('rs-drawer-dragging');
+        drawer.classList.add('csd-resizing');
+      }
+
+      function onResizeMove(e) {
+        if (!isResizing) return;
+        const { x, y } = getXY(e);
+        const dx = x - rStartX;
+        const dy = y - rStartY;
+
+        let newW = rStartW;
+        let newH = null;
+
+        if (rDir.includes('e')) newW = rStartW + dx;
+        if (rDir.includes('w')) {
+          newW = rStartW - dx;
+          const clamped = Math.min(Math.max(newW, MIN_W), MAX_W);
+          drawer.style.left  = (rStartLeft + rStartW - clamped) + 'px';
+          drawer.style.right = 'auto';
+        }
+        if (rDir.includes('s')) newH = rStartH + dy;
+
+        applySize(newW, newH);
+        e.preventDefault();
+      }
+
+      function onResizeEnd() {
+        if (!isResizing) return;
+        isResizing = false;
+        drawer.classList.remove('csd-resizing');
+        document.body.classList.remove('rs-drawer-dragging');
+        saveSize();
+      }
+
+      /* Mouse */
+      drawer.addEventListener('mousedown',   onResizeStart);
+      document.addEventListener('mousemove', onResizeMove);
+      document.addEventListener('mouseup',   onResizeEnd);
+
+      /* Touch */
+      drawer.addEventListener('touchstart',  onResizeStart, { passive: false });
+      document.addEventListener('touchmove', onResizeMove,  { passive: false });
+      document.addEventListener('touchend',  onResizeEnd);
+
+      /* Measure + restore after each open */
+      const obs = new MutationObserver(() => {
+        if (drawer.classList.contains('csd-open')) {
+          requestAnimationFrame(() => {
+            measureBaseH();
+            restoreSize();
+          });
+        }
+      });
+      obs.observe(drawer, { attributes: true, attributeFilter: ['class'] });
+    }
+
+
+    function refreshPaymentPanel(opts){
+      // opts.allowOpen = true  → only set when user EXPLICITLY clicks a payment method btn
+      // Without it, tab-switches and cart re-renders just sync state without popping the drawer
+      const allowOpen = opts && opts.allowOpen;
+      console.log('[DEBUG] refreshPaymentPanel entered. paymentState.method =', paymentState.method, 'allowOpen =', allowOpen);
       const totals = RS.getTotals();
+      console.log('[DEBUG] refreshPaymentPanel totals =', JSON.stringify(totals));
       const note = document.getElementById('pay-method-note');
       const checkoutBtn = document.getElementById('btn-checkout');
+      console.log('[DEBUG] refreshPaymentPanel checkoutBtn =', !!checkoutBtn);
       if(!checkoutBtn) return;
       document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.classList.toggle('active', btn.dataset.payMethod === paymentState.method));
       if(note) note.textContent = paymentState.method;
       checkoutBtn.disabled = totals.count < 1;
 
-      // Handle inline cash calculator
-      const inlineCalc = document.getElementById('cash-calc-inline');
-      if (inlineCalc) {
-        if (paymentState.method === 'Cash' && totals.count > 0) {
-          inlineCalc.style.display = 'flex';
-          const receivedInput = document.getElementById('inline-cash-received');
-          if (receivedInput) {
-            const currentVal = Number(receivedInput.value) || 0;
-            if (!receivedInput.dataset.userInteracted || currentVal <= 0 || receivedInput.dataset.grandTotal !== String(totals.grand)) {
-              receivedInput.value = totals.grand;
-              receivedInput.dataset.grandTotal = totals.grand;
-              delete receivedInput.dataset.userInteracted;
-            }
+      // Only open / close drawers when user explicitly triggered (e.g. clicking Cash/Split btn)
+      if (paymentState.method === 'Cash') {
+        console.log('[DEBUG] refreshPaymentPanel: handling Cash method');
+        const receivedInput = document.getElementById('inline-cash-received');
+        if (receivedInput) {
+          const currentVal = Number(receivedInput.value) || 0;
+          if (!receivedInput.dataset.userInteracted || currentVal <= 0 || receivedInput.dataset.grandTotal !== String(totals.grand)) {
+            receivedInput.value = totals.grand || '';
+            receivedInput.dataset.grandTotal = totals.grand;
+            delete receivedInput.dataset.userInteracted;
           }
-          updateInlineChange();
-        } else {
-          inlineCalc.style.display = 'none';
         }
-      }
-
-      // Handle inline split calculator
-      const inlineSplit = document.getElementById('split-calc-inline');
-      if (inlineSplit) {
-        if (paymentState.method === 'Split' && totals.count > 0) {
-          inlineSplit.style.display = 'flex';
-          isSplitPaymentActive = true;
-
-          const splitCash = document.getElementById('split-cash');
-          const splitUpi = document.getElementById('split-upi');
-          const splitCard = document.getElementById('split-card');
-          const splitDue = document.getElementById('split-due');
-
-          // Pre-fill default if all are empty/zero
-          const cashVal = Number(splitCash?.value) || 0;
-          const upiVal = Number(splitUpi?.value) || 0;
-          const cardVal = Number(splitCard?.value) || 0;
-          const dueVal = Number(splitDue?.value) || 0;
-          if (cashVal === 0 && upiVal === 0 && cardVal === 0 && dueVal === 0) {
-            if (splitCash) splitCash.value = totals.grand;
-            if (splitUpi) splitUpi.value = '';
-            if (splitCard) splitCard.value = '';
-            if (splitDue) splitDue.value = '';
-          }
-
-          updateSplitChange();
-        } else {
-          inlineSplit.style.display = 'none';
-          isSplitPaymentActive = false;
+        if (allowOpen) {
+          console.log('[DEBUG] refreshPaymentPanel: calling openDrawer(cash-drawer)');
+          openDrawer('cash-drawer');
         }
+        updateInlineChange();
+      } else if (paymentState.method === 'Split') {
+        console.log('[DEBUG] refreshPaymentPanel: handling Split method');
+        const splitCash = document.getElementById('split-cash');
+        const splitUpi  = document.getElementById('split-upi');
+        const splitCard = document.getElementById('split-card');
+        const splitDue  = document.getElementById('split-due');
+        const cashVal = Number(splitCash?.value) || 0;
+        const upiVal  = Number(splitUpi?.value)  || 0;
+        const cardVal = Number(splitCard?.value) || 0;
+        const dueVal  = Number(splitDue?.value)  || 0;
+        if (cashVal === 0 && upiVal === 0 && cardVal === 0 && dueVal === 0) {
+          if (splitCash) splitCash.value = totals.grand || '';
+          if (splitUpi)  splitUpi.value  = '';
+          if (splitCard) splitCard.value = '';
+          if (splitDue)  splitDue.value  = '';
+        }
+        isSplitPaymentActive = true;
+        if (allowOpen) {
+          console.log('[DEBUG] refreshPaymentPanel: calling openDrawer(split-drawer)');
+          openDrawer('split-drawer');
+        }
+        updateSplitChange();
+      } else {
+        console.log('[DEBUG] refreshPaymentPanel: closing drawers');
+        closeAllDrawers();
+        isSplitPaymentActive = false;
       }
     }
 
     function wirePaymentPanel(){
       const methods = document.getElementById('cart-pay-methods');
-      if(methods) methods.addEventListener('click', e=>{
-        const btn = e.target.closest('[data-pay-method]'); if(!btn) return;
-        paymentState.method = btn.dataset.payMethod;
-        refreshPaymentPanel();
+      console.log('[DEBUG] wirePaymentPanel: methods element found =', !!methods);
+      if(methods) {
+        methods.addEventListener('click', e=>{
+          console.log('[DEBUG] cart-pay-methods click event triggered');
+          const btn = e.target.closest('[data-pay-method]');
+          console.log('[DEBUG] cart-pay-methods click closest button found =', !!btn, btn ? btn.dataset.payMethod : null);
+          if(!btn) return;
+          paymentState.method = btn.dataset.payMethod;
+          // Pass allowOpen:true so the drawer opens on explicit user click
+          refreshPaymentPanel({ allowOpen: true });
+        });
+      }
+
+      // Close drawer buttons
+      const cashClose = document.getElementById('cash-drawer-close');
+      console.log('[DEBUG] cash-drawer-close element found =', !!cashClose);
+      cashClose?.addEventListener('click', () => {
+        console.log('[DEBUG] cash-drawer-close clicked');
+        closeAllDrawers();
       });
 
-      // Wire inline cash calculator events
+      const splitClose = document.getElementById('split-drawer-close');
+      console.log('[DEBUG] split-drawer-close element found =', !!splitClose);
+      splitClose?.addEventListener('click', () => {
+        console.log('[DEBUG] split-drawer-close clicked');
+        closeAllDrawers();
+        isSplitPaymentActive = false;
+      });
+
+      // Backdrop click-outside close with animation (CSS handles it)
+      const backdrop = document.getElementById('cpay-drawer-backdrop');
+      console.log('[DEBUG] cpay-drawer-backdrop element found =', !!backdrop);
+      backdrop?.addEventListener('click', () => {
+        console.log('[DEBUG] cpay-drawer-backdrop clicked');
+        closeAllDrawers();
+      });
+
+      // Wire cash received input
       const receivedInput = document.getElementById('inline-cash-received');
       if (receivedInput) {
         receivedInput.addEventListener('input', () => {
@@ -399,27 +781,30 @@
         });
       }
 
-      // Wire inline split calculator events
+      // Wire split inputs
       ['split-cash', 'split-upi', 'split-card', 'split-due'].forEach(id => {
         const inp = document.getElementById(id);
-        if (inp) {
-          inp.addEventListener('input', updateSplitChange);
-        }
+        if (inp) inp.addEventListener('input', updateSplitChange);
       });
 
-      document.querySelectorAll('.inline-den-btn').forEach(btn => {
-        btn.onclick = () => {
-          const totals = RS.getTotals();
-          const receivedInput = document.getElementById('inline-cash-received');
-          if (!receivedInput) return;
-          
+      // Wire denomination buttons
+      const inlineDenButtons = document.querySelectorAll('#cash-denominations-grid .btn-den');
+      inlineDenButtons.forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           const val = btn.dataset.val;
+          const totals = RS.getTotals();
+          if (!receivedInput) return;
+          let current = Number(receivedInput.value) || 0;
           if (val === 'exact') {
             receivedInput.value = totals.grand;
             delete receivedInput.dataset.userInteracted;
+          } else if (val === 'clear') {
+            receivedInput.value = '';
+            receivedInput.dataset.userInteracted = '1';
           } else {
             const increment = Number(val) || 0;
-            let current = Number(receivedInput.value) || 0;
             if (current === totals.grand && !receivedInput.dataset.userInteracted) {
               receivedInput.value = increment;
             } else {
@@ -430,6 +815,12 @@
           updateInlineChange();
         };
       });
+
+      // ── Initialise drag-to-reposition + resize for both drawers ──
+      makeDrawerDraggable(document.getElementById('cash-drawer'));
+      makeDrawerDraggable(document.getElementById('split-drawer'));
+      makeDrawerResizable(document.getElementById('cash-drawer'));
+      makeDrawerResizable(document.getElementById('split-drawer'));
 
       refreshPaymentPanel();
     }

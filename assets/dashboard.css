@@ -108,7 +108,10 @@
 .order-types { display: flex; gap: 8px; }
 .order-type-btn { padding: 11px 16px; border-radius: var(--r-pill); border: 1px solid var(--stroke-2); background: var(--panel); color: var(--text-soft); font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--t); display: inline-flex; align-items: center; gap: 7px; }
 .order-type-btn.active { background: var(--orange-tint); color: var(--orange); border-color: rgba(255,79,0,0.35); }
-.pos-cats { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+#pos-menu-order-types { display: none; }
+#pos-cart-order-types { display: flex; padding: 10px 12px; border-bottom: 1px solid var(--stroke); gap: 6px; background: var(--glass); }
+#pos-cart-order-types .order-type-btn { flex: 1; justify-content: center; padding: 8px 6px; font-size: 11.5px; border-radius: var(--r-sm); white-space: nowrap; gap: 5px; }
+.pos-cats { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; position: relative; scroll-behavior: smooth; }
 .pos-cats::-webkit-scrollbar { height: 5px; }
 .pos-cat-btn { padding: 8px 15px; border-radius: var(--r-pill); border: 1px solid var(--stroke-2); background: var(--panel); color: var(--text-soft); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: var(--t); display: inline-flex; align-items: center; gap: 7px; }
 .pos-cat-btn:hover { border-color: var(--stroke-hi); color: var(--text); }
@@ -119,6 +122,111 @@
 .pos-size-control button:hover { color: var(--text); transform: scale(1.15); }
 .pos-size-control button:active { transform: scale(0.9); }
 .pos-size-control input[type="range"] { width: 80px; accent-color: var(--orange); cursor: pointer; height: 4px; outline: none; }
+.pos-sort-select {
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  background: var(--panel);
+  border: 1px solid var(--stroke-2);
+  color: var(--text-soft);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+  transition: var(--t);
+  height: 38px;
+  box-sizing: border-box;
+}
+.pos-sort-select:hover {
+  border-color: var(--orange);
+}
+
+/* Custom Select Dropdown Widget */
+.custom-dropdown-widget {
+  position: relative;
+  display: inline-block;
+  min-width: 140px;
+}
+.custom-dropdown-widget .dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  background: var(--panel);
+  border: 1px solid var(--stroke-2);
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 38px;
+  box-sizing: border-box;
+  transition: var(--t);
+  user-select: none;
+}
+.custom-dropdown-widget .dropdown-trigger:hover,
+.custom-dropdown-widget.active .dropdown-trigger {
+  border-color: var(--orange);
+  color: var(--text);
+  background: var(--glass-2);
+}
+.custom-dropdown-widget .dropdown-trigger i.caret {
+  transition: transform 0.2s ease;
+  margin-left: 8px;
+  color: var(--text-mute);
+}
+.custom-dropdown-widget.active .dropdown-trigger i.caret {
+  transform: rotate(180deg);
+}
+.custom-dropdown-widget .dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  min-width: 190px;
+  background: var(--panel-solid);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 1100;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  box-sizing: border-box;
+  animation: dropdownFade 0.18s var(--ease);
+}
+.custom-dropdown-widget.active .dropdown-menu {
+  display: flex;
+}
+.custom-dropdown-widget .dropdown-item {
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-soft);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: var(--t);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.custom-dropdown-widget .dropdown-item:hover {
+  background: var(--orange-tint);
+  color: var(--orange);
+}
+.custom-dropdown-widget .dropdown-item.active {
+  background: var(--orange);
+  color: #fff;
+  font-weight: 600;
+}
+
+@keyframes dropdownFade {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .pos-item { border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--stroke); padding: clamp(6px, calc((8 * var(--pos-grid-size, 158px) - 592px) / 48), 22px) clamp(7px, calc((8 * var(--pos-grid-size, 158px) - 544px) / 48), 24px) clamp(5px, calc((8 * var(--pos-grid-size, 158px) - 640px) / 48), 20px); cursor: pointer; transition: transform .22s var(--ease), border-color .2s, box-shadow .3s, background .2s; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: clamp(4px, calc((7 * var(--pos-grid-size, 158px) - 578px) / 48), 16px); min-height: calc(var(--pos-grid-size, 158px) * 0.772); aspect-ratio: 158 / 122; }
 .pos-item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cc, var(--orange)); opacity: .9; }
 .pos-item::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(130% 100% at 0% 0%, color-mix(in srgb, var(--cc, var(--orange)) 10%, transparent), transparent 58%); }
@@ -193,8 +301,11 @@
 
   .pos-toolbar { flex-wrap: wrap; gap: 8px; }
   .pos-search { width: 100%; flex: none; }
-  .pos-size-control { flex: 1; justify-content: center; width: 100%; }
+   .pos-size-control { flex: 1; justify-content: center; width: 100%; }
+  .pos-sort { flex: 1; min-width: 120px; }
+  .pos-sort-select { padding: 8px 12px; border-radius: var(--r-md); font-size: 13px; height: 36px; width: 100%; }
   .order-types { width: 100%; justify-content: space-between; gap: 6px; }
+  #pos-menu-order-types { display: flex; }
   .order-type-btn { flex: 1; justify-content: center; padding: 10px 8px; font-size: 12px; }
   .pos-cat-btn { flex-shrink: 0; }
 }
@@ -1182,7 +1293,7 @@ body.product-guide-open {
   .tab-panel,
   .section-inner {
     padding: 12px !important;
-
+  }
 }
 
 /* Tab blinking/pulse attention effect */
@@ -1214,4 +1325,428 @@ body.product-guide-open {
   color: var(--orange) !important;
 }
 
+/* Floating Payment Popovers Styles */
+.cpay-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-sm);
+  padding: 10px;
+  box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.2), var(--shadow-md);
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  backdrop-filter: blur(12px);
+  animation: popoverFadeIn 0.15s ease-out;
+}
 
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.btn-popover-close {
+  transition: color 0.15s ease;
+}
+.btn-popover-close:hover {
+  color: var(--red) !important;
+}
+
+/* ============================================================
+   PAYMENT SIDE DRAWERS
+   Cash  = floating panel to the LEFT  of the cart
+   Split = floating panel to the RIGHT of the cart
+   ============================================================ */
+
+:root { --cart-w: 372px; }
+
+/* Base state – HIDDEN */
+.cpay-side-drawer {
+  position: fixed;
+  bottom: 140px;
+  width: 220px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 9999;
+  border-radius: 12px;
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--stroke-2);
+  box-shadow: 0 12px 36px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.08);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* slide-up + fade animation */
+  transform: translateY(14px);
+  transition: transform .26s cubic-bezier(.34,1.56,.64,1),
+              opacity .20s ease,
+              visibility 0s .26s;
+}
+
+/* OPEN state */
+.cpay-side-drawer.csd-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
+  transform: translateY(0);
+  transition: transform .26s cubic-bezier(.34,1.56,.64,1),
+              opacity .20s ease,
+              visibility 0s 0s;
+}
+
+/* Cash drawer – LEFT of cart */
+.cpay-drawer-left {
+  right: calc(var(--cart-w) + 16px);
+}
+
+/* Split drawer – also sits LEFT of cart, offset slightly higher so cash+split can coexist */
+.cpay-drawer-right {
+  right: calc(var(--cart-w) + 16px);
+  bottom: 162px; /* shifted up from 140px to avoid exact overlap with cash drawer */
+}
+
+/* ── Narrow screens: both drawers become bottom-centre sheets ── */
+@media (max-width: 1100px) {
+  .cpay-drawer-left,
+  .cpay-drawer-right {
+    left: 50%;
+    right: auto;
+    bottom: 96px;
+    width: min(92vw, 320px);
+    transform: translateX(-50%) translateY(18px);
+  }
+  .cpay-drawer-left.csd-open,
+  .cpay-drawer-right.csd-open {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+
+/* Drawer header */
+.csd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--stroke-2);
+  gap: 6px;
+}
+.csd-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.csd-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--text-mute);
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color .15s;
+  flex-shrink: 0;
+}
+.csd-close:hover { color: var(--red); }
+
+/* Drawer body */
+.csd-body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Label */
+.csd-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Cash: received row */
+.csd-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.csd-input {
+  width: 100% !important;
+  height: 32px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-align: right !important;
+  padding: 3px 8px !important;
+}
+
+/* Cash: change display */
+.csd-change-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--glass-2);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+}
+.csd-change-amt {
+  font-size: 16px;
+  font-weight: 800;
+  color: #25d366;
+}
+
+/* Denomination grid */
+.csd-den-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.csd-den-btn {
+  height: 26px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--stroke-2);
+  background: var(--glass-2);
+  color: var(--text-soft);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.csd-den-btn:hover {
+  background: var(--orange-tint);
+  color: var(--orange);
+  border-color: rgba(255,79,0,.4);
+}
+.csd-den-exact {
+  background: rgba(255,79,0,.08);
+  border-color: rgba(255,79,0,.4);
+  color: var(--orange);
+  grid-column: 1 / -1;
+}
+.csd-den-exact:hover {
+  background: var(--orange-tint);
+}
+.csd-den-clear {
+  border-color: rgba(255,69,58,.4);
+  color: var(--red);
+  background: rgba(255,69,58,.07);
+  grid-column: 1 / -1;
+}
+.csd-den-clear:hover {
+  background: rgba(255,69,58,.14);
+}
+
+/* Split: individual method rows */
+.csd-split-field {
+  display: grid;
+  grid-template-columns: 30px 44px 1fr;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-sm);
+  padding: 4px 8px;
+  background: var(--glass-2);
+}
+.csd-split-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.csd-split-field .csd-input {
+  height: 28px !important;
+  font-size: 13px !important;
+  padding: 2px 6px !important;
+  border: 1px solid var(--stroke-2) !important;
+  border-radius: var(--r-xs) !important;
+  background: var(--panel) !important;
+  text-align: right !important;
+}
+
+/* Split: balance status footer */
+.csd-split-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--glass-2);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font-size: 11px;
+}
+.csd-split-remaining { font-weight: 700; color: var(--text-soft); }
+.csd-split-paid { font-size: 13px; font-weight: 800; color: var(--orange); }
+
+/* On small screens: drawer slides down from top (below header) so it never blocks the item grid */
+@media (max-width: 1100px) {
+  .cpay-side-drawer {
+    position: fixed;
+    top: 60px;           /* sits just below the sticky header */
+    bottom: auto !important;
+    right: 8px !important;
+    left: 8px !important;
+    width: auto !important;
+    max-height: 55vh !important;  /* compact enough to still see cart below */
+    border-radius: var(--r-md);
+    transform: translateY(-20px) !important;  /* slides down from above */
+    opacity: 0;
+    visibility: hidden;
+  }
+  .cpay-side-drawer.csd-open {
+    transform: translateY(0) !important;
+    opacity: 1;
+    visibility: visible;
+  }
+}/* ─── Draggable drawer styles ──────────────────────────────────────────────── */
+
+/* Show move cursor only on the header (drag handle) */
+.cpay-side-drawer .csd-header {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cpay-side-drawer .csd-header:active {
+  cursor: grabbing;
+}
+
+/* Visual feedback while actively dragging */
+.cpay-side-drawer.csd-dragging {
+  opacity: .92;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35), 0 0 0 2px var(--orange);
+  transform: scale(1.01) !important;
+  transition: box-shadow .12s, opacity .12s !important;
+  /* Disable transition during drag for snap-free movement */
+  transition: none !important;
+}
+
+/* Tiny drag-hint label inside the header so cashiers know they can move it */
+.csd-header::after {
+  content: '⠿';           /* braille dots = drag icon feel */
+  font-size: 14px;
+  color: var(--text-mute);
+  opacity: .45;
+  margin-left: auto;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+/* Don't show the hint if the close button is already at that side */
+.csd-header .csd-close ~ .csd-title + .csd-header::after { display: none; }
+
+/* Prevent text/input selection globally while dragging */
+body.rs-drawer-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ─── Resizable drawer styles ─────────────────────────────────────────────── */
+
+/* Allow resize handles to poke slightly outside the drawer border */
+.cpay-side-drawer { overflow: visible; }
+/* Scrolling only inside the body */
+.csd-body { overflow-y: auto; }
+
+/* ── Base handle zone (invisible clickable region) ── */
+.csd-resize-handle {
+  position: absolute;
+  z-index: 10000;
+}
+
+/* Right edge */
+.csd-rh-e  { right:-6px; top:30px; bottom:30px; width:12px; cursor:ew-resize; }
+/* Bottom edge */
+.csd-rh-s  { bottom:-6px; left:30px; right:30px; height:12px; cursor:ns-resize; }
+/* Bottom-right corner */
+.csd-rh-se { right:-6px; bottom:-6px; width:20px; height:20px; cursor:se-resize; }
+/* Left edge */
+.csd-rh-w  { left:-6px; top:30px; bottom:30px; width:12px; cursor:ew-resize; }
+/* Bottom-left corner */
+.csd-rh-sw { left:-6px; bottom:-6px; width:20px; height:20px; cursor:sw-resize; }
+
+/* ── Corner bracket decorations (SE + SW) ── */
+.csd-rh-se::after,
+.csd-rh-sw::after {
+  content: '';
+  position: absolute;
+  width: 8px; height: 8px;
+  opacity: .35;
+  transition: opacity .15s;
+}
+.csd-rh-se::after {
+  right:3px; bottom:3px;
+  border-right:2.5px solid var(--text-soft);
+  border-bottom:2.5px solid var(--text-soft);
+  border-radius:0 0 2px 0;
+}
+.csd-rh-sw::after {
+  left:3px; bottom:3px;
+  border-left:2.5px solid var(--text-soft);
+  border-bottom:2.5px solid var(--text-soft);
+  border-radius:0 0 0 2px;
+}
+.csd-rh-se:hover::after,
+.csd-rh-sw:hover::after { opacity:.85; }
+
+/* ── Edge stripe hints (right / left) ── */
+.csd-rh-e::after,
+.csd-rh-w::after {
+  content:'';
+  position:absolute;
+  top:50%; transform:translateY(-50%);
+  width:3px; height:24px;
+  border-radius:2px;
+  background:var(--text-mute);
+  opacity:.25; transition:opacity .15s;
+}
+.csd-rh-e::after { right:2px; }
+.csd-rh-w::after { left:2px; }
+.csd-rh-e:hover::after,
+.csd-rh-w:hover::after { opacity:.7; }
+
+/* ── Bottom edge stripe hint ── */
+.csd-rh-s::after {
+  content:'';
+  position:absolute;
+  left:50%; transform:translateX(-50%);
+  width:24px; height:3px;
+  border-radius:2px;
+  background:var(--text-mute);
+  opacity:.25; bottom:2px; transition:opacity .15s;
+}
+.csd-rh-s:hover::after { opacity:.7; }
+
+/* ── Active resize state — orange outline + glowing handles ── */
+.cpay-side-drawer.csd-resizing {
+  box-shadow: 0 20px 60px rgba(0,0,0,.35), 0 0 0 2px rgba(255,79,0,.6) !important;
+  transition: none !important;
+}
+.cpay-side-drawer.csd-resizing .csd-rh-se::after,
+.cpay-side-drawer.csd-resizing .csd-rh-sw::after,
+.cpay-side-drawer.csd-resizing .csd-rh-e::after,
+.cpay-side-drawer.csd-resizing .csd-rh-w::after,
+.cpay-side-drawer.csd-resizing .csd-rh-s::after {
+  opacity:1 !important;
+  background: var(--orange);
+  border-color: var(--orange);
+}

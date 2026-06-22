@@ -29,13 +29,19 @@
   scroll-behavior: smooth;
 }
 
+html {
+  overflow-x: hidden; /* Prevent horizontal scroll without affecting fixed-position children */
+}
+
 body {
   font-family: var(--font-body);
   background-color: var(--bg-cream-light);
   color: var(--text-dark);
   line-height: 1.6;
-  overflow-x: hidden;
+  /* overflow-x handled on html element above */
 }
+
+
 
 /* Header & Nav */
 header {
