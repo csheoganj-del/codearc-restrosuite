@@ -31,6 +31,7 @@
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js"></script>
+<script src="assets/country-currency-data.js"></script>
 <style>
   body { min-height: 100vh; display: flex; flex-direction: column; }
 
@@ -339,33 +340,15 @@
             <div class="form-group">
               <label for="reg-country">Business Country</label>
               <select id="reg-country" class="form-input no-icon">
-                <option value="Ireland">Ireland</option>
+                <!-- Populated dynamically from RS_COUNTRIES -->
                 <option value="India" selected>India</option>
-                <option value="United States">United States</option>
-                <option value="United Kingdom">United Kingdom</option>
-                <option value="United Arab Emirates">United Arab Emirates</option>
-                <option value="Saudi Arabia">Saudi Arabia</option>
-                <option value="Singapore">Singapore</option>
-                <option value="Australia">Australia</option>
-                <option value="Canada">Canada</option>
-                <option value="New Zealand">New Zealand</option>
-                <option value="South Africa">South Africa</option>
               </select>
             </div>
             <div class="form-group">
               <label for="reg-currency">Currency</label>
               <select id="reg-currency" class="form-input no-icon">
-                <option value="EUR (€)">EUR (€)</option>
+                <!-- Populated dynamically from RS_COUNTRIES -->
                 <option value="INR (₹)" selected>INR (₹)</option>
-                <option value="USD ($)">USD ($)</option>
-                <option value="GBP (£)">GBP (£)</option>
-                <option value="AED (AED)">AED (AED)</option>
-                <option value="SAR (SAR)">SAR (SAR)</option>
-                <option value="SGD ($)">SGD ($)</option>
-                <option value="AUD ($)">AUD ($)</option>
-                <option value="CAD ($)">CAD ($)</option>
-                <option value="NZD ($)">NZD ($)</option>
-                <option value="ZAR (R)">ZAR (R)</option>
               </select>
             </div>
           </div>
