@@ -24,6 +24,19 @@
   function signedIn(){ return cloudConfigured && !!API.session(); }
   function mode(){ return signedIn() ? 'cloud' : 'local'; }
 
+  function getActiveTenantId() {
+    if (cloudConfigured && API && API.session) {
+      const s = API.session();
+      if (s && s.tenant_id) return s.tenant_id;
+    }
+    try {
+      const sLocal = JSON.parse(localStorage.getItem('rs:session') || 'null');
+      if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
+      if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
+    } catch(e) {}
+    return 'local-demo';
+  }
+
   /* ---------------- field mappers (app shape <-> doppio columns) ---------------- */
   const num = v => (v==null||v==='') ? 0 : Number(v);
   const parseItems = t => { try { const a=JSON.parse(t); return Array.isArray(a)?a:[]; } catch(e){ return []; } };
@@ -188,39 +201,82 @@
 
   /* ---------------- LOCAL (localStorage) ---------------- */
   const LS = {
-    key:c=>'rs_v2:'+c,
-    read:c=>{ try{ return JSON.parse(localStorage.getItem(LS.key(c)))||[]; }catch(e){ return []; } },
-    write:(c,a)=>{ try{ localStorage.setItem(LS.key(c), JSON.stringify(a)); }catch(e){} },
-    async list(c){ return LS.read(c); },
-    async put(c,id,obj){
+    key: c => {
+      const tenantId = getActiveTenantId();
+      return 'rs_v2:' + tenantId + ':' + c;
+    },
+    read: c => {
+      try {
+        const activeKey = LS.key(c);
+        const val = localStorage.getItem(activeKey);
+        if (val !== null) {
+          return JSON.parse(val) || [];
+        }
+        // Migration from old un-prefixed key
+        const oldKey = 'rs_v2:' + c;
+        const oldVal = localStorage.getItem(oldKey);
+        if (oldVal !== null) {
+          localStorage.setItem(activeKey, oldVal);
+          return JSON.parse(oldVal) || [];
+        }
+        return [];
+      } catch (e) {
+        return [];
+      }
+    },
+    write: (c, a) => {
+      try {
+        localStorage.setItem(LS.key(c), JSON.stringify(a));
+      } catch (e) {}
+    },
+    async list(c) { return LS.read(c); },
+    async put(c, id, obj) {
       const cleanId = cleanIdForCollection(c, id);
-      const a=LS.read(c);
-      const rec={...obj,id:cleanId};
-      const i=a.findIndex(x=>String(x.id)===String(cleanId));
-      if(i>=0)a[i]=rec; else a.push(rec);
-      LS.write(c,a);
+      const a = LS.read(c);
+      const rec = { ...obj, id: cleanId };
+      const i = a.findIndex(x => String(x.id) === String(cleanId));
+      if (i >= 0) a[i] = rec; else a.push(rec);
+      LS.write(c, a);
       return rec;
     },
-    async bulkPut(c,arr){
-      const a=LS.read(c);
+    async bulkPut(c, arr) {
+      const a = LS.read(c);
       const cleanedArr = arr.map(o => {
         const cleanId = cleanIdForCollection(c, o.id);
         return { ...o, id: cleanId };
       });
-      cleanedArr.forEach(o=>{
-        const i=a.findIndex(x=>String(x.id)===String(o.id));
-        if(i>=0)a[i]=o; else a.push(o);
+      cleanedArr.forEach(o => {
+        const i = a.findIndex(x => String(x.id) === String(o.id));
+        if (i >= 0) a[i] = o; else a.push(o);
       });
-      LS.write(c,a);
+      LS.write(c, a);
       return cleanedArr;
     },
-    async del(c,id){
+    async del(c, id) {
       const cleanId = cleanIdForCollection(c, id);
-      LS.write(c, LS.read(c).filter(x=>String(x.id)!==String(cleanId)));
+      LS.write(c, LS.read(c).filter(x => String(x.id) !== String(cleanId)));
       return true;
     },
-    async getSettings(){ try{ return JSON.parse(localStorage.getItem('rs_v2:settings'))||null; }catch(e){ return null; } },
-    async setSettings(o){ try{ localStorage.setItem('rs_v2:settings', JSON.stringify(o)); }catch(e){} return o; }
+    async getSettings() {
+      const tenantId = getActiveTenantId();
+      const activeKey = 'rs_v2:' + tenantId + ':settings';
+      try {
+        const val = localStorage.getItem(activeKey);
+        if (val !== null) return JSON.parse(val) || null;
+        const oldVal = localStorage.getItem('rs_v2:settings');
+        if (oldVal !== null) {
+          localStorage.setItem(activeKey, oldVal);
+          return JSON.parse(oldVal) || null;
+        }
+      } catch (e) {}
+      return null;
+    },
+    async setSettings(o) {
+      const tenantId = getActiveTenantId();
+      const activeKey = 'rs_v2:' + tenantId + ':settings';
+      try { localStorage.setItem(activeKey, JSON.stringify(o)); } catch (e) {}
+      return o;
+    }
   };
 
   /* ---------------- CLOUD (tenant-data) ---------------- */
@@ -308,11 +364,44 @@
   const lastListFetchTime = {};
 
   const back = () => signedIn() ? CLOUD : LS;
+  let cachedSettingsMap = {};
+
   // Resilient wrapper: if a cloud call throws, log + fall back to local cache so the UI still works.
   async function guard(method, c, ...args){
     if(!signedIn()) return LS[method](c, ...args);
     if(method === 'put' || method === 'bulkPut' || method === 'del') {
       try { await LS[method](c, ...args); } catch(e){}
+    }
+
+    if (method === 'getSettings') {
+      const tenantId = getActiveTenantId();
+      if (cachedSettingsMap[tenantId]) return cachedSettingsMap[tenantId];
+      const localData = await LS.getSettings();
+      if (localData) {
+        cachedSettingsMap[tenantId] = localData;
+      }
+      const now = Date.now();
+      const lastFetch = lastListFetchTime['settings'] || 0;
+
+      if (!activeListRequests['settings'] && (now - lastFetch > 5000)) {
+        activeListRequests['settings'] = (async () => {
+          try {
+            const res = await CLOUD.getSettings();
+            if (res) {
+              cachedSettingsMap[tenantId] = res;
+              await LS.setSettings(res);
+              lastListFetchTime['settings'] = Date.now();
+              window.dispatchEvent(new CustomEvent('rs:db-sync', { detail: { collection: 'settings', data: res } }));
+              document.dispatchEvent(new Event('rs:tables-updated'));
+            }
+          } catch(e) {
+            console.warn(`[RS_DB] background getSettings sync failed:`, e.message);
+          } finally {
+            delete activeListRequests['settings'];
+          }
+        })();
+      }
+      return localData;
     }
 
     if (method === 'list') {
@@ -374,7 +463,30 @@
       const a=LS.read('_accounts'); const u={id:'local-'+Date.now(),email:p.email,meta:p.meta||{}}; a.push({...u,password:p.password}); LS.write('_accounts',a); localStorage.setItem('rs:session',JSON.stringify({user:u})); return {user:u}; },
     async signIn(p){ if(cloudConfigured) return API.login(p);
       const u={id:'local-demo',email:p.email||'demo@restrosuite.in',meta:{}}; localStorage.setItem('rs:session',JSON.stringify({user:u})); return {user:u}; },
-    async signOut(){ if(API && API.logout) API.logout(); localStorage.removeItem('rs:session'); return true; },
+    async signOut(){
+      if(API && API.logout) API.logout();
+      // Clear in-memory cached state
+      for (const k in known) delete known[k];
+      for (const k in activeListRequests) delete activeListRequests[k];
+      for (const k in lastListFetchTime) delete lastListFetchTime[k];
+      cachedSettingsMap = {};
+      cachedSettings = null;
+
+      // Clear all rs_ and rs- keys in localStorage to prevent leaks to the next user
+      try {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('rs_') || k.startsWith('rs-'))) {
+            keys.push(k);
+          }
+        }
+        keys.forEach(k => localStorage.removeItem(k));
+      } catch(e) {}
+
+      localStorage.removeItem('rs:session');
+      return true;
+    },
     async session(){ if(API) { const s = API.session(); if(s) return s; } try{ return JSON.parse(localStorage.getItem('rs:session'))||null; }catch(e){ return null; } }
   };
 
@@ -390,7 +502,25 @@
     bulkPut:(c,arr)=>guard('bulkPut',c,arr),
     del:(c,id)=>guard('del',c,id),
     getSettings:()=>guard('getSettings','settings'),
-    setSettings:(o)=> signedIn()? CLOUD.setSettings(o).catch(e=>{console.warn('[RS_DB] setSettings cloud failed:',e.message);return LS.setSettings(o);}) : LS.setSettings(o),
+    setSettings: async (o)=> {
+      const tenantId = getActiveTenantId();
+      cachedSettingsMap[tenantId] = o;
+      await LS.setSettings(o);
+      if (signedIn()) {
+        try {
+          const res = await CLOUD.setSettings(o);
+          if (res) {
+            cachedSettingsMap[tenantId] = res;
+            await LS.setSettings(res);
+          }
+          return res;
+        } catch(e) {
+          console.warn('[RS_DB] setSettings cloud failed:', e.message);
+          return o;
+        }
+      }
+      return o;
+    },
     ...auth
   };
 })();

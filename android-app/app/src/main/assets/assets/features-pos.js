@@ -201,6 +201,7 @@
     };
     const isDineIn = () => orderType().toLowerCase().includes('dine');
     const isKotSent = () => kotSentKey && kotSentKey === cartKey();
+    const markKotSent = () => { kotSentKey = cartKey(); };
     const resetCustomerFields = () => {
       const ct = document.getElementById('cart-table');
       if (ct) ct.value = 'Walk-in / Takeaway';
@@ -351,6 +352,13 @@
 
       /* ── Restore saved position ── */
       function applyStoredPos() {
+        if (window.innerWidth <= 1024) {
+          drawer.style.left = '';
+          drawer.style.top = '';
+          drawer.style.right = '';
+          drawer.style.bottom = '';
+          return;
+        }
         try {
           const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
           if (!stored) return;
@@ -371,6 +379,9 @@
         drawer.style.top    = top  + 'px';
       }
 
+      // Add resize window listener to recalculate position/layout
+      window.addEventListener('resize', applyStoredPos);
+
       function savePos() {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -386,6 +397,7 @@
       }
 
       function onStart(e) {
+        if (window.innerWidth <= 1024) return;
         /* Ignore clicks on the close button itself */
         if (e.target.closest('.csd-close')) return;
         isDragging = true;
@@ -538,6 +550,18 @@
 
       /* ── 4.  Core: apply a scale ratio to the whole drawer ── */
       function applySize(targetW, targetH) {
+        if (window.innerWidth <= 1024) {
+          drawer.style.width = '';
+          drawer.style.height = '';
+          drawer.style.maxHeight = '';
+          drawer.style.overflow = '';
+          drawer.style.borderRadius = '';
+          wrap.style.width = '100%';
+          wrap.style.transform = '';
+          wrap.style.height = '100%';
+          bEl.style.overflowY = 'auto';
+          return;
+        }
         const w     = Math.min(Math.max(targetW, MIN_W), MAX_W);
         const scale = w / BASE_W;
 
@@ -582,11 +606,26 @@
       }
 
       function restoreSize() {
+        if (window.innerWidth <= 1024) {
+          drawer.style.width = '';
+          drawer.style.height = '';
+          drawer.style.maxHeight = '';
+          drawer.style.overflow = '';
+          drawer.style.borderRadius = '';
+          wrap.style.width = '100%';
+          wrap.style.transform = '';
+          wrap.style.height = '100%';
+          bEl.style.overflowY = 'auto';
+          return;
+        }
         try {
           const s = JSON.parse(localStorage.getItem(SIZE_KEY) || 'null');
           if (s) applySize(s.w, s.h);
         } catch(e) {}
       }
+
+      // Add resize window listener to reset sizing if view shrinks
+      window.addEventListener('resize', restoreSize);
 
       /* ── 6.  Resize drag tracking ── */
       let isResizing = false, rDir = '';
@@ -599,6 +638,7 @@
       }
 
       function onResizeStart(e) {
+        if (window.innerWidth <= 1024) return;
         const handle = e.target.closest('.csd-resize-handle');
         if (!handle) return;
         e.preventDefault();
@@ -916,6 +956,10 @@
               await RS_DB.del('pending_orders', matched.id);
               if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
             }
+            
+            // Sync in-memory held orders and reload table grid
+            await loadHeldFromDB();
+            await renderPosTableGrid();
           } catch(e) {
             console.warn("Failed to clear pending order or draft on checkout", e);
           }
@@ -1216,6 +1260,8 @@
                 if (draftToDel) {
                   await window.RS_DB.del('drafts', draftToDel.id).catch(() => {});
                 }
+                await loadHeldFromDB();
+                await renderPosTableGrid();
               } catch(e) {
                 console.warn("Failed to delete draft on clear cart", e);
               }
@@ -1985,6 +2031,7 @@
           }
         }
         // Update table grid status
+        await loadHeldFromDB();
         await renderPosTableGrid();
       }
 
