@@ -597,7 +597,7 @@
                 <th>Items</th>
                 <th>
                   Payment
-                  <select id="bills-pay-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                  <select id="bills-pay-filter" class="filter-select">
                     <option value="All">All</option>
                     <option value="Cash">Cash</option>
                     <option value="UPI">UPI</option>
@@ -607,7 +607,7 @@
                 <th>Amount</th>
                 <th>
                   Status
-                  <select id="bills-status-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                  <select id="bills-status-filter" class="filter-select">
                     <option value="All">All</option>
                     <option value="paid">Paid</option>
                     <option value="refunded">Refunded</option>
@@ -646,7 +646,7 @@
               <th>Ingredient</th>
               <th>
                 Category
-                <select id="inv-cat-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                <select id="inv-cat-filter" class="filter-select">
                   <option value="All">All</option>
                   <option value="veg">veg</option>
                   <option value="dairy">dairy</option>
@@ -660,7 +660,7 @@
               <th>Unit cost</th>
               <th>
                 Status
-                <select id="inv-status-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
+                <select id="inv-status-filter" class="filter-select">
                   <option value="All">All</option>
                   <option value="ok">Healthy</option>
                   <option value="low">Low</option>
@@ -712,7 +712,7 @@
                         <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; background:rgba(0,0,0,0.02); padding:8px 12px; border-radius:6px; border:1px solid var(--stroke-2);">
               <div style="display:flex; align-items:center; gap:6px;">
                 <span style="font-size:12px; color:var(--text-mute); font-weight:500;">Category:</span>
-                <select id="editor-cat-filter" style="background:var(--panel, #fff); border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:3px 6px; border-radius:4px; outline:none; cursor:pointer; font-weight:600; font-family:inherit;">
+                <select id="editor-cat-filter" class="filter-select">
                   <option value="All">All</option>
                   <option value="Starters">Starters</option>
                   <option value="Mains">Mains</option>
@@ -723,7 +723,7 @@
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
                 <span style="font-size:12px; color:var(--text-mute); font-weight:500;">Stock:</span>
-                <select id="editor-stock-filter" style="background:var(--panel, #fff); border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:3px 6px; border-radius:4px; outline:none; cursor:pointer; font-weight:600; font-family:inherit;">
+                <select id="editor-stock-filter" class="filter-select">
                   <option value="All">All</option>
                   <option value="ok">In stock</option>
                   <option value="low">Low</option>
@@ -961,7 +961,7 @@
               <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--stroke); padding-bottom: 8px; margin-bottom: 12px;">
                 <h3 style="font-size: 14px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-bug" style="color:var(--orange)"></i> Incidents</h3>
                 <div style="display: flex; gap: 6px; align-items: center;">
-                  <select id="app-incidents-status-filter" style="padding: 3px 6px; border-radius: 6px; border: 1px solid var(--stroke); background: var(--panel); color: var(--text); font-size: 11px;">
+                  <select id="app-incidents-status-filter" class="filter-select">
                     <option value="open">Open</option>
                     <option value="resolved">Resolved</option>
                     <option value="all">All</option>
@@ -1343,6 +1343,7 @@
 <script src="assets/features-growth.js?v=20260618-importsync3"></script>
 <script src="assets/features-extra.js"></script>
 <script src="src/dashboard/onboarding.js?v=20260619-duestour"></script>
+<script src="assets/country-currency-data.js"></script>
 <script src="assets/features-shell.js?v=20260618-realdata2"></script>
 
 <script>
@@ -1378,6 +1379,17 @@
     });
   });
 }());
+</script>
+
+<script>
+/* Global custom-dropdown init ─ wraps all select.form-input that are already
+   in the static HTML on page-load. Dynamic panes (settings, etc.) call
+   RS_wrapAllSelects themselves after injecting their content. */
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof window.RS_wrapAllSelects !== 'function') return;
+  // Wrap static form selects (e.g. cart-table, menu-editor category/type/gst)
+  window.RS_wrapAllSelects(document.body);
+});
 </script>
 </body>
 </html>
