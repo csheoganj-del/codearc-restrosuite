@@ -36,26 +36,49 @@
     /* ---------------- left form ---------------- */
     function buildForm(){
       const sec = $('#editor-tab'); if(!sec) return;
-      const panel = sec.querySelector('.panel'); if(!panel || panel.dataset.built) return;
-      panel.dataset.built = '1';
-      panel.innerHTML = `
-        <div class="panel-head"><h3 id="ed-form-title">Add new item</h3><button class="btn btn-ghost btn-sm" id="ed-reset" style="display:none"><i class="fa-solid fa-xmark"></i> Cancel edit</button></div>
-        <div style="display:flex;flex-direction:column;gap:14px">
-          <div><label class="fl">Item name</label><input class="form-input" id="ed-name" placeholder="e.g. Paneer Tikka"></div>
-          <div class="form-grid-2">
-            <div><label class="fl">Price (₹)</label><input class="form-input" id="ed-price" type="number" min="0" placeholder="199"></div>
-            <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select></div>
-          </div>
-          <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups…"></div>
-          </div>
-          <div class="form-grid-2">
-            <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
-            <div><label class="fl">GST slab</label><select class="form-input" id="ed-gst">${GST.map(g=>`<option>${g}</option>`).join('')}</select></div>
-          </div>
-          <div><label class="fl">Linked ingredients (recipe)</label><div class="ing-chips" id="ed-ings"></div></div>
-          <div id="ed-costline" style="font-size:12.5px;color:var(--text-mute)"></div>
-          <button class="btn btn-primary btn-block" id="ed-save"><i class="fa-solid fa-circle-check"></i> Save item</button>
-        </div>`;
+      const panel = sec.querySelector('.panel'); if(!panel) return;
+      
+      const activeSettings = window.RS_SETTINGS || {};
+      const taxLabel = activeSettings.set_tax_label || 'GST';
+      const curCountry = activeSettings.set_country || 'India';
+      const slabs = window.RS_getCountryTaxSlabs ? window.RS_getCountryTaxSlabs(curCountry) : ['5%','12%','18%'];
+      const symbol = activeSettings.set_currency ? activeSettings.set_currency.split(' ').slice(-1)[0].replace(/[()]/g, '') : '₹';
+
+      if(!panel.dataset.built) {
+        panel.dataset.built = '1';
+        panel.innerHTML = `
+          <div class="panel-head"><h3 id="ed-form-title">Add new item</h3><button class="btn btn-ghost btn-sm" id="ed-reset" style="display:none"><i class="fa-solid fa-xmark"></i> Cancel edit</button></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div><label class="fl">Item name</label><input class="form-input" id="ed-name" placeholder="e.g. Paneer Tikka"></div>
+            <div class="form-grid-2">
+              <div><label class="fl">Price (${symbol})</label><input class="form-input" id="ed-price" type="number" min="0" placeholder="199"></div>
+              <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select></div>
+            </div>
+            <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups…"></div>
+            </div>
+            <div class="form-grid-2">
+              <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
+              <div><label class="fl">${taxLabel} slab</label><select class="form-input" id="ed-gst">${slabs.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
+            </div>
+            <div><label class="fl">Linked ingredients (recipe)</label><div class="ing-chips" id="ed-ings"></div></div>
+            <div id="ed-costline" style="font-size:12.5px;color:var(--text-mute)"></div>
+            <button class="btn btn-primary btn-block" id="ed-save"><i class="fa-solid fa-circle-check"></i> Save item</button>
+          </div>`;
+      } else {
+        const edGst = $('#ed-gst');
+        const taxSlabLabel = edGst?.parentNode?.querySelector('.fl');
+        if (taxSlabLabel) taxSlabLabel.textContent = `${taxLabel} slab`;
+        if (edGst) {
+          const curVal = edGst.value;
+          edGst.innerHTML = slabs.map(g => `<option value="${g}">${g}</option>`).join('');
+          if (slabs.includes(curVal)) edGst.value = curVal;
+          else edGst.selectedIndex = 0;
+        }
+        const priceLabel = $('#ed-price')?.parentNode?.querySelector('.fl');
+        if (priceLabel) {
+          priceLabel.textContent = `Price (${symbol})`;
+        }
+      }
       let draftIngs = [];
       const ingsEl = $('#ed-ings'), costEl = $('#ed-costline');
       function renderIngs(){
@@ -90,6 +113,31 @@
           edNewCatRow.style.display = edCatSel.value === '__new__' ? 'block' : 'none';
         });
       }
+
+      // Auto-assign Ireland tax slab based on item name and category
+      const edName = $('#ed-name');
+      const edGst = $('#ed-gst');
+      const autoAssignIrelandTax = () => {
+        if (editingId) return; // Only for new items
+        const activeSettings = window.RS_SETTINGS || {};
+        const country = activeSettings.set_country || 'India';
+        if (String(country).toLowerCase() !== 'ireland') return;
+
+        if (edName && edCatSel && edGst) {
+          const typicalSlab = window.RS_getIrelandTypicalTaxSlab
+            ? window.RS_getIrelandTypicalTaxSlab(edName.value, edCatSel.value)
+            : '0%';
+          if (Array.from(edGst.options).some(o => o.value === typicalSlab)) {
+            edGst.value = typicalSlab;
+            // If custom dropdown is active, sync its display label
+            const cdTrigger = edGst.parentNode && edGst.parentNode.querySelector('.dropdown-trigger-label');
+            if (cdTrigger) cdTrigger.textContent = typicalSlab;
+          }
+        }
+      };
+      if (edName) edName.addEventListener('input', autoAssignIrelandTax);
+      if (edCatSel) edCatSel.addEventListener('change', autoAssignIrelandTax);
+
       $('#ed-reset').onclick = resetForm;
       $('#ed-save').onclick = async ()=>{
         const name = $('#ed-name').value.trim();
@@ -123,7 +171,20 @@
       };
       // expose for edit
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
-        $('#ed-name').value=m.name; $('#ed-price').value=m.price; $('#ed-cat').value=m.cat; $('#ed-type').value=m.veg?'veg':'nonveg'; $('#ed-gst').value=m.gst||'5%';
+        $('#ed-name').value=m.name; $('#ed-price').value=m.price; $('#ed-cat').value=m.cat; $('#ed-type').value=m.veg?'veg':'nonveg';
+        const edGst = $('#ed-gst');
+        if (edGst && m.gst) {
+          const exists = Array.from(edGst.options).some(o => o.value === m.gst);
+          if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = m.gst;
+            opt.textContent = m.gst;
+            edGst.appendChild(opt);
+          }
+          edGst.value = m.gst;
+        } else if (edGst) {
+          edGst.value = m.gst || edGst.options[0]?.value || '';
+        }
         draftIngs = recipeOf(m).map(g=>({...g})); renderIngs(); $('#ed-name').focus(); };
       function resetForm(){ editingId=null; $('#ed-form-title').textContent='Add new item'; $('#ed-reset').style.display='none';
         $('#ed-name').value=''; $('#ed-price').value=''; $('#ed-cat').selectedIndex=0; $('#ed-type').selectedIndex=0; $('#ed-gst').selectedIndex=0; draftIngs=[]; renderIngs(); }

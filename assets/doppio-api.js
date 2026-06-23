@@ -19,9 +19,9 @@
         const res = JSON.parse(xhr.responseText);
         if (res.supabaseUrl && res.supabaseAnonKey) {
           cfg = { url: res.supabaseUrl, anonKey: res.supabaseAnonKey };
-          enableDemoTools = res.enableDemoTools === true;
-          zeroCostLaunchMode = res.zeroCostLaunchMode === true;
         }
+        enableDemoTools = res.enableDemoTools === true;
+        zeroCostLaunchMode = res.zeroCostLaunchMode === true;
       }
     } catch(e) {
       console.warn('[doppio-api] Synchronous fetch /api/config failed:', e.message);

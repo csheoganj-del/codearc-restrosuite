@@ -49,14 +49,43 @@
     const gstRate = profile.gstRate !== undefined
       ? normalizeMoney(profile.gstRate)
       : 18;
-    const gst = gstEnabled ? Math.round(taxableAmount * (gstRate / 100)) : 0;
+    const isInclusive = profile.inclusivePricing === true;
+
+    let gst = 0;
+    if (gstEnabled) {
+      let totalTax = 0;
+      cart.forEach(item => {
+        if (!item) return;
+        const rate = (item.gst !== undefined && item.gst !== null && item.gst !== '')
+          ? parseFloat(String(item.gst).replace('%', ''))
+          : gstRate;
+        if (Number.isNaN(rate) || rate <= 0) return;
+
+        const itemSub = normalizeMoney(item.price) * normalizeMoney(item.qty);
+        const itemDiscount = subtotal > 0 ? (itemSub * (loyaltyDiscount / subtotal)) : 0;
+        const itemTaxable = Math.max(0, itemSub - itemDiscount);
+
+        let itemTax = 0;
+        if (isInclusive) {
+          itemTax = itemTaxable - (itemTaxable / (1 + rate / 100));
+        } else {
+          itemTax = itemTaxable * (rate / 100);
+        }
+        totalTax += itemTax;
+      });
+      gst = Math.round(totalTax);
+    }
+
+    const returnSubtotal = (isInclusive && gstEnabled) ? subtotal - gst : subtotal;
+    const returnTaxable = (isInclusive && gstEnabled) ? taxableAmount - gst : taxableAmount;
+    const returnTotal = isInclusive ? taxableAmount : (taxableAmount + gst);
 
     return {
-      subtotal,
+      subtotal: returnSubtotal,
       loyaltyDiscount,
-      taxableAmount,
+      taxableAmount: returnTaxable,
       gst,
-      total: taxableAmount + gst,
+      total: returnTotal,
       matchedCustomer: customer
     };
   }

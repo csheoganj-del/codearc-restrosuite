@@ -99,4 +99,33 @@ test('parseImportSheets tolerates flexible headers with spaces and underscores',
   assert.equal(parsed.menu[0].price, 180);
 });
 
+test('parseImportSheets defaults item tax slabs for Ireland correctly', () => {
+  globalThis.window = {
+    RS_SETTINGS: { set_country: 'Ireland' },
+    RS_getIrelandTypicalTaxSlab: (name, cat) => {
+      const n = String(name).toLowerCase();
+      if (n.includes('beer')) return '23%';
+      if (n.includes('pizza')) return '13.5%';
+      return '0%';
+    }
+  };
+
+  const parsed = imports.parseImportSheets({
+    Menu: [
+      { Name: 'Guinness Beer', Category: 'Alcohol', Price: '6.50' },
+      { Name: 'Hot Pepperoni Pizza', Category: 'Mains', Price: '14.99' },
+      { Name: 'Organic Raw Milk', Category: 'Groceries', Price: '1.80' }
+    ]
+  });
+
+  delete globalThis.window;
+
+  assert.equal(parsed.errors.length, 0);
+  assert.equal(parsed.menu.length, 3);
+  assert.equal(parsed.menu[0].gst, '23%');
+  assert.equal(parsed.menu[1].gst, '13.5%');
+  assert.equal(parsed.menu[2].gst, '0%');
+});
+
+
 

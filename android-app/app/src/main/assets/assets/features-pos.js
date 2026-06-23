@@ -15,7 +15,10 @@
       return s.tenant_name || s.outlet_name || s.business_name || titleCase(s.tenant_slug || s.outlet_id || sessionStorage.getItem('tenant_slug') || 'Outlet');
     };
     let receiptProfile = { name: sessionOutletName(), address:'', phone:'', gstin:'' };
+    let currentSettings = {};
     function normalizeReceiptProfile(settings){
+      currentSettings = settings || {};
+      window.RS_SETTINGS = currentSettings; // Update global reference
       const raw = (settings && settings._raw) || {};
       return {
         name: settings?.set_restaurant_name || settings?.set_outlet_name || raw.business_name || raw.outlet_name || sessionOutletName(),
@@ -24,8 +27,44 @@
         gstin: settings?.set_gstin || raw.gstin || ''
       };
     }
+    function getDigitalPaymentMethodName() {
+      const symbol = RS.getCurrencySymbol ? RS.getCurrencySymbol() : '₹';
+      return symbol === '₹' ? 'UPI' : 'Stripe';
+    }
     RS.updateStaticCurrencyLabels = function() {
       const symbol = RS.getCurrencySymbol ? RS.getCurrencySymbol() : '₹';
+      const digitalMethod = getDigitalPaymentMethodName();
+
+      // Update UPI button in payment methods
+      const upiBtn = document.querySelector('[data-pay-method="UPI"], [data-pay-method="Stripe"]');
+      if (upiBtn) {
+        upiBtn.setAttribute('data-pay-method', digitalMethod);
+        const icon = upiBtn.querySelector('i');
+        if (icon) {
+          icon.className = symbol === '₹' ? 'fa-solid fa-qrcode' : 'fa-brands fa-stripe';
+          icon.style.fontSize = symbol === '₹' ? '12px' : '15px';
+          icon.style.color = symbol === '₹' ? 'var(--orange)' : '#635bff';
+        }
+        const textSpan = upiBtn.querySelector('span');
+        if (textSpan) {
+          textSpan.textContent = digitalMethod;
+        }
+      }
+
+      // Update split labels
+      const splitUpiLabel = document.getElementById('split-upi-label');
+      const splitUpiIcon = document.getElementById('split-upi-icon');
+      if (splitUpiLabel) {
+        splitUpiLabel.textContent = digitalMethod;
+      }
+      if (splitUpiIcon) {
+        const icon = splitUpiIcon.querySelector('i');
+        if (icon) {
+          icon.className = symbol === '₹' ? 'fa-solid fa-qrcode' : 'fa-brands fa-stripe';
+        }
+        splitUpiIcon.style.background = symbol === '₹' ? 'rgba(255,79,0,.1)' : 'rgba(99,91,255,.1)';
+        splitUpiIcon.style.color = symbol === '₹' ? 'var(--orange)' : '#635bff';
+      }
       
       // Update labels like "Price (₹)"
       document.querySelectorAll('label').forEach(el => {
@@ -110,6 +149,7 @@
         RS.updateStaticCurrencyLabels();
       } catch(e){}
     }
+    RS.loadReceiptProfile = loadReceiptProfile; // Expose globally
     loadReceiptProfile();
     document.addEventListener('rs:hydrated', loadReceiptProfile);
 
@@ -181,10 +221,12 @@
     function receiptHTML(bill){
       const custName = bill.customer || 'Walk-in';
       let custSection = '';
-      if(custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
+      const hasPhone = bill.customerPhone && bill.customerPhone !== 'null' && bill.customerPhone !== 'undefined';
+      const hasName = custName && custName !== 'Walk-in' && custName !== 'Walk-in Guest';
+      if(hasName || hasPhone || bill.customerGst) {
         custSection = `
           <div class="rcp-meta"><span>Customer:</span><span>${esc(custName)}</span></div>
-          ${bill.customerPhone ? `<div class="rcp-meta"><span>Phone:</span><span>${esc(bill.customerPhone)}</span></div>` : ''}
+          ${hasPhone ? `<div class="rcp-meta"><span>Phone:</span><span>${esc(bill.customerPhone)}</span></div>` : ''}
           ${bill.customerGst ? `<div class="rcp-meta"><span>GSTIN:</span><span>${esc(bill.customerGst)}</span></div>` : ''}
         `;
       } else {
@@ -206,8 +248,47 @@
         <hr class="rcp-hr">
         <div class="rcp-line"><span>Subtotal</span><span>${rs(bill.sub)}</span></div>
         ${bill.disc?`<div class="rcp-line"><span>Discount</span><span>– ${rs(bill.disc)}</span></div>`:''}
-        ${bill.gst?`<div class="rcp-line"><span>CGST 2.5%</span><span>${rs(Math.round(bill.gst/2))}</span></div>
-        <div class="rcp-line"><span>SGST 2.5%</span><span>${rs(bill.gst-Math.round(bill.gst/2))}</span></div>`:''}
+        ${(() => {
+          if (!bill.gst) return '';
+          const activeSettings = window.RS_SETTINGS || currentSettings || {};
+          const taxLabel = activeSettings.set_tax_label || 'GST';
+          const taxRate = parseFloat(activeSettings.set_tax_rate_percent) || 0;
+          const isIndiaGst = (taxLabel.toUpperCase() === 'GST') && 
+            (String(activeSettings.set_country || '').toLowerCase() === 'india' || 
+             String(activeSettings.set_currency || '').includes('INR') ||
+             String(activeSettings.set_currency || '').includes('₹'));
+          
+          if (isIndiaGst) {
+            const halfRate = (taxRate / 2) || 2.5;
+            const cgstVal = Math.round(bill.gst / 2);
+            const sgstVal = bill.gst - cgstVal;
+            return `
+              <div class="rcp-line"><span>CGST ${halfRate}%</span><span>${rs(cgstVal)}</span></div>
+              <div class="rcp-line"><span>SGST ${halfRate}%</span><span>${rs(sgstVal)}</span></div>
+            `;
+          } else {
+            const activeRates = [];
+            if (Array.isArray(bill.items)) {
+              bill.items.forEach(i => {
+                if (i.qty > 0) {
+                  const rate = (i.gst !== undefined && i.gst !== null && i.gst !== '')
+                    ? parseFloat(String(i.gst).replace('%', ''))
+                    : taxRate;
+                  if (rate > 0 && !activeRates.includes(rate)) {
+                    activeRates.push(rate);
+                  }
+                }
+              });
+            }
+            let labelText = taxLabel;
+            if (activeRates.length === 1) {
+              labelText = `${taxLabel} (${activeRates[0]}%)`;
+            } else {
+              labelText = taxLabel;
+            }
+            return `<div class="rcp-line"><span>${esc(labelText)}</span><span>${rs(bill.gst)}</span></div>`;
+          }
+        })()}
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
         <hr class="rcp-hr">
         ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${t.method}</span><span>${rs(t.amount)}</span></div>`).join('')}
@@ -216,25 +297,515 @@
     }
 
     function receiptText(bill){
-      const lines = [
-        receiptProfile.name || 'Outlet',
-        receiptProfile.address,
-        receiptProfile.phone ? `Phone: ${receiptProfile.phone}` : '',
-        receiptProfile.gstin ? `GSTIN: ${receiptProfile.gstin}` : '',
-        `Bill: ${bill.no}`,
-        `${bill.table} | ${bill.time}`,
-        '',
-        ...bill.items.map(i => `${i.qty} x ${i.name} - ${rs(i.price * i.qty)}`),
-        '',
-        `Subtotal: ${rs(bill.sub)}`,
-        bill.disc ? `Discount: - ${rs(bill.disc)}` : '',
-        bill.gst ? `GST: ${rs(bill.gst)}` : '',
-        `Total: ${rs(bill.grand)}`,
-        `Paid by: ${(bill.tenders && bill.tenders[0] && bill.tenders[0].method) || 'Cash'}`,
-        '',
-        'Thank you for dining with us!'
-      ];
-      return lines.filter(Boolean).join('\n');
+      const borderDouble = '='.repeat(24);
+      const borderSingle = '-'.repeat(24);
+
+      const center = (text) => {
+        const width = 24;
+        if (!text) return '';
+        const t = String(text).trim();
+        if (t.length <= width) {
+          const leftPad = Math.floor((width - t.length) / 2);
+          return ' '.repeat(leftPad) + t;
+        }
+        // Word wrap
+        const words = t.split(' ');
+        const lines = [];
+        let currentLine = '';
+        words.forEach(word => {
+          if ((currentLine + (currentLine ? ' ' : '') + word).length <= width) {
+            currentLine += (currentLine ? ' ' : '') + word;
+          } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+          }
+        });
+        if (currentLine) lines.push(currentLine);
+        return lines.map(line => {
+          const leftPad = Math.floor((width - line.length) / 2);
+          return ' '.repeat(leftPad) + line;
+        }).join('\n');
+      };
+
+      const row = (col1, col2, col3) => {
+        const w1 = 13;
+        const w2 = 4;
+        const w3 = 7;
+        let c1 = String(col1).slice(0, w1 - 1);
+        c1 = c1.padEnd(w1, ' ');
+        const c2 = String(col2).toString().padStart(w2, ' ');
+        const c3 = String(col3).toString().padStart(w3, ' ');
+        return c1 + c2 + c3;
+      };
+
+      const double = (label, value) => {
+        const totalWidth = 24;
+        const valStr = String(value);
+        const padSize = totalWidth - label.length;
+        if (padSize < valStr.length) {
+          return label.slice(0, totalWidth - valStr.length) + valStr;
+        }
+        return label + valStr.padStart(padSize, ' ');
+      };
+
+      const cleanForWhatsApp = (text) => {
+        if (typeof text !== 'string') return text;
+        return text
+          .replace(/₹/g, 'Rs.')
+          .replace(/€/g, 'EUR')
+          .replace(/£/g, 'GBP');
+      };
+
+      const fmt = (n) => {
+        return cleanForWhatsApp(rs(n));
+      };
+
+      let msg = "```\n";
+      msg += borderDouble + '\n';
+      msg += center(receiptProfile.name || 'Outlet') + '\n';
+      if (receiptProfile.address) msg += center(receiptProfile.address) + '\n';
+      if (receiptProfile.phone) msg += center(`Phone: ${receiptProfile.phone}`) + '\n';
+      if (receiptProfile.gstin) msg += center(`GSTIN: ${receiptProfile.gstin}`) + '\n';
+      msg += borderDouble + '\n\n';
+
+      let leftBill = `Bill: ${bill.no}`;
+      let rightPay = (bill.tenders && bill.tenders[0] && bill.tenders[0].method) || 'Cash';
+      if (rightPay.length > 8) rightPay = rightPay.slice(0, 8);
+      const padSize = 24 - leftBill.length;
+      if (padSize < rightPay.length) {
+        msg += leftBill.slice(0, 24 - rightPay.length) + rightPay + '\n';
+      } else {
+        msg += leftBill + rightPay.padStart(padSize, ' ') + '\n';
+      }
+
+      msg += `Date: ${bill.time ? bill.time.split(' ')[0] : new Date().toLocaleDateString('en-IN')}\n`;
+      const custName = bill.customer || 'Walk-in';
+      if (custName && custName !== 'Walk-in' && custName !== 'Walk-in Guest') {
+        msg += `Guest: ${custName.slice(0, 17)}\n`;
+      }
+      msg += '\n';
+
+      msg += borderSingle + '\n';
+      msg += row('Item', 'Qty', 'Amt') + '\n';
+      msg += borderSingle + '\n';
+
+      (bill.items || []).forEach(i => {
+        msg += row(i.name, i.qty, Math.round(i.price * i.qty).toString()) + '\n';
+        msg += `  (${fmt(i.price)} each)\n`;
+      });
+
+      msg += borderSingle + '\n';
+      msg += double('Subtotal', fmt(bill.sub)) + '\n';
+      if (bill.disc) msg += double('Discount', `-${fmt(bill.disc)}`) + '\n';
+      
+      if (bill.gst) {
+        const activeSettings = window.RS_SETTINGS || {};
+        const taxLabel = activeSettings.set_tax_label || 'GST';
+        msg += double(taxLabel, fmt(bill.gst)) + '\n';
+      }
+
+      msg += borderDouble + '\n';
+      msg += double('GRAND TOTAL', fmt(bill.grand)) + '\n';
+      msg += borderDouble + '\n\n';
+
+      msg += center('Thank you for dining with us!') + '\n';
+      msg += center('Powered by RestroSuite') + '\n';
+      msg += "```";
+
+      return msg;
+    }
+
+    async function shareReceiptViaWhatsApp(bill, btn) {
+      // 1. Check if the gateway is online and ready
+      let gatewayReady = false;
+      let gatewayStatus = null;
+      const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i>Sending…';
+      }
+
+      try {
+        if (window.RS_API && typeof RS_API.data === 'function') {
+          if (!RS_API.zeroCostLaunchMode) {
+            gatewayStatus = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
+            if (gatewayStatus && gatewayStatus.status === 'ready') {
+              gatewayReady = true;
+            }
+          }
+        }
+      } catch(e) {
+        console.warn('Failed to check gateway status via API:', e.message);
+      }
+
+      // 2. Format receipt text
+      const text = receiptText(bill);
+
+      // Clean phone number format dynamically for WhatsApp API
+      function getCleanWhatsAppPhone(rawPhone) {
+        let ph = (rawPhone || '').trim();
+        if (!ph || ph === 'null' || ph === 'undefined') {
+          return '';
+        }
+        
+        let digitsOnly = ph.replace(/\D/g, '');
+        
+        // If it starts with + (or was passed with a leading dial code)
+        if (ph.startsWith('+')) {
+          const countries = (window.RS && window.RS.countries) || [];
+          for (const c of countries) {
+            const dialDigits = c.dial.replace(/\D/g, '');
+            if (digitsOnly.startsWith(dialDigits)) {
+              let local = digitsOnly.slice(dialDigits.length);
+              if (local.startsWith('0')) {
+                local = local.slice(1);
+              }
+              return dialDigits + local;
+            }
+          }
+          return digitsOnly;
+        }
+
+        // Check active country default dial code
+        const defaultCountry = (window.RS && window.RS.getDefaultCountry && window.RS.getDefaultCountry()) || { dial: '+91' };
+        const activeDialDigits = defaultCountry.dial.replace(/\D/g, '');
+
+        if (digitsOnly.startsWith(activeDialDigits)) {
+          let local = digitsOnly.slice(activeDialDigits.length);
+          if (local.startsWith('0')) {
+            local = local.slice(1);
+          }
+          return activeDialDigits + local;
+        }
+
+        if (digitsOnly.startsWith('0')) {
+          digitsOnly = digitsOnly.slice(1);
+        }
+
+        return activeDialDigits + digitsOnly;
+      }
+
+      let phone = getCleanWhatsAppPhone(bill.customerPhone);
+
+      // 3. If gateway is ready, send it instantly
+      if (gatewayReady) {
+        if (!phone || phone.trim() === '') {
+          const userPhone = prompt("Enter customer's WhatsApp number (with country code, e.g. 353852258004):");
+          if (userPhone === null) {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = originalHtml;
+            }
+            return; // User cancelled
+          }
+          phone = getCleanWhatsAppPhone(userPhone);
+          if (phone) {
+            bill.customerPhone = phone;
+            // Save updated phone to local DB
+            try {
+              if (window.RS_DB && typeof RS_DB.save === 'function') {
+                const localBill = await RS_DB.get('bills', bill.no);
+                if (localBill) {
+                  localBill.customerPhone = phone;
+                  await RS_DB.save('bills', localBill);
+                }
+              }
+            } catch(dbErr) {
+              console.warn('Failed to save to local DB:', dbErr.message);
+            }
+            // Save updated phone to remote DB
+            try {
+              if (window.RS_API && typeof RS_API.update === 'function') {
+                await RS_API.update('doppio_bills', { customerPhone: phone }, [{ operator: 'eq', column: 'orderId', value: bill.no }]);
+              }
+            } catch(apiErr) {
+              console.warn('Failed to save to remote DB:', apiErr.message);
+            }
+          }
+        }
+
+        if (phone) {
+          const activeSettings = window.RS_SETTINGS || {};
+          const format = activeSettings.set_whatsapp_bill_format || 'Text receipt';
+          let pdfData = undefined;
+          let filename = undefined;
+
+          if (format === 'Thermal PDF receipt' && ((window.jspdf && window.jspdf.jsPDF) || window.jsPDF)) {
+            RS.toast('Generating PDF receipt...', 'fa-spinner fa-spin');
+            try {
+              // ── Pure jsPDF text rendering ────────────────────────────────────────────
+              // html2canvas approach ALWAYS fails for this receipt because receiptHTML()
+              // uses CSS class names (rcp-center, rcp-logo, etc.) defined in the page
+              // stylesheet. Those classes are not available inside a cloned DOM element,
+              // so html2canvas captures a blank/white canvas.
+              //
+              // to draw every line of the receipt.
+              const activeSettings = window.RS_SETTINGS || currentSettings || {};
+              const taxLabel = activeSettings.set_tax_label || 'GST';
+              const taxRate  = parseFloat(activeSettings.set_tax_rate_percent) || 0;
+              const currSym  = (() => {
+                const c = activeSettings.set_currency || '₹';
+                // If it contains parentheses like "EUR (€)", extract the part inside parentheses
+                const m = c.match(/\(([^)]+)\)/);
+                if (m) return m[1].trim();
+                // Otherwise, if it has a space like "INR ₹" or just "₹", take the last word or non-word character
+                const parts = c.trim().split(/\s+/);
+                return parts[parts.length - 1];
+              })();
+
+              const cleanForJsPDF = (text) => {
+                if (typeof text !== 'string') return text;
+                return text
+                  .replace(/₹/g, 'Rs.')
+                  .replace(/€/g, '\x80')
+                  .replace(/£/g, '\xA3');
+              };
+
+              const fmt = (n) => {
+                const rounded = Math.round(Number(n || 0));
+                const locale = currSym === '₹' ? 'en-IN' : 'en-US';
+                const formattedAmt = rounded.toLocaleString(locale);
+                return cleanForJsPDF(`${currSym}${formattedAmt}`);
+              };
+
+              // Build lines array  ─────────────────────────────────
+              const W = 72; // usable mm width on 80mm paper (with 4mm margins each side)
+              const receiptLines = []; // { text, align:'C'|'L'|'R', bold, sep }
+
+              const center = (t, bold) => receiptLines.push({ text: t, align: 'C', bold: !!bold });
+              const sep    = ()        => receiptLines.push({ sep: true });
+              const left   = (t)       => receiptLines.push({ text: t, align: 'L' });
+              const lr     = (l, r)    => receiptLines.push({ left: l, right: r });
+
+              // Header
+              center(receiptProfile.name || 'Outlet', true);
+              if (receiptProfile.address) center(receiptProfile.address);
+              if (receiptProfile.phone)   center(`Phone: ${receiptProfile.phone}`);
+              if (receiptProfile.gstin)   center(`GSTIN: ${receiptProfile.gstin}`);
+              sep();
+
+              // Bill meta
+              lr(bill.no, bill.time);
+              lr('Table:', bill.table);
+
+              const custName = bill.customer || 'Walk-in';
+              const hasPhone = bill.customerPhone && bill.customerPhone !== 'null' && bill.customerPhone !== 'undefined';
+              const hasName  = custName && custName !== 'Walk-in' && custName !== 'Walk-in Guest';
+              if (hasName)                 lr('Customer:', custName);
+              else                         lr('Customer:', 'Walk-in');
+              if (hasPhone)                lr('Phone:', bill.customerPhone);
+              if (bill.customerGst)        lr('Cust GSTIN:', bill.customerGst);
+              sep();
+
+              // Items
+              (bill.items || []).forEach(i => {
+                lr(`${i.qty}x ${i.name}`, fmt(i.price * i.qty));
+              });
+              sep();
+
+              // Totals
+              lr('Subtotal', fmt(bill.sub));
+              if (bill.disc) lr('Discount', `- ${fmt(bill.disc)}`);
+
+              if (bill.gst) {
+                const isIndiaGst = (taxLabel.toUpperCase() === 'GST') &&
+                  (String(activeSettings.set_country || '').toLowerCase() === 'india' ||
+                   String(activeSettings.set_currency || '').includes('INR') ||
+                   String(activeSettings.set_currency || '').includes('₹'));
+                if (isIndiaGst) {
+                  const half = (taxRate / 2) || 2.5;
+                  const cgst = Math.round(bill.gst / 2);
+                  const sgst = bill.gst - cgst;
+                  lr(`CGST ${half}%`, fmt(cgst));
+                  lr(`SGST ${half}%`, fmt(sgst));
+                } else {
+                  const activeRates = [];
+                  if (Array.isArray(bill.items)) {
+                    bill.items.forEach(i => {
+                      if (i.qty > 0) {
+                        const rate = (i.gst !== undefined && i.gst !== null && i.gst !== '')
+                          ? parseFloat(String(i.gst).replace('%', ''))
+                          : taxRate;
+                        if (rate > 0 && !activeRates.includes(rate)) {
+                          activeRates.push(rate);
+                        }
+                      }
+                    });
+                  }
+                  let labelText = taxLabel;
+                  if (activeRates.length === 1) {
+                    labelText = `${taxLabel} (${activeRates[0]}%)`;
+                  }
+                  lr(labelText, fmt(bill.gst));
+                }
+              }
+
+              // TOTAL (bold)
+              receiptLines.push({ left: 'TOTAL', right: fmt(bill.grand), bold: true, big: true });
+              sep();
+
+              // Payment
+              (bill.tenders || []).forEach(t => lr(t.method, fmt(t.amount)));
+              if (bill.change) lr('Change', fmt(bill.change));
+              sep();
+
+              center('Thank you for dining with us!');
+              center('Powered by RestroSuite');
+
+              // ── Draw to jsPDF ────────────────────────────────────────────────────────
+              const pageH = Math.max(120, 28 + receiptLines.length * 5);
+              // html2pdf.bundle.min.js exposes jsPDF differently across versions:
+              //   v0.10.x → window.jspdf.jsPDF
+              //   older   → window.jsPDF
+              const JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+              if (!JsPDF) throw new Error('jsPDF not available');
+              const doc = new JsPDF({ unit: 'mm', format: [80, pageH], orientation: 'portrait' });
+
+              const marginL = 4;
+              const marginR = 76;
+              const colR    = 76;
+              let y = 8;
+              const lineH = 4.5;
+
+              doc.setFont('courier', 'normal');
+              doc.setFontSize(8);
+
+              const drawSep = () => {
+                doc.setDrawColor(180);
+                doc.setLineDashPattern([1.5, 1], 0);
+                doc.line(marginL, y, marginR, y);
+                doc.setLineDashPattern([], 0);
+                y += 2;
+              };
+
+              receiptLines.forEach(row => {
+                if (row.sep) { drawSep(); return; }
+
+                const fontSize = row.big ? 11 : 8;
+                const fontStyle = row.bold ? 'bold' : 'normal';
+                doc.setFontSize(fontSize);
+                doc.setFont('courier', fontStyle);
+
+                if (row.align === 'C') {
+                  doc.text(cleanForJsPDF(row.text), 40, y, { align: 'center' });
+                  y += lineH;
+                } else if (row.left !== undefined) {
+                  // left-right pair – truncate left side if too long
+                  const cleanLeft = cleanForJsPDF(row.left);
+                  const cleanRight = cleanForJsPDF(row.right);
+                  const rightW = doc.getTextWidth(cleanRight);
+                  const maxLeftW = (marginR - marginL) - rightW - 2;
+                  let leftText = cleanLeft;
+                  while (doc.getTextWidth(leftText) > maxLeftW && leftText.length > 1) {
+                    leftText = leftText.slice(0, -1);
+                  }
+                  if (leftText.length < cleanLeft.length) {
+                    leftText = leftText.slice(0, -3) + '...';
+                  }
+                  doc.text(leftText, marginL, y);
+                  doc.text(cleanRight, colR, y, { align: 'right' });
+                  y += lineH;
+                } else {
+                  doc.text(cleanForJsPDF(row.text), marginL, y);
+                  y += lineH;
+                }
+              });
+
+              const pdfBase64 = doc.output('datauristring');
+              pdfData = pdfBase64.split(',')[1];
+              filename = `receipt-${bill.no}.pdf`;
+            } catch (pdfErr) {
+              console.error('Failed to generate PDF:', pdfErr);
+              RS.toast('PDF generation failed, sending text...', 'fa-triangle-exclamation');
+            }
+          }
+
+          RS.toast('Sending WhatsApp receipt...', 'fa-spinner fa-spin');
+          try {
+            const res = await RS_API.data({
+              operation: 'gateway_send',
+              tenantId: tenantId,
+              phone: phone,
+              message: text,
+              orderId: bill.no,
+              pdfData: pdfData,
+              filename: filename
+            });
+            if (res && res.error) {
+              throw new Error(res.error);
+            }
+            RS.toast('Receipt sent instantly via WhatsApp!', 'fa-whatsapp');
+            if (btn) {
+              btn.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#22c55e;margin-right:5px"></i>Sent!';
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+              }, 4000);
+            }
+            return;
+          } catch(sendErr) {
+            console.error('Failed to send via gateway:', sendErr.message);
+            RS.toast('Gateway send failed, falling back...', 'fa-triangle-exclamation');
+            if (btn) {
+              btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;margin-right:5px"></i>Failed';
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+              }, 3000);
+            }
+          }
+        }
+      }
+
+      // 4. Fallback: Manual WhatsApp — copy to clipboard + show a clickable prompt
+      //    We avoid window.open() here because async code breaks the user-gesture
+      //    context, causing popup-blockers to silently kill the tab.
+      //    Instead we show a modal with a real button so the user can open it safely.
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(text);
+        }
+      } catch(clipErr) {
+        console.warn('Clipboard write failed:', clipErr.message);
+      }
+
+      const encodedText = encodeURIComponent(text);
+      let waUrl = '';
+      if (isMobile) {
+        waUrl = phone ? `https://wa.me/${phone}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`;
+      } else {
+        waUrl = phone ? `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}` : `https://web.whatsapp.com/send?text=${encodedText}`;
+      }
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+
+      // Show modal with a real button click — not blocked by popup blockers
+      RSModal.open({
+        title: 'Send Receipt via WhatsApp',
+        icon: 'fa-whatsapp',
+        size: 'sm',
+        body: `<div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:8px 0;text-align:center">
+          <div style="font-size:14px;color:var(--text-soft);line-height:1.6">
+            ${gatewayReady
+              ? '<i class="fa-solid fa-triangle-exclamation" style="color:#eab308;margin-right:6px"></i>Gateway send failed. The receipt text has been copied to your clipboard.<br>Click below to open WhatsApp and paste it.'
+              : '<i class="fa-brands fa-whatsapp" style="color:#22c55e;margin-right:6px"></i>The receipt has been copied to your clipboard.<br>Click below to open WhatsApp and paste it.'}
+          </div>
+          ${phone ? `<div style="font-size:12px;color:var(--text-mute)">Sending to: <strong>+${phone}</strong></div>` : ''}
+          <a href="${waUrl}" target="_blank" rel="noopener noreferrer" id="wa-open-btn"
+            style="display:inline-flex;align-items:center;gap:8px;background:#22c55e;color:#fff;font-weight:700;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(34,197,94,0.35);transition:all 0.2s">
+            <i class="fa-brands fa-whatsapp"></i> Open WhatsApp
+          </a>
+          <div style="font-size:11px;color:var(--text-mute)"><i class="fa-solid fa-clipboard" style="margin-right:4px"></i>Receipt text is already copied — just paste (Ctrl+V) in WhatsApp</div>
+        </div>`,
+        foot: `<button class="btn btn-ghost" id="wa-modal-close">Close</button>`
+      });
     }
 
     function showReceipt(bill){
@@ -247,12 +818,7 @@
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
         onMount(modal, close){
           modal.querySelector('#rc-print').onclick = ()=> RSPrint(printHtml, 'Receipt '+bill.no);
-          modal.querySelector('#rc-wa').onclick = ()=>{
-            const text = encodeURIComponent(receiptText(bill));
-            const url = `https://wa.me/?text=${text}`;
-            window.open(url, '_blank', 'noopener,noreferrer');
-            RS.toast('WhatsApp receipt ready','fa-whatsapp');
-          };
+          modal.querySelector('#rc-wa').onclick = (e)=> RSReceipt.share(bill, e.currentTarget);
           modal.querySelector('#rc-new').onclick = close;
         }
       });
@@ -264,6 +830,9 @@
       show: showReceipt,
       print(bill){
         RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`, 'Receipt '+bill.no);
+      },
+      share(bill, btn){
+        shareReceiptViaWhatsApp(bill, btn);
       }
     };
 
@@ -990,7 +1559,7 @@
             receivedAmount: receivedVal, changeAmount: changeVal,
             customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
             subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
+            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, gst:i.gst })) };
           RS.BILLS.unshift(billRow);
           if (RS.saveOne) await RS.saveOne('bills',billRow);
           const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
@@ -1009,6 +1578,14 @@
         resetCustomerFields();
         resetPayment();
         showReceipt(bill);
+
+        // Auto-send WhatsApp receipt if enabled and customer phone exists (deferred to prevent UI block)
+        const activeSettings = window.RS_SETTINGS || {};
+        if (activeSettings.set_auto_send_receipts && bill.customerPhone && bill.customerPhone !== 'null' && bill.customerPhone !== 'undefined') {
+          setTimeout(() => {
+            shareReceiptViaWhatsApp(bill);
+          }, 800);
+        }
 
         if (window.RS_DB) {
           try {
@@ -1094,6 +1671,13 @@
                   if (csel) {
                     csel.value = phone;
                   }
+                  
+                  // Immediately sync to the widget input elements to avoid race conditions
+                  const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+                  const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+                  if (nameEl) nameEl.value = name;
+                  if (phoneEl) phoneEl.value = phone;
+
                   document.dispatchEvent(new CustomEvent('rs:hydrated'));
                   
                   setTimeout(() => {
@@ -1191,6 +1775,13 @@
                     if (csel) {
                       csel.value = phone;
                     }
+
+                    // Immediately sync to the widget input elements to avoid race conditions
+                    const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+                    const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+                    if (nameEl) nameEl.value = name;
+                    if (phoneEl) phoneEl.value = phone;
+
                     document.dispatchEvent(new CustomEvent('rs:hydrated'));
                     
                     setTimeout(() => {
@@ -1219,7 +1810,7 @@
 
         const tenders = [];
         if (cash > 0) tenders.push({ method: 'Cash', amount: cash - changeAmount });
-        if (upi > 0) tenders.push({ method: 'UPI', amount: upi });
+        if (upi > 0) tenders.push({ method: getDigitalPaymentMethodName(), amount: upi });
         if (card > 0) tenders.push({ method: 'Card', amount: card });
         if (due > 0) tenders.push({ method: 'Due', amount: due });
 

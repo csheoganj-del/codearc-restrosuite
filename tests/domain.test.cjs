@@ -61,6 +61,22 @@ test("billing supports GST and loyalty being disabled", () => {
   assert.equal(result.total, 498);
 });
 
+test("billing supports item-level taxes", () => {
+  const result = billing.calculateCartTotals({
+    cart: [
+      { price: 100, qty: 1, gst: "23%" },
+      { price: 200, qty: 1, gst: "13.5%" },
+      { price: 50, qty: 1, gst: "0%" }
+    ],
+    businessProfile: { gstEnabled: true, loyaltyEnabled: false }
+  });
+
+  assert.equal(result.subtotal, 350);
+  assert.equal(result.gst, 50);
+  assert.equal(result.total, 400);
+});
+
+
 test("order ingredient deductions are aggregated", () => {
   const deductions = billing.aggregateDeductions(
     [{ name: "Latte", qty: 2 }, { name: "Latte", qty: 1 }],

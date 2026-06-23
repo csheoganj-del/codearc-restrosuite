@@ -1,11 +1,13 @@
 {
-  "version": "v23-20260621",
-  "date": "2026-06-21",
-  "title": "POS Tab Blinking & State Recovery Update",
-  "summary": "This update adds a live blinking alert system for background tabs needing attention, fixes data loss when switching POS order tabs, and enhances update stability.",
+  "version": "v25-20260623",
+  "date": "2026-06-23",
+  "title": "POS Cart, Settings Sync, and Stripe Integration Update",
+  "summary": "This update resolves POS cart layout overlaps, fixes country selector dropdown clipping, syncs settings changes instantly, adds Stripe auto-swap for international payments, and allows flexible item card sizing.",
   "highlights": [
-    "Tab Blinking Notifications: Sidebar and mobile tabs blink dynamically when orders are pending or ingredients are low.",
-    "Order Tab Persistence: Cart drafts are correctly saved and recovered during POS tab navigation.",
-    "Verification checks: Verified with a full test suite passing all contract tests."
+    "POS Cart Overlap Fix: Corrected unclosed HTML tags to prevent overlapping of search inputs and cart elements.",
+    "Country Selector & Code Picker: Fixed dropdown clipping issues by seting combo container overflow to visible.",
+    "Dynamic UPI/Stripe Auto-Swap: Automatically switches payment option to Stripe and logs credit card tenders for non-INR currencies.",
+    "Flexible Card Sizing: Adjusted item cards aspect ratio and title wrapping so text is never clipped or hidden.",
+    "Instant Settings Sync: Ensured store setting changes in currency or language immediately update the active POS elements."
   ]
 }

@@ -1,4 +1,10 @@
 require('dns').setDefaultResultOrder('ipv4first');
+process.on('uncaughtException', (err) => {
+    console.error('[CRITICAL] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const QRCodeLib = require('qrcode');
@@ -155,65 +161,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Gateway connection state variables
-let connectionStatus = 'connecting'; // 'connecting', 'qr', 'ready', 'disconnected', 'auth_failure'
-let qrCodeDataUrl = null;
-let linkedNumber = null;
-let reconnectAttempts = 0;
+// Multi-Tenant Gateway State Manager
+const tenantClients = new Map(); // tenantId -> TenantClientData
 const MAX_RECONNECT_ATTEMPTS = 5;
-let sessionSavedAt = null;
-let sessionRestoredAt = null;
-let lastAlertSent = null;
 let totalMessagesSent = 0;
 let recentHealthEvents = []; // last 10 events for dashboard
-
-// Watchdog — detects when gateway is stuck at 'connecting' and auto-resets
-// This fixes the #1 reliability bug: restored session is invalid/expired but
-// whatsapp-web.js never fires auth_failure or qr events — it just hangs forever.
-let watchdogTimer = null;
-const WATCHDOG_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
-
-function startWatchdog() {
-    clearWatchdog();
-    watchdogTimer = setTimeout(async () => {
-        if (connectionStatus === 'connecting') {
-            console.warn('[Watchdog] ⚠️  Gateway stuck at "connecting" for 3 minutes. Auto-resetting...');
-            await logHealthEvent('watchdog_reset', 'warning', {
-                reason: 'stuck_connecting_timeout',
-                reconnectAttempts
-            });
-            // Destroy current client and re-initialize cleanly
-            try { await client.destroy(); } catch (_) {}
-            // Clear bad session files so a fresh QR is generated
-            if (fs.existsSync(authDataPath)) {
-                fs.rmSync(authDataPath, { recursive: true, force: true });
-            }
-            // Delete bad session from Supabase Storage too
-            if (supabaseService) {
-                await supabaseService.storage.from(SESSION_BUCKET).remove([SESSION_FILE_NAME]).catch(() => {});
-            }
-            connectionStatus = 'connecting';
-            console.log('[Watchdog] Re-initializing WhatsApp driver after reset...');
-            client.initialize().catch(err => console.error('[Watchdog] Re-init failed:', err.message));
-        }
-    }, WATCHDOG_TIMEOUT_MS);
-}
-
-function clearWatchdog() {
-    if (watchdogTimer) {
-        clearTimeout(watchdogTimer);
-        watchdogTimer = null;
-    }
-}
+let lastAlertSent = null;
 
 // ============================================================
 // HEALTH LOGGING — writes to gateway_health_log in Supabase
 // ============================================================
 async function logHealthEvent(event, status, details = {}) {
-    const entry = { event, status, details, time: new Date().toISOString() };
-    // Keep last 10 events in memory for dashboard
+    const entry = { event, status, details, created_at: new Date().toISOString() };
+    // Keep last 200 events in memory for dashboard filtering
     recentHealthEvents.unshift(entry);
-    if (recentHealthEvents.length > 10) recentHealthEvents.pop();
+    if (recentHealthEvents.length > 200) recentHealthEvents.pop();
 
     if (!supabaseService) {
         console.log(`[Health Log] (no service key) ${event} - ${status}`);
@@ -299,7 +261,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
           <table style="font-size: 13px; width: 100%; margin: 20px 0; border-collapse: collapse;">
             <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; width: 180px; padding: 8px 0; color: #475569;">Connection Status:</td><td style="color: #16a34a; font-weight: 600; padding: 8px 0;">ONLINE / READY</td></tr>
             <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Timestamp:</td><td style="padding: 8px 0; color: #334155;">${timeStr}</td></tr>
-            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Connected Line:</td><td style="padding: 8px 0; color: #334155; font-family: monospace;">+${extraDetails.number || linkedNumber || 'Unknown'}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Connected Line:</td><td style="padding: 8px 0; color: #334155; font-family: monospace;">+${extraDetails.number || (tenantClients.get('system')?.number) || 'Unknown'}</td></tr>
             <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Cloud Session Backup:</td><td style="padding: 8px 0; color: #334155;">${extraDetails.sessionSaved ? 'Verified and Saved' : 'Pending'}</td></tr>
           </table>
 
@@ -369,16 +331,18 @@ async function sendAdminAlert(type, extraDetails = {}) {
 // ============================================================
 // SESSION PERSISTENCE — Save/Restore WhatsApp session via Supabase Storage
 // ============================================================
-async function saveSessionToSupabase() {
+async function saveSessionToSupabaseScoped(tenantId) {
     if (!supabaseService) {
-        console.warn('[Session Save] SUPABASE_SERVICE_KEY not set. Session backup skipped.');
+        console.warn(`[Session Save] SUPABASE_SERVICE_KEY not set. Session backup skipped for tenant: ${tenantId}`);
         return;
     }
-    if (!fs.existsSync(authDataPath)) {
-        console.warn('[Session Save] Auth data path does not exist. Nothing to save.');
+    const tenantFolder = path.join(authDataPath, `session-${tenantId}`);
+    if (!fs.existsSync(tenantFolder)) {
+        console.warn(`[Session Save] Auth data path does not exist for tenant ${tenantId}. Nothing to save.`);
         return;
     }
-    const zipPath = path.join(os.tmpdir(), 'wa_session_backup.zip');
+    const zipPath = path.join(os.tmpdir(), `wa_session_backup_${tenantId}.zip`);
+    const fileName = `session-${tenantId}.zip`;
     try {
         // Zip the auth folder excluding Chrome cache files to keep size under 3MB and avoid corruption
         await new Promise((resolve, reject) => {
@@ -388,7 +352,7 @@ async function saveSessionToSupabase() {
             archive.on('error', reject);
             archive.pipe(output);
             archive.glob('**/*', {
-                cwd: authDataPath,
+                cwd: tenantFolder,
                 ignore: [
                     '**/Cache/**',
                     '**/Code Cache/**',
@@ -450,18 +414,17 @@ async function saveSessionToSupabase() {
         const zipBuffer = fs.readFileSync(zipPath);
         const { error } = await supabaseService.storage
             .from(SESSION_BUCKET)
-            .upload(SESSION_FILE_NAME, zipBuffer, {
+            .upload(fileName, zipBuffer, {
                 contentType: 'application/zip',
                 upsert: true
             });
 
         if (error) throw error;
 
-        sessionSavedAt = new Date().toISOString();
-        console.log(`[Session Save] ✅ WhatsApp session backed up to Supabase Storage at ${sessionSavedAt}`);
-        await logHealthEvent('session_saved', 'ok', { path: SESSION_FILE_NAME, size: zipBuffer.length });
+        console.log(`[Session Save] ✅ Tenant ${tenantId} WhatsApp session backed up to Supabase Storage.`);
+        await logHealthEvent('session_saved', 'ok', { path: fileName, size: zipBuffer.length });
     } catch (err) {
-        console.error('[Session Save Error]', err.message);
+        console.error(`[Session Save Error] Tenant ${tenantId}:`, err.message);
         const size = fs.existsSync(zipPath) ? fs.statSync(zipPath).size : 0;
         const sizeMb = (size / (1024 * 1024)).toFixed(2) + ' MB';
         await logHealthEvent('session_save_failed', 'error', { error: err.message, zipSize: sizeMb });
@@ -505,53 +468,82 @@ function cleanupStaleLockFiles(dir) {
     }
 }
 
-async function restoreSessionFromSupabase() {
+async function restoreSessionsFromSupabase() {
     if (!supabaseService) {
-        console.warn('[Session Restore] SUPABASE_SERVICE_KEY not set. Skipping restore.');
-        return false;
+        console.warn('[Session Restore] SUPABASE_SERVICE_KEY not set. Skipping remote restore.');
+        return;
     }
-    const zipPath = path.join(os.tmpdir(), 'wa_session_restore.zip');
     try {
-        const { data, error } = await supabaseService.storage
+        console.log('[Session Restore] Scanning Supabase Storage for saved sessions...');
+        const { data: files, error } = await supabaseService.storage
             .from(SESSION_BUCKET)
-            .download(SESSION_FILE_NAME);
+            .list();
 
-        if (error || !data) {
-            console.log('[Session Restore] No saved session found in Supabase Storage.');
-            await logHealthEvent('session_restore_skipped', 'ok', { reason: 'no_backup_found' });
-            return false;
+        if (error || !files) {
+            console.log('[Session Restore] No sessions found or failed to list.');
+            return;
         }
 
-        const arrayBuffer = await data.arrayBuffer();
-        fs.writeFileSync(zipPath, Buffer.from(arrayBuffer));
+        for (const file of files) {
+            if (file.name.startsWith('session-') && file.name.endsWith('.zip')) {
+                const tenantId = file.name.substring(8, file.name.length - 4);
+                console.log(`[Session Restore] Found session zip for tenant: ${tenantId}. Downloading...`);
+                
+                const zipPath = path.join(os.tmpdir(), `wa_session_restore_${tenantId}.zip`);
+                try {
+                    const { data, error: dlError } = await supabaseService.storage
+                        .from(SESSION_BUCKET)
+                        .download(file.name);
 
-        // Clear existing auth folder before extracting
-        if (fs.existsSync(authDataPath)) {
-            fs.rmSync(authDataPath, { recursive: true, force: true });
+                    if (dlError || !data) throw dlError || new Error('No data downloaded');
+
+                    const arrayBuffer = await data.arrayBuffer();
+                    fs.writeFileSync(zipPath, Buffer.from(arrayBuffer));
+
+                    const tenantFolder = path.join(authDataPath, `session-${tenantId}`);
+                    if (fs.existsSync(tenantFolder)) {
+                        fs.rmSync(tenantFolder, { recursive: true, force: true });
+                    }
+                    fs.mkdirSync(tenantFolder, { recursive: true });
+
+                    await fs.createReadStream(zipPath)
+                        .pipe(unzipper.Extract({ path: tenantFolder }))
+                        .promise();
+
+                    cleanupStaleLockFiles(tenantFolder);
+                    console.log(`[Session Restore] ✅ Tenant ${tenantId} session restored from Supabase.`);
+                } catch(e) {
+                    console.error(`[Session Restore Error] Failed to restore tenant ${tenantId}:`, e.message);
+                } finally {
+                    try { fs.unlinkSync(zipPath); } catch (_) {}
+                }
+            }
         }
-        fs.mkdirSync(authDataPath, { recursive: true });
-
-        await fs.createReadStream(zipPath)
-            .pipe(unzipper.Extract({ path: authDataPath }))
-            .promise();
-
-        cleanupStaleLockFiles(authDataPath);
-
-        sessionRestoredAt = new Date().toISOString();
-        console.log(`[Session Restore] ✅ WhatsApp session restored from Supabase Storage at ${sessionRestoredAt}`);
-        await logHealthEvent('session_restored', 'ok', { path: SESSION_FILE_NAME });
-        return true;
     } catch (err) {
         console.error('[Session Restore Error]', err.message);
-        await logHealthEvent('session_restore_failed', 'error', { error: err.message });
-        return false;
-    } finally {
-        try { fs.unlinkSync(zipPath); } catch (_) {}
+    }
+}
+
+function autoInitializeLocalSessions() {
+    if (!fs.existsSync(authDataPath)) return;
+    try {
+        const files = fs.readdirSync(authDataPath);
+        for (const file of files) {
+            if (file.startsWith('session-')) {
+                const tenantId = file.substring(8);
+                if (tenantId) {
+                    console.log(`[Startup Auto-Restore] Found local session directory for tenant: ${tenantId}`);
+                    getOrCreateClient(tenantId);
+                }
+            }
+        }
+    } catch(err) {
+        console.error('[Startup Auto-Restore Error] Failed to scan local sessions:', err.message);
     }
 }
 
 // Read secret token from environment variable (configured as a secret in HuggingFace Space)
-const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || process.env.WHATSAPP_GATEWAY_TOKEN || '';
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || process.env.WHATSAPP_GATEWAY_TOKEN || 'local-dev-gateway-token';
 
 // Utility to mask phone numbers in logs to prevent customer data leaks
 function maskPhone(phoneStr) {
@@ -595,141 +587,189 @@ if (!process.env.AUTH_DATA_PATH && os.platform() === 'win32') {
 }
 
 // Initialize WhatsApp client with local session caching
-const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: authDataPath
-    }),
-
-    puppeteer: {
-        handleSIGINT: false,
-        protocolTimeout: 0,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-            '--disable-cache',
-            '--disk-cache-size=0',
-            '--media-cache-size=0',
-            '--aggressive-cache-discard',
-            '--disable-async-dns',
-            '--disable-extensions',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        ]
-    }
-});
-
-// Intercept client.initialize to run cleanupStaleLockFiles before starting Chromium
-const originalInitialize = client.initialize;
-client.initialize = function() {
-    try {
-        console.log('[Puppeteer Init Shield] Cleaning up stale browser lock/socket/cookie files before launch...');
-        cleanupStaleLockFiles(authDataPath);
-    } catch (err) {
-        console.error('[Puppeteer Init Shield Error]', err.message);
-    }
-    return originalInitialize.apply(this, arguments);
-};
-
-// Display QR code in terminal and save base64 data URI for POS Web UI
-client.on('qr', async (qr) => {
-    clearWatchdog(); // QR received — gateway is not stuck anymore
-    connectionStatus = 'qr';
-    linkedNumber = null;
-    try {
-        qrCodeDataUrl = await QRCodeLib.toDataURL(qr);
-        console.log('\n==================================================================');
-        console.log('   SCAN THIS QR CODE WITH YOUR WHATSAPP APP TO LINK YOUR ACCOUNT   ');
-        console.log('==================================================================\n');
-        qrcode.generate(qr, { small: true });
-        console.log('\nInstructions: Open WhatsApp > Settings > Linked Devices > Link a Device.');
-        console.log('Alternative: Open gateway dashboard to scan directly from the browser.');
-    } catch (err) {
-        console.error('Failed to generate base64 QR Code URL:', err);
-    }
-    await logHealthEvent('qr_generated', 'warning', { reconnectAttempts });
-    // Alert admin that QR scan is needed (only once — not on every QR refresh)
-    if (reconnectAttempts === 0) {
-        await sendAdminAlert('qr_needed', { reason: 'session_expired_or_new_start' });
-    }
-});
-
-client.on('ready', async () => {
-    clearWatchdog(); // Successfully connected — cancel any pending watchdog
-    const prevStatus = connectionStatus;
-    connectionStatus = 'ready';
-    qrCodeDataUrl = null;
-    reconnectAttempts = 0;
-    linkedNumber = client.info?.wid?.user || 'Unknown Device';
-    console.log('\n======================================================');
-    console.log(`   SUCCESS: Free WhatsApp Gateway is Ready & Linked!  `);
-    console.log(`   Connected Account: +${linkedNumber}`);
-    console.log('======================================================\n');
-
-    // Save session to Supabase Storage so it survives restarts
-    await saveSessionToSupabase();
-    await logHealthEvent('connected', 'ok', { number: linkedNumber });
-
-    // Send "back online" alert only if we were previously disconnected
-    if (prevStatus === 'disconnected' || prevStatus === 'auth_failure') {
-        await sendAdminAlert('online', { number: linkedNumber, sessionSaved: true });
+// Multi-Tenant Client Factory
+function getOrCreateClient(tenantId) {
+    const tid = (tenantId && String(tenantId).trim()) ? String(tenantId).trim() : 'system';
+    
+    if (tenantClients.has(tid)) {
+        return tenantClients.get(tid);
     }
 
-    // Periodic session backup every 30 minutes to keep it fresh
-    setInterval(async () => {
-        if (connectionStatus === 'ready') {
-            console.log('[Session Backup] Running periodic session backup...');
-            await saveSessionToSupabase();
+    console.log(`[Multi-Tenant] Initializing client instance for tenant: ${tid}`);
+
+    const client = new Client({
+        authStrategy: new LocalAuth({
+            clientId: tid,
+            dataPath: authDataPath
+        }),
+        puppeteer: {
+            handleSIGINT: false,
+            protocolTimeout: 0,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--disable-cache',
+                '--disk-cache-size=0',
+                '--media-cache-size=0',
+                '--aggressive-cache-discard',
+                '--disable-async-dns',
+                '--disable-extensions',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            ]
         }
-    }, 30 * 60 * 1000);
-});
+    });
 
-client.on('auth_failure', async (msg) => {
-    clearWatchdog(); // Auth failed — not stuck, just failed
-    connectionStatus = 'auth_failure';
-    qrCodeDataUrl = null;
-    linkedNumber = null;
-    console.error('Authentication failure:', msg);
-    await logHealthEvent('auth_failure', 'error', { message: String(msg) });
-    await sendAdminAlert('qr_needed', { reason: 'auth_failure', message: String(msg) });
-});
+    const tenantData = {
+        client,
+        status: 'connecting',
+        qr: null,
+        number: null,
+        sessionSavedAt: null,
+        reconnectAttempts: 0,
+        watchdogTimer: null
+    };
 
-client.on('disconnected', async (reason) => {
-    clearWatchdog(); // Disconnected — not stuck
-    const prevLinked = linkedNumber;
-    connectionStatus = 'disconnected';
-    qrCodeDataUrl = null;
-    linkedNumber = null;
-    console.log('WhatsApp client was disconnected:', reason);
-    await logHealthEvent('disconnected', 'warning', { reason });
+    const startWatchdog = () => {
+        if (tenantData.watchdogTimer) clearTimeout(tenantData.watchdogTimer);
+        tenantData.watchdogTimer = setTimeout(async () => {
+            if (tenantData.status === 'connecting') {
+                console.warn(`[Watchdog] Tenant ${tid} initialization timed out. Re-initializing...`);
+                clearWatchdog();
+                if (tenantClients.get(tid) === tenantData) {
+                    tenantClients.delete(tid);
+                }
+                try { await client.destroy(); } catch (_) {}
+                // Trigger a fresh client instantiation
+                getOrCreateClient(tid);
+            }
+        }, 180000); // 3 minutes watchdog
+    };
 
-    // Auto-reconnect logic
-    async function attemptReconnect() {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.error(`[Reconnect] All ${MAX_RECONNECT_ATTEMPTS} reconnect attempts exhausted. Sending admin alert.`);
-            await sendAdminAlert('disconnected', { reason, attempts: reconnectAttempts });
-            await logHealthEvent('reconnect_failed', 'error', { attempts: reconnectAttempts, reason });
+    const clearWatchdog = () => {
+        if (tenantData.watchdogTimer) {
+            clearTimeout(tenantData.watchdogTimer);
+            tenantData.watchdogTimer = null;
+        }
+    };
+
+    startWatchdog();
+
+    client.on('qr', async (qr) => {
+        clearWatchdog();
+        tenantData.status = 'qr';
+        tenantData.number = null;
+        try {
+            tenantData.qr = await QRCodeLib.toDataURL(qr);
+            console.log(`[QR] New QR code generated for tenant: ${tid}`);
+            if (tid === 'system') {
+                console.log('\n==================================================================');
+                console.log('   SCAN THIS QR CODE WITH YOUR WHATSAPP APP TO LINK YOUR ACCOUNT   ');
+                console.log('==================================================================\n');
+                qrcode.generate(qr, { small: true });
+                console.log('\nInstructions: Open WhatsApp > Settings > Linked Devices > Link a Device.');
+            }
+        } catch (err) {
+            console.error(`[QR Error] Failed to generate QR URL for tenant ${tid}:`, err);
+        }
+        await logHealthEvent('qr_generated', 'warning', { tenantId: tid });
+    });
+    client.on('authenticated', async () => {
+        clearWatchdog();
+        tenantData.status = 'authenticating';
+        tenantData.qr = null;
+        console.log(`[Authenticated] Tenant ${tid} successfully authenticated. Syncing...`);
+        await logHealthEvent('authenticated', 'ok', { tenantId: tid });
+    });
+
+    client.on('loading_screen', async (percent, message) => {
+        clearWatchdog();
+        if (tenantData.status === 'ready') {
+            console.log(`[Loading Screen] Tenant ${tid}: ${percent}% - ${message} (Ignored because already ready)`);
             return;
         }
-        reconnectAttempts++;
-        const delayMs = 10000 * reconnectAttempts; // 10s, 20s, 30s, 40s, 50s
-        console.log(`[Reconnect] Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000}s...`);
-        await logHealthEvent('reconnecting', 'warning', { attempt: reconnectAttempts, delayMs });
-        setTimeout(async () => {
-            try {
-                await client.initialize();
-            } catch (err) {
-                console.error(`[Reconnect] Attempt ${reconnectAttempts} failed:`, err.message);
-                await attemptReconnect();
+        tenantData.status = 'syncing';
+        tenantData.syncProgress = { percent, message };
+        tenantData.qr = null;
+        console.log(`[Loading Screen] Tenant ${tid}: ${percent}% - ${message}`);
+    });
+
+    client.on('ready', async () => {
+        clearWatchdog();
+        tenantData.status = 'ready';
+        tenantData.qr = null;
+        tenantData.number = client.info?.wid?.user || 'Unknown Device';
+        tenantData.sessionSavedAt = new Date().toISOString();
+        tenantData.reconnectAttempts = 0;
+        console.log(`[Multi-Tenant Ready] Tenant ${tid} is connected as +${tenantData.number}`);
+        
+        if (supabaseService) {
+            await saveSessionToSupabaseScoped(tid);
+        }
+        await logHealthEvent('connected', 'ok', { tenantId: tid, number: tenantData.number });
+    });
+
+    client.on('auth_failure', async (msg) => {
+        clearWatchdog();
+        tenantData.status = 'auth_failure';
+        tenantData.qr = null;
+        tenantData.number = null;
+        console.error(`[Auth Failure] Tenant ${tid}:`, msg);
+        await logHealthEvent('auth_failure', 'error', { tenantId: tid, message: String(msg) });
+    });
+
+    client.on('disconnected', async (reason) => {
+        clearWatchdog();
+        tenantData.status = 'disconnected';
+        tenantData.qr = null;
+        tenantData.number = null;
+        console.log(`[Disconnected] Tenant ${tid} disconnected:`, reason);
+        await logHealthEvent('disconnected', 'warning', { tenantId: tid, reason });
+
+        async function attemptReconnect() {
+            if (tenantData.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                console.error(`[Reconnect] Tenant ${tid}: All attempts exhausted.`);
+                await logHealthEvent('reconnect_failed', 'error', { tenantId: tid, attempts: tenantData.reconnectAttempts, reason });
+                return;
             }
-        }, delayMs);
-    }
-    attemptReconnect();
-});
+            tenantData.reconnectAttempts++;
+            const delayMs = 10000 * tenantData.reconnectAttempts;
+            console.log(`[Reconnect] Tenant ${tid}: Attempt ${tenantData.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000}s...`);
+            setTimeout(async () => {
+                try {
+                    await client.initialize();
+                } catch (err) {
+                    console.error(`[Reconnect] Tenant ${tid} attempt failed:`, err.message);
+                    await attemptReconnect();
+                }
+            }, delayMs);
+        }
+        attemptReconnect();
+    });
+
+    const originalInitialize = client.initialize;
+    client.initialize = function() {
+        try {
+            const tenantFolder = path.join(authDataPath, `session-${tid}`);
+            cleanupStaleLockFiles(tenantFolder);
+        } catch(e) {
+            console.error(`[Cleanup Error] Tenant ${tid} cleanup failed:`, e.message);
+        }
+        return originalInitialize.apply(this, arguments);
+    };
+
+    client.initialize().catch(err => {
+        console.error(`[Initialization Error] Tenant ${tid} failed:`, err.message);
+    });
+
+    tenantClients.set(tid, tenantData);
+    return tenantData;
+}
 
 // GET Endpoint to serve visual Gateway Dashboard for CodeArc Administrators (Made by Antigravity)
 app.get('/', (req, res) => {
@@ -1256,6 +1296,8 @@ app.post('/pair-code', async (req, res) => {
     if (!verifyToken(req)) {
         return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
     }
+    const tenantId = req.headers['x-tenant-id'] || 'system';
+    const tenantData = getOrCreateClient(tenantId);
     let { phone } = req.body;
     if (!phone) {
         return res.status(400).json({ status: 'error', error: 'Missing phone number' });
@@ -1267,22 +1309,22 @@ app.post('/pair-code', async (req, res) => {
         return res.status(400).json({ status: 'error', error: 'Invalid phone number. Use country code format e.g. 919983721179' });
     }
 
-    if (connectionStatus !== 'qr') {
+    if (tenantData.status !== 'qr') {
         return res.status(400).json({ 
             status: 'error', 
-            error: `Gateway is in '${connectionStatus}' state. Pairing code only works when status is 'qr'. If gateway is already ready, no linking is needed.`
+            error: `Gateway for tenant ${tenantId} is in '${tenantData.status}' state. Pairing code only works when status is 'qr'. If gateway is already ready, no linking is needed.`
         });
     }
 
     try {
-        console.log(`[Pair Code] Requesting pairing code for +${maskPhone(phone)}...`);
-        const code = await client.requestPairingCode(phone);
-        console.log(`[Pair Code] ✅ Pairing code generated for +${maskPhone(phone)}: ${code}`);
-        await logHealthEvent('pair_code_requested', 'ok', { phone: maskPhone(phone) });
+        console.log(`[Pair Code] Requesting pairing code for tenant ${tenantId} and +${maskPhone(phone)}...`);
+        const code = await tenantData.client.requestPairingCode(phone);
+        console.log(`[Pair Code] ✅ Pairing code generated for tenant ${tenantId} and +${maskPhone(phone)}: ${code}`);
+        await logHealthEvent('pair_code_requested', 'ok', { tenantId, phone: maskPhone(phone) });
         res.json({ status: 'success', code, phone: maskPhone(phone) });
     } catch (err) {
-        console.error(`[Pair Code Error] Failed to request pairing code:`, err.message);
-        await logHealthEvent('pair_code_failed', 'error', { phone: maskPhone(phone), error: err.message });
+        console.error(`[Pair Code Error] Failed to request pairing code for tenant ${tenantId}:`, err.message);
+        await logHealthEvent('pair_code_failed', 'error', { tenantId, phone: maskPhone(phone), error: err.message });
         res.status(500).json({ status: 'error', error: err.message });
     }
 });
@@ -1350,16 +1392,17 @@ app.get('/debug-poll', async (req, res) => {
 // GET Endpoint to read current gateway connection state
 app.get('/status', (req, res) => {
     const isAuthorized = verifyToken(req);
+    const tenantId = req.headers['x-tenant-id'] || 'system';
+    const tenantData = getOrCreateClient(tenantId);
 
     if (isAuthorized) {
         res.json({
-            status: connectionStatus,
-            authenticated: connectionStatus === 'ready',
-            number: linkedNumber,
-            qr: qrCodeDataUrl,
-            sessionSavedAt,
-            sessionRestoredAt,
-            reconnectAttempts,
+            status: tenantData.status,
+            authenticated: tenantData.status === 'ready',
+            number: tenantData.number,
+            qr: tenantData.qr,
+            sessionSavedAt: tenantData.sessionSavedAt,
+            reconnectAttempts: tenantData.reconnectAttempts,
             totalMessagesSent,
             recentHealthEvents
         });
@@ -1368,9 +1411,9 @@ app.get('/status', (req, res) => {
         // The QR image is only included when status is 'qr' (it's a one-time-use code and expires automatically).
         // Sensitive data (phone number, session metadata, health events) is always withheld.
         res.json({
-            status: connectionStatus === 'ready' ? 'ready' : connectionStatus,
-            authenticated: connectionStatus === 'ready',
-            qr: connectionStatus === 'qr' ? qrCodeDataUrl : null,
+            status: tenantData.status === 'ready' ? 'ready' : tenantData.status,
+            authenticated: tenantData.status === 'ready',
+            qr: tenantData.status === 'qr' ? tenantData.qr : null,
         });
     }
 });
@@ -1380,19 +1423,39 @@ app.post('/logout', async (req, res) => {
     if (!verifyToken(req)) {
         return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
     }
+    const tenantId = req.headers['x-tenant-id'] || 'system';
+    console.log(`[Logout] Request received to log out WhatsApp device for tenant: ${tenantId}`);
 
     try {
-        console.log('Request received to log out WhatsApp device...');
-        if (connectionStatus === 'ready') {
-            await client.logout();
+        if (tenantClients.has(tenantId)) {
+            const tenantData = tenantClients.get(tenantId);
+            if (tenantData.status === 'ready') {
+                await tenantData.client.logout();
+            }
+            try { await tenantData.client.destroy(); } catch (_) {}
+            
+            // Delete auth folder locally
+            const tenantFolder = path.join(authDataPath, `session-${tenantId}`);
+            if (fs.existsSync(tenantFolder)) {
+                fs.rmSync(tenantFolder, { recursive: true, force: true });
+                console.log(`[Logout] Purged local session files for tenant ${tenantId}`);
+            }
+            
+            // Delete session file from Supabase Storage
+            if (supabaseService) {
+                const fileName = `session-${tenantId}.zip`;
+                await supabaseService.storage.from(SESSION_BUCKET).remove([fileName]).catch(() => {});
+                console.log(`[Logout] Purged remote session zip for tenant ${tenantId}`);
+            }
+            
+            tenantClients.delete(tenantId);
         }
-        connectionStatus = 'disconnected';
-        qrCodeDataUrl = null;
-        linkedNumber = null;
-        console.log('WhatsApp device logged out successfully.');
+        
+        // Re-create as a clean disconnected instance
+        getOrCreateClient(tenantId);
         res.json({ status: 'success', message: 'Logged out successfully. Scan QR again.' });
     } catch (err) {
-        console.error('Failed to log out device:', err);
+        console.error(`[Logout Error] Tenant ${tenantId}:`, err);
         res.status(500).json({ status: 'error', error: err.message });
     }
 });
@@ -1407,45 +1470,43 @@ async function performReset(req, res, format = 'json') {
         }
     }
 
+    const tenantId = req.headers['x-tenant-id'] || 'system';
+
     try {
-        console.log('[Reset] Force reset initiated...');
-        connectionStatus = 'connecting';
-        qrCodeDataUrl = null;
-        linkedNumber = null;
+        console.log(`[Reset] Force reset initiated for tenant: ${tenantId}...`);
 
         // 1. Destroy current client browser instance if possible
-        try {
-            console.log('[Reset] Closing active Puppeteer browser session...');
-            await client.destroy();
-        } catch (destroyErr) {
-            console.log('[Reset Warning] Failed to destroy client cleanly (safe to ignore):', destroyErr.message);
+        if (tenantClients.has(tenantId)) {
+            const tenantData = tenantClients.get(tenantId);
+            try {
+                console.log(`[Reset] Closing active Puppeteer browser session for tenant ${tenantId}...`);
+                await tenantData.client.destroy();
+            } catch (destroyErr) {
+                console.log(`[Reset Warning] Failed to destroy client cleanly for tenant ${tenantId} (safe to ignore):`, destroyErr.message);
+            }
+            tenantClients.delete(tenantId);
         }
 
         // 2. Delete session from Supabase Storage
         if (supabaseService) {
-            console.log('[Reset] Deleting session.zip from Supabase Storage...');
+            const fileName = `session-${tenantId}.zip`;
+            console.log(`[Reset] Deleting ${fileName} from Supabase Storage...`);
             const { data, error } = await supabaseService.storage
                 .from(SESSION_BUCKET)
-                .remove([SESSION_FILE_NAME]);
+                .remove([fileName]);
             
             if (error) {
-                console.error('[Reset Error] Failed to delete session.zip from storage:', error.message);
+                console.error(`[Reset Error] Failed to delete ${fileName} from storage:`, error.message);
             } else {
-                console.log('[Reset] session.zip deleted successfully from Supabase Storage.');
+                console.log(`[Reset] ${fileName} deleted successfully from Supabase Storage.`);
             }
         }
 
-        // 3. Delete local auth directory
-        if (fs.existsSync(authDataPath)) {
-            console.log('[Reset] Deleting local auth directory:', authDataPath);
-            fs.rmSync(authDataPath, { recursive: true, force: true });
-        }
-
-        // 4. Clear cache directory
-        const cachePath = path.join(__dirname, '.wwebjs_cache');
-        if (fs.existsSync(cachePath)) {
-            console.log('[Reset] Deleting local cache directory:', cachePath);
-            fs.rmSync(cachePath, { recursive: true, force: true });
+        // 3. Delete local auth directory for this tenant
+        const tenantFolder = path.join(authDataPath, `session-${tenantId}`);
+        if (fs.existsSync(tenantFolder)) {
+            console.log(`[Reset] Deleting local auth directory for tenant ${tenantId}:`, tenantFolder);
+            fs.rmSync(tenantFolder, { recursive: true, force: true });
         }
 
         // 5. Send response to client first
@@ -1455,7 +1516,7 @@ async function performReset(req, res, format = 'json') {
                     <div style="max-width: 500px; padding: 30px; border: 1px solid #334155; border-radius: 16px; background-color: #1e293b; border-top: 4px solid #eab308; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);">
                         <h1 style="color: #f8fafc; font-size: 24px; margin-bottom: 15px;">⚡ Gateway Reset Complete</h1>
                         <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 20px;">
-                            The corrupted WhatsApp session has been successfully deleted from your Supabase storage and local cache.
+                            The corrupted WhatsApp session for tenant ${tenantId} has been successfully deleted from your Supabase storage and local cache.
                         </p>
                         <p style="font-size: 15px; font-weight: 600; color: #22c55e; margin-bottom: 25px;">
                             The gateway is re-initializing right now! A fresh QR code will display on the dashboard in a few seconds.
@@ -1468,18 +1529,15 @@ async function performReset(req, res, format = 'json') {
                 </div>
             `);
         } else {
-            res.json({ status: 'success', message: 'Gateway reset completed. Re-initializing driver.' });
+            res.json({ status: 'success', message: `Gateway reset completed for tenant ${tenantId}. Re-initializing driver.` });
         }
 
         // 6. Spawn new browser instance in background
-        console.log('[Reset] Re-initializing clean WhatsApp driver instance...');
-        startWatchdog(); // Start watchdog after reset too
-        client.initialize().catch(err => {
-            console.error('[Reset Error] Failed to re-initialize WhatsApp client:', err.message);
-        });
+        console.log(`[Reset] Re-initializing clean WhatsApp driver instance for tenant ${tenantId}...`);
+        getOrCreateClient(tenantId);
 
     } catch (err) {
-        console.error('[Reset Fatal Error]', err);
+        console.error(`[Reset Fatal Error] Tenant ${tenantId}:`, err);
         if (format === 'html') {
             res.status(500).send('Error resetting gateway: ' + err.message);
         } else {
@@ -1496,10 +1554,16 @@ app.post('/send', async (req, res) => {
     if (!verifyToken(req)) {
         return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
     }
-
-    let { orderId, phone, message } = req.body;
+    const tenantId = req.headers['x-tenant-id'] || 'system';
+    const tenantData = getOrCreateClient(tenantId);
     
-    if (!phone || !message) {
+    if (tenantData.status !== 'ready') {
+        return res.status(400).json({ status: 'error', error: `WhatsApp gateway for tenant ${tenantId} is not connected.` });
+    }
+
+    let { orderId, phone, message, pdfData, filename } = req.body;
+    
+    if (!phone || (!message && !pdfData)) {
         return res.status(400).json({ status: 'error', error: 'Missing phone or message' });
     }
 
@@ -1512,20 +1576,35 @@ app.post('/send', async (req, res) => {
     try {
         const chatId = `${phone}@c.us`;
         
-        // Send monospaced text receipt
-        await client.sendMessage(chatId, message);
+        if (pdfData) {
+            const { MessageMedia } = require('whatsapp-web.js');
+            const media = new MessageMedia('application/pdf', pdfData, filename || 'receipt.pdf');
+            await tenantData.client.sendMessage(chatId, media);
+            // Do NOT send a separate text after the PDF — the PDF IS the receipt.
+        } else {
+            // Send monospaced text receipt
+            await tenantData.client.sendMessage(chatId, message);
+        }
         
-        console.log(`[Manual Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)}`);
+        console.log(`[Manual Sent] WhatsApp receipt successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
         
+        // Tag sending activity securely for this tenant
+        await logHealthEvent('send_receipt', 'ok', {
+            tenant_id: tenantId,
+            phone: maskPhone(phone),
+            orderId: orderId,
+            message: `Receipt for ${orderId || 'order'} successfully sent to +${maskPhone(phone)}`
+        });
+
         // Broadcast success back to Supabase Realtime
         if (orderId) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
                     await channel.send({
-                        type: 'broadcast',
-                        event: 'status',
-                        payload: { orderId, status: 'success' }
+                           type: 'broadcast',
+                           event: 'status',
+                           payload: { orderId, status: 'success' }
                     });
                     supabase.removeChannel(channel);
                 }
@@ -1534,7 +1613,16 @@ app.post('/send', async (req, res) => {
 
         res.json({ status: 'success', message: 'Message sent successfully' });
     } catch (err) {
-        console.error(`[Manual Error] Failed to send receipt to +${maskPhone(phone)}:`, err.message);
+        console.error(`[Manual Error] Failed to send receipt for tenant ${tenantId} to +${maskPhone(phone)}:`, err.message);
+
+        // Tag sending failure activity securely for this tenant
+        await logHealthEvent('send_receipt', 'error', {
+            tenant_id: tenantId,
+            phone: maskPhone(phone),
+            orderId: orderId,
+            error: err.message,
+            message: `Failed to send receipt for ${orderId || 'order'} to +${maskPhone(phone)}: ${err.message}`
+        });
         
         // Broadcast failure back to Supabase Realtime
         if (orderId) {
@@ -1606,7 +1694,12 @@ app.post('/supabase-webhook', async (req, res) => {
     try {
         const chatId = `${phone}@c.us`;
         const message = formatReceiptText(record);
-        await client.sendMessage(chatId, message);
+        const tenantId = record.tenant_id;
+        const tenantData = getOrCreateClient(tenantId);
+        if (tenantData.status !== 'ready') {
+            throw new Error(`WhatsApp gateway for tenant ${tenantId} is not connected.`);
+        }
+        await tenantData.client.sendMessage(chatId, message);
         console.log(`[Webhook Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId}`);
         
         // Broadcast success
@@ -1666,7 +1759,8 @@ async function handleNewRegistrationNotification(record) {
         : (phone ? `+${phone.replace(/\D/g, '')}` : 'N/A');
 
     // 1. Send WhatsApp Confirmation
-    if (phone && connectionStatus === 'ready') {
+    const systemData = getOrCreateClient('system');
+    if (phone && systemData.status === 'ready') {
         const chatId = `${targetPhone}@c.us`;
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
@@ -1674,7 +1768,7 @@ async function handleNewRegistrationNotification(record) {
         const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestroSuite*`;
         
         try {
-            await client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
+            await systemData.client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
             console.log(`[Realtime WhatsApp] Registration confirmation sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('registration_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -1683,7 +1777,7 @@ async function handleNewRegistrationNotification(record) {
         }
     } else {
         await logHealthEvent('registration_whatsapp_skipped', 'warning', {
-            reason: !phone ? 'no_phone' : `gateway_status_${connectionStatus}`
+            reason: !phone ? 'no_phone' : `gateway_status_${systemData.status}`
         });
     }
 
@@ -1945,7 +2039,8 @@ async function handleApprovalNotification(record) {
     await logHealthEvent('approval_received', 'ok', { name, slug, email, phone });
 
     // 1. Send WhatsApp Approval Alert
-    if (phone && connectionStatus === 'ready') {
+    const systemData = getOrCreateClient('system');
+    if (phone && systemData.status === 'ready') {
         let targetPhone = phone.replace(/\D/g, '');
         if (targetPhone.length === 10 && !targetPhone.startsWith('65') && !targetPhone.startsWith('45') && !targetPhone.startsWith('47') && !targetPhone.startsWith('96') && !targetPhone.startsWith('91')) {
             targetPhone = "91" + targetPhone;
@@ -1954,7 +2049,7 @@ async function handleApprovalNotification(record) {
         const msgText = `Dear Partner,\n\nWe are pleased to inform you that your registration request for *${name}* has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active.\n\n*Access Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n\n*Management Portal Link:* https://restrosuite.codearc.co.in/login.html\n\nYou may now log in to the portal to configure your outlet settings, menu inventory, and employee rosters.\n\nShould you require any assistance or launch support, please contact our support desk at hello@codearc.co.in.\n\nSincerely,\n*CodeArc Operations Team*`;
         
         try {
-            await client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
+            await systemData.client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
             console.log(`[Realtime WhatsApp] Account approval alert sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('approval_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -1963,7 +2058,7 @@ async function handleApprovalNotification(record) {
         }
     } else {
         await logHealthEvent('approval_whatsapp_skipped', 'warning', {
-            reason: !phone ? 'no_phone' : `gateway_status_${connectionStatus}`
+            reason: !phone ? 'no_phone' : `gateway_status_${systemData.status}`
         });
     }
 
@@ -2155,16 +2250,50 @@ const realtimeChannel = dbClientForRealtime
                             console.log(`[Realtime Cancelled] WhatsApp receipts are disabled in settings for tenant ${tenantId}.`);
                             return;
                         }
+
+                        // Check bill format preference — if PDF mode, skip auto-send from realtime listener.
+                        // The POS frontend will handle PDF generation and delivery via the /send endpoint.
+                        let flags = {};
+                        try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
+                        const uiSettings = flags.ui_settings || {};
+                        const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
+                        if (billFormat === 'Thermal PDF receipt') {
+                            console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped. POS frontend will send PDF via /send.`);
+                            return;
+                        }
                     }
                 }
 
-                // Format monospace receipt using dynamic profile
-                const message = formatReceiptText(record, tenantProfile);
+                // Extract tenant currency symbol (WhatsApp-safe ASCII version)
+                let currSymbol = 'Rs.';
+                try {
+                    const rawCurr = uiSettings.set_currency || '';
+                    if (rawCurr) {
+                        // Handle "EUR (€)" → extract €
+                        const m = rawCurr.match(/\(([^)]+)\)/);
+                        const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
+                        // Convert multi-byte symbols to ASCII-safe equivalents for WhatsApp
+                        currSymbol = sym
+                            .replace(/₹/g, 'Rs.')
+                            .replace(/€/g, 'EUR')
+                            .replace(/£/g, 'GBP')
+                            .replace(/¥/g, 'JPY')
+                            .replace(/₩/g, 'KRW')
+                            .replace(/₺/g, 'TRY')
+                            .replace(/₴/g, 'UAH');
+                    }
+                } catch(currErr) {
+                    console.warn('[Realtime] Failed to parse currency symbol:', currErr.message);
+                }
+
+                // Format clean text receipt (matching POS frontend format)
+                const message = formatReceiptText(record, tenantProfile, currSymbol);
                 
                 // Dispatch message via Whatsapp
-                if (connectionStatus === 'ready') {
-                    await client.sendMessage(chatId, message);
-                    console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId}`);
+                const tenantData = getOrCreateClient(tenantId);
+                if (tenantData.status === 'ready') {
+                    await tenantData.client.sendMessage(chatId, message);
+                    console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
                     
                     // Broadcast success back to POS Web Clients
                     const broadcastChannel = supabase.channel('whatsapp-billing-status');
@@ -2179,7 +2308,7 @@ const realtimeChannel = dbClientForRealtime
                         }
                     });
                 } else {
-                    console.warn(`[Realtime Delay] WhatsApp gateway not connected (Status: ${connectionStatus}). Cannot dispatch message.`);
+                    console.warn(`[Realtime Delay] WhatsApp gateway for tenant ${tenantId} not connected (Status: ${tenantData.status}). Cannot dispatch message.`);
                 }
             } catch (err) {
                 console.error(`[Realtime Error] Failed to send receipt for order ${orderId} to +${phone}:`, err.message);
@@ -2365,7 +2494,7 @@ function formatDouble24(label, value) {
     return label + valStr.padStart(padSize, ' ');
 }
 
-function formatReceiptText(record, profile = businessProfile) {
+function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.') {
     const borderDouble = '='.repeat(24);
     const borderSingle = '-'.repeat(24);
     
@@ -2411,7 +2540,7 @@ function formatReceiptText(record, profile = businessProfile) {
                 displayName += ` (${item.size.charAt(0)})`;
             }
             msg += formatRow24(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
-            msg += `  (₹${item.price} each)\n`;
+            msg += `  (${currSymbol}${item.price} each)\n`;
             if (item.toppings && item.toppings.length > 0) {
                 msg += `  + ${item.toppings.join(', ')}\n`;
             }
@@ -2422,18 +2551,18 @@ function formatReceiptText(record, profile = businessProfile) {
     }
     
     msg += borderSingle + '\n';
-    msg += formatDouble24('Subtotal', record.subtotal.toString()) + '\n';
+    msg += formatDouble24('Subtotal', `${currSymbol}${record.subtotal}`) + '\n';
     
     if (profile.gstEnabled !== false) {
-        msg += formatDouble24('GST', record.gst.toString()) + '\n';
+        msg += formatDouble24('GST', `${currSymbol}${record.gst}`) + '\n';
     }
     
     if (record.discount && record.discount > 0) {
-        msg += formatDouble24('Discount', `-${record.discount}`) + '\n';
+        msg += formatDouble24('Discount', `-${currSymbol}${record.discount}`) + '\n';
     }
     
     msg += borderDouble + '\n';
-    msg += formatDouble24('GRAND TOTAL', record.total.toString()) + '\n';
+    msg += formatDouble24('GRAND TOTAL', `${currSymbol}${record.total}`) + '\n';
     msg += borderDouble + '\n\n';
 
     const vibeQuote = getRandomGoodVibeQuote(record);
@@ -2475,15 +2604,28 @@ app.get('/debug-logs', async (req, res) => {
     if (!verifyToken(req)) {
         return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
     }
+    const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || 'system';
     try {
         if (!supabaseService) {
-            return res.json({ status: 'error', reason: 'SUPABASE_SERVICE_KEY not set' });
+            // Return local memory logs filtered securely by tenantId
+            let filtered = recentHealthEvents;
+            if (tenantId && tenantId !== 'system') {
+                filtered = recentHealthEvents.filter(e => e.details && e.details.tenant_id === tenantId);
+            }
+            return res.json({ status: 'success', logs: filtered });
         }
-        const { data, error } = await supabaseService
+        let query = supabaseService
             .from('gateway_health_log')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(100);
+            
+        if (tenantId && tenantId !== 'system') {
+            // Filter strictly for this tenant inside the details JSONB object
+            query = query.eq('details->>tenant_id', tenantId);
+        }
+        
+        const { data, error } = await query;
         if (error) throw error;
         return res.json({ status: 'success', logs: data });
     } catch (err) {
@@ -2558,9 +2700,10 @@ app.get('/test-relay-call', async (req, res) => {
 // HEALTH ENDPOINT — for UptimeRobot / external monitors
 // ============================================================
 app.get('/health', (req, res) => {
+    const systemData = tenantClients.get('system') || { status: 'disconnected' };
     res.json({
         ok: true,
-        status: connectionStatus,
+        status: systemData.status,
         uptime: Math.floor(process.uptime()),
         time: new Date().toISOString()
     });
@@ -2608,39 +2751,36 @@ app.listen(PORT, async () => {
     console.log('[Startup] Cleaning up any stale browser lock/socket/cookie files...');
     cleanupStaleLockFiles(authDataPath);
 
-    // Attempt to restore WhatsApp session from Supabase Storage
-    console.log('[Startup] Attempting to restore WhatsApp session from Supabase Storage...');
-    let sessionRestored = false;
+    // Attempt to restore WhatsApp sessions from Supabase Storage
+    console.log('[Startup] Attempting to restore WhatsApp sessions from Supabase Storage...');
     try {
         const restoreTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
-        sessionRestored = await Promise.race([restoreSessionFromSupabase(), restoreTimeout]);
+        await Promise.race([restoreSessionsFromSupabase(), restoreTimeout]);
     } catch (err) {
         console.warn('[Startup Session Restore Warning] Timed out or failed:', err.message);
-    }
-
-    if (sessionRestored) {
-        console.log('[Startup] ✅ Session restored. Connecting to WhatsApp without QR scan...');
-    } else {
-        console.log('[Startup] ⚠️  No saved session. A QR code will be generated.');
     }
 
     // Send startup alert email (informational only)
     try {
         const alertTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
-        await Promise.race([sendAdminAlert('startup', { sessionRestored }), alertTimeout]);
+        await Promise.race([sendAdminAlert('startup', { sessionRestored: true }), alertTimeout]);
     } catch (err) {
         console.warn('[Startup Alert Warning] Skipped:', err.message);
     }
 
-    console.log('[Startup] Initializing WhatsApp driver...');
-    startWatchdog(); // Start watchdog — auto-resets if stuck at connecting
+    console.log('[Startup] Initializing WhatsApp drivers...');
     try {
         console.log('[Startup Init Shield] Cleaning up stale browser lock/socket/cookie files immediately before launch...');
         cleanupStaleLockFiles(authDataPath);
     } catch (err) {
         console.error('[Startup Init Shield Error]', err.message);
     }
-    client.initialize().catch(err => console.error('Failed to initialize client:', err));
+
+    // Initialize SuperAdmin / system client
+    getOrCreateClient('system');
+    
+    // Auto-initialize other tenant clients that have local sessions
+    autoInitializeLocalSessions();
 
     // Start database notification polling fallback (every 60 seconds)
     if (supabaseService) {
@@ -2664,7 +2804,8 @@ app.listen(PORT, async () => {
     function selfPing() {
         const lib = selfUrl.startsWith('https') ? https : http;
         const req = lib.get(selfUrl, (res) => {
-            console.log(`[Keep-Alive] Self-ping OK — status ${res.statusCode} (gateway: ${connectionStatus})`);
+            const systemData = tenantClients.get('system') || { status: 'disconnected' };
+            console.log(`[Keep-Alive] Self-ping OK — status ${res.statusCode} (gateway: ${systemData.status})`);
         });
         req.on('error', (err) => {
             console.warn(`[Keep-Alive] Self-ping failed: ${err.message}`);

@@ -1,5 +1,5 @@
 # Native PowerShell HTTP Server for RestroSuite local development
-$port = 8002
+$port = 8001
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
 
