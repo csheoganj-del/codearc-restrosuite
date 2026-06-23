@@ -479,10 +479,18 @@
               <input type="text" id="delivery-rider" placeholder="Rider Name / Notes" class="form-input" style="width: 100%; height: 32px; font-size: 12px; padding: 6px 8px;">
             </div>
             <div class="cart-items" id="cart-items"></div>
-            <div class="cart-foot">
-              <div class="totals">
-                <div class="tr"><span>Subtotal</span><b id="t-sub">₹0</b></div>
-                <div class="tr grand"><span class="lbl">Total</span><span class="amt" id="t-grand">₹0</span></div>
+              <div class="cart-foot">
+              <!-- Compact totals: sub+gst inline, grand prominent -->
+              <div class="totals-compact">
+                <div class="totals-meta">
+                  <span>Sub <b id="t-sub">₹0</b></span>
+                  <span id="t-disc-wrap" style="color:var(--orange)">Disc <b id="t-disc">₹0</b></span>
+                  <span>GST <b id="t-gst">₹0</b></span>
+                </div>
+                <div class="totals-grand">
+                  <span>Total</span>
+                  <span class="amt" id="t-grand">₹0</span>
+                </div>
               </div>
               <div class="cart-payment" id="cart-payment" style="margin-top: 6px; padding: 6px; border: 1px solid var(--stroke-2); border-radius: var(--r-sm); background: var(--glass-1);">
                 <div class="cpay-methods" id="cart-pay-methods" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;">

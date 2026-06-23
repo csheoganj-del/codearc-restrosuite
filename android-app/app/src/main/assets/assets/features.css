@@ -471,3 +471,6 @@
   color: var(--orange);
 }
 
+ 
+ @ m e d i a   ( m a x - w i d t h :   6 0 0 p x )   {   . r s - o v e r l a y   {   p a d d i n g :   1 2 p x   ! i m p o r t a n t ;   }   . r s - m o d a l   {   m a x - h e i g h t :   c a l c ( 1 0 0 d v h   -   2 4 p x )   ! i m p o r t a n t ;   }   }  
+ 
