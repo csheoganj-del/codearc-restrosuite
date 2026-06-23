@@ -15,7 +15,10 @@
       return s.tenant_name || s.outlet_name || s.business_name || titleCase(s.tenant_slug || s.outlet_id || sessionStorage.getItem('tenant_slug') || 'Outlet');
     };
     let receiptProfile = { name: sessionOutletName(), address:'', phone:'', gstin:'' };
+    let currentSettings = {};
     function normalizeReceiptProfile(settings){
+      currentSettings = settings || {};
+      window.RS_SETTINGS = currentSettings; // Update global reference
       const raw = (settings && settings._raw) || {};
       return {
         name: settings?.set_restaurant_name || settings?.set_outlet_name || raw.business_name || raw.outlet_name || sessionOutletName(),
@@ -24,6 +27,115 @@
         gstin: settings?.set_gstin || raw.gstin || ''
       };
     }
+    function getDigitalPaymentMethodName() {
+      const symbol = RS.getCurrencySymbol ? RS.getCurrencySymbol() : '\u20b9';
+      return symbol === '\u20b9' ? 'UPI' : 'Stripe';
+    }
+    RS.updateStaticCurrencyLabels = function() {
+      const symbol = RS.getCurrencySymbol ? RS.getCurrencySymbol() : '\u20b9';
+      const digitalMethod = getDigitalPaymentMethodName();
+
+      // Update UPI button in payment methods
+      const upiBtn = document.querySelector('[data-pay-method="UPI"], [data-pay-method="Stripe"]');
+      if (upiBtn) {
+        upiBtn.setAttribute('data-pay-method', digitalMethod);
+        const icon = upiBtn.querySelector('i');
+        if (icon) {
+          icon.className = symbol === '\u20b9' ? 'fa-solid fa-qrcode' : 'fa-brands fa-stripe';
+          icon.style.fontSize = symbol === '\u20b9' ? '12px' : '15px';
+          icon.style.color = symbol === '\u20b9' ? 'var(--orange)' : '#635bff';
+        }
+        const textSpan = upiBtn.querySelector('span');
+        if (textSpan) {
+          textSpan.textContent = digitalMethod;
+        }
+      }
+
+      // Update split labels
+      const splitUpiLabel = document.getElementById('split-upi-label');
+      const splitUpiIcon = document.getElementById('split-upi-icon');
+      if (splitUpiLabel) {
+        splitUpiLabel.textContent = digitalMethod;
+      }
+      if (splitUpiIcon) {
+        const icon = splitUpiIcon.querySelector('i');
+        if (icon) {
+          icon.className = symbol === '\u20b9' ? 'fa-solid fa-qrcode' : 'fa-brands fa-stripe';
+        }
+        splitUpiIcon.style.background = symbol === '\u20b9' ? 'rgba(255,79,0,.1)' : 'rgba(99,91,255,.1)';
+        splitUpiIcon.style.color = symbol === '\u20b9' ? 'var(--orange)' : '#635bff';
+      }
+      
+      // Update labels like "Price (\u20b9)"
+      document.querySelectorAll('label').forEach(el => {
+        if (el.textContent.includes('(\u20b9)')) {
+          el.textContent = el.textContent.replace(/\(\u20b9\)/g, `(${symbol})`);
+        } else if (el.textContent.includes('(\u20ac)') || el.textContent.includes('($)') || el.textContent.includes('(\u00a3)')) {
+          el.textContent = el.textContent.replace(/\((.*?)\)/g, `(${symbol})`);
+        }
+      });
+
+      // Update span tags containing "(\u20b9)"
+      document.querySelectorAll('span').forEach(el => {
+        if (el.textContent.includes('(\u20b9)')) {
+          el.textContent = el.textContent.replace(/\(\u20b9\)/g, `(${symbol})`);
+        } else if (el.textContent.includes('(\u20ac)') || el.textContent.includes('($)') || el.textContent.includes('(\u00a3)')) {
+          el.textContent = el.textContent.replace(/\((.*?)\)/g, `(${symbol})`);
+        }
+      });
+
+      // Update fa-indian-rupee-sign icons to dynamic currency
+      document.querySelectorAll('.fa-indian-rupee-sign').forEach(el => {
+        el.className = 'custom-currency-icon';
+        el.style.fontStyle = 'normal';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '16px';
+        el.textContent = symbol;
+      });
+      document.querySelectorAll('.custom-currency-icon').forEach(el => {
+        el.textContent = symbol;
+      });
+
+      // Update cash denomination buttons in checkout modal
+      document.querySelectorAll('.btn-den.csd-den-btn').forEach(btn => {
+        const val = btn.dataset.val;
+        if (val) {
+          if (val >= 1000) {
+            btn.textContent = symbol + (val / 1000) + 'k';
+          } else {
+            btn.textContent = symbol + val;
+          }
+        }
+      });
+      document.querySelectorAll('.inline-den-btn').forEach(btn => {
+        const val = btn.dataset.val;
+        if (val && val !== 'exact') {
+          btn.textContent = symbol + val;
+        }
+      });
+      
+      // Replace static currency symbols in key total elements
+      const targets = [
+        '#inline-cash-change',
+        '#split-status-text',
+        '#split-total-text',
+        '#insight-spend',
+        '#t-sub',
+        '#t-grand',
+        '#bills-stat-sales',
+        '#bills-stat-aov',
+        '#chain-total-revenue',
+        '#chain-avg-ticket',
+        '#pos-m-cart-bar-total'
+      ];
+      targets.forEach(selector => {
+        const el = document.querySelector(selector);
+        if (el) {
+          el.textContent = el.textContent.replace(/[\u20b9\u20ac$\u00a3]/g, symbol);
+        }
+      });
+    };
+
     async function loadReceiptProfile(){
       try {
         const settings = window.RS && RS.getSettings ? await RS.getSettings() : null;
@@ -31,7 +143,11 @@
       } catch(e) {
         receiptProfile.name = receiptProfile.name || sessionOutletName();
       }
+      try {
+        RS.updateStaticCurrencyLabels();
+      } catch(e){}
     }
+    RS.loadReceiptProfile = loadReceiptProfile; // Expose globally
     loadReceiptProfile();
     document.addEventListener('rs:hydrated', loadReceiptProfile);
 
