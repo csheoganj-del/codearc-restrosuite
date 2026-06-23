@@ -54,7 +54,19 @@
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const rs = n => '\u20b9' + Math.round(n).toLocaleString('en-IN');
+  function getCurrencySymbol() {
+    try {
+      const settings = window.RS_SETTINGS || {};
+      const raw = settings.set_currency || '';
+      if (raw) {
+        const m = raw.match(/\(([^)]+)\)/);
+        const sym = m ? m[1].trim() : raw.trim().split(/\s+/).pop();
+        if (sym) return sym;
+      }
+    } catch(e) {}
+    return '\u20b9';
+  }
+  const rs = n => getCurrencySymbol() + Math.round(n).toLocaleString('en-IN');
   const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
@@ -834,26 +846,6 @@
         console.error('[Order Type Switch Error]', e);
       }
       $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
-      
-      // Update trigger text based on order type
-      const triggerText = document.getElementById('cust-trigger-text');
-      if (triggerText) {
-        if (b.textContent.trim() === 'Takeaway') {
-          triggerText.innerText = 'Customer';
-        } else {
-          triggerText.innerText = 'Walk-in';
-        }
-      }
-      
-      // If Takeaway is selected, open the customer widget
-      if (b.textContent.trim() === 'Takeaway') {
-        const widgetContainer = document.getElementById('custom-customer-widget');
-        const trigger = document.getElementById('cust-widget-trigger');
-        const dropdown = document.getElementById('cust-widget-dropdown');
-        if (widgetContainer && trigger && dropdown) {
-          trigger.click();
-        }
-      }
     }));
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {
@@ -2553,6 +2545,7 @@
     removeOne(coll,id){ if(window.RS_DB) return RS_DB.del(coll, id); return Promise.resolve(); },
     saveSettings(obj){ if(window.RS_DB) return RS_DB.setSettings(obj); return Promise.resolve(); },
     getSettings(){ if(window.RS_DB) return RS_DB.getSettings(); return Promise.resolve(null); },
+    getCurrencySymbol,
     dbMode:()=> (window.RS_DB && window.RS_DB.mode) || 'local',
     downloadFile(content, mimeType, filename) {
       const blob = new Blob([content], { type: mimeType });
