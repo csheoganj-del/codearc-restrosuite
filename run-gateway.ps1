@@ -5,6 +5,7 @@ Write-Host "==========================================" -ForegroundColor Green
 # Set NODE_PATH dynamically to load dependencies cleanly
 $localNodeModules = Join-Path $PSScriptRoot "node_modules"
 $env:NODE_PATH = $localNodeModules
+$env:GATEWAY_TOKEN = "local-dev-gateway-token"
 
 # Append portable Node to PATH dynamically
 $portableNodeDir = Join-Path $PSScriptRoot "node-portable\node-v20.11.1-win-x64"

@@ -157,3 +157,178 @@ We have successfully implemented dynamic currency, country, and regional address
 6. **Validation**:
    - Ran `npm test` to verify complete test suite passes without regressions.
    - Synchronized web files to Android app assets.
+
+---
+
+# Walkthrough - POS Cart Layout and Overlap Fix (June 23, 2026)
+
+We have successfully resolved the chaotic, overlapping layout of the POS Cart Sidebar:
+
+1. **Fixed Unclosed `.cart-head` Container**:
+   - Identified that the closing `</div>` tag for the `.cart-head` div block (which contains the "Current Order" title, items count pill, and clear-cart trash icon) was accidentally omitted.
+   - Because `.cart-head` has `display: flex` with a horizontal layout direction, this unclosed tag caused all subsequent cart sections (including customer fields, delivery fields, items lists, totals, and payment buttons) to be parsed as children of `.cart-head` and squeezed onto a single crowded horizontal row.
+   - Added the missing `</div>` tag immediately after the items count and trash button container.
+2. **Synchronized across all files**:
+   - Applied the fix to [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html) in the root repository.
+   - Applied the fix to [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/android-app/app/src/main/assets/dashboard.html) in the Android app assets.
+   - Applied the fix to [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/codearc-restrosuite/dashboard.html) in the submodule repository to ensure 100% synchronization and prevent future regression.
+
+---
+
+# Walkthrough - Country Code Picker Overflow/Clipping Fix (June 23, 2026)
+
+We have successfully resolved the issue where users were unable to open/view the Country Code Picker dropdown in the phone input field:
+
+1. **Fixed Overflow Clipping on `.phone-combo`**:
+   - The `.phone-combo` wrapper element had `overflow: hidden` specified in its stylesheet, which was intended to clip the input's corners.
+   - Because the country picker dropdown (`.phone-country-picker`) is an absolute-positioned child element positioned below `.phone-combo`, the `overflow: hidden` rule completely clipped and hid the dropdown, preventing it from rendering on the screen when clicked.
+   - Changed `.phone-combo`'s styling from `overflow: hidden` to `overflow: visible` in `dashboard.css`.
+   - Applied left border-radius values (`border-top-left-radius` and `border-bottom-left-radius`) to the flag button (`.phone-flag-btn`) so that its background remains aligned with the rounded corners of the parent container now that `overflow: hidden` is disabled.
+2. **Synchronized across all files**:
+   - Applied the styling fixes to [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.css).
+   - Applied the styling fixes to [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/android-app/app/src/main/assets/assets/dashboard.css) in the Android app assets.
+   - Applied the styling fixes to [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/codearc-restrosuite/assets/dashboard.css) in the submodule repository.
+
+---
+
+# Walkthrough - Settings Sync, Country-Specific Payment Methods, and Phone Prefixes (June 23, 2026)
+
+We have successfully resolved the issues related to applying country, currency, and payment method settings on the POS dashboard:
+
+1. **Fixed POS Currency Rendering Sync**:
+   - The settings save handler was checking for a global `window.renderPOS` function, which was undefined because `renderPOS` is exposed under the `RS` namespace (i.e., `RS.renderPOS`). This prevented the POS items and cart from re-rendering when settings were saved.
+   - Updated [assets/features-shell.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-shell.js) to correctly call `RS.renderPOS()` and `RS.renderCart()`, causing the items, totals, and cart values to instantly update with the newly selected currency symbol.
+
+2. **Fixed Country Phone Prefix Override & Stale Cache**:
+   - Previously, the phone input picker default was overridden by a cached `rs_phone_country_...` value in `localStorage`, causing browsers to remain stuck on old country prefixes (e.g. `+91`) even after the outlet's default country was updated to Ireland (`IE`).
+   - Refactored `initPhoneCombo` in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) to ignore the `localStorage` cache if it is a different country code than the active default outlet country settings.
+   - Exposed a namespaced `RS.syncPhoneCombosToSettings()` function to programmatically force-update the active phone input country flags and dial codes.
+   - Wired this sync function to execute both during settings hydration (`hydrate()`) on page load and immediately upon settings updates (`set-save` callback).
+
+3. **Dynamic Payment Methods (UPI vs. Stripe)**:
+   - Added dynamic payment method swapping in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js) based on the active currency:
+     - For Indian Rupee (`₹`), the digital payment button and split input field show `UPI` with the QR code icon.
+     - For other currencies (`€`, `$`, `£`), the payment button and split input dynamically swap to `Stripe` with the Stripe icon/branding and deep purple theme color.
+   - Generalised the checkout tenders builder to push the correct digital payment name (`UPI` or `Stripe`) into the database ledger depending on the active currency.
+   - Added element identifiers (`id="split-upi-icon"` and `id="split-upi-label"`) in [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html) to enable the DOM updates.
+
+4. **Full Directory Sync**:
+   - Synchronized all files across the root repository, submodule, and Android app assets.
+
+---
+
+# Walkthrough - POS Item Card Sizing and Text Overflow Fix (June 23, 2026)
+
+We have successfully resolved the issue where long item names or small grid sizes caused content to overlap or be cut off:
+
+1. **Flexible Height Sizing**:
+   - Replaced `aspect-ratio: 158 / 122` on `.pos-item` in [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.css) with `aspect-ratio: auto`.
+   - This keeps the default sizing behavior through `min-height`, but allows cards to scale and grow vertically if they contain long names or if a small grid size is chosen.
+
+2. **Removed Line Clamping for Item Names**:
+   - Removed `-webkit-line-clamp: 2`, `overflow: hidden`, and `-webkit-box` styling from the item name class `.pname` in [assets/dashboard.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.css).
+   - Swapped it to `display: block`, `overflow: visible`, and `word-wrap: break-word` to ensure long names wrap fully to subsequent lines without clipping, keeping all text fully visible.
+
+3. **Synchronized All Copies**:
+   - Synced the updated CSS to the web root, the [codearc-restrosuite/](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/codearc-restrosuite) submodule, and the [android-app/](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/android-app) assets folder.
+
+---
+
+# Walkthrough - App Update Release Notes and Version Synchronization (June 23, 2026)
+
+We have successfully resolved the issue where editing code triggered the system update dialog but always displayed outdated, static release highlights ("v23-20260621 - POS Tab Blinking"):
+
+1. **Updated Release Metadata**:
+   - Edited [app-update.json](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/app-update.json) to bump the version to `v25-20260623` and replaced the old static notes with the actual list of changes made during this coding session.
+2. **Updated Version Fallbacks**:
+   - Modified the fallback app version variables in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) and [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html) to reference `v25-20260623` to align with the active release.
+3. **Synchronized and Synced All Repositories**:
+   - Copied the updated files (`app-update.json`, `assets/dashboard.js`, `dashboard.html`) to the submodule folder (`codearc-restrosuite/`).
+   - Ran `sync-assets.ps1` to sync the updated release details and assets to the native Android app directory (`android-app/app/src/main/assets/`).
+
+### 4. Sync Android Assets
+- Executed `powershell -File .\sync-assets.ps1` to sync the updated files to `android-app/app/src/main/assets/assets/*`.
+
+### 5. Supabase Database Migrations & Edge Function Deployments
+- Pushed SQL migrations (including `gateway_health_log` table setup) to the remote Supabase database project `htkauiibuejetimfiavs` using `supabase db push`.
+- Deployed the updated local code of `tenant-data` edge function containing the `gateway_logs` operation proxying logic to the remote Supabase project using `supabase functions deploy tenant-data`.
+
+---
+
+## Verification
+
+### Manual Verification
+1. Opened POS cart, clicked flag dropdown. The picker opens correctly and doesn't close immediately.
+2. Selected Ireland (`+353`) and inputted `0852258004`. Verified checkout output logs shows phone cleaned to `353852258004`.
+3. Checked topbar WhatsApp status badge; it displays exactly one status icon (e.g. Offline or QR scan icon).
+4. Opened settings, selected WhatsApp gateway settings tab. Verified the secure logs console renders successfully and polls recent logs for the authenticated tenant.
+5. Confirmed that the "Table is not available through tenant data API" error is resolved on both the local server and remote edge function.
+
+---
+
+# Walkthrough - Menu Recipe CSV Import & Template Download (June 23, 2026)
+
+We have successfully designed and integrated a Recipe template download and CSV import system within the Inventory tab's Recipes sub-panel:
+
+1. **Recipe Toolbar Actions**:
+   - Added two new buttons to the Menu Recipes panel header inside [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html): "Download Template" (`#btn-download-recipes-template`) and "Import CSV" (`#btn-import-recipes`).
+2. **Template Downloader**:
+   - Implemented a CSV template exporter in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) containing sample columns: `MenuItem`, `IngredientKey`, `Quantity`, `Unit` to make bulk data formatting easy for the user.
+3. **CSV Recipe Importer**:
+   - Implemented a CSV parser in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) that groups rows by `MenuItem`, matches menu items case-insensitively, matches ingredients against inventory items (by key or name), maps units, aggregates warnings/errors, and allows the cashier to preview changes before applying them.
+   - Saves the recipes to IndexedDB/Supabase and updates active POS and Menu Editor states instantly.
+4. **Submodule & Android Sync**:
+   - Synced the updated HTML/JS files to the `codearc-restrosuite/` submodule and the native Android `android-app/app/src/main/assets/` directory.
+
+---
+
+# Walkthrough - Dynamic Inventory Category Filter Dropdown (June 23, 2026)
+
+We have successfully resolved the issue where the category select dropdown in the Inventory tab was hardcoded to mismatched values (`veg`, `dairy`, `meat`, etc.) while the actual database items carried standard categories (like `food`, `drinks`):
+
+1. **Auto-Populated Dropdown Options**:
+   - Refactored the `#inv-cat-filter` initializer in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) to dynamically compile unique category names from active `INVENTORY` items on render.
+   - It automatically generates the dropdown options (e.g. `All`, `food`, `drinks`) dynamically and alphabetically sorts them, ensuring the options always match your actual inventory items.
+2. **Persistent Filter Selection**:
+   - Maintained the cashier's active filter state during redraw cycles, preventing the dropdown selection from resetting to `All` when the inventory lists are modified or re-hydrated.
+3. **Synchronized All Codebases**:
+   - Pushed the updated `assets/dashboard.js` logic to the submodule (`codearc-restrosuite/`) and synchronized the Android client assets.
+---
+
+# Walkthrough - WhatsApp Gateway Status Checking Fix (June 23, 2026)
+
+We have successfully resolved the issue where the WhatsApp Gateway status was stuck on "Checking..." (grey pill/spinner) and displaying "WhatsApp Offline" in the dashboard topbar:
+
+1. **Started Local Gateway Service**:
+   - Launched the local WhatsApp Gateway server (`whatsapp-gateway.js` via `run-gateway.ps1`) on port `3000` to handle communication requests.
+
+2. **Resolved Gateway Status Race Condition**:
+   - Fixed a race condition in `whatsapp-gateway.js` where the `loading_screen` event (which fires multiple times to show history sync progress up to 99% during session restoration) was overriding the `'ready'` state status back to `'syncing'`.
+   - Prevented progress events from overwriting the status back to `'syncing'` once the driver has successfully initialized and reached the `'ready'` state. This ensures that the gateway status stays `'ready'` when successfully linked.
+
+3. **Validated Backend Server Proxy**:
+   - Verified that the backend proxy server (`run-server.ps1` on port `8002`) successfully connects to the gateway and returns `status: ready` with `authenticated: true` for the active tenant.
+
+---
+
+# Walkthrough - WhatsApp Gateway Robustness, Stuck Session Reset, and PDF Receipt Fixes (June 23, 2026)
+
+We have successfully resolved the remaining WhatsApp gateway and receipt issues to establish a robust end-to-end communication system:
+
+1. **Fixed "Force New QR" Local Routing**:
+   - Restarted the local development backend server (`run-server.ps1` on port `8002`) to load the newly added `gateway_reset` operation routing, ensuring the reset command successfully proxies to the local gateway service.
+
+2. **Added Persistent Troubleshoot Reset Panel**:
+   - Added a troubleshooting card with a **"Force Reset"** button in the Settings > WhatsApp gateway panel in [assets/features-shell.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-shell.js).
+   - This allows cashiers to securely wipe stale local sessions, detach existing clients, delete corrupted ZIP archives from Supabase Storage, and request a fresh QR code from any state (including when the connection is stuck).
+
+3. **Fixed PDF Receipt Generation Failure**:
+   - Resolved a silent syntax error in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js) at line 493 where the `activeSettings` declaration was nested inside a line comment.
+   - This fixes the `ReferenceError: activeSettings is not defined` that caused PDF generation to fail silently and fall back to sending plain text.
+
+4. **Restored Monospace Thermal Borders Format**:
+   - Restored the original high-fidelity monospace thermal borders format for text receipts in [whatsapp-gateway.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/whatsapp-gateway.js) per the user's explicit preference.
+   - Verified that the receipt is wrapped in monospaced code blocks (` ``` `) on WhatsApp and formatted with proper alignment and spacing borders.
+
+5. **Assets Synchronized**:
+   - Synchronized all modified web files with the native Android app directory (`android-app/app/src/main/assets/`) using `sync-assets.ps1`.

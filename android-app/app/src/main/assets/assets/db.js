@@ -27,6 +27,11 @@
 
     function getTenantId() {
       try {
+        const tid = sessionStorage.getItem('tenant_id');
+        if (tid) return tid;
+        const localTid = originalGet.call(localStorage, 'tenant_id');
+        if (localTid) return localTid;
+
         const sLocal = JSON.parse(originalGet.call(localStorage, 'rs:session') || 'null');
         if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
         if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
@@ -65,6 +70,11 @@
       if (s && s.tenant_id) return s.tenant_id;
     }
     try {
+      const tid = sessionStorage.getItem('tenant_id');
+      if (tid) return tid;
+      const localTid = localStorage.getItem('tenant_id');
+      if (localTid) return localTid;
+
       const sLocal = JSON.parse(localStorage.getItem('rs:session') || 'null');
       if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
       if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
@@ -293,11 +303,22 @@
       // Only auto-generate a new ID if clientId mode AND the body doesn't already have one
       if(m.clientId && !body[m.pk]) { body[m.pk] = cleanId || newClientId(); }
       else if(!body[m.pk]) { body[m.pk] = cleanId; }
-      const res = await API.insert(m.table, body);
-      const newId = (Array.isArray(res)&&res[0]&&res[0][m.pk]!=null) ? res[0][m.pk] : (body[m.pk]!=null?body[m.pk]:cleanId);
-      const cleanNewId = cleanIdForCollection(c, newId);
-      if(!known[c]) known[c]=new Set(); known[c].add(String(cleanNewId));
-      return { ...obj, id:cleanNewId };
+      try {
+        const res = await API.insert(m.table, body);
+        const newId = (Array.isArray(res)&&res[0]&&res[0][m.pk]!=null) ? res[0][m.pk] : (body[m.pk]!=null?body[m.pk]:cleanId);
+        const cleanNewId = cleanIdForCollection(c, newId);
+        if(!known[c]) known[c]=new Set(); known[c].add(String(cleanNewId));
+        return { ...obj, id:cleanNewId };
+      } catch (err) {
+        console.warn(`[RS_DB] Cloud insert failed for ${c}/${cleanId}, attempting update fallback:`, err.message);
+        try {
+          await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
+          if(!known[c]) known[c]=new Set(); known[c].add(String(cleanId));
+          return cleanObj;
+        } catch (updateErr) {
+          throw err;
+        }
+      }
     },
     async bulkPut(c,arr){ for(const o of arr){ await CLOUD.put(c, o.id, o); } return arr; },
     async del(c,id){

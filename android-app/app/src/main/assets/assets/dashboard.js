@@ -54,11 +54,7 @@
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const rs = n => {
-    const symbol = window.RS && window.RS.getCurrencySymbol ? window.RS.getCurrencySymbol() : '₹';
-    const locale = symbol === '₹' ? 'en-IN' : 'en-US';
-    return symbol + Math.round(n).toLocaleString(locale);
-  };
+  const rs = n => '\u20b9' + Math.round(n).toLocaleString('en-IN');
   const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
@@ -216,11 +212,10 @@
     return bar;
   }
 
-  function setOperationStatus(message, state = 'running', progress = null) {
+  function setOperationStatus(message, state = 'running') {
     const bar = ensureOperationStatusBar();
     const icon = bar.querySelector('.operation-status-icon i');
     const title = bar.querySelector('.operation-status-title');
-    const progressSpan = bar.querySelector('.operation-status-track span');
     title.textContent = message;
     icon.className = state === 'success'
       ? 'fa-solid fa-circle-check'
@@ -228,64 +223,12 @@
         ? 'fa-solid fa-circle-exclamation'
         : 'fa-solid fa-spinner fa-spin';
     bar.className = `operation-status-bar is-visible is-${state}`;
-    
-    if (progressSpan) {
-      if (progress !== null && progress !== undefined) {
-        progressSpan.style.animation = 'none';
-        progressSpan.style.transform = 'none';
-        progressSpan.style.width = `${progress}%`;
-      } else {
-        progressSpan.style.animation = '';
-        progressSpan.style.transform = '';
-        progressSpan.style.width = '';
-      }
-    }
     return bar;
-  }
-
-  function showSuccessCelebration(message) {
-    let overlay = document.getElementById('rs-success-celebration-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'rs-success-celebration-overlay';
-      overlay.className = 'rs-success-overlay';
-      document.body.appendChild(overlay);
-    }
-    overlay.innerHTML = `
-      <div class="rs-success-card">
-        <div class="rs-success-icon-wrapper">
-          <svg class="rs-success-svg" viewBox="0 0 52 52">
-            <circle class="rs-success-circle" cx="26" cy="26" r="25" fill="none"/>
-            <path class="rs-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-          </svg>
-        </div>
-        <div class="rs-success-message">${message}</div>
-      </div>`;
-    
-    // Force reflow
-    overlay.offsetHeight;
-    
-    overlay.classList.add('is-active');
-    
-    window.setTimeout(() => {
-      overlay.classList.remove('is-active');
-    }, 2000);
   }
 
   function finishOperationStatus(message, state = 'success') {
     const bar = setOperationStatus(message, state);
-    if (state === 'success') {
-      showSuccessCelebration(message);
-    }
-    window.setTimeout(() => {
-      bar.classList.remove('is-visible');
-      const progressSpan = bar.querySelector('.operation-status-track span');
-      if (progressSpan) {
-        progressSpan.style.animation = '';
-        progressSpan.style.transform = '';
-        progressSpan.style.width = '';
-      }
-    }, state === 'error' ? 4200 : 2300);
+    window.setTimeout(() => bar.classList.remove('is-visible'), state === 'error' ? 4200 : 2300);
   }
 
   async function runWithOperation(message, action, button) {
@@ -556,23 +499,7 @@
      MENU DATA
      ============================================================ */
   const MENU = [];
-  // CATS is derived dynamically from loaded menu items — never hardcoded
-  // so each client sees their own categories, not a global default.
-  const DEFAULT_CATS = ['Starters','Mains','Breads','Beverages','Desserts'];
-  const CAT_ORDER = ['All','Starters','Mains','Breads','Beverages','Desserts','Soups','Salads','Sandwiches','Pizza','Burgers','Pasta','Rice','Biryani','Wraps','Rolls','Snacks','Sides','Sauces','Starters','Mocktails','Cocktails','Juices','Coffee','Tea','Shakes','Desserts'];
-  function getMenuCats() {
-    if (!MENU.length) return ['All', ...DEFAULT_CATS];
-    const unique = [...new Set(MENU.map(m => (m.cat || 'Other').trim()).filter(Boolean))];
-    // Sort by CAT_ORDER preference, then alphabetically for unknowns
-    unique.sort((a, b) => {
-      const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
-      if (ia !== -1 && ib !== -1) return ia - ib;
-      if (ia !== -1) return -1;
-      if (ib !== -1) return 1;
-      return a.localeCompare(b);
-    });
-    return ['All', ...unique];
-  }
+  const CATS = ['All','Starters','Mains','Breads','Beverages','Desserts'];
   const CAT_COLOR = { Starters:'#FF6A2A', Mains:'#8B7CF6', Breads:'#F0A93B', Beverages:'#2BB8C0', Desserts:'#F472B6' };
   const catColor = c => CAT_COLOR[c] || 'var(--orange)';
   const stockLabel = {ok:'In stock',low:'Low',out:'Out'};
@@ -692,238 +619,18 @@
       }
     }
   }
-  // ---- Phone prefix combo system ----
-  const RS_COUNTRIES = [
-    {name:'Afghanistan',code:'AF',dial:'+93',flag:'🇦🇫'},
-    {name:'Albania',code:'AL',dial:'+355',flag:'🇦🇱'},
-    {name:'Algeria',code:'DZ',dial:'+213',flag:'🇩🇿'},
-    {name:'Argentina',code:'AR',dial:'+54',flag:'🇦🇷'},
-    {name:'Australia',code:'AU',dial:'+61',flag:'🇦🇺'},
-    {name:'Austria',code:'AT',dial:'+43',flag:'🇦🇹'},
-    {name:'Bahrain',code:'BH',dial:'+973',flag:'🇧🇭'},
-    {name:'Bangladesh',code:'BD',dial:'+880',flag:'🇧🇩'},
-    {name:'Belgium',code:'BE',dial:'+32',flag:'🇧🇪'},
-    {name:'Brazil',code:'BR',dial:'+55',flag:'🇧🇷'},
-    {name:'Canada',code:'CA',dial:'+1',flag:'🇨🇦'},
-    {name:'China',code:'CN',dial:'+86',flag:'🇨🇳'},
-    {name:'Denmark',code:'DK',dial:'+45',flag:'🇩🇰'},
-    {name:'Egypt',code:'EG',dial:'+20',flag:'🇪🇬'},
-    {name:'Finland',code:'FI',dial:'+358',flag:'🇫🇮'},
-    {name:'France',code:'FR',dial:'+33',flag:'🇫🇷'},
-    {name:'Germany',code:'DE',dial:'+49',flag:'🇩🇪'},
-    {name:'Ghana',code:'GH',dial:'+233',flag:'🇬🇭'},
-    {name:'Greece',code:'GR',dial:'+30',flag:'🇬🇷'},
-    {name:'Hong Kong',code:'HK',dial:'+852',flag:'🇭🇰'},
-    {name:'Hungary',code:'HU',dial:'+36',flag:'🇭🇺'},
-    {name:'India',code:'IN',dial:'+91',flag:'🇮🇳'},
-    {name:'Indonesia',code:'ID',dial:'+62',flag:'🇮🇩'},
-    {name:'Iran',code:'IR',dial:'+98',flag:'🇮🇷'},
-    {name:'Iraq',code:'IQ',dial:'+964',flag:'🇮🇶'},
-    {name:'Ireland',code:'IE',dial:'+353',flag:'🇮🇪'},
-    {name:'Israel',code:'IL',dial:'+972',flag:'🇮🇱'},
-    {name:'Italy',code:'IT',dial:'+39',flag:'🇮🇹'},
-    {name:'Japan',code:'JP',dial:'+81',flag:'🇯🇵'},
-    {name:'Jordan',code:'JO',dial:'+962',flag:'🇯🇴'},
-    {name:'Kenya',code:'KE',dial:'+254',flag:'🇰🇪'},
-    {name:'Kuwait',code:'KW',dial:'+965',flag:'🇰🇼'},
-    {name:'Lebanon',code:'LB',dial:'+961',flag:'🇱🇧'},
-    {name:'Malaysia',code:'MY',dial:'+60',flag:'🇲🇾'},
-    {name:'Maldives',code:'MV',dial:'+960',flag:'🇲🇻'},
-    {name:'Mexico',code:'MX',dial:'+52',flag:'🇲🇽'},
-    {name:'Morocco',code:'MA',dial:'+212',flag:'🇲🇦'},
-    {name:'Nepal',code:'NP',dial:'+977',flag:'🇳🇵'},
-    {name:'Netherlands',code:'NL',dial:'+31',flag:'🇳🇱'},
-    {name:'New Zealand',code:'NZ',dial:'+64',flag:'🇳🇿'},
-    {name:'Nigeria',code:'NG',dial:'+234',flag:'🇳🇬'},
-    {name:'Norway',code:'NO',dial:'+47',flag:'🇳🇴'},
-    {name:'Oman',code:'OM',dial:'+968',flag:'🇴🇲'},
-    {name:'Pakistan',code:'PK',dial:'+92',flag:'🇵🇰'},
-    {name:'Philippines',code:'PH',dial:'+63',flag:'🇵🇭'},
-    {name:'Poland',code:'PL',dial:'+48',flag:'🇵🇱'},
-    {name:'Portugal',code:'PT',dial:'+351',flag:'🇵🇹'},
-    {name:'Qatar',code:'QA',dial:'+974',flag:'🇶🇦'},
-    {name:'Romania',code:'RO',dial:'+40',flag:'🇷🇴'},
-    {name:'Russia',code:'RU',dial:'+7',flag:'🇷🇺'},
-    {name:'Saudi Arabia',code:'SA',dial:'+966',flag:'🇸🇦'},
-    {name:'Singapore',code:'SG',dial:'+65',flag:'🇸🇬'},
-    {name:'South Africa',code:'ZA',dial:'+27',flag:'🇿🇦'},
-    {name:'South Korea',code:'KR',dial:'+82',flag:'🇰🇷'},
-    {name:'Spain',code:'ES',dial:'+34',flag:'🇪🇸'},
-    {name:'Sri Lanka',code:'LK',dial:'+94',flag:'🇱🇰'},
-    {name:'Sweden',code:'SE',dial:'+46',flag:'🇸🇪'},
-    {name:'Switzerland',code:'CH',dial:'+41',flag:'🇨🇭'},
-    {name:'Taiwan',code:'TW',dial:'+886',flag:'🇹🇼'},
-    {name:'Tanzania',code:'TZ',dial:'+255',flag:'🇹🇿'},
-    {name:'Thailand',code:'TH',dial:'+66',flag:'🇹🇭'},
-    {name:'Turkey',code:'TR',dial:'+90',flag:'🇹🇷'},
-    {name:'Uganda',code:'UG',dial:'+256',flag:'🇺🇬'},
-    {name:'Ukraine',code:'UA',dial:'+380',flag:'🇺🇦'},
-    {name:'United Arab Emirates',code:'AE',dial:'+971',flag:'🇦🇪'},
-    {name:'United Kingdom',code:'GB',dial:'+44',flag:'🇬🇧'},
-    {name:'United States',code:'US',dial:'+1',flag:'🇺🇸'},
-    {name:'Vietnam',code:'VN',dial:'+84',flag:'🇻🇳'},
-    {name:'Zimbabwe',code:'ZW',dial:'+263',flag:'🇿🇼'}
-  ];
-
-  function getDefaultCountry() {
-    const settings = window.RS_SETTINGS || {};
-    const countryName = (settings.set_country || 'India').trim().toLowerCase();
-    // Map currency to country as fallback
-    const currencyMap = {
-      'inr':{ name:'India', code:'IN', dial:'+91', flag:'🇮🇳' },
-      'eur':{ name:'Ireland', code:'IE', dial:'+353', flag:'🇮🇪' },
-      'usd':{ name:'United States', code:'US', dial:'+1', flag:'🇺🇸' },
-      'gbp':{ name:'United Kingdom', code:'GB', dial:'+44', flag:'🇬🇧' },
-      'aed':{ name:'United Arab Emirates', code:'AE', dial:'+971', flag:'🇦🇪' },
-      'sar':{ name:'Saudi Arabia', code:'SA', dial:'+966', flag:'🇸🇦' },
-      'sgd':{ name:'Singapore', code:'SG', dial:'+65', flag:'🇸🇬' },
-      'aud':{ name:'Australia', code:'AU', dial:'+61', flag:'🇦🇺' },
-      'cad':{ name:'Canada', code:'CA', dial:'+1', flag:'🇨🇦' },
-      'nzd':{ name:'New Zealand', code:'NZ', dial:'+64', flag:'🇳🇿' },
-      'zar':{ name:'South Africa', code:'ZA', dial:'+27', flag:'🇿🇦' }
-    };
-    // Try name match first
-    const byName = RS_COUNTRIES.find(c => c.name.toLowerCase() === countryName
-      || countryName.includes(c.name.toLowerCase())
-      || c.name.toLowerCase().includes(countryName));
-    if (byName) return byName;
-    // Fallback to currency
-    const currVal = (settings.set_currency || 'INR (₹)').toLowerCase();
-    for (const [key, val] of Object.entries(currencyMap)) {
-      if (currVal.startsWith(key)) return val;
-    }
-    return RS_COUNTRIES.find(c => c.code === 'IN');
-  }
-
-  // Initialise a phone combo widget.
-  // comboId: wrapper div id, btnId: flag button id, flagId: flag span id,
-  // dialId: dial code span id, inputId: phone input id, pickerId: picker div id,
-  // searchId: search input id, listId: list div id
-  function initPhoneCombo({ comboId, btnId, flagId, dialId, inputId, pickerId, searchId, listId }) {
-    const comboEl    = document.getElementById(comboId);
-    const flagBtn    = document.getElementById(btnId);
-    const flagEl     = document.getElementById(flagId);
-    const dialEl     = document.getElementById(dialId);
-    const phoneInput = document.getElementById(inputId);
-    const pickerEl   = document.getElementById(pickerId);
-    const searchEl   = document.getElementById(searchId);
-    const listEl     = document.getElementById(listId);
-    if (!comboEl || !flagBtn || !pickerEl || !listEl) return;
-
-    let activeCountry = getDefaultCountry();
-    // Try to restore saved selection
-    try {
-      const saved = localStorage.getItem('rs_phone_country_' + inputId);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const found = RS_COUNTRIES.find(c => c.code === parsed.code);
-        if (found) activeCountry = found;
-      }
-    } catch(e){}
-
-    function applyCountry(c) {
-      activeCountry = c;
-      if (flagEl) flagEl.textContent = c.flag;
-      if (dialEl) dialEl.textContent = c.dial;
-      try { localStorage.setItem('rs_phone_country_' + inputId, JSON.stringify({code:c.code, dial:c.dial})); } catch(e){}
-    }
-    applyCountry(activeCountry);
-
-    function renderList(filter) {
-      const q = (filter || '').toLowerCase();
-      const items = q ? RS_COUNTRIES.filter(c =>
-        c.name.toLowerCase().includes(q) || c.dial.includes(q) || c.code.toLowerCase().includes(q)
-      ) : RS_COUNTRIES;
-      listEl.innerHTML = items.map(c => `
-        <div class="pcp-item${c.code === activeCountry.code ? ' active' : ''}" data-code="${c.code}">
-          <span class="pcp-flag">${c.flag}</span>
-          <span class="pcp-name">${c.name}</span>
-          <span class="pcp-dial">${c.dial}</span>
-        </div>`).join('');
-      listEl.querySelectorAll('.pcp-item').forEach(el => {
-        el.addEventListener('click', () => {
-          const found = RS_COUNTRIES.find(c => c.code === el.dataset.code);
-          if (found) { applyCountry(found); closePicker(); }
-        });
-      });
-    }
-
-    function openPicker() {
-      pickerEl.classList.remove('hidden');
-      renderList('');
-      if (searchEl) { searchEl.value = ''; searchEl.focus(); }
-    }
-    function closePicker() {
-      pickerEl.classList.add('hidden');
-    }
-
-    flagBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      pickerEl.classList.contains('hidden') ? openPicker() : closePicker();
-    });
-    if (searchEl) {
-      searchEl.addEventListener('input', () => renderList(searchEl.value));
-      searchEl.addEventListener('keydown', e => { if(e.key === 'Escape') closePicker(); });
-    }
-    document.addEventListener('click', e => {
-      if (!comboEl.contains(e.target)) closePicker();
-    }, true);
-
-    // Expose getter for full number
-    comboEl._getFullNumber = () => {
-      const raw = (phoneInput ? phoneInput.value.trim() : '');
-      if (!raw) return '';
-      // If user already typed the dial code, don't double-prefix
-      if (raw.startsWith('+')) return raw;
-      return activeCountry.dial + raw;
-    };
-    comboEl._getDialCode = () => activeCountry.dial;
-    comboEl._getCountry = () => ({ ...activeCountry });
-    comboEl._setCountry = (code) => {
-      const found = RS_COUNTRIES.find(c => c.code === code);
-      if (found) applyCountry(found);
-    };
-  }
-
-  function initAllPhoneCombos() {
-    initPhoneCombo({
-      comboId: 'cust-phone-combo', btnId: 'cust-flag-btn', flagId: 'cust-flag-emoji',
-      dialId: 'cust-dial-code', inputId: 'cust-input-phone',
-      pickerId: 'cust-country-picker', searchId: 'cust-pcp-search', listId: 'cust-pcp-list'
-    });
-    initPhoneCombo({
-      comboId: 'tw-phone-combo', btnId: 'tw-flag-btn', flagId: 'tw-flag-emoji',
-      dialId: 'tw-dial-code', inputId: 'takeaway-cust-phone',
-      pickerId: 'tw-country-picker', searchId: 'tw-pcp-search', listId: 'tw-pcp-list'
-    });
-  }
-
-  // Helper: get full phone number from a combo (or plain input as fallback)
-  function getFullPhoneFromInput(inputId) {
-    const combo = document.getElementById(
-      inputId === 'cust-input-phone' ? 'cust-phone-combo' :
-      inputId === 'takeaway-cust-phone' ? 'tw-phone-combo' : null
-    );
-    if (combo && combo._getFullNumber) return combo._getFullNumber();
-    const el = document.getElementById(inputId);
-    return el ? el.value.trim() : '';
-  }
-
   function getCustomer(){
-    const phoneCombo = document.getElementById('cust-phone-combo');
-    let fullPhone = '';
-    if (phoneCombo && phoneCombo._getFullNumber) {
-      fullPhone = phoneCombo._getFullNumber();
-    } else {
-      const phoneEl = document.getElementById('cust-input-phone');
-      fullPhone = phoneEl ? phoneEl.value.trim() : '';
+    const sel = $('#cart-customer-sel');
+    if (sel && sel.value) {
+      const opt = sel.options[sel.selectedIndex];
+      return {
+        name: opt.getAttribute('data-name') || '',
+        phone: sel.value,
+        gst: opt.getAttribute('data-gst') || '',
+        table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
+      };
     }
-    return {
-      name: (document.getElementById('cust-input-name')?.value || '').trim(),
-      phone: fullPhone,
-      gst: ($('#cust-gst')?.value || '').trim(),
-      table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
-    };
+    return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), gst:($('#cust-gst')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
   }
   function runKotAction(){
     if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -973,11 +680,6 @@
       if (lowerText.includes('delivery')) return 'Delivery';
       if (lowerText.includes('dine')) return 'Dine-in';
       return 'Takeaway';
-    }
-
-    // Helper to update customer widget/fields visibility
-    function updateCustomerWidgetVisibility() {
-      // Customer inputs are now always visible and unified in POS customer fields
     }
 
     // Load saved active order type and corresponding cart
@@ -1044,9 +746,9 @@
         const customer = JSON.parse(savedCustomer);
         const cartTable = $('#cart-table');
         if (cartTable && customer.table) cartTable.value = customer.table;
-        const custName = $('#cust-name') || document.getElementById('cust-input-name');
+        const custName = $('#cust-name');
         if (custName && customer.name) custName.value = customer.name;
-        const custPhone = $('#cust-phone') || document.getElementById('cust-input-phone');
+        const custPhone = $('#cust-phone');
         if (custPhone && customer.phone) custPhone.value = customer.phone;
         const custGst = $('#cust-gst');
         if (custGst && customer.gst) custGst.value = customer.gst;
@@ -1055,35 +757,19 @@
       console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
     }
 
-    // Initialize visibility
-    updateCustomerWidgetVisibility();
-
-    function refreshPosCats() {
-      const cats = getMenuCats();
-      const posCatsEl = document.getElementById('pos-cats');
-      if (!posCatsEl) return;
-      const currentActive = activeCat;
-      const newActive = cats.includes(currentActive) ? currentActive : 'All';
-      activeCat = newActive;
-      posCatsEl.innerHTML = cats.map(c =>
-        `<button class="pos-cat-btn ${c === newActive ? 'active' : ''}" data-cat="${c}">${c}</button>`
-      ).join('');
-      $$('#pos-cats .pos-cat-btn').forEach(b => b.addEventListener('click', () => {
-        activeCat = b.dataset.cat;
-        $$('#pos-cats .pos-cat-btn').forEach(x => x.classList.toggle('active', x === b));
-        renderPOS();
-        const container = document.getElementById('pos-cats');
-        if (container) {
-          container.scrollTo({
-            left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
-            behavior: 'smooth'
-          });
-        }
-      }));
-    }
-    window.refreshPosCats = refreshPosCats;
-    refreshPosCats();
-
+    $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
+    $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
+      activeCat=b.dataset.cat;
+      $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
+      renderPOS();
+      const container = document.getElementById('pos-cats');
+      if (container) {
+        container.scrollTo({
+          left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
+          behavior: 'smooth'
+        });
+      }
+    }));
     $('#pos-search-input').addEventListener('input', renderPOS);
     $('#pos-sort-select').addEventListener('change', renderPOS);
     $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
@@ -1104,8 +790,8 @@
             deliveryCharge: dc ? dc.value : '',
             deliveryRider: dr ? dr.value : ''
           }));
-          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name') || document.getElementById('takeaway-cust-name');
-          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone') || document.getElementById('takeaway-cust-phone');
+          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
           localStorage.setItem('rs_tab_cust_' + tabKey, JSON.stringify({
             name: nameEl ? nameEl.value.trim() : '',
             phone: phoneEl ? phoneEl.value.trim() : ''
@@ -1135,14 +821,10 @@
           const savedNewTabCust = localStorage.getItem('rs_tab_cust_' + newTabKey);
           if (savedNewTabCust) {
             const newCustData = JSON.parse(savedNewTabCust);
-            const nameElWidget = document.getElementById('cust-input-name') || document.getElementById('cust-name');
-            const phoneElWidget = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
-            const nameElTakeaway = document.getElementById('takeaway-cust-name');
-            const phoneElTakeaway = document.getElementById('takeaway-cust-phone');
-            if (nameElWidget) nameElWidget.value = newCustData.name || '';
-            if (phoneElWidget) phoneElWidget.value = newCustData.phone || '';
-            if (nameElTakeaway) nameElTakeaway.value = newCustData.name || '';
-            if (phoneElTakeaway) phoneElTakeaway.value = newCustData.phone || '';
+            const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+            const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+            if (nameEl) nameEl.value = newCustData.name || '';
+            if (phoneEl) phoneEl.value = newCustData.phone || '';
           }
 
           // Re-render the cart!
@@ -1153,17 +835,26 @@
       }
       $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
       
-      // Update visibility based on new order type
-      updateCustomerWidgetVisibility();
+      // Update trigger text based on order type
+      const triggerText = document.getElementById('cust-trigger-text');
+      if (triggerText) {
+        if (b.textContent.trim() === 'Takeaway') {
+          triggerText.innerText = 'Customer';
+        } else {
+          triggerText.innerText = 'Walk-in';
+        }
+      }
+      
+      // If Takeaway is selected, open the customer widget
+      if (b.textContent.trim() === 'Takeaway') {
+        const widgetContainer = document.getElementById('custom-customer-widget');
+        const trigger = document.getElementById('cust-widget-trigger');
+        const dropdown = document.getElementById('cust-widget-dropdown');
+        if (widgetContainer && trigger && dropdown) {
+          trigger.click();
+        }
+      }
     }));
-
-    // Sync takeaway fields with widget fields
-    function syncTakeawayFields() {
-      // No takeaway fields to sync anymore
-    }
-    syncTakeawayFields();
-    initAllPhoneCombos();
-
     $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
     $('#btn-kot').onclick = () => {
       if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -2841,7 +2532,7 @@
   window.RS = {
     toast, activateTab, rs, initials, avatarColors, catColor,
     nextBillNo, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
-    MENU, get CATS(){ return getMenuCats(); }, stockLabel, stockCls,
+    MENU, CATS, stockLabel, stockCls,
     getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
     setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
     titles, addRenderer:(id,fn)=>{
@@ -2860,14 +2551,8 @@
     save(coll){ const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES}; const arr=map[coll]; if(window.RS_DB&&arr) return RS_DB.bulkPut(coll, arr.map(x=>({...x}))); return Promise.resolve(); },
     saveOne(coll,obj){ if(window.RS_DB) return RS_DB.put(coll, obj.id, {...obj}); return Promise.resolve(); },
     removeOne(coll,id){ if(window.RS_DB) return RS_DB.del(coll, id); return Promise.resolve(); },
-    saveSettings(obj){ if(window.RS_DB) { window.RS_SETTINGS = obj; return RS_DB.setSettings(obj); } return Promise.resolve(); },
+    saveSettings(obj){ if(window.RS_DB) return RS_DB.setSettings(obj); return Promise.resolve(); },
     getSettings(){ if(window.RS_DB) return RS_DB.getSettings(); return Promise.resolve(null); },
-    getCurrencySymbol() {
-      const settings = window.RS_SETTINGS || {};
-      const val = settings.set_currency || 'INR (₹)';
-      const match = val.match(/\(([^)]+)\)/);
-      return match ? match[1] : '₹';
-    },
     dbMode:()=> (window.RS_DB && window.RS_DB.mode) || 'local',
     downloadFile(content, mimeType, filename) {
       const blob = new Blob([content], { type: mimeType });
@@ -2927,15 +2612,6 @@
   }
   async function hydrate(){
     if(!window.RS_DB) return;
-    try {
-      window.RS_SETTINGS = await RS_DB.getSettings();
-      if (window.RS && window.RS.updateStaticCurrencyLabels) {
-        window.RS.updateStaticCurrencyLabels();
-      }
-    } catch(e) {
-      console.warn('Failed to load settings in hydrate', e);
-      window.RS_SETTINGS = {};
-    }
     const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES};
     
     // 1. Instantly load from local storage cache
@@ -2945,7 +2621,7 @@
         if(cached && cached.length){ replaceArr(map[coll], cached); }
       } catch(e){}
     }
-    try{ renderPOS(); if (window.refreshPosCats) window.refreshPosCats(); }catch(e){}
+    try{ renderPOS(); }catch(e){}
 
     // Restore persistent cart state / pre-update snapshot
     try {
@@ -3129,40 +2805,16 @@
 
   function bindGlobalImportExportEvents() {
     const escHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    function importPreview({ title, summary, rows, skipped, duplicatesCount = 0 }) {
+    function importPreview({ title, summary, rows, skipped }) {
       return new Promise(resolve => {
         const warnings = (skipped || []).slice(0, 6).map(msg => `<li>${escHtml(msg)}</li>`).join('');
-        const duplicateSelector = duplicatesCount > 0 ? `
-          <div class="form-group" style="margin-top: 12px; text-align: left; background: var(--glass-1); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
-            <label style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
-              <i class="fa-solid fa-clone" style="color: var(--orange);"></i> ${duplicatesCount} duplicates detected
-            </label>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin: 0;">
-                <input type="radio" name="duplicate-behavior" value="overwrite" checked style="accent-color: var(--orange); margin: 0; width: auto; height: auto;">
-                <span><b>Overwrite</b> existing items</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin: 0;">
-                <input type="radio" name="duplicate-behavior" value="skip" style="accent-color: var(--orange); margin: 0; width: auto; height: auto;">
-                <span><b>Skip</b> duplicates (Ignore)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin: 0;">
-                <input type="radio" name="duplicate-behavior" value="keep" style="accent-color: var(--orange); margin: 0; width: auto; height: auto;">
-                <span><b>Keep both</b> (Create new item copy)</span>
-              </label>
-            </div>
-          </div>
-        ` : '';
-
         const body = `<div style="display:flex;flex-direction:column;gap:12px">
           <div class="crm-stats"><div class="cs"><div class="csv">${rows}</div><div class="csl">Rows ready</div></div><div class="cs"><div class="csv">${(skipped||[]).length}</div><div class="csl">Skipped</div></div></div>
           <div style="font-size:13px;color:var(--text-soft)">${escHtml(summary)}</div>
-          ${duplicateSelector}
           ${warnings ? `<div class="sr-empty" style="text-align:left;padding:12px"><b>Skipped rows</b><ul style="margin:8px 0 0 18px">${warnings}</ul></div>` : ''}
         </div>`;
         if (!window.RSModal) {
-          const ok = window.confirm(`${title}\n\n${rows} rows ready. ${(skipped||[]).length} skipped.\nContinue import?`);
-          resolve(ok ? { proceed: true, behavior: 'overwrite' } : false);
+          resolve(window.confirm(`${title}\n\n${rows} rows ready. ${(skipped||[]).length} skipped.\nContinue import?`));
           return;
         }
         RSModal.open({
@@ -3170,34 +2822,21 @@
           foot:`<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-database"></i> Import</button>`,
           onMount(modal, close) {
             modal.querySelector('[data-cancel]').onclick = () => { close(); resolve(false); };
-            modal.querySelector('[data-confirm]').onclick = () => {
-              let behavior = 'overwrite';
-              const selected = modal.querySelector('input[name="duplicate-behavior"]:checked');
-              if (selected) {
-                behavior = selected.value;
-              }
-              close();
-              resolve({ proceed: true, behavior });
-            };
+            modal.querySelector('[data-confirm]').onclick = () => { close(); resolve(true); };
           }
         });
       });
     }
-    window.RS.importPreview = importPreview;
-    async function saveImportedRecords(collection, records, onProgress) {
+    async function saveImportedRecords(collection, records) {
       const before = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
       const failed = [];
       let saved = 0;
-      for (let i = 0; i < records.length; i++) {
-        const record = records[i];
+      for (const record of records) {
         try {
           await RS.saveOne(collection, record);
           saved++;
         } catch(e) {
           failed.push(`${record.name || record.no || record.id || 'Row'}: ${e.message}`);
-        }
-        if (onProgress) {
-          onProgress(i + 1, records.length);
         }
       }
       const lastError = window.RS_LAST_CLOUD_ERROR;
@@ -3298,7 +2937,6 @@
 
               const records = [];
               const skipped = [];
-              let duplicatesCount = 0;
               rows.forEach((row, index) => {
                 const name = getValue(row, ['name', 'itemname', 'menuitem', 'item', 'ingredientname', 'ingredient']);
                 if(!name) { skipped.push(`Row ${index + 2}: missing item name`); return; }
@@ -3312,7 +2950,7 @@
                 
                 const existing = MENU.find(x => String(x.name).toLowerCase() === String(name).toLowerCase());
                 const item = {
-                  _existing: existing,
+                  id: existing ? existing.id : 'menu_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                   name: String(name),
                   cat: String(cat),
                   price: price,
@@ -3320,41 +2958,16 @@
                   stock: available ? 'ok' : 'out',
                   description: String(desc)
                 };
-                if (existing) duplicatesCount++;
                 records.push(item);
               });
               if(!records.length) throw new Error('No valid menu rows found');
-              const res = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available.', rows:records.length, skipped, duplicatesCount });
-              if(!res || !res.proceed) {
+              const proceed = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available.', rows:records.length, skipped });
+              if(!proceed) {
                 finishOperationStatus('Menu import cancelled', 'error');
                 return;
               }
-              const finalRecords = [];
-              records.forEach(item => {
-                if (item._existing) {
-                  if (res.behavior === 'skip') {
-                    return;
-                  } else if (res.behavior === 'keep') {
-                    item.id = 'menu_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-                    item.name = item.name + ' (Copy)';
-                  } else {
-                    item.id = item._existing.id;
-                  }
-                } else {
-                  item.id = 'menu_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_');
-                }
-                delete item._existing;
-                finalRecords.push(item);
-              });
-              if(!finalRecords.length) {
-                finishOperationStatus('No new menu items imported (duplicates skipped)');
-                return;
-              }
-              setOperationStatus(`Importing 1/${finalRecords.length} menu rows...`, 'running', (1 / finalRecords.length) * 100);
-              const result = await saveImportedRecords('menu', finalRecords, (current, total) => {
-                const percentage = (current / total) * 100;
-                setOperationStatus(`Importing ${current}/${total} menu rows...`, 'running', percentage);
-              });
+              setOperationStatus(`Importing ${records.length} menu rows...`);
+              const result = await saveImportedRecords('menu', records);
               finishOperationStatus(`${result.saved} menu items imported`);
               importResultToast('menu items', result);
               if(window.RS_DB) {
@@ -3364,7 +2977,6 @@
                   items.forEach(i => MENU.push(i));
                   renderEditor();
                   renderPOS();
-                  if (window.refreshPosCats) window.refreshPosCats();
                 }
               }
             } catch(err) {
@@ -3467,7 +3079,6 @@
 
               const records = [];
               const skipped = [];
-              let duplicatesCount = 0;
               rows.forEach((row, index) => {
                 const name = getValue(row, ['ingredientname', 'ingredient', 'name', 'item', 'ingredientkey']);
                 if(!name) { skipped.push(`Row ${index + 2}: missing ingredient name`); return; }
@@ -3479,7 +3090,7 @@
                 
                 const existing = INVENTORY.find(x => String(x.name).toLowerCase() === String(name).toLowerCase() || String(x.key).toLowerCase() === String(name).toLowerCase());
                 const item = {
-                  _existing: existing,
+                  id: existing ? existing.id : 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                   name: String(name),
                   cat: String(cat),
                   stock: Number.isFinite(parsedStock) ? parsedStock : 0,
@@ -3487,41 +3098,16 @@
                   cost: Number.isFinite(parsedCost) ? parsedCost : 0,
                   unit: String(unit)
                 };
-                if (existing) duplicatesCount++;
                 records.push(item);
               });
               if(!records.length) throw new Error('No valid inventory rows found');
-              const res = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels for this outlet and sync to Supabase when cloud is available.', rows:records.length, skipped, duplicatesCount });
-              if(!res || !res.proceed) {
+              const proceed = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels for this outlet and sync to Supabase when cloud is available.', rows:records.length, skipped });
+              if(!proceed) {
                 finishOperationStatus('Inventory import cancelled', 'error');
                 return;
               }
-              const finalRecords = [];
-              records.forEach(item => {
-                if (item._existing) {
-                  if (res.behavior === 'skip') {
-                    return;
-                  } else if (res.behavior === 'keep') {
-                    item.id = 'inv_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-                    item.name = item.name + ' (Copy)';
-                  } else {
-                    item.id = item._existing.id;
-                  }
-                } else {
-                  item.id = 'inv_' + String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '_');
-                }
-                delete item._existing;
-                finalRecords.push(item);
-              });
-              if(!finalRecords.length) {
-                finishOperationStatus('No new inventory items imported (duplicates skipped)');
-                return;
-              }
-              setOperationStatus(`Importing 1/${finalRecords.length} inventory rows...`, 'running', (1 / finalRecords.length) * 100);
-              const result = await saveImportedRecords('inventory', finalRecords, (current, total) => {
-                const percentage = (current / total) * 100;
-                setOperationStatus(`Importing ${current}/${total} inventory rows...`, 'running', percentage);
-              });
+              setOperationStatus(`Importing ${records.length} inventory rows...`);
+              const result = await saveImportedRecords('inventory', records);
               finishOperationStatus(`${result.saved} inventory items imported`);
               importResultToast('ingredients', result);
               if(window.RS_DB) {

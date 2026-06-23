@@ -180,7 +180,14 @@
         <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
         <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
         <div class="set-section form-grid-2" id="set-country-currency-row"></div>`,
-      tax:`<div class="set-section form-grid-2">${sel('Default GST slab',['5%','12%','18%'],'5%')}${field('Invoice prefix','INV-')}</div>
+      tax:`<div class="set-section form-grid-2">
+          ${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
+          ${field('Invoice prefix','INV-')}
+        </div>
+        <div class="set-section form-grid-2">
+          ${field('Tax label','GST','e.g. GST, VAT, Sales Tax')}
+          ${field('Tax rate (%)','5','Tax rate percentage')}
+        </div>
         ${toggle('Service charge','Add 5% service charge on dine-in',false)}
         ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
         ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
@@ -189,11 +196,32 @@
         ${toggle('Auto-print receipt','Print automatically after payment',true)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
         <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}</div>`,
-      gateway:`<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Configure your WhatsApp gateway for this outlet</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Ready</span></div>
+      gateway:`<div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Configure your WhatsApp gateway for this outlet</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</span></div></div>
         ${toggle('Auto-send receipts','WhatsApp the bill to customer after payment',true)}
+        ${sel('WhatsApp bill format',['Text receipt','Thermal PDF receipt'],'Text receipt')}
         ${toggle('Order updates','Notify customer when order is ready',true)}
         ${toggle('Marketing broadcasts','Allow promotional campaigns',true)}
-        <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining with us. Your bill is attached.</textarea></div>`,
+        <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining with us. Your bill is attached.</textarea></div>
+        <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
+          <label class="fl" style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:8px;">
+            <span>Recent WhatsApp Activity Logs</span>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-refresh-client-logs" style="font-size:10px; padding:2px 8px; height:22px; cursor:pointer;"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+          </label>
+          <div id="client-gateway-logs" style="max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.15); border:1px solid var(--stroke-2); border-radius:var(--r-sm); padding:10px; font-family:monospace; font-size:11px; line-height:1.5; color:var(--text-soft)">
+            <div style="text-align:center; padding:12px; color:var(--text-mute)">Loading activity logs...</div>
+          </div>
+        </div>
+        <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+            <div>
+              <div style="font-weight:700; font-size:13px; color:var(--text)">Troubleshoot Gateway</div>
+              <div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">If WhatsApp is stuck or not showing a new QR, you can force a fresh reset.</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-danger" id="btn-gateway-troubleshoot-reset" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); font-size:11px; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; white-space:nowrap; transition:all 0.2s">
+              <i class="fa-solid fa-triangle-exclamation"></i> Force Reset
+            </button>
+          </div>
+        </div>`,
       team:`<div class="set-row"><div class="si"><div class="st">Team members</div><div class="sd">Manage staff roles and permissions for this outlet</div></div><button class="btn btn-ghost btn-sm" id="set-team-go">Manage team</button></div>
         ${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
         ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
@@ -221,11 +249,239 @@
         </div></div>`;
       const body = $('#set-body');
       let SET_STORE = {};
+      let outletGatewayInterval = null;
+      async function pollOutletGateway() {
+        const container = body.querySelector('#outlet-gateway-status-container');
+        if (!container) {
+          stopOutletGatewayPolling();
+          return;
+        }
+        const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+        const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+        
+        // 1. Poll Gateway Status
+        try {
+          const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
+          if (!res || res.error) {
+            container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd" style="color:#ef4444">Failed to fetch status: ${res ? res.error : 'Offline'}</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>`;
+          } else if (res.status === 'ready') {
+            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Your WhatsApp account is active and connected.</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Ready</span></div><div style="display:flex;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--stroke);padding:12px;border-radius:8px"><div style="font-size:13px">Connected number: <strong>+${res.number || ''}</strong></div><button type="button" class="btn btn-sm btn-danger" id="btn-outlet-gateway-logout" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);font-size:11px;padding:6px 12px;border-radius:6px;cursor:pointer"><i class="fa-solid fa-power-off"></i> Disconnect</button></div></div>`;
+            const logoutBtn = container.querySelector('#btn-outlet-gateway-logout');
+            if (logoutBtn) {
+              logoutBtn.onclick = async () => {
+                if (!confirm("Are you sure you want to disconnect this WhatsApp account? You will need to scan a new QR code to re-link it.")) return;
+                logoutBtn.disabled = true;
+                logoutBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Disconnecting...';
+                try {
+                  await RS_API.data({ operation: 'gateway_logout', tenantId: tenantId });
+                  pollOutletGateway();
+                  if (typeof window.updateTopbarWhatsAppStatus === 'function') window.updateTopbarWhatsAppStatus();
+                } catch (err) {
+                  console.error(err);
+                  alert("Failed to disconnect: " + err.message);
+                  logoutBtn.disabled = false;
+                  logoutBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Disconnect';
+                }
+              };
+            }
+          } else if (res.status === 'qr') {
+            if (res.qr) {
+              // Speed up polling while waiting for scan
+              if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
+              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings → Linked Devices → Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically…</div></div></div>`;
+            } else {
+              container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Generating QR code… please wait.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Generating…</span></div>`;
+            }
+          } else if (res.status === 'syncing' || res.status === 'authenticated') {
+            // QR just scanned — show animated syncing UI, speed up polling to catch 'ready'
+            if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
+            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">QR scanned! Syncing your WhatsApp account…</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308;animation:pulse 0.8s infinite alternate"></span> Syncing</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 18px;border:1.5px solid rgba(234,179,8,0.3);border-radius:var(--r-md);background:linear-gradient(135deg,rgba(234,179,8,0.04),rgba(234,179,8,0.01));text-align:center">
+                <div style="position:relative;width:72px;height:72px">
+                  <svg viewBox="0 0 72 72" style="width:72px;height:72px;transform:rotate(-90deg)">
+                    <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(234,179,8,0.15)" stroke-width="5"/>
+                    <circle cx="36" cy="36" r="30" fill="none" stroke="#eab308" stroke-width="5" stroke-dasharray="188" stroke-dashoffset="50" stroke-linecap="round" style="animation:wa-spin-progress 1.8s linear infinite"/>
+                  </svg>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:#eab308">
+                    <i class="fa-brands fa-whatsapp"></i>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Connecting your account…</div>
+                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp is verifying your device.<br>This usually takes 5–15 seconds.</div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#22c55e;background:rgba(34,197,94,0.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(34,197,94,0.2)"><i class="fa-solid fa-check"></i> QR Scanned</span>
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#eab308;background:rgba(234,179,8,0.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(234,179,8,0.2)"><i class="fa-solid fa-spinner fa-spin"></i> Authenticating</span>
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-soft);background:var(--panel);padding:4px 10px;border-radius:20px;border:1px solid var(--stroke)"><i class="fa-solid fa-circle-dot"></i> Ready</span>
+                </div>
+                <div style="margin-top:4px;border-top:1px solid rgba(234,179,8,0.15);padding-top:14px;width:100%">
+                  <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Stuck? Connection not going through?</div>
+                  <button type="button" id="btn-gateway-force-newqr" style="display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,0.08);color:#ef4444;border:1px solid rgba(239,68,68,0.25);font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;cursor:pointer;transition:all 0.2s">
+                    <i class="fa-solid fa-rotate-right"></i> Force New QR
+                  </button>
+                </div>
+              </div>
+            </div>
+            <style>@keyframes wa-spin-progress{0%{stroke-dashoffset:188}100%{stroke-dashoffset:0}}</style>`;
+            // Wire the Force New QR button
+            const forceQrBtn = container.querySelector('#btn-gateway-force-newqr');
+            if (forceQrBtn) {
+              forceQrBtn.onclick = async () => {
+                forceQrBtn.disabled = true;
+                forceQrBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting…';
+                try {
+                  await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
+                } catch(e) { /* ignore — gateway restarts itself */ }
+                // Wait a moment for gateway to restart then resume normal polling
+                setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
+              };
+            }
+          } else if (res.status === 'auth_failure') {
+            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Authentication failed. Please try scanning the QR code again.</div></div><span class="pill" style="padding:5px 12px;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2)"><i class="fa-solid fa-triangle-exclamation"></i> Auth Failed</span></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--r-md);background:rgba(239,68,68,0.03)">
+                <div style="font-size:22px;color:#ef4444"><i class="fa-solid fa-circle-xmark"></i></div>
+                <div style="flex:1;font-size:12.5px;color:var(--text-soft)">WhatsApp rejected the authentication attempt. This can happen if the QR code expired or was used from another device. Click <strong>Retry</strong> to generate a fresh QR code.</div>
+                <button type="button" class="btn btn-sm" id="btn-gateway-retry" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);font-size:11px;padding:6px 12px;border-radius:6px;white-space:nowrap"><i class="fa-solid fa-rotate-right"></i> Retry</button>
+              </div>
+            </div>`;
+            const retryBtn = container.querySelector('#btn-gateway-retry');
+            if (retryBtn) retryBtn.onclick = () => pollOutletGateway();
+          } else if (res.status === 'connecting') {
+            // Speed up polling while gateway is starting
+            if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
+            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up — this usually takes 5–15 seconds.</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 18px;border:1.5px solid rgba(107,114,128,0.2);border-radius:var(--r-md);background:rgba(107,114,128,0.03);text-align:center">
+                <div style="position:relative;width:56px;height:56px">
+                  <svg viewBox="0 0 56 56" style="width:56px;height:56px;transform:rotate(-90deg)">
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(107,114,128,0.15)" stroke-width="4"/>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="#6b7280" stroke-width="4" stroke-dasharray="138" stroke-dashoffset="138" stroke-linecap="round" style="animation:gw-conn-spin 1.5s linear infinite"/>
+                  </svg>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#6b7280"><i class="fa-brands fa-whatsapp"></i></div>
+                </div>
+                <div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Initialising gateway…</div>
+                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp gateway is booting up.<br>A QR code will appear shortly.</div>
+                </div>
+                <div style="border-top:1px solid rgba(107,114,128,0.15);padding-top:14px;width:100%;text-align:center">
+                  <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Stuck on this screen? Try forcing a reset:</div>
+                  <button type="button" id="btn-gateway-conn-reset" style="display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,0.08);color:#ef4444;border:1px solid rgba(239,68,68,0.25);font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;cursor:pointer;transition:all 0.2s">
+                    <i class="fa-solid fa-rotate-right"></i> Force Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+            <style>@keyframes gw-conn-spin{0%{stroke-dashoffset:138}100%{stroke-dashoffset:0}}</style>`;
+            const connResetBtn = container.querySelector('#btn-gateway-conn-reset');
+            if (connResetBtn) {
+              connResetBtn.onclick = async () => {
+                connResetBtn.disabled = true;
+                connResetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting…';
+                try {
+                  await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
+                } catch(e) { /* ignore */ }
+                setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
+              };
+            }
+          } else {
+            container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Unknown status: ${res.status || 'N/A'}</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin"></i> ${res.status ? res.status.toUpperCase() : 'CHECKING'}</span></div>`;
+          }
+        } catch (e) {
+          console.warn('Failed to poll outlet gateway status:', e);
+          container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd" style="color:#ef4444">Failed to fetch status: ${e.message}</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>`;
+        }
+
+        // 2. Poll Gateway Activity Logs securely (for this tenant only)
+        const logsContainer = body.querySelector('#client-gateway-logs');
+        if (logsContainer) {
+          try {
+            const logsRes = await RS_API.data({ operation: 'gateway_logs', tenantId: tenantId });
+            if (logsRes && logsRes.logs) {
+              const logs = logsRes.logs.slice(0, 15);
+              if (logs.length === 0) {
+                logsContainer.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-mute);">No recent activity logs found.</div>';
+              } else {
+                logsContainer.innerHTML = logs.map(log => {
+                  const logDate = log.created_at ? new Date(log.created_at) : new Date();
+                  const timeStr = logDate.toTimeString().slice(0, 8);
+                  const msg = log.details?.message || log.details?.error || 'System event';
+                  const cls = log.status === 'ok' ? 'color:#22c55e' : (log.status === 'warning' ? 'color:#eab308' : 'color:#ef4444');
+                  return `<div style="margin-bottom: 4px;"><span style="color:var(--text-mute);margin-right:8px;">${timeStr}</span><span style="${cls}">[${log.event.toUpperCase()}] ${msg}</span></div>`;
+                }).join('');
+              }
+            } else {
+              logsContainer.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-mute);">Failed to retrieve logs.</div>';
+            }
+          } catch (e) {
+            logsContainer.innerHTML = `<div style="text-align: center; padding: 12px; color: #ef4444;">Error loading logs: ${e.message}</div>`;
+          }
+        }
+
+        // 3. Wire Refresh Button Click
+        const refreshBtn = body.querySelector('#btn-refresh-client-logs');
+        if (refreshBtn && !refreshBtn.dataset.listenerBound) {
+          refreshBtn.dataset.listenerBound = 'true';
+          refreshBtn.onclick = () => {
+            const icon = refreshBtn.querySelector('i');
+            if (icon) icon.classList.add('fa-spin');
+            pollOutletGateway().then(() => {
+              if (icon) {
+                setTimeout(() => icon.classList.remove('fa-spin'), 600);
+              }
+            });
+          };
+        }
+
+        // 4. Wire Troubleshoot Force Reset Button Click
+        const troubleshootBtn = body.querySelector('#btn-gateway-troubleshoot-reset');
+        if (troubleshootBtn && !troubleshootBtn.dataset.listenerBound) {
+          troubleshootBtn.dataset.listenerBound = 'true';
+          troubleshootBtn.onclick = async () => {
+            if (!confirm("Are you sure you want to force reset the WhatsApp gateway? This will clear the current session and generate a new QR code. Any unsent messages in the queue may be lost.")) return;
+            troubleshootBtn.disabled = true;
+            const originalHtml = troubleshootBtn.innerHTML;
+            troubleshootBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+            try {
+              await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
+              toast('Gateway reset command sent', 'fa-circle-check');
+            } catch (err) {
+              console.error(err);
+              alert("Reset failed: " + err.message);
+            } finally {
+              setTimeout(() => {
+                troubleshootBtn.disabled = false;
+                troubleshootBtn.innerHTML = originalHtml;
+                pollOutletGateway();
+              }, 3000);
+            }
+          };
+        }
+      }
+      function startOutletGatewayPolling() {
+        if (outletGatewayInterval) clearInterval(outletGatewayInterval);
+        pollOutletGateway();
+        outletGatewayInterval = setInterval(pollOutletGateway, 5000);
+      }
+      function stopOutletGatewayPolling() {
+        if (outletGatewayInterval) {
+          clearInterval(outletGatewayInterval);
+          outletGatewayInterval = null;
+        }
+      }
+
       function applyStore(){ $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; }); }
       function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
       function show(key){
         if(body.querySelector('[data-skey]')) collect();
         body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`;
+        if (key === 'gateway') {
+          startOutletGatewayPolling();
+        } else {
+          stopOutletGatewayPolling();
+        }
         // If profile pane: inject country/currency selects dynamically using stored values
         if (key === 'profile') {
           const row = body.querySelector('#set-country-currency-row');
@@ -233,6 +489,29 @@
             const curCountry  = SET_STORE['set_country']  || 'India';
             const curCurrency = SET_STORE['set_currency'] || 'INR (₹)';
             row.innerHTML = countrySelect(curCountry) + currencySelect(curCurrency);
+            
+            // Helper to update GSTIN label and placeholder dynamically based on country tax label
+            const updateGstinLabels = (countryName) => {
+              const gstinLabel = body.querySelector('[data-skey="set_gstin"]')?.parentNode?.querySelector('.fl');
+              const gstinInput = body.querySelector('[data-skey="set_gstin"]');
+              if (gstinLabel && gstinInput) {
+                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(countryName);
+                const label = taxInfo ? taxInfo.label : 'GST';
+                if (label === 'GST') {
+                  gstinLabel.textContent = 'GSTIN';
+                  gstinInput.placeholder = 'GSTIN if enabled';
+                } else if (label === 'VAT') {
+                  gstinLabel.textContent = 'VAT Number';
+                  gstinInput.placeholder = 'VAT Number if enabled';
+                } else {
+                  gstinLabel.textContent = 'Tax ID / EIN';
+                  gstinInput.placeholder = 'Tax ID if enabled';
+                }
+              }
+            };
+
+            updateGstinLabels(curCountry);
+
             // Country → currency auto-link
             const countrySel  = body.querySelector('#set-country');
             const currencySel = body.querySelector('#set-currency');
@@ -248,11 +527,48 @@
                   // Dispatch change so any wrapper widget can react
                   currencySel.dispatchEvent(new Event('change', { bubbles: true }));
                 }
+                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(countrySel.value);
+                if (taxInfo) {
+                  SET_STORE['set_tax_label'] = taxInfo.label;
+                  SET_STORE['set_tax_rate_percent'] = taxInfo.rate;
+                }
+                updateGstinLabels(countrySel.value);
               });
             }
           }
         }
         applyStore();
+
+        // Localize tax pane dynamically after loading values
+        if (key === 'tax') {
+          const curCountry = SET_STORE['set_country'] || 'India';
+          const taxLabel = SET_STORE['set_tax_label'] || 'GST';
+          const isIndiaGst = (taxLabel.toUpperCase() === 'GST') && 
+            (curCountry.toLowerCase() === 'india' || curCountry.trim() === '');
+          
+          const hsnInput = body.querySelector('[data-skey="set_show_hsn_codes"]');
+          const hsnRow = hsnInput?.closest('.set-row');
+          if (hsnRow) {
+            hsnRow.style.display = isIndiaGst ? 'flex' : 'none';
+          }
+          
+          const incInput = body.querySelector('[data-skey="set_inclusive_pricing"]');
+          const incDesc = incInput?.closest('.set-row')?.querySelector('.sd');
+          if (incDesc) {
+            incDesc.textContent = `Menu prices include ${taxLabel}`;
+          }
+
+          const taxLabelInput = body.querySelector('[data-skey="set_tax_label"]');
+          if (taxLabelInput) {
+            taxLabelInput.addEventListener('input', () => {
+              const label = taxLabelInput.value || 'Tax';
+              if (incDesc) incDesc.textContent = `Menu prices include ${label}`;
+              const checkIndiaGst = (label.toUpperCase() === 'GST') && 
+                (curCountry.toLowerCase() === 'india' || curCountry.trim() === '');
+              if (hsnRow) hsnRow.style.display = checkIndiaGst ? 'flex' : 'none';
+            });
+          }
+        }
         // Upgrade all native selects to custom dropdown widgets for visual consistency
         if (typeof window.RS_wrapAllSelects === 'function') {
           window.RS_wrapAllSelects(body, ['set-country', 'set-currency']);
@@ -290,7 +606,7 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); try{ if (window.renderPOS) renderPOS(); } catch(e){} }); };
+      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }
@@ -358,6 +674,79 @@
           }
         });
       });
+    }
+    
+    // Add topbar status badge polling & click handler
+    window.updateTopbarWhatsAppStatus = async function() {
+      const textEl = document.getElementById('topbar-whatsapp-status-text');
+      const pillEl = document.getElementById('topbar-whatsapp-status-pill');
+      if (!textEl || !pillEl) return;
+      const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+      try {
+        const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
+        if (res && res.status === 'ready') {
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp" style="margin-right:4px"></i>WhatsApp Linked';
+          pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
+          pillEl.style.color = '#22c55e';
+          pillEl.style.border = '1px solid rgba(34, 197, 94, 0.2)';
+        } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
+          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Syncing';
+          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
+          pillEl.style.color = '#eab308';
+          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+        } else if (res && res.status === 'qr') {
+          textEl.innerHTML = '<i class="fa-solid fa-qrcode" style="margin-right:4px"></i>Scan to Connect';
+          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
+          pillEl.style.color = '#eab308';
+          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+        } else if (res && res.status === 'auth_failure') {
+          textEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-right:4px"></i>Auth Failed';
+          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          pillEl.style.color = '#ef4444';
+          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        } else if (res && res.status === 'connecting') {
+          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Starting…';
+          pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
+          pillEl.style.color = '#6b7280';
+          pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
+        } else {
+          textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
+          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          pillEl.style.color = '#ef4444';
+          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        }
+      } catch(err) {
+        textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
+        pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+        pillEl.style.color = '#ef4444';
+        pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+      }
+    };
+    
+    let topbarWhatsAppInterval = null;
+    window.startTopbarWhatsAppPolling = function() {
+      if (topbarWhatsAppInterval) clearInterval(topbarWhatsAppInterval);
+      window.updateTopbarWhatsAppStatus();
+      topbarWhatsAppInterval = setInterval(window.updateTopbarWhatsAppStatus, 15000);
+      
+      const pill = document.getElementById('topbar-whatsapp-status-pill');
+      if (pill) {
+        pill.onclick = () => {
+          if (window.RS && typeof RS.activateTab === 'function') {
+            RS.activateTab('settings-tab');
+          }
+          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+          if (gatewayBtn) {
+            gatewayBtn.click();
+          }
+        };
+      }
+    };
+    
+    document.addEventListener('rs:hydrated', window.startTopbarWhatsAppPolling);
+    if (window.RS_DB && window.RS_DB.session) {
+      window.startTopbarWhatsAppPolling();
     }
   }
   if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });

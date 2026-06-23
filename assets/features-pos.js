@@ -24,81 +24,6 @@
         gstin: settings?.set_gstin || raw.gstin || ''
       };
     }
-    RS.updateStaticCurrencyLabels = function() {
-      const symbol = RS.getCurrencySymbol ? RS.getCurrencySymbol() : '₹';
-      
-      // Update labels like "Price (₹)"
-      document.querySelectorAll('label').forEach(el => {
-        if (el.textContent.includes('(₹)')) {
-          el.textContent = el.textContent.replace(/\(₹\)/g, `(${symbol})`);
-        } else if (el.textContent.includes('(€)') || el.textContent.includes('($)') || el.textContent.includes('(£)')) {
-          el.textContent = el.textContent.replace(/\((.*?)\)/g, `(${symbol})`);
-        }
-      });
-
-      // Update span tags containing "(₹)"
-      document.querySelectorAll('span').forEach(el => {
-        if (el.textContent.includes('(₹)')) {
-          el.textContent = el.textContent.replace(/\(₹\)/g, `(${symbol})`);
-        } else if (el.textContent.includes('(€)') || el.textContent.includes('($)') || el.textContent.includes('(£)')) {
-          el.textContent = el.textContent.replace(/\((.*?)\)/g, `(${symbol})`);
-        }
-      });
-
-      // Update fa-indian-rupee-sign
-      document.querySelectorAll('.fa-indian-rupee-sign').forEach(el => {
-        el.className = 'custom-currency-icon';
-        el.style.fontStyle = 'normal';
-        el.style.fontWeight = 'bold';
-        el.style.fontSize = '16px';
-        el.textContent = symbol;
-      });
-      
-      document.querySelectorAll('.custom-currency-icon').forEach(el => {
-        el.textContent = symbol;
-      });
-
-      // Update cash denomination buttons in checkout modal
-      document.querySelectorAll('.btn-den.csd-den-btn').forEach(btn => {
-        const val = btn.dataset.val;
-        if (val) {
-          if (val >= 1000) {
-            btn.textContent = symbol + (val / 1000) + 'k';
-          } else {
-            btn.textContent = symbol + val;
-          }
-        }
-      });
-      
-      document.querySelectorAll('.inline-den-btn').forEach(btn => {
-        const val = btn.dataset.val;
-        if (val && val !== 'exact') {
-          btn.textContent = symbol + val;
-        }
-      });
-      
-      // Replace static text nodes in total sections
-      const targets = [
-        '#inline-cash-change',
-        '#split-status-text',
-        '#split-total-text',
-        '#insight-spend',
-        '#t-sub',
-        '#t-grand',
-        '#bills-stat-sales',
-        '#bills-stat-aov',
-        '#chain-total-revenue',
-        '#chain-avg-ticket',
-        '#pos-m-cart-bar-total'
-      ];
-      targets.forEach(selector => {
-        const el = document.querySelector(selector);
-        if (el) {
-          el.textContent = el.textContent.replace(/[₹€$£]/g, symbol);
-        }
-      });
-    };
-
     async function loadReceiptProfile(){
       try {
         const settings = window.RS && RS.getSettings ? await RS.getSettings() : null;
@@ -106,9 +31,6 @@
       } catch(e) {
         receiptProfile.name = receiptProfile.name || sessionOutletName();
       }
-      try {
-        RS.updateStaticCurrencyLabels();
-      } catch(e){}
     }
     loadReceiptProfile();
     document.addEventListener('rs:hydrated', loadReceiptProfile);
@@ -1703,7 +1625,7 @@
       const btnSaveNew = document.getElementById('btn-save-new-cust');
       const btnReset = document.getElementById('btn-reset-cust');
       
-      if (!sel || !nameInput || !phoneInput) return;
+      if (!widgetContainer || !sel) return;
       
       // Helper to calculate favorite item
       async function getFavoriteItem(c) {
@@ -1768,20 +1690,16 @@
         const currentPhone = sel.value;
         
         // Don't override inputs while user is typing a temporary customer
-        if (nameInput === document.activeElement || phoneInput === document.activeElement) {
+        if (dropdown.classList.contains('show') && (nameInput === document.activeElement || phoneInput === document.activeElement)) {
           return;
         }
         
         if (!currentPhone) {
           nameInput.value = '';
           phoneInput.value = '';
-          if (triggerText) {
-            const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
-            const isTakeaway = activeOrderTypeBtn && activeOrderTypeBtn.textContent.trim() === 'Takeaway';
-            triggerText.innerText = isTakeaway ? 'Customer' : 'Walk-in';
-          }
-          if (insightsPanel) insightsPanel.style.display = 'none';
-          if (actionRow) actionRow.style.display = 'none';
+          triggerText.innerText = 'Walk-in';
+          insightsPanel.style.display = 'none';
+          actionRow.style.display = 'none';
           return;
         }
         
@@ -1790,78 +1708,65 @@
         if (c) {
           nameInput.value = c.name || '';
           phoneInput.value = c.phone || '';
-          if (triggerText) triggerText.innerText = c.name || c.phone;
+          triggerText.innerText = c.name || c.phone;
           
-          if (insightsPanel) {
-            const visits = c.visits || 0;
-            const spend = c.spend || 0;
-            const favorite = await getFavoriteItem(c);
-            
-            const iv = document.getElementById('insight-visits');
-            const is = document.getElementById('insight-spend');
-            const ifa = document.getElementById('insight-favorite');
-            if (iv) iv.innerText = visits;
-            if (is) is.innerText = '₹' + spend;
-            if (ifa) ifa.innerText = favorite;
-            insightsPanel.style.display = 'grid';
-          }
-          if (actionRow) actionRow.style.display = 'none';
+          const visits = c.visits || 0;
+          const spend = c.spend || 0;
+          const favorite = await getFavoriteItem(c);
+          
+          document.getElementById('insight-visits').innerText = visits;
+          document.getElementById('insight-spend').innerText = '₹' + spend;
+          document.getElementById('insight-favorite').innerText = favorite;
+          insightsPanel.style.display = 'grid';
+          actionRow.style.display = 'none';
         } else {
           // Check if temp option exists
           const opt = sel.options[sel.selectedIndex];
           const name = opt ? (opt.getAttribute('data-name') || '') : '';
           nameInput.value = name;
           phoneInput.value = currentPhone.startsWith('temp-') ? '' : currentPhone;
-          if (triggerText) triggerText.innerText = name || currentPhone;
-          if (insightsPanel) insightsPanel.style.display = 'none';
+          triggerText.innerText = name || currentPhone;
+          insightsPanel.style.display = 'none';
           
-          if (actionRow) {
-            if (name && currentPhone && !currentPhone.startsWith('temp-')) {
-              actionRow.style.display = 'block';
-            } else {
-              actionRow.style.display = 'none';
-            }
+          if (name && currentPhone && !currentPhone.startsWith('temp-')) {
+            actionRow.style.display = 'block';
+          } else {
+            actionRow.style.display = 'none';
           }
         }
       }
       
-      if (trigger && dropdown && widgetContainer) {
-        // Toggle dropdown
-        trigger.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const isOpen = dropdown.classList.contains('show');
-          trigger.setAttribute('aria-expanded', !isOpen);
-          if (isOpen) {
-            dropdown.classList.remove('show');
-            widgetContainer.classList.remove('active');
-          } else {
-            dropdown.classList.add('show');
-            widgetContainer.classList.add('active');
-            syncWidgetWithHiddenSelect();
-          }
-        });
-        
-        trigger.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            trigger.click();
-          }
-        });
-      }
+      // Toggle dropdown
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('show');
+        trigger.setAttribute('aria-expanded', !isOpen);
+        if (isOpen) {
+          dropdown.classList.remove('show');
+          widgetContainer.classList.remove('active');
+        } else {
+          dropdown.classList.add('show');
+          widgetContainer.classList.add('active');
+          syncWidgetWithHiddenSelect();
+        }
+      });
       
-      if (dropdown) {
-        // Prevent closing when clicking inside the dropdown
-        dropdown.addEventListener('click', (e) => {
-          e.stopPropagation();
-        });
-      }
+      trigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          trigger.click();
+        }
+      });
+      
+      // Prevent closing when clicking inside the dropdown
+      dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
       
       // Close dropdown when clicking outside
       document.addEventListener('click', () => {
-        if (dropdown && widgetContainer) {
-          dropdown.classList.remove('show');
-          widgetContainer.classList.remove('active');
-        }
+        dropdown.classList.remove('show');
+        widgetContainer.classList.remove('active');
       });
       
       // Live search input handling
@@ -1872,18 +1777,14 @@
         updateTemporaryCustomer(nameVal, phoneVal);
         
         if (!nameVal && !phoneVal) {
-          if (searchResults) searchResults.style.display = 'none';
-          if (insightsPanel) insightsPanel.style.display = 'none';
-          if (actionRow) actionRow.style.display = 'none';
-          if (triggerText) {
-            const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
-            const isTakeaway = activeOrderTypeBtn && activeOrderTypeBtn.textContent.trim() === 'Takeaway';
-            triggerText.innerText = isTakeaway ? 'Customer' : 'Walk-in';
-          }
+          searchResults.style.display = 'none';
+          insightsPanel.style.display = 'none';
+          actionRow.style.display = 'none';
+          triggerText.innerText = 'Walk-in';
           return;
         }
         
-        if (triggerText) triggerText.innerText = nameVal || phoneVal;
+        triggerText.innerText = nameVal || phoneVal;
         
         const allCustomers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
         const matches = allCustomers.filter(c => {
@@ -1892,7 +1793,7 @@
           return matchName && matchPhone;
         });
         
-        if (matches.length > 0 && searchResults) {
+        if (matches.length > 0) {
           searchResults.innerHTML = matches.map(c => `
             <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}">
               <span class="res-name">${esc(c.name)}</span>
@@ -1926,17 +1827,15 @@
             };
           });
         } else {
-          if (searchResults) searchResults.style.display = 'none';
-          if (insightsPanel) insightsPanel.style.display = 'none';
+          searchResults.style.display = 'none';
+          insightsPanel.style.display = 'none';
         }
         
-        if (actionRow) {
-          const exactMatch = allCustomers.find(c => c.phone === phoneVal);
-          if (!exactMatch && nameVal && phoneVal && phoneVal.length >= 10) {
-            actionRow.style.display = 'block';
-          } else {
-            actionRow.style.display = 'none';
-          }
+        const exactMatch = allCustomers.find(c => c.phone === phoneVal);
+        if (!exactMatch && nameVal && phoneVal && phoneVal.length >= 10) {
+          actionRow.style.display = 'block';
+        } else {
+          actionRow.style.display = 'none';
         }
       };
       
@@ -1944,67 +1843,61 @@
       phoneInput.addEventListener('input', handleInput);
       
       // Save new customer action
-      if (btnSaveNew) {
-        btnSaveNew.addEventListener('click', async () => {
-          const name = nameInput.value.trim();
-          const phone = phoneInput.value.trim();
-          if (!name || !phone) {
-            RS.toast('Name and phone are required', 'fa-circle-exclamation');
-            return;
+      btnSaveNew.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        const phone = phoneInput.value.trim();
+        if (!name || !phone) {
+          RS.toast('Name and phone are required', 'fa-circle-exclamation');
+          return;
+        }
+        if (window.RS_DB) {
+          try {
+            const newCust = {
+              id: 'cust-' + Date.now(),
+              name, phone, email: '',
+              visits: 1, spend: 0, last: new Date().toLocaleDateString('en-CA'), tier: 'silver'
+            };
+            await RS_DB.put('customers', newCust.id, newCust);
+            
+            // Reload standard customer select options
+            await loadCustomersForPos();
+            
+            // Sync selection to new customer
+            sel.value = phone;
+            sel.dispatchEvent(new Event('change'));
+            
+            RS.toast('Customer saved successfully', 'fa-circle-check');
+            actionRow.style.display = 'none';
+            await syncWidgetWithHiddenSelect();
+          } catch(e) {
+            console.warn("Failed saving customer", e);
+            RS.toast('Save failed: ' + e.message, 'fa-circle-exclamation');
           }
-          if (window.RS_DB) {
-            try {
-              const newCust = {
-                id: 'cust-' + Date.now(),
-                name, phone, email: '',
-                visits: 1, spend: 0, last: new Date().toLocaleDateString('en-CA'), tier: 'silver'
-              };
-              await RS_DB.put('customers', newCust.id, newCust);
-              
-              // Reload standard customer select options
-              await loadCustomersForPos();
-              
-              // Sync selection to new customer
-              sel.value = phone;
-              sel.dispatchEvent(new Event('change'));
-              
-              RS.toast('Customer saved successfully', 'fa-circle-check');
-              actionRow.style.display = 'none';
-              await syncWidgetWithHiddenSelect();
-            } catch(e) {
-              console.warn("Failed saving customer", e);
-              RS.toast('Save failed: ' + e.message, 'fa-circle-exclamation');
-            }
-          }
-        });
-      }
+        }
+      });
       
       // Reset action
-      if (btnReset) {
-        btnReset.addEventListener('click', () => {
-          sel.value = '';
-          const tempOpt = sel.querySelector('option[data-temp="true"]');
-          if (tempOpt) tempOpt.remove();
-          
-          if (deliveryAddress) deliveryAddress.value = '';
-          if (deliveryCharge) deliveryCharge.value = '';
-          if (deliveryRider) deliveryRider.value = '';
-          
-          const currentCart = window.RS.getCart();
-          const deliveryItemIndex = currentCart.findIndex(item => item.id === 'delivery-charge-item');
-          if (deliveryItemIndex >= 0) {
-            currentCart.splice(deliveryItemIndex, 1);
-            window.RS.setCart(currentCart);
-          }
-          
-          sel.dispatchEvent(new Event('change'));
-          if (dropdown && widgetContainer) {
-            dropdown.classList.remove('show');
-            widgetContainer.classList.remove('active');
-          }
-          syncWidgetWithHiddenSelect();
-        });
-      }
+      btnReset.addEventListener('click', () => {
+        sel.value = '';
+        const tempOpt = sel.querySelector('option[data-temp="true"]');
+        if (tempOpt) tempOpt.remove();
+        
+        if (deliveryAddress) deliveryAddress.value = '';
+        if (deliveryCharge) deliveryCharge.value = '';
+        if (deliveryRider) deliveryRider.value = '';
+        
+        const currentCart = window.RS.getCart();
+        const deliveryItemIndex = currentCart.findIndex(item => item.id === 'delivery-charge-item');
+        if (deliveryItemIndex >= 0) {
+          currentCart.splice(deliveryItemIndex, 1);
+          window.RS.setCart(currentCart);
+        }
+        
+        sel.dispatchEvent(new Event('change'));
+        dropdown.classList.remove('show');
+        widgetContainer.classList.remove('active');
+        syncWidgetWithHiddenSelect();
+      });
       
       // Background interval to watch for value modifications from outer scripts (like draft load)
       let lastKnownSelValue = null;
@@ -2631,11 +2524,11 @@
         // F2: Focus Customer Search
         if (e.key === 'F2') {
           e.preventDefault();
+          const widgetTrigger = document.getElementById('cust-widget-trigger');
+          const dropdown = document.getElementById('cust-widget-dropdown');
           const nameInput = document.getElementById('cust-input-name');
-          if (nameInput) {
-            const widgetTrigger = document.getElementById('cust-widget-trigger');
-            const dropdown = document.getElementById('cust-widget-dropdown');
-            if (widgetTrigger && dropdown && !dropdown.classList.contains('show')) {
+          if (widgetTrigger && dropdown && nameInput) {
+            if (!dropdown.classList.contains('show')) {
               widgetTrigger.click();
             }
             setTimeout(() => nameInput.focus(), 50);

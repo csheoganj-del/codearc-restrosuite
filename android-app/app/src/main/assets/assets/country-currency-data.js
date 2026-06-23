@@ -140,6 +140,98 @@
     return window.RS_COUNTRIES.find(c => c.name.toLowerCase() === n) || null;
   };
 
+  /** Returns standard default tax label and rate for a given country (case-insensitive). */
+  window.RS_getCountryTaxInfo = function(name) {
+    const n = String(name || '').trim().toLowerCase();
+    if (['india'].includes(n)) return { label: 'GST', rate: 5 };
+    if (['united kingdom', 'uk', 'great britain'].includes(n)) return { label: 'VAT', rate: 20 };
+    if (['saudi arabia'].includes(n)) return { label: 'VAT', rate: 15 };
+    if (['united arab emirates', 'uae'].includes(n)) return { label: 'VAT', rate: 5 };
+    if (['australia'].includes(n)) return { label: 'GST', rate: 10 };
+    if (['new zealand'].includes(n)) return { label: 'GST', rate: 15 };
+    if (['singapore'].includes(n)) return { label: 'GST', rate: 9 };
+    if (['canada'].includes(n)) return { label: 'GST', rate: 5 };
+    if (['united states', 'us', 'usa'].includes(n)) return { label: 'Sales Tax', rate: 8 };
+    if (['ireland'].includes(n)) return { label: 'VAT', rate: 23 };
+    if (['germany', 'austria', 'belgium', 'france', 'italy', 'spain', 'netherlands', 'portugal', 'finland', 'greece'].includes(n)) return { label: 'VAT', rate: 20 };
+    if (['south africa'].includes(n)) return { label: 'VAT', rate: 15 };
+    
+    // Fallback: Check currency to guess VAT vs Sales Tax
+    const entry = window.RS_getCountryByName && window.RS_getCountryByName(name);
+    if (entry) {
+      if (entry.currencyCode === 'EUR') return { label: 'VAT', rate: 20 };
+      if (entry.currencyCode === 'GBP') return { label: 'VAT', rate: 20 };
+    }
+    return { label: 'VAT', rate: 10 }; // general default
+  };
+
+  /** Returns dynamic tax rate slabs for a given country (case-insensitive). */
+  window.RS_getCountryTaxSlabs = function(name) {
+    const n = String(name || '').trim().toLowerCase();
+    if (['india'].includes(n)) return ['0%', '5%', '12%', '18%', '28%'];
+    if (['united kingdom', 'uk', 'great britain'].includes(n)) return ['0%', '5%', '20%'];
+    if (['ireland'].includes(n)) return ['0%', '13.5%', '23%'];
+    if (['saudi arabia'].includes(n)) return ['0%', '15%'];
+    if (['united arab emirates', 'uae'].includes(n)) return ['0%', '5%'];
+    if (['australia'].includes(n)) return ['0%', '10%'];
+    if (['singapore'].includes(n)) return ['0%', '9%'];
+    if (['canada'].includes(n)) return ['0%', '5%'];
+    // Default fallback
+    return ['0%', '10%', '20%'];
+  };
+
+  /** Returns typical VAT rate slab for Ireland based on item name and category. */
+  window.RS_getIrelandTypicalTaxSlab = function(itemName, categoryName) {
+    const name = String(itemName || '').toLowerCase().trim();
+    const cat = String(categoryName || '').toLowerCase().trim();
+
+    // Alcohol: 23%
+    if (name.includes('beer') || name.includes('wine') || name.includes('whiskey') || name.includes('whisky') || 
+        name.includes('vodka') || name.includes('rum') || name.includes('gin') || name.includes('cider') || 
+        name.includes('alcohol') || name.includes('cocktail') || name.includes('liqueur') || name.includes('brandy') ||
+        name.includes('tequila') || name.includes('champagne') || name.includes('prosecco') ||
+        cat.includes('alcohol') || cat.includes('bar') || cat.includes('wine') || cat.includes('beer') || 
+        cat.includes('cocktail') || cat.includes('spirit') || cat.includes('liquor')) {
+      return '23%';
+    }
+
+    // Soft drinks, energy drinks, sweets, confectionery: 23%
+    if (name.includes('cola') || name.includes('soda') || name.includes('soft drink') || name.includes('energy drink') || 
+        name.includes('sprite') || name.includes('fanta') || name.includes('coke') || name.includes('pepsi') || 
+        name.includes('lemonade') || name.includes('sweet') || name.includes('chocolate') || name.includes('candy') || 
+        name.includes('confectionery') || name.includes('cookie') || name.includes('brownie') || name.includes('cake') ||
+        name.includes('muffin') || name.includes('pastry') || name.includes('donut') || name.includes('lollipop') || 
+        name.includes('ice cream') || name.includes('milkshake') || name.includes('shake') ||
+        cat.includes('beverage') || cat.includes('soft drink') || cat.includes('sweet') || 
+        cat.includes('dessert') || cat.includes('shake') || cat.includes('juice')) {
+      return '23%';
+    }
+
+    // Hot takeaway food (burgers, pizza, curry, chips, etc.): 13.5%
+    if (name.includes('burger') || name.includes('pizza') || name.includes('curry') || name.includes('chips') || 
+        name.includes('fries') || name.includes('hot') || name.includes('kebab') || name.includes('tikka') || 
+        name.includes('biryani') || name.includes('naan') || name.includes('grilled') || name.includes('pasta') || 
+        name.includes('soup') || name.includes('coffee') || name.includes('tea') || name.includes('steak') || 
+        name.includes('fried') || name.includes('noodle') || name.includes('rice') || name.includes('masala') ||
+        name.includes('korma') || name.includes('tandoori') || name.includes('samosa') || name.includes('wrap') ||
+        name.includes('sandwich') || name.includes('panini') || name.includes('bagel') || name.includes('toast') ||
+        cat.includes('starter') || cat.includes('main') || cat.includes('bread') || cat.includes('pizza') || 
+        cat.includes('burger') || cat.includes('pasta') || cat.includes('rice') || cat.includes('biryani') || 
+        cat.includes('wrap') || cat.includes('hot food') || cat.includes('takeaway')) {
+      return '13.5%';
+    }
+
+    // Basic unprepared food items: 0%
+    if (name.includes('raw') || name.includes('unprepared') || name.includes('vegetable') || name.includes('fruit') ||
+        name.includes('egg') || name.includes('milk') || name.includes('bread') || name.includes('flour') ||
+        name.includes('wheat') || name.includes('rice') || name.includes('butter') || name.includes('cheese')) {
+      return '0%';
+    }
+
+    // Default basic fallback
+    return '0%';
+  };
+
   /** Returns the RS_COUNTRIES entry for a given dial code (e.g. "353"). */
   window.RS_getCountryByDial = function(dial) {
     const d = String(dial || '').replace(/\D/g, '');

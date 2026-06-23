@@ -199,6 +199,59 @@ async function signValue(value: string, secret: string) {
   return encodeBase64Url(new Uint8Array(signature));
 }
 
+function getGatewayUrlAndToken() {
+  let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || "";
+  const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
+
+  if (!url) {
+    url = "https://kalpeshdeora1006-whatsapp-gateway.hf.space";
+  }
+
+  url = url.trim().replace(/\/+$/, "");
+  return { url, token: token.trim() };
+}
+
+async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Request, bodyData?: Record<string, unknown>, tenantId?: string) {
+  const { url, token } = getGatewayUrlAndToken();
+  const targetUrl = `${url}${path}`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
+  }
+  if (tenantId) {
+    headers["x-tenant-id"] = tenantId;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    const response = await fetch(targetUrl, {
+      method,
+      headers,
+      body: bodyData ? JSON.stringify(bodyData) : undefined,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const text = await response.text();
+      return jsonResponse({ error: `Gateway returned status ${response.status}: ${text}` }, response.status, req);
+    }
+
+    const json = await response.json();
+    return jsonResponse({ data: json }, 200, req);
+  } catch (err: any) {
+    console.error(`Gateway proxy error for ${targetUrl}:`, err);
+    return jsonResponse({ error: `Failed to connect to gateway: ${err.message || err}` }, 502, req);
+  }
+}
+
+
 async function verifyTenantSession(req: Request) {
   if (!SUPERADMIN_SESSION_SECRET) return { ok: false, error: "Session signing secret is not configured." };
 
@@ -342,12 +395,38 @@ serve(async (req) => {
     const payload = await req.json();
     const table = String(payload.table || "");
     const operation = String(payload.operation || "");
-    const filters = Array.isArray(payload.filters) ? payload.filters : [];
-    const columns = typeof payload.columns === "string" && payload.columns.trim() ? payload.columns : "*";
+
+    if (operation === "gateway_status") {
+      return await proxyGatewayRequest("/status", "GET", req, undefined, verified.tenantId);
+    }
+    if (operation === "gateway_logout") {
+      return await proxyGatewayRequest("/logout", "POST", req, undefined, verified.tenantId);
+    }
+    if (operation === "gateway_reset") {
+      return await proxyGatewayRequest("/reset", "POST", req, undefined, verified.tenantId);
+    }
+    if (operation === "gateway_logs") {
+      return await proxyGatewayRequest("/debug-logs?tenantId=" + encodeURIComponent(verified.tenantId), "GET", req, undefined, verified.tenantId);
+    }
+    if (operation === "gateway_send") {
+      const phone = String(payload.phone || "");
+      const message = String(payload.message || "");
+      const orderId = String(payload.orderId || "");
+      const pdfData = payload.pdfData ? String(payload.pdfData) : undefined;
+      const filename = payload.filename ? String(payload.filename) : undefined;
+      if (!phone || !message) {
+        return jsonResponse({ error: "Missing phone or message." }, 400, req);
+      }
+      return await proxyGatewayRequest("/send", "POST", req, { phone, message, orderId, pdfData, filename }, verified.tenantId);
+    }
 
     if (!TENANT_TABLES.has(table)) return jsonResponse({ error: "Table is not available through tenant data API." }, 400, req);
 
+    const filters = Array.isArray(payload.filters) ? payload.filters : [];
+    const columns = typeof payload.columns === "string" && payload.columns.trim() ? payload.columns : "*";
+
     const allowedTableTabs = TABLE_TAB_ACCESS[table];
+
     if (allowedTableTabs && !allowedTableTabs.some((tab) => (verified.allowedTabs as string[]).includes(tab))) {
       return jsonResponse({ error: "You do not have permission to access this module." }, 403, req);
     }

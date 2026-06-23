@@ -1,5 +1,5 @@
 # Native PowerShell HTTP Server for RestroSuite local development
-$port = 8001
+$port = 8080
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
 
@@ -51,17 +51,10 @@ try {
             if ($urlPath -eq "/api/config") {
                 $response.Headers.Add("Access-Control-Allow-Origin", "*")
                 $response.ContentType = "application/json"
-                
-                $supabaseUrl = [Environment]::GetEnvironmentVariable("SUPABASE_URL")
-                $supabaseAnonKey = [Environment]::GetEnvironmentVariable("SUPABASE_ANON_KEY")
-                
-                if (-not $supabaseUrl -or -not $supabaseAnonKey) {
-                    $response.StatusCode = 503
-                    $resBody = '{"error":"Service configuration is incomplete. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env.local"}'
-                } else {
-                    $response.StatusCode = 200
-                    $resBody = [System.Text.Json.JsonSerializer]::Serialize(@{ supabaseUrl = $supabaseUrl; supabaseAnonKey = $supabaseAnonKey })
-                }
+
+                $response.StatusCode = 200
+                # Always use demo mode for local server
+                $resBody = '{"supabaseUrl":"","supabaseAnonKey":"","enableDemoTools":true,"zeroCostLaunchMode":true}'
                 
                 $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resBody)
                 $response.ContentLength64 = $resBytes.Length

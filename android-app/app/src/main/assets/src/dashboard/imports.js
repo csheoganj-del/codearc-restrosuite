@@ -134,6 +134,26 @@
         result.errors.push(`Menu row ${index + 2}: Name, Category and a positive Price are required.`);
         return;
       }
+
+      let csvTaxVal = value(row, ["GST", "GstSlab", "VAT", "VatSlab", "Tax", "TaxSlab", "TaxRate", "VatRate", "Rate"]);
+      let resolvedTaxSlab = '';
+      const activeSettings = (typeof window !== 'undefined' && window.RS_SETTINGS) || {};
+      const country = activeSettings.set_country || 'India';
+
+      if (csvTaxVal) {
+        csvTaxVal = String(csvTaxVal).trim();
+        resolvedTaxSlab = csvTaxVal.endsWith('%') ? csvTaxVal : csvTaxVal + '%';
+      } else if (String(country).toLowerCase() === 'ireland') {
+        resolvedTaxSlab = (typeof window !== 'undefined' && window.RS_getIrelandTypicalTaxSlab)
+          ? window.RS_getIrelandTypicalTaxSlab(name, category)
+          : '0%';
+      } else {
+        const slabs = (typeof window !== 'undefined' && window.RS_getCountryTaxSlabs)
+          ? window.RS_getCountryTaxSlabs(country)
+          : ['0%'];
+        resolvedTaxSlab = slabs[0] || '0%';
+      }
+
       result.menu.push({
         name,
         category: category.toUpperCase(),
@@ -142,6 +162,7 @@
         prepTime: Math.max(1, Math.round(numberValue(value(row, ["PrepTimeMinutes", "PrepTime"]), 5))),
         available: booleanValue(value(row, ["Available"]), true),
         bestseller: booleanValue(value(row, ["Bestseller"]), false),
+        gst: resolvedTaxSlab,
         icon: "&#9733;"
       });
     });
