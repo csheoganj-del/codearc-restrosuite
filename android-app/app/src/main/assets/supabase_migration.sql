@@ -152,3 +152,17 @@ ALTER TABLE public.doppio_crm ADD COLUMN IF NOT EXISTS dues numeric NOT NULL DEF
 ALTER TABLE public.saas_tenants ADD COLUMN IF NOT EXISTS country text;
 ALTER TABLE public.doppio_bills ADD COLUMN IF NOT EXISTS tenders jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE public.doppio_bills ADD COLUMN IF NOT EXISTS change numeric DEFAULT 0;
+
+-- 8. Razorpay webhook idempotency table
+-- Prevents duplicate side-effects when Razorpay retries delivery on transient errors.
+CREATE TABLE IF NOT EXISTS public.processed_webhook_events (
+  event_id   TEXT        PRIMARY KEY,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Auto-purge events older than 90 days to keep the table small
+CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_processed_at
+  ON public.processed_webhook_events (processed_at);
+-- Only the service role should read/write this table
+ALTER TABLE public.processed_webhook_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_only" ON public.processed_webhook_events
+  USING (false) WITH CHECK (false);

@@ -330,7 +330,7 @@
   /* ---------------- CLOUD (tenant-data) ---------------- */
   const SETTINGS_MAP = {
     set_restaurant_name:'business_name', set_outlet_name:'business_name', set_address:'address',
-    set_phone:'phone', set_gstin:'gstin', set_gst_state:'gst_state'
+    set_phone:'phone', set_gstin:'gst_number'
   };
   const CLOUD = {
     async list(c){
@@ -510,8 +510,21 @@
     }
     catch(e){
       console.warn(`[RS_DB] cloud ${method} ${c} failed, using local cache:`, e.message);
-      window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
-      window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
+      // Schema-cache errors (missing DB column) should NOT trigger a noisy notification —
+      // they are resolved by running the migration SQL, not by the user.
+      const isSchemaCacheError = e.message && (
+        e.message.includes('schema cache') ||
+        e.message.includes('Could not find') ||
+        e.message.includes('column') ||
+        e.message.includes('42703')
+      );
+      if (!isSchemaCacheError) {
+        window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
+        window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
+      } else {
+        // Log silently — user needs to run the DB migration
+        console.warn(`[RS_DB] Schema mismatch on ${c}: "${e.message}". Run the missing DB migration to fix.`);
+      }
       return LS[method](c, ...args);
     }
   }

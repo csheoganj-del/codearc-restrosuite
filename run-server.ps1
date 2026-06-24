@@ -160,6 +160,146 @@ try {
                     }
                 }
 
+                # Intercept client gateway operations to run locally (allowing testing of the local gateway without cloud routing)
+                if ($urlPath -eq "/functions/v1/tenant-data" -and ![string]::IsNullOrEmpty($reqBody)) {
+                    try {
+                        $bodyObj = ConvertFrom-Json $reqBody
+                        $operation = $bodyObj.operation
+                        $gatewayOperations = @("gateway_status", "gateway_logs", "gateway_reset", "gateway_logout", "gateway_send")
+                        if ($gatewayOperations -contains $operation) {
+                            Write-Host "[Local Dev Backend] Intercepted $operation - routing directly to local client gateway..." -ForegroundColor Green
+                            
+                            # 1. Determine local gateway URL and token from env files
+                            $localGatewayUrl = ""
+                            $localGatewayToken = ""
+                            
+                            $envFiles = @("$PSScriptRoot\.env.local", "$PSScriptRoot\.env")
+                            foreach ($envPath in $envFiles) {
+                                if (Test-Path $envPath) {
+                                    Get-Content $envPath | ForEach-Object {
+                                        if ($_ -match "^\s*WHATSAPP_GATEWAY_URL\s*=\s*(.+)$" -and [string]::IsNullOrEmpty($localGatewayUrl)) {
+                                            $localGatewayUrl = $Matches[1].Trim().Trim('"').Trim("'")
+                                        }
+                                        if ($_ -match "^\s*WHATSAPP_GATEWAY_TOKEN\s*=\s*(.+)$" -and [string]::IsNullOrEmpty($localGatewayToken)) {
+                                            $localGatewayToken = $Matches[1].Trim().Trim('"').Trim("'")
+                                        }
+                                        if ($_ -match "^\s*GATEWAY_TOKEN\s*=\s*(.+)$" -and [string]::IsNullOrEmpty($localGatewayToken)) {
+                                            $localGatewayToken = $Matches[1].Trim().Trim('"').Trim("'")
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if ([string]::IsNullOrEmpty($localGatewayUrl)) {
+                                $localGatewayUrl = "http://localhost:3000"
+                            }
+                            if ([string]::IsNullOrEmpty($localGatewayToken)) {
+                                $localGatewayToken = "local-dev-gateway-token"
+                            }
+                            
+                            $localGatewayUrl = $localGatewayUrl.TrimEnd('/')
+                            
+                            # 2. Determine tenant ID
+                            $tenantId = "system"
+                            if ($bodyObj.tenantId) {
+                                $tenantId = $bodyObj.tenantId
+                            }
+                            
+                            # 3. Map operation to gateway path and method
+                            $gwPath = ""
+                            $gwMethod = "GET"
+                            $gwBody = $null
+                            
+                            if ($operation -eq "gateway_status") {
+                                $gwPath = "/status"
+                                $gwMethod = "GET"
+                            } elseif ($operation -eq "gateway_logout") {
+                                $gwPath = "/logout"
+                                $gwMethod = "POST"
+                            } elseif ($operation -eq "gateway_reset") {
+                                $gwPath = "/reset"
+                                $gwMethod = "POST"
+                            } elseif ($operation -eq "gateway_logs") {
+                                $gwPath = "/debug-logs?tenantId=" + [System.Uri]::EscapeDataString($tenantId)
+                                $gwMethod = "GET"
+                            } elseif ($operation -eq "gateway_send") {
+                                $gwPath = "/send"
+                                $gwMethod = "POST"
+                                $gwBody = @{
+                                    phone = $bodyObj.phone
+                                    message = $bodyObj.message
+                                    orderId = $bodyObj.orderId
+                                    pdfData = $bodyObj.pdfData
+                                    filename = $bodyObj.filename
+                                } | ConvertTo-Json -Depth 10
+                            }
+                            
+                            $targetGwUrl = $localGatewayUrl + $gwPath
+                            
+                            # 4. Prepare headers
+                            $gwHeaders = @{
+                                "Content-Type" = "application/json"
+                                "x-tenant-id" = $tenantId
+                            }
+                            if (-not [string]::IsNullOrEmpty($localGatewayToken)) {
+                                $bearerToken = $localGatewayToken
+                                if (-not $bearerToken.ToLower().StartsWith("bearer ")) {
+                                    $bearerToken = "Bearer " + $bearerToken
+                                }
+                                $gwHeaders.Add("Authorization", $bearerToken)
+                            }
+                            
+                            # 5. Call gateway
+                            Write-Host "[Local Dev Backend] Gateway Request: $gwMethod $targetGwUrl" -ForegroundColor Cyan
+                            $resBytes = @()
+                            $statusCode = 200
+                            
+                            try {
+                                $webParams = @{
+                                    Uri = $targetGwUrl
+                                    Method = $gwMethod
+                                    Headers = $gwHeaders
+                                    UseBasicParsing = $true
+                                }
+                                if ($gwBody) {
+                                    $webParams.Add("Body", $gwBody)
+                                }
+                                
+                                $responseObj = Invoke-WebRequest @webParams -ErrorAction Stop
+                                $gwJson = $responseObj.Content
+                                $wrappedResponse = '{"data":' + $gwJson + '}'
+                                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($wrappedResponse)
+                                $statusCode = 200
+                            } catch {
+                                $statusCode = 500
+                                $rawRes = $_.Exception.Message
+                                if ($null -ne $_.Exception.Response) {
+                                    $statusCode = $_.Exception.Response.StatusCode
+                                    $stream = $_.Exception.Response.GetResponseStream()
+                                    $reader = New-Object System.IO.StreamReader($stream)
+                                    $rawRes = $reader.ReadToEnd()
+                                    $reader.Close()
+                                }
+                                Write-Warning "[Local Dev Backend] Gateway call failed: $rawRes"
+                                $wrappedResponse = '{"error":' + (ConvertTo-Json $rawRes) + '}'
+                                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($wrappedResponse)
+                            }
+                            
+                            $response.ContentType = "application/json; charset=utf-8"
+                            $response.StatusCode = $statusCode
+                            $response.Headers.Add("Access-Control-Allow-Origin", "*")
+                            $response.Headers.Add("Access-Control-Allow-Headers", "*")
+                            $response.Headers.Add("Access-Control-Allow-Methods", "*")
+                            $response.ContentLength64 = $resBytes.Length
+                            $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+                            $response.Close()
+                            continue
+                        }
+                    } catch {
+                        Write-Warning "[Local Dev Backend] Gateway interception handling failed: $_"
+                    }
+                }
+
                 # Make remote request
                 Write-Host "[Proxy] Request: $($request.HttpMethod) $urlPath -> Target: $targetUrl" -ForegroundColor Cyan
                 if ($null -ne $reqBody) {

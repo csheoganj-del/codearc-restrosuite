@@ -93,11 +93,22 @@
       function loadJsPDF() {
         return new Promise((resolve, reject) => {
           if (window.jspdf) return resolve(window.jspdf);
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-          script.onload = () => resolve(window.jspdf || window.umd?.jspdf);
-          script.onerror = () => reject(new Error('Failed to load jsPDF library'));
-          document.head.appendChild(script);
+          function tryLoad(src, fallbackSrc) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = () => {
+              const mod = window.jspdf || window.umd?.jspdf;
+              if (mod) { resolve(mod); return; }
+              if (fallbackSrc) tryLoad(fallbackSrc, null);
+              else reject(new Error('jsPDF loaded but not found on window'));
+            };
+            script.onerror = () => {
+              if (fallbackSrc) { console.warn('[jsPDF] Local failed, trying CDN...'); tryLoad(fallbackSrc, null); }
+              else reject(new Error('Failed to load jsPDF (local and CDN both failed)'));
+            };
+            document.head.appendChild(script);
+          }
+          tryLoad('/assets/lib/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
         });
       }
 

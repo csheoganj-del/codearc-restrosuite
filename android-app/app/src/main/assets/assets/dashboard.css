@@ -2082,3 +2082,39 @@ body.rs-drawer-dragging {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Accessibility: focus-visible outlines ─────────────────────────────── */
+/* Visible keyboard focus rings without affecting mouse users */
+:focus-visible {
+  outline: 2px solid var(--orange, #fc8019);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--orange, #fc8019);
+  outline-offset: 2px;
+}
+
+/* ── Accessibility: reduced-motion ────────────────────────────────────── */
+/* Respect the OS setting for users who are sensitive to motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Accessibility: dark-mode preference ──────────────────────────────── */
+/* If the user hasn't explicitly set a theme, honour the OS preference */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}

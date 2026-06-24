@@ -54,6 +54,22 @@
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  /* ---------- HTML ESCAPING (XSS prevention) ---------- */
+  // Every value interpolated into innerHTML MUST pass through esc() first.
+  // Unescaped user/server data in innerHTML is a stored-XSS vector that
+  // enables full account takeover (session tokens live in localStorage).
+  function esc(v) {
+    if (v == null) return '';
+    return String(v)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  // Alias for readability in templates
+  const _e = esc;
   function getCurrencySymbol() {
     try {
       const settings = window.RS_SETTINGS || {};
@@ -189,7 +205,9 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v27-20260624';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v33-20260624';
+  // Show version in topbar
+  (function(){ const el = document.getElementById('app-version-pill'); if(el) el.textContent = appVersion; })();
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 
@@ -632,10 +650,10 @@
     grid.innerHTML = items.map(m=>{
       const inCart = cart.find(c=>String(c.id)===String(m.id));
       return `
-      <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${m.id}" style="--cc:${catColor(m.cat)}">
+      <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
         ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
-        <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${m.cat}</span></div>
-        <div class="pname">${m.name}</div>
+        <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat)}</span></div>
+        <div class="pname">${_e(m.name)}</div>
         <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></div>
       </div>`;
     }).join('');
@@ -1084,7 +1102,7 @@
       }
     })();
 
-    $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
+    $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
       activeCat=b.dataset.cat;
       $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
@@ -1426,8 +1444,8 @@
 
     $('#qr-grid').innerHTML = QR_ORDERS.map((o,i)=>`
       <div class="qr-card s-${o.status}">
-        <div class="qr-ch"><div><span class="tnum">Table ${o.table.split('-')[1]||o.table}</span><div class="qtime">${o.time}</div></div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
-        <div class="qr-lines">${o.items.map(it=>`<div class="ql"><span>${it[0]}</span><b>${rs(it[1])}</b></div>`).join('')}</div>
+        <div class="qr-ch"><div><span class="tnum">Table ${_e(o.table.split('-')[1]||o.table)}</span><div class="qtime">${_e(o.time)}</div></div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
+        <div class="qr-lines">${o.items.map(it=>`<div class="ql"><span>${_e(it[0])}</span><b>${rs(it[1])}</b></div>`).join('')}</div>
         <div class="qr-cf"><span class="qtot">${rs(o.total)}</span>
           ${o.status!=='served'?`<button class="btn btn-ghost btn-sm" data-merge="${i}"><i class="fa-solid fa-code-merge"></i> Merge</button><button class="btn btn-primary btn-sm" data-adv="${i}">${o.status==='pending'?'Accept':'Mark served'}</button>`:`<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i> Bill</button>`}
         </div>
@@ -1565,11 +1583,11 @@
 
     $('#bills-table-body').innerHTML = filtered.map(b=>`
       <tr>
-        <td><b>${b.no || b.orderId || b.id || '-'}</b></td><td>${b.time || b.dateTime || '-'}</td><td>${b.table || '-'}</td><td>${b.items}</td>
-        <td><span class="pill ${payPill[b.pay]}" style="padding:3px 9px">${b.pay}</span></td>
+        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(b.time || b.dateTime || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
+        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
         <td>${b.status==='paid'?'<span class="pill pill-green" style="padding:3px 9px">Paid</span>':'<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger" title="Refund" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button></div></td>
+        <td><div class="row-actions"><button class="icon-act go" title="Reprint" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button></div></td>
       </tr>`).join('');
     const billBody = $('#bills-table-body');
     const visibleBills = filtered;
@@ -1771,15 +1789,15 @@
           const ings = m.ingredients || [];
           const cost = ings.reduce((a,g)=>a+g.qty*invCost(g.name),0);
           const margin = m.price && cost ? Math.round((1-cost/m.price)*100) : (m.price?100:0);
-          const ingText = ings.length ? ings.map(g=>`${g.qty}${g.unit} ${g.name}`).join(', ') : '<span style="color:var(--text-mute)">No recipe â€” click âœ  to define</span>';
+          const ingText = ings.length ? ings.map(g=>`${_e(g.qty)}${_e(g.unit)} ${_e(g.name)}`).join(', ') : '<span style=”color:var(--text-mute)”>No recipe — click ✎ to define</span>';
           return `<tr>
-            <td><div style="display:flex;align-items:center;gap:9px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${m.name}</b></div></td>
-            <td>${m.cat}</td>
-            <td style="max-width:220px;font-size:12px">${ingText}</td>
-            <td class="td-strong">${cost?rs(cost):'â€”'}</td>
-            <td class="td-strong">${rs(m.price)}</td>
-            <td><span class="stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}">${cost?margin+'%':'â€”'}</span></td>
-            <td><button class="icon-act go" data-recipe-edit="${m.id}" title="Define recipe"><i class="fa-solid fa-pen"></i></button></td>
+            <td><div style=”display:flex;align-items:center;gap:9px”><span class=”veg ${m.veg?'':'nonveg'}”></span><b>${_e(m.name)}</b></div></td>
+            <td>${_e(m.cat)}</td>
+            <td style=”max-width:220px;font-size:12px”>${ingText}</td>
+            <td class=”td-strong”>${cost?rs(cost):'—'}</td>
+            <td class=”td-strong”>${rs(m.price)}</td>
+            <td><span class=”stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}”>${cost?margin+'%':'—'}</span></td>
+            <td><button class=”icon-act go” data-recipe-edit=”${_e(m.id)}” title=”Define recipe”><i class=”fa-solid fa-pen”></i></button></td>
           </tr>`;
         }).join('')
         : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet â€” add items in Menu Editor first</td></tr>';
@@ -1868,11 +1886,11 @@
   const renderEditor = () => {
     $('#editor-list').innerHTML = MENU.map(m=>`
       <tr>
-        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${m.name}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} Â· ${m.cat}</div></div></div></td>
-        <td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td>
+        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${_e(m.name)}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${_e(m.cat)}</div></div></div></td>
+        <td>${_e(m.cat)}</td><td class="td-strong">${rs(m.price)}</td>
         <td><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></td>
         <td><label class="switch-mini"><input type="checkbox" ${m.stock!=='out'?'checked':''}><span></span></label></td>
-        <td><div class="row-actions"><button class="icon-act go" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" title="Recipe"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
+        <td><div class="row-actions"><button class="icon-act go" title="Edit" aria-label="Edit ${_e(m.name)}"><i class="fa-solid fa-pen"></i></button><button class="icon-act" title="Recipe" aria-label="Recipe for ${_e(m.name)}"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" title="Delete" aria-label="Delete ${_e(m.name)}"><i class="fa-solid fa-trash"></i></button></div></td>
       </tr>`).join('');
     $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editorâ€¦','fa-pen')));
     $$('#editor-list .icon-act.danger').forEach(b=>b.addEventListener('click',()=>toast('Item removed','fa-trash')));
@@ -2033,8 +2051,8 @@
 
     $('#kds-grid').innerHTML = KDS.map((o,i)=>`
       <div class="kds-card" data-k="${i}">
-        <div class="kds-h"><div><div class="ktok">${o.tok}</div><div class="ktype">${o.type}</div></div><span class="kds-timer" data-start="${o.start}">0:00</span></div>
-        <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${it[0]}Ã—</span><div><span class="kn">${it[1]}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${it[2]}</div>`:''}</div></div>`).join('')}</div>
+        <div class="kds-h"><div><div class="ktok">${_e(o.tok)}</div><div class="ktype">${_e(o.type)}</div></div><span class="kds-timer" data-start="${_e(o.start)}">0:00</span></div>
+        <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${_e(it[0])}×</span><div><span class="kn">${_e(it[1])}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${_e(it[2])}</div>`:''}</div></div>`).join('')}</div>
         <div class="kds-foot"><button class="btn btn-primary btn-block" data-done="${i}"><i class="fa-solid fa-check"></i> Mark ready</button></div>
       </div>`).join('');
     $$('#kds-grid .kds-item').forEach(it=> it.addEventListener('click',()=>it.classList.toggle('done')));
@@ -2087,8 +2105,8 @@
     $('#hub-grid').innerHTML = HUB.map(h=>`
       <div class="hub-card">
         <div class="hub-ic ${h.bg}"><i class="fa-solid ${h.ic}"></i></div>
-        <h4>${h.t}</h4><p>${h.d}</p>
-        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${h.m}</span>
+        <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
+        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(h.m)}</span>
       </div>`).join('');
     $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'â€¦','fa-arrow-up-right-from-square')));
   };
@@ -2124,10 +2142,10 @@
 
     $('#emp-grid').innerHTML = EMPLOYEES.map((e,i)=>`
       <div class="emp-card">
-        <div class="emp-top"><div class="emp-av" style="background:${avatarColors[i%avatarColors.length]}">${initials(e.name)}</div><div style="flex:1"><div class="en">${e.name}</div><div class="ee">${e.email}</div></div></div>
-        <div style="margin-bottom:14px"><span class="role-tag ${e.rc}">${e.role}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${e.shift}</span></div>
-        <div class="emp-stats"><div class="es"><div class="esv">${e.sales}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${e.orders}</div><div class="esl">Orders</div></div></div>
-        <div class="emp-actions"><button class="btn btn-ghost btn-sm" style="flex:1"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove"><i class="fa-solid fa-user-minus"></i></button></div>
+        <div class="emp-top"><div class="emp-av" style="background:${avatarColors[i%avatarColors.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email)}</div></div></div>
+        <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc)}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift)}</span></div>
+        <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales)}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders)}</div><div class="esl">Orders</div></div></div>
+        <div class="emp-actions"><button class="btn btn-ghost btn-sm" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button></div>
       </div>`).join('');
     $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissionsâ€¦','fa-user-gear')));
   };
@@ -2257,11 +2275,11 @@
         const name = t.name || t.tenant_name || t.slug || 'Unknown';
         const slug = t.slug || t.tenant_slug || '';
         return `<tr>
-          <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${initials(name)}</div><div><b>${name}</b><div style="font-size:11px;color:var(--text-mute)">${slug}</div></div></div></td>
-          <td><span class="pill ${planLabel.toLowerCase()} ${pillCls}" style="padding:3px 9px">${planLabel}</span></td>
-          <td class="td-strong">${mrr?rs(mrr):'â€”'}</td><td>${t.outlet_count||1}</td><td>${joined}</td>
-          <td><span class="tenant-status ${statusCls}">${statusText}</span></td>
-          <td><div class="row-actions"><button class="icon-act manage-tenant-btn" title="Manage" data-tid="${t.id||''}"><i class="fa-solid fa-gear"></i></button></div></td>
+          <td><div style=”display:flex;align-items:center;gap:11px”><div class=”avatar-sm” style=”background:${avatarColors[name.length%avatarColors.length]}”>${_e(initials(name))}</div><div><b>${_e(name)}</b><div style=”font-size:11px;color:var(--text-mute)”>${_e(slug)}</div></div></div></td>
+          <td><span class=”pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}” style=”padding:3px 9px”>${_e(planLabel)}</span></td>
+          <td class=”td-strong”>${mrr?rs(mrr):'—'}</td><td>${_e(t.outlet_count||1)}</td><td>${_e(joined)}</td>
+          <td><span class=”tenant-status ${_e(statusCls)}”>${_e(statusText)}</span></td>
+          <td><div class=”row-actions”><button class=”icon-act manage-tenant-btn” title=”Manage” data-tid=”${_e(t.id||'')}”><i class=”fa-solid fa-gear”></i></button></div></td>
         </tr>`;
       }).join('');
 
@@ -2278,7 +2296,7 @@
         });
       });
     } catch(err) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${err.message||'Failed to load tenants'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message||'Failed to load tenants')}</td></tr>`;
     }
   };
 
@@ -2322,7 +2340,7 @@
         statusBadge.style.background = b.bg;
         statusBadge.style.borderColor = b.border;
         statusBadge.style.color = b.color;
-        statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${b.dot};display:inline-block;"></span>${b.label}`;
+        statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${_e(b.dot)};display:inline-block;"></span>${_e(b.label)}`;
       }
 
       if (usernameEl) usernameEl.value = tenant.username || '';
@@ -3827,6 +3845,7 @@
       const cur = document.getElementById(`rs-progress-step-${stepIndex}`);
       if (cur) {
         cur.style.color = 'var(--text)';
+
         const icon = cur.querySelector('.step-icon');
         if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--orange)"></i>';
       }
@@ -3844,4 +3863,3 @@
     }
   };
 })();
-

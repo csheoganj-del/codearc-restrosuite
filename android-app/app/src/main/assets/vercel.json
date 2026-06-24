@@ -35,6 +35,4 @@
     { "source": "/login", "destination": "/login.html" },
     { "source": "/dashboard", "destination": "/dashboard.html" },
     { "source": "/robots.txt", "destination": "/robots.txt" },
-    { "source": "/sitemap.xml", "destination": "/sitemap.xml" }
-  ]
-}
+    { "source": "/sitemap.xml", "destination

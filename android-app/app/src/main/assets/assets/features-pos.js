@@ -365,61 +365,430 @@
 
     function loadJsPDF() {
       return new Promise((resolve, reject) => {
-        if (window.jspdf) return resolve(window.jspdf);
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        script.onload = () => {
-          resolve(window.jspdf || window.umd?.jspdf);
-        };
-        script.onerror = () => reject(new Error('Failed to load jsPDF library'));
-        document.head.appendChild(script);
+        // jsPDF UMD sets window.jspdf = { jsPDF } in browsers
+        // Some builds also set window.jsPDF directly
+        function resolveJsPDF() {
+          if (window.jspdf && window.jspdf.jsPDF) return window.jspdf;
+          if (window.jsPDF) return { jsPDF: window.jsPDF };
+          return null;
+        }
+        const existing = resolveJsPDF();
+        if (existing) return resolve(existing);
+
+        function tryLoad(src, fallbackSrc) {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => {
+            const mod = resolveJsPDF();
+            if (mod) { resolve(mod); return; }
+            if (fallbackSrc) { tryLoad(fallbackSrc, null); }
+            else reject(new Error('jsPDF loaded but class not found on window'));
+          };
+          script.onerror = () => {
+            if (fallbackSrc) {
+              console.warn('[jsPDF] Local bundle failed, trying CDN fallback...');
+              tryLoad(fallbackSrc, null);
+            } else {
+              reject(new Error('Failed to load jsPDF (local and CDN both failed)'));
+            }
+          };
+          document.head.appendChild(script);
+        }
+
+        // Try local bundle first (no CDN dependency), fall back to CDN
+        tryLoad('/assets/lib/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
       });
     }
 
     async function compileThermalPDF(bill) {
       const jspdfModule = await loadJsPDF();
       const { jsPDF } = jspdfModule;
+
+      const profile = bill.taxProfile || (window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular' });
+      const country = profile.country || 'IN';
+      const taxSystem = profile.tax_system || 'GST';
+      const isIreland = (country === 'IE');
+
+      // ── Layout constants (all in mm) ──────────────────────────────
+      const W        = 88;          // paper width (88 mm thermal printer)
+      const PAD      = 6;           // left / right padding
+      const CW       = W - PAD * 2; // usable content width
       
-      const text = receiptText(bill);
-      const lines = text.split('\n');
-      
-      const lineHeight = 4.2;
-      const padding = 5;
-      const height = Math.max(100, lines.length * lineHeight + padding * 2 + 10);
-      
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [80, height]
-      });
-      
-      doc.setFont('courier', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(0, 0, 0);
-      
-      let y = padding + 4;
-      lines.forEach(line => {
-        if (line.toUpperCase().includes('TOTAL') || line.toUpperCase().startsWith('---') || line.toUpperCase().startsWith('===')) {
-          doc.setFont('courier', 'bold');
-        } else {
-          doc.setFont('courier', 'normal');
+      const BG       = [251, 250, 247]; // #fbfaf7 — off-white receipt paper
+      const INK      = [22, 21, 28];   // #16151c — near-black main text
+      const MUTED    = [107, 105, 96]; // #6b6960 — grey for sub-lines
+      const META_C   = [74, 72, 66];   // #4a4842 — meta rows
+
+      // Render function used for both measuring and drawing
+      function renderBill(doc, isMeasurePass) {
+        let y = 5; // top margin
+
+        function setFont(style, size) {
+          if (!isMeasurePass) {
+            doc.setFont('helvetica', style);
+            doc.setFontSize(size);
+          }
         }
+
+        function setTextColor(rgb) {
+          if (!isMeasurePass) {
+            doc.setTextColor(...rgb);
+          }
+        }
+
+        function setDrawColor(rgb) {
+          if (!isMeasurePass) {
+            doc.setDrawColor(...rgb);
+          }
+        }
+
+        function setLineWidth(width) {
+          if (!isMeasurePass) {
+            doc.setLineWidth(width);
+          }
+        }
+
+        function colorInk()   { setTextColor(INK); }
+        function colorMuted() { setTextColor(MUTED); }
+        function colorMeta()  { setTextColor(META_C); }
+
+        // Draw horizontal line (dashed)
+        function drawHr() {
+          setDrawColor([201, 198, 189]); // #c9c6bd
+          setLineWidth(0.25);
+          const dashLen = 1.5;
+          const gapLen = 1.2;
+          let x = PAD;
+          while (x < W - PAD) {
+            const end = Math.min(x + dashLen, W - PAD);
+            if (!isMeasurePass) {
+              doc.line(x, y + 2.5, end, y + 2.5);
+            }
+            x += dashLen + gapLen;
+          }
+          y += 5.5; // Y height of hr
+        }
+
+        // Draw thin horizontal line (dashed)
+        function drawHrThin() {
+          setDrawColor([220, 218, 212]); // #dcdaed
+          setLineWidth(0.2);
+          let xT = PAD;
+          while (xT < W - PAD) {
+            const end = Math.min(xT + 1.2, W - PAD);
+            if (!isMeasurePass) {
+              doc.line(xT, y + 2.2, end, y + 2.2);
+            }
+            xT += 1.2 + 1;
+          }
+          y += 4.5; // Y height of hr-thin
+        }
+
+        // Draw centered logo
+        const logoText = receiptProfile.name || 'Outlet';
+        setFont('bold', 15); // matches 20px
+        colorInk();
+        if (!isMeasurePass) {
+          doc.text(logoText, W / 2, y + 5.5, { align: 'center' });
+        }
+        y += 7.5;
+
+        // Sub lines (address, phone, etc.)
+        const subLinesData = [
+          receiptProfile.address,
+          receiptProfile.phone ? 'Phone ' + receiptProfile.phone : '',
+          (country === 'IN' && profile.state_code) ? 'State Code: ' + profile.state_code : '',
+          profile.tax_registration_no ? (profile.tax_system || 'GST') + ' No: ' + profile.tax_registration_no : ''
+        ].filter(Boolean);
+
+        setFont('normal', 8.5); // matches 11px
+        colorMuted();
+        subLinesData.forEach(text => {
+          const actualDoc = doc || new jsPDF();
+          const lines = actualDoc.splitTextToSize(text, CW);
+          lines.forEach(sl => {
+            if (!isMeasurePass) {
+              doc.text(sl, W / 2, y + 3, { align: 'center' });
+            }
+            y += 4.5;
+          });
+        });
+
+        // Separator
+        drawHr();
+
+        // Metadata rows
+        setFont('normal', 8.7); // matches 11.5px
+        colorMeta();
+        const metaRows = [
+          { left: bill.no, right: bill.time },
+          { left: 'Table:', right: bill.table }
+        ];
+        const custName = bill.customer || 'Walk-in';
+        if (custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
+          metaRows.push({ left: 'Customer:', right: custName });
+          if (bill.customerPhone) metaRows.push({ left: 'Phone:', right: bill.customerPhone });
+          if (bill.customerGst) metaRows.push({ left: (profile.tax_system || 'GST') + ' Reg:', right: bill.customerGst });
+        } else {
+          metaRows.push({ left: 'Customer:', right: 'Walk-in' });
+        }
+
+        metaRows.forEach(row => {
+          if (!isMeasurePass) {
+            doc.text(String(row.left), PAD, y + 3.5);
+            doc.text(String(row.right), W - PAD, y + 3.5, { align: 'right' });
+          }
+          y += 4.8;
+        });
+
+        // Separator
+        drawHr();
+
+        // Items
+        setFont('normal', 9.4); // matches 12.5px
+        bill.items.forEach(i => {
+          const catLabel  = i.taxCategory || i.tax_category;
+          const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
+          
+          const qtyStr = `${i.qty}\u00d7 `;
+          const nameStr = i.name + (isIreland ? ` (${rateLabel})` : '');
+          const priceStr = rs(i.price * i.qty);
+
+          const actualDoc = doc || new jsPDF();
+          const rightW = actualDoc.getTextWidth(priceStr) + 1;
+          const leftMax = CW - rightW;
+          const qtyW = actualDoc.getTextWidth(qtyStr);
+
+          // Word wrap nameStr
+          const words = nameStr.split(' ');
+          let firstLine = '';
+          let wordIndex = 0;
+          
+          while (wordIndex < words.length) {
+            const testLine = firstLine ? firstLine + ' ' + words[wordIndex] : words[wordIndex];
+            const testW = actualDoc.getTextWidth(testLine);
+            if (testW > leftMax - qtyW) {
+              break;
+            }
+            firstLine = testLine;
+            wordIndex++;
+          }
+          
+          if (!firstLine && words.length > 0) {
+            firstLine = words[0];
+            wordIndex = 1;
+          }
+          
+          const remainingText = words.slice(wordIndex).join(' ');
+
+          if (!isMeasurePass) {
+            // Draw Qty (Muted)
+            doc.setTextColor(...MUTED);
+            doc.text(qtyStr, PAD, y + 4);
+            // Draw Name (Ink)
+            doc.setTextColor(...INK);
+            doc.text(firstLine, PAD + qtyW, y + 4);
+            // Draw Price (Ink)
+            doc.text(priceStr, W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5; // row height for first line
+
+          if (remainingText) {
+            const remainingLines = actualDoc.splitTextToSize(remainingText, leftMax);
+            remainingLines.forEach(line => {
+              if (!isMeasurePass) {
+                doc.setTextColor(...INK);
+                doc.text(line, PAD, y + 3.5);
+              }
+              y += 4.5;
+            });
+          }
+        });
+
+        // Separator
+        drawHr();
+
+        // Totals
+        setFont('normal', 9.4); // matches 12.5px
+        colorInk();
         
-        const isCenter = line.startsWith('   ') || line.includes('dining with us') || line.includes('Powered by') || line === (receiptProfile.name || 'Outlet');
-        if (isCenter) {
-          const textWidth = doc.getTextWidth(line.trim());
-          const x = (80 - textWidth) / 2;
-          doc.text(line.trim(), x, y);
+        const totalsRows = [
+          { left: 'Subtotal', right: rs(bill.sub) }
+        ];
+        if (bill.disc) totalsRows.push({ left: 'Discount', right: '\u2013 ' + rs(bill.disc) });
+        if (bill.serviceChargeAmount) totalsRows.push({ left: 'Service Charge (5%)', right: rs(bill.serviceChargeAmount) });
+        if (bill.liquorTaxAmount) totalsRows.push({ left: 'Liquor VAT', right: rs(bill.liquorTaxAmount) });
+
+        totalsRows.forEach(row => {
+          if (!isMeasurePass) {
+            doc.text(row.left, PAD, y + 4);
+            doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5;
+        });
+
+        // Tax breakdown
+        if (profile.gst_scheme === 'composition' && country === 'IN') {
+          setFont('italic', 8.2);
+          colorMuted();
+          const msg = 'Composition taxable person, not eligible to collect tax';
+          const actualDoc = doc || new jsPDF();
+          const scLines = actualDoc.splitTextToSize(msg, CW);
+          scLines.forEach(sl => {
+            if (!isMeasurePass) {
+              doc.text(sl, W / 2, y + 3, { align: 'center' });
+            }
+            y += 4.5;
+          });
         } else {
-          doc.text(line, padding, y);
+          const summary = bill.taxSummary || [];
+          if (summary.length > 0) {
+            drawHrThin();
+            if (country === 'IN') {
+              setFont('normal', 9.4);
+              colorInk();
+              const halfGst = Math.round((bill.gst || 0) / 2);
+              const gstLines = [
+                { left: 'CGST (2.5%)', right: rs(halfGst) },
+                { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
+              ];
+              gstLines.forEach(row => {
+                if (!isMeasurePass) {
+                  doc.text(row.left, PAD, y + 4);
+                  doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+                }
+                y += 5.5;
+              });
+              
+              setFont('normal', 8.2);
+              colorMuted();
+              if (!isMeasurePass) {
+                doc.text('SAC 9963', PAD, y + 3);
+              }
+              y += 4.5;
+            } else {
+              setFont('bold', 8.2);
+              colorMuted();
+              if (!isMeasurePass) {
+                doc.text('VAT Breakout', PAD, y + 3);
+              }
+              y += 4.5;
+
+              setFont('normal', 8.2);
+              summary.forEach(band => {
+                const leftText = 'Rate ' + band.percent + '%';
+                const rightText = 'Net ' + rs(band.net) + ' | VAT ' + rs(band.tax);
+                if (!isMeasurePass) {
+                  doc.text(leftText, PAD, y + 3);
+                  doc.text(rightText, W - PAD, y + 3, { align: 'right' });
+                }
+                y += 4.5;
+              });
+            }
+          } else if (bill.gst > 0) {
+            drawHrThin();
+            setFont('normal', 9.4);
+            colorInk();
+            const halfGst = Math.round((bill.gst || 0) / 2);
+            const gstLines = [
+              { left: 'CGST (2.5%)', right: rs(halfGst) },
+              { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
+            ];
+            gstLines.forEach(row => {
+              if (!isMeasurePass) {
+                doc.text(row.left, PAD, y + 4);
+                doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+              }
+              y += 5.5;
+            });
+          }
         }
-        y += lineHeight;
-      });
-      
+
+        // Total
+        setFont('bold', 12.75); // matches 17px
+        colorInk();
+        if (!isMeasurePass) {
+          doc.text('TOTAL', PAD, y + 5.5);
+          doc.text(rs(bill.grand), W - PAD, y + 5.5, { align: 'right' });
+        }
+        y += 8.5;
+
+        // Separator
+        drawHr();
+
+        // Tenders
+        setFont('normal', 9.4);
+        colorInk();
+        const tenders = bill.tenders || [];
+        if (tenders.length > 0) {
+          tenders.forEach(t => {
+            if (!isMeasurePass) {
+              doc.text(t.method, PAD, y + 4);
+              doc.text(rs(t.amount), W - PAD, y + 4, { align: 'right' });
+            }
+            y += 5.5;
+          });
+        } else {
+          if (!isMeasurePass) {
+            doc.text('Cash', PAD, y + 4);
+            doc.text(rs(bill.grand), W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5;
+        }
+
+        if (bill.change) {
+          if (!isMeasurePass) {
+            doc.text('Change', PAD, y + 4);
+            doc.text(rs(bill.change), W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5;
+        }
+
+        // Footer
+        y += 4; // margin-top before footer
+        setFont('normal', 8.5); // matches 11px
+        colorMuted();
+        if (!isMeasurePass) {
+          doc.text('Thank you for dining with us!', W / 2, y + 3.5, { align: 'center' });
+        }
+        y += 4.5;
+        setFont('bold', 8.5); // matches 11px
+        colorInk();
+        if (!isMeasurePass) {
+          doc.text('Powered by RestroSuite', W / 2, y + 3.5, { align: 'center' });
+        }
+        y += 9.5; // margin-bottom
+
+        return y;
+      }
+
+      // Pass 1: Measure height of the receipt content
+      const totalH = renderBill(null, true);
+
+      // Pass 2: Generate PDF with exact height
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, totalH] });
+
+      // Draw background color
+      doc.setFillColor(...BG);
+      doc.rect(0, 0, W, totalH, 'F');
+
+      // Draw content
+      renderBill(doc, false);
+
       return doc.output('datauristring');
     }
 
+
+    // Double-send guard: prevents auto-send + manual click from both firing for the same bill
+    const _waSendingBills = new Set();
+
     async function shareReceiptViaWhatsApp(bill) {
+      if (_waSendingBills.has(bill.no)) return; // already sending this bill
+      _waSendingBills.add(bill.no);
+      try { await _doShareReceiptViaWhatsApp(bill); } finally { _waSendingBills.delete(bill.no); }
+    }
+
+    async function _doShareReceiptViaWhatsApp(bill) {
       let phone = bill.customerPhone;
       if (!phone || phone.trim() === '' || phone === 'null') {
         phone = prompt("Enter customer's WhatsApp number (with country code, e.g. 353852258004):");
@@ -446,6 +815,7 @@
       const settings = window.RS_SETTINGS || {};
       const format = settings.set_whatsapp_bill_format || 'Text receipt';
       const isPdf = (format === 'Thermal PDF receipt');
+      console.log('[WhatsApp] bill format setting:', format, '| isPdf:', isPdf);
 
       const steps = ['Preparing receipt document...', 'Connecting to WhatsApp Gateway...', 'Delivering billing message...'];
       if (window.RS_ProgressOverlay) {
@@ -456,74 +826,96 @@
       let text = receiptText(bill);
       let pdfBase64 = null;
 
+      // Generate PDF if the bill format is set to Thermal PDF receipt
+      if (isPdf) {
+        console.log('[WhatsApp] Loading jsPDF...');
+        const pdfDataUrl = await compileThermalPDF(bill);
+        pdfBase64 = pdfDataUrl ? (pdfDataUrl.split(',')[1] || null) : null;
+        console.log('[WhatsApp] PDF generated, base64 length:', pdfBase64 ? pdfBase64.length : 0);
+        if (!pdfBase64) throw new Error('PDF generation returned empty data — check jsPDF library.');
+      }
+
       try {
-        if (isPdf) {
-          const pdfDataUrl = await compileThermalPDF(bill);
-          pdfBase64 = pdfDataUrl.split(',')[1];
-        }
         
         if (window.RS_ProgressOverlay) {
           window.RS_ProgressOverlay.update(1, 45);
-        }
-        
-        let gatewayReady = false;
-        if (window.RS_DB && RS_DB.mode === 'local') {
-          gatewayReady = true;
-        } else {
-          try {
-            if (window.RS_API && typeof RS_API.data === 'function') {
-              if (RS_API.zeroCostLaunchMode) {
-                gatewayReady = true;
-              } else {
-                const gatewayStatus = await RS_API.data({ operation: 'gateway_status' });
-                if (gatewayStatus && gatewayStatus.status === 'ready') {
-                  gatewayReady = true;
-                }
-              }
-            }
-          } catch(e) {
-            console.warn('Failed to check gateway status via API:', e.message);
-          }
         }
 
         if (window.RS_ProgressOverlay) {
           window.RS_ProgressOverlay.update(2, 75);
         }
 
-        if (gatewayReady) {
-          const payload = {
+        // Attempt to send via gateway directly (skip the /status pre-check:
+        // /status works without auth so it always shows "ready" even if /send token is wrong)
+        if (window.RS_API && typeof RS_API.data === 'function') {
+          const sendPayload = {
             operation: 'gateway_send',
             phone: phone,
             message: text,
             orderId: bill.no
           };
           if (isPdf && pdfBase64) {
-            payload.pdfData = pdfBase64;
-            payload.filename = `receipt-${bill.no}.pdf`;
+            sendPayload.pdfData = pdfBase64;
+            sendPayload.filename = `receipt-${bill.no}.pdf`;
           }
-          
-          if (window.RS_API && typeof RS_API.data === 'function') {
-            const res = await RS_API.data(payload);
-            if (res && res.error) {
-              throw new Error(res.error);
+          console.log('[WhatsApp] Sending via gateway. hasPdf:', !!(isPdf && pdfBase64));
+
+          let sendResult;
+          try {
+            sendResult = await RS_API.data(sendPayload);
+          } catch(sendErr) {
+            // Classify the error to give actionable feedback
+            const msg = sendErr.message || '';
+            if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('Invalid Gateway Token')) {
+              throw new Error('WhatsApp gateway token mismatch. Restart the gateway using run-gateway.ps1 and ensure GATEWAY_TOKEN in .env.local matches.');
+            } else if (msg.includes('ECONNREFUSED') || msg.includes('offline') || msg.includes('fetch') || msg.includes('Connection')) {
+              throw new Error('WhatsApp gateway is not running. Start it with run-gateway.ps1 and try again.');
+            } else if (msg.includes('not ready') || msg.includes('qr')) {
+              throw new Error('WhatsApp is not connected. Scan the QR code in Settings → WhatsApp gateway.');
             }
-            if (window.RS_ProgressOverlay) {
-              window.RS_ProgressOverlay.update(3, 100);
-              window.RS_ProgressOverlay.hide();
-            }
-            RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
-            return;
+            throw sendErr;
           }
+
+          if (sendResult && sendResult.error) {
+            // Gateway returned an application-level error
+            const errMsg = sendResult.error;
+            if (errMsg.includes('not ready') || errMsg.includes('qr')) {
+              throw new Error('WhatsApp is not connected. Scan the QR code in Settings → WhatsApp gateway.');
+            }
+            throw new Error(errMsg);
+          }
+
+          if (window.RS_ProgressOverlay) {
+            window.RS_ProgressOverlay.update(3, 100);
+            window.RS_ProgressOverlay.hide();
+          }
+          RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
+          return;
         }
         
-        throw new Error('Gateway not ready or API offline');
+        throw new Error('WhatsApp API not available');
 
       } catch(err) {
-        console.warn('Gateway send failed, falling back to manual redirect:', err.message);
+        console.warn('Gateway send failed:', err.message);
         if (window.RS_ProgressOverlay) {
           window.RS_ProgressOverlay.hide();
         }
+
+        // For actionable gateway errors, show a toast and don't open web WhatsApp
+        const isGatewayConfigError = err.message && (
+          err.message.includes('token mismatch') ||
+          err.message.includes('not running') ||
+          err.message.includes('not connected') ||
+          err.message.includes('QR code') ||
+          err.message.includes('Unauthorized')
+        );
+
+        if (isGatewayConfigError) {
+          RS.toast(err.message, 'fa-triangle-exclamation');
+          return;
+        }
         
+        // Gateway truly offline / unreachable — fallback to manual web WhatsApp
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         let phoneVal = phone || '';
         phoneVal = phoneVal.replace(/\D/g, '');
@@ -544,21 +936,33 @@
           waUrl = phoneVal ? `https://web.whatsapp.com/send?phone=${phoneVal}&text=${encodedText}` : `https://web.whatsapp.com/send?text=${encodedText}`;
         }
         window.open(waUrl, '_blank', 'noopener,noreferrer');
-        RS.toast('WhatsApp manual receipt ready', 'fa-whatsapp');
+        RS.toast('Gateway offline — opened manual WhatsApp', 'fa-whatsapp');
       }
     }
 
     function showReceipt(bill){
       const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`;
+      const autoSendSettings = window.RS_SETTINGS || {};
+      const autoSendOn = autoSendSettings.set_auto_send_receipts !== false
+                      && autoSendSettings.set_auto_send_receipts !== 'false';
+      const hasPhone = bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null';
+      // If auto-send is on and phone is set, the receipt is already being sent automatically.
+      // Show a status chip instead of the WhatsApp button to prevent double-send.
+      const waBtn = (autoSendOn && hasPhone)
+        ? `<span class="btn btn-ghost" id="rc-wa" style="flex:1;opacity:0.7;cursor:default"><i class="fa-brands fa-whatsapp"></i> Sending\u2026</span>`
+        : `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>`;
       RSModal.open({
         title:'Bill settled', sub:`${bill.no} \u00b7 ${rs(bill.grand)}`, icon:'fa-circle-check', size:'sm',
         body:`<div class="receipt-paper">${receiptHTML(bill)}</div>`,
-        foot:`<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+        foot:`${waBtn}
               <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
         onMount(modal, close){
           modal.querySelector('#rc-print').onclick = ()=> RSPrint(printHtml, 'Receipt '+bill.no);
-          modal.querySelector('#rc-wa').onclick = ()=> RSReceipt.share(bill);
+          const waEl = modal.querySelector('#rc-wa');
+          if (waEl && waEl.tagName === 'BUTTON') {
+            waEl.onclick = ()=> RSReceipt.share(bill);
+          }
           modal.querySelector('#rc-new').onclick = close;
         }
       });
@@ -1348,6 +1752,17 @@
         resetCustomerFields();
         resetPayment();
         showReceipt(bill);
+
+        // Auto-send WhatsApp receipt if enabled in settings
+        try {
+          const autoSendSettings = window.RS_SETTINGS || {};
+          const autoSendEnabled = autoSendSettings.set_auto_send_receipts !== false && autoSendSettings.set_auto_send_receipts !== 'false';
+          if (autoSendEnabled && bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null') {
+            setTimeout(() => { shareReceiptViaWhatsApp(bill); }, 800);
+          }
+        } catch(autoSendErr) {
+          console.warn('Auto-send WhatsApp failed:', autoSendErr.message);
+        }
 
         if (window.RS_DB) {
           try {
