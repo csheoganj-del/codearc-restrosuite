@@ -1,13 +1,13 @@
 {
-  "version": "v25-20260623",
+  "version": "v26-20260623",
   "date": "2026-06-23",
-  "title": "POS Cart, Settings Sync, and Stripe Integration Update",
-  "summary": "This update resolves POS cart layout overlaps, fixes country selector dropdown clipping, syncs settings changes instantly, adds Stripe auto-swap for international payments, and allows flexible item card sizing.",
+  "title": "Country-Aware Tax Engine & Globalization Update",
+  "summary": "This update implements a complete country-aware tax engine supporting India (GST), Ireland (VAT), UK (VAT), US (Sales Tax), UAE (VAT), Australia/Singapore/Canada (GST), and more. Cart now shows real-time customer name/phone for all 3 order types (Takeaway, Dine-in, Delivery) with automatic CRM linkage on checkout. WhatsApp PDF receipts and progress overlays are fully wired.",
   "highlights": [
-    "POS Cart Overlap Fix: Corrected unclosed HTML tags to prevent overlapping of search inputs and cart elements.",
-    "Country Selector & Code Picker: Fixed dropdown clipping issues by seting combo container overflow to visible.",
-    "Dynamic UPI/Stripe Auto-Swap: Automatically switches payment option to Stripe and logs credit card tenders for non-INR currencies.",
-    "Flexible Card Sizing: Adjusted item cards aspect ratio and title wrapping so text is never clipped or hidden.",
-    "Instant Settings Sync: Ensured store setting changes in currency or language immediately update the active POS elements."
+    "Global Tax Engine: 250+ countries auto-map their correct tax system (GST/VAT/Sales Tax) on country selection — no hardcoded GST.",
+    "Date-Effective Tax Rates: Ireland's 9% hospitality VAT auto-upgrades to 13.5% from 1 July 2026; India GST rates version-locked for historical invoice accuracy.",
+    "Customer CRM Auto-Link: Name and phone fields are now always visible in the cart for all order types. On checkout, customers are auto-created or updated in the CRM database.",
+    "WhatsApp PDF Receipts: Thermal PDF receipts with correct tax labels are sent via WhatsApp with animated progress overlay.",
+    "SQL Migration: New supabase_globalization_migration.sql adds tax_system, currency, vat_number, whatsapp_logs table, and date-effective tax rate schedule to Supabase."
   ]
 }

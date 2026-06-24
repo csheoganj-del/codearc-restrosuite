@@ -313,7 +313,7 @@
 .pos-item .veg::after { width: clamp(4.5px, calc(6.5 * var(--pos-grid-size, 158px) / 158), 9px); height: clamp(4.5px, calc(6.5 * var(--pos-grid-size, 158px) / 158), 9px); }
 .veg.nonveg, .pos-item .veg.nonveg { border-color: var(--red); } .veg.nonveg::after, .pos-item .veg.nonveg::after { background: var(--red); }
 
-.pos-cart { display: flex; flex-direction: column; border-radius: var(--r-lg); background: var(--panel); border: 1px solid var(--stroke); overflow: hidden; position: sticky; top: 90px; height: calc(100vh - 110px); }
+.pos-cart { display: flex; flex-direction: column; border-radius: var(--r-lg); background: var(--panel); border: 1px solid var(--stroke); overflow: visible; position: sticky; top: 90px; height: calc(100vh - 110px); }
 .cart-head { padding: 8px 12px; border-bottom: 1px solid var(--stroke); display: flex; align-items: center; justify-content: space-between; }
 .cart-head h3 { font-size: 13px; }
 .cart-table-sel { display: flex; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--stroke); }
@@ -1983,6 +1983,8 @@ body.rs-drawer-dragging {
   position: relative;
   width: 100%;
   box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
 }
 .phone-combo:focus-within { border-color: var(--orange); }
 .phone-combo .phone-flag-btn {

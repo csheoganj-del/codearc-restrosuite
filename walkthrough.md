@@ -332,3 +332,70 @@ We have successfully resolved the remaining WhatsApp gateway and receipt issues 
 
 5. **Assets Synchronized**:
    - Synchronized all modified web files with the native Android app directory (`android-app/app/src/main/assets/`) using `sync-assets.ps1`.
+
+---
+
+# Walkthrough - Country-Aware Tax Engine & Globalization (June 23, 2026)
+
+We have successfully implemented a complete country-aware tax engine and globalization system across the RestroSuite platform:
+
+## 1. Country-to-ISO Mapping (All 250+ Countries)
+
+- Upgraded `RS_getTenantTaxProfile()` in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) to use the `RS_getCountryByName()` lookup from the full country-currency dataset, with a comprehensive fallback name→ISO map.
+- Now correctly resolves **any country** to its ISO code and tax system:
+  - **GST countries**: India (5%/18%), Australia (10%), New Zealand (15%), Singapore (9%), Canada (5%), Malaysia (6%)
+  - **VAT countries**: Ireland (9%→13.5% from Jul 2026), UK (20%), UAE (5%), Saudi Arabia (15%), Germany/France/EU (20%), South Africa (15%)
+  - **Sales Tax**: United States (~6-10% configurable per state)
+
+## 2. Date-Effective Tax Rate Schedule
+
+- Created [supabase_globalization_migration.sql](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/supabase_globalization_migration.sql) with:
+  - **`doppio_tax_rates` table**: date-effective tax rate schedule for India GST, Ireland VAT, UK VAT, UAE VAT, Australia GST, Canada HST, and US Sales Tax.
+  - **Ireland rate change**: 9% hospitality VAT rate (from 2011) has a new record effective 2026-07-01 reverting to 13.5% — old invoices remain reproducible at the old rate.
+  - **`doppio_tax_rates_current` view**: always resolves the latest effective rate per country+code.
+  - **`doppio_whatsapp_logs` table**: tenant-isolated WhatsApp dispatch log with RLS enforcement.
+  - **Extended `saas_tenants`**: added `currency`, `tax_system`, `vat_number`, `gstin`, `whatsapp_enabled`, `whatsapp_format` columns.
+  - **Extended `doppio_bills`**: added `tax_summary`, `tax_profile`, `channel`, `customer_name`, `customer_phone`, `delivery_address`, `service_charge_amt` columns.
+  - **CRM index**: phone+tenant_id composite index for fast customer lookups.
+
+## 3. Customer CRM Input Fix
+
+- Fixed `getCustomer()` in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js) to correctly read from the actual cart input IDs `#cust-input-name` and `#cust-input-phone` (with fallback to old `#cust-name`/`#cust-phone`).
+- Fixed cart persistence restore (lines 1027, 2940) to restore customer data to the new input IDs.
+- Customer name and phone are now correctly captured for all 3 order types (Takeaway, Dine-in, Delivery) and auto-linked to CRM on checkout.
+
+## 4. Dynamic Tax Label in Cart
+
+- `renderCart()` now correctly shows the localized tax label from `taxProfile.tax_system` (e.g. `VAT (Incl.)` for Ireland, `Sales Tax` for US, `GST` for India).
+- The `inclusive_pricing` field is now properly exposed from `RS_getTenantTaxProfile()`.
+
+## 5. Assets Synchronized
+
+- Synced all changes to `codearc-restrosuite/` submodule and `android-app/app/src/main/assets/` via `sync-assets.ps1`.
+- Updated app version to `v26-20260623`.
+
+---
+
+# Walkthrough - POS CRM Customer Widget Formatting Polish (June 24, 2026)
+
+We have polished the user interface and user experience of the POS customer details input fields and floating insights dropdown:
+
+## 1. Unified Sizing & Alignment
+- **Consistent Heights**: Set all cart-header controls (the table selector, Guest Name input, and Guest Phone picker container) to a compact, matching height of `34px`.
+- **Aesthetic Border Radius**: Applied a consistent `8px` border radius across all input fields, matching the premium RestroSuite visual design language.
+- **Table select vertical stretch fix**: Configured the grid layout container `.cart-table-sel` with `align-items: start;` so that the Table selector dropdown retains its clean 34px height instead of stretching vertically to match the height of two stacked inputs.
+- **Focus States**: Added focus-within styling to the programmatically wrapped `.phone-combo` element so that clicking or focusing inside the phone input highlights the wrapper's border in matching brand orange with a soft glow, exactly mirroring the Name input focus state.
+
+## 2. Dropdown Layout & Separator Polish
+- **Draggable & Resizable Side Drawer Integration**: Completely restructured the insights dropdown into a standard `.cpay-side-drawer cpay-drawer-left` layout matching the Cash and Split drawers. It now slides up smoothly, includes a close button (`×`), and supports full touch/mouse dragging and corner resizing.
+- **Glassmorphism & Backdrop Blur**: Inherits the default drawer styling with a beautiful `backdrop-filter: blur(10px)` filter, which blurs the menu items behind it to completely eliminate readability clutter.
+- **Vertical Insights list**: Refactored the insights panel inside the dropdown to list CRM metrics (Visits, Spent, and Favorite items) in vertical rows with clean separator borders instead of a cramped 2-column grid, making it highly readable in a compact container.
+
+- **Cache Busting Version Bump**: Incremented the default cache-busting build version key to `'v27-20260624'` in both `dashboard.html` and `assets/dashboard.js` to ensure browsers instantly fetch the new stylesheet instead of loading cached versions from previous turns.
+
+## 3. Submodule Sync
+- Automatically synchronized all modified assets and markup files with the native Android app directory (`android-app/`) and the submodule clone (`codearc-restrosuite/`).
+- Updated app version to `v27-20260624`.
+
+
+

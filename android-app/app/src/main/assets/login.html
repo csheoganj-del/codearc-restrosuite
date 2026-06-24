@@ -746,11 +746,23 @@
           .map(c => `<option value="${c.currency}"${c.currency === savedCur ? ' selected' : ''}>${c.currency}</option>`)
           .join('');
       }
-      // Country → currency auto-link on direct country select change
+      // Country → currency & country code auto-link on direct country select change
       if (regCountrySel && regCurrencySel) {
         regCountrySel.addEventListener('change', () => {
           const entry = window.RS_getCountryByName && window.RS_getCountryByName(regCountrySel.value);
-          if (entry) regCurrencySel.value = entry.currency;
+          if (entry) {
+            regCurrencySel.value = entry.currency;
+            if (ccSel) {
+              const dialCode = entry.dial;
+              for (let i = 0; i < ccSel.options.length; i++) {
+                const opt = ccSel.options[i];
+                if (opt.value === dialCode || opt.textContent.includes(`+${dialCode}`)) {
+                  ccSel.selectedIndex = i;
+                  break;
+                }
+              }
+            }
+          }
         });
       }
     })();
@@ -895,11 +907,16 @@
       } else {
         const tenantId = payload.slug;
         const activeKey = 'rs_v2:' + tenantId + ':settings';
+        const countryVal = document.getElementById('reg-country').value;
+        const taxInfo = window.RS_getCountryTaxInfo ? window.RS_getCountryTaxInfo(countryVal) : { label: 'GST', rate: 5 };
         const localSettings = {
           set_restaurant_name: payload.name,
           set_outlet_name: payload.name,
-          set_country: document.getElementById('reg-country').value,
-          set_currency: document.getElementById('reg-currency').value
+          set_country: countryVal,
+          set_currency: document.getElementById('reg-currency').value,
+          set_tax_label: taxInfo.label,
+          set_tax_rate_percent: taxInfo.rate,
+          set_calculate_taxes: true
         };
         try { localStorage.setItem(activeKey, JSON.stringify(localSettings)); } catch(e) {}
 

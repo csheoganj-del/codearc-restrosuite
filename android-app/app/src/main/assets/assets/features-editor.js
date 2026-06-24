@@ -147,7 +147,47 @@
         const catSel = $('#ed-cat'); const newCatInput = $('#ed-new-cat');
         let cat = catSel ? catSel.value : 'Starters';
         if (cat === '__new__') { cat = (newCatInput ? newCatInput.value.trim() : '') || 'Other'; }
-        const data = { name, price, cat, veg:$('#ed-type').value==='veg', gst:$('#ed-gst').value, ingredients:draftIngs.slice() };
+
+        // Translate selected percentage back to database rateCode
+        const selectedGst = $('#ed-gst').value;
+        const cleanPercent = parseFloat(selectedGst);
+        let rateCode = null;
+        const activeSettings = window.RS_SETTINGS || {};
+        const curCountry = activeSettings.set_country || 'India';
+        const entry = window.RS_getCountryByName && window.RS_getCountryByName(curCountry);
+        const countryCode = entry ? entry.code : 'IN';
+        
+        const matches = (window.RS_TAX_RATES || []).filter(r => 
+          String(r.country || r.country_code).toUpperCase() === String(countryCode).toUpperCase() &&
+          Number(r.percent) === cleanPercent
+        );
+        if (matches.length > 0) {
+          rateCode = matches[0].rateCode || matches[0].rate_code;
+        } else {
+          // Fallback static codes
+          if (countryCode === 'IE') {
+            if (cleanPercent === 9 || cleanPercent === 13.5) rateCode = 'IE_FOOD_9';
+            else if (cleanPercent === 23) rateCode = 'IE_STANDARD_23';
+            else rateCode = 'IE_ZERO';
+          } else if (countryCode === 'IN') {
+            if (cleanPercent === 5) rateCode = 'IN_REST_5';
+            else if (cleanPercent === 18) rateCode = 'IN_GOODS_18';
+            else rateCode = 'IN_NIL_0';
+          } else {
+            rateCode = `${countryCode}_TAX_${cleanPercent}`;
+          }
+        }
+
+        const data = { 
+          name, 
+          price, 
+          cat, 
+          veg: $('#ed-type').value==='veg', 
+          gst: selectedGst, 
+          taxCategory: rateCode, 
+          ingredients: draftIngs.slice() 
+        };
+        
         if(editingId){
           const m=RS.MENU.find(x=>String(x.id)===String(editingId));
           Object.assign(m,data);
@@ -173,17 +213,35 @@
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
         $('#ed-name').value=m.name; $('#ed-price').value=m.price; $('#ed-cat').value=m.cat; $('#ed-type').value=m.veg?'veg':'nonveg';
         const edGst = $('#ed-gst');
-        if (edGst && m.gst) {
-          const exists = Array.from(edGst.options).some(o => o.value === m.gst);
+        
+        // Resolve slab percentage from m.taxCategory if missing or stale
+        let displayGst = m.gst;
+        if (m.taxCategory) {
+          const activeSettings = window.RS_SETTINGS || {};
+          const curCountry = activeSettings.set_country || 'India';
+          const entry = window.RS_getCountryByName && window.RS_getCountryByName(curCountry);
+          const countryCode = entry ? entry.code : 'IN';
+          const resolved = window.RS_resolveRate && window.RS_resolveRate(countryCode, m.taxCategory);
+          if (resolved) {
+            displayGst = resolved.percent + '%';
+          }
+        }
+        if (!displayGst) displayGst = '5%';
+
+        if (edGst && displayGst) {
+          const exists = Array.from(edGst.options).some(o => o.value === displayGst);
           if (!exists) {
             const opt = document.createElement('option');
-            opt.value = m.gst;
-            opt.textContent = m.gst;
+            opt.value = displayGst;
+            opt.textContent = displayGst;
             edGst.appendChild(opt);
           }
-          edGst.value = m.gst;
+          edGst.value = displayGst;
+          // If custom dropdown is active, sync its display label
+          const cdTrigger = edGst.parentNode && edGst.parentNode.querySelector('.dropdown-trigger-label');
+          if (cdTrigger) cdTrigger.textContent = displayGst;
         } else if (edGst) {
-          edGst.value = m.gst || edGst.options[0]?.value || '';
+          edGst.value = displayGst || edGst.options[0]?.value || '';
         }
         draftIngs = recipeOf(m).map(g=>({...g})); renderIngs(); $('#ed-name').focus(); };
       function resetForm(){ editingId=null; $('#ed-form-title').textContent='Add new item'; $('#ed-reset').style.display='none';

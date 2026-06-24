@@ -118,10 +118,12 @@
       from: r => ({ id:r.id, name:r.name, cat:r.category, price:num(r.price),
                     veg: !(r.recipe_specs && r.recipe_specs.veg===false),
                     stock: r.available===false ? 'out' : 'ok',
-                    ingredients: (r.recipe_specs && r.recipe_specs.ingredients) || [] }),
+                    ingredients: (r.recipe_specs && r.recipe_specs.ingredients) || [],
+                    taxCategory: r.tax_category || 'IN_REST_5' }),
       to: o => ({ id:o.id, name:o.name, category:o.cat, price:num(o.price),
                   available: o.stock!=='out',
-                  recipe_specs: { veg: !!o.veg, ingredients: o.ingredients || [] } })
+                  recipe_specs: { veg: !!o.veg, ingredients: o.ingredients || [] },
+                  tax_category: o.taxCategory || 'IN_REST_5' })
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
@@ -131,13 +133,32 @@
                     subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
                     amount:num(r.total), pay:r.paymentMethod, status:'paid',
                     customerName:r.customerName, customerPhone:r.customerPhone,
-                    tenders:parseTenders(r.tenders), change:num(r.change) }),
+                    tenders:parseTenders(r.tenders), change:num(r.change),
+                    taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
+                    channel: r.channel || 'dine_in',
+                    taxProfile: typeof r.tax_profile === 'string' ? JSON.parse(r.tax_profile) : (r.tax_profile || {}),
+                    liquorTaxAmount: num(r.liquor_tax_amount),
+                    serviceChargeAmount: num(r.service_charge_amount) }),
       to: o => ({ id:o.id, orderId:o.no, customerName:o.customerName||'Walk-in Guest', customerPhone:o.customerPhone||null,
                   items: JSON.stringify(o._items||[]), subtotal:num(o.subtotal), gst:num(o.gst),
                   cgst:num(o.cgst), sgst:num(o.sgst), igst:0, total:num(o.amount),
                   paymentMethod:o.pay||'UPI', dateTime:o.time||new Date().toISOString(), transaction_type:'intra',
                   tenders: Array.isArray(o.tenders) ? JSON.stringify(o.tenders) : o.tenders || '[]',
-                  change: num(o.change || 0) })
+                  change: num(o.change || 0),
+                  tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
+                  channel: o.channel || 'dine_in',
+                  tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
+                  liquor_tax_amount: num(o.liquorTaxAmount),
+                  service_charge_amount: num(o.serviceChargeAmount) })
+    },
+    tax_rates: {
+      table:'doppio_tax_rates', pk:'id', clientId:true,
+      from: r => ({ id:r.id, country:r.country, rateCode:r.rate_code, label:r.label,
+                    percent:num(r.percent), validFrom:r.valid_from, validTo:r.valid_to,
+                    itcAllowed:!!r.itc_allowed, notes:r.notes||'' }),
+      to: o => ({ id:o.id, country:o.country, rate_code:o.rateCode, label:o.label,
+                  percent:num(o.percent), valid_from:o.validFrom, valid_to:o.validTo||null,
+                  itc_allowed:!!o.itcAllowed, notes:o.notes||'' })
     },
     inventory: {
       table:'doppio_inventory', pk:'id', clientId:true,
@@ -247,7 +268,32 @@
   /* ---------------- LOCAL (localStorage) ---------------- */
   const LS = {
     key:c=>'rs_v2:'+c,
-    read:c=>{ try{ return JSON.parse(localStorage.getItem(LS.key(c)))||[]; }catch(e){ return []; } },
+    read:c=>{
+      try{
+        const val = localStorage.getItem(LS.key(c));
+        if (val) return JSON.parse(val);
+        if (c === 'tax_rates') {
+          const defaultRates = [
+            { id: 'IN_REST_5_demo', country: 'IN', rateCode: 'IN_REST_5', label: 'GST Restaurant AC/Non-AC', percent: 5.0, validFrom: '2025-09-22', validTo: null, itcAllowed: false, notes: 'Standalone restaurant' },
+            { id: 'IN_REST_18_demo', country: 'IN', rateCode: 'IN_REST_18', label: 'GST Specified Premises', percent: 18.0, validFrom: '2025-09-22', validTo: null, itcAllowed: true, notes: 'Hotel room tariff >= ₹7,500/night' },
+            { id: 'IN_CATER_18_demo', country: 'IN', rateCode: 'IN_CATER_18', label: 'GST Outdoor Catering', percent: 18.0, validFrom: '2025-09-22', validTo: null, itcAllowed: true, notes: 'Catering services' },
+            { id: 'IN_COMP_5_demo', country: 'IN', rateCode: 'IN_COMP_5', label: 'GST Composition Scheme', percent: 5.0, validFrom: '2025-09-22', validTo: null, itcAllowed: false, notes: 'Flat 5% borne by restaurant' },
+            { id: 'IN_GOODS_5_demo', country: 'IN', rateCode: 'IN_GOODS_5', label: 'GST Packaged Goods 5%', percent: 5.0, validFrom: '2025-09-22', validTo: null, itcAllowed: false, notes: 'Packaged food goods' },
+            { id: 'IN_GOODS_18_demo', country: 'IN', rateCode: 'IN_GOODS_18', label: 'GST Branded Goods 18%', percent: 18.0, validFrom: '2025-09-22', validTo: null, itcAllowed: true, notes: 'Branded retail goods' },
+            { id: 'IN_NIL_0_demo', country: 'IN', rateCode: 'IN_NIL_0', label: 'GST Nil Rated', percent: 0.0, validFrom: '2025-09-22', validTo: null, itcAllowed: false, notes: 'Essential foods' },
+            { id: 'IE_FOOD_135_demo', country: 'IE', rateCode: 'IE_FOOD_135', label: 'VAT Hot Food (Pre-Jul 26)', percent: 13.5, validFrom: '2019-01-01', validTo: '2026-06-30', itcAllowed: true, notes: 'Restaurant food until 30-Jun-2026' },
+            { id: 'IE_FOOD_9_demo', country: 'IE', rateCode: 'IE_FOOD_9', label: 'VAT Hot Food (Post-Jul 26)', percent: 9.0, validFrom: '2026-07-01', validTo: null, itcAllowed: true, notes: 'Restaurant food from 1-Jul-2026' },
+            { id: 'IE_DRINK_23_demo', country: 'IE', rateCode: 'IE_DRINK_23', label: 'VAT Drinks/Alcohol', percent: 23.0, validFrom: '2019-01-01', validTo: null, itcAllowed: true, notes: 'Alcohol & soft drinks' },
+            { id: 'IE_COLD_0_demo', country: 'IE', rateCode: 'IE_COLD_0', label: 'VAT Cold Takeaway', percent: 0.0, validFrom: '2019-01-01', validTo: null, itcAllowed: true, notes: 'Chilled food to-go' },
+            { id: 'IE_DELIVERY_23_demo', country: 'IE', rateCode: 'IE_DELIVERY_23', label: 'VAT Delivery Services', percent: 23.0, validFrom: '2019-01-01', validTo: null, itcAllowed: true, notes: 'Delivery service charge' },
+            { id: 'IE_ACCOM_135_demo', country: 'IE', rateCode: 'IE_ACCOM_135', label: 'VAT Accommodation', percent: 13.5, validFrom: '2019-01-01', validTo: null, itcAllowed: true, notes: 'Hotel rooms' }
+          ];
+          try { localStorage.setItem(LS.key(c), JSON.stringify(defaultRates)); } catch(e){}
+          return defaultRates;
+        }
+        return [];
+      }catch(e){ return []; }
+    },
     write:(c,a)=>{ try{ localStorage.setItem(LS.key(c), JSON.stringify(a)); }catch(e){} },
     async list(c){ return LS.read(c); },
     async put(c,id,obj){
