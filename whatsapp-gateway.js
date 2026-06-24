@@ -668,6 +668,11 @@ function getOrCreateClient(tenantId) {
                 '--aggressive-cache-discard',
                 '--disable-async-dns',
                 '--disable-extensions',
+                '--single-process',
+                '--disable-default-apps',
+                '--no-default-browser-check',
+                '--disable-features=IsolateOrigins,site-per-process,Translate,BackForwardCache',
+                '--js-flags=--max-old-space-size=512',
                 '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
             ]
         }
@@ -696,7 +701,7 @@ function getOrCreateClient(tenantId) {
                 // Trigger a fresh client instantiation
                 getOrCreateClient(tid);
             }
-        }, 180000); // 3 minutes watchdog
+        }, 45000); // 45 seconds watchdog
     };
 
     const clearWatchdog = () => {
