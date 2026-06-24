@@ -397,5 +397,20 @@ We have polished the user interface and user experience of the POS customer deta
 - Automatically synchronized all modified assets and markup files with the native Android app directory (`android-app/`) and the submodule clone (`codearc-restrosuite/`).
 - Updated app version to `v27-20260624`.
 
+---
+
+# Walkthrough - POS Receipt State Code Country Guard (June 24, 2026)
+
+We have resolved the issue where the Indian GST State Code (`07` / Delhi) was printed by default on receipts for all countries, including non-GST regions like Ireland (Ballymahon).
+
+## 1. Logic Enhancements
+- **State Code Fallback Guard** in [assets/dashboard.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/dashboard.js#L618): Refactored the `RS_getTenantTaxProfile` function to set `state_code` as `'07'` only if the selected country is India (`IN`). For all other countries, it now defaults to an empty string (`''`).
+- **Receipt Template Guard** in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js#L243): Added a country guard condition so that the receipt builder only renders the `State Code` line if the profile country is India (`IN`).
+
+## 2. Sync & Git Push
+- Synced the changes to the Android app (`android-app/`) and nested submodule clones via `sync-assets.ps1`.
+- Committed and pushed all updates to the remote `main` branch.
+
+
 
 
