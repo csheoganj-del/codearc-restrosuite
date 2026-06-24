@@ -947,20 +947,28 @@
     }
   }
   function getCustomer(){
+    const nameEl = $('#cust-input-name') || $('#cust-name');
+    const phoneEl = $('#cust-input-phone') || $('#cust-phone');
+    const gstEl = $('#cust-gst');
+    
+    let phoneVal = '';
+    if (phoneEl) {
+      phoneVal = window.RS_getFullPhoneNumber ? window.RS_getFullPhoneNumber(phoneEl) : phoneEl.value;
+    }
+    
     const sel = $('#cart-customer-sel');
     if (sel && sel.value) {
       const opt = sel.options[sel.selectedIndex];
+      const selPhone = sel.value;
+      const finalPhone = (selPhone.startsWith('temp-') || !selPhone.startsWith('+')) ? phoneVal.trim() : selPhone.trim();
       return {
         name: opt.getAttribute('data-name') || '',
-        phone: sel.value,
+        phone: finalPhone,
         gst: opt.getAttribute('data-gst') || '',
         table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
       };
     }
-    const nameEl = $('#cust-input-name') || $('#cust-name');
-    const phoneEl = $('#cust-input-phone') || $('#cust-phone');
-    const gstEl = $('#cust-gst');
-    return { name:(nameEl?.value||'').trim(), phone:(phoneEl?.value||'').trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+    return { name:(nameEl?.value||'').trim(), phone:phoneVal.trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
   }
   function runKotAction(){
     if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');

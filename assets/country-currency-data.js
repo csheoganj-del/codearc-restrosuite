@@ -554,4 +554,38 @@
     });
   };
 
+  /**
+   * Helper to reconstruct a full, unified phone number (including dial code)
+   * from a phone input element that might have a country picker wrapper.
+   */
+  window.RS_getFullPhoneNumber = function(phoneInput) {
+    if (!phoneInput) return '';
+    let val = phoneInput.value.trim();
+    if (!val) return '';
+
+    // If it already starts with '+', it is already a full international number
+    if (val.startsWith('+')) {
+      return val;
+    }
+
+    // Otherwise, try to find a sibling flag button inside the .phone-combo wrapper
+    const combo = phoneInput.closest('.phone-combo');
+    const dialEl = combo ? combo.querySelector('.pdial') : null;
+    if (dialEl) {
+      const dialCode = dialEl.textContent.trim(); // E.g., "+353" or "+91"
+      const dialDigits = dialCode.replace(/\D/g, ''); // E.g., "353" or "91"
+      
+      const cleanVal = val.replace(/\D/g, '');
+      if (cleanVal.startsWith(dialDigits)) {
+        // User typed the dial code but omitted the '+' (e.g., "353852258004")
+        return '+' + val;
+      } else {
+        // They typed only the national/local number, prepend the dial code
+        return dialCode + ' ' + val;
+      }
+    }
+
+    return val;
+  };
+
 })();
