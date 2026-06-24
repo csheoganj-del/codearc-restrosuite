@@ -61,7 +61,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v24-20260622';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v27-20260624';
   document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
 </script>
 <script>
@@ -415,53 +415,43 @@
                 <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative;">
-              <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative; align-items: start;">
+              <select class="form-input" id="cart-table" style="height: 34px; padding: 0 32px 0 12px; font-size: 12.5px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
               <div class="custom-customer-widget" id="custom-customer-widget">
-                <div class="cust-widget-trigger" id="cust-widget-trigger" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Customer Selector">
-                  <i class="fa-solid fa-user-tag"></i>
-                  <span id="cust-trigger-text">Walk-in</span>
-                  <i class="fa-solid fa-chevron-down caret"></i>
+                <!-- Direct inputs visible in cart -->
+                <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                  <input type="text" id="cust-input-name" placeholder="Guest Name" class="form-input" style="padding: 0 10px; font-size: 12.5px; height: 34px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
+                  <input type="text" id="cust-input-phone" placeholder="Guest Phone" class="form-input" style="padding: 0 10px; font-size: 12.5px; height: 34px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
                 </div>
-                <div class="cust-widget-dropdown" id="cust-widget-dropdown">
-                  <div class="cust-fields-row">
-                    <div class="field-group">
-                      <label>Name</label>
-                      <input type="text" id="cust-input-name" placeholder="John Doe" autocomplete="off" class="form-input">
-                    </div>
-                    <div class="field-group">
-                      <label>Phone</label>
-                      <input type="text" id="cust-input-phone" placeholder="9876543210" autocomplete="off" class="form-input">
-                    </div>
-                  </div>
-                  
-                  <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
-                  
-                  <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
-                    <div class="insight-item">
-                      <span class="insight-label">Visits</span>
-                      <span class="insight-val" id="insight-visits">0</span>
-                    </div>
-                    <div class="insight-item">
-                      <span class="insight-label">Spent</span>
-                      <span class="insight-val" id="insight-spend">₹0</span>
-                    </div>
-                    <div class="insight-item" style="grid-column: span 2; border-top: 1px solid var(--stroke); padding-top: 4px; margin-top: 4px;">
-                      <span class="insight-label">Favorite</span>
-                      <span class="insight-val" id="insight-favorite">None</span>
-                    </div>
-                  </div>
+                
+                <!-- Hidden trigger for backwards compatibility -->
+                <div class="cust-widget-trigger" id="cust-widget-trigger" style="display: none;">
+                  <span id="cust-trigger-text">Walk-in</span>
+                </div>
 
-                  <div class="cust-action-row" id="cust-action-row" style="display: none; margin-top: 6px;">
-                    <button type="button" class="btn btn-sm btn-primary" id="btn-save-new-cust" style="width: 100%; justify-content: center; font-size:11px; padding: 6px 8px;">
-                      <i class="fa-solid fa-plus"></i> Add New Customer
-                    </button>
+                <!-- Dropdown overlay for search results, insights and actions -->
+                <div class="cpay-side-drawer cpay-drawer-left" id="cust-widget-dropdown">
+                  <div class="csd-header">
+                    <span class="csd-title"><i class="fa-solid fa-user-gear" style="color:var(--orange);"></i> Customer Insights</span>
+                    <button type="button" id="cust-widget-close" class="csd-close">&times;</button>
                   </div>
-                  
-                  <div class="cust-reset-row" style="margin-top: 6px; border-top: 1px solid var(--stroke); padding-top: 6px;">
-                    <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-cust" style="width: 100%; justify-content: center; font-size:11px; color: var(--text-soft); padding: 6px 8px;">
-                      <i class="fa-solid fa-user-slash"></i> Reset to Walk-in
-                    </button>
+                  <div class="csd-body" style="overflow-y: auto;">
+                    <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
+                    
+                    <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
+                      <div class="insight-item">
+                        <span class="insight-label">Visits</span>
+                        <span class="insight-val" id="insight-visits">0</span>
+                      </div>
+                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
+                        <span class="insight-label">Spent</span>
+                        <span class="insight-val" id="insight-spend">₹0</span>
+                      </div>
+                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
+                        <span class="insight-label">Favorite</span>
+                        <span class="insight-val" id="insight-favorite" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">None</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1312,15 +1302,16 @@
 <script src="src/dashboard/bills.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/chain.js"></script>
 <script>
+  document.write('<script src="assets/country-currency-data.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
   document.write('<script src="assets/dashboard.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
   document.write('<script src="assets/features-pos.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  document.write('<script src="assets/features-editor.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  document.write('<script src="assets/features-manage.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  document.write('<script src="assets/features-growth.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  document.write('<script src="assets/features-extra.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  document.write('<script src="src/dashboard/onboarding.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  document.write('<script src="assets/features-shell.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
 </script>
-<script src="assets/features-editor.js"></script>
-<script src="assets/features-manage.js"></script>
-<script src="assets/features-growth.js?v=20260618-importsync3"></script>
-<script src="assets/features-extra.js"></script>
-<script src="src/dashboard/onboarding.js?v=20260619-duestour"></script>
-<script src="assets/features-shell.js?v=20260618-realdata2"></script>
 
 <script>
 /* Fix 1: Sidebar hamburger toggle — mobile/tablet */
@@ -1358,3 +1349,4 @@
 </script>
 </body>
 </html>
+

@@ -159,14 +159,16 @@
     function toggle(t,d,on){ return `<div class="set-row"><div class="si"><div class="st">${t}</div><div class="sd">${d}</div></div><label class="toggle"><input type="checkbox" data-skey="${skey(t)}" ${on?'checked':''}><span></span></label></div>`; }
     // Country & currency helpers — populated from shared RS_COUNTRIES data
     function countrySelect(cur) {
-      const countries = (window.RS_COUNTRIES || []).map(c => c.name);
+      const countries = window.RS_COUNTRIES || [];
       if (!countries.length) return `<div><label class="fl">Country</label><input class="form-input" id="set-country" data-skey="set_country" value="${cur||'India'}" placeholder="Outlet country"></div>`;
-      const opts = countries.map(n => `<option ${n===(cur||'India')?'selected':''}>${n}</option>`).join('');
+      const flag = window.RS_countryFlag || (code => '🌐');
+      const opts = countries.map(c => `<option value="${c.name}" ${c.name===(cur||'India')?'selected':''}>${flag(c.code)} ${c.name} (+${c.dial})</option>`).join('');
       return `<div><label class="fl">Country</label><select class="form-input" id="set-country" data-skey="set_country">${opts}</select></div>`;
     }
     function currencySelect(cur) {
       const currencies = window.RS_getCurrencies ? window.RS_getCurrencies() : [];
       const defaults = ['INR (₹)','EUR (€)','USD ($)','GBP (£)','AED (د.إ)','SAR (ر.س)','SGD ($)','AUD ($)','CAD ($)','NZD ($)','ZAR (R)'];
+      const flag = window.RS_countryFlag || (() => '');
       const opts = (currencies.length ? currencies.map(c => c.currency) : defaults)
         .map(c => `<option ${c===(cur||'INR (₹)')?'selected':''}>${c}</option>`).join('');
       return `<div><label class="fl">Currency</label><select class="form-input" id="set-currency" data-skey="set_currency">${opts}</select></div>`;
@@ -512,27 +514,44 @@
 
             updateGstinLabels(curCountry);
 
-            // Country → currency auto-link
+            // Country → currency + phone-prefix + tax auto-link
             const countrySel  = body.querySelector('#set-country');
             const currencySel = body.querySelector('#set-currency');
             if (countrySel && currencySel) {
               countrySel.addEventListener('change', () => {
-                const entry = window.RS_getCountryByName && window.RS_getCountryByName(countrySel.value);
+                // Extract real country name (strip flag + dial suffix added to option text)
+                const rawVal = countrySel.value;
+                const entry = window.RS_getCountryByName && window.RS_getCountryByName(rawVal);
                 if (entry && entry.currency) {
                   currencySel.value = entry.currency;
-                  // sync custom dropdown label if wrapped
-                  const cdLabel = currencySel.parentNode && currencySel.parentNode.nextSibling &&
-                    currencySel.parentNode.nextSibling.querySelector('.dropdown-trigger-label');
-                  if (cdLabel) cdLabel.textContent = entry.currency;
-                  // Dispatch change so any wrapper widget can react
+                  // Force-refresh the custom dropdown trigger label
+                  const cdTrigger = currencySel.closest('div')?.querySelector('.dropdown-trigger-label');
+                  if (cdTrigger) cdTrigger.textContent = entry.currency;
                   currencySel.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(countrySel.value);
+                if (entry && entry.dial) {
+                  // Update outlet phone prefix in settings
+                  const phoneInput = body.querySelector('[data-skey="set_phone"]');
+                  if (phoneInput) {
+                    let rawPhone = phoneInput.value.replace(/^\+\d{1,4}\s*/, '').trim();
+                    phoneInput.value = `+${entry.dial} ${rawPhone}`;
+                    phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                  // Update cart customer phone prefix picker if it exists
+                  const cartPhonePicker = document.querySelector('#cust-input-phone');
+                  if (cartPhonePicker && cartPhonePicker.dataset.phonePrefixBuilt) {
+                    const pflag = cartPhonePicker.parentElement?.querySelector('.pflag');
+                    const pdial = cartPhonePicker.parentElement?.querySelector('.pdial');
+                    if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+                    if (pdial) pdial.textContent = `+${entry.dial}`;
+                  }
+                }
+                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(rawVal);
                 if (taxInfo) {
                   SET_STORE['set_tax_label'] = taxInfo.label;
                   SET_STORE['set_tax_rate_percent'] = taxInfo.rate;
                 }
-                updateGstinLabels(countrySel.value);
+                updateGstinLabels(rawVal);
               });
             }
           }
@@ -573,6 +592,19 @@
         if (typeof window.RS_wrapAllSelects === 'function') {
           window.RS_wrapAllSelects(body, ['set-country', 'set-currency']);
         }
+        // Mount phone prefix picker on the outlet phone field in profile settings
+        if (key === 'profile' && window.RS_buildPhonePrefix) {
+          const outletPhoneEl = body.querySelector('[data-skey="set_phone"]');
+          if (outletPhoneEl && !outletPhoneEl.dataset.phonePrefixBuilt) {
+            const settings2 = window.RS_SETTINGS || {};
+            let initCode = 'IN';
+            if (settings2.set_country && window.RS_getCountryByName) {
+              const e2 = window.RS_getCountryByName(settings2.set_country);
+              if (e2) initCode = e2.code;
+            }
+            window.RS_buildPhonePrefix(outletPhoneEl, initCode);
+          }
+        }
         $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
         const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
         const btnReset = $('#btn-client-reset-data');
@@ -606,7 +638,7 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
+      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }
@@ -744,6 +776,44 @@
       }
     };
     
+    RS.syncPhoneCombosToSettings = function(customSettings) {
+      const settings = customSettings || window.RS_SETTINGS || {};
+      if (!settings.set_country || !window.RS_getCountryByName) return;
+      const entry = window.RS_getCountryByName(settings.set_country);
+      if (!entry) return;
+
+      // 1. Update settings profile phone input if it exists
+      const settingsPhone = document.querySelector('[data-skey="set_phone"]');
+      if (settingsPhone && settingsPhone.dataset.phonePrefixBuilt) {
+        if (typeof settingsPhone.RS_setCountryCode === 'function') {
+          settingsPhone.RS_setCountryCode(entry.code);
+        } else {
+          const pflag = settingsPhone.parentElement.querySelector('.pflag');
+          const pdial = settingsPhone.parentElement.querySelector('.pdial');
+          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+          if (pdial) pdial.textContent = `+${entry.dial}`;
+        }
+      }
+
+      // 2. Update cart customer phone prefix picker if it exists
+      const cartPhone = document.querySelector('#cust-input-phone');
+      if (cartPhone && cartPhone.dataset.phonePrefixBuilt) {
+        if (typeof cartPhone.RS_setCountryCode === 'function') {
+          cartPhone.RS_setCountryCode(entry.code);
+        } else {
+          const pflag = cartPhone.parentElement.querySelector('.pflag');
+          const pdial = cartPhone.parentElement.querySelector('.pdial');
+          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+          if (pdial) pdial.textContent = `+${entry.dial}`;
+        }
+      }
+    };
+    
+    // Sync immediately on load if settings are already loaded
+    try {
+      RS.syncPhoneCombosToSettings();
+    } catch(e){}
+
     document.addEventListener('rs:hydrated', window.startTopbarWhatsAppPolling);
     if (window.RS_DB && window.RS_DB.session) {
       window.startTopbarWhatsAppPolling();

@@ -238,6 +238,132 @@
     return window.RS_COUNTRIES.find(c => c.dial === d) || null;
   };
 
+  /** Converts a 2-letter ISO country code to its flag emoji. E.g. 'IE' → '🇮🇪' */
+  window.RS_countryFlag = function(code) {
+    if (!code || code.length !== 2) return '🌐';
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+  };
+
+  /**
+   * Builds and mounts a reusable phone-prefix picker next to a plain <input>.
+   * @param {HTMLInputElement} phoneInput  - the target phone <input> element
+   * @param {string} [defaultCode]         - ISO-2 code to pre-select (e.g. 'IN')
+   * @param {Function} [onChange]          - optional callback(entry) when prefix changes
+   * Returns the wrapper <div> that replaces the raw input in the DOM.
+   */
+  window.RS_buildPhonePrefix = function(phoneInput, defaultCode, onChange) {
+    if (!phoneInput || phoneInput.dataset.phonePrefixBuilt) return;
+    phoneInput.dataset.phonePrefixBuilt = '1';
+
+    // Determine starting country
+    const startCode = defaultCode || 'IN';
+    let activeEntry = window.RS_COUNTRIES.find(c => c.code === startCode) ||
+                      window.RS_COUNTRIES.find(c => c.name === 'India');
+
+    // Build wrapper
+    const wrap = document.createElement('div');
+    wrap.className = 'phone-combo';
+    wrap.style.cssText = 'display:flex;align-items:center;position:relative;border:1px solid var(--stroke-2);border-radius:8px;background:var(--glass);overflow:visible;height:34px;box-sizing:border-box;transition:var(--t);';
+
+    // Flag button
+    const flagBtn = document.createElement('button');
+    flagBtn.type = 'button';
+    flagBtn.className = 'phone-flag-btn';
+    flagBtn.style.cssText = 'height:100%;flex-shrink:0;display:flex;align-items:center;gap:4px;padding:0 8px 0 10px;background:transparent;border:none;border-right:1px solid var(--stroke-2);cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;border-top-left-radius:8px;border-bottom-left-radius:8px;';
+    flagBtn.innerHTML = `<span class="pflag">${window.RS_countryFlag(activeEntry.code)}</span><span class="pdial">+${activeEntry.dial}</span><i class="fa-solid fa-chevron-down" style="font-size:9px;opacity:0.6;margin-left:2px;"></i>`;
+
+    // Picker dropdown
+    const picker = document.createElement('div');
+    picker.className = 'phone-country-picker';
+    picker.style.cssText = 'position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:var(--panel-solid,var(--panel));border:1px solid var(--stroke-2);border-radius:var(--r-md);box-shadow:0 8px 32px rgba(0,0,0,0.22);min-width:260px;max-height:260px;display:none;flex-direction:column;overflow:hidden;';
+
+    // Search inside picker
+    const srch = document.createElement('input');
+    srch.type = 'text';
+    srch.placeholder = 'Search country or code…';
+    srch.style.cssText = 'padding:9px 12px;border:none;border-bottom:1px solid var(--stroke-2);background:var(--glass);color:var(--text);font-size:13px;outline:none;font-family:inherit;flex-shrink:0;';
+
+    const list = document.createElement('div');
+    list.style.cssText = 'overflow-y:auto;flex:1;';
+
+    const renderList = (q) => {
+      list.innerHTML = '';
+      const f = (q || '').toLowerCase();
+      window.RS_COUNTRIES.filter(c =>
+        !f || c.name.toLowerCase().includes(f) || c.dial.includes(f) || c.code.toLowerCase().includes(f)
+      ).slice(0, 80).forEach(c => {
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;font-size:13px;transition:background .12s;';
+        if (c.code === activeEntry.code) item.style.background = 'var(--orange-tint,rgba(249,115,22,0.08))';
+        item.innerHTML = `<span style="font-size:18px;width:22px;text-align:center;">${window.RS_countryFlag(c.code)}</span><span style="flex:1;color:var(--text);">${c.name}</span><span style="color:var(--text-soft);font-weight:600;">+${c.dial}</span>`;
+        item.addEventListener('mousedown', e => {
+          e.preventDefault();
+          activeEntry = c;
+          flagBtn.querySelector('.pflag').textContent = window.RS_countryFlag(c.code);
+          flagBtn.querySelector('.pdial').textContent = `+${c.dial}`;
+          picker.style.display = 'none';
+          // Strip any old prefix from the input and add the new one
+          let raw = phoneInput.value.replace(/^\+\d{1,4}\s*/, '').trim();
+          phoneInput.value = `+${c.dial} ${raw}`;
+          phoneInput.focus();
+          phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+          if (typeof onChange === 'function') onChange(c);
+        });
+        item.addEventListener('mouseenter', () => item.style.background = 'var(--glass-2,rgba(255,255,255,0.06))');
+        item.addEventListener('mouseleave', () => item.style.background = c.code === activeEntry.code ? 'var(--orange-tint,rgba(249,115,22,0.08))' : '');
+        list.appendChild(item);
+      });
+    };
+
+    srch.addEventListener('input', () => renderList(srch.value));
+    picker.appendChild(srch);
+    picker.appendChild(list);
+
+    let open = false;
+    flagBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      open = !open;
+      picker.style.display = open ? 'flex' : 'none';
+      if (open) { renderList(''); setTimeout(() => srch.focus(), 50); }
+    });
+    document.addEventListener('click', () => { open = false; picker.style.display = 'none'; }, true);
+    picker.addEventListener('click', e => e.stopPropagation());
+
+    // Style the input itself
+    phoneInput.style.cssText = 'flex:1;border:none;background:transparent;padding:0 10px;font-size:12.5px;color:var(--text);outline:none;font-family:inherit;min-width:0;height:100%;box-sizing:border-box;';
+
+    // Auto-detect and sync flag from input value when typing or programmatically changed
+    const syncFlagFromValue = () => {
+      const val = phoneInput.value.trim();
+      if (!val || !val.startsWith('+')) return;
+      const cleanVal = val.replace(/\D/g, '');
+      const sorted = window.RS_COUNTRIES.slice().sort((a, b) => b.dial.length - a.dial.length);
+      const matchedCountry = sorted.find(c => cleanVal.startsWith(c.dial));
+      if (matchedCountry && matchedCountry.code !== activeEntry.code) {
+        activeEntry = matchedCountry;
+        flagBtn.querySelector('.pflag').textContent = window.RS_countryFlag(matchedCountry.code);
+        flagBtn.querySelector('.pdial').textContent = `+${matchedCountry.dial}`;
+      }
+    };
+    phoneInput.addEventListener('input', syncFlagFromValue);
+    phoneInput.RS_setCountryCode = function(code) {
+      const entry = window.RS_COUNTRIES.find(c => c.code === code);
+      if (entry) {
+        activeEntry = entry;
+        flagBtn.querySelector('.pflag').textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+        flagBtn.querySelector('.pdial').textContent = `+${entry.dial}`;
+      }
+    };
+
+    // Replace input in DOM with wrapper
+    phoneInput.parentNode.insertBefore(wrap, phoneInput);
+    wrap.appendChild(flagBtn);
+    wrap.appendChild(phoneInput);
+    wrap.appendChild(picker);
+
+    return wrap;
+  };
+
   /** Returns unique currencies list as [{ currency, symbol, currencyCode }] */
   window.RS_getCurrencies = function() {
     const seen = new Set();

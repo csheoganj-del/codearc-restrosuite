@@ -146,6 +146,9 @@
       try {
         RS.updateStaticCurrencyLabels();
       } catch(e){}
+      try {
+        if (RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings();
+      } catch(e){}
     }
     RS.loadReceiptProfile = loadReceiptProfile; // Expose globally
     loadReceiptProfile();
@@ -217,13 +220,18 @@
 
     /* ---------------- receipt builder ---------------- */
     function receiptHTML(bill){
+      const profile = bill.taxProfile || (window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular' });
+      const country = profile.country || 'IN';
+      const taxSystem = profile.tax_system || 'GST';
+      const isIreland = (country === 'IE');
+      
       const custName = bill.customer || 'Walk-in';
       let custSection = '';
       if(custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
         custSection = `
           <div class="rcp-meta"><span>Customer:</span><span>${esc(custName)}</span></div>
           ${bill.customerPhone ? `<div class="rcp-meta"><span>Phone:</span><span>${esc(bill.customerPhone)}</span></div>` : ''}
-          ${bill.customerGst ? `<div class="rcp-meta"><span>GSTIN:</span><span>${esc(bill.customerGst)}</span></div>` : ''}
+          ${bill.customerGst ? `<div class="rcp-meta"><span>${taxSystem} Reg:</span><span>${esc(bill.customerGst)}</span></div>` : ''}
         `;
       } else {
         custSection = `<div class="rcp-meta"><span>Customer:</span><span>Walk-in</span></div>`;
@@ -232,20 +240,64 @@
       const profileLines = [
         receiptProfile.address,
         receiptProfile.phone ? `Phone ${receiptProfile.phone}` : '',
-        receiptProfile.gstin ? `GSTIN ${receiptProfile.gstin}` : ''
+        profile.state_code ? `State Code: ${profile.state_code}` : '',
+        profile.tax_registration_no ? `${taxSystem} No: ${profile.tax_registration_no}` : ''
       ].filter(Boolean).map(line => `<div class="rcp-sub">${esc(line)}</div>`).join('');
+      
+      const itemsHTML = bill.items.map(i => {
+        const catLabel = i.taxCategory || i.tax_category;
+        const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
+        return `<div class="rcp-line"><span><span class="q">${i.qty}× </span>${esc(i.name)} ${isIreland ? `<small style="font-size:10px;color:var(--text-mute)">(${rateLabel})</small>` : ''}</span><span>${rs(i.price*i.qty)}</span></div>`;
+      }).join('');
+      
+      let taxBreakdownHTML = '';
+      if (profile.gst_scheme === 'composition' && country === 'IN') {
+        taxBreakdownHTML = `<div class="rcp-line" style="text-align:center;font-size:11px;color:var(--text-soft);margin-top:6px;font-style:italic;">Composition taxable person, not eligible to collect tax</div>`;
+      } else {
+        const summary = bill.taxSummary || [];
+        if (summary.length > 0) {
+          taxBreakdownHTML = `<div style="margin-top: 6px; border-top: 1px dashed var(--stroke-2); padding-top: 6px;">`;
+          if (country === 'IN') {
+            const halfGst = Math.round((bill.gst || 0) / 2);
+            taxBreakdownHTML += `
+              <div class="rcp-line"><span>CGST (2.5%)</span><span>${rs(halfGst)}</span></div>
+              <div class="rcp-line"><span>SGST (2.5%)</span><span>${rs(bill.gst - halfGst)}</span></div>
+              <div class="rcp-sub" style="font-size:10.5px;color:var(--text-mute);margin-top:2px;">SAC 9963</div>
+            `;
+          } else {
+            taxBreakdownHTML += `<div style="font-size:11px;color:var(--text-soft);margin-bottom:4px;font-weight:700;">VAT Breakout</div>`;
+            summary.forEach(band => {
+              taxBreakdownHTML += `
+                <div class="rcp-line" style="font-size:11.5px;color:var(--text-soft)">
+                  <span>Rate ${band.percent}%</span>
+                  <span>Net ${rs(band.net)} | VAT ${rs(band.tax)}</span>
+                </div>
+              `;
+            });
+          }
+          taxBreakdownHTML += `</div>`;
+        } else if (bill.gst > 0) {
+          const halfGst = Math.round((bill.gst || 0) / 2);
+          taxBreakdownHTML = `
+            <div class="rcp-line"><span>CGST (2.5%)</span><span>${rs(halfGst)}</span></div>
+            <div class="rcp-line"><span>SGST (2.5%)</span><span>${rs(bill.gst - halfGst)}</span></div>
+          `;
+        }
+      }
+      
       return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div>${profileLines || '<div class="rcp-sub">CodeArc RestroSuite</div>'}</div>
         <hr class="rcp-hr">
         <div class="rcp-meta"><span>${bill.no}</span><span>${bill.time}</span></div>
         <div class="rcp-meta"><span>Table:</span><span>${bill.table}</span></div>
         ${custSection}
         <hr class="rcp-hr">
-        ${bill.items.map(i=>`<div class="rcp-line"><span><span class="q">${i.qty}× </span>${esc(i.name)}</span><span>${rs(i.price*i.qty)}</span></div>`).join('')}
+        ${itemsHTML}
         <hr class="rcp-hr">
         <div class="rcp-line"><span>Subtotal</span><span>${rs(bill.sub)}</span></div>
-        ${bill.disc?`<div class="rcp-line"><span>Discount</span><span>– ${rs(bill.disc)}</span></div>`:''}
-        ${bill.gst?`<div class="rcp-line"><span>CGST 2.5%</span><span>${rs(Math.round(bill.gst/2))}</span></div>
-        <div class="rcp-line"><span>SGST 2.5%</span><span>${rs(bill.gst-Math.round(bill.gst/2))}</span></div>`:''}
+        ${bill.disc ? `<div class="rcp-line"><span>Discount</span><span>– ${rs(bill.disc)}</span></div>` : ''}
+        ${bill.serviceChargeAmount ? `<div class="rcp-line"><span>Service Charge (5%)</span><span>${rs(bill.serviceChargeAmount)}</span></div>` : ''}
+        ${bill.liquorTaxAmount ? `<div class="rcp-line"><span>Liquor VAT</span><span>${rs(bill.liquorTaxAmount)}</span></div>` : ''}
+        ${taxBreakdownHTML}
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
         <hr class="rcp-hr">
         ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${t.method}</span><span>${rs(t.amount)}</span></div>`).join('')}
@@ -254,25 +306,246 @@
     }
 
     function receiptText(bill){
+      const profile = bill.taxProfile || (window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular' });
+      const country = profile.country || 'IN';
+      const isIreland = (country === 'IE');
+      
       const lines = [
         receiptProfile.name || 'Outlet',
         receiptProfile.address,
         receiptProfile.phone ? `Phone: ${receiptProfile.phone}` : '',
-        receiptProfile.gstin ? `GSTIN: ${receiptProfile.gstin}` : '',
+        profile.tax_registration_no ? `${profile.tax_system} No: ${profile.tax_registration_no}` : '',
         `Bill: ${bill.no}`,
         `${bill.table} | ${bill.time}`,
         '',
-        ...bill.items.map(i => `${i.qty} x ${i.name} - ${rs(i.price * i.qty)}`),
+        ...bill.items.map(i => {
+          const catLabel = i.taxCategory || i.tax_category;
+          const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
+          return `${i.qty} x ${i.name} ${isIreland ? `(${rateLabel})` : ''} - ${rs(i.price * i.qty)}`;
+        }),
         '',
         `Subtotal: ${rs(bill.sub)}`,
         bill.disc ? `Discount: - ${rs(bill.disc)}` : '',
-        bill.gst ? `GST: ${rs(bill.gst)}` : '',
+        bill.serviceChargeAmount ? `Service Charge (5%): ${rs(bill.serviceChargeAmount)}` : '',
+        bill.liquorTaxAmount ? `Liquor VAT: ${rs(bill.liquorTaxAmount)}` : ''
+      ];
+      
+      if (profile.gst_scheme === 'composition' && country === 'IN') {
+        lines.push('Composition taxable person, not eligible to collect tax');
+      } else {
+        const summary = bill.taxSummary || [];
+        if (summary.length > 0) {
+          if (country === 'IN') {
+            const halfGst = Math.round((bill.gst || 0) / 2);
+            lines.push(`CGST (2.5%): ${rs(halfGst)}`);
+            lines.push(`SGST (2.5%): ${rs(bill.gst - halfGst)}`);
+            lines.push('SAC: 9963');
+          } else {
+            lines.push('VAT Breakout:');
+            summary.forEach(band => {
+              lines.push(`  Rate ${band.percent}%: Net ${rs(band.net)} | VAT ${rs(band.tax)}`);
+            });
+          }
+        } else if (bill.gst > 0) {
+          const halfGst = Math.round((bill.gst || 0) / 2);
+          lines.push(`CGST (2.5%): ${rs(halfGst)}`);
+          lines.push(`SGST (2.5%): ${rs(bill.gst - halfGst)}`);
+        }
+      }
+      
+      lines.push(
         `Total: ${rs(bill.grand)}`,
         `Paid by: ${(bill.tenders && bill.tenders[0] && bill.tenders[0].method) || 'Cash'}`,
         '',
         'Thank you for dining with us!'
-      ];
+      );
+      
       return lines.filter(Boolean).join('\n');
+    }
+
+    function loadJsPDF() {
+      return new Promise((resolve, reject) => {
+        if (window.jspdf) return resolve(window.jspdf);
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        script.onload = () => {
+          resolve(window.jspdf || window.umd?.jspdf);
+        };
+        script.onerror = () => reject(new Error('Failed to load jsPDF library'));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function compileThermalPDF(bill) {
+      const jspdfModule = await loadJsPDF();
+      const { jsPDF } = jspdfModule;
+      
+      const text = receiptText(bill);
+      const lines = text.split('\n');
+      
+      const lineHeight = 4.2;
+      const padding = 5;
+      const height = Math.max(100, lines.length * lineHeight + padding * 2 + 10);
+      
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [80, height]
+      });
+      
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(0, 0, 0);
+      
+      let y = padding + 4;
+      lines.forEach(line => {
+        if (line.toUpperCase().includes('TOTAL') || line.toUpperCase().startsWith('---') || line.toUpperCase().startsWith('===')) {
+          doc.setFont('courier', 'bold');
+        } else {
+          doc.setFont('courier', 'normal');
+        }
+        
+        const isCenter = line.startsWith('   ') || line.includes('dining with us') || line.includes('Powered by') || line === (receiptProfile.name || 'Outlet');
+        if (isCenter) {
+          const textWidth = doc.getTextWidth(line.trim());
+          const x = (80 - textWidth) / 2;
+          doc.text(line.trim(), x, y);
+        } else {
+          doc.text(line, padding, y);
+        }
+        y += lineHeight;
+      });
+      
+      return doc.output('datauristring');
+    }
+
+    async function shareReceiptViaWhatsApp(bill) {
+      let phone = bill.customerPhone;
+      if (!phone || phone.trim() === '' || phone === 'null') {
+        phone = prompt("Enter customer's WhatsApp number (with country code, e.g. 353852258004):");
+        if (phone === null) return; // User cancelled
+        phone = phone.replace(/\D/g, '');
+        if (phone) {
+          bill.customerPhone = phone;
+          try {
+            if (window.RS_DB) {
+              const localBill = await RS_DB.list('bills').then(arr => arr.find(b => b.no === bill.no));
+              if (localBill) {
+                localBill.customerPhone = phone;
+                await RS_DB.put('bills', localBill.id, localBill);
+              }
+            }
+          } catch(dbErr) {
+            console.warn('Failed to save to local DB:', dbErr.message);
+          }
+        } else {
+          return;
+        }
+      }
+
+      const settings = window.RS_SETTINGS || {};
+      const format = settings.set_whatsapp_bill_format || 'Text receipt';
+      const isPdf = (format === 'Thermal PDF receipt');
+
+      const steps = ['Preparing receipt document...', 'Connecting to WhatsApp Gateway...', 'Delivering billing message...'];
+      if (window.RS_ProgressOverlay) {
+        window.RS_ProgressOverlay.show('Sending WhatsApp Bill', steps);
+        window.RS_ProgressOverlay.update(0, 15);
+      }
+
+      let text = receiptText(bill);
+      let pdfBase64 = null;
+
+      try {
+        if (isPdf) {
+          const pdfDataUrl = await compileThermalPDF(bill);
+          pdfBase64 = pdfDataUrl.split(',')[1];
+        }
+        
+        if (window.RS_ProgressOverlay) {
+          window.RS_ProgressOverlay.update(1, 45);
+        }
+        
+        let gatewayReady = false;
+        if (window.RS_DB && RS_DB.mode === 'local') {
+          gatewayReady = true;
+        } else {
+          try {
+            if (window.RS_API && typeof RS_API.data === 'function') {
+              if (RS_API.zeroCostLaunchMode) {
+                gatewayReady = true;
+              } else {
+                const gatewayStatus = await RS_API.data({ operation: 'gateway_status' });
+                if (gatewayStatus && gatewayStatus.status === 'ready') {
+                  gatewayReady = true;
+                }
+              }
+            }
+          } catch(e) {
+            console.warn('Failed to check gateway status via API:', e.message);
+          }
+        }
+
+        if (window.RS_ProgressOverlay) {
+          window.RS_ProgressOverlay.update(2, 75);
+        }
+
+        if (gatewayReady) {
+          const payload = {
+            operation: 'gateway_send',
+            phone: phone,
+            message: text,
+            orderId: bill.no
+          };
+          if (isPdf && pdfBase64) {
+            payload.pdfData = pdfBase64;
+            payload.filename = `receipt-${bill.no}.pdf`;
+          }
+          
+          if (window.RS_API && typeof RS_API.data === 'function') {
+            const res = await RS_API.data(payload);
+            if (res && res.error) {
+              throw new Error(res.error);
+            }
+            if (window.RS_ProgressOverlay) {
+              window.RS_ProgressOverlay.update(3, 100);
+              window.RS_ProgressOverlay.hide();
+            }
+            RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
+            return;
+          }
+        }
+        
+        throw new Error('Gateway not ready or API offline');
+
+      } catch(err) {
+        console.warn('Gateway send failed, falling back to manual redirect:', err.message);
+        if (window.RS_ProgressOverlay) {
+          window.RS_ProgressOverlay.hide();
+        }
+        
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let phoneVal = phone || '';
+        phoneVal = phoneVal.replace(/\D/g, '');
+        
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+          }
+        } catch(clipErr) {
+          console.warn('Clipboard write failed:', clipErr.message);
+        }
+
+        const encodedText = encodeURIComponent(text);
+        let waUrl = '';
+        if (isMobile) {
+          waUrl = phoneVal ? `https://wa.me/${phoneVal}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`;
+        } else {
+          waUrl = phoneVal ? `https://web.whatsapp.com/send?phone=${phoneVal}&text=${encodedText}` : `https://web.whatsapp.com/send?text=${encodedText}`;
+        }
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+        RS.toast('WhatsApp manual receipt ready', 'fa-whatsapp');
+      }
     }
 
     function showReceipt(bill){
@@ -285,12 +558,7 @@
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
         onMount(modal, close){
           modal.querySelector('#rc-print').onclick = ()=> RSPrint(printHtml, 'Receipt '+bill.no);
-          modal.querySelector('#rc-wa').onclick = ()=>{
-            const text = encodeURIComponent(receiptText(bill));
-            const url = `https://wa.me/?text=${text}`;
-            window.open(url, '_blank', 'noopener,noreferrer');
-            RS.toast('WhatsApp receipt ready','fa-whatsapp');
-          };
+          modal.querySelector('#rc-wa').onclick = ()=> RSReceipt.share(bill);
           modal.querySelector('#rc-new').onclick = close;
         }
       });
@@ -302,6 +570,9 @@
       show: showReceipt,
       print(bill){
         RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`, 'Receipt '+bill.no);
+      },
+      share(bill){
+        shareReceiptViaWhatsApp(bill);
       }
     };
 
@@ -998,27 +1269,56 @@
           dueAmount = totals.grand;
         }
 
-        if (dueAmount > 0 && cust.phone) {
+        const hasPhone = cust.phone && cust.phone.trim();
+        const hasName = cust.name && cust.name.trim() && cust.name.toLowerCase() !== 'walk-in guest' && cust.name.toLowerCase() !== 'walk-in';
+        if (hasPhone || hasName) {
           try {
             const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
-            const matched = customers.find(c => c.phone === cust.phone);
+            let matched = null;
+            if (hasPhone) {
+              matched = customers.find(c => c.phone && String(c.phone).trim() === String(cust.phone).trim());
+            } else if (hasName) {
+              matched = customers.find(c => c.name && String(c.name).trim().toLowerCase() === String(cust.name).trim().toLowerCase());
+            }
             if (matched) {
-              matched.dues = (matched.dues || 0) + dueAmount;
-              matched.spend = (matched.spend || 0) + dueAmount;
               matched.visits = (matched.visits || 0) + 1;
+              matched.spend = (matched.spend || 0) + totals.grand;
               matched.last = new Date().toLocaleDateString('en-CA');
+              if (dueAmount > 0) {
+                matched.dues = (matched.dues || 0) + dueAmount;
+              }
+              if (hasName && !matched.name) matched.name = cust.name.trim();
+              if (hasPhone && !matched.phone) matched.phone = cust.phone.trim();
               await RS_DB.put('customers', matched.id, matched);
-              RS.toast('Customer credit (due) updated', 'fa-address-book');
+              RS.toast('CRM customer details updated', 'fa-address-book');
+            } else {
+              const newCust = {
+                id: 'cust-' + Date.now(),
+                name: cust.name ? cust.name.trim() : 'Guest',
+                phone: cust.phone ? cust.phone.trim() : '',
+                email: '',
+                visits: 1,
+                spend: totals.grand,
+                last: new Date().toLocaleDateString('en-CA'),
+                dues: dueAmount,
+                tier: totals.grand > 25000 ? 'vip' : totals.grand > 12000 ? 'gold' : 'silver'
+              };
+              await RS_DB.put('customers', newCust.id, newCust);
+              RS.toast('New customer added to CRM', 'fa-address-book');
+            }
+            if (typeof loadCustomersForPos === 'function') {
+              await loadCustomersForPos();
             }
           } catch (e) {
-            console.warn("Failed to update customer dues on checkout", e);
+            console.warn("Failed to link customer to CRM on checkout", e);
           }
         }
 
         const bill = {
           no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
           table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
-          tenders: customTenders || [{ method: payMethod, amount: receivedVal }], change: changeVal || 0
+          tenders: customTenders || [{ method: payMethod, amount: receivedVal }], change: changeVal || 0,
+          taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
         };
         try {
           const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
@@ -1028,7 +1328,8 @@
             receivedAmount: receivedVal, changeAmount: changeVal,
             customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
             subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price })) };
+            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, taxCategory: i.taxCategory || i.tax_category })),
+            taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge };
           RS.BILLS.unshift(billRow);
           if (RS.saveOne) await RS.saveOne('bills',billRow);
           const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
@@ -1806,7 +2107,7 @@
         const currentPhone = sel.value;
         
         // Don't override inputs while user is typing a temporary customer
-        if (dropdown.classList.contains('show') && (nameInput === document.activeElement || phoneInput === document.activeElement)) {
+        if (dropdown.classList.contains('csd-open') && (nameInput === document.activeElement || phoneInput === document.activeElement)) {
           return;
         }
         
@@ -1815,7 +2116,7 @@
           phoneInput.value = '';
           triggerText.innerText = 'Walk-in';
           insightsPanel.style.display = 'none';
-          actionRow.style.display = 'none';
+          if (actionRow) actionRow.style.display = 'none';
           return;
         }
         
@@ -1834,7 +2135,7 @@
           document.getElementById('insight-spend').innerText = '₹' + spend;
           document.getElementById('insight-favorite').innerText = favorite;
           insightsPanel.style.display = 'grid';
-          actionRow.style.display = 'none';
+          if (actionRow) actionRow.style.display = 'none';
         } else {
           // Check if temp option exists
           const opt = sel.options[sel.selectedIndex];
@@ -1845,34 +2146,47 @@
           insightsPanel.style.display = 'none';
           
           if (name && currentPhone && !currentPhone.startsWith('temp-')) {
-            actionRow.style.display = 'block';
+            if (actionRow) actionRow.style.display = 'block';
           } else {
-            actionRow.style.display = 'none';
+            if (actionRow) actionRow.style.display = 'none';
           }
         }
       }
       
-      // Toggle dropdown
-      trigger.addEventListener('click', (e) => {
+      // Toggle dropdown on inputs click/focus
+      nameInput.addEventListener('click', (e) => {
         e.stopPropagation();
-        const isOpen = dropdown.classList.contains('show');
-        trigger.setAttribute('aria-expanded', !isOpen);
-        if (isOpen) {
-          dropdown.classList.remove('show');
-          widgetContainer.classList.remove('active');
-        } else {
-          dropdown.classList.add('show');
-          widgetContainer.classList.add('active');
-          syncWidgetWithHiddenSelect();
-        }
+        dropdown.classList.add('csd-open');
+        widgetContainer.classList.add('active');
       });
-      
-      trigger.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          trigger.click();
-        }
+      nameInput.addEventListener('focus', () => {
+        dropdown.classList.add('csd-open');
+        widgetContainer.classList.add('active');
       });
+      phoneInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.add('csd-open');
+        widgetContainer.classList.add('active');
+      });
+      phoneInput.addEventListener('focus', () => {
+        dropdown.classList.add('csd-open');
+        widgetContainer.classList.add('active');
+      });
+
+      if (trigger) {
+        trigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isOpen = dropdown.classList.contains('csd-open');
+          if (isOpen) {
+            dropdown.classList.remove('csd-open');
+            widgetContainer.classList.remove('active');
+          } else {
+            dropdown.classList.add('csd-open');
+            widgetContainer.classList.add('active');
+            syncWidgetWithHiddenSelect();
+          }
+        });
+      }
       
       // Prevent closing when clicking inside the dropdown
       dropdown.addEventListener('click', (e) => {
@@ -1880,9 +2194,11 @@
       });
       
       // Close dropdown when clicking outside
-      document.addEventListener('click', () => {
-        dropdown.classList.remove('show');
-        widgetContainer.classList.remove('active');
+      document.addEventListener('click', (e) => {
+        if (widgetContainer && !widgetContainer.contains(e.target)) {
+          dropdown.classList.remove('csd-open');
+          widgetContainer.classList.remove('active');
+        }
       });
       
       // Live search input handling
@@ -1895,7 +2211,7 @@
         if (!nameVal && !phoneVal) {
           searchResults.style.display = 'none';
           insightsPanel.style.display = 'none';
-          actionRow.style.display = 'none';
+          if (actionRow) actionRow.style.display = 'none';
           triggerText.innerText = 'Walk-in';
           return;
         }
@@ -1903,9 +2219,10 @@
         triggerText.innerText = nameVal || phoneVal;
         
         const allCustomers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
+        const cleanPhoneVal = phoneVal.replace(/\D/g, '');
         const matches = allCustomers.filter(c => {
           const matchName = nameVal ? (c.name || '').toLowerCase().includes(nameVal.toLowerCase()) : true;
-          const matchPhone = phoneVal ? (c.phone || '').includes(phoneVal) : true;
+          const matchPhone = cleanPhoneVal ? (c.phone || '').replace(/\D/g, '').includes(cleanPhoneVal) : true;
           return matchName && matchPhone;
         });
         
@@ -1947,11 +2264,11 @@
           insightsPanel.style.display = 'none';
         }
         
-        const exactMatch = allCustomers.find(c => c.phone === phoneVal);
-        if (!exactMatch && nameVal && phoneVal && phoneVal.length >= 10) {
-          actionRow.style.display = 'block';
+        const exactMatch = allCustomers.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhoneVal);
+        if (!exactMatch && nameVal && cleanPhoneVal && cleanPhoneVal.length >= 10) {
+          if (actionRow) actionRow.style.display = 'block';
         } else {
-          actionRow.style.display = 'none';
+          if (actionRow) actionRow.style.display = 'none';
         }
       };
       
@@ -1959,61 +2276,105 @@
       phoneInput.addEventListener('input', handleInput);
       
       // Save new customer action
-      btnSaveNew.addEventListener('click', async () => {
-        const name = nameInput.value.trim();
-        const phone = phoneInput.value.trim();
-        if (!name || !phone) {
-          RS.toast('Name and phone are required', 'fa-circle-exclamation');
-          return;
-        }
-        if (window.RS_DB) {
-          try {
-            const newCust = {
-              id: 'cust-' + Date.now(),
-              name, phone, email: '',
-              visits: 1, spend: 0, last: new Date().toLocaleDateString('en-CA'), tier: 'silver'
-            };
-            await RS_DB.put('customers', newCust.id, newCust);
-            
-            // Reload standard customer select options
-            await loadCustomersForPos();
-            
-            // Sync selection to new customer
-            sel.value = phone;
-            sel.dispatchEvent(new Event('change'));
-            
-            RS.toast('Customer saved successfully', 'fa-circle-check');
-            actionRow.style.display = 'none';
-            await syncWidgetWithHiddenSelect();
-          } catch(e) {
-            console.warn("Failed saving customer", e);
-            RS.toast('Save failed: ' + e.message, 'fa-circle-exclamation');
+      if (btnSaveNew) {
+        btnSaveNew.addEventListener('click', async () => {
+          const name = nameInput.value.trim();
+          const phone = phoneInput.value.trim();
+          if (!name || !phone) {
+            RS.toast('Name and phone are required', 'fa-circle-exclamation');
+            return;
           }
-        }
-      });
+          if (window.RS_DB) {
+            try {
+              const newCust = {
+                id: 'cust-' + Date.now(),
+                name, phone, email: '',
+                visits: 1, spend: 0, last: new Date().toLocaleDateString('en-CA'), tier: 'silver'
+              };
+              await RS_DB.put('customers', newCust.id, newCust);
+              
+              // Reload standard customer select options
+              await loadCustomersForPos();
+              
+              // Sync selection to new customer
+              sel.value = phone;
+              sel.dispatchEvent(new Event('change'));
+              
+              RS.toast('Customer saved successfully', 'fa-circle-check');
+              if (actionRow) actionRow.style.display = 'none';
+              await syncWidgetWithHiddenSelect();
+            } catch(e) {
+              console.warn("Failed saving customer", e);
+              RS.toast('Save failed: ' + e.message, 'fa-circle-exclamation');
+            }
+          }
+        });
+      }
       
       // Reset action
-      btnReset.addEventListener('click', () => {
-        sel.value = '';
-        const tempOpt = sel.querySelector('option[data-temp="true"]');
-        if (tempOpt) tempOpt.remove();
-        
-        if (deliveryAddress) deliveryAddress.value = '';
-        if (deliveryCharge) deliveryCharge.value = '';
-        if (deliveryRider) deliveryRider.value = '';
-        
-        const currentCart = window.RS.getCart();
-        const deliveryItemIndex = currentCart.findIndex(item => item.id === 'delivery-charge-item');
-        if (deliveryItemIndex >= 0) {
-          currentCart.splice(deliveryItemIndex, 1);
-          window.RS.setCart(currentCart);
-        }
-        
-        sel.dispatchEvent(new Event('change'));
-        dropdown.classList.remove('show');
-        widgetContainer.classList.remove('active');
-        syncWidgetWithHiddenSelect();
-      });
+      if (btnReset) {
+        btnReset.addEventListener('click', () => {
+          sel.value = '';
+          const tempOpt = sel.querySelector('option[data-temp="true"]');
+          if (tempOpt) tempOpt.remove();
+          
+          if (deliveryAddress) deliveryAddress.value = '';
+          if (deliveryCharge) deliveryCharge.value = '';
+          if (deliveryRider) deliveryRider.value = '';
+          
+          const currentCart = window.RS.getCart();
+          const deliveryItemIndex = currentCart.findIndex(item => item.id === 'delivery-charge-item');
+          if (deliveryItemIndex >= 0) {
+            currentCart.splice(deliveryItemIndex, 1);
+            window.RS.setCart(currentCart);
+          }
+          
+          sel.dispatchEvent(new Event('change'));
+          dropdown.classList.remove('csd-open');
+          widgetContainer.classList.remove('active');
+          syncWidgetWithHiddenSelect();
+        });
+      }
+
+      // Close button action
+      const btnClose = document.getElementById('cust-widget-close');
+      if (btnClose) {
+        btnClose.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dropdown.classList.remove('csd-open');
+          widgetContainer.classList.remove('active');
+        });
+      }
+
+      // Make customer insights drawer draggable and resizable
+      makeDrawerDraggable(dropdown);
+      makeDrawerResizable(dropdown);
+
+      // Insights click to open CRM profile
+      if (insightsPanel) {
+        insightsPanel.style.cursor = 'pointer';
+        insightsPanel.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const currentPhone = sel.value;
+          if (!currentPhone) return;
+          try {
+            const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+            const c = customers.find(x => x.phone === currentPhone);
+            if (c) {
+              dropdown.classList.remove('csd-open');
+              widgetContainer.classList.remove('active');
+              if (window.RS && typeof window.RS.activateTab === 'function') {
+                window.RS.activateTab('customers-tab');
+              }
+              if (window.RS && typeof window.RS.showCustomerProfile === 'function') {
+                window.RS.showCustomerProfile(c);
+              }
+            }
+          } catch(err) {
+            console.warn("Failed to open customer CRM profile modal", err);
+          }
+        });
+      }
       
       // Background interval to watch for value modifications from outer scripts (like draft load)
       let lastKnownSelValue = null;
@@ -2644,7 +3005,7 @@
           const dropdown = document.getElementById('cust-widget-dropdown');
           const nameInput = document.getElementById('cust-input-name');
           if (widgetTrigger && dropdown && nameInput) {
-            if (!dropdown.classList.contains('show')) {
+            if (!dropdown.classList.contains('csd-open')) {
               widgetTrigger.click();
             }
             setTimeout(() => nameInput.focus(), 50);

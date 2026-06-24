@@ -308,6 +308,9 @@
         if (action === 'gateway_logs') {
           return { logs: [] };
         }
+        if (action === 'gateway_send') {
+          return { status: 'success', messageId: 'msg-' + Date.now() };
+        }
         if (action === 'gateway_reset') {
           return { status: 'success' };
         }

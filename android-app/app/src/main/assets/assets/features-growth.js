@@ -794,6 +794,7 @@
         }});
     }
     RS.titles['customers-tab']=['Customers','CRM, loyalty & order history']; RS.addRenderer('customers-tab', renderCustomers);
+    RS.showCustomerProfile = customerModal;
 
     /* ===================== GROWTH HUB SCREENS ===================== */
     const HUB = [

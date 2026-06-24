@@ -189,7 +189,7 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v24-20260622';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v27-20260624';
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 
@@ -520,9 +520,111 @@
   /* ============================================================
      POS
      ============================================================ */
+  const TAX_RATES = [];
+  window.RS_TAX_RATES = TAX_RATES;
+
+  window.RS_resolveRate = function(country, rateCode, dateStr) {
+    const list = window.RS_TAX_RATES || [];
+    const date = dateStr ? new Date(dateStr) : new Date();
+    const matches = list.filter(r => 
+      String(r.country).toUpperCase() === String(country || 'IN').toUpperCase() && 
+      String(r.rateCode || r.rate_code).toUpperCase() === String(rateCode).toUpperCase()
+    );
+    const active = matches.find(r => {
+      const from = new Date(r.validFrom || r.valid_from);
+      const to = r.validTo || r.valid_to ? new Date(r.validTo || r.valid_to) : null;
+      return date >= from && (!to || date <= to);
+    });
+    if (active) {
+      return { 
+        percent: Number(active.percent), 
+        itc_allowed: !!(active.itcAllowed || active.itc_allowed),
+        label: active.label
+      };
+    }
+    if (String(country).toUpperCase() === 'IE') {
+      if (rateCode === 'IE_FOOD_9' || rateCode === 'IE_FOOD_135') {
+        const cutover = new Date('2026-07-01');
+        return { percent: date >= cutover ? 9.0 : 13.5, itc_allowed: true, label: 'VAT Hot Food' };
+      }
+      if (rateCode === 'IE_DRINK_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Drinks' };
+      if (rateCode === 'IE_COLD_0') return { percent: 0.0, itc_allowed: true, label: 'VAT Cold Takeaway' };
+      if (rateCode === 'IE_DELIVERY_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Delivery' };
+      if (rateCode === 'IE_ACCOM_135') return { percent: 13.5, itc_allowed: true, label: 'VAT Accommodation' };
+    }
+    if (String(country).toUpperCase() === 'IN') {
+      if (rateCode === 'IN_REST_5') return { percent: 5.0, itc_allowed: false, label: 'GST Standalone' };
+      if (rateCode === 'IN_REST_18') return { percent: 18.0, itc_allowed: true, label: 'GST Specified' };
+      if (rateCode === 'IN_CATER_18') return { percent: 18.0, itc_allowed: true, label: 'GST Catering' };
+      if (rateCode === 'IN_COMP_5') return { percent: 5.0, itc_allowed: false, label: 'GST Composition' };
+      if (rateCode === 'IN_GOODS_5') return { percent: 5.0, itc_allowed: false, label: 'GST Goods' };
+      if (rateCode === 'IN_GOODS_18') return { percent: 18.0, itc_allowed: true, label: 'GST Goods' };
+      if (rateCode === 'IN_NIL_0') return { percent: 0.0, itc_allowed: false, label: 'GST Nil Rated' };
+    }
+    const m = String(rateCode).match(/_(\d+)(?:5)?$/);
+    const pct = m ? Number(m[1]) : 5;
+    return { percent: pct, itc_allowed: false, label: rateCode };
+  };
+
+  window.RS_getTenantTaxProfile = function() {
+    const settings = window.RS_SETTINGS || {};
+
+    // Use RS_COUNTRIES lookup table for full world coverage
+    let country = 'IN';
+    if (settings.set_country) {
+      const entry = (window.RS_getCountryByName && window.RS_getCountryByName(settings.set_country)) || null;
+      if (entry) {
+        country = entry.code;
+      } else {
+        // Fallback map for common country names/aliases
+        const fallbackMap = {
+          'india': 'IN', 'ireland': 'IE', 'united kingdom': 'GB', 'uk': 'GB', 'great britain': 'GB',
+          'united states': 'US', 'usa': 'US', 'australia': 'AU', 'canada': 'CA',
+          'new zealand': 'NZ', 'singapore': 'SG', 'united arab emirates': 'AE', 'uae': 'AE',
+          'saudi arabia': 'SA', 'south africa': 'ZA', 'germany': 'DE', 'france': 'FR',
+          'netherlands': 'NL', 'spain': 'ES', 'italy': 'IT', 'portugal': 'PT', 'belgium': 'BE',
+          'austria': 'AT', 'sweden': 'SE', 'denmark': 'DK', 'norway': 'NO', 'finland': 'FI',
+          'greece': 'GR', 'malaysia': 'MY', 'thailand': 'TH', 'vietnam': 'VN', 'indonesia': 'ID',
+          'philippines': 'PH', 'kenya': 'KE', 'nigeria': 'NG', 'ghana': 'GH',
+          'pakistan': 'PK', 'bangladesh': 'BD', 'sri lanka': 'LK', 'nepal': 'NP'
+        };
+        country = fallbackMap[String(settings.set_country || '').toLowerCase()] || 'IN';
+      }
+    }
+
+    // Tax system by country code
+    const vatCountries  = ['IE', 'GB', 'DE', 'FR', 'NL', 'ES', 'IT', 'PT', 'BE', 'AT', 'FI', 'GR', 'DK', 'SE', 'NO', 'SA', 'AE', 'ZA', 'KE', 'NG', 'GH', 'PH', 'TH', 'ID'];
+    const salesTaxCodes = ['US'];
+    let taxSystem;
+    if (vatCountries.includes(country))  taxSystem = 'VAT';
+    else if (salesTaxCodes.includes(country)) taxSystem = 'Sales Tax';
+    else taxSystem = 'GST';
+
+    // Honor explicit override from settings
+    if (settings.set_tax_label) taxSystem = settings.set_tax_label;
+
+    let profile = {};
+    try {
+      if (settings.set_tax_profile) {
+        profile = typeof settings.set_tax_profile === 'string' ? JSON.parse(settings.set_tax_profile) : settings.set_tax_profile;
+      }
+    } catch(e) {}
+    return {
+      country: country,
+      tax_system: taxSystem,
+      inclusive_pricing: !!settings.set_inclusive_pricing,
+      tax_registration_no: settings.set_gstin || profile.tax_registration_no || '',
+      gst_scheme: profile.gst_scheme || (settings.set_gst_scheme) || 'regular',
+      state_code: settings.set_gst_state || profile.state_code || '07',
+      specified_premises: !!(profile.specified_premises || settings.set_specified_premises),
+      vat_filing_frequency: profile.vat_filing_frequency || 'bi_monthly',
+      accounting_year_end: profile.accounting_year_end || null,
+      apply_gst_on_service_charge: !!(profile.apply_gst_on_service_charge || settings.set_apply_gst_on_service_charge),
+      liquor_vat_rate: Number(settings.set_liquor_vat_rate || profile.liquor_vat_rate || 20)
+    };
+  };
+
   let activeCat='All', cart=[], discountPct=0;
-  const posGstEnabled = false;
-  const posDiscountEnabled = false;
   const renderPOS = () => {
     const grid = $('#pos-grid');
     const q = ($('#pos-search-input')?.value||'').toLowerCase();
@@ -545,14 +647,36 @@
     const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
     $('#cart-count').textContent = count+(count===1?' item':' items');
 
-    const sub=cart.reduce((a,c)=>a+c.price*c.qty,0);
-    const disc=posDiscountEnabled ? Math.round(sub*discountPct/100) : 0;
-    const taxed=sub-disc; const gst=posGstEnabled ? Math.round(taxed*0.05) : 0;
-    const grand=taxed+gst;
-    $('#t-sub').textContent=rs(sub);
-    if($('#t-disc')) $('#t-disc').textContent='– '+rs(disc);
-    if($('#t-gst')) $('#t-gst').textContent=rs(gst);
-    $('#t-grand').textContent=rs(grand);
+    const totals = getTotals();
+    const isIncl = totals.taxProfile.inclusive_pricing;
+    const taxLabel = totals.taxProfile.tax_system || 'GST';
+    const settings = window.RS_SETTINGS || {};
+    
+    let metaHTML = `<span>Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
+    if (totals.disc > 0) {
+      metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">– ${rs(totals.disc)}</b></span>`;
+    }
+    if (totals.serviceCharge > 0) {
+      metaHTML += `<span>SC <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
+    }
+    
+    // Ireland handles composition differently (not applicable)
+    if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
+      metaHTML += `<span style="font-size:10px;color:var(--text-mute)">Composition Scheme</span>`;
+    } else {
+      metaHTML += `<span>${taxLabel}${isIncl ? ' (Incl.)' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
+    }
+    
+    if (totals.liquorTax > 0) {
+      metaHTML += `<span>Liquor VAT <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
+    }
+    
+    const metaDiv = document.querySelector('.totals-meta');
+    if (metaDiv) {
+      metaDiv.innerHTML = metaHTML;
+    }
+    
+    $('#t-grand').textContent=rs(totals.grand);
 
     // Update Mobile Cart Bar
     const barCount = $('#pos-m-cart-bar-count');
@@ -560,7 +684,7 @@
     const cartBar = $('#pos-m-cart-bar');
     if (barCount && barTotal && cartBar) {
       barCount.textContent = count + (count === 1 ? ' item' : ' items');
-      barTotal.textContent = rs(grand);
+      barTotal.textContent = rs(totals.grand);
       if (count > 0 && window.innerWidth <= 1024) {
         cartBar.classList.remove('hidden');
       } else {
@@ -617,7 +741,180 @@
       console.warn('[Cart Persistence Warning] Failed to persist active cart:', e);
     }
   }
-  function getTotals(){ const sub=cart.reduce((a,c)=>a+c.price*c.qty,0); const disc=posDiscountEnabled ? Math.round(sub*discountPct/100) : 0; const taxed=sub-disc; const gst=posGstEnabled ? Math.round(taxed*0.05) : 0; return {sub,disc,gst,grand:taxed+gst,count:cart.reduce((a,c)=>a+c.qty,0),discountPct:posDiscountEnabled?discountPct:0,items:cart.map(c=>({...c}))}; }
+  function getTotals(){
+    const settings = window.RS_SETTINGS || {};
+    const taxProfile = window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular', specified_premises: false };
+    const country = taxProfile.country;
+    
+    let channel = 'dine_in';
+    const activeTypeBtn = document.querySelector('.order-type-btn.active');
+    if (activeTypeBtn) {
+      const t = activeTypeBtn.textContent.trim().toLowerCase();
+      if (t.includes('dine')) channel = 'dine_in';
+      else if (t.includes('take') || t.includes('carry')) channel = 'takeaway';
+      else if (t.includes('deliv')) channel = 'delivery';
+    }
+    
+    const calculateTaxesEnabled = settings.set_calculate_taxes !== false;
+    const serviceChargeEnabled = settings.set_service_charge === true && channel === 'dine_in';
+    const roundOffEnabled = settings.set_round_off_totals !== false;
+    const inclusivePricing = settings.set_inclusive_pricing === true;
+    
+    const rawSubtotal = cart.reduce((a,c)=>a+c.price*c.qty,0);
+    const discAmount = Math.round(rawSubtotal * discountPct / 100);
+    const netAfterDiscount = rawSubtotal - discAmount;
+    
+    let serviceChargeAmount = 0;
+    if (serviceChargeEnabled) {
+      serviceChargeAmount = Math.round(netAfterDiscount * 0.05);
+    }
+    
+    const items = cart.map(c => {
+      const lineGross = c.price * c.qty;
+      const lineDisc = Math.round(lineGross * discountPct / 100);
+      const lineTaxableBase = lineGross - lineDisc;
+      
+      let lineServiceCharge = 0;
+      if (serviceChargeEnabled && rawSubtotal > 0) {
+        lineServiceCharge = Math.round(serviceChargeAmount * (lineTaxableBase / netAfterDiscount));
+      }
+      
+      let lineTaxableValue = lineTaxableBase;
+      if (serviceChargeEnabled && taxProfile.apply_gst_on_service_charge) {
+        lineTaxableValue += lineServiceCharge;
+      }
+      
+      let rateCode = c.taxCategory || c.tax_category;
+      if (!rateCode) {
+        if (country === 'IE') {
+          rateCode = 'IE_FOOD_9';
+        } else {
+          if (taxProfile.gst_scheme === 'composition') {
+            rateCode = 'IN_COMP_5';
+          } else if (taxProfile.specified_premises) {
+            rateCode = 'IN_REST_18';
+          } else {
+            rateCode = 'IN_REST_5';
+          }
+        }
+      }
+      
+      const resolved = window.RS_resolveRate(country, rateCode);
+      let taxPercent = resolved.percent;
+      let isAlcohol = (rateCode === 'IN_ALCOHOL_EXEMPT');
+      let liquorTax = 0;
+      let tax = 0;
+      
+      if (isAlcohol) {
+        const liquorRate = taxProfile.liquor_vat_rate || 20;
+        if (inclusivePricing) {
+          liquorTax = Number((lineTaxableValue - (lineTaxableValue / (1 + liquorRate/100))).toFixed(2));
+          lineTaxableValue = Number((lineTaxableValue - liquorTax).toFixed(2));
+        } else {
+          liquorTax = Number((lineTaxableValue * (liquorRate / 100)).toFixed(2));
+        }
+      } else {
+        if (calculateTaxesEnabled) {
+          if (inclusivePricing) {
+            tax = Number((lineTaxableValue - (lineTaxableValue / (1 + taxPercent/100))).toFixed(2));
+            lineTaxableValue = Number((lineTaxableValue - tax).toFixed(2));
+          } else {
+            tax = Number((lineTaxableValue * (taxPercent / 100)).toFixed(2));
+          }
+        }
+      }
+      
+      return {
+        ...c,
+        lineGross,
+        lineDisc,
+        lineTaxableValue,
+        taxPercent,
+        tax,
+        liquorTax,
+        rateCode,
+        serviceCharge: lineServiceCharge,
+        itcAllowed: resolved.itc_allowed,
+        label: resolved.label
+      };
+    });
+    
+    const bandMap = {};
+    let totalGst = 0;
+    let totalLiquorTax = 0;
+    let totalTaxableValue = 0;
+    
+    items.forEach(item => {
+      totalGst += item.tax;
+      totalLiquorTax += item.liquorTax;
+      totalTaxableValue += item.lineTaxableValue;
+      
+      if (item.tax > 0 || item.liquorTax > 0 || item.taxPercent >= 0) {
+        const key = item.rateCode;
+        if (!bandMap[key]) {
+          bandMap[key] = {
+            rateCode: key,
+            label: item.label,
+            percent: item.taxPercent,
+            net: 0,
+            tax: 0,
+            gross: 0,
+            itcAllowed: item.itcAllowed
+          };
+        }
+        bandMap[key].net += item.lineTaxableValue;
+        bandMap[key].tax += item.tax + item.liquorTax;
+        bandMap[key].gross += item.lineTaxableValue + item.tax + item.liquorTax;
+      }
+    });
+    
+    const taxSummary = Object.values(bandMap).map(b => ({
+      rateCode: b.rateCode,
+      label: b.label,
+      percent: Number(b.percent.toFixed(2)),
+      net: Number(b.net.toFixed(2)),
+      tax: Number(b.tax.toFixed(2)),
+      gross: Number(b.gross.toFixed(2)),
+      itcAllowed: b.itcAllowed
+    }));
+    
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+    if (country === 'IN' && taxProfile.gst_scheme !== 'composition') {
+      cgst = Number((totalGst / 2).toFixed(2));
+      sgst = Number((totalGst - cgst).toFixed(2));
+    }
+    
+    let grand = netAfterDiscount + serviceChargeAmount;
+    if (!inclusivePricing) {
+      grand += totalGst + totalLiquorTax;
+    }
+    
+    if (roundOffEnabled) {
+      grand = Math.round(grand);
+    } else {
+      grand = Number(grand.toFixed(2));
+    }
+    
+    return {
+      sub: rawSubtotal,
+      disc: discAmount,
+      gst: totalGst,
+      cgst,
+      sgst,
+      igst,
+      liquorTax: totalLiquorTax,
+      serviceCharge: serviceChargeAmount,
+      grand,
+      count: cart.reduce((a,c)=>a+c.qty,0),
+      discountPct,
+      taxSummary,
+      taxProfile,
+      channel,
+      items
+    };
+  }
   function clearCart(){
     cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart();
     if (window.innerWidth <= 1024) {
@@ -642,7 +939,10 @@
         table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
       };
     }
-    return { name:($('#cust-name')?.value||'').trim(), phone:($('#cust-phone')?.value||'').trim(), gst:($('#cust-gst')?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+    const nameEl = $('#cust-input-name') || $('#cust-name');
+    const phoneEl = $('#cust-input-phone') || $('#cust-phone');
+    const gstEl = $('#cust-gst');
+    return { name:(nameEl?.value||'').trim(), phone:(phoneEl?.value||'').trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
   }
   function runKotAction(){
     if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -758,9 +1058,9 @@
         const customer = JSON.parse(savedCustomer);
         const cartTable = $('#cart-table');
         if (cartTable && customer.table) cartTable.value = customer.table;
-        const custName = $('#cust-name');
+        const custName = $('#cust-input-name') || $('#cust-name');
         if (custName && customer.name) custName.value = customer.name;
-        const custPhone = $('#cust-phone');
+        const custPhone = $('#cust-input-phone') || $('#cust-phone');
         if (custPhone && customer.phone) custPhone.value = customer.phone;
         const custGst = $('#cust-gst');
         if (custGst && customer.gst) custGst.value = customer.gst;
@@ -768,6 +1068,21 @@
     } catch (e) {
       console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
     }
+
+    // ── Mount country-code prefix picker on cart customer phone ──
+    (function mountCartPhonePicker() {
+      const phoneEl = document.getElementById('cust-input-phone');
+      if (!phoneEl || phoneEl.dataset.phonePrefixBuilt) return;
+      const settings = window.RS_SETTINGS || {};
+      let countryCode = 'IN';
+      if (settings.set_country && window.RS_getCountryByName) {
+        const entry = window.RS_getCountryByName(settings.set_country);
+        if (entry) countryCode = entry.code;
+      }
+      if (window.RS_buildPhonePrefix) {
+        window.RS_buildPhonePrefix(phoneEl, countryCode);
+      }
+    })();
 
     $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
@@ -1182,11 +1497,15 @@
   }
   function shareBillReceipt(b) {
     const bill = receiptPayloadFromBill(b);
-    const text = window.RSReceipt && typeof RSReceipt.text === 'function'
-      ? RSReceipt.text(bill)
-      : `${bill.no}\nTotal: ${rs(bill.grand)}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-    toast('WhatsApp receipt ready','fa-whatsapp');
+    if (window.RSReceipt && typeof RSReceipt.share === 'function') {
+      RSReceipt.share(bill);
+    } else {
+      const text = window.RSReceipt && typeof RSReceipt.text === 'function'
+        ? RSReceipt.text(bill)
+        : `${bill.no}\nTotal: ${rs(bill.grand)}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      toast('WhatsApp receipt ready','fa-whatsapp');
+    }
   }
   async function markBillRefunded(b) {
     if (!b || b.status === 'refunded') return;
@@ -2667,8 +2986,8 @@
         discountPct = discToRestore;
         
         if (custToRestore) {
-          const cn = document.getElementById('cust-name');
-          const cp = document.getElementById('cust-phone');
+          const cn = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+          const cp = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
           const cg = document.getElementById('cust-gst');
           const ct = document.getElementById('cart-table');
           const csel = document.getElementById('cart-customer-sel');
@@ -3131,25 +3450,41 @@
     if (btnExportBills) {
       btnExportBills.onclick = () => {
         if (!BILLS || !BILLS.length) return toast('No bills to export', 'fa-circle-exclamation');
-        setOperationStatus('Exporting bills...');
-        const headers = ['Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone', 'Subtotal', 'GST', 'Total', 'Payment', 'Status'];
-        const rows = BILLS.map(b => [
-          b.no || b.orderId || b.id || '',
-          b.dateTime || b.time || '',
-          b.table || '',
-          b.items || '',
-          b.customerName || '',
-          b.customerPhone || '',
-          b.subtotal || '',
-          b.gst || '',
-          b.amount || b.total || '',
-          b.pay || b.paymentMethod || '',
-          b.status || ''
-        ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
-        const csv = [headers.join(','), ...rows].join('\n');
-        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
-        finishOperationStatus('Bills exported');
-        toast('Bills exported successfully', 'fa-circle-check');
+        
+        const steps = ['Compiling billing data...', 'Formatting Excel spreadsheet...', 'Triggering secure download...'];
+        window.RS_ProgressOverlay.show('Exporting Bills', steps);
+        window.RS_ProgressOverlay.update(0, 33);
+        
+        setTimeout(() => {
+          window.RS_ProgressOverlay.update(1, 66);
+          
+          setTimeout(() => {
+            window.RS_ProgressOverlay.update(2, 90);
+            
+            const settings = window.RS_SETTINGS || {};
+            const taxLabel = settings.set_tax_label || 'GST';
+            const headers = ['Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone', 'Subtotal', taxLabel, 'Total', 'Payment', 'Status'];
+            const rows = BILLS.map(b => [
+              b.no || b.orderId || b.id || '',
+              b.dateTime || b.time || '',
+              b.table || '',
+              b.items || '',
+              b.customerName || '',
+              b.customerPhone || '',
+              b.subtotal || '',
+              b.gst || '',
+              b.amount || b.total || '',
+              b.pay || b.paymentMethod || '',
+              b.status || ''
+            ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
+            const csv = [headers.join(','), ...rows].join('\n');
+            RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
+            
+            window.RS_ProgressOverlay.update(3, 100);
+            window.RS_ProgressOverlay.hide();
+            toast('Bills exported successfully', 'fa-circle-check');
+          }, 600);
+        }, 600);
       };
     }
 
@@ -3414,4 +3749,99 @@
   // function renderPlatformSummary
   // conflictTargets
   // ON CONFLICT (tenant_id, "orderId") DO UPDATE SET
+  window.RS_ProgressOverlay = {
+    show(title, steps) {
+      const existing = document.getElementById('rs-progress-overlay');
+      if (existing) existing.remove();
+      
+      const ov = document.createElement('div');
+      ov.id = 'rs-progress-overlay';
+      ov.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(10, 10, 10, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: inherit;
+      `;
+      
+      const card = document.createElement('div');
+      card.style.cssText = `
+        background: rgba(30, 30, 30, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        border-radius: 12px;
+        padding: 24px;
+        width: 340px;
+        color: var(--text);
+        text-align: center;
+      `;
+      
+      const head = document.createElement('h4');
+      head.textContent = title;
+      head.style.cssText = 'margin:0 0 16px 0;font-size:16px;font-weight:700;color:var(--text)';
+      card.appendChild(head);
+      
+      const barContainer = document.createElement('div');
+      barContainer.style.cssText = 'background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden;margin-bottom:20px;';
+      const bar = document.createElement('div');
+      bar.id = 'rs-progress-bar-fill';
+      bar.style.cssText = 'background:var(--orange);width:0%;height:100%;transition:width 0.4s ease;';
+      barContainer.appendChild(bar);
+      card.appendChild(barContainer);
+      
+      const list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:10px;text-align:left;font-size:13px;';
+      steps.forEach((step, idx) => {
+        const item = document.createElement('div');
+        item.id = `rs-progress-step-${idx}`;
+        item.style.cssText = 'display:flex;align-items:center;gap:10px;color:var(--text-mute);transition:color 0.3s ease;';
+        item.innerHTML = `<span class="step-icon" style="min-width:18px;display:inline-flex;justify-content:center;"><i class="fa-regular fa-circle"></i></span> <span>${step}</span>`;
+        list.appendChild(item);
+      });
+      card.appendChild(list);
+      ov.appendChild(card);
+      document.body.appendChild(ov);
+    },
+    
+    update(stepIndex, progressPercent) {
+      const bar = document.getElementById('rs-progress-bar-fill');
+      if (bar) bar.style.width = `${progressPercent}%`;
+      
+      for (let i = 0; i < stepIndex; i++) {
+        const el = document.getElementById(`rs-progress-step-${i}`);
+        if (el) {
+          el.style.color = '#25d366';
+          const icon = el.querySelector('.step-icon');
+          if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        }
+      }
+      
+      const cur = document.getElementById(`rs-progress-step-${stepIndex}`);
+      if (cur) {
+        cur.style.color = 'var(--text)';
+        const icon = cur.querySelector('.step-icon');
+        if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--orange)"></i>';
+      }
+    },
+    
+    hide(delay = 600) {
+      setTimeout(() => {
+        const overlay = document.getElementById('rs-progress-overlay');
+        if (overlay) {
+          overlay.style.opacity = '0';
+          overlay.style.transition = 'opacity 0.3s ease';
+          setTimeout(() => overlay.remove(), 300);
+        }
+      }, delay);
+    }
+  };
 })();
+
