@@ -25,7 +25,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 // Service-role key for Supabase Storage access (set as env variable in HuggingFace Secrets)
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // Anon client for Realtime
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -1737,6 +1737,7 @@ app.post('/supabase-webhook', async (req, res) => {
     
     let phone = record.customerPhone;
     const orderId = record.orderId;
+    const tenantId = record.tenant_id;
 
     if (!phone || phone.trim() === '' || phone === 'null') {
         console.log(`[Webhook] Ignored: No phone number provided for bill ${orderId}`);
@@ -1748,10 +1749,86 @@ app.post('/supabase-webhook', async (req, res) => {
         phone = "91" + phone;
     }
 
+    // Wait 5s — the POS frontend auto-sends after 800ms; this gives it time
+    // to call /send first so we can skip if it already handled the bill (PDF mode).
+    await new Promise(r => setTimeout(r, 5000));
+
+    // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
+    if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
+        console.log(`[Webhook Skipped] Order ${orderId} already handled by frontend via /send.`);
+        return res.json({ status: 'skipped', reason: 'Order already handled via /send' });
+    }
+
     try {
         const chatId = `${phone}@c.us`;
-        const message = formatReceiptText(record);
-        const tenantId = record.tenant_id;
+        let uiSettings = {};
+        
+        // Fetch dynamic business profile for this tenant
+        let tenantProfile = { ...businessProfile };
+        if (tenantId) {
+            const dbClient = supabaseService || supabase;
+            const { data: profiles, error: profileErr } = await dbClient
+                .from('doppio_business_profile')
+                .select('*')
+                .eq('tenant_id', tenantId);
+            
+            if (profileErr) {
+                console.error(`[Webhook Error] Failed to fetch profile for tenant ${tenantId}:`, profileErr.message);
+            }
+            
+            if (profiles && profiles.length > 0) {
+                tenantProfile.name = profiles[0].business_name || tenantProfile.name;
+                tenantProfile.address = profiles[0].address || tenantProfile.address;
+                tenantProfile.phone = profiles[0].phone || tenantProfile.phone;
+                tenantProfile.gstEnabled = profiles[0].gst_enabled !== false;
+                
+                // Check if WhatsApp is enabled in tenant business settings
+                if (profiles[0].whatsapp_enabled === false) {
+                    console.log(`[Webhook Cancelled] WhatsApp receipts are disabled in settings for tenant ${tenantId}.`);
+                    return res.json({ status: 'cancelled', reason: 'WhatsApp receipts disabled' });
+                }
+
+                // Check bill format preference — if PDF mode, skip auto-send.
+                let flags = {};
+                try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
+                uiSettings = flags.ui_settings || {};
+                
+                // Check if auto-send is disabled
+                const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
+                if (!autoSendEnabled) {
+                    console.log(`[Webhook Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
+                    return res.json({ status: 'skipped', reason: 'Auto-send receipts disabled' });
+                }
+
+                const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
+                if (billFormat === 'Thermal PDF receipt') {
+                    console.log(`[Webhook Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped.`);
+                    return res.json({ status: 'skipped', reason: 'Thermal PDF receipt format selected' });
+                }
+            }
+        }
+
+        // Extract tenant currency symbol (WhatsApp-safe ASCII version)
+        let currSymbol = 'Rs.';
+        try {
+            const rawCurr = uiSettings.set_currency || '';
+            if (rawCurr) {
+                const m = rawCurr.match(/\(([^)]+)\)/);
+                const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
+                currSymbol = sym
+                    .replace(/₹/g, 'Rs.')
+                    .replace(/€/g, 'EUR')
+                    .replace(/£/g, 'GBP')
+                    .replace(/¥/g, 'JPY')
+                    .replace(/₩/g, 'KRW')
+                    .replace(/₺/g, 'TRY')
+                    .replace(/₴/g, 'UAH');
+            }
+        } catch(currErr) {
+            console.warn('[Webhook] Failed to parse currency symbol:', currErr.message);
+        }
+
+        const message = formatReceiptText(record, tenantProfile, currSymbol);
         const tenantData = getOrCreateClient(tenantId);
         if (tenantData.status !== 'ready') {
             throw new Error(`WhatsApp gateway for tenant ${tenantId} is not connected.`);
@@ -2303,10 +2380,14 @@ const realtimeChannel = dbClientForRealtime
                 let tenantProfile = { ...businessProfile };
                 if (tenantId) {
                     const dbClient = supabaseService || supabase;
-                    const { data: profiles } = await dbClient
+                    const { data: profiles, error: profileErr } = await dbClient
                         .from('doppio_business_profile')
                         .select('*')
                         .eq('tenant_id', tenantId);
+                    
+                    if (profileErr) {
+                        console.error(`[Realtime Error] Failed to fetch profile for tenant ${tenantId}:`, profileErr.message);
+                    }
                     
                     if (profiles && profiles.length > 0) {
                         tenantProfile.name = profiles[0].business_name || tenantProfile.name;
@@ -2325,6 +2406,14 @@ const realtimeChannel = dbClientForRealtime
                         let flags = {};
                         try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
                         uiSettings = flags.ui_settings || {};
+
+                        // Check if auto-send is disabled
+                        const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
+                        if (!autoSendEnabled) {
+                            console.log(`[Realtime Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
+                            return;
+                        }
+
                         const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
                         if (billFormat === 'Thermal PDF receipt') {
                             console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped. POS frontend will send PDF via /send.`);
