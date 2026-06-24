@@ -62,6 +62,11 @@ All changes are optimized, styled to match the RestroSuite design system, and sy
 * Implemented the **`showSettleDuesModal()`** popup to pay off outstanding dues (Cash/UPI/Card), update their credit balance, and record the settlement payment in the bill ledger. 
 * Integrated the **`RSReceipt`** modal to automatically trigger upon successful dues settlement, offering cashiers and customers options to print a formal settlement receipt or share it directly over WhatsApp.
 
+### 3. WhatsApp Session Restore Fix
+* **Problem**: When the Hugging Face Space restarted, it failed to restore the active WhatsApp session and prompted for a new QR code scan, despite having downloaded the backup zip file from Supabase Storage.
+* **Root Cause**: The gateway's session zip logic had an ignore rule matching `**/*.log`. In Chromium/Puppeteer, session keys/secrets are stored inside LevelDB databases (e.g. `IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb` and `Local Storage/leveldb`). LevelDB uses `.log` files (e.g. `000003.log`) for write-ahead logging (WAL) of the latest database writes. Because these `.log` files were excluded, the session database was corrupted or out-of-date upon restore, forcing a new QR code scan.
+* **Resolution**: Removed `**/*.log` and `**/*.txt` from the zip ignore patterns list in `whatsapp-gateway.js`. Important chromium system logs are still cleanly excluded using explicit rules (`**/LOG`, `**/LOG.old`), while LevelDB operational files (like `*.log` write-ahead logs, `*.ldb`, `CURRENT`, and `MANIFEST-*`) are now fully preserved. Session restores now execute successfully after restart.
+
 ---
 
 ## Table QR Code Printing
