@@ -201,6 +201,18 @@ async function signValue(value: string, secret: string) {
   return encodeBase64Url(new Uint8Array(signature));
 }
 
+// Constant-time string comparison — prevents timing side-channel attacks on
+// HMAC signature comparison. A naive !== short-circuits on the first
+// mismatched byte, leaking the expected signature one byte at a time.
+function timingSafeEqualString(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  return diff === 0;
+}
+
 function getGatewayUrlAndToken() {
   let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || "";
   const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
@@ -265,7 +277,7 @@ async function verifyTenantSession(req: Request) {
   if (!payloadEncoded || !signature) return { ok: false, error: "Invalid session token." };
 
   const expectedSignature = await signValue(payloadEncoded, SUPERADMIN_SESSION_SECRET);
-  if (expectedSignature !== signature) return { ok: false, error: "Invalid session token." };
+  if (!timingSafeEqualString(expectedSignature, signature)) return { ok: false, error: "Invalid session token." };
 
   try {
     const payloadText = new TextDecoder().decode(decodeBase64Url(payloadEncoded));

@@ -411,6 +411,23 @@ We have resolved the issue where the Indian GST State Code (`07` / Delhi) was pr
 - Synced the changes to the Android app (`android-app/`) and nested submodule clones via `sync-assets.ps1`.
 - Committed and pushed all updates to the remote `main` branch.
 
+---
 
+# Walkthrough - WhatsApp PDF Receipts & Settings Schema Alignment (June 24, 2026)
 
+We have successfully resolved the issue where WhatsApp receipts were double-delivered as text messages instead of PDF attachments, and resolved schema mapping mismatches in the settings module.
 
+## 1. POS Database Settings Mapping Fix
+- **Correct Column Name**: Updated `SETTINGS_MAP` in [assets/db.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/db.js#L333) to map `set_gstin` to `gst_number` (the actual column in `doppio_business_profile` table), fixing silent database update failures.
+- **Removed Mismatching Column**: Removed the mapping for `set_gst_state` from `SETTINGS_MAP` so it falls back to the generic `feature_flags.ui_settings` handling. This avoids DB schema insertion/update errors and loads successfully from the jsonb column.
+
+## 2. WhatsApp Gateway Enhancements
+- **Service Client Fallback & Placeholder Guard**: Refactored the `supabaseService` client initialization in [whatsapp-gateway.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/whatsapp-gateway.js#L36-L40) to ignore the placeholder `<service-role-key-for-gateway-storage>` string. It now sets `supabaseService` to `null` to trigger the correct local fallbacks, resolving `Invalid API key` console errors.
+- **RLS Query Bypass**: Modified the realtime listener query in [whatsapp-gateway.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/whatsapp-gateway.js#L2304) to use `supabaseService || supabase` instead of `supabase` anon client. In production, this uses the service role key to bypass RLS policies on the `doppio_business_profile` table to successfully read receipt settings.
+- **Auto-Send Delay Adjustment**: Increased the realtime listener's delay from `1.5` seconds to `5` seconds. This gives the client browser ample time to generate the PDF receipt using jsPDF and make the `/send` API request, allowing the gateway to register the order ID in `realtimeSkipOrders` and correctly skip sending a duplicate text fallback message.
+
+- **Local Client Gateway Routing / Tenant ID Injection**: Added a check in [assets/doppio-api.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/doppio-api.js#L221-L227) to automatically attach `payload.tenantId` for all gateway operations. This ensures that the local dev server (`run-server.ps1`) correctly resolves and routes the request (including the base64-encoded PDF receipt payload) to the active tenant's client instance (`ee3c35da-5223-4372-a3a6-987849d665da`) instead of routing to the default unauthenticated `'system'` client.
+
+## 3. Code Synchronization
+- Synced all modifications to `android-app/app/src/main/assets/` via `sync-assets.ps1`.
+- App version updated and verified under `v33-20260624`.

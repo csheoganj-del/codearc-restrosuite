@@ -32,11 +32,21 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WEBHOOK_SECRET = Deno.env.get("RAZORPAY_WEBHOOK_SECRET")!;
 
 // ── Plan ID → slug mapping ────────────────────────────────────────────────────
-// Update these with your real Razorpay plan IDs after creating them in the dashboard.
+// Plan slugs MUST match the PLAN_ENTITLEMENTS keys in tenant-access/index.ts:
+//   free | starter | growth | enterprise
+// Update the Razorpay plan IDs below after creating plans in your dashboard.
+// Pricing (source of truth — keep in sync with index.html and README):
+//   starter    ₹749 / month
+//   growth     ₹1,499 / month
+//   enterprise ₹2,999 / month
 const PLAN_SLUG_MAP: Record<string, string> = {
-  plan_basic_monthly: "basic",        // ₹999 / month
-  plan_standard_monthly: "standard",  // ₹2,499 / month
-  plan_enterprise_monthly: "enterprise", // ₹4,999 / month
+  plan_starter_monthly: "starter",      // ₹749 / month
+  plan_growth_monthly: "growth",        // ₹1,499 / month
+  plan_enterprise_monthly: "enterprise", // ₹2,999 / month
+  // Legacy plan IDs (kept for backward compatibility with existing subscriptions)
+  plan_basic_monthly: "starter",
+  plan_standard_monthly: "growth",
+  plan_pro_monthly: "growth",
 };
 
 // ── Verify Razorpay webhook signature ────────────────────────────────────────
@@ -96,6 +106,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const event = payload.event as string;
+  const eventId = (payload.id as string) ?? "";
+
+  // ── Idempotency guard ─────────────────────────────────────────────────────
+  // Razorpay retries delivery on any non-2xx response. Without this guard, a
+  // transient DB error on subscription.cancelled would re-apply side-effects on
+  // retry and could suspend an already-cancelled tenant twice, or—worse—leave a
+  // tenant in the wrong state if a previously-applied event fires again.
+  if (eventId) {
+    const supabaseCheck = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { error: idempotencyError } = await supabaseCheck
+      .from("processed_webhook_events")
+      .insert({ event_id: eventId, processed_at: new Date().toISOString() });
+
+    if (idempotencyError) {
+      if (idempotencyError.code === "23505") {
+        // Duplicate key — event already processed. Acknowledge so Razorpay stops retrying.
+        console.log(`Duplicate event ${eventId} — already processed, acknowledging.`);
+        return new Response("OK — already processed", { status: 200 });
+      }
+      // Unexpected DB error: return 500 so Razorpay retries later.
+      console.error("Idempotency insert failed:", idempotencyError);
+      return new Response("DB error", { status: 500 });
+    }
+  }
+
   const entity = (payload.payload as Record<string, unknown>)?.subscription
     ?.entity as Record<string, unknown> | undefined;
 
@@ -107,7 +142,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const subscriptionId = entity.id as string;
   const planId = (entity.plan_id as string) ?? "";
-  const planSlug = PLAN_SLUG_MAP[planId] ?? "basic";
+  const planSlug = PLAN_SLUG_MAP[planId] ?? "starter";
 
   // The tenant's username is stored in the subscription notes at creation time.
   // Set notes: { tenant_username: "their-username" } when creating the Razorpay subscription.

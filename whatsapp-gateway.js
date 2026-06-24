@@ -18,8 +18,11 @@ const unzipper = require('unzipper');
 // ============================================================
 // SUPABASE CLIENTS
 // ============================================================
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://htkauiibuejetimfiavs.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.warn('[Config] SUPABASE_URL or SUPABASE_ANON_KEY is not set. Supabase-dependent features (realtime, health log) will be disabled.');
+}
 
 // Service-role key for Supabase Storage access (set as env variable in HuggingFace Secrets)
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
@@ -30,7 +33,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 // Service client for Storage (session backup) + health log
-const supabaseService = SUPABASE_SERVICE_KEY
+const hasServiceKey = SUPABASE_SERVICE_KEY &&
+                      SUPABASE_SERVICE_KEY.trim() !== '' &&
+                      !SUPABASE_SERVICE_KEY.startsWith('<');
+const supabaseService = hasServiceKey
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { realtime: { transport: ws } })
     : null;
 
@@ -157,12 +163,38 @@ async function sendMailHelper(to, subject, html, text = '') {
 
 const app = express();
 
-// Enable CORS for POS dashboard requests
-app.use(cors());
+// SECURITY: CORS must be restricted — wildcard cors() allows any origin to make
+// credentialed requests to the gateway, which is a CSRF vector. Restrict to the
+// Supabase Edge Function origin and your Vercel deployment origin.
+// GATEWAY_ALLOWED_ORIGINS must be set in environment secrets. If unset, ALL
+// cross-origin requests are blocked (fail-closed). Example:
+//   GATEWAY_ALLOWED_ORIGINS=https://codearc-restrosuite.vercel.app,https://htkauiibuejetimfiavs.supabase.co
+const GATEWAY_ALLOWED_ORIGINS_RAW = (process.env.GATEWAY_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+if (GATEWAY_ALLOWED_ORIGINS_RAW.length === 0) {
+    console.warn('[Security] GATEWAY_ALLOWED_ORIGINS is not set. All cross-origin requests will be blocked. Set it in environment secrets.');
+}
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (server-to-server, curl, Postman in same-origin context)
+        if (!origin) return callback(null, true);
+        // Fail-closed: if no origins are configured, block all cross-origin requests
+        if (GATEWAY_ALLOWED_ORIGINS_RAW.length === 0) {
+            return callback(new Error('CORS: no allowed origins configured'));
+        }
+        if (GATEWAY_ALLOWED_ORIGINS_RAW.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('CORS origin not allowed'));
+    },
+    credentials: true,
+}));
 app.use(express.json());
 
 // Multi-Tenant Gateway State Manager
 const tenantClients = new Map(); // tenantId -> TenantClientData
+// Orders already handled by the /send endpoint — realtime listener skips these
+// to prevent double-sending when the POS frontend sends explicitly (e.g. PDF mode).
+const realtimeSkipOrders = new Set(); // "tenantId:orderId"
 const MAX_RECONNECT_ATTEMPTS = 5;
 let totalMessagesSent = 0;
 let recentHealthEvents = []; // last 10 events for dashboard
@@ -542,8 +574,25 @@ function autoInitializeLocalSessions() {
     }
 }
 
-// Read secret token from environment variable (configured as a secret in HuggingFace Space)
-const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || process.env.WHATSAPP_GATEWAY_TOKEN || 'local-dev-gateway-token';
+// SECURITY: GATEWAY_TOKEN must be explicitly set in production. There is NO
+// default fallback — using a predictable default string is equivalent to
+// publishing the token in source code. The gateway will refuse all authenticated
+// requests if this variable is unset. Set it in your HuggingFace Space / Railway /
+// VPS environment secrets, or in .env.local for local development.
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || process.env.WHATSAPP_GATEWAY_TOKEN || '';
+
+// Constant-time string comparison for token verification. Prevents timing
+// side-channel attacks where an attacker can infer the correct token byte-by-byte
+// by measuring response times. Always compares the full length.
+function timingSafeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const aBuf = Buffer.from(a, 'utf8');
+    const bBuf = Buffer.from(b, 'utf8');
+    if (aBuf.length !== bBuf.length) return false;
+    let diff = 0;
+    for (let i = 0; i < aBuf.length; i++) diff |= aBuf[i] ^ bBuf[i];
+    return diff === 0;
+}
 
 // Utility to mask phone numbers in logs to prevent customer data leaks
 function maskPhone(phoneStr) {
@@ -553,12 +602,12 @@ function maskPhone(phoneStr) {
     return clean.substring(0, 2) + '*'.repeat(clean.length - 6) + clean.substring(clean.length - 4);
 }
 
-// Token validation helper
+// Token validation helper — FAIL-CLOSED.
+// Returns true ONLY if a token is provided AND it matches the configured secret
+// using constant-time comparison. If GATEWAY_TOKEN is empty, ALL requests are denied.
 function verifyToken(req) {
     if (!GATEWAY_TOKEN) {
-        // Fail-closed: if the token is not configured, deny all requests.
-        // Set GATEWAY_TOKEN in your HuggingFace Space secrets to enable access.
-        console.warn('[Security] GATEWAY_TOKEN is not set. All authenticated endpoints are blocked. Configure it in environment secrets.');
+        console.warn('[Security] GATEWAY_TOKEN is not set. All authenticated endpoints are blocked. Set GATEWAY_TOKEN in environment secrets.');
         return false;
     }
     
@@ -575,7 +624,8 @@ function verifyToken(req) {
         }
     }
     
-    return token === GATEWAY_TOKEN;
+    if (!token) return false;
+    return timingSafeEqual(token, GATEWAY_TOKEN);
 }
 
 const os = require('os');
@@ -1587,7 +1637,14 @@ app.post('/send', async (req, res) => {
         }
         
         console.log(`[Manual Sent] WhatsApp receipt successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
-        
+
+        // Mark this order as handled so the realtime listener doesn't double-send
+        if (orderId) {
+            const skipKey = `${tenantId}:${orderId}`;
+            realtimeSkipOrders.add(skipKey);
+            setTimeout(() => realtimeSkipOrders.delete(skipKey), 60_000); // clean up after 60s
+        }
+
         // Tag sending activity securely for this tenant
         await logHealthEvent('send_receipt', 'ok', {
             tenant_id: tenantId,
@@ -2218,6 +2275,16 @@ const realtimeChannel = dbClientForRealtime
 
             console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
 
+            // Wait 5s — the POS frontend auto-sends after 800ms; this gives it time
+            // to call /send first so we can skip if it already handled the bill (PDF mode).
+            await new Promise(r => setTimeout(r, 5000));
+
+            // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
+            if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
+                console.log(`[Realtime Skipped] Order ${orderId} already handled by frontend via /send.`);
+                return;
+            }
+
             if (!phone || phone.trim() === '' || phone === 'null') {
                 console.log(`[Realtime Triggered] Ignored: No phone number provided for bill ${orderId}`);
                 return;
@@ -2230,11 +2297,13 @@ const realtimeChannel = dbClientForRealtime
 
             try {
                 const chatId = `${phone}@c.us`;
+                let uiSettings = {};
                 
                 // Fetch dynamic business profile for this tenant
                 let tenantProfile = { ...businessProfile };
                 if (tenantId) {
-                    const { data: profiles } = await supabase
+                    const dbClient = supabaseService || supabase;
+                    const { data: profiles } = await dbClient
                         .from('doppio_business_profile')
                         .select('*')
                         .eq('tenant_id', tenantId);
@@ -2255,7 +2324,7 @@ const realtimeChannel = dbClientForRealtime
                         // The POS frontend will handle PDF generation and delivery via the /send endpoint.
                         let flags = {};
                         try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
-                        const uiSettings = flags.ui_settings || {};
+                        uiSettings = flags.ui_settings || {};
                         const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
                         if (billFormat === 'Thermal PDF receipt') {
                             console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped. POS frontend will send PDF via /send.`);
@@ -2505,16 +2574,16 @@ function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.'
     msg += centerText24(profile.phone) + '\n';
     msg += borderDouble + '\n\n';
     
-    let leftBill = `Bill: ${record.orderId}`;
-    let rightPay = record.paymentMethod || 'Cash';
-    if (rightPay.length > 8) {
-        rightPay = rightPay.slice(0, 8);
-    }
-    const padSize = 24 - leftBill.length;
-    if (padSize < rightPay.length) {
-        msg += leftBill.slice(0, 24 - rightPay.length) + rightPay + '\n';
+    const billLine = `Bill: ${record.orderId}`;
+    const payLine = record.paymentMethod || 'Cash';
+    const padSize = 24 - billLine.length;
+    if (padSize >= payLine.length) {
+        // Bill number short enough — payment fits on same line
+        msg += billLine + payLine.padStart(padSize, ' ') + '\n';
     } else {
-        msg += leftBill + rightPay.padStart(padSize, ' ') + '\n';
+        // Bill number too long — put each on its own line, no truncation
+        msg += billLine + '\n';
+        msg += `Paid: ${payLine}` + '\n';
     }
     
     const dateOnly = record.dateTime ? record.dateTime.split(',')[0] : new Date().toLocaleDateString('en-IN');
@@ -2796,29 +2865,11 @@ app.listen(PORT, async () => {
     // ============================================================
     const selfUrl = process.env.SPACE_HOST
         ? `https://${process.env.SPACE_HOST}/health`
-        : `http://localhost:${PORT}/health`;
-
-    const https = require('https');
-    const http  = require('http');
-
-    function selfPing() {
-        const lib = selfUrl.startsWith('https') ? https : http;
-        const req = lib.get(selfUrl, (res) => {
-            const systemData = tenantClients.get('system') || { status: 'disconnected' };
-            console.log(`[Keep-Alive] Self-ping OK — status ${res.statusCode} (gateway: ${systemData.status})`);
-        });
-        req.on('error', (err) => {
-            console.warn(`[Keep-Alive] Self-ping failed: ${err.message}`);
-        });
-        req.end();
-    }
-
-    // First ping after 30s, then every 4 minutes
-    setTimeout(() => {
-        selfPing();
-        setInterval(selfPing, 4 * 60 * 1000);
-    }, 30000);
-
-    console.log(`[Keep-Alive] Self-ping scheduler started → ${selfUrl} (every 4 min)`);
+        : `http://localhost:3000/health`;
+    setInterval(() => {
+        const client = selfUrl.startsWith('https') ? require('https') : require('http');
+        client.get(selfUrl, (r) => {
+            console.log(`[Keep-Alive] Pinged ${selfUrl}`);
+        }).on('error', () => {});
+    }, 4 * 60 * 1000);
 });
-
