@@ -615,7 +615,7 @@
       inclusive_pricing: !!settings.set_inclusive_pricing,
       tax_registration_no: settings.set_gstin || profile.tax_registration_no || '',
       gst_scheme: profile.gst_scheme || (settings.set_gst_scheme) || 'regular',
-      state_code: settings.set_gst_state || profile.state_code || '07',
+      state_code: settings.set_gst_state || profile.state_code || (country === 'IN' ? '07' : ''),
       specified_premises: !!(profile.specified_premises || settings.set_specified_premises),
       vat_filing_frequency: profile.vat_filing_frequency || 'bi_monthly',
       accounting_year_end: profile.accounting_year_end || null,
