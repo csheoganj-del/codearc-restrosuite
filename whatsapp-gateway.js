@@ -2791,21 +2791,42 @@ app.listen(PORT, async () => {
         console.log(`[Startup] Code version commit lookup failed (git not installed or no repo).`);
     }
 
-    // Ensure storage bucket file size limit is set correctly (150MB) to allow session backup
+    // Ensure storage bucket exists and limits are set correctly (150MB) to allow session backup
     if (supabaseService) {
         try {
-            console.log('[Startup] Ensuring storage bucket limits are set correctly...');
+            console.log('[Startup] Ensuring storage bucket exists and limits are set correctly...');
             const bucketTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+            
+            const runSetup = async () => {
+                const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
+                if (listError) throw listError;
+                const exists = buckets && buckets.some(b => b.name === SESSION_BUCKET);
+                if (!exists) {
+                    console.log(`[Startup] Bucket '${SESSION_BUCKET}' not found. Creating it...`);
+                    const { error: createError } = await supabaseService.storage.createBucket(SESSION_BUCKET, {
+                        public: false,
+                        fileSizeLimit: 157286400, // 150MB
+                        allowedMimeTypes: ['application/zip']
+                    });
+                    if (createError) throw createError;
+                    console.log(`[Startup] Bucket '${SESSION_BUCKET}' created successfully.`);
+                } else {
+                    const { error: updateError } = await supabaseService.storage.updateBucket(SESSION_BUCKET, {
+                        public: false,
+                        fileSizeLimit: 157286400 // 150MB
+                    });
+                    if (updateError) throw updateError;
+                    console.log(`[Startup] Bucket '${SESSION_BUCKET}' updated successfully.`);
+                }
+            };
+
             await Promise.race([
-                supabaseService.storage.updateBucket(SESSION_BUCKET, {
-                    public: false,
-                    fileSizeLimit: 157286400 // 150MB
-                }),
+                runSetup(),
                 bucketTimeout
             ]);
             console.log('[Startup] Storage bucket configured.');
         } catch (err) {
-            console.warn('[Startup Storage Config Warning]', err.message === 'timeout' ? 'Bucket update timed out — skipping.' : err.message);
+            console.warn('[Startup Storage Config Warning]', err.message === 'timeout' ? 'Bucket setup timed out — skipping.' : err.message);
         }
     }
 
