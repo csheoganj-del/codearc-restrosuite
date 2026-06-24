@@ -2694,7 +2694,7 @@
       if (btnSaveNew) {
         btnSaveNew.addEventListener('click', async () => {
           const name = nameInput.value.trim();
-          const phone = phoneInput.value.trim();
+          const phone = (window.RS_getFullPhoneNumber ? window.RS_getFullPhoneNumber(phoneInput) : phoneInput.value).trim();
           if (!name || !phone) {
             RS.toast('Name and phone are required', 'fa-circle-exclamation');
             return;
