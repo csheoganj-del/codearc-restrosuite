@@ -2805,7 +2805,7 @@ app.listen(PORT, async () => {
                     console.log(`[Startup] Bucket '${SESSION_BUCKET}' not found. Creating it...`);
                     const { error: createError } = await supabaseService.storage.createBucket(SESSION_BUCKET, {
                         public: false,
-                        fileSizeLimit: 157286400, // 150MB
+                        fileSizeLimit: 10485760, // 10MB
                         allowedMimeTypes: ['application/zip']
                     });
                     if (createError) throw createError;
@@ -2813,7 +2813,7 @@ app.listen(PORT, async () => {
                 } else {
                     const { error: updateError } = await supabaseService.storage.updateBucket(SESSION_BUCKET, {
                         public: false,
-                        fileSizeLimit: 157286400 // 150MB
+                        fileSizeLimit: 10485760 // 10MB
                     });
                     if (updateError) throw updateError;
                     console.log(`[Startup] Bucket '${SESSION_BUCKET}' updated successfully.`);
