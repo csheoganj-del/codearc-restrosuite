@@ -425,8 +425,6 @@ async function saveSessionToSupabaseScoped(tenantId) {
                     '**/AmountExtractionHeuristicRegexes/**',
                     '**/FileTypePolicies/**',
                     '**/ZxcvbnData/**',
-                    '**/*.log',
-                    '**/*.txt',
                     // Extra optimization: exclude heavy IndexedDB blobs, network sessions, extensions and storage logs
                     '**/*.blob',
                     '**/*.blob/**',
