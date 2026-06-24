@@ -66,6 +66,7 @@ const TENANT_TABLES = new Set([
   "doppio_online_orders",
   "doppio_table_layout",
   "doppio_waitlist",
+  "doppio_tax_rates",
 ]);
 
 const TABLE_TAB_ACCESS: Record<string, string[]> = {
@@ -102,6 +103,7 @@ const TABLE_TAB_ACCESS: Record<string, string[]> = {
   doppio_outlets: ["growth-hub-tab", "reports-tab"],
   doppio_migration_status: ["growth-hub-tab"],
   doppio_saas_invoices: ["growth-hub-tab"],
+  doppio_tax_rates: ["pos-tab", "tax-tab", "editor-tab"],
 };
 
 const ROLE_DEFAULT_TABS: Record<string, string[]> = {
