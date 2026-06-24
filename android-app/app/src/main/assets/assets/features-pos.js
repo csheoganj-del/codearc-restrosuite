@@ -240,7 +240,7 @@
       const profileLines = [
         receiptProfile.address,
         receiptProfile.phone ? `Phone ${receiptProfile.phone}` : '',
-        profile.state_code ? `State Code: ${profile.state_code}` : '',
+        (country === 'IN' && profile.state_code) ? `State Code: ${profile.state_code}` : '',
         profile.tax_registration_no ? `${taxSystem} No: ${profile.tax_registration_no}` : ''
       ].filter(Boolean).map(line => `<div class="rcp-sub">${esc(line)}</div>`).join('');
       
