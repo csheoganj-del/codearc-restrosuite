@@ -428,8 +428,8 @@ serve(async (req) => {
       const orderId = String(payload.orderId || "");
       const pdfData = payload.pdfData ? String(payload.pdfData) : undefined;
       const filename = payload.filename ? String(payload.filename) : undefined;
-      if (!phone || !message) {
-        return jsonResponse({ error: "Missing phone or message." }, 400, req);
+      if (!phone || (!message && !pdfData)) {
+        return jsonResponse({ error: "Missing phone or message/pdfData." }, 400, req);
       }
       return await proxyGatewayRequest("/send", "POST", req, { phone, message, orderId, pdfData, filename }, verified.tenantId);
     }
