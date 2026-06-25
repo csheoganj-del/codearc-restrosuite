@@ -11,21 +11,25 @@
   let enableDemoTools = false;
   let zeroCostLaunchMode = false;
   if (!cfg.url || !cfg.anonKey) {
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', '/api/config', false);
-      xhr.send(null);
-      if (xhr.status === 200) {
-        const res = JSON.parse(xhr.responseText);
-        if (res.supabaseUrl && res.supabaseAnonKey) {
-          cfg = { url: res.supabaseUrl, anonKey: res.supabaseAnonKey };
-        }
-        enableDemoTools = res.enableDemoTools === true;
-        zeroCostLaunchMode = res.zeroCostLaunchMode === true;
+    // Use the async config promise from config.js when available (non-blocking).
+    // Synchronous XHR is deprecated and blocks the main thread; this replaces it.
+    const configSource = window.__configReady || Promise.resolve();
+    configSource.then(() => {
+      if (window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__) {
+        cfg = { url: window.__SUPABASE_URL__, anonKey: window.__SUPABASE_ANON_KEY__ };
+      } else if (!cfg.url || !cfg.anonKey) {
+        // Final fallback: async fetch (still non-blocking)
+        fetch('/api/config').then(r => r.ok ? r.json() : null).then(res => {
+          if (res && res.supabaseUrl && res.supabaseAnonKey) {
+            cfg = { url: res.supabaseUrl, anonKey: res.supabaseAnonKey };
+            enableDemoTools = res.enableDemoTools === true;
+            zeroCostLaunchMode = res.zeroCostLaunchMode === true;
+          }
+        }).catch(e => console.warn('[doppio-api] Async /api/config failed:', e.message));
       }
-    } catch(e) {
-      console.warn('[doppio-api] Synchronous fetch /api/config failed:', e.message);
-    }
+      enableDemoTools = !!(window.__enableDemoTools);
+      zeroCostLaunchMode = !!(window.__zeroCostLaunchMode);
+    });
   }
   // Normalise: accept either the bare project URL or one with a /rest/v1 or /functions/v1 suffix.
   const REMOTE_BASE = String(cfg.url || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');

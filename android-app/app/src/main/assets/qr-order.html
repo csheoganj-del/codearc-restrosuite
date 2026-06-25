@@ -590,6 +590,7 @@
   </div>
 
   <script>
+  function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
     (function() {
       'use strict';
 
@@ -733,7 +734,7 @@
         apiCall('get_order_status', { orderId: latestOrder.orderId })
           .then(res => {
             if (res.error) {
-              box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Could not verify order status. (${res.error})</p>`;
+              box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Could not verify order status. (${escHtml(String(res.error||'Unknown error'))})</p>`;
               return;
             }
 

@@ -489,7 +489,13 @@
           try {
             const res = await CLOUD.list(c, ...args);
             if (res) {
-              LS.write(c, res);
+              // SAFE MERGE: preserve locally-created records not yet in cloud
+              // (bills/orders written while offline must not be overwritten)
+              const existing = LS.read(c);
+              const cloudIds = new Set(res.map(r => String(r.id)));
+              const localOnly = existing.filter(r => r.id && !cloudIds.has(String(r.id)));
+              const merged = [...res, ...localOnly];
+              LS.write(c, merged);
               lastListFetchTime[c] = Date.now();
 
               // Dispatch database sync event
@@ -536,6 +542,10 @@
       if (!isSchemaCacheError) {
         window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
         window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
+        // Queue for retry when back online
+        if (method === 'put' || method === 'del') {
+          addToSyncQueue(method, c, args);
+        }
       } else {
         // Log silently — user needs to run the DB migration
         console.warn(`[RS_DB] Schema mismatch on ${c}: "${e.message}". Run the missing DB migration to fix.`);
@@ -544,17 +554,59 @@
     }
   }
 
+  /* ---------------- OFFLINE SYNC QUEUE (retry failed cloud writes on reconnect) ---------------- */
+  const SYNC_QUEUE_KEY = 'rs:sync_queue';
+  function getSyncQueue() { try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e){ return []; } }
+  function saveSyncQueue(q) { try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); } catch(e){} }
+  function addToSyncQueue(method, collection, args) {
+    if (!MAP[collection]) return; // only queue known collections
+    const q = getSyncQueue();
+    // Deduplicate: if same collection+id already queued for put, replace it
+    const id = args[0];
+    const idx = q.findIndex(x => x.method === method && x.collection === collection && String(x.args[0]) === String(id));
+    const entry = { method, collection, args, queuedAt: Date.now() };
+    if (idx >= 0) q[idx] = entry; else q.push(entry);
+    // Cap queue at 200 entries to prevent localStorage bloat
+    if (q.length > 200) q.splice(0, q.length - 200);
+    saveSyncQueue(q);
+  }
+  async function drainSyncQueue() {
+    if (!signedIn()) return;
+    const q = getSyncQueue();
+    if (!q.length) return;
+    saveSyncQueue([]); // optimistic clear — failures re-enqueue
+    let failed = 0;
+    for (const entry of q) {
+      try {
+        await CLOUD[entry.method](entry.collection, ...entry.args);
+      } catch(e) {
+        console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
+        addToSyncQueue(entry.method, entry.collection, entry.args);
+        failed++;
+      }
+    }
+    if (failed === 0 && q.length > 0) {
+      // Invalidate list cache so UI refreshes with latest cloud data
+      for (const entry of q) { delete lastListFetchTime[entry.collection]; }
+      window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: q.length } }));
+    }
+  }
+  // Retry on reconnect
+  window.addEventListener('online', () => {
+    console.log('[RS_DB] Back online — draining sync queue');
+    setTimeout(drainSyncQueue, 1000); // brief delay for connection to stabilise
+  });
+  // Also expose for manual call
+  window.RS_DB_DRAIN = drainSyncQueue;
+
+  /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */
+
   /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */
   const auth = {
-    async signUp(p){ if(cloudConfigured) return API.register(p); // local demo:
-      const a=LS.read('_accounts'); const u={id:'local-'+Date.now(),email:p.email,meta:p.meta||{}}; a.push({...u,password:p.password}); LS.write('_accounts',a); localStorage.setItem('rs:session',JSON.stringify({user:u})); return {user:u}; },
-    async signIn(p){ if(cloudConfigured) return API.login(p);
-      const u={id:'local-demo',email:p.email||'demo@restrosuite.in',meta:{}}; localStorage.setItem('rs:session',JSON.stringify({user:u})); return {user:u}; },
+    async signUp(p){ if(cloudConfigured) return API.register(p); throw new Error('Cloud not configured'); },
+    async signIn(p){ if(cloudConfigured){ const r=await API.login(p); if(r.token) localStorage.setItem('rs:session',JSON.stringify(r)); return r; } throw new Error('Cloud not configured'); },
     async signOut(){
-      if(API && API.logout) API.logout();
-      // Clear in-memory cached state
-      for (const k in known) delete known[k];
-      for (const k in activeListRequests) delete activeListRequests[k];
+      if(cloudConfigured && signedIn()){ try{ await API.logout(); }catch(e){} }
       for (const k in lastListFetchTime) delete lastListFetchTime[k];
       cachedSettingsMap = {};
       cachedSettings = null;

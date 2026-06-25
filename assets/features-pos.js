@@ -791,7 +791,31 @@
     async function _doShareReceiptViaWhatsApp(bill) {
       let phone = bill.customerPhone;
       if (!phone || phone.trim() === '' || phone === 'null') {
-        phone = prompt("Enter customer's WhatsApp number (with country code, e.g. 353852258004):");
+        // Use a proper modal dialog instead of the deprecated browser prompt()
+        phone = await new Promise(resolve => {
+          const ov = document.createElement('div');
+          ov.className = 'rs-overlay';
+          ov.innerHTML = `<div class="rs-modal sm">
+            <div class="rs-mhead"><span class="rs-mtitle"><i class="fa-brands fa-whatsapp"></i> WhatsApp Number</span><button class="rs-mclose icon-btn"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="rs-mbody" style="padding:18px 20px 8px">
+              <label class="field-label">Customer WhatsApp (with country code)</label>
+              <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric" placeholder="e.g. 919876543210" style="margin-top:6px" autocomplete="tel">
+              <p style="font-size:12px;color:var(--text-mute);margin-top:8px">Include country code without +. Example: 91 for India.</p>
+            </div>
+            <div class="rs-mfoot"><button class="rs-mcancel btn-ghost">Cancel</button><button class="rs-mok btn-primary"><i class="fa-brands fa-whatsapp"></i> Send</button></div>
+          </div>`;
+          document.body.appendChild(ov);
+          const inp = ov.querySelector('#wa-phone-input');
+          const ok  = ov.querySelector('.rs-mok');
+          const cancel = ov.querySelector('.rs-mcancel');
+          const close  = ov.querySelector('.rs-mclose');
+          inp.focus();
+          const finish = val => { document.body.removeChild(ov); resolve(val); };
+          ok.onclick     = () => finish(inp.value.trim() || null);
+          cancel.onclick = () => finish(null);
+          close.onclick  = () => finish(null);
+          inp.onkeydown  = e => { if(e.key==='Enter') ok.click(); if(e.key==='Escape') finish(null); };
+        });
         if (phone === null) return; // User cancelled
         phone = phone.replace(/\D/g, '');
         if (phone) {
@@ -817,8 +841,7 @@
       const isPdf = (format === 'Thermal PDF receipt');
       console.log('[WhatsApp] bill format setting:', format, '| isPdf:', isPdf);
 
-      // Fire-and-forget: runs entirely in background, cashier is never blocked.
-      // A small toast appears when done (success or fail).
+      // Fire-and-forget: runs in background, with offline queue fallback.
       (async () => {
         try {
           const text = receiptText(bill);
@@ -832,6 +855,7 @@
             console.log('[WhatsApp BG] PDF ready, base64 length:', pdfBase64.length);
           }
 
+          if (!navigator.onLine) throw new Error('offline');
           if (!window.RS_API || typeof RS_API.data !== 'function') throw new Error('WhatsApp API not available');
 
           const sendPayload = { operation: 'gateway_send', phone, message: text, orderId: bill.no };
@@ -847,7 +871,21 @@
           RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
         } catch(err) {
           console.warn('[WhatsApp BG] Send failed:', err.message);
-          RS.toast('WhatsApp: ' + (err.message || 'Send failed'), 'fa-triangle-exclamation');
+          // Queue for retry when back online
+          const isOffline = err.message === 'offline' || !navigator.onLine;
+          const WA_QUEUE_KEY = 'rs:wa_queue';
+          try {
+            const q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]');
+            q.push({ phone, billNo: bill.no, message: receiptText(bill), queuedAt: Date.now() });
+            localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(q));
+            if (isOffline) {
+              RS.toast('Offline — receipt queued, will send when back online', 'fa-clock');
+            } else {
+              RS.toast('WhatsApp send failed — queued for retry', 'fa-clock');
+            }
+          } catch(qErr) {
+            RS.toast('WhatsApp: ' + (err.message || 'Send failed'), 'fa-triangle-exclamation');
+          }
         }
       })();
       // Return immediately — no blocking, no spinner
@@ -1662,6 +1700,8 @@
         resetCustomerFields();
         resetPayment();
         showReceipt(bill);
+        // Android bridge: haptic + audio feedback on successful payment
+        document.dispatchEvent(new CustomEvent('rs:bill-paid', { detail: { total: bill.grand || bill.amount || '' } }));
 
         // Auto-send WhatsApp receipt if enabled in settings
         try {

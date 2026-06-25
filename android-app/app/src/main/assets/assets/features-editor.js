@@ -3,6 +3,9 @@
    ============================================================ */
 (function(){
   'use strict';
+  // HTML escaping — prevents XSS when inserting DB-sourced strings into innerHTML
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s);
@@ -82,7 +85,7 @@
       let draftIngs = [];
       const ingsEl = $('#ed-ings'), costEl = $('#ed-costline');
       function renderIngs(){
-        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${g.name} ${g.qty}${g.unit} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
+        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${esc(g.name)} ${esc(g.qty)}${esc(g.unit)} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
           + `<span class="ing-chip add" id="ed-add-ing"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span>`;
         ingsEl.querySelectorAll('[data-i]').forEach(b=> b.onclick=()=>{ draftIngs.splice(+b.dataset.i,1); renderIngs(); });
         $('#ed-add-ing').onclick = openIngPicker;
@@ -99,7 +102,7 @@
           onMount(modal, close){
             const q = modal.querySelector('#ing-q'), box = modal.querySelector('#ing-pick');
             function draw(){ const t=(q.value||'').toLowerCase();
-              box.innerHTML = list.filter(i=>i.name.toLowerCase().includes(t)).map(i=>`<div class="sr-item" data-n="${i.name}" data-u="${i.unit}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${i.name}</div><div class="si-s">${i.cat} · ${rs(i.cost)}/${i.unit}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
+              box.innerHTML = list.filter(i=>i.name.toLowerCase().includes(t)).map(i=>`<div class="sr-item" data-n="${esc(i.name)}" data-u="${esc(i.unit)}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${esc(i.name)}</div><div class="si-s">${esc(i.cat)} · ${rs(i.cost)}/${esc(i.unit)}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
               box.querySelectorAll('[data-n]').forEach(el=> el.onclick=()=>{ draftIngs.push({name:el.dataset.n, qty:0.1, unit:el.dataset.u}); close(); renderIngs(); });
             }
             q.addEventListener('input',draw); draw(); q.focus();

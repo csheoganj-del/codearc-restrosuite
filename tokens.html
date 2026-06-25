@@ -10,97 +10,153 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script>
     (function() {
-      var user = sessionStorage.getItem('logged_in_user');
-      var role = sessionStorage.getItem('logged_in_role');
-      if (!user) {
-        window.location.replace('login.html');
-        return;
-      }
-      document.documentElement.classList.add('role-' + (role || 'customer_display'));
-      document.documentElement.classList.add('tokens-fullscreen');
+      var user = sessionStorage.getItem('logged_in_user') || sessionStorage.getItem('tenant_id');
+      if (!user) { window.location.replace('login.html'); }
     })();
   </script>
   <style>
-    /* Tokens Fullscreen Styles */
-    html.tokens-fullscreen body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #F7F3EF;
-    }
-    html.tokens-fullscreen .sidebar,
-    html.tokens-fullscreen .mobile-bottom-nav,
-    html.tokens-fullscreen .header-container,
-    html.tokens-fullscreen .tab-content:not(#tokens-tab) {
-      display: none !important;
-    }
-    html.tokens-fullscreen #tokens-tab {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      display: flex !important;
-      flex-direction: column;
-      padding: 24px;
-      background: #F7F3EF;
-    }
-    .exit-fullscreen-btn {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 9999;
-      padding: 8px 16px;
-      background: rgba(255, 255, 255, 0.95);
-      color: #172033;
-      border: 1px solid rgba(23, 32, 51, 0.2);
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
-    }
-    .exit-fullscreen-btn:hover {
-      background: rgba(252, 128, 25, 0.1);
-    }
+    body { margin:0; padding:0; background:#F7F3EF; font-family:'Plus Jakarta Sans',system-ui,sans-serif; overflow:hidden; }
+    #tokens-standalone { position:fixed; inset:0; display:flex; flex-direction:column; padding:20px; }
+    .exit-btn { position:fixed; top:12px; right:12px; z-index:9999; padding:8px 16px;
+      background:rgba(255,255,255,.95); color:#172033; border:1px solid rgba(23,32,51,.2);
+      border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; }
+    .exit-btn:hover { background:rgba(232,93,38,.1); }
+    .token-board-head { display:flex; align-items:center; justify-content:space-between;
+      background:#fff; border-radius:12px; padding:14px 20px; margin-bottom:16px;
+      box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .tb-ic { width:38px; height:38px; background:#FFF1E9; border-radius:10px;
+      display:flex; align-items:center; justify-content:center; color:#E85D26; font-size:18px; }
+    .token-board { display:flex; gap:16px; flex:1; overflow:hidden; }
+    .token-col { flex:1; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
+    .token-col-h { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+      padding:8px 14px; border-radius:8px; }
+    .token-col-h.preparing { background:#FEF3C7; color:#92400E; }
+    .token-col-h.ready { background:#D1FAE5; color:#065F46; }
+    .token-chip { background:#fff; border-radius:12px; padding:16px;
+      box-shadow:0 2px 6px rgba(0,0,0,.06); display:flex; flex-direction:column; gap:5px; }
+    .token-chip.prep { border-left:4px solid #F59E0B; }
+    .token-chip.rdy { border-left:4px solid #22C55E; cursor:pointer; }
+    .token-chip.rdy:hover { background:#F0FDF4; }
+    .tk { font-size:32px; font-weight:900; color:#172033; letter-spacing:-.02em; }
+    .tmeta { font-size:12px; color:#6B7280; }
+    .tmin { font-size:12px; color:#F59E0B; font-weight:600; }
+    .tcall { font-size:12px; color:#22C55E; font-weight:700; }
+    .pill-green { display:inline-flex; align-items:center; gap:5px; padding:4px 10px;
+      background:#D1FAE5; color:#065F46; border-radius:999px; font-size:12px; font-weight:600; }
+    .dot-live { width:7px; height:7px; border-radius:50%; background:#22C55E; display:inline-block;
+      animation:pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .empty-col { display:flex; flex-direction:column; align-items:center;
+      justify-content:center; flex:1; color:#9CA3AF; gap:8px; font-size:14px; padding:40px 0; }
+    .empty-col i { font-size:36px; }
   </style>
 </head>
 <body>
-  <button class="exit-fullscreen-btn" onclick="window.location.href='dashboard.html'">
+  <button class="exit-btn" onclick="window.location.href='dashboard.html'">
     <i class="fas fa-times"></i> Exit Display
   </button>
+  <div id="tokens-standalone">
+    <div class="token-board-head">
+      <div style="display:flex;align-items:center;gap:11px">
+        <span class="tb-ic"><i class="fa-solid fa-bullhorn"></i></span>
+        <div>
+          <div style="font-weight:700;font-size:15px">Customer Token Monitor</div>
+          <div style="font-size:12px;color:#6B7280">Pickup counter display — auto-refreshes every 8s</div>
+        </div>
+      </div>
+      <span class="pill-green"><span class="dot-live"></span> Live</span>
+    </div>
+    <div class="token-board">
+      <div class="token-col">
+        <div class="token-col-h preparing">
+          <i class="fa-solid fa-fire"></i> Preparing &middot; <span id="prep-count">0</span>
+        </div>
+        <div id="prep-list"></div>
+      </div>
+      <div class="token-col">
+        <div class="token-col-h ready">
+          <i class="fa-solid fa-circle-check"></i> Ready for pickup &middot; <span id="ready-count">0</span>
+        </div>
+        <div id="ready-list"></div>
+      </div>
+    </div>
+  </div>
 
-  <!-- Inject dashboard content for Tokens -->
-  <div id="dashboard-inject"></div>
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+  <script src="assets/supabase-config.js"></script>
+  <script src="assets/doppio-api.js"></script>
+  <script src="assets/db.js?v=20260625"></script>
   <script>
-    // Load the dashboard and extract only the Tokens tab
-    fetch('dashboard.html')
-      .then(response => response.text())
-      .then(html => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // Copy Tokens tab content
-        const tokensTab = doc.getElementById('tokens-tab');
-        if (tokensTab) {
-          document.getElementById('dashboard-inject').innerHTML = tokensTab.outerHTML;
-          document.getElementById('tokens-tab').classList.add('active');
-        }
+  (function() {
+    'use strict';
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    var PREPARING = [], READY = [];
 
-        // Copy necessary scripts
-        const scripts = doc.querySelectorAll('script');
-        scripts.forEach(script => {
-          if (script.src && script.src.includes('dashboard')) {
-            const newScript = document.createElement('script');
-            newScript.src = script.src;
-            document.body.appendChild(newScript);
+    function renderBoard() {
+      document.getElementById('prep-count').textContent = PREPARING.length;
+      document.getElementById('ready-count').textContent = READY.length;
+      var prepList = document.getElementById('prep-list');
+      var readyList = document.getElementById('ready-list');
+
+      prepList.innerHTML = PREPARING.length === 0
+        ? '<div class="empty-col"><i class="fa-solid fa-fire"></i><span>Nothing in kitchen right now</span></div>'
+        : PREPARING.map(function(t) {
+            return '<div class="token-chip prep"><div class="tk">' + esc(t.tok) + '</div>' +
+              '<div class="tmeta">' + esc(t.type) + ' &middot; ' + esc(t.items) + ' items</div>' +
+              '<div class="tmin"><i class="fa-solid fa-clock"></i> ~' + esc(t.min) + ' min</div></div>';
+          }).join('');
+
+      readyList.innerHTML = READY.length === 0
+        ? '<div class="empty-col"><i class="fa-solid fa-circle-check"></i><span>No orders ready yet</span></div>'
+        : READY.map(function(t) {
+            return '<div class="token-chip rdy" data-tok="' + esc(t.tok) + '">' +
+              '<div class="tk">' + esc(t.tok) + '</div>' +
+              '<div class="tmeta">' + esc(t.type) + ' &middot; ' + esc(t.items) + ' items</div>' +
+              '<div class="tcall"><i class="fa-solid fa-bell"></i> Tap to announce</div></div>';
+          }).join('');
+
+      readyList.querySelectorAll('.token-chip.rdy').forEach(function(c) {
+        c.addEventListener('click', function() {
+          var tok = c.dataset.tok;
+          if (window.AndroidInterface && window.AndroidInterface.speakBilingual) {
+            window.AndroidInterface.speakBilingual(
+              'Token ' + tok + ', please collect your order at the counter',
+              'Token ' + tok
+            );
           }
         });
-      })
-      .catch(err => {
-        console.error('Failed to load dashboard:', err);
-        window.location.href = 'dashboard.html';
       });
+    }
+
+    function loadOrders() {
+      if (!window.RS_DB) { setTimeout(loadOrders, 500); return; }
+      RS_DB.list('pending_orders').then(function(rows) {
+        PREPARING = []; READY = [];
+        var now = Date.now();
+        (rows || []).forEach(function(r) {
+          var st = String(r.status || '').toLowerCase();
+          var isPrep = st === 'accepted' || st === 'preparing';
+          var isReady = st === 'ready';
+          if (!isPrep && !isReady) return;
+          var items = Array.isArray(r.items) ? r.items.reduce(function(a,i){return a+(i.qty||1);},0) : 0;
+          var ageMin = Math.max(0, Math.round((now - new Date(r.dateTime||now).getTime()) / 60000));
+          var entry = { tok: r.orderId || String(r.id||'').slice(-4) || '??', type: r.orderType || 'Order', items: items, min: ageMin };
+          if (isPrep) PREPARING.push(entry); else READY.push(entry);
+        });
+        renderBoard();
+      }).catch(function(e) { console.warn('Token board load error:', e); });
+    }
+
+    setTimeout(loadOrders, 800);
+    setInterval(loadOrders, 8000);
+    window.addEventListener('rs:db-sync', function(e) {
+      if (e && e.detail && e.detail.collection === 'pending_orders') loadOrders();
+    });
+  })();
   </script>
 </body>
 </html>

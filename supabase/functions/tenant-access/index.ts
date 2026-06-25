@@ -804,7 +804,20 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   if (!name || !slug || !username || !password) {
     return jsonResponse({ error: "Outlet name, outlet ID, username, and password are required." }, 400, req);
   }
- 
+
+  // Input length limits — prevent oversized payloads and database abuse
+  if (name.length > 100) return jsonResponse({ error: "Outlet name must be 100 characters or fewer." }, 400, req);
+  if (slug.length > 40)  return jsonResponse({ error: "Outlet ID must be 40 characters or fewer." }, 400, req);
+  if (username.length > 40) return jsonResponse({ error: "Username must be 40 characters or fewer." }, 400, req);
+  if (password.length > 128) return jsonResponse({ error: "Password must be 128 characters or fewer." }, 400, req);
+  if (email.length > 254)    return jsonResponse({ error: "Email address is too long." }, 400, req);
+  if (phone.length > 20)     return jsonResponse({ error: "Phone number is too long." }, 400, req);
+
+  // Email format validation
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return jsonResponse({ error: "Please enter a valid email address." }, 400, req);
+  }
+
   if (password.length < 10) {
     return jsonResponse({ error: "Password must be at least 10 characters." }, 400, req);
   }
