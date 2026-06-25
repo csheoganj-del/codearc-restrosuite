@@ -3,6 +3,9 @@
    ============================================================ */
 (function(){
   'use strict';
+  // HTML escaping — prevents XSS when inserting DB-sourced strings into innerHTML
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -20,11 +23,11 @@
         <div class="token-board">
           <div class="token-col">
             <div class="token-col-h preparing"><i class="fa-solid fa-fire"></i> Preparing · ${PREPARING.length}</div>
-            <div class="token-list">${PREPARING.map(t=>`<div class="token-chip prep"><div class="tk">${t.tok}</div><div class="tmeta">${t.type} · ${t.items} items</div><div class="tmin"><i class="fa-solid fa-clock"></i> ${t.min}m</div></div>`).join('')}</div>
+            <div class="token-list">${PREPARING.map(t=>`<div class="token-chip prep"><div class="tk">${esc(t.tok)}</div><div class="tmeta">${esc(t.type)} · ${esc(t.items)} items</div><div class="tmin"><i class="fa-solid fa-clock"></i> ${esc(t.min)}m</div></div>`).join('')}</div>
           </div>
           <div class="token-col">
             <div class="token-col-h ready"><i class="fa-solid fa-circle-check"></i> Ready for pickup · ${READY.length}</div>
-            <div class="token-list">${READY.map(t=>`<div class="token-chip rdy" data-tok="${t.tok}"><div class="tk">${t.tok}</div><div class="tmeta">${t.type} · ${t.items} items</div><div class="tcall"><i class="fa-solid fa-bell"></i> Now serving</div></div>`).join('')}</div>
+            <div class="token-list">${READY.map(t=>`<div class="token-chip rdy" data-tok="${esc(t.tok)}"><div class="tk">${esc(t.tok)}</div><div class="tmeta">${esc(t.type)} · ${esc(t.items)} items</div><div class="tcall"><i class="fa-solid fa-bell"></i> Now serving</div></div>`).join('')}</div>
           </div>
         </div>`;
       $$('.token-chip.rdy',sec).forEach(c=> c.onclick=()=> RS.toast('Announced '+c.dataset.tok+' at counter','fa-bullhorn'));
@@ -806,61 +809,192 @@
       data.forEach(d=>{ const frac=d[1]/100; const len=frac*C; segs+=`<circle r="42" cx="60" cy="60" fill="none" stroke="${d[2]}" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-acc*C}" transform="rotate(-90 60 60)"/>`; acc+=frac; });
       return `<svg viewBox="0 0 120 120" style="width:150px;height:150px">${segs}<text x="60" y="56" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="800" font-family="Plus Jakarta Sans">100%</text><text x="60" y="72" text-anchor="middle" fill="var(--text-mute)" font-size="9">payments</text></svg>`;
     }
-    function renderAnalytics(){
+    // ── Analytics: build data from real bills ────────────────────────────────
+    function anDays(period){ return period==='Last 7 days'?7:period==='Last 90 days'?90:30; }
+
+    function buildAnalytics(bills, days){
+      const now = Date.now();
+      const cutoff = now - days * 86400000;
+      const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+
+      const filtered = bills.filter(function(b){
+        if (b.status !== 'paid') return false;
+        const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+        return t >= cutoff;
+      });
+
+      const total = filtered.reduce(function(a,b){ return a+(b.amount||b.total||0); },0);
+      const orders = filtered.length;
+      const aov = orders ? Math.round(total/orders) : 0;
+      const todayRev = filtered.filter(function(b){ return new Date(b.dateTime).getTime()>=todayStart; })
+                               .reduce(function(a,b){ return a+(b.amount||b.total||0); },0);
+
+      // Daily trend array (days slots, oldest→newest)
+      const daily = Array(days).fill(0);
+      filtered.forEach(function(b){
+        const age = Math.floor((now - new Date(b.dateTime).getTime()) / 86400000);
+        if (age >= 0 && age < days) daily[days-1-age] += (b.amount||b.total||0);
+      });
+      const half = Math.floor(days/2);
+      const prev = daily.slice(0,half).reduce(function(a,v){return a+v;},0);
+      const curr = daily.slice(half).reduce(function(a,v){return a+v;},0);
+      const trend = prev>0 ? Math.round((curr-prev)/prev*100) : 0;
+
+      // Hourly footfall
+      const hours = Array(24).fill(0);
+      filtered.forEach(function(b){ hours[new Date(b.dateTime).getHours()]++; });
+      const peakIdx = hours.indexOf(Math.max.apply(null,hours));
+      const peakLabel = hours[peakIdx]>0 ? (peakIdx%12||12)+':00 '+(peakIdx<12?'AM':'PM') : 'N/A';
+
+      // Payment mix
+      const payMap = {};
+      filtered.forEach(function(b){
+        const m = b.pay||b.paymentMethod||b.payMethod||'Unknown';
+        payMap[m] = (payMap[m]||0)+(b.amount||b.total||0);
+      });
+      const payColors = ['var(--orange)','var(--green)','var(--violet-soft)','var(--amber)','var(--blue-soft)'];
+      const payEntries = Object.entries(payMap).sort(function(a,b){return b[1]-a[1];});
+      const payTotal = payEntries.reduce(function(a,e){return a+e[1];},0)||1;
+      const PAY_LIVE = payEntries.map(function(e,i){
+        return [e[0], Math.round(e[1]/payTotal*100), payColors[i%payColors.length]];
+      });
+
+      // Top items
+      const itemMap = {};
+      filtered.forEach(function(b){
+        (b._items||[]).forEach(function(it){
+          if (!it||!it.name) return;
+          if (!itemMap[it.name]) itemMap[it.name]={qty:0,rev:0};
+          itemMap[it.name].qty += (it.qty||1);
+          itemMap[it.name].rev += (it.price||0)*(it.qty||1);
+        });
+      });
+      const ITEMS_LIVE = Object.entries(itemMap)
+        .sort(function(a,b){return b[1].qty-a[1].qty;})
+        .slice(0,8)
+        .map(function(e){return [e[0], e[1].qty, rs(e[1].rev)];});
+
+      // Staff performance
+      const staffMap = {};
+      filtered.forEach(function(b){
+        const who = b.servedBy||b.staff||b.cashier||b.waiter||null;
+        if (!who) return;
+        if (!staffMap[who]) staffMap[who]={orders:0,rev:0};
+        staffMap[who].orders++;
+        staffMap[who].rev += (b.amount||b.total||0);
+      });
+      const STAFF_LIVE = Object.entries(staffMap)
+        .sort(function(a,b){return b[1].rev-a[1].rev;})
+        .map(function(e){return [e[0], e[1].orders, rs(e[1].rev)];});
+
+      return {total,orders,aov,todayRev,daily,trend,peakLabel,PAY_LIVE,ITEMS_LIVE,STAFF_LIVE,hours};
+    }
+
+    function renderAnalytics(period){
+      period = period || 'Last 30 days';
+      const days = anDays(period);
       const sec = $('#analytics-tab');
-      const total = DAILY.reduce((a,b)=>a+b,0)*1000;
-      const orders = 0, aov = 0, today=0, peakHour='N/A';
-      sec.innerHTML = `
-        <div class="toolbar-row"><span class="eyebrow">Last 30 days</span><div class="grow"></div>
-          <select class="form-input" id="an-period" style="width:auto;padding:9px 32px 9px 14px"><option>Last 7 days</option><option selected>Last 30 days</option><option>Last 90 days</option></select>
-          <button class="btn btn-ghost btn-sm" id="an-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
-        <div class="stat-row" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
-          <div class="stat-card"><div><div class="sl">Total revenue</div><div class="sv">${rs(total)}</div><div class="sd" style="display:none"></div></div></div>
-          <div class="stat-card"><div><div class="sl">Total orders</div><div class="sv" style="color:var(--violet-soft)">${orders}</div><div class="sd">bills generated</div></div></div>
-          <div class="stat-card"><div><div class="sl">Avg order value</div><div class="sv" style="color:var(--green)">${rs(aov)}</div><div class="sd">per transaction</div></div></div>
-          <div class="stat-card"><div><div class="sl">Today's revenue</div><div class="sv" style="color:var(--amber)">${rs(today)}</div><div class="sd">0 orders today</div></div></div>
-          <div class="stat-card"><div><div class="sl">Peak hour</div><div class="sv" style="color:var(--orange)">${peakHour}</div><div class="sd">Busiest: -</div></div></div>
-        </div>
+      sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px"></i><div style="margin-top:12px;font-size:13px">Loading analytics…</div></div>';
 
-        <div class="report-grid" style="--cols:2fr 1fr;margin-top:4px">
-          <div class="panel panel-pad">
-            <div class="panel-head"><h3>Daily revenue trend</h3><span class="pill pill-green">0%</span></div>
-            ${spark(DAILY,'var(--orange)',150)}
-            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>30 days ago</span><span>Today</span></div>
-          </div>
-          <div class="panel panel-pad">
-            <div class="panel-head"><h3>Payment mix</h3></div>
-            <div style="display:flex;align-items:center;gap:16px"><div>${donut(PAY)}</div><div style="flex:1">${PAY.length > 0 ? PAY.map(p=>`<div class="kv" style="padding:5px 0"><span><span class="lg-dot" style="background:${p[2]}"></span> ${p[0]}</span><b>${p[1]}%</b></div>`).join('') : '<div style="color:var(--text-mute);font-size:12px;text-align:center;">No payment data</div>'}</div></div>
-          </div>
-        </div>
+      RS_DB.list('doppio_bills').then(function(allBills){
+        const d = buildAnalytics(allBills||[], days);
+        const trendColor = d.trend>=0?'var(--green)':'var(--red)';
+        const trendIcon = d.trend>=0?'fa-arrow-trend-up':'fa-arrow-trend-down';
+        const trendLabel = (d.trend>=0?'+':'')+d.trend+'%';
+        const maxHour = Math.max.apply(null,d.hours)||1;
 
-        <div class="report-grid" style="--cols:1fr 1fr;margin-top:16px">
-          <div class="panel panel-pad">
-            <div class="panel-head"><h3>Hourly footfall</h3><span class="pill">Avg/day</span></div>
-            <div class="bars" style="height:130px;display:flex;align-items:flex-end;gap:3px;justify-content:center;">
-              ${HOURS.length > 0 ? HOURS.map((v,i)=>`<div style="flex:1;border-radius:3px 3px 0 0;background:${i>=19&&i<=21?'var(--orange)':'color-mix(in srgb,var(--orange) 35%,transparent)'};height:${Math.max(4,v/Math.max(...HOURS)*100)}%" title="${i}:00 · ${v} orders"></div>`).join('') : '<div style="color:var(--text-mute);font-size:12px;">No footfall data</div>'}
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>12 AM</span><span>12 PM</span><span>11 PM</span></div>
-          </div>
-          <div class="panel panel-pad">
-            <div class="panel-head"><h3>Top selling items</h3></div>
-            <table class="data-table"><tbody>
-              ${ITEMS.length > 0 ? ITEMS.map((it,i)=>`<tr><td style="width:24px;color:var(--text-mute)">${i+1}</td><td><b>${it[0]}</b></td><td>${it[1]} sold</td><td style="text-align:right;color:${it[2][0]==='-'?'var(--red)':'var(--green)'}">${it[2]}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-mute)">No sales items yet</td></tr>'}
-            </tbody></table>
-          </div>
-        </div>
+        sec.innerHTML =
+          '<div class="toolbar-row">' +
+            '<span class="eyebrow">'+period+'</span>' +
+            '<div class="grow"></div>' +
+            '<select class="form-input" id="an-period" style="width:auto;padding:9px 32px 9px 14px">' +
+              '<option'+(period==='Last 7 days'?' selected':'')+'>Last 7 days</option>' +
+              '<option'+(period==='Last 30 days'?' selected':'')+'>Last 30 days</option>' +
+              '<option'+(period==='Last 90 days'?' selected':'')+'>Last 90 days</option>' +
+            '</select>' +
+            '<button class="btn btn-ghost btn-sm" id="an-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>' +
+          '</div>' +
 
-        <div class="panel panel-pad" style="margin-top:16px">
-          <div class="panel-head"><h3>Staff performance</h3><span class="pill">This month</span></div>
-          <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Orders handled</th><th>Sales attributed</th><th>Share</th></tr></thead><tbody>
-          ${STAFF.length > 0 ? STAFF.map(s=>{const pct=Math.round(s[2]/STAFF.reduce((a,x)=>a+x[2],0)*100);return `<tr><td><b>${s[0]}</b></td><td>${s[1]}</td><td>${s[2]}</td><td class="td-strong">${s[3]}</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;border-radius:99px;background:var(--glass-3);max-width:90px"><div style="height:100%;border-radius:99px;background:var(--orange);width:${pct}%"></div></div><span style="font-size:12px;color:var(--text-mute)">${pct}%</span></div></td></tr>`;}).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-mute)">No staff performance records logged</td></tr>'}
-          </tbody></table></div>
-        </div>`;
-      const r=$('#an-refresh'); if(r) r.onclick=()=>{ renderAnalytics(); RS.toast('Analytics refreshed','fa-rotate'); };
-      const p=$('#an-period'); if(p) p.onchange=()=>RS.toast('Period: '+p.value,'fa-calendar');
+          '<div class="stat-row" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">' +
+            '<div class="stat-card"><div><div class="sl">Total revenue</div><div class="sv">'+rs(d.total)+'</div><div class="sd">'+d.orders+' orders</div></div></div>' +
+            '<div class="stat-card"><div><div class="sl">Orders</div><div class="sv" style="color:var(--violet-soft)">'+d.orders+'</div><div class="sd">bills generated</div></div></div>' +
+            '<div class="stat-card"><div><div class="sl">Avg order value</div><div class="sv" style="color:var(--green)">'+rs(d.aov)+'</div><div class="sd">per transaction</div></div></div>' +
+            '<div class="stat-card"><div><div class="sl">Today\'s revenue</div><div class="sv" style="color:var(--amber)">'+rs(d.todayRev)+'</div><div class="sd">live today</div></div></div>' +
+            '<div class="stat-card"><div><div class="sl">Peak hour</div><div class="sv" style="color:var(--orange)">'+d.peakLabel+'</div><div class="sd">busiest time</div></div></div>' +
+          '</div>' +
+
+          '<div class="report-grid" style="--cols:2fr 1fr;margin-top:4px">' +
+            '<div class="panel panel-pad">' +
+              '<div class="panel-head"><h3>Daily revenue trend</h3>' +
+                '<span class="pill" style="background:color-mix(in srgb,'+trendColor+' 12%,transparent);color:'+trendColor+'"><i class="fa-solid '+trendIcon+'"></i> '+trendLabel+' vs prior half</span>' +
+              '</div>' +
+              spark(d.daily,'var(--orange)',150) +
+              '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>'+days+' days ago</span><span>Today</span></div>' +
+            '</div>' +
+            '<div class="panel panel-pad">' +
+              '<div class="panel-head"><h3>Payment mix</h3></div>' +
+              '<div style="display:flex;align-items:center;gap:16px">' +
+                '<div>'+donut(d.PAY_LIVE)+'</div>' +
+                '<div style="flex:1">'+(d.PAY_LIVE.length>0 ? d.PAY_LIVE.map(function(p){return '<div class="kv" style="padding:5px 0"><span><span class="lg-dot" style="background:'+p[2]+'"></span> '+esc(p[0])+'</span><b>'+p[1]+'%</b></div>';}).join('') : '<div style="color:var(--text-mute);font-size:12px;text-align:center">No payment data<br>yet</div>')+'</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="report-grid" style="--cols:1fr 1fr;margin-top:16px">' +
+            '<div class="panel panel-pad">' +
+              '<div class="panel-head"><h3>Hourly footfall</h3><span class="pill">orders/hour</span></div>' +
+              '<div style="height:130px;display:flex;align-items:flex-end;gap:2px">' +
+                d.hours.map(function(v,i){
+                  var h = Math.max(4, Math.round(v/maxHour*100));
+                  var bg = (i===new Date().getHours()) ? 'var(--orange)' : 'color-mix(in srgb,var(--orange) 35%,transparent)';
+                  return '<div style="flex:1;border-radius:3px 3px 0 0;min-height:4px;background:'+bg+';height:'+h+'%" title="'+i+':00 \xb7 '+v+' orders"></div>';
+                }).join('') +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-mute);margin-top:6px"><span>12 AM</span><span>12 PM</span><span>11 PM</span></div>' +
+            '</div>' +
+            '<div class="panel panel-pad">' +
+              '<div class="panel-head"><h3>Top selling items</h3></div>' +
+              '<table class="data-table"><tbody>' +
+                (d.ITEMS_LIVE.length>0 ? d.ITEMS_LIVE.map(function(it,i){
+                  return '<tr><td style="width:22px;color:var(--text-mute);font-size:12px">'+(i+1)+'</td><td><b>'+esc(it[0])+'</b></td><td style="color:var(--text-mute)">'+it[1]+' sold</td><td style="text-align:right;color:var(--green)">'+it[2]+'</td></tr>';
+                }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:24px">No item data yet</td></tr>') +
+              '</tbody></table>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="panel panel-pad" style="margin-top:16px">' +
+            '<div class="panel-head"><h3>Staff performance</h3><span class="pill">'+period+'</span></div>' +
+            '<div class="table-scroll"><table class="data-table">' +
+              '<thead><tr><th>Team member</th><th>Orders</th><th>Sales</th><th>Share</th></tr></thead>' +
+              '<tbody>' +
+              (d.STAFF_LIVE.length>0 ? (function(){
+                var totalRev = d.STAFF_LIVE.reduce(function(a,s){return a+(parseFloat(String(s[2]).replace(/[^\d.]/g,''))||0);},0)||1;
+                return d.STAFF_LIVE.map(function(s){
+                  var rev = parseFloat(String(s[2]).replace(/[^\d.]/g,''))||0;
+                  var pct = Math.round(rev/totalRev*100);
+                  return '<tr><td><b>'+esc(s[0])+'</b></td><td>'+s[1]+'</td><td class="td-strong">'+s[2]+'</td>' +
+                    '<td><div style="display:flex;align-items:center;gap:8px">' +
+                      '<div style="flex:1;height:6px;border-radius:99px;background:var(--glass-3);max-width:90px">' +
+                        '<div style="height:100%;border-radius:99px;background:var(--orange);width:'+pct+'%"></div>' +
+                      '</div>' +
+                      '<span style="font-size:12px;color:var(--text-mute)">'+pct+'%</span>' +
+                    '</div></td></tr>';
+                }).join('');
+              })() : '<tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:24px">Staff data appears when bills include a <code>servedBy</code> field</td></tr>') +
+              '</tbody>' +
+            '</table></div>' +
+          '</div>';
+
+        var r = $('#an-refresh');
+        if (r) r.onclick = function(){ renderAnalytics(period); RS.toast('Analytics refreshed','fa-rotate'); };
+        var p = $('#an-period');
+        if (p) p.onchange = function(){ renderAnalytics(p.value); };
+      }).catch(function(){
+        sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="font-size:24px;color:var(--orange)"></i><div style="margin-top:12px">Could not load bills data</div></div>';
+      });
     }
     RS.titles['analytics-tab']=['Advanced Analytics','Revenue, items, staff & payment insights'];
-    RS.addRenderer('analytics-tab', renderAnalytics);
+    RS.addRenderer('analytics-tab', function(){ renderAnalytics('Last 30 days'); });
   }
   if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
 })();

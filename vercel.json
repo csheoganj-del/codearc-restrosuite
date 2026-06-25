@@ -32,9 +32,53 @@
     }
   ],
   "rewrites": [
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/dashboard", "destination": "/dashboard.html" },
-    { "source": "/robots.txt", "destination": "/robots.txt" },
-    { "source": "/sitemap.xml", "destination": "/sitemap.xml" }
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/dashboard.html"
+    },
+    {
+      "source": "/home",
+      "destination": "/home.html"
+    },
+    {
+      "source": "/order",
+      "destination": "/order.html"
+    },
+    {
+      "source": "/qr-order",
+      "destination": "/qr-order.html"
+    },
+    {
+      "source": "/kds",
+      "destination": "/kds.html"
+    },
+    {
+      "source": "/tokens",
+      "destination": "/tokens.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/refund-policy",
+      "destination": "/refund-policy.html"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap.xml"
+    }
   ]
 }

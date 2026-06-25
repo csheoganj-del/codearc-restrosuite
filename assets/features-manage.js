@@ -3,6 +3,9 @@
    ============================================================ */
 (function(){
   'use strict';
+  // HTML escaping — prevents XSS when inserting DB-sourced strings into innerHTML
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -86,7 +89,7 @@
                   const q = subModal.querySelector('#ing-q'), box = subModal.querySelector('#ing-pick');
                   function draw() {
                     const t = (q.value || '').toLowerCase();
-                    box.innerHTML = list.filter(i => i.name.toLowerCase().includes(t)).map(i => `<div class="sr-item" data-n="${i.name}" data-u="${i.unit}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${i.name}</div><div class="si-s">${i.cat} · ${rs(i.cost)}/${i.unit}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
+                    box.innerHTML = list.filter(i => i.name.toLowerCase().includes(t)).map(i => `<div class="sr-item" data-n="${esc(i.name)}" data-u="${esc(i.unit)}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${esc(i.name)}</div><div class="si-s">${esc(i.cat)} · ${rs(i.cost)}/${esc(i.unit)}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
                     box.querySelectorAll('[data-n]').forEach(el => {
                       el.onclick = () => {
                         const exists = draft.find(g => g.name === el.dataset.n);
@@ -157,12 +160,12 @@
             }, 0);
             return `
               <tr data-id="${m.id}">
-                <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${m.name}</b></div></td>
-                <td>${m.cat}</td>
+                <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${esc(m.name)}</b></div></td>
+                <td>${esc(m.cat)}</td>
                 <td class="td-strong">${rs(cost)}</td>
                 <td>
                   ${ings.length 
-                    ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${ings.map(g => `<span class="pill" style="font-size:11.5px;padding:2px 7px;background:var(--hover);border-color:var(--border)">${g.name} (${g.qty} ${g.unit})</span>`).join('')}</div>`
+                    ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${ings.map(g => `<span class="pill" style="font-size:11.5px;padding:2px 7px;background:var(--hover);border-color:var(--border)">${esc(g.name)} (${esc(g.qty)} ${esc(g.unit)})</span>`).join('')}</div>`
                     : `<span style="color:var(--text-mute);font-style:italic">No ingredients linked</span>`
                   }
                 </td>

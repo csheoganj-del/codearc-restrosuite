@@ -177,7 +177,17 @@
     const defaultOutletName = sessionMeta.tenant_name || sessionMeta.business_name || String(sessionMeta.tenant_slug || sessionStorage.getItem('tenant_slug') || 'Outlet').replace(/[-_]+/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
     const defaultOutletCode = sessionMeta.tenant_slug || sessionMeta.outlet_id || sessionStorage.getItem('tenant_slug') || '';
     const PANES = {
-      profile:`<div class="set-section form-grid-2">${field('Restaurant name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
+      profile:`<div class="set-section form-grid-2">${field('Business name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
+<div class="set-section" style="margin-top:12px">
+  <label class="fl">Business type <span style="font-size:11px;color:var(--orange);font-weight:600;margin-left:6px">SaaS vertical</span></label>
+  <select class="form-input" data-skey="set_business_type" style="max-width:320px">
+    <option value="restaurant">Restaurant / Café / Food</option>
+    <option value="retail">Retail Store</option>
+    <option value="salon">Salon / Spa</option>
+    <option value="clinic">Clinic / Hospital</option>
+  </select>
+  <p style="font-size:11.5px;color:var(--text-soft);margin-top:6px">Changing this adapts the dashboard tabs, labels, and features for your business. Save and refresh to apply.</p>
+</div>
         <div class="set-section">${field('Address','','Outlet address')}</div>
         <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
         <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
@@ -638,7 +648,7 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
+      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); } if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }

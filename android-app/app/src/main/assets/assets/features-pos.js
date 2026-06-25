@@ -791,7 +791,31 @@
     async function _doShareReceiptViaWhatsApp(bill) {
       let phone = bill.customerPhone;
       if (!phone || phone.trim() === '' || phone === 'null') {
-        phone = prompt("Enter customer's WhatsApp number (with country code, e.g. 353852258004):");
+        // Use a proper modal dialog instead of the deprecated browser prompt()
+        phone = await new Promise(resolve => {
+          const ov = document.createElement('div');
+          ov.className = 'rs-overlay';
+          ov.innerHTML = `<div class="rs-modal sm">
+            <div class="rs-mhead"><span class="rs-mtitle"><i class="fa-brands fa-whatsapp"></i> WhatsApp Number</span><button class="rs-mclose icon-btn"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="rs-mbody" style="padding:18px 20px 8px">
+              <label class="field-label">Customer WhatsApp (with country code)</label>
+              <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric" placeholder="e.g. 919876543210" style="margin-top:6px" autocomplete="tel">
+              <p style="font-size:12px;color:var(--text-mute);margin-top:8px">Include country code without +. Example: 91 for India.</p>
+            </div>
+            <div class="rs-mfoot"><button class="rs-mcancel btn-ghost">Cancel</button><button class="rs-mok btn-primary"><i class="fa-brands fa-whatsapp"></i> Send</button></div>
+          </div>`;
+          document.body.appendChild(ov);
+          const inp = ov.querySelector('#wa-phone-input');
+          const ok  = ov.querySelector('.rs-mok');
+          const cancel = ov.querySelector('.rs-mcancel');
+          const close  = ov.querySelector('.rs-mclose');
+          inp.focus();
+          const finish = val => { document.body.removeChild(ov); resolve(val); };
+          ok.onclick     = () => finish(inp.value.trim() || null);
+          cancel.onclick = () => finish(null);
+          close.onclick  = () => finish(null);
+          inp.onkeydown  = e => { if(e.key==='Enter') ok.click(); if(e.key==='Escape') finish(null); };
+        });
         if (phone === null) return; // User cancelled
         phone = phone.replace(/\D/g, '');
         if (phone) {
@@ -817,127 +841,54 @@
       const isPdf = (format === 'Thermal PDF receipt');
       console.log('[WhatsApp] bill format setting:', format, '| isPdf:', isPdf);
 
-      const steps = ['Preparing receipt document...', 'Connecting to WhatsApp Gateway...', 'Delivering billing message...'];
-      if (window.RS_ProgressOverlay) {
-        window.RS_ProgressOverlay.show('Sending WhatsApp Bill', steps);
-        window.RS_ProgressOverlay.update(0, 15);
-      }
+      // Fire-and-forget: runs in background, with offline queue fallback.
+      (async () => {
+        try {
+          const text = receiptText(bill);
+          let pdfBase64 = null;
 
-      let text = receiptText(bill);
-      let pdfBase64 = null;
+          if (isPdf) {
+            console.log('[WhatsApp BG] Generating PDF...');
+            const pdfDataUrl = await compileThermalPDF(bill);
+            pdfBase64 = pdfDataUrl ? (pdfDataUrl.split(',')[1] || null) : null;
+            if (!pdfBase64) throw new Error('PDF generation failed — check jsPDF library.');
+            console.log('[WhatsApp BG] PDF ready, base64 length:', pdfBase64.length);
+          }
 
-      // Generate PDF if the bill format is set to Thermal PDF receipt
-      if (isPdf) {
-        console.log('[WhatsApp] Loading jsPDF...');
-        const pdfDataUrl = await compileThermalPDF(bill);
-        pdfBase64 = pdfDataUrl ? (pdfDataUrl.split(',')[1] || null) : null;
-        console.log('[WhatsApp] PDF generated, base64 length:', pdfBase64 ? pdfBase64.length : 0);
-        if (!pdfBase64) throw new Error('PDF generation returned empty data — check jsPDF library.');
-      }
+          if (!navigator.onLine) throw new Error('offline');
+          if (!window.RS_API || typeof RS_API.data !== 'function') throw new Error('WhatsApp API not available');
 
-      try {
-        
-        if (window.RS_ProgressOverlay) {
-          window.RS_ProgressOverlay.update(1, 45);
-        }
-
-        if (window.RS_ProgressOverlay) {
-          window.RS_ProgressOverlay.update(2, 75);
-        }
-
-        // Attempt to send via gateway directly (skip the /status pre-check:
-        // /status works without auth so it always shows "ready" even if /send token is wrong)
-        if (window.RS_API && typeof RS_API.data === 'function') {
-          const sendPayload = {
-            operation: 'gateway_send',
-            phone: phone,
-            message: text,
-            orderId: bill.no
-          };
+          const sendPayload = { operation: 'gateway_send', phone, message: text, orderId: bill.no };
           if (isPdf && pdfBase64) {
             sendPayload.pdfData = pdfBase64;
             sendPayload.filename = `receipt-${bill.no}.pdf`;
           }
-          console.log('[WhatsApp] Sending via gateway. hasPdf:', !!(isPdf && pdfBase64));
+          console.log('[WhatsApp BG] Sending. hasPdf:', !!(isPdf && pdfBase64));
 
-          let sendResult;
-          try {
-            sendResult = await RS_API.data(sendPayload);
-          } catch(sendErr) {
-            // Classify the error to give actionable feedback
-            const msg = sendErr.message || '';
-            if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('Invalid Gateway Token')) {
-              throw new Error('WhatsApp gateway token mismatch. Restart the gateway using run-gateway.ps1 and ensure GATEWAY_TOKEN in .env.local matches.');
-            } else if (msg.includes('ECONNREFUSED') || msg.includes('offline') || msg.includes('fetch') || msg.includes('Connection')) {
-              throw new Error('WhatsApp gateway is not running. Start it with run-gateway.ps1 and try again.');
-            } else if (msg.includes('not ready') || msg.includes('qr')) {
-              throw new Error('WhatsApp is not connected. Scan the QR code in Settings → WhatsApp gateway.');
-            }
-            throw sendErr;
-          }
+          const sendResult = await RS_API.data(sendPayload).catch(err => { throw err; });
+          if (sendResult && sendResult.error) throw new Error(sendResult.error);
 
-          if (sendResult && sendResult.error) {
-            // Gateway returned an application-level error
-            const errMsg = sendResult.error;
-            if (errMsg.includes('not ready') || errMsg.includes('qr')) {
-              throw new Error('WhatsApp is not connected. Scan the QR code in Settings → WhatsApp gateway.');
-            }
-            throw new Error(errMsg);
-          }
-
-          if (window.RS_ProgressOverlay) {
-            window.RS_ProgressOverlay.update(3, 100);
-            window.RS_ProgressOverlay.hide();
-          }
           RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
-          return;
-        }
-        
-        throw new Error('WhatsApp API not available');
-
-      } catch(err) {
-        console.warn('Gateway send failed:', err.message);
-        if (window.RS_ProgressOverlay) {
-          window.RS_ProgressOverlay.hide();
-        }
-
-        // For actionable gateway errors, show a toast and don't open web WhatsApp
-        const isGatewayConfigError = err.message && (
-          err.message.includes('token mismatch') ||
-          err.message.includes('not running') ||
-          err.message.includes('not connected') ||
-          err.message.includes('QR code') ||
-          err.message.includes('Unauthorized')
-        );
-
-        if (isGatewayConfigError) {
-          RS.toast(err.message, 'fa-triangle-exclamation');
-          return;
-        }
-        
-        // Gateway truly offline / unreachable — fallback to manual web WhatsApp
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        let phoneVal = phone || '';
-        phoneVal = phoneVal.replace(/\D/g, '');
-        
-        try {
-          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            await navigator.clipboard.writeText(text);
+        } catch(err) {
+          console.warn('[WhatsApp BG] Send failed:', err.message);
+          // Queue for retry when back online
+          const isOffline = err.message === 'offline' || !navigator.onLine;
+          const WA_QUEUE_KEY = 'rs:wa_queue';
+          try {
+            const q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]');
+            q.push({ phone, billNo: bill.no, message: receiptText(bill), queuedAt: Date.now() });
+            localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(q));
+            if (isOffline) {
+              RS.toast('Offline — receipt queued, will send when back online', 'fa-clock');
+            } else {
+              RS.toast('WhatsApp send failed — queued for retry', 'fa-clock');
+            }
+          } catch(qErr) {
+            RS.toast('WhatsApp: ' + (err.message || 'Send failed'), 'fa-triangle-exclamation');
           }
-        } catch(clipErr) {
-          console.warn('Clipboard write failed:', clipErr.message);
         }
-
-        const encodedText = encodeURIComponent(text);
-        let waUrl = '';
-        if (isMobile) {
-          waUrl = phoneVal ? `https://wa.me/${phoneVal}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`;
-        } else {
-          waUrl = phoneVal ? `https://web.whatsapp.com/send?phone=${phoneVal}&text=${encodedText}` : `https://web.whatsapp.com/send?text=${encodedText}`;
-        }
-        window.open(waUrl, '_blank', 'noopener,noreferrer');
-        RS.toast('Gateway offline — opened manual WhatsApp', 'fa-whatsapp');
-      }
+      })();
+      // Return immediately — no blocking, no spinner
     }
 
     function showReceipt(bill){
@@ -946,11 +897,8 @@
       const autoSendOn = autoSendSettings.set_auto_send_receipts !== false
                       && autoSendSettings.set_auto_send_receipts !== 'false';
       const hasPhone = bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null';
-      // If auto-send is on and phone is set, the receipt is already being sent automatically.
-      // Show a status chip instead of the WhatsApp button to prevent double-send.
-      const waBtn = (autoSendOn && hasPhone)
-        ? `<span class="btn btn-ghost" id="rc-wa" style="flex:1;opacity:0.7;cursor:default"><i class="fa-brands fa-whatsapp"></i> Sending\u2026</span>`
-        : `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>`;
+      // Always show the WhatsApp button \u2014 sending is background so cashier can resend if needed.
+      const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>`;
       RSModal.open({
         title:'Bill settled', sub:`${bill.no} \u00b7 ${rs(bill.grand)}`, icon:'fa-circle-check', size:'sm',
         body:`<div class="receipt-paper">${receiptHTML(bill)}</div>`,
@@ -1752,6 +1700,8 @@
         resetCustomerFields();
         resetPayment();
         showReceipt(bill);
+        // Android bridge: haptic + audio feedback on successful payment
+        document.dispatchEvent(new CustomEvent('rs:bill-paid', { detail: { total: bill.grand || bill.amount || '' } }));
 
         // Auto-send WhatsApp receipt if enabled in settings
         try {

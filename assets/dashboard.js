@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite Console â€” interactivity & data rendering
+   RestroSuite Console – interactivity & data rendering
    ============================================================ */
 (function () {
   'use strict';
@@ -184,7 +184,7 @@
   let toastT;
   function toast(msg, icon='fa-circle-check', onClick=null){
     const el=$('#toast');
-    el.innerHTML=`<i class="fa-solid ${icon}"></i> ${msg}`;
+    el.innerHTML=`<i class="fa-solid ${_e(icon)}"></i> ${_e(msg)}`;
     el.classList.add('show');
     if (onClick) {
       el.style.cursor = 'pointer';
@@ -714,8 +714,8 @@
     else { wrap.innerHTML = cart.map(c=>`
       <div class="cart-line">
         <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
-        <div class="cinfo"><div class="cn">${c.name}</div><div class="cp">${rs(c.price)} each</div></div>
-        <div class="qty"><button data-d="-1" data-id="${c.id}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${c.id}"><i class="fa-solid fa-plus"></i></button></div>
+        <div class="cinfo"><div class="cn">${_e(c.name)}</div><div class="cp">${rs(c.price)} each</div></div>
+        <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
         <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
       </div>`).join('');
       $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
@@ -988,8 +988,8 @@
       console.error('[Checkout Error]', err);
       return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
     }
-    toast('Bill printed & WhatsApp sent','fa-print');
-    clearCart();
+    // RSPOS module not loaded — do not silently show false success
+    return toast('Checkout module not ready — please refresh', 'fa-circle-exclamation');
   }
   let cartActionsDelegated = false;
   function ensureCartActionDelegation(){
@@ -1207,8 +1207,7 @@
         console.error('[Checkout Error]', err);
         return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
       }
-      toast('Bill printed & WhatsApp sent','fa-print');
-      clearCart();
+      return toast('Checkout module not ready — please refresh', 'fa-circle-exclamation');
     };
 
     // Grid size slider controls
@@ -1341,7 +1340,7 @@
         const mappedKds = activeKds.map(r => ({
           id: r.id,
           tok: r.orderId,
-          type: `${r.orderType} Â· ${r.tableNumber}`,
+          type: `${r.orderType} · ${r.tableNumber}`,
           start: parseOrderTimestamp(r.dateTime) || Date.now(),
           items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
         }));
@@ -1367,6 +1366,11 @@
         try { updateTabAttentionBlinking(); } catch(e){}
       } catch(e) {
         console.warn("syncPendingOrders failed", e);
+        // Only show toast if user is likely watching the KDS/orders tab
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && (activeTab.id === 'kds-tab' || activeTab.id === 'pending-orders-tab')) {
+          toast('Order sync issue — retrying…', 'fa-rotate');
+        }
       } finally {
         pendingOrdersSyncInFlight = false;
       }
@@ -1614,7 +1618,7 @@
       return shareBillReceipt(bill);
     };
     billBody.addEventListener('click', billBody._rsBillActionHandler, true);
-    $$('#bills-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Reprinting billâ€¦','fa-print')));
+    $$('#bills-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Reprinting bill…','fa-print')));
     $$('#bills-table-body .icon-act .fa-whatsapp').forEach(b=>b.closest('button').addEventListener('click',()=>toast('Bill shared on WhatsApp','fa-whatsapp')));
     $$('#bills-table-body .icon-act.danger:not([disabled])').forEach(b=>b.addEventListener('click',()=>toast('Refund initiated','fa-rotate-left')));
   };
@@ -1780,6 +1784,7 @@
                 } catch (e) {
                   console.warn('Failed to save PO', e);
                   finishOperationStatus('Failed to create PO', 'error');
+                  toast('Failed to save purchase order — saved locally', 'fa-circle-exclamation');
                 }
               };
             }
@@ -1808,7 +1813,7 @@
             <td><button class=”icon-act go” data-recipe-edit=”${_e(m.id)}” title=”Define recipe”><i class=”fa-solid fa-pen”></i></button></td>
           </tr>`;
         }).join('')
-        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet â€” add items in Menu Editor first</td></tr>';
+        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet – add items in Menu Editor first</td></tr>';
 
       // clicking recipe edit navigates to menu editor and opens that item
       $$('#recipe-table-body [data-recipe-edit]').forEach(btn => {
@@ -1900,140 +1905,232 @@
         <td><label class="switch-mini"><input type="checkbox" ${m.stock!=='out'?'checked':''}><span></span></label></td>
         <td><div class="row-actions"><button class="icon-act go" title="Edit" aria-label="Edit ${_e(m.name)}"><i class="fa-solid fa-pen"></i></button><button class="icon-act" title="Recipe" aria-label="Recipe for ${_e(m.name)}"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" title="Delete" aria-label="Delete ${_e(m.name)}"><i class="fa-solid fa-trash"></i></button></div></td>
       </tr>`).join('');
-    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editorâ€¦','fa-pen')));
+    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editor…','fa-pen')));
     $$('#editor-list .icon-act.danger').forEach(b=>b.addEventListener('click',()=>toast('Item removed','fa-trash')));
   };
 
   /* ============================================================
      REPORTS
      ============================================================ */
-  const renderReports = () => {
-    const paidBills = BILLS.filter(b => b.status === 'paid');
-    
-    // Calculate stats
-    const totalRevenue = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const totalOrders = paidBills.length;
-    const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    
-    // Estimate GST collected (assume 5% average)
-    const netTaxableSales = Math.round(totalRevenue / 1.05);
-    const gstCollected = totalRevenue - netTaxableSales;
-    
-    const reportsTab = document.getElementById('reports-tab');
-    if (reportsTab) {
-      const svElements = reportsTab.querySelectorAll('.stat-row .stat-card .sv');
-      if (svElements.length >= 4) {
-        svElements[0].textContent = totalRevenue > 0 ? rs(totalRevenue) : '₹0';
-        svElements[1].textContent = totalOrders;
-        svElements[2].textContent = aov > 0 ? rs(aov) : '₹0';
-        svElements[3].textContent = gstCollected > 0 ? rs(gstCollected) : '₹0';
-      }
-      
-      const tbody = reportsTab.querySelector('.panel table.data-table tbody');
-      if (tbody) {
-        tbody.innerHTML = `
-          <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">${rs(gstCollected)}</td></tr>
-          <tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">${rs(0)}</td></tr>
-          <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">${rs(netTaxableSales)}</td></tr>
-          <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">${rs(gstCollected)}</b></td></tr>
-        `;
-      }
-    }
+  const renderReports = (period) => {
+    period = period || 'Last 30 days';
+    const days = period==='Today'?1:period==='This week'?7:period==='This month'?30:period==='Last 90 days'?90:30;
+    const now = Date.now();
+    const cutoff = now - days * 86400000;
+    const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
 
-    // Daily revenue chart
-    const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const dayVals = [0, 0, 0, 0, 0, 0, 0];
-    
-    paidBills.forEach(b => {
-      if (b.time) {
-        const todayDay = new Date().getDay();
-        const index = (todayDay + 6) % 7;
-        dayVals[index] += b.amount || 0;
-      }
+    const paidBills = BILLS.filter(b => {
+      if (b.status !== 'paid') return false;
+      const t = b.dateTime ? new Date(b.dateTime).getTime() : (b.time ? new Date(b.time).getTime() : 0);
+      return t >= cutoff;
     });
 
-    const maxVal = Math.max(...dayVals) || 1;
-    const hasDailyData = dayVals.some(v => v > 0);
-    
-    if (!hasDailyData) {
-      $('#chart-revenue').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-mute); font-size:12px; grid-column:1/-1; width:100%;">No sales trend data available</div>`;
-    } else {
-      $('#chart-revenue').innerHTML = days.map((d,i)=>`<div class="cbar"><div class="bar" style="height:0" data-h="${dayVals[i]/maxVal*100}"><span class="bv">${rs(dayVals[i])}</span></div><span class="bl">${d}</span></div>`).join('');
-      setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
-    }
-    
-    // Payment mix donut
-    const payCounts = { UPI: 0, Cash: 0, Card: 0, Due: 0 };
+    const totalRevenue = paidBills.reduce((sum,b)=>sum+(b.amount||b.total||0),0);
+    const totalOrders = paidBills.length;
+    const aov = totalOrders>0 ? Math.round(totalRevenue/totalOrders) : 0;
+
+    // Tax: use stored fields when available, else estimate by tax category
+    let gst5=0, gst12=0, gst18=0, gst28=0;
     paidBills.forEach(b => {
-      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
-        b.tenders.forEach(t => {
-          const method = t.method || 'Cash';
-          if (payCounts[method] !== undefined) {
-            payCounts[method] += Number(t.amount || 0);
-          }
+      if (b.taxSummary && typeof b.taxSummary === 'object') {
+        Object.entries(b.taxSummary).forEach(([rate, obj]) => {
+          const tax = (obj && obj.tax) ? obj.tax : 0;
+          if (rate==='5') gst5+=tax;
+          else if (rate==='12') gst12+=tax;
+          else if (rate==='18') gst18+=tax;
+          else if (rate==='28') gst28+=tax;
+          else gst5+=tax;
         });
       } else {
-        const method = b.pay || b.paymentMethod || 'Cash';
-        if (payCounts[method] !== undefined) {
-          payCounts[method] += b.amount || 0;
-        }
+        // Fallback estimate
+        gst5 += Math.round((b.cgst||0) + (b.sgst||0));
+        if (!b.cgst && !b.sgst) gst5 += Math.round((b.amount||0)/1.05*0.05);
       }
     });
-    const payTotal = payCounts.UPI + payCounts.Cash + payCounts.Card + payCounts.Due;
-    
-    if (payTotal === 0) {
-      $('#donut-pay').style.background = 'var(--glass-2)';
-      $('#donut-pay .donut-center .dc-v').textContent = '₹0';
-      $('#legend-pay').innerHTML = `<div style="color:var(--text-mute); font-size:12px; margin-top:10px; text-align:center;">No payments recorded</div>`;
-    } else {
-      const keys = ['UPI', 'Cash', 'Card', 'Due'];
-      const colors = { UPI: 'var(--violet)', Cash: 'var(--green)', Card: 'var(--orange)', Due: 'var(--red)' };
-      
-      let pcts = keys.map(k => Math.round((payCounts[k] / payTotal) * 100));
-      const sum = pcts.reduce((a,b)=>a+b, 0);
-      if (sum !== 100) {
-        let adjustIdx = pcts.findIndex(p => p > 0);
-        if (adjustIdx !== -1) {
-          pcts[adjustIdx] += (100 - sum);
-        }
-      }
-      
-      const payMix = keys.map((k, i) => [k, pcts[i], colors[k]]).filter(p => p[1] > 0);
-      
-      let acc=0; const seg=payMix.map(p=>{const s=`${p[2]} ${acc}% ${acc+p[1]}%`;acc+=p[1];return s;}).join(',');
-      $('#donut-pay').style.background=seg ? `conic-gradient(${seg})` : 'var(--glass-2)';
-      $('#donut-pay .donut-center .dc-v').textContent = totalRevenue > 0 ? rs(totalRevenue) : '₹0';
-      $('#legend-pay').innerHTML=payMix.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${p[0]}<span class="lg-val">${p[1]}%</span></div>`).join('');
+    const totalGST = gst5+gst12+gst18+gst28;
+    const netSales = totalRevenue - totalGST;
+
+    // Daily revenue (days slots, oldest→newest)
+    const dailySlots = Array(days).fill(0);
+    const dailyLabels = [];
+    for (let i=days-1;i>=0;i--) {
+      const d = new Date(now - i*86400000);
+      dailyLabels.push(days<=7 ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] : (d.getDate()+'/'+((d.getMonth()+1))));
     }
-    
-    // Category sales distribution
+    paidBills.forEach(b => {
+      const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+      const age = Math.floor((now-t)/86400000);
+      if (age>=0 && age<days) dailySlots[days-1-age] += (b.amount||b.total||0);
+    });
+    const maxSlot = Math.max(...dailySlots,1);
+    const hasDailyData = dailySlots.some(v=>v>0);
+
+    // Payment mix
+    const payMap = {};
+    paidBills.forEach(b => {
+      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
+        b.tenders.forEach(t => { const m=t.method||'Cash'; payMap[m]=(payMap[m]||0)+Number(t.amount||0); });
+      } else {
+        const m=b.pay||b.paymentMethod||'Cash'; payMap[m]=(payMap[m]||0)+(b.amount||0);
+      }
+    });
+    const payTotal = Object.values(payMap).reduce((a,v)=>a+v,0)||1;
+    const payColors = {Cash:'var(--green)',UPI:'var(--violet)',Card:'var(--orange)',Due:'var(--red)',Stripe:'var(--blue-soft)',Online:'var(--violet-soft)'};
+    const payEntries = Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
+    let acc=0;
+    const payMix = payEntries.map(([name,val])=>{
+      const pct=Math.round(val/payTotal*100);
+      return [name,pct,payColors[name]||'var(--amber)'];
+    }).filter(p=>p[1]>0);
+    let conicAcc=0;
+    const seg = payMix.map(p=>{const s=`${p[2]} ${conicAcc}% ${conicAcc+p[1]}%`;conicAcc+=p[1];return s;}).join(',');
+
+    // Category breakdown from _items
     const catSales = {};
     paidBills.forEach(b => {
-      if (typeof b.items === 'string') {
-        b.items.split(',').forEach(itemStr => {
-          const cleanStr = itemStr.trim();
-          const menuItem = MENU.find(m => cleanStr.startsWith(m.name) || cleanStr.includes(m.name));
-          const cat = menuItem ? menuItem.cat : 'Others';
-          const qtyMatch = cleanStr.match(/\sx(\d+)/);
-          const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-          const price = menuItem ? menuItem.price : 100;
-          catSales[cat] = (catSales[cat] || 0) + (price * qty);
+      (b._items||[]).forEach(it => {
+        if (!it||!it.name) return;
+        const cat = it.category||it.cat||'Uncategorized';
+        catSales[cat] = (catSales[cat]||0) + (it.price||0)*(it.qty||1);
+      });
+      // fallback: parse old string-format items
+      if (!b._items || !b._items.length) {
+        const items = typeof b.items==='string' ? b.items.split(',') : [];
+        items.forEach(str => {
+          const m = MENU.find(x=>str.trim().startsWith(x.name));
+          if (m) { const cat=m.cat||'Uncategorized'; catSales[cat]=(catSales[cat]||0)+(m.price||0); }
         });
       }
     });
+    const catTotal = Object.values(catSales).reduce((a,v)=>a+v,0)||1;
+    const sortedCats = Object.entries(catSales).sort((a,b)=>b[1]-a[1]).map(([name,val])=>[name,Math.round(val/catTotal*100)]);
 
-    const catTotal = Object.values(catSales).reduce((a,b)=>a+b, 0);
-    if (catTotal === 0) {
-      $('#cat-bars').innerHTML = `<div style="color:var(--text-mute); font-size:12px; text-align:center; padding:20px;">No category sales data available</div>`;
-    } else {
-      const sortedCats = Object.entries(catSales).sort((a,b)=>b[1]-a[1]).map(entry => {
-        const pct = Math.round(entry[1] / catTotal * 100);
-        return [entry[0], pct];
+    // Top items table
+    const itemMap = {};
+    paidBills.forEach(b => {
+      (b._items||[]).forEach(it => {
+        if (!it||!it.name) return;
+        if (!itemMap[it.name]) itemMap[it.name]={qty:0,rev:0};
+        itemMap[it.name].qty += (it.qty||1);
+        itemMap[it.name].rev += (it.price||0)*(it.qty||1);
       });
-      $('#cat-bars').innerHTML=sortedCats.map(c=>`<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${c[0]}</span><b style="color:var(--text)">${c[1]}%</b></div><div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div></div>`).join('');
-      setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
-    }
+    });
+    const topItems = Object.entries(itemMap).sort((a,b)=>b[1].rev-a[1].rev).slice(0,6);
+
+    const tab = document.getElementById('reports-tab');
+    if (!tab) return;
+
+    tab.innerHTML = `
+      <div class="toolbar-row" style="margin-bottom:4px">
+        <span class="eyebrow">${period}</span>
+        <div class="grow"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${['Today','This week','This month','Last 30 days','Last 90 days'].map(p=>
+            `<button class="btn btn-sm ${p===period?'btn-primary':'btn-ghost'}" onclick="window._renderReports('${p}')">${p}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(totalRevenue)}</div><div class="sl">Revenue</div><div class="sd">${period}</div></div></div>
+        <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">${totalOrders}</div><div class="sl">Orders</div><div class="sd">bills generated</div></div></div>
+        <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">${rs(aov)}</div><div class="sl">Avg order value</div></div></div>
+        <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">${rs(totalGST)}</div><div class="sl">GST collected</div></div></div>
+      </div>
+
+      <div class="report-grid">
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">${period} · hover for value</span></div>
+          <div class="chart-bars" id="chart-revenue">
+            ${hasDailyData
+              ? dailySlots.map((v,i)=>`<div class="cbar"><div class="bar" style="height:0" data-h="${Math.round(v/maxSlot*100)}"><span class="bv">${rs(v)}</span></div><span class="bl">${dailyLabels[i]}</span></div>`).join('')
+              : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px;width:100%">No sales data for this period</div>`
+            }
+          </div>
+        </div>
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Payment mix</h3></div>
+          <div class="donut-wrap">
+            <div class="donut" id="donut-pay" style="${seg?`background:conic-gradient(${seg})`:'background:var(--glass-2)'}">
+              <div class="donut-center"><div class="dc-v">${rs(totalRevenue)}</div><div class="dc-l">collected</div></div>
+            </div>
+            <div class="legend" id="legend-pay">
+              ${payMix.length>0
+                ? payMix.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${_e(p[0])}<span class="lg-val">${p[1]}%</span></div>`).join('')
+                : '<div style="color:var(--text-mute);font-size:12px;margin-top:10px;text-align:center">No payments recorded</div>'
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-grid" style="margin-top:16px">
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Top categories by revenue</h3></div>
+          <div id="cat-bars">
+            ${sortedCats.length>0
+              ? sortedCats.map(c=>`<div style="margin-bottom:13px">
+                  <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${_e(c[0])}</span><b style="color:var(--text)">${c[1]}%</b></div>
+                  <div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div>
+                </div>`).join('')
+              : '<div style="color:var(--text-mute);font-size:12px;text-align:center;padding:20px">No category data yet</div>'
+            }
+          </div>
+        </div>
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Tax summary</h3></div>
+          <table class="data-table"><tbody>
+            <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">${rs(gst5)}</td></tr>
+            ${gst12>0?`<tr><td>GST @ 12%</td><td class="td-strong" style="text-align:right">${rs(gst12)}</td></tr>`:''}
+            ${gst18>0?`<tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">${rs(gst18)}</td></tr>`:''}
+            ${gst28>0?`<tr><td>GST @ 28% (luxury)</td><td class="td-strong" style="text-align:right">${rs(gst28)}</td></tr>`:''}
+            <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">${rs(netSales)}</td></tr>
+            <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">${rs(totalGST)}</b></td></tr>
+          </tbody></table>
+          <button class="btn btn-ghost btn-block" id="btn-download-gstr" style="margin-top:14px"><i class="fa-solid fa-file-arrow-down"></i> Download GSTR-ready CSV</button>
+        </div>
+      </div>
+
+      ${topItems.length>0?`
+      <div class="panel panel-pad" style="margin-top:16px">
+        <div class="panel-head"><h3>Top items by revenue</h3><span class="pill">${period}</span></div>
+        <table class="data-table"><thead><tr><th>#</th><th>Item</th><th>Qty sold</th><th style="text-align:right">Revenue</th></tr></thead><tbody>
+          ${topItems.map(([name,d],i)=>`<tr><td style="color:var(--text-mute);width:24px">${i+1}</td><td><b>${_e(name)}</b></td><td>${d.qty}</td><td style="text-align:right;color:var(--green)">${rs(d.rev)}</td></tr>`).join('')}
+        </tbody></table>
+      </div>`:''}
+    `;
+
+    // Animate bars
+    setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
+    setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
+
+    // GSTR CSV download
+    const gstrBtn = document.getElementById('btn-download-gstr');
+    if (gstrBtn) gstrBtn.onclick = () => {
+      const rows = [['Bill No','Date','Customer','Amount','GST 5%','GST 12%','GST 18%','GST 28%','Payment Method']];
+      paidBills.forEach(b => {
+        const ts = b.taxSummary||{};
+        rows.push([
+          b.no||b.id||'',
+          b.dateTime ? new Date(b.dateTime).toLocaleDateString('en-IN') : '',
+          b.customerName||'Walk-in Guest',
+          b.amount||b.total||0,
+          ts['5']?ts['5'].tax||0:0,
+          ts['12']?ts['12'].tax||0:0,
+          ts['18']?ts['18'].tax||0:0,
+          ts['28']?ts['28'].tax||0:0,
+          b.pay||b.paymentMethod||''
+        ]);
+      });
+      const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+      a.download = 'GSTR_report_'+new Date().toISOString().slice(0,10)+'.csv';
+      a.click();
+      toast('GSTR CSV downloaded','fa-file-arrow-down');
+    };
   };
+  window._renderReports = (p) => renderReports(p);
 
   /* ============================================================
      KDS
@@ -2116,7 +2213,7 @@
         <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
         <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(h.m)}</span>
       </div>`).join('');
-    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'â€¦','fa-arrow-up-right-from-square')));
+    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'…','fa-arrow-up-right-from-square')));
   };
 
   /* ============================================================
@@ -2155,7 +2252,7 @@
         <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales)}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders)}</div><div class="esl">Orders</div></div></div>
         <div class="emp-actions"><button class="btn btn-ghost btn-sm" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button></div>
       </div>`).join('');
-    $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissionsâ€¦','fa-user-gear')));
+    $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissions…','fa-user-gear')));
   };
 
   /* ============================================================
@@ -2240,7 +2337,7 @@
   const renderSuper = async () => {
     const tbody = $('#tenant-table-body');
     if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registryâ€¦</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry…</td></tr>';
     renderPlatformSummary([]);
     try {
       let tenants = [];
@@ -2278,7 +2375,7 @@
         const statusKey = (t.status||'active').toLowerCase();
         const statusCls = tStatus[statusKey] || 't-active';
         const statusText = t.status ? (t.status.charAt(0).toUpperCase()+t.status.slice(1).replace(/_/g,' ')) : 'Active';
-        const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : 'â€”';
+        const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : '–';
         const mrr = t.mrr || 0;
         const name = t.name || t.tenant_name || t.slug || 'Unknown';
         const slug = t.slug || t.tenant_slug || '';
@@ -2732,7 +2829,7 @@
           <article class="app-incident-card">
             <div style="flex: 1; min-width: 0;">
               <strong>${escHtml(report.error_message || 'Unknown application error')}</strong>
-              <span>${escHtml(report.tenant_slug || 'unknown workspace')} Â· ${escHtml(report.source || 'dashboard')} Â· ${escHtml(report.url_path || 'unknown path')}</span>
+              <span>${escHtml(report.tenant_slug || 'unknown workspace')} · ${escHtml(report.source || 'dashboard')} · ${escHtml(report.url_path || 'unknown path')}</span>
               ${stack}
               <div class="app-incident-meta">
                 <span class="app-incident-pill ${escHtml(severity)}">${escHtml(severity)}</span>
@@ -3069,6 +3166,7 @@
       setupTenantDataRealtime();
     }catch(e){ console.warn('sync pending orders/realtime failed', e); }
     document.dispatchEvent(new CustomEvent('rs:hydrated'));
+    if(window.RS_SAAS) RS_SAAS.applyToUI();
   }
 
   /* ---------- boot ---------- */
@@ -3712,8 +3810,8 @@
       // null = server confirmed token is invalid/expired â†’ redirect
       if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
     }).catch(() => {
-      // Network error / Supabase offline â€” keep user on dashboard, don't log them out
-      console.warn('[RS] validateSession network error â€” keeping local session alive.');
+      // Network error / Supabase offline – keep user on dashboard, don't log them out
+      console.warn('[RS] validateSession network error – keeping local session alive.');
       // Network error / Supabase offline — keep user on dashboard, don't log them out
       console.warn('[RS] validateSession network error — keeping local session alive.');
     });
@@ -3742,6 +3840,76 @@
   setInterval(() => {
     try { updateTabAttentionBlinking(); } catch(e) {}
   }, 2000);
+
+  // ── Offline / Online connectivity banner ──────────────────────────────────
+  (function setupConnectivityBanner() {
+    let banner = document.getElementById('rs-offline-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'rs-offline-banner';
+      banner.setAttribute('role', 'alert');
+      banner.setAttribute('aria-live', 'polite');
+      banner.style.cssText = [
+        'position:fixed','bottom:0','left:0','right:0','z-index:99998',
+        'background:#1a1a1a','color:#fff','font-size:13px','font-weight:600',
+        'padding:10px 18px','display:none','align-items:center','gap:10px',
+        'border-top:2px solid var(--orange,#e85d26)',
+        'box-shadow:0 -2px 12px rgba(0,0,0,.4)'
+      ].join(';');
+      banner.innerHTML = '<i class="fa-solid fa-wifi-slash" style="color:var(--orange,#e85d26)"></i>&nbsp;<span id="rs-offline-msg">You are offline — data is saved locally and will sync when reconnected.</span>';
+      document.body.appendChild(banner);
+    }
+    function showBanner(msg) {
+      const msgEl = document.getElementById('rs-offline-msg');
+      if (msgEl) msgEl.textContent = msg;
+      banner.style.display = 'flex';
+    }
+    function hideBanner() { banner.style.display = 'none'; }
+
+    if (!navigator.onLine) showBanner('You are offline — data is saved locally and will sync when reconnected.');
+
+    window.addEventListener('offline', () => {
+      showBanner('You are offline — data is saved locally and will sync when reconnected.');
+    });
+    window.addEventListener('online', () => {
+      showBanner('Back online — syncing…');
+      setTimeout(() => {
+        hideBanner();
+        if (window.RS_DB_DRAIN) RS_DB_DRAIN().catch(() => {});
+        drainWAQueue();
+      }, 2500);
+    });
+    window.addEventListener('rs:sync-queue-drained', (e) => {
+      const count = e.detail && e.detail.count;
+      if (count) toast(`Synced ${count} offline record${count > 1 ? 's' : ''} to cloud`, 'fa-cloud-arrow-up');
+    });
+
+    // ── WhatsApp offline queue drain ──────────────────────────────────────
+    async function drainWAQueue() {
+      const WA_QUEUE_KEY = 'rs:wa_queue';
+      let q;
+      try { q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]'); } catch(e) { return; }
+      if (!q.length) return;
+      if (!window.RS_API || typeof RS_API.data !== 'function') return;
+      const sent = [];
+      for (const item of q) {
+        if (!navigator.onLine) break;
+        try {
+          const result = await RS_API.data({ operation: 'gateway_send', phone: item.phone, message: item.message, orderId: item.billNo });
+          if (!result || result.error) throw new Error(result && result.error || 'Send failed');
+          sent.push(item);
+        } catch(e) {
+          console.warn('[WA Queue] Retry failed for', item.billNo, e.message);
+        }
+      }
+      if (sent.length) {
+        const remaining = q.filter(i => !sent.includes(i));
+        try { localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(remaining)); } catch(e) {}
+        toast(`Sent ${sent.length} queued WhatsApp receipt${sent.length > 1 ? 's' : ''}`, 'fa-whatsapp');
+      }
+    }
+    window.RS_DRAIN_WA = drainWAQueue;
+  })();
 
   // Security contract test compatibility:
   // const FAST_INTERACTION_MODE = true;
@@ -3775,6 +3943,130 @@
   // function renderPlatformSummary
   // conflictTargets
   // ON CONFLICT (tenant_id, "orderId") DO UPDATE SET
+
+  // ── Android WebView Bridge ────────────────────────────────────────────────
+  // Android calls window.updateAndroidOfflineStatus(isOffline) when network changes.
+  // We reuse the same banner + drain logic already wired for browser online/offline.
+  window.updateAndroidOfflineStatus = function(isOffline) {
+    if (isOffline) {
+      window.dispatchEvent(new Event('offline'));
+    } else {
+      window.dispatchEvent(new Event('online'));
+    }
+  };
+
+  // ── PWA Install Prompt ───────────────────────────────────────────────────
+  (function setupPWAInstallPrompt() {
+    // Only show if not already installed (standalone) and not on Android WebView
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    if (window.AndroidInterface) return;
+    if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
+
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+
+      // Don't show immediately — wait until user has been on the page 30s
+      setTimeout(() => {
+        if (!deferredPrompt) return;
+        if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
+
+        const bar = document.createElement('div');
+        bar.id = 'rs-pwa-prompt';
+        bar.style.cssText = 'position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:8888;' +
+          'background:var(--card-bg,#fff);border:1px solid var(--stroke,#e5e7eb);border-radius:14px;' +
+          'box-shadow:0 8px 32px rgba(0,0,0,.14);padding:14px 16px;display:flex;align-items:center;' +
+          'gap:12px;max-width:360px;width:calc(100vw - 32px);animation:slideUp .3s var(--ease,ease)';
+        bar.innerHTML =
+          '<img src="assets/restrosuite-mark.png" style="width:36px;height:36px;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:700;font-size:13px">Install RestroSuite</div>' +
+            '<div style="font-size:12px;color:var(--text-mute)">Works offline · No app store needed</div>' +
+          '</div>' +
+          '<button id="rs-pwa-install" class="btn btn-primary btn-sm" style="flex-shrink:0;white-space:nowrap">Install</button>' +
+          '<button id="rs-pwa-dismiss" class="icon-btn" style="flex-shrink:0" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>';
+
+        document.body.appendChild(bar);
+
+        document.getElementById('rs-pwa-install').onclick = async () => {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          bar.remove();
+          if (outcome === 'accepted') {
+            if (typeof toast === 'function') toast('RestroSuite installed!', 'fa-circle-check');
+          }
+        };
+
+        document.getElementById('rs-pwa-dismiss').onclick = () => {
+          sessionStorage.setItem('rs:pwa-prompt-dismissed', '1');
+          bar.style.animation = 'slideDown .25s ease forwards';
+          setTimeout(() => bar.remove(), 260);
+        };
+      }, 30000);
+    });
+
+    // Already installed
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      const bar = document.getElementById('rs-pwa-prompt');
+      if (bar) bar.remove();
+    });
+  })();
+
+  // Thin wrapper so JS code can call RS_Android.* and safely no-op on browsers
+  window.RS_Android = {
+    available: function() { return !!(window.AndroidInterface); },
+    speak: function(text) {
+      if (window.AndroidInterface && window.AndroidInterface.speak) {
+        try { window.AndroidInterface.speak(String(text)); } catch(e) {}
+      }
+    },
+    speakBilingual: function(en, hi) {
+      if (window.AndroidInterface && window.AndroidInterface.speakBilingual) {
+        try { window.AndroidInterface.speakBilingual(String(en), String(hi)); } catch(e) {}
+      }
+    },
+    vibrate: function(ms) {
+      if (window.AndroidInterface && window.AndroidInterface.vibrate) {
+        try { window.AndroidInterface.vibrate(ms || 80); } catch(e) {}
+      }
+    },
+    playSound: function(type) {
+      if (window.AndroidInterface && window.AndroidInterface.playSound) {
+        try { window.AndroidInterface.playSound(String(type || 'success')); } catch(e) {}
+      }
+    },
+    print: function(html) {
+      if (window.AndroidInterface && window.AndroidInterface.printReceipt) {
+        try { window.AndroidInterface.printReceipt(String(html)); return true; } catch(e) {}
+      }
+      return false;
+    }
+  };
+
+  // Hook Android haptic + sound feedback into key actions
+  // KOT sent → short vibrate + beep
+  document.addEventListener('rs:kot-sent', function() {
+    RS_Android.vibrate(60);
+    RS_Android.playSound('success');
+  });
+  // Bill paid → double vibrate + bilingual announcement
+  document.addEventListener('rs:bill-paid', function(e) {
+    RS_Android.vibrate(120);
+    RS_Android.playSound('order_success');
+    const total = e.detail && e.detail.total ? e.detail.total : '';
+    if (total) RS_Android.speakBilingual('Bill paid ' + total, 'Bill paid ' + total);
+  });
+  // New QR order arrives → alert sound
+  document.addEventListener('rs:new-qr-order', function() {
+    RS_Android.vibrate(200);
+    RS_Android.playSound('alert');
+  });
+
   window.RS_ProgressOverlay = {
     show(title, steps) {
       const existing = document.getElementById('rs-progress-overlay');
@@ -3809,7 +4101,6 @@
         color: var(--text);
         text-align: center;
       `;
-      
       const head = document.createElement('h4');
       head.textContent = title;
       head.style.cssText = 'margin:0 0 16px 0;font-size:16px;font-weight:700;color:var(--text)';
