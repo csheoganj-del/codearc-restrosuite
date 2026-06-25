@@ -55,4 +55,108 @@
   <button class="exit-btn" onclick="window.location.href='dashboard.html'">
     <i class="fas fa-times"></i> Exit Display
   </button>
-  <div id="token
+  <div id="tokens-standalone">
+    <div class="token-board-head">
+      <div style="display:flex;align-items:center;gap:11px">
+        <span class="tb-ic"><i class="fa-solid fa-bullhorn"></i></span>
+        <div>
+          <div style="font-weight:700;font-size:15px">Customer Token Monitor</div>
+          <div style="font-size:12px;color:#6B7280">Pickup counter display — auto-refreshes every 8s</div>
+        </div>
+      </div>
+      <span class="pill-green"><span class="dot-live"></span> Live</span>
+    </div>
+    <div class="token-board">
+      <div class="token-col">
+        <div class="token-col-h preparing">
+          <i class="fa-solid fa-fire"></i> Preparing &middot; <span id="prep-count">0</span>
+        </div>
+        <div id="prep-list"></div>
+      </div>
+      <div class="token-col">
+        <div class="token-col-h ready">
+          <i class="fa-solid fa-circle-check"></i> Ready for pickup &middot; <span id="ready-count">0</span>
+        </div>
+        <div id="ready-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+  <script src="assets/supabase-config.js"></script>
+  <script src="assets/doppio-api.js"></script>
+  <script src="assets/db.js?v=20260625"></script>
+  <script>
+  (function() {
+    'use strict';
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    var PREPARING = [], READY = [];
+
+    function renderBoard() {
+      document.getElementById('prep-count').textContent = PREPARING.length;
+      document.getElementById('ready-count').textContent = READY.length;
+      var prepList = document.getElementById('prep-list');
+      var readyList = document.getElementById('ready-list');
+
+      prepList.innerHTML = PREPARING.length === 0
+        ? '<div class="empty-col"><i class="fa-solid fa-fire"></i><span>Nothing in kitchen right now</span></div>'
+        : PREPARING.map(function(t) {
+            return '<div class="token-chip prep"><div class="tk">' + esc(t.tok) + '</div>' +
+              '<div class="tmeta">' + esc(t.type) + ' &middot; ' + esc(t.items) + ' items</div>' +
+              '<div class="tmin"><i class="fa-solid fa-clock"></i> ~' + esc(t.min) + ' min</div></div>';
+          }).join('');
+
+      readyList.innerHTML = READY.length === 0
+        ? '<div class="empty-col"><i class="fa-solid fa-circle-check"></i><span>No orders ready yet</span></div>'
+        : READY.map(function(t) {
+            return '<div class="token-chip rdy" data-tok="' + esc(t.tok) + '">' +
+              '<div class="tk">' + esc(t.tok) + '</div>' +
+              '<div class="tmeta">' + esc(t.type) + ' &middot; ' + esc(t.items) + ' items</div>' +
+              '<div class="tcall"><i class="fa-solid fa-bell"></i> Tap to announce</div></div>';
+          }).join('');
+
+      readyList.querySelectorAll('.token-chip.rdy').forEach(function(c) {
+        c.addEventListener('click', function() {
+          var tok = c.dataset.tok;
+          if (window.AndroidInterface && window.AndroidInterface.speakBilingual) {
+            window.AndroidInterface.speakBilingual(
+              'Token ' + tok + ', please collect your order at the counter',
+              'Token ' + tok
+            );
+          }
+        });
+      });
+    }
+
+    function loadOrders() {
+      if (!window.RS_DB) { setTimeout(loadOrders, 500); return; }
+      RS_DB.list('pending_orders').then(function(rows) {
+        PREPARING = []; READY = [];
+        var now = Date.now();
+        (rows || []).forEach(function(r) {
+          var st = String(r.status || '').toLowerCase();
+          var isPrep = st === 'accepted' || st === 'preparing';
+          var isReady = st === 'ready';
+          if (!isPrep && !isReady) return;
+          var items = Array.isArray(r.items) ? r.items.reduce(function(a,i){return a+(i.qty||1);},0) : 0;
+          var ageMin = Math.max(0, Math.round((now - new Date(r.dateTime||now).getTime()) / 60000));
+          var entry = { tok: r.orderId || String(r.id||'').slice(-4) || '??', type: r.orderType || 'Order', items: items, min: ageMin };
+          if (isPrep) PREPARING.push(entry); else READY.push(entry);
+        });
+        renderBoard();
+      }).catch(function(e) { console.warn('Token board load error:', e); });
+    }
+
+    setTimeout(loadOrders, 800);
+    setInterval(loadOrders, 8000);
+    window.addEventListener('rs:db-sync', function(e) {
+      if (e && e.detail && e.detail.collection === 'pending_orders') loadOrders();
+    });
+  })();
+  </script>
+</body>
+</html>
