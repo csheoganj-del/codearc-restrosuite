@@ -287,8 +287,8 @@
       
       return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div>${profileLines || '<div class="rcp-sub">CodeArc RestroSuite</div>'}</div>
         <hr class="rcp-hr">
-        <div class="rcp-meta"><span>${bill.no}</span><span>${bill.time}</span></div>
-        <div class="rcp-meta"><span>Table:</span><span>${bill.table}</span></div>
+        <div class="rcp-meta"><span>${esc(bill.no)}</span><span>${esc(bill.time)}</span></div>
+        <div class="rcp-meta"><span>Table:</span><span>${esc(bill.table)}</span></div>
         ${custSection}
         <hr class="rcp-hr">
         ${itemsHTML}
@@ -300,7 +300,7 @@
         ${taxBreakdownHTML}
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
         <hr class="rcp-hr">
-        ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${t.method}</span><span>${rs(t.amount)}</span></div>`).join('')}
+        ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${esc(t.method)}</span><span>${rs(t.amount)}</span></div>`).join('')}
         ${bill.change?`<div class="rcp-line"><span class="q">Change</span><span>${rs(bill.change)}</span></div>`:''}
         <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
     }
@@ -396,7 +396,7 @@
         }
 
         // Try local bundle first (no CDN dependency), fall back to CDN
-        tryLoad('/assets/lib/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        tryLoad('assets/lib/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
       });
     }
 

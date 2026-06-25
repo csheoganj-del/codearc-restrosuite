@@ -207,10 +207,18 @@ The repo includes a Supabase Edge Function at `supabase/functions/razorpay-webho
 
 **Setup:**
 
-1. In the Razorpay dashboard, create plans for each tier (Basic ₹999, Standard ₹2,499, Enterprise ₹4,999).
+1. In the Razorpay dashboard, create a plan for each tier with these exact `plan_id`s (the webhook maps them to entitlements):
+   - `plan_starter_monthly` → starter — **₹749 / month**
+   - `plan_growth_monthly` → growth — **₹1,499 / month**
+   - `plan_enterprise_monthly` → enterprise — **₹2,999 / month**
+
+   The pricing above is the single source of truth and must match the
+   `index.html` pricing cards and `razorpay-webhook/index.ts` `PLAN_SLUG_MAP`.
 2. Set the webhook URL to: `https://<project-ref>.supabase.co/functions/v1/razorpay-webhook`
-3. Enable events: `subscription.activated`, `subscription.charged`, `subscription.cancelled`, `payment.failed`
+3. Enable events: `subscription.activated`, `subscription.charged`, `subscription.cancelled`, `subscription.completed`, `payment.failed`
 4. Copy the webhook signing secret to Supabase secrets: `supabase secrets set RAZORPAY_WEBHOOK_SECRET=<value>`
+5. Run the idempotency migration so retried deliveries are de-duplicated:
+   `supabase/migrations/20260625000000_webhook_idempotency.sql`
 
 Frontend integration notes are in [`docs/razorpay-frontend.md`](docs/razorpay-frontend.md) *(to be added alongside checkout flow)*.
 
