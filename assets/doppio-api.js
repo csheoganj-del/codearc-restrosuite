@@ -33,6 +33,18 @@
   const ANON = String(cfg.anonKey || '').trim();
   const CONFIGURED = !!(REMOTE_BASE && ANON);
 
+  // SECURITY: the demo/mock fallback below can fabricate a full session for ANY
+  // slug/role (including superadmin) when Supabase is misconfigured or unreachable.
+  // In production this is an auth bypass — a transient /api/config failure would
+  // silently log any visitor in as admin. Demo mode must ONLY be available on a
+  // local developer machine. Never enable it for a real hostname (incl. Vercel
+  // previews, custom domains, or the Android WebView which uses file:// origins).
+  const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  // Android WebView injects window.ENV_SUPABASE_URL, so CONFIGURED is true there.
+  // An explicit opt-in flag (window.RS_ALLOW_DEMO = true) can still enable demo
+  // mode locally without spinning up Supabase.
+  const ALLOW_DEMO = IS_LOCALHOST && (window.RS_ALLOW_DEMO === true);
+
   const SS = window.sessionStorage;
   const LS_SESS = window.localStorage; // persistent session storage
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',

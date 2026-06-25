@@ -1261,6 +1261,7 @@ body.product-guide-open {
 }
 
 @media (min-width: 761px) and (max-width: 1024px) {
+  .app { grid-template-columns: 1fr !important; }
   .sidebar-hamburger { display: flex; }
   .sidebar-overlay.active { display: block; }
   

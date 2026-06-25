@@ -439,6 +439,21 @@
       if (localData) {
         cachedSettingsMap[tenantId] = localData;
       }
+      
+      if (!localData && signedIn()) {
+        try {
+          const res = await CLOUD.getSettings();
+          if (res) {
+            cachedSettingsMap[tenantId] = res;
+            await LS.setSettings(res);
+            lastListFetchTime['settings'] = Date.now();
+            return res;
+          }
+        } catch(e) {
+          console.warn(`[RS_DB] initial getSettings sync failed:`, e.message);
+        }
+      }
+
       const now = Date.now();
       const lastFetch = lastListFetchTime['settings'] || 0;
 

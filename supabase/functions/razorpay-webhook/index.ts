@@ -164,9 +164,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .from("saas_tenants")
         .update({
           status: "active",
-          plan: planSlug,
+          // plan_code is the column read by tenant-access/tenant-data/tenant-admin.
+          // Writing `plan` (the old field) silently left the entitlement gate stale.
+          plan_code: planSlug,
           subscription_id: subscriptionId,
           subscription_activated_at: new Date().toISOString(),
+          subscription_status: "active",
         })
         .eq("username", tenantUsername);
 

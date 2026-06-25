@@ -558,15 +558,24 @@ function autoInitializeLocalSessions() {
     if (!fs.existsSync(authDataPath)) return;
     try {
         const files = fs.readdirSync(authDataPath);
+        const tenantIds = [];
         for (const file of files) {
             if (file.startsWith('session-')) {
                 const tenantId = file.substring(8);
-                if (tenantId) {
-                    console.log(`[Startup Auto-Restore] Found local session directory for tenant: ${tenantId}`);
-                    getOrCreateClient(tenantId);
+                if (tenantId && tenantId !== 'system') {
+                    tenantIds.push(tenantId);
                 }
             }
         }
+
+        // Initialize non-system tenants sequentially with a 15-second delay to prevent CPU thrashing
+        tenantIds.forEach((tenantId, index) => {
+            const delayMs = (index + 1) * 15000; // start 15s after system client is initialized
+            setTimeout(() => {
+                console.log(`[Startup Auto-Restore] Initializing driver for tenant: ${tenantId} (after ${delayMs / 1000}s stagger delay)`);
+                getOrCreateClient(tenantId);
+            }, delayMs);
+        });
     } catch(err) {
         console.error('[Startup Auto-Restore Error] Failed to scan local sessions:', err.message);
     }
@@ -697,11 +706,15 @@ function getOrCreateClient(tenantId) {
                 if (tenantClients.get(tid) === tenantData) {
                     tenantClients.delete(tid);
                 }
-                try { await client.destroy(); } catch (_) {}
+                try {
+                    const destroyPromise = client.destroy();
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                    await Promise.race([destroyPromise, timeoutPromise]);
+                } catch (_) {}
                 // Trigger a fresh client instantiation
                 getOrCreateClient(tid);
             }
-        }, 45000); // 45 seconds watchdog
+        }, 120000); // 120 seconds watchdog (2 minutes) to allow slow cloud starts
     };
 
     const clearWatchdog = () => {
@@ -1483,9 +1496,19 @@ app.post('/logout', async (req, res) => {
         if (tenantClients.has(tenantId)) {
             const tenantData = tenantClients.get(tenantId);
             if (tenantData.status === 'ready') {
-                await tenantData.client.logout();
+                try {
+                    const logoutPromise = tenantData.client.logout();
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Logout timeout')), 5000));
+                    await Promise.race([logoutPromise, timeoutPromise]);
+                } catch (logoutErr) {
+                    console.log(`[Logout Warning] Logout failed or timed out for tenant ${tenantId}:`, logoutErr.message);
+                }
             }
-            try { await tenantData.client.destroy(); } catch (_) {}
+            try {
+                const destroyPromise = tenantData.client.destroy();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                await Promise.race([destroyPromise, timeoutPromise]);
+            } catch (_) {}
             
             // Delete auth folder locally
             const tenantFolder = path.join(authDataPath, `session-${tenantId}`);
@@ -1533,9 +1556,11 @@ async function performReset(req, res, format = 'json') {
             const tenantData = tenantClients.get(tenantId);
             try {
                 console.log(`[Reset] Closing active Puppeteer browser session for tenant ${tenantId}...`);
-                await tenantData.client.destroy();
+                const destroyPromise = tenantData.client.destroy();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                await Promise.race([destroyPromise, timeoutPromise]);
             } catch (destroyErr) {
-                console.log(`[Reset Warning] Failed to destroy client cleanly for tenant ${tenantId} (safe to ignore):`, destroyErr.message);
+                console.log(`[Reset Warning] Failed to destroy client cleanly or timed out for tenant ${tenantId} (safe to ignore):`, destroyErr.message);
             }
             tenantClients.delete(tenantId);
         }

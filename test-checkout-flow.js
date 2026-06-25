@@ -22,7 +22,11 @@ const server = http.createServer((req, res) => {
   server.listen(PORT);
   console.log(`Server on http://localhost:${PORT}`);
 
-  const browser = await puppeteer.launch({ headless: false, args: ['--no-sandbox', '--window-size=1400,900'] });
+  const browser = await puppeteer.launch({
+    headless: false,
+    executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    args: ['--no-sandbox', '--window-size=1400,900']
+  });
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
 
@@ -203,24 +207,58 @@ const server = http.createServer((req, res) => {
     console.log(`Discount panel visible after click: ${panelVisible}`);
   }
 
-  // Screenshot 6: Discount panel
-  console.log('Screenshot 6: Discount panel open...');
-  await page.screenshot({ path: path.join(ROOT, 'screenshot-6-discount.png'), fullPage: false });
-
-  // Check console errors
+  // Check console errors and all messages
+  const logs = [];
   const errors = [];
-  page.on('pageerror', err => errors.push(err.message));
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => {
+    console.error('BROWSER ERROR:', err.message);
+    errors.push(err.message);
+  });
+  page.on('console', msg => {
+    const text = msg.text();
+    console.log(`BROWSER CONSOLE [${msg.type()}]:`, text);
+    if (msg.type() === 'error') errors.push(text);
+    logs.push(text);
+  });
+
+  // Inject cart items, fill phone number, and set PDF setting
+  console.log('Injecting cart items, phone number, and PDF receipt setting...');
+  await page.evaluate(() => {
+    if (window.RS && window.RS.addToCart) {
+      window.RS.addToCart({ id: 101, name: 'Basmati Boiled Rice', price: 3, category: 'Food' });
+      window.RS.addToCart({ id: 102, name: 'Saag Paneer(Side)', price: 9, category: 'Food' });
+      window.RS.addToCart({ id: 103, name: 'Sausages (3)', price: 4, category: 'Food' });
+    }
+    
+    const phoneInput = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+    if (phoneInput) {
+      phoneInput.value = '919983721179';
+      phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    const nameInput = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+    if (nameInput) {
+      nameInput.value = 'Test User';
+      nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Set settings to Thermal PDF receipt
+    window.RS_SETTINGS = {
+      set_whatsapp_bill_format: 'Thermal PDF receipt',
+      set_auto_send_receipts: true,
+      set_whatsapp_enabled: true
+    };
+  });
+
+  console.log('Clicking checkout button...');
+  await page.click('#btn-checkout');
+
+  console.log('Waiting 10 seconds for PDF compilation and gateway send...');
+  await new Promise(r => setTimeout(r, 10000));
 
   console.log('\n=== CHECKOUT FLOW TEST RESULTS ===');
-  console.log(`Cash section visible by default: ${cashSectionVisible}`);
-  console.log(`Default payment method: ${activePayMethod}`);
   console.log(`Screenshots saved to project root`);
   if (errors.length) console.log('Console errors:', errors.join('\n'));
   else console.log('No console errors detected during test');
-
-  // Keep browser open for 8 seconds for visual inspection
-  await new Promise(r => setTimeout(r, 8000));
 
   await browser.close();
   server.close();
