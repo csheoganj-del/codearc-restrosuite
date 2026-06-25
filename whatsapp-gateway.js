@@ -28,12 +28,13 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // Anon client for Realtime
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-    realtime: { transport: ws }
-});
+const supabase = (SUPABASE_URL && SUPABASE_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_KEY, { realtime: { transport: ws } })
+    : null;
 
 // Service client for Storage (session backup) + health log
-const hasServiceKey = SUPABASE_SERVICE_KEY &&
+const hasServiceKey = SUPABASE_URL &&
+                      SUPABASE_SERVICE_KEY &&
                       SUPABASE_SERVICE_KEY.trim() !== '' &&
                       !SUPABASE_SERVICE_KEY.startsWith('<');
 const supabaseService = hasServiceKey
@@ -188,7 +189,7 @@ app.use(cors({
     },
     credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Multi-Tenant Gateway State Manager
 const tenantClients = new Map(); // tenantId -> TenantClientData
@@ -659,6 +660,10 @@ function getOrCreateClient(tenantId) {
             clientId: tid,
             dataPath: authDataPath
         }),
+        webVersionCache: {
+            type: 'remote',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1042095497-alpha.html'
+        },
         puppeteer: {
             handleSIGINT: false,
             protocolTimeout: 0,
@@ -667,22 +672,7 @@ function getOrCreateClient(tenantId) {
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--disable-cache',
-                '--disk-cache-size=0',
-                '--media-cache-size=0',
-                '--aggressive-cache-discard',
-                '--disable-async-dns',
-                '--disable-extensions',
-                '--single-process',
-                '--disable-default-apps',
-                '--no-default-browser-check',
-                '--disable-features=IsolateOrigins,site-per-process,Translate,BackForwardCache',
-                '--js-flags=--max-old-space-size=512',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                '--disable-gpu'
             ]
         }
     });
@@ -1682,7 +1672,7 @@ app.post('/send', async (req, res) => {
         });
 
         // Broadcast success back to Supabase Realtime
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -1710,7 +1700,7 @@ app.post('/send', async (req, res) => {
         });
         
         // Broadcast failure back to Supabase Realtime
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -1777,9 +1767,10 @@ app.post('/supabase-webhook', async (req, res) => {
         phone = "91" + phone;
     }
 
-    // Wait 5s — the POS frontend auto-sends after 800ms; this gives it time
-    // to call /send first so we can skip if it already handled the bill (PDF mode).
-    await new Promise(r => setTimeout(r, 5000));
+    // Wait 15s — the POS frontend auto-sends after 800ms but the full chain
+    // (jsPDF load + edge function cold start + network) can take 8-12s.
+    // 15s gives enough headroom without meaningfully delaying text-only sends.
+    await new Promise(r => setTimeout(r, 15000));
 
     // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
     if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
@@ -1820,7 +1811,13 @@ app.post('/supabase-webhook', async (req, res) => {
                 let flags = {};
                 try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
                 uiSettings = flags.ui_settings || {};
-                
+
+                // If uiSettings couldn't be loaded, skip rather than risk sending wrong format.
+                if (!uiSettings || Object.keys(uiSettings).length === 0) {
+                    console.log(`[Webhook Skipped] uiSettings empty for tenant ${tenantId} — skipping to avoid duplicate/wrong-format send.`);
+                    return res.json({ status: 'skipped', reason: 'uiSettings not available' });
+                }
+
                 // Check if auto-send is disabled
                 const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
                 if (!autoSendEnabled) {
@@ -1865,7 +1862,7 @@ app.post('/supabase-webhook', async (req, res) => {
         console.log(`[Webhook Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId}`);
         
         // Broadcast success
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -1881,7 +1878,7 @@ app.post('/supabase-webhook', async (req, res) => {
         res.json({ status: 'success', message: 'Message sent successfully via Webhook' });
     } catch (err) {
         console.error(`[Webhook Error] Failed to send receipt:`, err.message);
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -2363,198 +2360,213 @@ async function runNotificationPollingFallback() {
 // NATIVE SUPABASE REALTIME DB LISTENERS
 // ======================================================
 const dbClientForRealtime = supabaseService || supabase;
-const realtimeChannel = dbClientForRealtime
-    .channel('doppio-realtime-listener')
-    .on(
-        'postgres_changes',
-        {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'doppio_bills'
-        },
-        async (payload) => {
-            const record = payload.new;
-            const orderId = record.orderId;
-            let phone = record.customerPhone;
-            const tenantId = record.tenant_id;
+if (dbClientForRealtime) {
+    const realtimeChannel = dbClientForRealtime
+        .channel('doppio-realtime-listener')
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'doppio_bills'
+            },
+            async (payload) => {
+                const record = payload.new;
+                const orderId = record.orderId;
+                let phone = record.customerPhone;
+                const tenantId = record.tenant_id;
 
-            console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
+                console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
 
-            // Wait 5s — the POS frontend auto-sends after 800ms; this gives it time
-            // to call /send first so we can skip if it already handled the bill (PDF mode).
-            await new Promise(r => setTimeout(r, 5000));
+                // Wait 5s — the POS frontend auto-sends after 800ms; this gives it time
+                // to call /send first so we can skip if it already handled the bill (PDF mode).
+                // 15s gives enough headroom for jsPDF load + edge cold start + network.
+                await new Promise(r => setTimeout(r, 15000));
 
-            // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
-            if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
-                console.log(`[Realtime Skipped] Order ${orderId} already handled by frontend via /send.`);
-                return;
-            }
-
-            if (!phone || phone.trim() === '' || phone === 'null') {
-                console.log(`[Realtime Triggered] Ignored: No phone number provided for bill ${orderId}`);
-                return;
-            }
-
-            phone = phone.replace(/\D/g, '');
-            if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
-                phone = "91" + phone;
-            }
-
-            try {
-                const chatId = `${phone}@c.us`;
-                let uiSettings = {};
-                
-                // Fetch dynamic business profile for this tenant
-                let tenantProfile = { ...businessProfile };
-                if (tenantId) {
-                    const dbClient = supabaseService || supabase;
-                    const { data: profiles, error: profileErr } = await dbClient
-                        .from('doppio_business_profile')
-                        .select('*')
-                        .eq('tenant_id', tenantId);
-                    
-                    if (profileErr) {
-                        console.error(`[Realtime Error] Failed to fetch profile for tenant ${tenantId}:`, profileErr.message);
-                    }
-                    
-                    if (profiles && profiles.length > 0) {
-                        tenantProfile.name = profiles[0].business_name || tenantProfile.name;
-                        tenantProfile.address = profiles[0].address || tenantProfile.address;
-                        tenantProfile.phone = profiles[0].phone || tenantProfile.phone;
-                        tenantProfile.gstEnabled = profiles[0].gst_enabled !== false;
-                        
-                        // Check if WhatsApp is enabled in tenant business settings
-                        if (profiles[0].whatsapp_enabled === false) {
-                            console.log(`[Realtime Cancelled] WhatsApp receipts are disabled in settings for tenant ${tenantId}.`);
-                            return;
-                        }
-
-                        // Check bill format preference — if PDF mode, skip auto-send from realtime listener.
-                        // The POS frontend will handle PDF generation and delivery via the /send endpoint.
-                        let flags = {};
-                        try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
-                        uiSettings = flags.ui_settings || {};
-
-                        // Check if auto-send is disabled
-                        const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
-                        if (!autoSendEnabled) {
-                            console.log(`[Realtime Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
-                            return;
-                        }
-
-                        const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
-                        if (billFormat === 'Thermal PDF receipt') {
-                            console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped. POS frontend will send PDF via /send.`);
-                            return;
-                        }
-                    }
+                // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
+                if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
+                    console.log(`[Realtime Skipped] Order ${orderId} already handled by frontend via /send.`);
+                    return;
                 }
 
-                // Extract tenant currency symbol (WhatsApp-safe ASCII version)
-                let currSymbol = 'Rs.';
+                if (!phone || phone.trim() === '' || phone === 'null') {
+                    console.log(`[Realtime Triggered] Ignored: No phone number provided for bill ${orderId}`);
+                    return;
+                }
+
+                phone = phone.replace(/\D/g, '');
+                if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
+                    phone = "91" + phone;
+                }
+
                 try {
-                    const rawCurr = uiSettings.set_currency || '';
-                    if (rawCurr) {
-                        // Handle "EUR (€)" → extract €
-                        const m = rawCurr.match(/\(([^)]+)\)/);
-                        const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
-                        // Convert multi-byte symbols to ASCII-safe equivalents for WhatsApp
-                        currSymbol = sym
-                            .replace(/₹/g, 'Rs.')
-                            .replace(/€/g, 'EUR')
-                            .replace(/£/g, 'GBP')
-                            .replace(/¥/g, 'JPY')
-                            .replace(/₩/g, 'KRW')
-                            .replace(/₺/g, 'TRY')
-                            .replace(/₴/g, 'UAH');
-                    }
-                } catch(currErr) {
-                    console.warn('[Realtime] Failed to parse currency symbol:', currErr.message);
-                }
-
-                // Format clean text receipt (matching POS frontend format)
-                const message = formatReceiptText(record, tenantProfile, currSymbol);
-                
-                // Dispatch message via Whatsapp
-                const tenantData = getOrCreateClient(tenantId);
-                if (tenantData.status === 'ready') {
-                    await tenantData.client.sendMessage(chatId, message);
-                    console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
+                    const chatId = `${phone}@c.us`;
+                    let uiSettings = {};
                     
-                    // Broadcast success back to POS Web Clients
-                    const broadcastChannel = supabase.channel('whatsapp-billing-status');
-                    broadcastChannel.subscribe(async (status) => {
-                        if (status === 'SUBSCRIBED') {
-                            await broadcastChannel.send({
-                                type: 'broadcast',
-                                event: 'status',
-                                payload: { orderId, status: 'success' }
-                            });
-                            supabase.removeChannel(broadcastChannel);
+                    // Fetch dynamic business profile for this tenant
+                    let tenantProfile = { ...businessProfile };
+                    if (tenantId) {
+                        const dbClient = supabaseService || supabase;
+                        const { data: profiles, error: profileErr } = await dbClient
+                            .from('doppio_business_profile')
+                            .select('*')
+                            .eq('tenant_id', tenantId);
+                        
+                        if (profileErr) {
+                            console.error(`[Realtime Error] Failed to fetch profile for tenant ${tenantId}:`, profileErr.message);
                         }
-                    });
-                } else {
-                    console.warn(`[Realtime Delay] WhatsApp gateway for tenant ${tenantId} not connected (Status: ${tenantData.status}). Cannot dispatch message.`);
-                }
-            } catch (err) {
-                console.error(`[Realtime Error] Failed to send receipt for order ${orderId} to +${phone}:`, err.message);
-                
-                // Broadcast failure back to POS Web Clients
-                const broadcastChannel = supabase.channel('whatsapp-billing-status');
-                broadcastChannel.subscribe(async (status) => {
-                    if (status === 'SUBSCRIBED') {
-                        await broadcastChannel.send({
-                            type: 'broadcast',
-                            event: 'status',
-                            payload: { orderId, status: 'failed', error: err.message }
-                        });
-                        supabase.removeChannel(broadcastChannel);
-                    }
-                });
-            }
-        }
-    )
-    .on(
-        'postgres_changes',
-        {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'saas_tenants'
-        },
-        async (payload) => {
-            const record = payload.new;
-            console.log(`[Realtime SaaS] Detected new registration insert: ${record.name} (${record.slug})`);
-            await handleNewRegistrationNotification(record);
-        }
-    )
-    .on(
-        'postgres_changes',
-        {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'saas_tenants'
-        },
-        async (payload) => {
-            const oldRecord = payload.old;
-            const newRecord = payload.new;
-            
-            // Check if status transitioned from pending to approved
-            // Note: If replica identity full is not set, oldRecord might only contain the ID.
-            // In that case, we fall back to checking if newRecord status is 'approved' and oldRecord.status was undefined (or not 'approved').
-            const oldStatus = oldRecord ? oldRecord.status : null;
-            const newStatus = newRecord ? newRecord.status : null;
-            
-            console.log(`[Realtime SaaS] Detected tenant update: ${newRecord.name} (Status: ${oldStatus} -> ${newStatus})`);
-            
-            if (newStatus === 'approved' && oldStatus !== 'approved') {
-                await handleApprovalNotification(newRecord);
-            }
-        }
-    );
+                        
+                        if (profiles && profiles.length > 0) {
+                            tenantProfile.name = profiles[0].business_name || tenantProfile.name;
+                            tenantProfile.address = profiles[0].address || tenantProfile.address;
+                            tenantProfile.phone = profiles[0].phone || tenantProfile.phone;
+                            tenantProfile.gstEnabled = profiles[0].gst_enabled !== false;
+                            
+                            // Check if WhatsApp is enabled in tenant business settings
+                            if (profiles[0].whatsapp_enabled === false) {
+                                console.log(`[Realtime Cancelled] WhatsApp receipts are disabled in settings for tenant ${tenantId}.`);
+                                return;
+                            }
 
-realtimeChannel.subscribe((status) => {
-    console.log(`[Realtime Sub] Connected to Supabase Postgres Replication status: ${status}`);
-});
+                            // Check bill format preference — if PDF mode, skip auto-send from realtime listener.
+                            // The POS frontend will handle PDF generation and delivery via the /send endpoint.
+                            let flags = {};
+                            try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
+                            uiSettings = flags.ui_settings || {};
+
+                            // If uiSettings couldn't be loaded, skip rather than risk sending wrong format.
+                            if (!uiSettings || Object.keys(uiSettings).length === 0) {
+                                console.log(`[Realtime Skipped] uiSettings empty for tenant ${tenantId} — skipping to avoid duplicate/wrong-format send.`);
+                                return;
+                            }
+
+                            // Check if auto-send is disabled
+                            const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
+                            if (!autoSendEnabled) {
+                                console.log(`[Realtime Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
+                                return;
+                            }
+
+                            const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
+                            if (billFormat === 'Thermal PDF receipt') {
+                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped. POS frontend will send PDF via /send.`);
+                                return;
+                            }
+                        }
+                    }
+
+                    // Extract tenant currency symbol (WhatsApp-safe ASCII version)
+                    let currSymbol = 'Rs.';
+                    try {
+                        const rawCurr = uiSettings.set_currency || '';
+                        if (rawCurr) {
+                            // Handle "EUR (€)" → extract €
+                            const m = rawCurr.match(/\(([^)]+)\)/);
+                            const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
+                            // Convert multi-byte symbols to ASCII-safe equivalents for WhatsApp
+                            currSymbol = sym
+                                .replace(/₹/g, 'Rs.')
+                                .replace(/€/g, 'EUR')
+                                .replace(/£/g, 'GBP')
+                                .replace(/¥/g, 'JPY')
+                                .replace(/₩/g, 'KRW')
+                                .replace(/₺/g, 'TRY')
+                                .replace(/₴/g, 'UAH');
+                        }
+                    } catch(currErr) {
+                        console.warn('[Realtime] Failed to parse currency symbol:', currErr.message);
+                    }
+
+                    // Format clean text receipt (matching POS frontend format)
+                    const message = formatReceiptText(record, tenantProfile, currSymbol);
+                    
+                    // Dispatch message via Whatsapp
+                    const tenantData = getOrCreateClient(tenantId);
+                    if (tenantData.status === 'ready') {
+                        await tenantData.client.sendMessage(chatId, message);
+                        console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
+                        
+                        // Broadcast success back to POS Web Clients
+                        if (supabase) {
+                            const broadcastChannel = supabase.channel('whatsapp-billing-status');
+                            broadcastChannel.subscribe(async (status) => {
+                                if (status === 'SUBSCRIBED') {
+                                    await broadcastChannel.send({
+                                        type: 'broadcast',
+                                        event: 'status',
+                                        payload: { orderId, status: 'success' }
+                                    });
+                                    supabase.removeChannel(broadcastChannel);
+                                }
+                            });
+                        }
+                    } else {
+                        console.warn(`[Realtime Delay] WhatsApp gateway for tenant ${tenantId} not connected (Status: ${tenantData.status}). Cannot dispatch message.`);
+                    }
+                } catch (err) {
+                    console.error(`[Realtime Error] Failed to send receipt for order ${orderId} to +${phone}:`, err.message);
+                    
+                    // Broadcast failure back to POS Web Clients
+                    if (supabase) {
+                        const broadcastChannel = supabase.channel('whatsapp-billing-status');
+                        broadcastChannel.subscribe(async (status) => {
+                            if (status === 'SUBSCRIBED') {
+                                await broadcastChannel.send({
+                                    type: 'broadcast',
+                                    event: 'status',
+                                    payload: { orderId, status: 'failed', error: err.message }
+                                });
+                                supabase.removeChannel(broadcastChannel);
+                            }
+                        });
+                    }
+                }
+            }
+        )
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'saas_tenants'
+            },
+            async (payload) => {
+                const record = payload.new;
+                console.log(`[Realtime SaaS] Detected new registration insert: ${record.name} (${record.slug})`);
+                await handleNewRegistrationNotification(record);
+            }
+        )
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'saas_tenants'
+            },
+            async (payload) => {
+                const oldRecord = payload.old;
+                const newRecord = payload.new;
+                
+                // Check if status transitioned from pending to approved
+                // Note: If replica identity full is not set, oldRecord might only contain the ID.
+                // In that case, we fall back to checking if newRecord status is 'approved' and oldRecord.status was undefined (or not 'approved').
+                const oldStatus = oldRecord ? oldRecord.status : null;
+                const newStatus = newRecord ? newRecord.status : null;
+                
+                console.log(`[Realtime SaaS] Detected tenant update: ${newRecord.name} (Status: ${oldStatus} -> ${newStatus})`);
+                
+                if (newStatus === 'approved' && oldStatus !== 'approved') {
+                    await handleApprovalNotification(newRecord);
+                }
+            }
+        );
+
+    realtimeChannel.subscribe((status) => {
+        console.log(`[Realtime Sub] Connected to Supabase Postgres Replication status: ${status}`);
+    });
+} else {
+    console.warn('[Realtime] Supabase clients not initialized. Postgres realtime listener is disabled.');
+}
 
 // ======================================================
 // MONOSPACE RECEIPT FORMATTER UTILITIES
