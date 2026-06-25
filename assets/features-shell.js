@@ -659,8 +659,15 @@
     /* ===================== DB MODE BADGE + SESSION ===================== */
     (function(){
       const pill = document.getElementById('db-mode-pill');
-      const cloud = window.RS_DB && window.RS_DB.isCloud;
-      if(pill){ pill.innerHTML = `<span class="dot dot-live"></span> ${cloud?'Cloud':'Local'}`; pill.title = cloud?'Connected to Supabase — data syncs to the cloud':'Local mode — data persists in this browser. Add Supabase keys to sync.'; }
+      function updatePill() {
+        const cloud = window.RS_DB && window.RS_DB.isCloud;
+        if(pill){
+          pill.innerHTML = `<span class="dot dot-live"></span> ${cloud?'Cloud':'Local'}`;
+          pill.title = cloud?'Connected to Supabase — data syncs to the cloud':'Local mode — data persists in this browser. Add Supabase keys to sync.';
+        }
+      }
+      updatePill();
+      document.addEventListener('rs:hydrated', updatePill);
       // reflect signed-in user on the sidebar pill, if any
       if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
       // route sign-out through the data layer
