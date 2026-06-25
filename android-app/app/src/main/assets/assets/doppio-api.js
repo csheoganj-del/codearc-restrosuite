@@ -10,32 +10,34 @@
   let cfg = window.RS_SUPABASE || { url:'', anonKey:'' };
   let enableDemoTools = false;
   let zeroCostLaunchMode = false;
-  if (!cfg.url || !cfg.anonKey) {
-    // Use the async config promise from config.js when available (non-blocking).
-    // Synchronous XHR is deprecated and blocks the main thread; this replaces it.
-    const configSource = window.__configReady || Promise.resolve();
-    configSource.then(() => {
-      if (window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__) {
-        cfg = { url: window.__SUPABASE_URL__, anonKey: window.__SUPABASE_ANON_KEY__ };
-      } else if (!cfg.url || !cfg.anonKey) {
-        // Final fallback: async fetch (still non-blocking)
-        fetch('/api/config').then(r => r.ok ? r.json() : null).then(res => {
-          if (res && res.supabaseUrl && res.supabaseAnonKey) {
-            cfg = { url: res.supabaseUrl, anonKey: res.supabaseAnonKey };
-            enableDemoTools = res.enableDemoTools === true;
-            zeroCostLaunchMode = res.zeroCostLaunchMode === true;
-          }
-        }).catch(e => console.warn('[doppio-api] Async /api/config failed:', e.message));
-      }
-      enableDemoTools = !!(window.__enableDemoTools);
-      zeroCostLaunchMode = !!(window.__zeroCostLaunchMode);
-    });
+
+  let REMOTE_BASE = '';
+  let BASE = '';
+  let ANON = '';
+  let CONFIGURED = false;
+  let supabaseClient = null;
+
+  function recomputeConfig() {
+    REMOTE_BASE = String(cfg.url || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');
+    BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '' : REMOTE_BASE;
+    ANON = String(cfg.anonKey || '').trim();
+    CONFIGURED = !!(REMOTE_BASE && ANON);
+
+    if (window.supabase && CONFIGURED && !supabaseClient) {
+      supabaseClient = window.supabase.createClient(REMOTE_BASE, ANON);
+    }
+
+    if (window.RS_API) {
+      window.RS_API.configured = CONFIGURED;
+      window.RS_API.baseUrl = BASE;
+      window.RS_API.supabaseClient = supabaseClient;
+      window.RS_API.enableDemoTools = enableDemoTools;
+      window.RS_API.zeroCostLaunchMode = zeroCostLaunchMode;
+    }
   }
-  // Normalise: accept either the bare project URL or one with a /rest/v1 or /functions/v1 suffix.
-  const REMOTE_BASE = String(cfg.url || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');
-  const BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '' : REMOTE_BASE;
-  const ANON = String(cfg.anonKey || '').trim();
-  const CONFIGURED = !!(REMOTE_BASE && ANON);
+
+  // Run initial recompute synchronously
+  recomputeConfig();
 
   // SECURITY: the demo/mock fallback below can fabricate a full session for ANY
   // slug/role (including superadmin) when Supabase is misconfigured or unreachable.
@@ -55,7 +57,34 @@
               tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display',
               persist:'rs_session_persistent' };
 
-  const supabaseClient = (window.supabase && CONFIGURED) ? window.supabase.createClient(REMOTE_BASE, ANON) : null;
+  if (!cfg.url || !cfg.anonKey) {
+    const configSource = window.__configReady || Promise.resolve();
+    configSource.then(() => {
+      if (window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__) {
+        cfg = { url: window.__SUPABASE_URL__, anonKey: window.__SUPABASE_ANON_KEY__ };
+        if (window.CONFIG) {
+          enableDemoTools = !!window.CONFIG.enableDemoTools;
+          zeroCostLaunchMode = !!window.CONFIG.zeroCostLaunchMode;
+        } else {
+          enableDemoTools = !!window.__enableDemoTools;
+          zeroCostLaunchMode = !!window.__zeroCostLaunchMode;
+        }
+        recomputeConfig();
+      } else if (!cfg.url || !cfg.anonKey) {
+        fetch('/api/config')
+          .then(r => r.ok ? r.json() : null)
+          .then(res => {
+            if (res && res.supabaseUrl && res.supabaseAnonKey) {
+              cfg = { url: res.supabaseUrl, anonKey: res.supabaseAnonKey };
+              enableDemoTools = res.enableDemoTools === true;
+              zeroCostLaunchMode = res.zeroCostLaunchMode === true;
+              recomputeConfig();
+            }
+          })
+          .catch(e => console.warn('[doppio-api] Async /api/config failed:', e.message));
+      }
+    });
+  }
 
   // Helper: read from localStorage first (persistent), then sessionStorage (tab-only)
   function ssGet(k){ return LS_SESS.getItem(k) || SS.getItem(k); }
