@@ -59,14 +59,15 @@
     };
   })();
 
-  const API = window.RS_API;
-  const cloudConfigured = !!(API && API.configured);
-  function signedIn(){ return cloudConfigured && !!API.session(); }
+  function isCloudConfigured() {
+    return !!(window.RS_API && window.RS_API.configured);
+  }
+  function signedIn(){ return isCloudConfigured() && !!(window.RS_API && window.RS_API.session()); }
   function mode(){ return signedIn() ? 'cloud' : 'local'; }
 
   function getActiveTenantId() {
-    if (cloudConfigured && API && API.session) {
-      const s = API.session();
+    if (isCloudConfigured() && window.RS_API && window.RS_API.session) {
+      const s = window.RS_API.session();
       if (s && s.tenant_id) return s.tenant_id;
     }
     try {
@@ -603,10 +604,10 @@
 
   /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */
   const auth = {
-    async signUp(p){ if(cloudConfigured) return API.register(p); throw new Error('Cloud not configured'); },
-    async signIn(p){ if(cloudConfigured){ const r=await API.login(p); if(r.token) localStorage.setItem('rs:session',JSON.stringify(r)); return r; } throw new Error('Cloud not configured'); },
+    async signUp(p){ if(isCloudConfigured()) return window.RS_API.register(p); throw new Error('Cloud not configured'); },
+    async signIn(p){ if(isCloudConfigured()){ const r=await window.RS_API.login(p); if(r.token) localStorage.setItem('rs:session',JSON.stringify(r)); return r; } throw new Error('Cloud not configured'); },
     async signOut(){
-      if(cloudConfigured && signedIn()){ try{ await API.logout(); }catch(e){} }
+      if(isCloudConfigured() && signedIn()){ try{ await window.RS_API.logout(); }catch(e){} }
       for (const k in lastListFetchTime) delete lastListFetchTime[k];
       cachedSettingsMap = {};
       cachedSettings = null;
@@ -630,13 +631,13 @@
       localStorage.removeItem('rs:session');
       return true;
     },
-    async session(){ if(API) { const s = API.session(); if(s) return s; } try{ return JSON.parse(localStorage.getItem('rs:session'))||null; }catch(e){ return null; } }
+    async session(){ if(window.RS_API) { const s = window.RS_API.session(); if(s) return s; } try{ return JSON.parse(localStorage.getItem('rs:session'))||null; }catch(e){ return null; } }
   };
 
   window.RS_DB = {
     get mode(){ return mode(); },
     get isCloud(){ return signedIn(); },
-    cloudConfigured,
+    get cloudConfigured(){ return isCloudConfigured(); },
     list:(c)=>guard('list',c),
     listLocal:(c)=>LS.list(c),
     listCloud:(c)=>CLOUD.list(c),
