@@ -16,6 +16,140 @@ const archiver = require('archiver');
 const unzipper = require('unzipper');
 
 // ============================================================
+// HUMAN-SEND ENGINE — prevents Meta automation detection
+// ============================================================
+//
+// How Meta bans numbers:
+//  1. COMPLAINT RATE (primary)  — >2% of recipients tap "Block/Report Spam" → flagged
+//  2. MESSAGE VELOCITY          — machine-like uniform intervals (exactly 5s every time)
+//  3. PROTOCOL FINGERPRINT      — no typing indicator, no online presence, no read receipts
+//  4. BURST PATTERN             — silent for hours then 50 msgs in 60 seconds
+//  5. NUMBER TRUST SCORE        — new number + no profile pic + no incoming msgs = low trust
+//
+// This engine addresses issues 2, 3, and 4. Issue 1 is handled by only sending
+// to customers who voluntarily provided their number at checkout.
+
+// Per-tenant daily send counter { tenantId: { date, count } }
+const _dailySendCount = {};
+const DAILY_LIMIT = 200; // safe ceiling per number per day
+
+// Per-tenant send queue to prevent bursting
+const _sendQueues = new Map(); // tenantId → Promise chain
+
+/** Returns a random integer between min and max (inclusive) */
+function _randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+/** Sleep for ms milliseconds */
+function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/** Is it a reasonable sending hour? (8am–9pm local machine time) */
+function _isBusinessHour() {
+    const h = new Date().getHours();
+    return h >= 8 && h < 21;
+}
+
+/**
+ * Human-like delay before sending a message:
+ *   - Short "typing" pause proportional to message length (simulates reading+typing)
+ *   - Random jitter so no two sends are exactly the same interval apart
+ */
+function _humanDelay(messageText) {
+    // ~200 chars/sec reading speed + 80 wpm typing → about 15ms per character, capped
+    const charDelay = Math.min((messageText || '').length * 12, 3500);
+    const jitter    = _randInt(800, 2800);
+    return charDelay + jitter; // 1–6 seconds total
+}
+
+/**
+ * Inter-message spacing — random gap between consecutive sends.
+ * Uniform timing (always 5000ms) is a dead giveaway; this varies 3–9s.
+ */
+function _betweenMessageDelay() { return _randInt(3000, 9000); }
+
+/** Check and increment daily counter. Returns false if limit reached. */
+function _checkDailyLimit(tenantId) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!_dailySendCount[tenantId] || _dailySendCount[tenantId].date !== today) {
+        _dailySendCount[tenantId] = { date: today, count: 0 };
+    }
+    if (_dailySendCount[tenantId].count >= DAILY_LIMIT) return false;
+    _dailySendCount[tenantId].count++;
+    return true;
+}
+
+/**
+ * humanSend — drop-in replacement for client.sendMessage()
+ *
+ * Wraps every outbound message with:
+ *   1. Daily rate-limit check (200/day per number)
+ *   2. Business-hour check (warns but does not block — restaurant may need late sends)
+ *   3. Typing indicator for realistic duration
+ *   4. Random human-like delay before actual send
+ *   5. Serial queue per tenant (no parallel bursts)
+ *   6. Inter-message gap after send
+ *
+ * @param {object} client      — wwebjs Client instance
+ * @param {string} chatId      — "phone@c.us"
+ * @param {string|object} msg  — message or MessageMedia
+ * @param {object} [opts]      — sendMessage options passthrough
+ * @param {string} [tenantId]  — for rate-limit tracking
+ */
+async function humanSend(client, chatId, msg, opts, tenantId) {
+    tenantId = tenantId || chatId;
+
+    // ── Rate limit ────────────────────────────────────────────────────────────
+    if (!_checkDailyLimit(tenantId)) {
+        console.warn(`[HumanSend] Daily limit (${DAILY_LIMIT}) reached for ${tenantId}. Message not sent.`);
+        throw new Error(`Daily WhatsApp send limit reached for this outlet. Try again tomorrow.`);
+    }
+
+    if (!_isBusinessHour()) {
+        console.warn(`[HumanSend] Sending outside business hours (8am-9pm) for ${tenantId}.`);
+    }
+
+    // ── Queue per tenant (no burst parallelism) ───────────────────────────────
+    const prev = _sendQueues.get(tenantId) || Promise.resolve();
+    const next = prev.then(async () => {
+        try {
+            // 1. Go online
+            try { await client.sendPresenceUpdate('available', chatId); } catch(_) {}
+
+            // 2. Show typing indicator
+            let chat;
+            try {
+                chat = await client.getChatById(chatId);
+                await chat.sendStateTyping();
+            } catch(_) {}
+
+            // 3. Wait a human-realistic duration
+            const msgText = typeof msg === 'string' ? msg : (msg?.caption || '');
+            await _sleep(_humanDelay(msgText));
+
+            // 4. Send the actual message
+            const result = await client.sendMessage(chatId, msg, opts || {});
+
+            // 5. Clear typing state
+            try { if (chat) await chat.clearState(); } catch(_) {}
+
+            // 6. Go back to idle presence
+            try { await client.sendPresenceUpdate('paused', chatId); } catch(_) {}
+
+            // 7. Post-send gap before next message can fire
+            await _sleep(_betweenMessageDelay());
+
+            return result;
+        } catch (err) {
+            // Still do the post-send gap so next queued message isn't fired instantly
+            await _sleep(_betweenMessageDelay());
+            throw err;
+        }
+    });
+
+    _sendQueues.set(tenantId, next.catch(() => {})); // don't let rejection break the chain
+    return next;
+}
+
+// ============================================================
 // SUPABASE CLIENTS
 // ============================================================
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -1647,13 +1781,13 @@ app.post('/send', async (req, res) => {
         if (pdfData) {
             const { MessageMedia } = require('whatsapp-web.js');
             const media = new MessageMedia('application/pdf', pdfData, filename || 'receipt.pdf');
-            await tenantData.client.sendMessage(chatId, media);
+            await humanSend(tenantData.client, chatId, media, {}, tenantId);
             // Do NOT send a separate text after the PDF — the PDF IS the receipt.
         } else {
             // Send monospaced text receipt
-            await tenantData.client.sendMessage(chatId, message);
+            await humanSend(tenantData.client, chatId, message, {}, tenantId);
         }
-        
+
         console.log(`[Manual Sent] WhatsApp receipt successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
 
         // Mark this order as handled so the realtime listener doesn't double-send
@@ -1858,7 +1992,7 @@ app.post('/supabase-webhook', async (req, res) => {
         if (tenantData.status !== 'ready') {
             throw new Error(`WhatsApp gateway for tenant ${tenantId} is not connected.`);
         }
-        await tenantData.client.sendMessage(chatId, message);
+        await humanSend(tenantData.client, chatId, message, {}, tenantId);
         console.log(`[Webhook Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId}`);
         
         // Broadcast success
@@ -1927,7 +2061,7 @@ async function handleNewRegistrationNotification(record) {
         const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestroSuite*`;
         
         try {
-            await systemData.client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
+            await humanSend(systemData.client, chatId, escapeLinks(msgText), { linkPreview: false }, 'system');
             console.log(`[Realtime WhatsApp] Registration confirmation sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('registration_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -2208,7 +2342,7 @@ async function handleApprovalNotification(record) {
         const msgText = `Dear Partner,\n\nWe are pleased to inform you that your registration request for *${name}* has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active.\n\n*Access Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n\n*Management Portal Link:* https://restrosuite.codearc.co.in/login.html\n\nYou may now log in to the portal to configure your outlet settings, menu inventory, and employee rosters.\n\nShould you require any assistance or launch support, please contact our support desk at hello@codearc.co.in.\n\nSincerely,\n*CodeArc Operations Team*`;
         
         try {
-            await systemData.client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
+            await humanSend(systemData.client, chatId, escapeLinks(msgText), { linkPreview: false }, 'system');
             console.log(`[Realtime WhatsApp] Account approval alert sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('approval_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -2483,7 +2617,7 @@ if (dbClientForRealtime) {
                     // Dispatch message via Whatsapp
                     const tenantData = getOrCreateClient(tenantId);
                     if (tenantData.status === 'ready') {
-                        await tenantData.client.sendMessage(chatId, message);
+                        await humanSend(tenantData.client, chatId, message, {}, tenantId);
                         console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
                         
                         // Broadcast success back to POS Web Clients
@@ -2874,152 +3008,4 @@ app.get('/test-relay-call', async (req, res) => {
         headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(postData),
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        },
-        timeout: 10000
-    };
-    
-    const request = https.request(url, options, (response) => {
-        let body = '';
-        response.on('data', chunk => body += chunk);
-        response.on('end', () => {
-            res.json({
-                statusCode: response.statusCode,
-                headers: response.headers,
-                body: body
-            });
-        });
-    });
-    request.on('error', err => res.json({ error: err.message }));
-    request.write(postData);
-    request.end();
-});
-
-// HEALTH ENDPOINT — for UptimeRobot / external monitors
-// ============================================================
-app.get('/health', (req, res) => {
-    const systemData = tenantClients.get('system') || { status: 'disconnected' };
-    res.json({
-        ok: true,
-        status: systemData.status,
-        uptime: Math.floor(process.uptime()),
-        time: new Date().toISOString()
-    });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-    console.log('\n======================================================');
-    console.log(` RestroSuite WhatsApp Gateway running at:`);
-    console.log(` http://localhost:${PORT}`);
-    console.log('======================================================');
-    try {
-        const commitHash = require('child_process').execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-        console.log(`[Startup] Code version commit: ${commitHash}`);
-    } catch (err) {
-        console.log(`[Startup] Code version commit lookup failed (git not installed or no repo).`);
-    }
-
-    // Ensure storage bucket exists and limits are set correctly (150MB) to allow session backup
-    if (supabaseService) {
-        try {
-            console.log('[Startup] Ensuring storage bucket exists and limits are set correctly...');
-            const bucketTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
-            
-            const runSetup = async () => {
-                const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
-                if (listError) throw listError;
-                const exists = buckets && buckets.some(b => b.name === SESSION_BUCKET);
-                if (!exists) {
-                    console.log(`[Startup] Bucket '${SESSION_BUCKET}' not found. Creating it...`);
-                    const { error: createError } = await supabaseService.storage.createBucket(SESSION_BUCKET, {
-                        public: false,
-                        fileSizeLimit: 10485760, // 10MB
-                        allowedMimeTypes: ['application/zip']
-                    });
-                    if (createError) throw createError;
-                    console.log(`[Startup] Bucket '${SESSION_BUCKET}' created successfully.`);
-                } else {
-                    const { error: updateError } = await supabaseService.storage.updateBucket(SESSION_BUCKET, {
-                        public: false,
-                        fileSizeLimit: 10485760 // 10MB
-                    });
-                    if (updateError) throw updateError;
-                    console.log(`[Startup] Bucket '${SESSION_BUCKET}' updated successfully.`);
-                }
-            };
-
-            await Promise.race([
-                runSetup(),
-                bucketTimeout
-            ]);
-            console.log('[Startup] Storage bucket configured.');
-        } catch (err) {
-            console.warn('[Startup Storage Config Warning]', err.message === 'timeout' ? 'Bucket setup timed out — skipping.' : err.message);
-        }
-    }
-
-    try {
-        const healthTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
-        await Promise.race([logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() }), healthTimeout]);
-    } catch (err) {
-        console.warn('[Startup Health Log Warning] Skipped:', err.message);
-    }
-
-    // Clean up any stale lock/socket/cookie files from a previous run first
-    console.log('[Startup] Cleaning up any stale browser lock/socket/cookie files...');
-    cleanupStaleLockFiles(authDataPath);
-
-    // Attempt to restore WhatsApp sessions from Supabase Storage
-    console.log('[Startup] Attempting to restore WhatsApp sessions from Supabase Storage...');
-    try {
-        const restoreTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
-        await Promise.race([restoreSessionsFromSupabase(), restoreTimeout]);
-    } catch (err) {
-        console.warn('[Startup Session Restore Warning] Timed out or failed:', err.message);
-    }
-
-    // Send startup alert email (informational only)
-    try {
-        const alertTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
-        await Promise.race([sendAdminAlert('startup', { sessionRestored: true }), alertTimeout]);
-    } catch (err) {
-        console.warn('[Startup Alert Warning] Skipped:', err.message);
-    }
-
-    console.log('[Startup] Initializing WhatsApp drivers...');
-    try {
-        console.log('[Startup Init Shield] Cleaning up stale browser lock/socket/cookie files immediately before launch...');
-        cleanupStaleLockFiles(authDataPath);
-    } catch (err) {
-        console.error('[Startup Init Shield Error]', err.message);
-    }
-
-    // Initialize SuperAdmin / system client
-    getOrCreateClient('system');
-    
-    // Auto-initialize other tenant clients that have local sessions
-    autoInitializeLocalSessions();
-
-    // Start database notification polling fallback (every 60 seconds)
-    if (supabaseService) {
-        console.log('[Startup] Starting database notification polling fallback...');
-        setTimeout(runNotificationPollingFallback, 5000); // Initial run in 5s
-        setInterval(runNotificationPollingFallback, 60000); // Run every 60s
-    }
-
-    // ============================================================
-    // KEEP-ALIVE SELF-PING — prevents HuggingFace Space from sleeping
-    // Pings own /health endpoint every 4 minutes so the space stays
-    // warm 24/7 even on the free tier.
-    // ============================================================
-    const selfUrl = process.env.SPACE_HOST
-        ? `https://${process.env.SPACE_HOST}/health`
-        : `http://localhost:3000/health`;
-    setInterval(() => {
-        const client = selfUrl.startsWith('https') ? require('https') : require('http');
-        client.get(selfUrl, (r) => {
-            console.log(`[Keep-Alive] Pinged ${selfUrl}`);
-        }).on('error', () => {});
-    }, 4 * 60 * 1000);
-});
+   
