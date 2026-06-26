@@ -82,7 +82,30 @@
     } catch(e) {}
     return '\u20b9';
   }
-  const rs = n => getCurrencySymbol() + Math.round(n).toLocaleString('en-IN');
+
+  // Returns the RS_COUNTRIES entry for the outlet's selected country.
+  // locale and tz fields are now on every entry in country-currency-data.js.
+  function getOutletCountryEntry() {
+    try {
+      const country = (window.RS_SETTINGS || {}).set_country || 'India';
+      return (window.RS_getCountryByName && window.RS_getCountryByName(country))
+        || { locale: 'en-IN', tz: 'Asia/Kolkata' };
+    } catch(e) { return { locale: 'en-IN', tz: 'Asia/Kolkata' }; }
+  }
+
+  // BCP 47 locale for the outlet (e.g. 'en-IE' for Ireland, 'de-DE' for Germany)
+  window.RS_getOutletLocale = function() {
+    return getOutletCountryEntry().locale || 'en-IN';
+  };
+
+  // IANA timezone for the outlet (e.g. 'Europe/Dublin' for Ireland)
+  window.RS_getOutletTimezone = function() {
+    return getOutletCountryEntry().tz || 'Asia/Kolkata';
+  };
+
+  // Narrow no-break space (\u202f) gives visible gap without wrapping.
+  // Number grouping uses outlet locale so Irish bills show 1,000 not 1,00,000.
+  const rs = n => getCurrencySymbol() + '\u202f' + Math.round(n).toLocaleString(window.RS_getOutletLocale());
   const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
@@ -1539,8 +1562,19 @@
   }
   async function markBillRefunded(b) {
     if (!b || b.status === 'refunded') return;
-    if (!window.confirm(`Mark ${b.no || b.id} as refunded?`)) return;
+
+    // ── PIN gate ─────────────────────────────────────────────────────────────
+    if (window.RSPinModal) {
+      const ok = await RSPinModal.request(`Refund ${b.no || b.id || 'bill'}`);
+      if (!ok) return;
+    }
+
+    // ── Refund reason modal ──────────────────────────────────────────────────
+    const reason = await showRefundModal(b);
+    if (reason === null) return; // cancelled
+
     b.status = 'refunded';
+    b.refundReason = reason || 'POS refund';
     let cloudMarked = false;
     try {
       if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
@@ -1551,7 +1585,7 @@
           data:{
             order_id:String(b.id || b.no),
             amount:Number(b.amount || 0),
-            reason:'POS refund',
+            reason:b.refundReason,
             status:'approved'
           },
           returning:false
@@ -1562,7 +1596,123 @@
       console.warn('Refund cloud update failed', e);
     }
     renderBills();
-    toast(cloudMarked ? 'Refund recorded' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
+    toast(cloudMarked ? 'Refund recorded in cloud' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
+  }
+
+  /** Refund detail modal — returns reason string, or null if cancelled */
+  function showRefundModal(b) {
+    return new Promise(resolve => {
+      document.getElementById('rs-refund-overlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rs-refund-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
+      const amt = rs(b.amount || 0);
+      overlay.innerHTML = `
+        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+            <div style="width:42px;height:42px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;color:#ef4444;flex-shrink:0;"><i class="fa-solid fa-rotate-left"></i></div>
+            <div>
+              <div style="font-weight:800;font-size:15px;color:var(--text,#111);">Process Refund</div>
+              <div style="font-size:12px;color:var(--text-soft,#6b7280);">${b.no || b.id} &middot; ${amt}</div>
+            </div>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-soft,#6b7280);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Reason for refund</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;" id="rfund-reason-chips">
+            ${['Customer complaint','Wrong order','Quality issue','Duplicate charge','Changed mind','Other'].map(r=>`<button data-r="${r}" style="padding:8px 10px;border-radius:10px;border:1.5px solid var(--stroke-2,#e5e7eb);background:var(--glass,#f9fafb);font-size:12px;cursor:pointer;font-family:inherit;color:var(--text,#111);text-align:left;transition:all .15s;" class="rfund-chip">${r}</button>`).join('')}
+          </div>
+          <textarea id="rfund-note" placeholder="Additional notes (optional)…" rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:13px;resize:none;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;"></textarea>
+          <div style="display:flex;gap:10px;margin-top:16px;">
+            <button id="rfund-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
+            <button id="rfund-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Confirm Refund</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      let selectedReason = '';
+      overlay.querySelectorAll('.rfund-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          overlay.querySelectorAll('.rfund-chip').forEach(c => { c.style.cssText += ';background:var(--glass,#f9fafb);border-color:var(--stroke-2,#e5e7eb);color:var(--text,#111);font-weight:normal;'; });
+          chip.style.background = '#ef4444'; chip.style.borderColor = '#ef4444'; chip.style.color = '#fff'; chip.style.fontWeight = '700';
+          selectedReason = chip.dataset.r;
+        });
+      });
+      document.getElementById('rfund-confirm').onclick = () => {
+        const note = document.getElementById('rfund-note').value.trim();
+        const reason = [selectedReason, note].filter(Boolean).join(' — ') || 'POS refund';
+        overlay.remove(); resolve(reason);
+      };
+      document.getElementById('rfund-cancel').onclick = () => { overlay.remove(); resolve(null); };
+      overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(null); } });
+    });
+  }
+
+  async function deleteBill(b) {
+    if (!b) return;
+    // ── PIN gate ─────────────────────────────────────────────────────────────
+    if (window.RSPinModal) {
+      const ok = await RSPinModal.request(`Delete Bill ${b.no || b.id || ''}`);
+      if (!ok) return;
+    }
+    // ── Confirm ───────────────────────────────────────────────────────────────
+    const confirmed = await showDeleteConfirm(b);
+    if (!confirmed) return;
+
+    const idx = BILLS.findIndex(x => x === b || x.no === b.no);
+    if (idx !== -1) BILLS.splice(idx, 1);
+
+    // ── Restore inventory (sale never happened) ───────────────────────────────
+    // Only on DELETE — refund does NOT restore stock (food was served)
+    try {
+      const bItems = b._items || [];
+      let invChanged = false;
+      bItems.forEach(it => {
+        const menuItem = MENU.find(m => m.name === it.name);
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        const orderedQty = Number(it.qty) || 1;
+        menuItem.ingredients.forEach(ing => {
+          const invItem = INVENTORY.find(x => x.name === ing.name);
+          if (!invItem) return;
+          invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
+          invChanged = true;
+        });
+      });
+      if (invChanged && window.RS_DB && RS_DB.writeLocal) {
+        await RS_DB.writeLocal('inventory', INVENTORY);
+      }
+    } catch(e) { console.warn('Inventory restore failed', e); }
+
+    try {
+      if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      if (window.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
+        await RS_API.data({ table:'doppio_bills', operation:'delete', filters:{ bill_no: b.no || b.id }, returning:false }).catch(e=>console.warn('Cloud delete',e));
+      }
+    } catch(e) { console.warn('Bill delete sync failed', e); }
+    renderBills();
+    toast(`Bill ${b.no || b.id || ''} deleted — inventory restored`, 'fa-trash');
+  }
+
+  function showDeleteConfirm(b) {
+    return new Promise(resolve => {
+      document.getElementById('rs-del-overlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rs-del-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
+      overlay.innerHTML = `
+        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);text-align:center;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:#ef4444;margin:0 auto 16px;"><i class="fa-solid fa-trash-can"></i></div>
+          <div style="font-weight:800;font-size:16px;color:var(--text,#111);margin-bottom:8px;">Delete Bill?</div>
+          <div style="font-size:13px;color:var(--text-soft,#6b7280);line-height:1.6;margin-bottom:22px;"><strong>${b.no || b.id || 'This bill'}</strong> will be permanently removed from records.<br>This action <strong>cannot be undone</strong>.</div>
+          <div style="display:flex;gap:10px;">
+            <button id="rs-del-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
+            <button id="rs-del-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Yes, Delete</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById('rs-del-confirm').onclick = () => { overlay.remove(); resolve(true); };
+      document.getElementById('rs-del-cancel').onclick  = () => { overlay.remove(); resolve(false); };
+      overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    });
   }
   const renderBills = () => {
     // Dynamically compute stats from BILLS
@@ -1599,7 +1749,7 @@
         <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
         <td>${b.status==='paid'?'<span class="pill pill-green" style="padding:3px 9px">Paid</span>':'<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button></div></td>
+        <td><div class="row-actions"><button class="icon-act go" title="Reprint" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
       </tr>`).join('');
     const billBody = $('#bills-table-body');
     const visibleBills = filtered;
@@ -1613,14 +1763,12 @@
       const row = btn.closest('tr');
       const bill = visibleBills[[...billBody.children].indexOf(row)];
       if (!bill) return;
-      if (btn.classList.contains('go')) return showBillReceipt(bill);
-      if (btn.classList.contains('danger')) return markBillRefunded(bill);
+      if (btn.classList.contains('go'))         return showBillReceipt(bill);
+      if (btn.classList.contains('refund-act')) return markBillRefunded(bill);
+      if (btn.classList.contains('del-act'))    return deleteBill(bill);
       return shareBillReceipt(bill);
     };
     billBody.addEventListener('click', billBody._rsBillActionHandler, true);
-    $$('#bills-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Reprinting bill…','fa-print')));
-    $$('#bills-table-body .icon-act .fa-whatsapp').forEach(b=>b.closest('button').addEventListener('click',()=>toast('Bill shared on WhatsApp','fa-whatsapp')));
-    $$('#bills-table-body .icon-act.danger:not([disabled])').forEach(b=>b.addEventListener('click',()=>toast('Refund initiated','fa-rotate-left')));
   };
 
   /* ============================================================
@@ -2981,6 +3129,54 @@
     getModalRoot,
     seedToken:()=>{ window.__tok = (window.__tok||122)+1; return 'A-'+window.__tok; },
     BILLS, INVENTORY, EMPLOYEES, QR_ORDERS,
+
+    // ── Inventory deduction/restoration helpers ───────────────────────────────
+    // Called after bill is generated. Deducts recipe ingredients from stock.
+    deductInventoryForBill(billRow) {
+      const items = billRow._items || [];
+      if (!items.length) return;
+      let changed = false;
+      items.forEach(it => {
+        const menuItem = MENU.find(m => m.name === it.name);
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        const orderedQty = Number(it.qty) || 1;
+        menuItem.ingredients.forEach(ing => {
+          const invItem = INVENTORY.find(x => x.name === ing.name);
+          if (!invItem) return;
+          invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(ing.qty) || 0) * orderedQty);
+          changed = true;
+        });
+      });
+      if (changed) {
+        if (window.RS_DB && RS_DB.writeLocal) RS_DB.writeLocal('inventory', INVENTORY).catch(() => {});
+        const rendered = document.querySelector('#inventory-tab.active');
+        if (rendered && window.RS && RS.render) RS.render('inventory-tab');
+      }
+    },
+
+    // Called ONLY when deleting a bill (not on refund). Adds stock back.
+    restoreInventoryForBill(billRow) {
+      const items = billRow._items || [];
+      if (!items.length) return;
+      let changed = false;
+      items.forEach(it => {
+        const menuItem = MENU.find(m => m.name === it.name);
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        const orderedQty = Number(it.qty) || 1;
+        menuItem.ingredients.forEach(ing => {
+          const invItem = INVENTORY.find(x => x.name === ing.name);
+          if (!invItem) return;
+          invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
+          changed = true;
+        });
+      });
+      if (changed) {
+        if (window.RS_DB && RS_DB.writeLocal) RS_DB.writeLocal('inventory', INVENTORY).catch(() => {});
+        const rendered = document.querySelector('#inventory-tab.active');
+        if (rendered && window.RS && RS.render) RS.render('inventory-tab');
+      }
+    },
+
     // ---- persistence ----
     save(coll){ const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES}; const arr=map[coll]; if(window.RS_DB&&arr) return RS_DB.bulkPut(coll, arr.map(x=>({...x}))); return Promise.resolve(); },
     saveOne(coll,obj){ if(window.RS_DB) return RS_DB.put(coll, obj.id, {...obj}); return Promise.resolve(); },
@@ -3868,297 +4064,4 @@
 
     if (!navigator.onLine) showBanner('You are offline — data is saved locally and will sync when reconnected.');
 
-    window.addEventListener('offline', () => {
-      showBanner('You are offline — data is saved locally and will sync when reconnected.');
-    });
-    window.addEventListener('online', () => {
-      showBanner('Back online — syncing…');
-      setTimeout(() => {
-        hideBanner();
-        if (window.RS_DB_DRAIN) RS_DB_DRAIN().catch(() => {});
-        drainWAQueue();
-      }, 2500);
-    });
-    window.addEventListener('rs:sync-queue-drained', (e) => {
-      const count = e.detail && e.detail.count;
-      if (count) toast(`Synced ${count} offline record${count > 1 ? 's' : ''} to cloud`, 'fa-cloud-arrow-up');
-    });
-
-    // ── WhatsApp offline queue drain ──────────────────────────────────────
-    async function drainWAQueue() {
-      const WA_QUEUE_KEY = 'rs:wa_queue';
-      let q;
-      try { q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]'); } catch(e) { return; }
-      if (!q.length) return;
-      if (!window.RS_API || typeof RS_API.data !== 'function') return;
-      const sent = [];
-      for (const item of q) {
-        if (!navigator.onLine) break;
-        try {
-          const result = await RS_API.data({ operation: 'gateway_send', phone: item.phone, message: item.message, orderId: item.billNo });
-          if (!result || result.error) throw new Error(result && result.error || 'Send failed');
-          sent.push(item);
-        } catch(e) {
-          console.warn('[WA Queue] Retry failed for', item.billNo, e.message);
-        }
-      }
-      if (sent.length) {
-        const remaining = q.filter(i => !sent.includes(i));
-        try { localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(remaining)); } catch(e) {}
-        toast(`Sent ${sent.length} queued WhatsApp receipt${sent.length > 1 ? 's' : ''}`, 'fa-whatsapp');
-      }
-    }
-    window.RS_DRAIN_WA = drainWAQueue;
-  })();
-
-  // Security contract test compatibility:
-  // const FAST_INTERACTION_MODE = true;
-  // const ENABLE_DEMO_TOOLS = true;
-  // employees-tab', 'growth-hub-tab'
-  // document.querySelectorAll('.more-sheet-link[data-tab]')
-  // else if (tabId === 'growth-hub-tab') { renderGrowthHub()
-  // function debounce
-  // requestIdleCallback
-  // vaultWriteQueue
-  // frameTask(renderBills)
-  // if (!document.hidden && navigator.onLine) syncWithSupabase()
-  // channel('doppio-employees-realtime')
-  // table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}`
-  // table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}`
-  // channel('doppio-crm-realtime')
-  // channel(`doppio-menu-realtime-${activeTenantId}`)
-  // event: 'menu-updated'
-  // broadcastMenuUpdate()
-  // await Promise.all(cloudWrites)
-  // Recipe import failed for ${newItem.name}
-  // onConflict: 'tenant_id,name'
-  // onConflict: 'tenant_id,item_name'
-  // table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}`
-  // table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}`
-  // const belongsToActiveTenant = bills.some
-  // if (!belongsToActiveTenant) return
-  // const scheduleTenantDataSync
-  // String(response.payload.tenantId) === String(activeTenantId)
-  // function renderGrowthHub
-  // function renderPlatformSummary
-  // conflictTargets
-  // ON CONFLICT (tenant_id, "orderId") DO UPDATE SET
-
-  // ── Android WebView Bridge ────────────────────────────────────────────────
-  // Android calls window.updateAndroidOfflineStatus(isOffline) when network changes.
-  // We reuse the same banner + drain logic already wired for browser online/offline.
-  window.updateAndroidOfflineStatus = function(isOffline) {
-    if (isOffline) {
-      window.dispatchEvent(new Event('offline'));
-    } else {
-      window.dispatchEvent(new Event('online'));
-    }
-  };
-
-  // ── PWA Install Prompt ───────────────────────────────────────────────────
-  (function setupPWAInstallPrompt() {
-    // Only show if not already installed (standalone) and not on Android WebView
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-    if (window.AndroidInterface) return;
-    if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
-
-    let deferredPrompt = null;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-
-      // Don't show immediately — wait until user has been on the page 30s
-      setTimeout(() => {
-        if (!deferredPrompt) return;
-        if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
-
-        const bar = document.createElement('div');
-        bar.id = 'rs-pwa-prompt';
-        bar.style.cssText = 'position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:8888;' +
-          'background:var(--card-bg,#fff);border:1px solid var(--stroke,#e5e7eb);border-radius:14px;' +
-          'box-shadow:0 8px 32px rgba(0,0,0,.14);padding:14px 16px;display:flex;align-items:center;' +
-          'gap:12px;max-width:360px;width:calc(100vw - 32px);animation:slideUp .3s var(--ease,ease)';
-        bar.innerHTML =
-          '<img src="assets/restrosuite-mark.png" style="width:36px;height:36px;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="font-weight:700;font-size:13px">Install RestroSuite</div>' +
-            '<div style="font-size:12px;color:var(--text-mute)">Works offline · No app store needed</div>' +
-          '</div>' +
-          '<button id="rs-pwa-install" class="btn btn-primary btn-sm" style="flex-shrink:0;white-space:nowrap">Install</button>' +
-          '<button id="rs-pwa-dismiss" class="icon-btn" style="flex-shrink:0" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>';
-
-        document.body.appendChild(bar);
-
-        document.getElementById('rs-pwa-install').onclick = async () => {
-          if (!deferredPrompt) return;
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          deferredPrompt = null;
-          bar.remove();
-          if (outcome === 'accepted') {
-            if (typeof toast === 'function') toast('RestroSuite installed!', 'fa-circle-check');
-          }
-        };
-
-        document.getElementById('rs-pwa-dismiss').onclick = () => {
-          sessionStorage.setItem('rs:pwa-prompt-dismissed', '1');
-          bar.style.animation = 'slideDown .25s ease forwards';
-          setTimeout(() => bar.remove(), 260);
-        };
-      }, 30000);
-    });
-
-    // Already installed
-    window.addEventListener('appinstalled', () => {
-      deferredPrompt = null;
-      const bar = document.getElementById('rs-pwa-prompt');
-      if (bar) bar.remove();
-    });
-  })();
-
-  // Thin wrapper so JS code can call RS_Android.* and safely no-op on browsers
-  window.RS_Android = {
-    available: function() { return !!(window.AndroidInterface); },
-    speak: function(text) {
-      if (window.AndroidInterface && window.AndroidInterface.speak) {
-        try { window.AndroidInterface.speak(String(text)); } catch(e) {}
-      }
-    },
-    speakBilingual: function(en, hi) {
-      if (window.AndroidInterface && window.AndroidInterface.speakBilingual) {
-        try { window.AndroidInterface.speakBilingual(String(en), String(hi)); } catch(e) {}
-      }
-    },
-    vibrate: function(ms) {
-      if (window.AndroidInterface && window.AndroidInterface.vibrate) {
-        try { window.AndroidInterface.vibrate(ms || 80); } catch(e) {}
-      }
-    },
-    playSound: function(type) {
-      if (window.AndroidInterface && window.AndroidInterface.playSound) {
-        try { window.AndroidInterface.playSound(String(type || 'success')); } catch(e) {}
-      }
-    },
-    print: function(html) {
-      if (window.AndroidInterface && window.AndroidInterface.printReceipt) {
-        try { window.AndroidInterface.printReceipt(String(html)); return true; } catch(e) {}
-      }
-      return false;
-    }
-  };
-
-  // Hook Android haptic + sound feedback into key actions
-  // KOT sent → short vibrate + beep
-  document.addEventListener('rs:kot-sent', function() {
-    RS_Android.vibrate(60);
-    RS_Android.playSound('success');
-  });
-  // Bill paid → double vibrate + bilingual announcement
-  document.addEventListener('rs:bill-paid', function(e) {
-    RS_Android.vibrate(120);
-    RS_Android.playSound('order_success');
-    const total = e.detail && e.detail.total ? e.detail.total : '';
-    if (total) RS_Android.speakBilingual('Bill paid ' + total, 'Bill paid ' + total);
-  });
-  // New QR order arrives → alert sound
-  document.addEventListener('rs:new-qr-order', function() {
-    RS_Android.vibrate(200);
-    RS_Android.playSound('alert');
-  });
-
-  window.RS_ProgressOverlay = {
-    show(title, steps) {
-      const existing = document.getElementById('rs-progress-overlay');
-      if (existing) existing.remove();
-      
-      const ov = document.createElement('div');
-      ov.id = 'rs-progress-overlay';
-      ov.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(10, 10, 10, 0.75);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: inherit;
-      `;
-      
-      const card = document.createElement('div');
-      card.style.cssText = `
-        background: rgba(30, 30, 30, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        border-radius: 12px;
-        padding: 24px;
-        width: 340px;
-        color: var(--text);
-        text-align: center;
-      `;
-      const head = document.createElement('h4');
-      head.textContent = title;
-      head.style.cssText = 'margin:0 0 16px 0;font-size:16px;font-weight:700;color:var(--text)';
-      card.appendChild(head);
-      
-      const barContainer = document.createElement('div');
-      barContainer.style.cssText = 'background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden;margin-bottom:20px;';
-      const bar = document.createElement('div');
-      bar.id = 'rs-progress-bar-fill';
-      bar.style.cssText = 'background:var(--orange);width:0%;height:100%;transition:width 0.4s ease;';
-      barContainer.appendChild(bar);
-      card.appendChild(barContainer);
-      
-      const list = document.createElement('div');
-      list.style.cssText = 'display:flex;flex-direction:column;gap:10px;text-align:left;font-size:13px;';
-      steps.forEach((step, idx) => {
-        const item = document.createElement('div');
-        item.id = `rs-progress-step-${idx}`;
-        item.style.cssText = 'display:flex;align-items:center;gap:10px;color:var(--text-mute);transition:color 0.3s ease;';
-        item.innerHTML = `<span class="step-icon" style="min-width:18px;display:inline-flex;justify-content:center;"><i class="fa-regular fa-circle"></i></span> <span>${step}</span>`;
-        list.appendChild(item);
-      });
-      card.appendChild(list);
-      ov.appendChild(card);
-      document.body.appendChild(ov);
-    },
-    
-    update(stepIndex, progressPercent) {
-      const bar = document.getElementById('rs-progress-bar-fill');
-      if (bar) bar.style.width = `${progressPercent}%`;
-      
-      for (let i = 0; i < stepIndex; i++) {
-        const el = document.getElementById(`rs-progress-step-${i}`);
-        if (el) {
-          el.style.color = '#25d366';
-          const icon = el.querySelector('.step-icon');
-          if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
-        }
-      }
-      
-      const cur = document.getElementById(`rs-progress-step-${stepIndex}`);
-      if (cur) {
-        cur.style.color = 'var(--text)';
-
-        const icon = cur.querySelector('.step-icon');
-        if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--orange)"></i>';
-      }
-    },
-    
-    hide(delay = 600) {
-      setTimeout(() => {
-        const overlay = document.getElementById('rs-progress-overlay');
-        if (overlay) {
-          overlay.style.opacity = '0';
-          overlay.style.transition = 'opacity 0.3s ease';
-          setTimeout(() => overlay.remove(), 300);
-        }
-      }, delay);
-    }
-  };
-})();
+    window.addE

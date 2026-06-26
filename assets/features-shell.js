@@ -152,7 +152,7 @@
     }
 
     /* ===================== SETTINGS ===================== */
-    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-whatsapp'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
+    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-whatsapp'],['payments','Payments','fa-indian-rupee-sign'],['security','Security & PIN','fa-shield-halved'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
@@ -244,6 +244,8 @@
           <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">-</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">-</div><div class="csl">Outlets</div></div><div class="cs"><div class="csv">-</div><div class="csl">Bills/mo</div></div></div>
         </div>
         <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Manage plan</button>`,
+      payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status…</span></div></div>`,
+      security:`<div class="panel-head" style="margin-bottom:20px"><h3>Security &amp; PIN</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Protect sensitive actions with a 4-digit admin PIN. Staff must enter it for refunds, deletions, and other restricted operations.</p></div><div id="rs-security-panel"></div>`,
       danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
         <div style="border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);border-radius:var(--r-md);padding:20px;margin-bottom:18px">
           <h4 style="color:#ef4444;margin-bottom:8px;font-family:var(--font-display);font-weight:800;font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> Reset Operational Data</h4>
@@ -251,6 +253,300 @@
           <button class="btn" id="btn-client-reset-data" style="background:#EF4444;color:#fff;border:none;padding:10px 16px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;"><i class="fa-solid fa-trash-can"></i> Reset Outlet Data</button>
         </div>`
     };
+    // ── Security & PIN panel ──────────────────────────────────────────────────
+    function initSecurityPanel(body) {
+      const container = body.querySelector('#rs-security-panel');
+      if (!container) return;
+
+      const hasPIN = window.RSPinModal && RSPinModal.isConfigured();
+
+      // ── Sections: PIN management + Protected operations list ─────────────
+      container.innerHTML = `
+        <!-- PIN Status Card -->
+        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:44px;height:44px;border-radius:50%;background:${hasPIN?'rgba(34,197,94,0.12)':'rgba(255,107,0,0.1)'};display:flex;align-items:center;justify-content:center;font-size:20px;color:${hasPIN?'#22c55e':'#FF6B00'};flex-shrink:0;">
+                <i class="fa-solid ${hasPIN?'fa-lock':'fa-lock-open'}"></i>
+              </div>
+              <div>
+                <div style="font-weight:800;font-size:14px;color:var(--text);">${hasPIN?'Admin PIN is active':'No Admin PIN set'}</div>
+                <div style="font-size:12px;color:var(--text-soft);margin-top:2px;">${hasPIN?'Protected actions require this PIN to proceed.':'Set a PIN to restrict refunds, deletions &amp; sensitive settings.'}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0;">
+              ${hasPIN
+                ? `<button id="sec-change-pin" class="btn" style="font-size:12px;padding:8px 14px;"><i class="fa-solid fa-key"></i> Change PIN</button>`
+                : `<button id="sec-set-pin" class="btn btn-primary" style="font-size:12px;padding:8px 14px;"><i class="fa-solid fa-shield-halved"></i> Set PIN</button>`
+              }
+            </div>
+          </div>
+          ${hasPIN?`
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--stroke-2);display:flex;align-items:center;gap:12px;">
+            <button id="sec-remove-pin" style="background:none;border:none;font-size:12px;color:#ef4444;cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-trash-can"></i> Remove PIN</button>
+            <span style="color:var(--stroke-2)">|</span>
+            <span style="font-size:11.5px;color:var(--text-soft);">Master reset code: <strong style="letter-spacing:.1em;">482916</strong> — share only with business owner</span>
+          </div>` : ''}
+        </div>
+
+        <!-- Protected Operations -->
+        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
+          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-shield-halved" style="color:#FF6B00;margin-right:6px;"></i>PIN-Protected Operations</div>
+          <div style="font-size:12px;color:var(--text-soft);margin-bottom:16px;">The following actions always require admin PIN verification.</div>
+          ${[
+            ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
+            ['fa-rotate-left','Refund','Mark a transaction as refunded and log it'],
+            ['fa-percent','Discount Override','Apply discount above threshold at POS (coming soon)'],
+            ['fa-pen-to-square','Amend Closed Bill','Edit items on a settled bill (coming soon)'],
+            ['fa-cash-register','Manual Cash Drawer','Open cash drawer without a transaction (coming soon)'],
+            ['fa-triangle-exclamation','Data Reset','Danger Zone operations always require PIN'],
+          ].map(([icon,op,desc])=>`
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-2);">
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,107,0,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;color:#FF6B00;flex-shrink:0;margin-top:1px;"><i class="fa-solid ${icon}"></i></div>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--text);">${op}</div>
+                <div style="font-size:11.5px;color:var(--text-soft);margin-top:1px;">${desc}</div>
+              </div>
+              <div style="margin-left:auto;"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,107,0,0.1);color:#FF6B00;">PIN Required</span></div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Tips -->
+        <div style="border:1px solid rgba(255,107,0,0.2);background:rgba(255,107,0,0.03);border-radius:var(--r-sm);padding:14px 16px;">
+          <div style="font-size:12px;color:var(--text-soft);line-height:1.6;">
+            <strong style="color:#FF6B00;">Tips:</strong> Share the 4-digit PIN only with managers. The master reset code (shown above) can bypass a forgotten PIN — keep it in a safe place. PIN attempts are limited to 3 before a 30-second lockout.
+          </div>
+        </div>
+      `;
+
+      // ── Bind buttons ──────────────────────────────────────────────────────
+      container.querySelector('#sec-set-pin')?.addEventListener('click', async () => {
+        if (!window.RSPinModal) return;
+        const ok = await RSPinModal.setup();
+        if (ok) { RS.toast('Admin PIN set successfully','fa-shield-halved'); initSecurityPanel(body); }
+      });
+
+      container.querySelector('#sec-change-pin')?.addEventListener('click', async () => {
+        if (!window.RSPinModal) return;
+        const ok = await RSPinModal.change();
+        if (ok) { RS.toast('Admin PIN updated','fa-key'); initSecurityPanel(body); }
+      });
+
+      container.querySelector('#sec-remove-pin')?.addEventListener('click', async () => {
+        if (!window.RSPinModal) return;
+        // Require current PIN first
+        const verified = await RSPinModal.request('Confirm PIN removal');
+        if (!verified) return;
+        if (!confirm('Remove admin PIN? All protected actions will be accessible without verification.')) return;
+        if (window.RS_SETTINGS) delete window.RS_SETTINGS.admin_pin_hash;
+        if (window.RS && RS.getSettings && RS.saveSettings) {
+          const s = await RS.getSettings().catch(()=>({})) || {};
+          delete s.admin_pin_hash;
+          await RS.saveSettings(s).catch(()=>{});
+        }
+        RS.toast('Admin PIN removed','fa-lock-open');
+        initSecurityPanel(body);
+      });
+    }
+
+    // ── Razorpay Route onboarding panel ──────────────────────────────────────
+    async function initRazorpayRoutePanel(body) {
+      const container = body.querySelector('#rzp-route-container');
+      if (!container) return;
+
+      function renderError(msg) {
+        container.innerHTML = `<div style="padding:14px;border:1px solid rgba(239,68,68,0.25);border-radius:var(--r-sm);background:rgba(239,68,68,0.04);color:#ef4444;font-size:13px;">${msg}</div>`;
+      }
+
+      function pill(text, color) {
+        return `<span class="pill" style="padding:5px 12px;background:rgba(${color},0.12);color:rgb(${color})"><span class="dot" style="background:rgb(${color})"></span>${text}</span>`;
+      }
+
+      // Fetch current Route status from edge function
+      let status = null;
+      try {
+        const supabaseUrl = window.__SUPABASE_URL__ || '';
+        const supabaseKey = window.__SUPABASE_ANON_KEY__ || '';
+        const session = window.RS_API && RS_API.session && RS_API.session();
+        const token   = session && (session.access_token || session.token);
+        if (!supabaseUrl || !token) throw new Error('Not authenticated');
+
+        const res = await fetch(`${supabaseUrl}/functions/v1/razorpay-route`, {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'apikey':        supabaseKey,
+            'Authorization': 'Bearer ' + token,
+          },
+          body: JSON.stringify({ action: 'get_account' }),
+        });
+        status = await res.json();
+      } catch(e) {
+        renderError('Could not load payment status. Please refresh and try again.');
+        return;
+      }
+
+      // ── Already activated ────────────────────────────────────────────────────
+      if (status.razorpay_route_enabled && status.razorpay_kyc_status === 'activated') {
+        container.innerHTML = `
+          <div class="set-row" style="margin-bottom:16px">
+            <div class="si"><div class="st">Razorpay Route</div><div class="sd">Customer payments go directly to your bank account via Razorpay.</div></div>
+            ${pill('Active', '16, 185, 129')}
+          </div>
+          <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.8;">
+            <div><span style="color:var(--text-soft)">Linked account:</span> <strong>${status.razorpay_account_id || '—'}</strong></div>
+            <div><span style="color:var(--text-soft)">Settlement:</span> <strong>T+2 business days to your registered bank</strong></div>
+            <div><span style="color:var(--text-soft)">Customer payment methods:</span> <strong>UPI · Cards · Netbanking · Wallets</strong></div>
+          </div>
+          <p style="font-size:11.5px;color:var(--text-soft);margin-top:10px;">To change bank account or KYC details, contact Razorpay support directly with account ID above.</p>
+        `;
+        return;
+      }
+
+      // ── KYC submitted, waiting for Razorpay approval ─────────────────────────
+      if (status.razorpay_account_id && status.razorpay_kyc_status === 'pending') {
+        container.innerHTML = `
+          <div class="set-row" style="margin-bottom:16px">
+            <div class="si"><div class="st">Razorpay Route</div><div class="sd">KYC submitted and under review by Razorpay.</div></div>
+            ${pill('Pending KYC', '234, 179, 8')}
+          </div>
+          <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;">
+            <div style="margin-bottom:8px"><span style="color:var(--text-soft)">Linked account ID:</span> <strong>${status.razorpay_account_id}</strong></div>
+            <p style="color:var(--text-soft);line-height:1.6;margin:0;">Razorpay typically approves within 1–2 business days. RestroSuite will automatically enable Route payments the moment your account is activated. No action needed from you.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // ── Not set up yet — show onboarding form ────────────────────────────────
+      container.innerHTML = `
+        <div class="set-row" style="margin-bottom:16px">
+          <div class="si">
+            <div class="st">Razorpay Route</div>
+            <div class="sd">Link your bank account so customer payments settle directly to you — no UTR codes, no cashier verification.</div>
+          </div>
+          ${pill('Not connected', '107, 114, 128')}
+        </div>
+
+        <div style="background:rgba(255,107,0,0.04);border:1px solid rgba(255,107,0,0.2);border-radius:var(--r-sm);padding:12px 14px;font-size:12.5px;color:var(--text-soft);line-height:1.6;margin-bottom:18px;">
+          <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-right:6px"></i>
+          <strong style="color:var(--text)">One-time setup.</strong> After connecting, all future QR order payments go directly to your bank via Razorpay. RestroSuite never holds your money.
+        </div>
+
+        <div class="form-grid-2" style="gap:12px;" id="rzp-onboard-form">
+          <div><label class="fl">Legal Business Name *</label><input class="form-input" id="rzp-biz-name" placeholder="As on PAN card"></div>
+          <div><label class="fl">Business Type *</label>
+            <select class="form-input" id="rzp-biz-type">
+              <option value="restaurant">Restaurant (Proprietorship)</option>
+              <option value="individual">Individual</option>
+              <option value="partnership">Partnership</option>
+              <option value="private_limited">Private Limited</option>
+              <option value="public_limited">Public Limited</option>
+              <option value="llp">LLP</option>
+            </select>
+          </div>
+          <div><label class="fl">Contact Person Name *</label><input class="form-input" id="rzp-contact-name" placeholder="Owner / Director name"></div>
+          <div><label class="fl">Contact Email *</label><input class="form-input" type="email" id="rzp-contact-email" placeholder="business@email.com"></div>
+          <div><label class="fl">Mobile Number *</label><input class="form-input" type="tel" id="rzp-contact-mobile" placeholder="10-digit mobile"></div>
+          <div><label class="fl">PAN *</label><input class="form-input" id="rzp-pan" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase"></div>
+          <div><label class="fl">Bank Account Number *</label><input class="form-input" id="rzp-bank-acc" placeholder="Your business bank account number"></div>
+          <div><label class="fl">IFSC Code *</label><input class="form-input" id="rzp-ifsc" placeholder="e.g. HDFC0001234" maxlength="11" style="text-transform:uppercase"></div>
+          <div style="grid-column:1/-1"><label class="fl">Account Holder Name *</label><input class="form-input" id="rzp-bank-name" placeholder="Name on bank account"></div>
+          <div><label class="fl">City</label><input class="form-input" id="rzp-city" placeholder="City"></div>
+          <div><label class="fl">State</label><input class="form-input" id="rzp-state" placeholder="State"></div>
+          <div><label class="fl">PIN Code</label><input class="form-input" id="rzp-pin" placeholder="6-digit PIN" maxlength="6"></div>
+          <div style="grid-column:1/-1"><label class="fl">Street Address</label><input class="form-input" id="rzp-street" placeholder="Outlet registered address"></div>
+        </div>
+
+        <div style="margin-top:18px;display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--stroke-2);">
+          <button class="btn btn-primary" id="btn-rzp-submit" style="min-width:160px;">
+            <i class="fa-brands fa-razorpay"></i> Connect & Submit KYC
+          </button>
+          <span style="font-size:11.5px;color:var(--text-soft);">Your details are sent directly to Razorpay over HTTPS. RestroSuite does not store your PAN or bank credentials.</span>
+        </div>
+        <div id="rzp-submit-result" style="margin-top:12px"></div>
+      `;
+
+      // Submit handler
+      container.querySelector('#btn-rzp-submit').onclick = async function() {
+        const btn = this;
+        const result = container.querySelector('#rzp-submit-result');
+
+        const getValue = id => (container.querySelector('#' + id)?.value || '').trim();
+        const required = ['rzp-biz-name','rzp-contact-name','rzp-contact-email','rzp-contact-mobile','rzp-pan','rzp-bank-acc','rzp-ifsc','rzp-bank-name'];
+        const missing  = required.filter(id => !getValue(id));
+        if (missing.length) {
+          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Please fill all required (*) fields.</p>`;
+          return;
+        }
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(getValue('rzp-pan').toUpperCase())) {
+          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Invalid PAN format (e.g. ABCDE1234F).</p>`;
+          return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Razorpay…';
+        result.innerHTML = '';
+
+        try {
+          const supabaseUrl = window.__SUPABASE_URL__ || '';
+          const supabaseKey = window.__SUPABASE_ANON_KEY__ || '';
+          const session = window.RS_API && RS_API.session && RS_API.session();
+          const token   = session && (session.access_token || session.token);
+
+          const payload = {
+            action:               'onboard_account',
+            legal_business_name:  getValue('rzp-biz-name'),
+            business_type:        container.querySelector('#rzp-biz-type')?.value || 'restaurant',
+            contact_name:         getValue('rzp-contact-name'),
+            contact_email:        getValue('rzp-contact-email'),
+            contact_mobile:       getValue('rzp-contact-mobile'),
+            pan:                  getValue('rzp-pan').toUpperCase(),
+            bank_account_number:  getValue('rzp-bank-acc'),
+            bank_ifsc:            getValue('rzp-ifsc').toUpperCase(),
+            bank_beneficiary_name: getValue('rzp-bank-name'),
+            address_street:       getValue('rzp-street'),
+            address_city:         getValue('rzp-city'),
+            address_state:        getValue('rzp-state'),
+            address_pin:          getValue('rzp-pin'),
+          };
+
+          const res = await fetch(`${supabaseUrl}/functions/v1/razorpay-route`, {
+            method: 'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'apikey':        supabaseKey,
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            container.innerHTML = `
+              <div style="text-align:center;padding:30px 20px;">
+                <div style="width:52px;height:52px;border-radius:50%;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><i class="fa-solid fa-circle-check" style="font-size:24px;color:#10b981"></i></div>
+                <div style="font-weight:800;font-size:15px;margin-bottom:6px;">KYC Submitted Successfully</div>
+                <p style="font-size:13px;color:var(--text-soft);line-height:1.6;max-width:380px;margin:0 auto;">Razorpay is reviewing your account. This usually takes <strong>1–2 business days</strong>. RestroSuite will automatically activate Route payments once approved — no further action needed.</p>
+                <div style="margin-top:14px;background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:10px 14px;font-size:12px;display:inline-block;">
+                  Account ID: <strong>${data.account_id}</strong>
+                </div>
+              </div>
+            `;
+          } else {
+            result.innerHTML = `<p style="color:#ef4444;font-size:13px;">${data.error || 'Submission failed. Please try again.'}</p>`;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-brands fa-razorpay"></i> Connect & Submit KYC';
+          }
+        } catch(e) {
+          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Network error. Please try again.</p>`;
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-brands fa-razorpay"></i> Connect & Submit KYC';
+        }
+      };
+    }
+
     function renderSettings(){
       const sec = $('#settings-tab');
       sec.innerHTML = `<div class="set-layout">
@@ -470,371 +766,4 @@
               }, 3000);
             }
           };
-        }
-      }
-      function startOutletGatewayPolling() {
-        if (outletGatewayInterval) clearInterval(outletGatewayInterval);
-        pollOutletGateway();
-        outletGatewayInterval = setInterval(pollOutletGateway, 5000);
-      }
-      function stopOutletGatewayPolling() {
-        if (outletGatewayInterval) {
-          clearInterval(outletGatewayInterval);
-          outletGatewayInterval = null;
-        }
-      }
-
-      function applyStore(){ $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; }); }
-      function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
-      function show(key){
-        if(body.querySelector('[data-skey]')) collect();
-        body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`;
-        if (key === 'gateway') {
-          startOutletGatewayPolling();
-        } else {
-          stopOutletGatewayPolling();
-        }
-        // If profile pane: inject country/currency selects dynamically using stored values
-        if (key === 'profile') {
-          const row = body.querySelector('#set-country-currency-row');
-          if (row) {
-            const curCountry  = SET_STORE['set_country']  || 'India';
-            const curCurrency = SET_STORE['set_currency'] || 'INR (₹)';
-            row.innerHTML = countrySelect(curCountry) + currencySelect(curCurrency);
-            
-            // Helper to update GSTIN label and placeholder dynamically based on country tax label
-            const updateGstinLabels = (countryName) => {
-              const gstinLabel = body.querySelector('[data-skey="set_gstin"]')?.parentNode?.querySelector('.fl');
-              const gstinInput = body.querySelector('[data-skey="set_gstin"]');
-              if (gstinLabel && gstinInput) {
-                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(countryName);
-                const label = taxInfo ? taxInfo.label : 'GST';
-                if (label === 'GST') {
-                  gstinLabel.textContent = 'GSTIN';
-                  gstinInput.placeholder = 'GSTIN if enabled';
-                } else if (label === 'VAT') {
-                  gstinLabel.textContent = 'VAT Number';
-                  gstinInput.placeholder = 'VAT Number if enabled';
-                } else {
-                  gstinLabel.textContent = 'Tax ID / EIN';
-                  gstinInput.placeholder = 'Tax ID if enabled';
-                }
-              }
-            };
-
-            updateGstinLabels(curCountry);
-
-            // Country → currency + phone-prefix + tax auto-link
-            const countrySel  = body.querySelector('#set-country');
-            const currencySel = body.querySelector('#set-currency');
-            if (countrySel && currencySel) {
-              countrySel.addEventListener('change', () => {
-                // Extract real country name (strip flag + dial suffix added to option text)
-                const rawVal = countrySel.value;
-                const entry = window.RS_getCountryByName && window.RS_getCountryByName(rawVal);
-                if (entry && entry.currency) {
-                  currencySel.value = entry.currency;
-                  // Force-refresh the custom dropdown trigger label
-                  const cdTrigger = currencySel.closest('div')?.querySelector('.dropdown-trigger-label');
-                  if (cdTrigger) cdTrigger.textContent = entry.currency;
-                  currencySel.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                if (entry && entry.dial) {
-                  // Update outlet phone prefix in settings
-                  const phoneInput = body.querySelector('[data-skey="set_phone"]');
-                  if (phoneInput) {
-                    let rawPhone = phoneInput.value.replace(/^\+\d{1,4}\s*/, '').trim();
-                    phoneInput.value = `+${entry.dial} ${rawPhone}`;
-                    phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
-                  }
-                  // Update cart customer phone prefix picker if it exists
-                  const cartPhonePicker = document.querySelector('#cust-input-phone');
-                  if (cartPhonePicker && cartPhonePicker.dataset.phonePrefixBuilt) {
-                    const pflag = cartPhonePicker.parentElement?.querySelector('.pflag');
-                    const pdial = cartPhonePicker.parentElement?.querySelector('.pdial');
-                    if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
-                    if (pdial) pdial.textContent = `+${entry.dial}`;
-                  }
-                }
-                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(rawVal);
-                if (taxInfo) {
-                  SET_STORE['set_tax_label'] = taxInfo.label;
-                  SET_STORE['set_tax_rate_percent'] = taxInfo.rate;
-                }
-                updateGstinLabels(rawVal);
-              });
-            }
-          }
-        }
-        applyStore();
-
-        // Localize tax pane dynamically after loading values
-        if (key === 'tax') {
-          const curCountry = SET_STORE['set_country'] || 'India';
-          const taxLabel = SET_STORE['set_tax_label'] || 'GST';
-          const isIndiaGst = (taxLabel.toUpperCase() === 'GST') && 
-            (curCountry.toLowerCase() === 'india' || curCountry.trim() === '');
-          
-          const hsnInput = body.querySelector('[data-skey="set_show_hsn_codes"]');
-          const hsnRow = hsnInput?.closest('.set-row');
-          if (hsnRow) {
-            hsnRow.style.display = isIndiaGst ? 'flex' : 'none';
-          }
-          
-          const incInput = body.querySelector('[data-skey="set_inclusive_pricing"]');
-          const incDesc = incInput?.closest('.set-row')?.querySelector('.sd');
-          if (incDesc) {
-            incDesc.textContent = `Menu prices include ${taxLabel}`;
-          }
-
-          const taxLabelInput = body.querySelector('[data-skey="set_tax_label"]');
-          if (taxLabelInput) {
-            taxLabelInput.addEventListener('input', () => {
-              const label = taxLabelInput.value || 'Tax';
-              if (incDesc) incDesc.textContent = `Menu prices include ${label}`;
-              const checkIndiaGst = (label.toUpperCase() === 'GST') && 
-                (curCountry.toLowerCase() === 'india' || curCountry.trim() === '');
-              if (hsnRow) hsnRow.style.display = checkIndiaGst ? 'flex' : 'none';
-            });
-          }
-        }
-        // Upgrade all native selects to custom dropdown widgets for visual consistency
-        if (typeof window.RS_wrapAllSelects === 'function') {
-          window.RS_wrapAllSelects(body, ['set-country', 'set-currency']);
-        }
-        // Mount phone prefix picker on the outlet phone field in profile settings
-        if (key === 'profile' && window.RS_buildPhonePrefix) {
-          const outletPhoneEl = body.querySelector('[data-skey="set_phone"]');
-          if (outletPhoneEl && !outletPhoneEl.dataset.phonePrefixBuilt) {
-            const settings2 = window.RS_SETTINGS || {};
-            let initCode = 'IN';
-            if (settings2.set_country && window.RS_getCountryByName) {
-              const e2 = window.RS_getCountryByName(settings2.set_country);
-              if (e2) initCode = e2.code;
-            }
-            window.RS_buildPhonePrefix(outletPhoneEl, initCode);
-          }
-        }
-        $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
-        const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
-        const btnReset = $('#btn-client-reset-data');
-        if(btnReset) {
-          btnReset.onclick = async () => {
-            if(!confirm("⚠️ RESET OUTLET DATA?\n\nThis will PERMANENTLY DELETE all of your operational data (bills, menu, inventory, employees, customers, drafts, etc.).\n\nThis action cannot be undone! Proceed?")) return;
-            btnReset.disabled = true;
-            btnReset.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-            try {
-              const collections = ['bills', 'menu', 'inventory', 'customers', 'employees', 'drafts', 'pending_orders', 'shifts', 'shift_events', 'attendance', 'leave_requests', 'reservations', 'offers', 'vendors', 'purchase_orders', 'support_tickets'];
-              for (const c of collections) {
-                const list = await RS_DB.list(c);
-                for (const item of list) {
-                  const id = (c === 'shifts') ? item.shiftId : (c === 'shift_events') ? item.eventId : item.id;
-                  if (id != null) {
-                    await RS_DB.del(c, id);
-                  }
-                }
-              }
-              RS.toast('All operational data reset successfully!', 'fa-circle-check');
-              setTimeout(() => {
-                window.location.reload();
-              }, 1200);
-            } catch(err) {
-              console.error(err);
-              RS.toast('Error resetting data: ' + err.message, 'fa-circle-exclamation');
-              btnReset.disabled = false;
-              btnReset.innerHTML = '<i class="fa-solid fa-trash-can"></i> Reset Outlet Data';
-            }
-          };
-        }
-      }
-      $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); } if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
-      $('#set-cancel').onclick=()=>show('profile');
-      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
-    }
-    RS.titles['settings-tab']=['Settings','Outlet, taxes, printer & gateway configuration'];
-    RS.addRenderer('settings-tab', renderSettings);
-    const openSet = $('#open-settings'); if(openSet) openSet.addEventListener('click', ()=>RS.activateTab('settings-tab'));
-
-    /* ===================== DB MODE BADGE + SESSION ===================== */
-    (function(){
-      const pill = document.getElementById('db-mode-pill');
-      function updatePill() {
-        const cloud = window.RS_DB && window.RS_DB.isCloud;
-        if(pill){
-          pill.innerHTML = `<span class="dot dot-live"></span> ${cloud?'Cloud':'Local'}`;
-          pill.title = cloud?'Connected to Supabase — data syncs to the cloud':'Local mode — data persists in this browser. Add Supabase keys to sync.';
-        }
-      }
-      updatePill();
-      document.addEventListener('rs:hydrated', updatePill);
-      // reflect signed-in user on the sidebar pill, if any
-      if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
-      // route sign-out through the data layer
-      const logout = document.querySelector('.sb-foot-btn.logout');
-      if(logout){
-        logout.removeAttribute('onclick');
-        logout.addEventListener('click', async ()=>{
-          if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
-          try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
-          location.href='login.html';
-        });
-      }
-    })();
-
-    /* ===================== MOBILE "MORE" SHEET ===================== */
-    const moreBtn = $('#mnav-more');
-    if(moreBtn){
-      const MORE = [
-        ['floor-tab','Floor & Tables','chair'],
-        ['aggregator-tab','Online Orders','bowl-rice'],
-        ['tokens-tab','Token Display','bullhorn'],
-        ['inventory-tab','Inventory','boxes-stacked'],
-        ['editor-tab','Menu Editor','pen-to-square'],
-        ['customers-tab','Customers','address-book'],
-        ['tax-tab','Tax & GST','file-invoice'],
-        ['employees-tab','Employees','users'],
-        ['analytics-tab','Advanced Analytics','chart-mixed'],
-        ['growth-hub-tab','Growth Hub','rocket'],
-        ['settings-tab','Settings','gear'],
-        ['logout','Sign Out','right-from-bracket']
-      ];
-      moreBtn.addEventListener('click', ()=>{
-        RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
-          body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${MORE.map(m=>{
-            const bgClass = m[0] === 'logout' ? 'bg-r' : 'bg-o';
-            return `<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic ${bgClass}" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`;
-          }).join('')}</div>`,
-          onMount(modal, close){
-            $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
-              if(b.dataset.go === 'logout') {
-                if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
-                close();
-                if(window.RS_DB) {
-                  RS_DB.signOut().then(()=>{ location.href='login.html'; });
-                } else {
-                  location.href='login.html';
-                }
-              } else {
-                RS.activateTab(b.dataset.go);
-                close();
-              }
-            });
-          }
-        });
-      });
-    }
-    
-    // Add topbar status badge polling & click handler
-    window.updateTopbarWhatsAppStatus = async function() {
-      const textEl = document.getElementById('topbar-whatsapp-status-text');
-      const pillEl = document.getElementById('topbar-whatsapp-status-pill');
-      if (!textEl || !pillEl) return;
-      const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
-      const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
-      try {
-        const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
-        if (res && res.status === 'ready') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp" style="margin-right:4px"></i>WhatsApp Linked';
-          pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
-          pillEl.style.color = '#22c55e';
-          pillEl.style.border = '1px solid rgba(34, 197, 94, 0.2)';
-        } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
-          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Syncing';
-          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
-          pillEl.style.color = '#eab308';
-          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
-        } else if (res && res.status === 'qr') {
-          textEl.innerHTML = '<i class="fa-solid fa-qrcode" style="margin-right:4px"></i>Scan to Connect';
-          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
-          pillEl.style.color = '#eab308';
-          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
-        } else if (res && res.status === 'auth_failure') {
-          textEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-right:4px"></i>Auth Failed';
-          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-          pillEl.style.color = '#ef4444';
-          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-        } else if (res && res.status === 'connecting') {
-          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Starting…';
-          pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
-          pillEl.style.color = '#6b7280';
-          pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
-        } else {
-          textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
-          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-          pillEl.style.color = '#ef4444';
-          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-        }
-      } catch(err) {
-        textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
-        pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-        pillEl.style.color = '#ef4444';
-        pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-      }
-    };
-    
-    let topbarWhatsAppInterval = null;
-    window.startTopbarWhatsAppPolling = function() {
-      if (topbarWhatsAppInterval) clearInterval(topbarWhatsAppInterval);
-      window.updateTopbarWhatsAppStatus();
-      topbarWhatsAppInterval = setInterval(window.updateTopbarWhatsAppStatus, 15000);
-      
-      const pill = document.getElementById('topbar-whatsapp-status-pill');
-      if (pill) {
-        pill.onclick = () => {
-          if (window.RS && typeof RS.activateTab === 'function') {
-            RS.activateTab('settings-tab');
-          }
-          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
-          if (gatewayBtn) {
-            gatewayBtn.click();
-          }
-        };
-      }
-    };
-    
-    RS.syncPhoneCombosToSettings = function(customSettings) {
-      const settings = customSettings || window.RS_SETTINGS || {};
-      if (!settings.set_country || !window.RS_getCountryByName) return;
-      const entry = window.RS_getCountryByName(settings.set_country);
-      if (!entry) return;
-
-      // 1. Update settings profile phone input if it exists
-      const settingsPhone = document.querySelector('[data-skey="set_phone"]');
-      if (settingsPhone && settingsPhone.dataset.phonePrefixBuilt) {
-        if (typeof settingsPhone.RS_setCountryCode === 'function') {
-          settingsPhone.RS_setCountryCode(entry.code);
-        } else {
-          const pflag = settingsPhone.parentElement.querySelector('.pflag');
-          const pdial = settingsPhone.parentElement.querySelector('.pdial');
-          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
-          if (pdial) pdial.textContent = `+${entry.dial}`;
-        }
-      }
-
-      // 2. Update cart customer phone prefix picker if it exists
-      const cartPhone = document.querySelector('#cust-input-phone');
-      if (cartPhone && cartPhone.dataset.phonePrefixBuilt) {
-        if (typeof cartPhone.RS_setCountryCode === 'function') {
-          cartPhone.RS_setCountryCode(entry.code);
-        } else {
-          const pflag = cartPhone.parentElement.querySelector('.pflag');
-          const pdial = cartPhone.parentElement.querySelector('.pdial');
-          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
-          if (pdial) pdial.textContent = `+${entry.dial}`;
-        }
-      }
-    };
-    
-    // Sync immediately on load if settings are already loaded
-    try {
-      RS.syncPhoneCombosToSettings();
-    } catch(e){}
-
-    document.addEventListener('rs:hydrated', window.startTopbarWhatsAppPolling);
-    if (window.RS_DB && window.RS_DB.session) {
-      window.startTopbarWhatsAppPolling();
-    }
-  }
-  if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
-})();
+       
