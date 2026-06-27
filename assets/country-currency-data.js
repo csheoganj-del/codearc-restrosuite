@@ -409,4 +409,186 @@
     };
 
     // Trigger button
-    const trigger = do
+    const trigger = document.createElement('div');
+    trigger.className = 'dropdown-trigger';
+    trigger.setAttribute('role', 'button');
+    trigger.setAttribute('tabindex', '0');
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'dropdown-trigger-label';
+    labelSpan.textContent = currentLabel();
+
+    const caret = document.createElement('i');
+    caret.className = 'fa-solid fa-chevron-down caret';
+
+    trigger.appendChild(labelSpan);
+    trigger.appendChild(caret);
+
+    // Dropdown panel
+    const menu = document.createElement('ul');
+    menu.className = 'dropdown-menu';
+    menu.setAttribute('role', 'listbox');
+
+    const renderMenuItems = (filter) => {
+      menu.innerHTML = '';
+      const items = buildItems();
+      const q = (filter || '').toLowerCase();
+      let shown = 0;
+      items.forEach(item => {
+        if (q && !item.label.toLowerCase().includes(q)) return;
+        const li = document.createElement('li');
+        li.className = 'dropdown-item' + (item.value === nativeSel.value || item.label === currentLabel() ? ' active' : '');
+        li.setAttribute('role', 'option');
+        li.setAttribute('data-val', item.value);
+        li.textContent = item.label;
+        li.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          nativeSel.value = item.value;
+          // If value not set (option text = value), find by text
+          if (nativeSel.value !== item.value) {
+            for (let i = 0; i < nativeSel.options.length; i++) {
+              if (nativeSel.options[i].text === item.label) {
+                nativeSel.selectedIndex = i;
+                break;
+              }
+            }
+          }
+          labelSpan.textContent = item.label;
+          nativeSel.dispatchEvent(new Event('change', { bubbles: true }));
+          closeMenu();
+        });
+        menu.appendChild(li);
+        shown++;
+      });
+      if (shown === 0) {
+        const li = document.createElement('li');
+        li.className = 'dropdown-item';
+        li.style.color = 'var(--text-mute)';
+        li.style.fontStyle = 'italic';
+        li.textContent = 'No results';
+        menu.appendChild(li);
+      }
+    };
+
+    // Search input (optional)
+    let searchInput = null;
+    if (options.searchable) {
+      const searchWrap = document.createElement('div');
+      searchWrap.style.cssText = 'padding:6px 8px 2px;';
+      searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.placeholder = 'Search...';
+      searchInput.style.cssText = 'width:100%;padding:7px 10px;border:1px solid var(--stroke-2);border-radius:var(--r-xs);background:var(--glass);color:var(--text);font-size:13px;outline:none;font-family:inherit;';
+      searchInput.addEventListener('input', () => renderMenuItems(searchInput.value));
+      searchInput.addEventListener('focus', () => { searchInput.style.borderColor = 'var(--orange)'; });
+      searchInput.addEventListener('blur',  () => { searchInput.style.borderColor = 'var(--stroke-2)'; });
+      searchWrap.appendChild(searchInput);
+      menu.appendChild(searchWrap);
+    }
+
+    const openMenu = () => {
+      // Close all other open dropdowns
+      document.querySelectorAll('.custom-dropdown-widget.active').forEach(d => {
+        if (d !== wrapper) d.classList.remove('active');
+      });
+      if (searchInput) { searchInput.value = ''; }
+      renderMenuItems('');
+      wrapper.classList.add('active');
+      if (searchInput) setTimeout(() => searchInput.focus(), 60);
+      // Ensure menu opens upward if near bottom of viewport
+      setTimeout(() => {
+        const rect = menu.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight - 20) {
+          menu.style.top = 'auto';
+          menu.style.bottom = 'calc(100% + 6px)';
+        } else {
+          menu.style.top = 'calc(100% + 6px)';
+          menu.style.bottom = 'auto';
+        }
+      }, 0);
+    };
+
+    const closeMenu = () => {
+      wrapper.classList.remove('active');
+      if (searchInput) searchInput.value = '';
+    };
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (wrapper.classList.contains('active')) closeMenu(); else openMenu();
+    });
+
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMenu(); }
+      if (e.key === 'Escape') closeMenu();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!wrapper.contains(e.target)) closeMenu();
+    }, true);
+
+    // Keep widget label in sync if native value is changed programmatically
+    const syncLabel = () => { labelSpan.textContent = currentLabel(); };
+    nativeSel.addEventListener('change', syncLabel);
+
+    // Observe if options change (e.g. dynamic population)
+    const mo = new MutationObserver(syncLabel);
+    mo.observe(nativeSel, { childList: true, subtree: true });
+
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(menu);
+    nativeSel.parentNode.insertBefore(wrapper, nativeSel.nextSibling);
+  };
+
+  /**
+   * Wraps all select.form-input elements inside a given container that are not
+   * already wrapped.  Call after dynamic HTML is injected into the DOM.
+   *
+   * Usage: RS_wrapAllSelects(document.getElementById('set-body'))
+   *
+   * Pass `true` as second arg to make country/currency selects searchable.
+   */
+  window.RS_wrapAllSelects = function(container, searchableIds) {
+    const root = container || document;
+    const ids = new Set(Array.isArray(searchableIds) ? searchableIds : []);
+    root.querySelectorAll('select.form-input:not([data-cd-wrapped])').forEach(sel => {
+      const isSearchable = ids.has(sel.id) || ids.has(sel.dataset.skey);
+      window.RS_createCustomDropdown(sel, { searchable: isSearchable });
+    });
+  };
+
+  /**
+   * Helper to reconstruct a full, unified phone number (including dial code)
+   * from a phone input element that might have a country picker wrapper.
+   */
+  window.RS_getFullPhoneNumber = function(phoneInput) {
+    if (!phoneInput) return '';
+    let val = phoneInput.value.trim();
+    if (!val) return '';
+
+    // If it already starts with '+', it is already a full international number
+    if (val.startsWith('+')) {
+      return val;
+    }
+
+    // Otherwise, try to find a sibling flag button inside the .phone-combo wrapper
+    const combo = phoneInput.closest('.phone-combo');
+    const dialEl = combo ? combo.querySelector('.pdial') : null;
+    if (dialEl) {
+      const dialCode = dialEl.textContent.trim(); // E.g., "+353" or "+91"
+      const dialDigits = dialCode.replace(/\D/g, ''); // E.g., "353" or "91"
+      
+      const cleanVal = val.replace(/\D/g, '');
+      if (cleanVal.startsWith(dialDigits)) {
+        // User typed the dial code but omitted the '+' (e.g., "353852258004")
+        return '+' + val;
+      } else {
+        // They typed only the national/local number, prepend the dial code
+        return dialCode + ' ' + val;
+      }
+    }
+
+    return val;
+  };
+
+})();

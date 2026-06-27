@@ -859,7 +859,7 @@
       let records = [];
 
       if(name==='Reservations'){ 
-        icon='fa-calendar-check'; sub='Today's bookings'; size='lg';
+        icon='fa-calendar-check'; sub="Today's bookings"; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('reservations'); } catch(e){}
         }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Gateway launcher — reads .env.local and starts whatsapp-gateway.js
+ * Gateway launcher -- reads .env.local and starts whatsapp-gateway.js
  * with all environment variables correctly set.
  */
 const fs   = require('fs');
@@ -25,7 +25,7 @@ if (fs.existsSync(envPath)) {
   });
   console.log('[launcher] Loaded .env.local');
 } else {
-  console.warn('[launcher] .env.local not found — gateway may fail');
+  console.warn('[launcher] .env.local not found -- gateway may fail');
 }
 
 console.log('[launcher] SUPABASE_URL   :', env.SUPABASE_URL   || '(not set)');
