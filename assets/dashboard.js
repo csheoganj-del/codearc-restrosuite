@@ -3429,6 +3429,10 @@
     const curTab=document.querySelector('.tab-content.active'); if(curTab && renderers[curTab.id]) { try{ renderers[curTab.id](); }catch(e){} }
     
     // 2. Fetch fresh data from the cloud in parallel (non-blocking)
+    // Wait for /api/config to resolve before checking cloud mode — without this,
+    // RS_API.configured is still false (empty URL) on the first load in a new browser,
+    // so the cloud fetch is skipped and a blank menu is shown until a hard refresh.
+    if (window.__configReady) { try { await window.__configReady; } catch(e) {} }
     const dbMode = (window.RS_DB && window.RS_DB.mode) || 'local';
     const signedIn = window.RS_API && !!window.RS_API.session();
     if (dbMode === 'cloud' && signedIn) {
@@ -3459,8 +3463,14 @@
   }
 
   /* ---------- boot ---------- */
-  // Session guard: in cloud mode, require a valid signed-in session
+  // Session guard: in cloud mode, require a valid signed-in session.
+  // Run synchronously first (catches the common case where config is already cached),
+  // then re-run after __configReady resolves to catch the new-browser race where
+  // RS_API.configured is still false when this line first executes.
   if(window.RS_API && RS_API.configured && !RS_API.session()){ location.href='login.html'; return; }
+  (window.__configReady || Promise.resolve()).then(() => {
+    if(window.RS_API && RS_API.configured && !RS_API.session()){ location.href='login.html'; }
+  }).catch(()=>{});
 
   const sess = window.RS_API ? RS_API.session() : null;
   const isSuper = sess && sess.role === 'superadmin';
@@ -4147,17 +4157,19 @@
   if(!isSuper && !isBrandAdmin) hydrate();
 
   // validate the stored session against the backend; only bounce if server explicitly rejects it
-  if(window.RS_API && RS_API.configured){
-    RS_API.validateSession().then(sess => {
-      // null = server confirmed token is invalid/expired â†’ redirect
-      if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
-    }).catch(() => {
-      // Network error / Supabase offline – keep user on dashboard, don't log them out
-      console.warn('[RS] validateSession network error – keeping local session alive.');
-      // Network error / Supabase offline — keep user on dashboard, don't log them out
-      console.warn('[RS] validateSession network error — keeping local session alive.');
-    });
-  }
+  // Await __configReady first so RS_API.configured is true even on first new-browser load
+  // (without this the guard is false and validateSession is silently skipped).
+  (window.__configReady || Promise.resolve()).then(() => {
+    if(window.RS_API && RS_API.configured){
+      RS_API.validateSession().then(sess => {
+        // null = server confirmed token is invalid/expired → redirect
+        if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href=’login.html’; }
+      }).catch(() => {
+        // Network error / Supabase offline — keep user on dashboard, don’t log them out
+        console.warn(‘[RS] validateSession network error — keeping local session alive.’);
+      });
+    }
+  }).catch(()=>{});
 
   // Wire up logout button cleanly
   $$('.logout').forEach(b => {
