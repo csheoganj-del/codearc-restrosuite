@@ -74,7 +74,7 @@ export default async function handler(req, res) {
   msg += `\n*TOTAL    ${rs(total)}*\n\n`;
   msg += `Cash    ${rs(total)}\n\n`;
   msg += `Thank you for dining with us!\n`;
-  msg += `*Powered by RestroSuite* — https://codearc-restrosuite.vercel.app`;
+  msg += `*Powered by RestroSuite* — https://restrosuite.codearc.co.in`;
 
   // ── Call WhatsApp gateway ────────────────────────────────────────────────
   const baseUrl    = (process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-whatsapp-gateway.hf.space').replace(/\/$/, '');
@@ -94,23 +94,4 @@ export default async function handler(req, res) {
       return res.status(textResp.status).json({ error: textData.error || `Gateway error ${textResp.status}` });
     }
 
-    // Step 2 — send PDF as WhatsApp document (if provided)
-    if (pdfData) {
-      try {
-        await fetch(`${baseUrl}/send`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            phone: cleanPhone,
-            pdfData,
-            filename: filename || `Receipt_${billNo}.pdf`
-          })
-        });
-      } catch (_) { /* PDF send failure is non-fatal — text already delivered */ }
-    }
-
-    return res.status(200).json({ success: true, cleanPhone, billNo });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to contact WhatsApp gateway: ' + err.message });
-  }
-}
+    // Step 2 — send PDF 
