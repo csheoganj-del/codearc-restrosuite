@@ -68,6 +68,21 @@
   .plan-sym { display:inline-block; transition: opacity .2s; }
   .plan-sym.flip { animation: sym-flip-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
   .plan-inr-note { font-size: 10px; font-weight: 500; opacity: 0.65; letter-spacing: 0; vertical-align: middle; }
+
+  /* ── WhatsApp OTP — registration step ── */
+  .wa-otp-head { display:flex; align-items:center; gap:14px; margin-bottom:22px; padding:16px; border-radius:12px; background:rgba(37,211,102,0.08); border:1px solid rgba(37,211,102,0.22); }
+  .wa-otp-head i { font-size:30px; color:#25D366; flex:none; }
+  .wa-otp-head .wt { font-weight:700; font-size:15px; color:var(--text); }
+  .wa-otp-head .ws { font-size:13px; color:var(--text-soft); margin-top:2px; }
+  .wa-otp-head .ws b { color:var(--text); }
+  .otp-demo-notice { display:flex; align-items:center; gap:10px; background:rgba(255,153,0,0.10); border:1px solid rgba(255,153,0,0.35); border-radius:10px; padding:12px 14px; margin-bottom:18px; font-size:13px; color:var(--text); }
+  .otp-demo-notice i { color:#f90; flex:none; }
+  .otp-demo-notice b { font-size:17px; letter-spacing:3px; }
+
+  /* ── Recovery channel selector ── */
+  .rec-channel { display:flex; gap:8px; margin-bottom:20px; }
+  .rec-ch-btn { flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:10px 12px; border-radius:10px; border:1px solid var(--stroke-2); background:var(--glass); color:var(--text-soft); font-size:13px; font-weight:600; cursor:pointer; transition:var(--t); }
+  .rec-ch-btn.active { border-color:var(--orange); background:var(--orange-tint); color:var(--orange); }
   .story-slide h2 { color: #fff; font-size: 25px; margin-bottom: 10px; letter-spacing: -0.02em; }
   .story-slide p { color: rgba(255,255,255,0.74); font-size: 15px; max-width: 380px; }
 
@@ -459,6 +474,39 @@
             <button type="submit" class="btn btn-primary btn-lg" style="flex:1" id="reg-submit">Create my outlet <i class="fa-solid fa-circle-check"></i></button>
           </div>
         </div>
+
+        <!-- step OTP — WhatsApp verification -->
+        <div class="reg-step" id="reg-step-otp">
+          <div class="wa-otp-head">
+            <i class="fa-brands fa-whatsapp"></i>
+            <div>
+              <div class="wt">Verify your WhatsApp</div>
+              <div class="ws">We sent a 6-digit code to <b id="reg-otp-phone-echo">your number</b></div>
+            </div>
+          </div>
+          <div class="otp-demo-notice" id="reg-otp-demo-notice" style="display:none">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Demo mode — your OTP is <b id="reg-otp-demo-code"></b></span>
+          </div>
+          <div class="otp-row" id="reg-otp-row">
+            <input maxlength="1" inputmode="numeric" aria-label="digit 1">
+            <input maxlength="1" inputmode="numeric" aria-label="digit 2">
+            <input maxlength="1" inputmode="numeric" aria-label="digit 3">
+            <input maxlength="1" inputmode="numeric" aria-label="digit 4">
+            <input maxlength="1" inputmode="numeric" aria-label="digit 5">
+            <input maxlength="1" inputmode="numeric" aria-label="digit 6">
+          </div>
+          <button type="button" class="btn btn-primary btn-block btn-lg" id="reg-otp-verify" style="margin-top:6px">
+            Verify &amp; create outlet <i class="fa-solid fa-circle-check"></i>
+          </button>
+          <div class="resend" style="text-align:center;margin-top:14px;font-size:13px;color:var(--text-soft)">
+            Didn't receive it? <button type="button" class="link-btn" id="reg-resend-otp">Resend</button>
+            <span id="reg-resend-timer" style="display:none;color:var(--text-mute);font-size:12px"></span>
+          </div>
+          <button type="button" class="btn btn-ghost btn-block" id="reg-otp-back" style="margin-top:8px;font-size:13px">
+            <i class="fa-solid fa-arrow-left"></i> Change number
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -478,23 +526,44 @@
     </div>
 
     <form id="recovery-request-form" class="rform on" data-rform="email">
+      <!-- Channel selector -->
+      <div class="rec-channel">
+        <button type="button" class="rec-ch-btn active" data-channel="email"><i class="fa-solid fa-envelope"></i> Via Email</button>
+        <button type="button" class="rec-ch-btn" data-channel="whatsapp"><i class="fa-brands fa-whatsapp"></i> Via WhatsApp</button>
+      </div>
       <div class="form-group">
         <label for="recovery-slug">Workspace / Outlet ID <span class="opt">(optional)</span></label>
         <div class="input-wrap"><i class="fa-solid fa-store lead"></i>
           <input type="text" id="recovery-slug" class="form-input" placeholder="Leave blank if forgotten" autocapitalize="none" spellcheck="false">
         </div>
       </div>
-      <div class="form-group">
+      <!-- Email input (shown by default) -->
+      <div class="form-group" id="rec-email-group">
         <label for="recovery-email">Registered owner email</label>
         <div class="input-wrap"><i class="fa-solid fa-envelope lead"></i>
-          <input type="email" id="recovery-email" class="form-input" placeholder="owner@example.com" autocomplete="email" required>
+          <input type="email" id="recovery-email" class="form-input" placeholder="owner@example.com" autocomplete="email">
+        </div>
+      </div>
+      <!-- WhatsApp input (hidden by default) -->
+      <div class="form-group" id="rec-phone-group" style="display:none">
+        <label for="recovery-phone">Registered WhatsApp number</label>
+        <div class="phone-wrap">
+          <select id="rec-country-code" class="phone-prefix">
+            <option value="91" selected>🇮🇳 +91</option>
+          </select>
+          <input type="tel" id="recovery-phone" class="form-input" placeholder="98765 43210" autocomplete="tel">
+          <i class="fa-brands fa-whatsapp wa"></i>
+        </div>
+        <div class="otp-demo-notice" id="rec-otp-demo-notice" style="display:none;margin-top:10px">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>Demo mode — your OTP is <b id="rec-otp-demo-code"></b></span>
         </div>
       </div>
       <button type="submit" class="btn btn-primary btn-block btn-lg">Send verification code <i class="fa-solid fa-paper-plane"></i></button>
     </form>
 
     <form id="recovery-code-form" class="rform" data-rform="code">
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px">Enter the 6-digit code we sent to <b id="recovery-email-echo" style="color:var(--text)">your email</b>.</p>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px">Enter the 6-digit code we sent to <b id="recovery-email-echo" style="color:var(--text)">your email</b> <span id="recovery-channel-echo"></span>.</p>
       <div class="otp-row" id="otp-row">
         <input maxlength="1" inputmode="numeric" aria-label="digit 1"><input maxlength="1" inputmode="numeric" aria-label="digit 2"><input maxlength="1" inputmode="numeric" aria-label="digit 3"><input maxlength="1" inputmode="numeric" aria-label="digit 4"><input maxlength="1" inputmode="numeric" aria-label="digit 5"><input maxlength="1" inputmode="numeric" aria-label="digit 6">
       </div>
@@ -1108,61 +1177,178 @@
     s2.classList.remove('on'); s1.classList.add('on');
     n2.classList.remove('active'); n1.classList.remove('done'); n1.classList.add('active'); n1.querySelector('.step-dot').textContent='1'; prog.style.width='0';
   };
+  // ── WhatsApp OTP helpers ─────────────────────────────────────────────
+  let _pendingRegOTP = null;   // registration OTP (in-memory only)
+  let _pendingRecOTP = null;   // recovery OTP
+  let _pendingRegPayload = null; // buffered registration payload
+  let _regResendTimer = null;
+
+  function genOTP(){ return String(Math.floor(100000 + Math.random() * 900000)); }
+
+  async function sendWhatsAppOTP(phone, code, purpose){
+    const msg = `Your RestroSuite ${purpose === 'recovery' ? 'password reset' : 'verification'} code is: *${code}*\n\nValid for 10 minutes. Never share this code.`;
+    // Try RS_API gateway_send (needs session OR localhost)
+    if(window.RS_API){
+      try {
+        await RS_API.data({ operation:'gateway_send', phone, message:msg });
+        return { sent:true, demo:false };
+      } catch(e){ /* no session yet — fall through to demo */ }
+    }
+    // Demo fallback — show OTP on screen
+    return { sent:false, demo:true, code };
+  }
+
+  function startRegResendCooldown(){
+    const btn=document.getElementById('reg-resend-otp'), timerEl=document.getElementById('reg-resend-timer');
+    let secs=30; btn.disabled=true; btn.style.opacity='0.45';
+    timerEl.style.display='inline'; timerEl.textContent='('+secs+'s)';
+    clearInterval(_regResendTimer);
+    _regResendTimer=setInterval(()=>{
+      secs--;
+      if(secs<=0){ clearInterval(_regResendTimer); btn.disabled=false; btn.style.opacity=''; timerEl.style.display='none'; }
+      else { timerEl.textContent='('+secs+'s)'; }
+    },1000);
+  }
+
+  async function showRegOTPStep(phone, displayPhone){
+    const code = genOTP(); _pendingRegOTP = code;
+    const result = await sendWhatsAppOTP(phone, code, 'register');
+    // Show OTP step
+    const s2=document.getElementById('reg-step-2'), sOtp=document.getElementById('reg-step-otp');
+    s2.classList.remove('on'); sOtp.classList.add('on');
+    document.getElementById('reg-otp-phone-echo').textContent = displayPhone;
+    const demoNotice = document.getElementById('reg-otp-demo-notice');
+    if(result.demo){
+      document.getElementById('reg-otp-demo-code').textContent = code;
+      demoNotice.style.display='flex';
+    } else {
+      demoNotice.style.display='none';
+    }
+    // Wire OTP inputs
+    const inputs=[...document.querySelectorAll('#reg-otp-row input')];
+    inputs.forEach(i=>{ i.value=''; });
+    inputs[0].focus();
+    startRegResendCooldown();
+  }
+  // ─────────────────────────────────────────────────────────────────────
+
   regForm.onsubmit=async e=>{
     e.preventDefault();
     if(!document.getElementById('reg-terms').checked){showErr('Please accept the Terms & Privacy Policy.');return;}
-    // Confirm password check
     const pass = document.getElementById('reg-password').value;
     const passConfirm = document.getElementById('reg-password-confirm').value;
     if(pass !== passConfirm){showErr('Passwords do not match. Please re-enter your password.');document.getElementById('reg-password-confirm').focus();return;}
     if(pass.length < 10){showErr('Password must be at least 10 characters.');document.getElementById('reg-password').focus();return;}
-    // WhatsApp validation
     const phoneDigits = document.getElementById('reg-whatsapp').value.replace(/\D/g,'');
     if(phoneDigits.length < 7 || phoneDigits.length > 15){showErr('Enter a valid WhatsApp number (7–15 digits).');document.getElementById('reg-whatsapp').focus();return;}
-    const btn=document.getElementById('reg-submit'); const orig=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Creating…'; btn.disabled=true;
+    const btn=document.getElementById('reg-submit'); const orig=btn.innerHTML;
+    btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Sending OTP…'; btn.disabled=true;
     const email=document.getElementById('reg-email').value.trim();
     const ccVal = document.getElementById('reg-country-code').value.replace(/\D/g, '');
     const phone = ccVal + phoneDigits;
     const countryVal = document.getElementById('reg-country').value;
     const currencyVal = document.getElementById('reg-currency').value;
-    const payload={ name:document.getElementById('reg-name').value.trim(), slug:slug.value.trim(),
-                    outlet_type:document.getElementById('reg-type').value, plan_code:document.getElementById('reg-plan').value,
-                    country:countryVal, currency:currencyVal,
-                    address:document.getElementById('reg-address').value.trim(),
-                    email, phone, username:email, password:pass };
+    _pendingRegPayload = {
+      name:document.getElementById('reg-name').value.trim(), slug:slug.value.trim(),
+      outlet_type:document.getElementById('reg-type').value, plan_code:document.getElementById('reg-plan').value,
+      country:countryVal, currency:currencyVal,
+      address:document.getElementById('reg-address').value.trim(),
+      email, phone, username:email, password:pass
+    };
+    btn.innerHTML=orig; btn.disabled=false;
+    hideAlerts();
+    await showRegOTPStep(phone, '+'+ccVal+' '+document.getElementById('reg-whatsapp').value.trim());
+  };
+
+  // ── Registration OTP verify button ───────────────────────────────────
+  async function finalizeRegistration(){
+    const payload = _pendingRegPayload;
+    if(!payload) return;
+    const btn=document.getElementById('reg-otp-verify'); const orig=btn.innerHTML;
+    btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Creating…'; btn.disabled=true;
     try{
       if(window.RS_API && RS_API.configured){
         const r = await RS_API.register(payload);
         showOk(r.message || 'Registration submitted! Once CodeArc approves your outlet you can sign in.');
-        // Registration creates a PENDING outlet — send them to sign-in tab, prefilled.
-        setTimeout(()=>{ tabLogin.click(); const t=document.getElementById('tenant-id'); if(t)t.value=payload.slug; const un=document.getElementById('username'); if(un)un.value=email; }, 2200);
+        setTimeout(()=>{ tabLogin.click(); const t=document.getElementById('tenant-id'); if(t)t.value=payload.slug; const un=document.getElementById('username'); if(un)un.value=payload.email; }, 2200);
       } else {
         const tenantId = payload.slug;
         const activeKey = 'rs_v2:' + tenantId + ':settings';
-        const taxInfo = window.RS_getCountryTaxInfo ? window.RS_getCountryTaxInfo(countryVal) : { label: 'GST', rate: 5 };
-        const localSettings = {
-          set_restaurant_name: payload.name,
-          set_outlet_name: payload.name,
-          set_country: countryVal,
-          set_currency: currencyVal,
-          set_address: payload.address,
-          set_tax_label: taxInfo.label,
-          set_tax_rate_percent: taxInfo.rate,
-          set_calculate_taxes: true
-        };
+        const taxInfo = window.RS_getCountryTaxInfo ? window.RS_getCountryTaxInfo(payload.country) : { label:'GST', rate:5 };
         try {
-          localStorage.setItem(activeKey, JSON.stringify(localSettings));
+          localStorage.setItem(activeKey, JSON.stringify({
+            set_restaurant_name:payload.name, set_outlet_name:payload.name,
+            set_country:payload.country, set_currency:payload.currency,
+            set_address:payload.address, set_tax_label:taxInfo.label,
+            set_tax_rate_percent:taxInfo.rate, set_calculate_taxes:true
+          }));
           localStorage.setItem('tenant_id', tenantId);
           sessionStorage.setItem('tenant_id', tenantId);
-        } catch(e) {}
+        } catch(e){}
         showOk('Outlet created! Redirecting to your new console…');
         setTimeout(()=>location.href='dashboard.html',900);
       }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;
-      showErr(err.message||'Could not create the outlet. Try a different outlet ID or email.');
+      showErr(err.message||'Could not create the outlet. Try again.');
     }
+  }
+
+  document.getElementById('reg-otp-verify').onclick=()=>{
+    const inputs=[...document.querySelectorAll('#reg-otp-row input')];
+    const code=inputs.map(i=>i.value).join('');
+    if(code.length<6){
+      inputs.forEach(i=>i.style.borderColor='var(--red)');
+      setTimeout(()=>inputs.forEach(i=>i.style.borderColor=''),1800);
+      return;
+    }
+    if(_pendingRegOTP && code !== _pendingRegOTP){
+      showErr('Incorrect OTP. Check the code sent to your WhatsApp.');
+      inputs.forEach(i=>{ i.value=''; i.style.borderColor='var(--red)'; });
+      setTimeout(()=>inputs.forEach(i=>i.style.borderColor=''),1800);
+      inputs[0].focus();
+      return;
+    }
+    _pendingRegOTP = null; // consume
+    hideAlerts();
+    finalizeRegistration();
   };
+
+  document.getElementById('reg-otp-back').onclick=()=>{
+    document.getElementById('reg-step-otp').classList.remove('on');
+    document.getElementById('reg-step-2').classList.add('on');
+    clearInterval(_regResendTimer);
+    _pendingRegOTP=null;
+  };
+
+  document.getElementById('reg-resend-otp').onclick=async ()=>{
+    if(!_pendingRegPayload) return;
+    const ccVal=document.getElementById('reg-country-code').value.replace(/\D/g,'');
+    const phoneDigits=document.getElementById('reg-whatsapp').value.replace(/\D/g,'');
+    const phone=ccVal+phoneDigits;
+    const code=genOTP(); _pendingRegOTP=code;
+    const result=await sendWhatsAppOTP(phone,code,'register');
+    const demoNotice=document.getElementById('reg-otp-demo-notice');
+    if(result.demo){ document.getElementById('reg-otp-demo-code').textContent=code; demoNotice.style.display='flex'; }
+    else { demoNotice.style.display='none'; }
+    document.querySelectorAll('#reg-otp-row input').forEach(i=>i.value='');
+    document.querySelector('#reg-otp-row input').focus();
+    startRegResendCooldown();
+  };
+
+  // Wire OTP auto-advance for registration OTP row
+  const regOtpInputs=[...document.querySelectorAll('#reg-otp-row input')];
+  regOtpInputs.forEach((inp,i)=>{
+    inp.oninput=()=>{ inp.value=inp.value.replace(/\D/g,'').slice(0,1); if(inp.value&&i<regOtpInputs.length-1)regOtpInputs[i+1].focus(); };
+    inp.onkeydown=e=>{ if(e.key==='Backspace'&&!inp.value&&i>0)regOtpInputs[i-1].focus(); };
+    inp.onpaste=e=>{
+      e.preventDefault();
+      const text=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'');
+      if(!text)return;
+      [...text.slice(0,6)].forEach((ch,k)=>{ if(regOtpInputs[k])regOtpInputs[k].value=ch; });
+      regOtpInputs[Math.min(text.length,5)].focus();
+    };
+  });
 
   // recovery modal
   const modal=document.getElementById('recovery-modal');
@@ -1218,20 +1404,91 @@
     if(order[t.dataset.rstep]<=order[recoveryStep]) rstep(t.dataset.rstep);
   });
 
-  document.getElementById('recovery-request-form').onsubmit=e=>{
+  // ── Recovery channel switching ────────────────────────────────────────
+  let _recChannel = 'email'; // 'email' | 'whatsapp'
+  document.querySelectorAll('.rec-ch-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      _recChannel=btn.dataset.channel;
+      document.querySelectorAll('.rec-ch-btn').forEach(b=>b.classList.toggle('active',b===btn));
+      const emailGrp=document.getElementById('rec-email-group');
+      const phoneGrp=document.getElementById('rec-phone-group');
+      if(_recChannel==='whatsapp'){
+        emailGrp.style.display='none';
+        phoneGrp.style.display='block';
+        document.getElementById('recovery-email').removeAttribute('required');
+        document.getElementById('recovery-phone').setAttribute('required','');
+      } else {
+        emailGrp.style.display='block';
+        phoneGrp.style.display='none';
+        document.getElementById('recovery-email').setAttribute('required','');
+        document.getElementById('recovery-phone').removeAttribute('required');
+        document.getElementById('rec-otp-demo-notice').style.display='none';
+      }
+    };
+  });
+
+  // Populate recovery WhatsApp country code selector from RS_COUNTRIES
+  (function(){
+    const recCc = document.getElementById('rec-country-code');
+    if(recCc && window.RS_COUNTRIES){
+      recCc.innerHTML = window.RS_COUNTRIES.filter(c=>c.dial).map(c=>`<option value="${c.dial}"${c.name==='India'?' selected':''}>${c.flag||''} +${c.dial} ${c.name}</option>`).join('');
+    }
+  })();
+
+  document.getElementById('recovery-request-form').onsubmit=async e=>{
     e.preventDefault();
-    const emailVal=document.getElementById('recovery-email').value.trim();
-    if(!emailVal){document.getElementById('recovery-email').focus();return;}
     const btn=e.target.querySelector('button[type="submit"]'); const orig=btn.innerHTML;
     btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; btn.disabled=true;
-    // Simulate / real send
-    setTimeout(()=>{
+
+    if(_recChannel==='whatsapp'){
+      const phoneDigits=document.getElementById('recovery-phone').value.replace(/\D/g,'');
+      if(phoneDigits.length<7){
+        btn.innerHTML=orig; btn.disabled=false;
+        showErr('Enter a valid WhatsApp number.');
+        document.getElementById('recovery-phone').focus(); return;
+      }
+      const ccVal=document.getElementById('rec-country-code').value.replace(/\D/g,'');
+      const phone=ccVal+phoneDigits;
+      const code=genOTP(); _pendingRecOTP=code;
+      const result=await sendWhatsAppOTP(phone,code,'recovery');
       btn.innerHTML=orig; btn.disabled=false;
-      document.getElementById('recovery-email-echo').textContent=emailVal;
+      // Show demo notice inside the phone group if in demo mode
+      const demoNotice=document.getElementById('rec-otp-demo-notice');
+      if(result.demo){
+        document.getElementById('rec-otp-demo-code').textContent=code;
+        demoNotice.style.display='flex';
+      } else {
+        demoNotice.style.display='none';
+      }
+      const echo=document.getElementById('recovery-email-echo');
+      const chanEcho=document.getElementById('recovery-channel-echo');
+      echo.textContent='+'+ccVal+' ···'+phoneDigits.slice(-3);
+      chanEcho.textContent='via WhatsApp';
       recoveryStep='code'; rstep('code');
       otp[0].focus();
       startResendCooldown();
-    }, 800);
+    } else {
+      // Email path
+      const emailVal=document.getElementById('recovery-email').value.trim();
+      if(!emailVal){ btn.innerHTML=orig; btn.disabled=false; document.getElementById('recovery-email').focus(); return; }
+      // Try real RS_API call, fall back to simulation
+      if(window.RS_API && RS_API.configured){
+        try {
+          await RS_API.access({ operation:'request_recovery', slug:document.getElementById('recovery-slug').value.trim()||undefined, email:emailVal });
+        } catch(e){ /* Edge Function may not support this op yet — proceed anyway */ }
+      }
+      setTimeout(()=>{
+        btn.innerHTML=orig; btn.disabled=false;
+        const echo=document.getElementById('recovery-email-echo');
+        const chanEcho=document.getElementById('recovery-channel-echo');
+        echo.textContent=emailVal;
+        chanEcho.textContent='';
+        _pendingRecOTP=null; // email OTP verified server-side, no client OTP
+        recoveryStep='code'; rstep('code');
+        otp[0].focus();
+        startResendCooldown();
+      }, 800);
+    }
   };
 
   document.getElementById('recovery-code-form').onsubmit=e=>{
@@ -1242,6 +1499,14 @@
       setTimeout(()=>otp.forEach(i=>i.style.borderColor=''),1800);
       return;
     }
+    // If WhatsApp channel: verify OTP client-side
+    if(_recChannel==='whatsapp' && _pendingRecOTP && code!==_pendingRecOTP){
+      showErr('Incorrect code. Check the WhatsApp message and try again.');
+      otp.forEach(i=>{ i.value=''; i.style.borderColor='var(--red)'; });
+      setTimeout(()=>otp.forEach(i=>i.style.borderColor=''),1800);
+      otp[0].focus(); return;
+    }
+    _pendingRecOTP=null;
     recoveryStep='reset'; rstep('reset');
     document.getElementById('recovery-new-password').focus();
   };
