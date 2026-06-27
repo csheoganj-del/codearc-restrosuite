@@ -79,6 +79,11 @@
               enableDemoTools = res.enableDemoTools === true;
               zeroCostLaunchMode = res.zeroCostLaunchMode === true;
               recomputeConfig();
+              // Sync to window globals so config.js consumers (realtime, supabaseClient) see the URL
+              if (!window.__SUPABASE_URL__) {
+                window.__SUPABASE_URL__ = cfg.url;
+                window.__SUPABASE_ANON_KEY__ = cfg.anonKey;
+              }
             }
           })
           .catch(e => console.warn('[doppio-api] Async /api/config failed:', e.message));

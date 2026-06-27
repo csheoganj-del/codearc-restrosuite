@@ -329,6 +329,16 @@
   };
 
   /* ---------------- CLOUD (tenant-data) ---------------- */
+  // Bridge: the CLOUD methods below call API.select/insert/update/remove.
+  // These are provided by RS_API (doppio-api.js). Using a lazy proxy so the
+  // reference always points at the current RS_API even if it is replaced later.
+  const API = {
+    select(...a) { return window.RS_API.select(...a); },
+    insert(...a) { return window.RS_API.insert(...a); },
+    update(...a) { return window.RS_API.update(...a); },
+    remove(...a) { return window.RS_API.remove(...a); },
+  };
+
   const SETTINGS_MAP = {
     set_restaurant_name:'business_name', set_outlet_name:'business_name', set_address:'address',
     set_phone:'phone', set_gstin:'gst_number'
@@ -657,14 +667,4 @@
             cachedSettingsMap[tenantId] = res;
             await LS.setSettings(res);
           }
-          return res;
-        } catch(e) {
-          console.warn('[RS_DB] setSettings cloud failed:', e.message);
-          return o;
-        }
-      }
-      return o;
-    },
-    ...auth
-  };
-})();
+          return res
