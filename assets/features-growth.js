@@ -859,7 +859,7 @@
       let records = [];
 
       if(name==='Reservations'){ 
-        icon='fa-calendar-check'; sub="Today's bookings"; size='lg';
+        icon='fa-calendar-check'; sub='Today's bookings'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('reservations'); } catch(e){}
         }
@@ -1058,4 +1058,32 @@
                   icon: 'fa-tags',
                   size: 'sm',
                   body: formBody,
-                  foot: `<button class="btn btn
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Create Offer</button>`,
+                  onMount(offModal, offClose) {
+                    offModal.querySelector('[data-cancel]').onclick = offClose;
+                    offModal.querySelector('[data-confirm]').onclick = async () => {
+                      const code = offModal.querySelector('#off-code').value || '';
+                      if (!code) return RS.toast('Coupon code is required', 'fa-circle-exclamation');
+                      const description = offModal.querySelector('#off-desc').value || 'Discount Coupon';
+
+                      const id = 'off_' + Date.now().toString().slice(-6);
+                      const offRow = { id, code, description, usageCount: 0, status: 'active' };
+                      offClose();
+                      if (RS.saveOne) {
+                        await RS.saveOne('offers', offRow);
+                        RS.toast('Offer coupon created successfully', 'fa-circle-check');
+                        hubScreen('Offers & Coupons');
+                      }
+                    };
+                  }
+                });
+              }
+            };
+          }
+        }
+      });
+    }
+    RS.addRenderer('growth-hub-tab', renderHub);
+  }
+  if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
+})();
