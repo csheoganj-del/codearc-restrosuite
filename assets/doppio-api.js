@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — Doppio backend API client
+   RestroSuite -- Doppio backend API client
    Talks to the existing Supabase Edge Functions:
      • tenant-access  (login / register / session / recovery)
      • tenant-data    (tenant-scoped CRUD on doppio_* tables)
@@ -41,7 +41,7 @@
 
   // SECURITY: the demo/mock fallback below can fabricate a full session for ANY
   // slug/role (including superadmin) when Supabase is misconfigured or unreachable.
-  // In production this is an auth bypass — a transient /api/config failure would
+  // In production this is an auth bypass -- a transient /api/config failure would
   // silently log any visitor in as admin. Demo mode must ONLY be available on a
   // local developer machine. Never enable it for a real hostname (incl. Vercel
   // previews, custom domains, or the Android WebView which uses file:// origins).
@@ -208,7 +208,7 @@
     async register(payload){
       // payload: { name, slug, outlet_type, email, phone, username, password }
       if(!CONFIGURED) {
-        // Demo/unconfigured mode: do NOT store a session — registration creates a PENDING
+        // Demo/unconfigured mode: do NOT store a session -- registration creates a PENDING
         // outlet that must be approved before login. Storing a session here would bypass
         // the approval gate and auto-redirect to dashboard.
         await new Promise(r => setTimeout(r, 600));
@@ -249,7 +249,7 @@
         if (err.status === 401 || err.status === 403) {
           return null;
         }
-        // Network error or offline — keep the local session alive
+        // Network error or offline -- keep the local session alive
         throw err;
       }
     },
@@ -265,7 +265,7 @@
     async data(payload){
       const token = ssGet(K.token);
       // Gateway operations (send/status/logs/reset) don't require a Supabase session
-      // when running on localhost — the local dev server authenticates with the gateway directly.
+      // when running on localhost -- the local dev server authenticates with the gateway directly.
       const GATEWAY_OPS = ['gateway_status','gateway_send','gateway_logs','gateway_reset','gateway_logout'];
       const isGatewayOp = payload && GATEWAY_OPS.includes(payload.operation);
       
@@ -386,14 +386,14 @@
       return post('tenant-admin', { action, ...payload }, adminToken, 'Superadmin request failed');
     },
 
-    // ── Staff account management (tenant-users edge function) ─────────────
+    // -- Staff account management (tenant-users edge function) -------------
     // Requires an active admin/owner session token.
     async staffUsers({ action, ...payload }) {
       const token = ssGet(K.token);
       if (!token) throw new Error('Not signed in.');
 
       if (!CONFIGURED) {
-        // Mock mode — use sessionStorage as a fake DB
+        // Mock mode -- use sessionStorage as a fake DB
         await new Promise(r => setTimeout(r, 300));
         const store = () => JSON.parse(sessionStorage.getItem('mock_staff_users') || '[]');
         const save  = (d) => sessionStorage.setItem('mock_staff_users', JSON.stringify(d));
@@ -416,56 +416,4 @@
           save(users); return { user: users[idx] };
         }
         if (action === 'reset_password') return { success: true };
-        if (action === 'revoke_user_sessions') return { success: true };
-        if (action === 'audit_logs') return { logs: [] };
-        throw new Error('Unknown action');
-      }
-
-      return post('tenant-users', { action, ...payload }, token, 'Staff account operation failed');
-    },
-  };
-
-  window.RS_API = api;
-
-  /* ---------------- GLOBAL ERROR BOUNDARY ---------------- */
-  // Catches any unhandled promise rejection across the whole app and surfaces
-  // a non-blocking "Something went wrong — reload?" banner. This prevents the
-  // dashboard from silently half-rendering on network errors or unexpected
-  // exceptions (e.g. JSON parse failures on non-200 responses).
-  window.addEventListener('unhandledrejection', function(event) {
-    const err = event.reason;
-    // Ignore deliberate AbortController cancellations
-    if (err && err.name === 'AbortError') return;
-    const msg = (err && (err.message || String(err))) || 'An unexpected error occurred.';
-    // Don't spam the banner for benign network blips during auth check
-    if (msg === 'Failed to fetch' && document.visibilityState === 'hidden') return;
-    // Surface a dismissible banner if the dashboard shell is present
-    const existing = document.getElementById('rs-global-error-banner');
-    if (existing) return; // already showing
-    const banner = document.createElement('div');
-    banner.id = 'rs-global-error-banner';
-    banner.style.cssText = [
-      'position:fixed','bottom:20px','left:50%','transform:translateX(-50%)',
-      'background:var(--glass-2,rgba(30,30,30,.95))','color:var(--text,#fff)',
-      'border:1px solid var(--red,#ef4444)','border-radius:12px',
-      'padding:12px 18px','z-index:99999','font-size:13px',
-      'display:flex','align-items:center','gap:12px','max-width:90vw',
-      'box-shadow:0 4px 24px rgba(0,0,0,.4)','backdrop-filter:blur(8px)'
-    ].join(';');
-    const errText = document.createTextNode('⚠️ ' + msg.slice(0, 120));
-    const reload = document.createElement('button');
-    reload.textContent = 'Reload';
-    reload.style.cssText = 'padding:4px 12px;border-radius:8px;border:1px solid var(--orange,#fc8019);background:transparent;color:var(--orange,#fc8019);cursor:pointer;font-size:12px;white-space:nowrap';
-    reload.onclick = function() { location.reload(); };
-    const dismiss = document.createElement('button');
-    dismiss.textContent = '×';
-    dismiss.style.cssText = 'padding:4px 8px;border-radius:8px;border:none;background:transparent;color:var(--text-mute,#888);cursor:pointer;font-size:16px';
-    dismiss.onclick = function() { banner.remove(); };
-    banner.appendChild(errText);
-    banner.appendChild(reload);
-    banner.appendChild(dismiss);
-    document.body ? document.body.appendChild(banner) : document.addEventListener('DOMContentLoaded', function() { document.body.appendChild(banner); });
-    // Auto-dismiss after 12 seconds
-    setTimeout(function() { if (banner.parentNode) banner.remove(); }, 12000);
-  });
-})();
+        if (action === 'revoke_user_ses

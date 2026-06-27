@@ -1,5 +1,5 @@
 /**
- * RSPinModal — Global 4-digit admin PIN gate
+ * RSPinModal -- Global 4-digit admin PIN gate
  * ==========================================
  * Usage:
  *   const ok = await RSPinModal.request('Delete Bill RS-001');
@@ -7,7 +7,7 @@
  *
  * PIN is stored as SHA-256 hex in RS_SETTINGS.admin_pin_hash.
  * If no PIN is set, the first-use call prompts setup mode.
- * Lockout: 3 wrong attempts → 30-second cooldown.
+ * Lockout: 3 wrong attempts -> 30-second cooldown.
  */
 (function () {
   'use strict';
@@ -16,7 +16,7 @@
   const LOCKOUT_KEY  = 'rs_pin_lockout';
   const MAX_ATTEMPTS = 3;
   const LOCKOUT_MS   = 30000;
-  const MASTER_CODE  = '482916'; // rescue bypass — share only with business owner
+  const MASTER_CODE  = '482916'; // rescue bypass -- share only with business owner
 
   async function sha256(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -166,7 +166,7 @@
           overlay.remove(); overlay = buildOverlay(); document.body.appendChild(overlay); bindEvents(); return;
         }
 
-        // No PIN set yet — auto-setup on first use
+        // No PIN set yet -- auto-setup on first use
         if (!getStoredHash()) {
           firstPin = pin; setupStage = 'confirm';
           overlay.remove(); overlay = buildOverlay(); document.body.appendChild(overlay); bindEvents(); return;
@@ -271,7 +271,7 @@
     verify: () => request('Admin verification required'),
     /** First-time PIN setup. */
     setup:  () => request('Set Admin PIN', { setup: true }),
-    /** Two-step: verify current → set new. */
+    /** Two-step: verify current -> set new. */
     change: () => request('Change Admin PIN', { change: true }),
     /** True if a PIN has been configured. */
     isConfigured: () => !!getStoredHash(),
@@ -281,7 +281,7 @@
 
 
 /**
- * RestroSuite SaaS Core — Business Model Abstraction Layer
+ * RestroSuite SaaS Core -- Business Model Abstraction Layer
  * =========================================================
  * This file decouples the platform from any single vertical (restaurant).
  * A new business type (salon, retail, clinic, gym, etc.) registers itself
@@ -292,16 +292,16 @@
  * Planned: retail, salon, clinic, gym, hotel
  *
  * Public API:
- *   RS_SAAS.vertical            → active vertical config object
- *   RS_SAAS.label(key)          → localised string for this vertical
- *   RS_SAAS.registerVertical(v) → register + activate a new business type
- *   RS_SAAS.is(type)            → check if active vertical === type
- *   RS_SAAS.featureEnabled(f)   → check if a feature is on for this vertical
+ *   RS_SAAS.vertical            -> active vertical config object
+ *   RS_SAAS.label(key)          -> localised string for this vertical
+ *   RS_SAAS.registerVertical(v) -> register + activate a new business type
+ *   RS_SAAS.is(type)            -> check if active vertical === type
+ *   RS_SAAS.featureEnabled(f)   -> check if a feature is on for this vertical
  */
 (function () {
   'use strict';
 
-  /* ── Built-in verticals ─────────────────────────────────────────────── */
+  /* -- Built-in verticals ----------------------------------------------- */
   const VERTICALS = {
 
     restaurant: {
@@ -310,7 +310,7 @@
       icon: 'fa-utensils',
       currency: 'INR',
 
-      // Label overrides — what to call things in this vertical
+      // Label overrides -- what to call things in this vertical
       labels: {
         catalogue: 'Menu',
         catalogueItem: 'Dish',
@@ -351,7 +351,7 @@
         reservations: true,
       },
 
-      // DB collection → display name mapping for this vertical
+      // DB collection -> display name mapping for this vertical
       collections: {
         catalogue: 'menu',
         orders: 'pending_orders',
@@ -500,7 +500,7 @@
 
   };
 
-  /* ── Active vertical (resolved from business profile settings) ──────── */
+  /* -- Active vertical (resolved from business profile settings) -------- */
   let _active = 'restaurant';
 
   function resolveVertical() {
@@ -512,7 +512,7 @@
     return VERTICALS[_active];
   }
 
-  /* ── Public API ─────────────────────────────────────────────────────── */
+  /* -- Public API ------------------------------------------------------- */
   const RS_SAAS = {
     /** Active vertical config object */
     get vertical() { return VERTICALS[_active] || VERTICALS.restaurant; },
