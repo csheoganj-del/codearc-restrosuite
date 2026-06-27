@@ -766,4 +766,371 @@
               }, 3000);
             }
           };
-       
+        }
+      }
+      function startOutletGatewayPolling() {
+        if (outletGatewayInterval) clearInterval(outletGatewayInterval);
+        pollOutletGateway();
+        outletGatewayInterval = setInterval(pollOutletGateway, 5000);
+      }
+      function stopOutletGatewayPolling() {
+        if (outletGatewayInterval) {
+          clearInterval(outletGatewayInterval);
+          outletGatewayInterval = null;
+        }
+      }
+
+      function applyStore(){ $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; }); }
+      function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
+      function show(key){
+        if(body.querySelector('[data-skey]')) collect();
+        body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`;
+        if (key === 'gateway') {
+          startOutletGatewayPolling();
+        } else {
+          stopOutletGatewayPolling();
+        }
+        // If profile pane: inject country/currency selects dynamically using stored values
+        if (key === 'profile') {
+          const row = body.querySelector('#set-country-currency-row');
+          if (row) {
+            const curCountry  = SET_STORE['set_country']  || 'India';
+            const curCurrency = SET_STORE['set_currency'] || 'INR (₹)';
+            row.innerHTML = countrySelect(curCountry) + currencySelect(curCurrency);
+            
+            // Helper to update GSTIN label and placeholder dynamically based on country tax label
+            const updateGstinLabels = (countryName) => {
+              const gstinLabel = body.querySelector('[data-skey="set_gstin"]')?.parentNode?.querySelector('.fl');
+              const gstinInput = body.querySelector('[data-skey="set_gstin"]');
+              if (gstinLabel && gstinInput) {
+                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(countryName);
+                const label = taxInfo ? taxInfo.label : 'GST';
+                if (label === 'GST') {
+                  gstinLabel.textContent = 'GSTIN';
+                  gstinInput.placeholder = 'GSTIN if enabled';
+                } else if (label === 'VAT') {
+                  gstinLabel.textContent = 'VAT Number';
+                  gstinInput.placeholder = 'VAT Number if enabled';
+                } else {
+                  gstinLabel.textContent = 'Tax ID / EIN';
+                  gstinInput.placeholder = 'Tax ID if enabled';
+                }
+              }
+            };
+
+            updateGstinLabels(curCountry);
+
+            // Country → currency + phone-prefix + tax auto-link
+            const countrySel  = body.querySelector('#set-country');
+            const currencySel = body.querySelector('#set-currency');
+            if (countrySel && currencySel) {
+              countrySel.addEventListener('change', () => {
+                // Extract real country name (strip flag + dial suffix added to option text)
+                const rawVal = countrySel.value;
+                const entry = window.RS_getCountryByName && window.RS_getCountryByName(rawVal);
+                if (entry && entry.currency) {
+                  currencySel.value = entry.currency;
+                  // Force-refresh the custom dropdown trigger label
+                  const cdTrigger = currencySel.closest('div')?.querySelector('.dropdown-trigger-label');
+                  if (cdTrigger) cdTrigger.textContent = entry.currency;
+                  currencySel.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (entry && entry.dial) {
+                  // Update outlet phone prefix in settings
+                  const phoneInput = body.querySelector('[data-skey="set_phone"]');
+                  if (phoneInput) {
+                    let rawPhone = phoneInput.value.replace(/^\+\d{1,4}\s*/, '').trim();
+                    phoneInput.value = `+${entry.dial} ${rawPhone}`;
+                    phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                  // Update cart customer phone prefix picker if it exists
+                  const cartPhonePicker = document.querySelector('#cust-input-phone');
+                  if (cartPhonePicker && cartPhonePicker.dataset.phonePrefixBuilt) {
+                    const pflag = cartPhonePicker.parentElement?.querySelector('.pflag');
+                    const pdial = cartPhonePicker.parentElement?.querySelector('.pdial');
+                    if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+                    if (pdial) pdial.textContent = `+${entry.dial}`;
+                  }
+                }
+                const taxInfo = window.RS_getCountryTaxInfo && window.RS_getCountryTaxInfo(rawVal);
+                if (taxInfo) {
+                  SET_STORE['set_tax_label'] = taxInfo.label;
+                  SET_STORE['set_tax_rate_percent'] = taxInfo.rate;
+                }
+                updateGstinLabels(rawVal);
+              });
+            }
+          }
+        }
+        applyStore();
+
+        // Localize tax pane dynamically after loading values
+        if (key === 'tax') {
+          const curCountry = SET_STORE['set_country'] || 'India';
+          const taxLabel = SET_STORE['set_tax_label'] || 'GST';
+          const isIndiaGst = (taxLabel.toUpperCase() === 'GST') && 
+            (curCountry.toLowerCase() === 'india' || curCountry.trim() === '');
+          
+          const hsnInput = body.querySelector('[data-skey="set_show_hsn_codes"]');
+          const hsnRow = hsnInput?.closest('.set-row');
+          if (hsnRow) {
+            hsnRow.style.display = isIndiaGst ? 'flex' : 'none';
+          }
+          
+          const incInput = body.querySelector('[data-skey="set_inclusive_pricing"]');
+          const incDesc = incInput?.closest('.set-row')?.querySelector('.sd');
+          if (incDesc) {
+            incDesc.textContent = `Menu prices include ${taxLabel}`;
+          }
+
+          const taxLabelInput = body.querySelector('[data-skey="set_tax_label"]');
+          if (taxLabelInput) {
+            taxLabelInput.addEventListener('input', () => {
+              const label = taxLabelInput.value || 'Tax';
+              if (incDesc) incDesc.textContent = `Menu prices include ${label}`;
+              const checkIndiaGst = (label.toUpperCase() === 'GST') && 
+                (curCountry.toLowerCase() === 'india' || curCountry.trim() === '');
+              if (hsnRow) hsnRow.style.display = checkIndiaGst ? 'flex' : 'none';
+            });
+          }
+        }
+        // Upgrade all native selects to custom dropdown widgets for visual consistency
+        if (typeof window.RS_wrapAllSelects === 'function') {
+          window.RS_wrapAllSelects(body, ['set-country', 'set-currency']);
+        }
+        // Mount phone prefix picker on the outlet phone field in profile settings
+        if (key === 'profile' && window.RS_buildPhonePrefix) {
+          const outletPhoneEl = body.querySelector('[data-skey="set_phone"]');
+          if (outletPhoneEl && !outletPhoneEl.dataset.phonePrefixBuilt) {
+            const settings2 = window.RS_SETTINGS || {};
+            let initCode = 'IN';
+            if (settings2.set_country && window.RS_getCountryByName) {
+              const e2 = window.RS_getCountryByName(settings2.set_country);
+              if (e2) initCode = e2.code;
+            }
+            window.RS_buildPhonePrefix(outletPhoneEl, initCode);
+          }
+        }
+        $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
+        const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
+        const btnReset = $('#btn-client-reset-data');
+        if(btnReset) {
+          btnReset.onclick = async () => {
+            if(!confirm("⚠️ RESET OUTLET DATA?\n\nThis will PERMANENTLY DELETE all of your operational data (bills, menu, inventory, employees, customers, drafts, etc.).\n\nThis action cannot be undone! Proceed?")) return;
+            btnReset.disabled = true;
+            btnReset.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+            try {
+              const collections = ['bills', 'menu', 'inventory', 'customers', 'employees', 'drafts', 'pending_orders', 'shifts', 'shift_events', 'attendance', 'leave_requests', 'reservations', 'offers', 'vendors', 'purchase_orders', 'support_tickets'];
+              for (const c of collections) {
+                const list = await RS_DB.list(c);
+                for (const item of list) {
+                  const id = (c === 'shifts') ? item.shiftId : (c === 'shift_events') ? item.eventId : item.id;
+                  if (id != null) {
+                    await RS_DB.del(c, id);
+                  }
+                }
+              }
+              RS.toast('All operational data reset successfully!', 'fa-circle-check');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1200);
+            } catch(err) {
+              console.error(err);
+              RS.toast('Error resetting data: ' + err.message, 'fa-circle-exclamation');
+              btnReset.disabled = false;
+              btnReset.innerHTML = '<i class="fa-solid fa-trash-can"></i> Reset Outlet Data';
+            }
+          };
+        }
+      }
+      $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
+      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); } if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
+      $('#set-cancel').onclick=()=>show('profile');
+      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
+    }
+    RS.titles['settings-tab']=['Settings','Outlet, taxes, printer & gateway configuration'];
+    RS.addRenderer('settings-tab', renderSettings);
+    const openSet = $('#open-settings'); if(openSet) openSet.addEventListener('click', ()=>RS.activateTab('settings-tab'));
+
+    /* ===================== DB MODE BADGE + SESSION ===================== */
+    (function(){
+      const pill = document.getElementById('db-mode-pill');
+      function updatePill() {
+        const cloud = window.RS_DB && window.RS_DB.isCloud;
+        if(pill){
+          pill.innerHTML = `<span class="dot dot-live"></span> ${cloud?'Cloud':'Local'}`;
+          pill.title = cloud?'Connected to Supabase — data syncs to the cloud':'Local mode — data persists in this browser. Add Supabase keys to sync.';
+        }
+      }
+      updatePill();
+      document.addEventListener('rs:hydrated', updatePill);
+      // reflect signed-in user on the sidebar pill, if any
+      if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
+      // route sign-out through the data layer
+      const logout = document.querySelector('.sb-foot-btn.logout');
+      if(logout){
+        logout.removeAttribute('onclick');
+        logout.addEventListener('click', async ()=>{
+          if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
+          try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
+          location.href='login.html';
+        });
+      }
+    })();
+
+    /* ===================== MOBILE "MORE" SHEET ===================== */
+    const moreBtn = $('#mnav-more');
+    if(moreBtn){
+      const MORE = [
+        ['floor-tab','Floor & Tables','chair'],
+        ['aggregator-tab','Online Orders','bowl-rice'],
+        ['tokens-tab','Token Display','bullhorn'],
+        ['inventory-tab','Inventory','boxes-stacked'],
+        ['editor-tab','Menu Editor','pen-to-square'],
+        ['customers-tab','Customers','address-book'],
+        ['tax-tab','Tax & GST','file-invoice'],
+        ['employees-tab','Employees','users'],
+        ['analytics-tab','Advanced Analytics','chart-mixed'],
+        ['growth-hub-tab','Growth Hub','rocket'],
+        ['settings-tab','Settings','gear'],
+        ['logout','Sign Out','right-from-bracket']
+      ];
+      moreBtn.addEventListener('click', ()=>{
+        RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
+          body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${MORE.map(m=>{
+            const bgClass = m[0] === 'logout' ? 'bg-r' : 'bg-o';
+            return `<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic ${bgClass}" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`;
+          }).join('')}</div>`,
+          onMount(modal, close){
+            $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
+              if(b.dataset.go === 'logout') {
+                if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
+                close();
+                if(window.RS_DB) {
+                  RS_DB.signOut().then(()=>{ location.href='login.html'; });
+                } else {
+                  location.href='login.html';
+                }
+              } else {
+                RS.activateTab(b.dataset.go);
+                close();
+              }
+            });
+          }
+        });
+      });
+    }
+    
+    // Add topbar status badge polling & click handler
+    window.updateTopbarWhatsAppStatus = async function() {
+      const textEl = document.getElementById('topbar-whatsapp-status-text');
+      const pillEl = document.getElementById('topbar-whatsapp-status-pill');
+      if (!textEl || !pillEl) return;
+      const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+      try {
+        const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
+        if (res && res.status === 'ready') {
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp" style="margin-right:4px"></i>WhatsApp Linked';
+          pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
+          pillEl.style.color = '#22c55e';
+          pillEl.style.border = '1px solid rgba(34, 197, 94, 0.2)';
+        } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
+          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Syncing';
+          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
+          pillEl.style.color = '#eab308';
+          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+        } else if (res && res.status === 'qr') {
+          textEl.innerHTML = '<i class="fa-solid fa-qrcode" style="margin-right:4px"></i>Scan to Connect';
+          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
+          pillEl.style.color = '#eab308';
+          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+        } else if (res && res.status === 'auth_failure') {
+          textEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-right:4px"></i>Auth Failed';
+          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          pillEl.style.color = '#ef4444';
+          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        } else if (res && res.status === 'connecting') {
+          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Starting…';
+          pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
+          pillEl.style.color = '#6b7280';
+          pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
+        } else {
+          textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
+          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          pillEl.style.color = '#ef4444';
+          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        }
+      } catch(err) {
+        textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
+        pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+        pillEl.style.color = '#ef4444';
+        pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+      }
+    };
+    
+    let topbarWhatsAppInterval = null;
+    window.startTopbarWhatsAppPolling = function() {
+      if (topbarWhatsAppInterval) clearInterval(topbarWhatsAppInterval);
+      window.updateTopbarWhatsAppStatus();
+      topbarWhatsAppInterval = setInterval(window.updateTopbarWhatsAppStatus, 15000);
+      
+      const pill = document.getElementById('topbar-whatsapp-status-pill');
+      if (pill) {
+        pill.onclick = () => {
+          if (window.RS && typeof RS.activateTab === 'function') {
+            RS.activateTab('settings-tab');
+          }
+          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+          if (gatewayBtn) {
+            gatewayBtn.click();
+          }
+        };
+      }
+    };
+    
+    RS.syncPhoneCombosToSettings = function(customSettings) {
+      const settings = customSettings || window.RS_SETTINGS || {};
+      if (!settings.set_country || !window.RS_getCountryByName) return;
+      const entry = window.RS_getCountryByName(settings.set_country);
+      if (!entry) return;
+
+      // 1. Update settings profile phone input if it exists
+      const settingsPhone = document.querySelector('[data-skey="set_phone"]');
+      if (settingsPhone && settingsPhone.dataset.phonePrefixBuilt) {
+        if (typeof settingsPhone.RS_setCountryCode === 'function') {
+          settingsPhone.RS_setCountryCode(entry.code);
+        } else {
+          const pflag = settingsPhone.parentElement.querySelector('.pflag');
+          const pdial = settingsPhone.parentElement.querySelector('.pdial');
+          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+          if (pdial) pdial.textContent = `+${entry.dial}`;
+        }
+      }
+
+      // 2. Update cart customer phone prefix picker if it exists
+      const cartPhone = document.querySelector('#cust-input-phone');
+      if (cartPhone && cartPhone.dataset.phonePrefixBuilt) {
+        if (typeof cartPhone.RS_setCountryCode === 'function') {
+          cartPhone.RS_setCountryCode(entry.code);
+        } else {
+          const pflag = cartPhone.parentElement.querySelector('.pflag');
+          const pdial = cartPhone.parentElement.querySelector('.pdial');
+          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+          if (pdial) pdial.textContent = `+${entry.dial}`;
+        }
+      }
+    };
+    
+    // Sync immediately on load if settings are already loaded
+    try {
+      RS.syncPhoneCombosToSettings();
+    } catch(e){}
+
+    document.addEventListener('rs:hydrated', window.startTopbarWhatsAppPolling);
+    if (window.RS_DB && window.RS_DB.session) {
+      window.startTopbarWhatsAppPolling();
+    }
+  }
+  if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
+})();

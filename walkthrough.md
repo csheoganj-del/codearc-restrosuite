@@ -436,3 +436,21 @@ We have successfully resolved the issue where WhatsApp receipts were double-deli
 ## 3. Code Synchronization
 - Synced all modifications to `android-app/app/src/main/assets/` via `sync-assets.ps1`.
 - App version updated and verified under `v33-20260624`.
+
+---
+
+# Walkthrough - Table QR Code Print Loading Fix (June 25, 2026)
+
+We have resolved the issue where table QR code cards were printed as empty gray border outlines instead of displaying the actual QR code.
+
+## 1. Root Cause
+When printing a table QR (either a single card or a batch of all cards), the application dynamically writes the HTML structure containing the `<img>` tags pointing to the QR code generation API (`https://api.qrserver.com/v1/create-qr-code/...`).
+Previously, the print helper immediately executed `window.print()` before the browser could perform the asynchronous network requests to fetch and render the QR code images. Because the print dialog blocks background thread execution in Chromium, the images remained unloaded and blank.
+
+## 2. Logic Enhancements
+- **Asynchronous Image Load Guard** in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js): Refactored the `window.RSPrint` helper to query all `<img>` tags inside the iframe, monitor their `onload`/`onerror` events, and wait until all image assets are fully loaded and cached before executing the print command.
+- **Fallback Printer Script Waiter** in [assets/features-growth.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-growth.js): Refactored the fallback `window.open` code for both single table QR printing and batch floor table QR printing to dynamically write an inline script that waits for all images to complete loading before invoking `window.print()` and `window.close()`.
+
+## 3. Code Synchronization
+- Synchronized all web assets with the local Android application container using `powershell -File .\sync-assets.ps1`.
+

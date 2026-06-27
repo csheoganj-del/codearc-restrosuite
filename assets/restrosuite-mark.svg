@@ -1,22 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="RestroSuite logo mark">
-  <!-- Rounded square background -->
-  <rect width="64" height="64" rx="14" fill="#FF4F00"/>
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="none" role="img" aria-label="RestroSuite logo mark">
   <!-- Fork (left) -->
-  <g fill="white">
-    <rect x="20" y="12" width="2.5" height="10" rx="1.25"/>
-    <rect x="24" y="12" width="2.5" height="10" rx="1.25"/>
-    <rect x="28" y="12" width="2.5" height="10" rx="1.25"/>
-    <!-- Fork handle merged -->
-    <path d="M20 21.5 C20 21.5 20.5 26 24.25 26 C28 26 28.5 21.5 28.5 21.5 L28.5 52 L20 52 Z" rx="1"/>
+  <g fill="#1a1a1a">
+    <rect x="28" y="28" width="5" height="38" rx="2.5"/>
+    <rect x="38" y="28" width="5" height="38" rx="2.5"/>
+    <rect x="48" y="28" width="5" height="38" rx="2.5"/>
+    <path d="M28 62 C28 62 29 80 40.5 80 C52 80 53 62 53 62 L53 162 L28 162 Z" rx="2"/>
   </g>
-
   <!-- Knife (right) -->
-  <g fill="white">
-    <path d="M36 12 C36 12 44 18 44 26 L36 26 Z" opacity="0.9"/>
-    <rect x="36" y="26" width="2.5" height="26" rx="1.25"/>
+  <g fill="#1a1a1a">
+    <path d="M152 28 C152 28 168 44 168 72 L152 72 Z" opacity="0.9"/>
+    <rect x="152" y="72" width="6" height="90" rx="3"/>
   </g>
-
-  <!-- Small dot / steam accent above center -->
-  <circle cx="32" cy="9" r="2" fill="white" opacity="0.5"/>
+  <!-- Plate outer ring -->
+  <circle cx="96" cy="96" r="66" fill="#1a1a1a"/>
+  <!-- Plate white ring -->
+  <circle cx="96" cy="96" r="58" fill="white"/>
+  <!-- Plate inner dark -->
+  <circle cx="96" cy="96" r="50" fill="#1a1a1a"/>
+  <!-- Code bracket </> -->
+  <!-- < bracket -->
+  <path d="M66 82 L80 96 L66 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- > bracket -->
+  <path d="M126 82 L112 96 L126 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- / slash -->
+  <line x1="106" y1="78" x2="86" y2="114" stroke="#FF6A2A" stroke-width="6" stroke-linecap="round"/>
 </svg>
