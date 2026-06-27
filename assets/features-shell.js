@@ -944,7 +944,19 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{ RS.toast('Settings saved'+(RS.dbMode&&RS.dbMode()==='cloud'?' to cloud':''),'fa-circle-check'); if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); } if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels(); if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE); if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(); try{ if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch(e){} }); };
+      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{
+        const isCloud = RS.dbMode && RS.dbMode()==='cloud';
+        if(isCloud){
+          RS.toast('Settings saved to cloud','fa-circle-check');
+        } else {
+          RS.toast('Settings saved locally only — not synced to cloud. Log in to sync across devices.','fa-triangle-exclamation');
+        }
+        if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); }
+        if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
+        if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
+        if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile();
+        try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
+      }); };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }
@@ -958,8 +970,15 @@
       function updatePill() {
         const cloud = window.RS_DB && window.RS_DB.isCloud;
         if(pill){
-          pill.innerHTML = `<span class="dot dot-live"></span> ${cloud?'Cloud':'Local'}`;
-          pill.title = cloud?'Connected to Supabase -- data syncs to the cloud':'Local mode -- data persists in this browser. Add Supabase keys to sync.';
+          if (cloud) {
+            pill.innerHTML = `<span class="dot dot-live"></span> Cloud`;
+            pill.style.cssText = '';
+            pill.title = 'Connected to Supabase — data syncs to the cloud';
+          } else {
+            pill.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size:10px;margin-right:3px"></i> Local only`;
+            pill.style.cssText = 'background:rgba(245,158,11,0.15);color:#b45309;border:1px solid rgba(245,158,11,0.4)';
+            pill.title = 'Local mode — data is saved in this browser only and will NOT sync to other devices. Log in to enable cloud sync.';
+          }
         }
       }
       updatePill();
