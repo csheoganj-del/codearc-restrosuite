@@ -531,6 +531,7 @@
       return localData;
     }
 
+    window.dispatchEvent(new CustomEvent('rs:sync-start', { detail: { method, collection: c } }));
     try {
       const res = await CLOUD[method](c, ...args);
       if (res && (method === 'put' || method === 'bulkPut')) {
@@ -542,6 +543,7 @@
           }
         } catch(e){}
       }
+      window.dispatchEvent(new CustomEvent('rs:sync-done', { detail: { method, collection: c } }));
       return res;
     }
     catch(e){
@@ -565,6 +567,7 @@
         // Log silently -- user needs to run the DB migration
         console.warn(`[RS_DB] Schema mismatch on ${c}: "${e.message}". Run the missing DB migration to fix.`);
       }
+      window.dispatchEvent(new CustomEvent('rs:sync-done', { detail: { method, collection: c, error: true } }));
       return LS[method](c, ...args);
     }
   }

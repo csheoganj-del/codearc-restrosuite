@@ -967,25 +967,108 @@
     /* ===================== DB MODE BADGE + SESSION ===================== */
     (function(){
       const pill = document.getElementById('db-mode-pill');
-      function updatePill() {
-        const cloud = window.RS_DB && window.RS_DB.isCloud;
-        if(pill){
-          if (cloud) {
-            pill.innerHTML = `<span class="dot dot-live"></span> Cloud`;
-            pill.style.cssText = '';
-            pill.title = 'Connected to Supabase — data syncs to the cloud';
-          } else {
-            pill.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size:10px;margin-right:3px"></i> Local only`;
-            pill.style.cssText = 'background:rgba(245,158,11,0.15);color:#b45309;border:1px solid rgba(245,158,11,0.4)';
-            pill.title = 'Local mode — data is saved in this browser only and will NOT sync to other devices. Log in to enable cloud sync.';
-          }
-        }
+      const ALL_STATES = ['cloud','syncing','local-only','offline','sync-error'];
+
+      // Count of in-flight cloud writes — hold Syncing until all settle
+      let activeSyncCount = 0;
+      let syncDoneTimer   = null;
+      let errorClearTimer = null;
+
+      function setState(state, title, html) {
+        if (!pill) return;
+        pill.style.cssText = '';              // wipe any legacy inline styles
+        ALL_STATES.forEach(s => pill.classList.remove(s));
+        if (state) pill.classList.add(state);
+        pill.title   = title;
+        pill.innerHTML = html;
       }
-      updatePill();
+
+      function updatePill() {
+        if (!pill) return;
+        const isCloud  = window.RS_DB && window.RS_DB.isCloud;
+        const isOnline = navigator.onLine;
+
+        if (!isOnline) {
+          setState('offline',
+            'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
+            `<i class="fa-solid fa-wifi-slash" style="font-size:10px"></i>&nbsp;Offline`
+          );
+          return;
+        }
+        if (!isCloud) {
+          setState('local-only',
+            'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
+            `<i class="fa-solid fa-triangle-exclamation" style="font-size:10px"></i>&nbsp;Local only`
+          );
+          return;
+        }
+        // Signed in + online — check for recent error (within 30 s)
+        const err = window.RS_LAST_CLOUD_ERROR;
+        if (err && (Date.now() - err.time < 30000)) {
+          setState('sync-error',
+            `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
+            `<i class="fa-solid fa-circle-exclamation" style="font-size:10px"></i>&nbsp;Sync error`
+          );
+          clearTimeout(errorClearTimer);
+          errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
+          return;
+        }
+        setState('cloud',
+          'Connected to Supabase — all data syncs to the cloud instantly.',
+          `<span class="dot dot-live"></span>&nbsp;Cloud`
+        );
+      }
+
+      function showSyncing() {
+        if (!pill || !navigator.onLine || !(window.RS_DB && window.RS_DB.isCloud)) return;
+        ALL_STATES.forEach(s => pill.classList.remove(s));
+        pill.classList.add('syncing');
+        pill.style.cssText = '';
+        pill.title     = 'Syncing to cloud…';
+        pill.innerHTML = `<span class="dot dot-live" style="background:currentColor;animation:pulse 0.7s ease infinite alternate"></span>&nbsp;Syncing…`;
+      }
+
+      // ── Sync-event listeners (fired by db.js guard()) ─────────────────
+      window.addEventListener('rs:sync-start', () => {
+        activeSyncCount++;
+        clearTimeout(syncDoneTimer);
+        showSyncing();
+      });
+
+      window.addEventListener('rs:sync-done', () => {
+        activeSyncCount = Math.max(0, activeSyncCount - 1);
+        if (activeSyncCount === 0) {
+          clearTimeout(syncDoneTimer);
+          syncDoneTimer = setTimeout(updatePill, 400); // min 400 ms flash
+        }
+      });
+
+      window.addEventListener('rs:cloud-fallback', () => {
+        clearTimeout(syncDoneTimer);
+        syncDoneTimer = setTimeout(updatePill, 400);
+      });
+
+      // All queued offline writes successfully drained — clear any error badge
+      window.addEventListener('rs:sync-queue-drained', () => {
+        window.RS_LAST_CLOUD_ERROR = null;
+        clearTimeout(errorClearTimer);
+        updatePill();
+      });
+
+      // ── Network change listeners ───────────────────────────────────────
+      window.addEventListener('offline', updatePill);
+      window.addEventListener('online',  () => setTimeout(updatePill, 1200)); // wait for drain to kick off
+
+      // ── Data hydration ─────────────────────────────────────────────────
       document.addEventListener('rs:hydrated', updatePill);
-      // reflect signed-in user on the sidebar pill, if any
+
+      // Initial render
+      updatePill();
+
+      // ── Reflect signed-in user on sidebar pill ────────────────────────
       if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
-      // route sign-out through the data layer
+
+      // ── Route sign-out through the data layer ─────────────────────────
       const logout = document.querySelector('.sb-foot-btn.logout');
       if(logout){
         logout.removeAttribute('onclick');
