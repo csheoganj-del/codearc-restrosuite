@@ -213,9 +213,33 @@
       d.open();
       d.write(fullHtml);
       d.close();
-      f.contentWindow.focus();
-      f.contentWindow.print();
-      setTimeout(()=>f.remove(), 800);
+
+      const performPrint = () => {
+        f.contentWindow.focus();
+        f.contentWindow.print();
+        setTimeout(() => f.remove(), 1000);
+      };
+
+      const imgs = Array.from(f.contentWindow.document.getElementsByTagName('img'));
+      if (imgs.length === 0) {
+        performPrint();
+      } else {
+        let loaded = 0;
+        const checkDone = () => {
+          loaded++;
+          if (loaded === imgs.length) {
+            setTimeout(performPrint, 300);
+          }
+        };
+        imgs.forEach(img => {
+          if (img.complete) {
+            checkDone();
+          } else {
+            img.onload = checkDone;
+            img.onerror = checkDone;
+          }
+        });
+      }
     };
 
     /* ---------------- receipt builder ---------------- */
@@ -1667,7 +1691,7 @@
         }
 
         const bill = {
-          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
+          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true,timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
           table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
           tenders: customTenders || [{ method: payMethod, amount: receivedVal }], change: changeVal || 0,
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
@@ -1952,7 +1976,7 @@
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
       const tok = RS.seedToken();
       const kotInner = `<div class="kot-h"><span class="kt">KOT ${tok}</span><span style="font-weight:700">${cust.table}</span></div>
-        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'})} · ${totals.count} items</div>
+        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'})} · ${totals.count} items</div>
         ${totals.items.map(i=>`<div class="kot-item"><span class="kq">${i.qty}×</span><span>${i.name}</span></div>`).join('')}`;
       RSModal.open({
         title:'Kitchen ticket', sub:'Token '+tok, icon:'fa-fire', size:'sm',
@@ -2132,7 +2156,7 @@
               gst: r.customerGst || '',
               count: (r.items || []).reduce((sum, item) => sum + (item.qty || 1), 0),
               total: r.total || 0,
-              time: r.time || new Date().toLocaleTimeString('en-IN', {hour: 'numeric', minute: '2-digit', hour12: true}),
+              time: r.time || new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN', {hour: 'numeric', minute: '2-digit', hour12: true, timeZone: window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
               orderType: r.orderType || orderTypeKey,
               deliveryAddress: r.deliveryAddress || '',
               deliveryCharge: r.deliveryCharge || '',
@@ -2165,7 +2189,7 @@
         gst: cust.gst, 
         count: totals.count, 
         total: totals.grand, 
-        time: new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}),
+        time: new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
         orderType: orderTypeKey
       };
       
@@ -3379,35 +3403,4 @@
         // F4: Cycle Order Type Tab
         else if (e.key === 'F4') {
           e.preventDefault();
-          const btns = Array.from(document.querySelectorAll('.order-type-btn'));
-          if (btns.length > 0) {
-            const activeIdx = btns.findIndex(btn => btn.classList.contains('active'));
-            const nextIdx = (activeIdx + 1) % btns.length;
-            btns[nextIdx].click();
-          }
-        }
-        // Ctrl+S: KOT Print
-        else if (e.ctrlKey && e.key.toLowerCase() === 's') {
-          e.preventDefault();
-          const kotBtn = document.getElementById('btn-kot');
-          if (kotBtn) kotBtn.click();
-        }
-        // Ctrl+Enter: Checkout / Settle
-        else if (e.ctrlKey && e.key === 'Enter') {
-          e.preventDefault();
-          const checkoutBtn = document.getElementById('btn-checkout');
-          if (checkoutBtn) checkoutBtn.click();
-        }
-      });
-      
-      // Initialize the custom customer selector widget
-      initCustomCustomerWidget();
-    }
-
-  if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });
-
-  // Security contract test compatibility:
-  // let isSplitPaymentActive = false;
-  // class="pos-customize-btn"
-  // function openCustomizationModal(item) {}
-})();
+          const btns = Array.from(document.querySelectorAll('.order-typ

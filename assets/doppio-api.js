@@ -379,7 +379,45 @@
       const adminToken = ssGet('superadmin_admin_token');
       if(!adminToken) throw new Error("Superadmin session expired. Please log in again.");
       return post('tenant-admin', { action, ...payload }, adminToken, 'Superadmin request failed');
-    }
+    },
+
+    // ── Staff account management (tenant-users edge function) ─────────────
+    // Requires an active admin/owner session token.
+    async staffUsers({ action, ...payload }) {
+      const token = ssGet(K.token);
+      if (!token) throw new Error('Not signed in.');
+
+      if (!CONFIGURED) {
+        // Mock mode — use sessionStorage as a fake DB
+        await new Promise(r => setTimeout(r, 300));
+        const store = () => JSON.parse(sessionStorage.getItem('mock_staff_users') || '[]');
+        const save  = (d) => sessionStorage.setItem('mock_staff_users', JSON.stringify(d));
+
+        if (action === 'list_users') {
+          return { users: store(), usage: { active_staff: store().length, max_staff: 15 }, plan: { code: 'growth', name: 'Growth' } };
+        }
+        if (action === 'create_user') {
+          const users = store();
+          if (users.find(u => u.username === payload.username)) throw new Error('That username already exists in this workspace.');
+          const user = { id: 'mock-' + Date.now(), username: payload.username, display_name: payload.display_name, role: payload.role, status: 'active', allowed_tabs: [], created_at: new Date().toISOString() };
+          users.push(user); save(users);
+          return { user };
+        }
+        if (action === 'update_user') {
+          const users = store();
+          const idx = users.findIndex(u => u.id === payload.user_id);
+          if (idx === -1) throw new Error('Staff account was not found.');
+          users[idx] = { ...users[idx], ...( payload.role !== undefined ? { role: payload.role } : {} ), ...( payload.status !== undefined ? { status: payload.status } : {} ), ...( payload.display_name !== undefined ? { display_name: payload.display_name } : {} ) };
+          save(users); return { user: users[idx] };
+        }
+        if (action === 'reset_password') return { success: true };
+        if (action === 'revoke_user_sessions') return { success: true };
+        if (action === 'audit_logs') return { logs: [] };
+        throw new Error('Unknown action');
+      }
+
+      return post('tenant-users', { action, ...payload }, token, 'Staff account operation failed');
+    },
   };
 
   window.RS_API = api;

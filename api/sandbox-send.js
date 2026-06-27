@@ -1,113 +1,116 @@
-// Simple in-memory rate limiter (per-serverless-instance)
-const rateLimitMap = new Map();
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Basic IP-based rate limiting
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-  const now = Date.now();
-  const limitTime = 60 * 60 * 1000; // 1 hour
-  const maxRequests = 3;
-
-  if (!rateLimitMap.has(ip)) {
-    rateLimitMap.set(ip, []);
-  }
-
-  const timestamps = rateLimitMap.get(ip).filter(t => now - t < limitTime);
-  timestamps.push(now);
-  rateLimitMap.set(ip, timestamps);
-
-  if (timestamps.length > maxRequests) {
-    return res.status(429).json({
-      error: 'Too many requests. You can send up to 3 real WhatsApp messages per hour.'
-    });
-  }
-
-  const { phone, items } = req.body;
+  const { phone, items, country, pdfData, filename } = req.body;
 
   if (!phone || !items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Missing phone number or cart items' });
   }
 
-  // Clean phone number format
-  let cleanPhone = phone.replace(/\D/g, '');
-  if (cleanPhone.length === 10 && !cleanPhone.startsWith('91')) {
-    cleanPhone = '91' + cleanPhone;
-  }
-
-  if (cleanPhone.length < 10 || cleanPhone.length > 15) {
-    return res.status(400).json({ error: 'Invalid phone number format. Please provide a valid 10-digit number.' });
-  }
-
-  // Format the WhatsApp message
-  const border = "========================";
-  const divider = "------------------------";
-  
-  let msg = `*RestroSuite Interactive Sandbox*\n`;
-  msg += `${border}\n`;
-  msg += `Receipt: #RS-DEMO-${Math.floor(1000 + Math.random() * 9000)}\n`;
-  msg += `Date: ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}\n`;
-  msg += `${divider}\n`;
-  
-  let subtotal = 0;
-  items.forEach(item => {
-    const price = Number(item.price);
-    const qty = Number(item.qty);
-    const itemTotal = price * qty;
-    subtotal += itemTotal;
-    msg += `${qty} x ${item.name} - ₹${itemTotal}\n`;
-  });
-  
-  const tax = Math.round(subtotal * 0.05);
-  const finalTotal = subtotal + tax;
-  
-  msg += `${divider}\n`;
-  msg += `Subtotal: ₹${subtotal}\n`;
-  msg += `GST (5%): ₹${tax}\n`;
-  msg += `*Total: ₹${finalTotal}*\n`;
-  msg += `${border}\n`;
-  msg += `Thank you for testing the RestroSuite sandbox! ☕\n`;
-  msg += `Experience the fastest local-first billing software at *half the normal cost*.\n`;
-  msg += `👉 Visit: https://restrosuite.codearc.co.in`;
-
-  // Call the WhatsApp Gateway
-  const baseGatewayUrl = process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
-  const gatewayUrl = baseGatewayUrl.replace(/\/$/, '') + '/send';
-  const token = process.env.WHATSAPP_GATEWAY_TOKEN || '';
-
-  const headers = {
-    'Content-Type': 'application/json'
+  // Country config for message formatting
+  const CONFIGS = {
+    IN: { sym:'₹', dial:'91',  taxLabel:'GST', taxMode:'cgst_sgst',   taxRate:5,  sacCode:'9963' },
+    IE: { sym:'€', dial:'353', taxLabel:'VAT', taxMode:'vat_breakout', taxRate:9  },
+    GB: { sym:'£', dial:'44',  taxLabel:'VAT', taxMode:'vat_breakout', taxRate:20 },
+    US: { sym:'$', dial:'1',   taxLabel:'Tax', taxMode:'sales_tax',    taxRate:8  },
+    AU: { sym:'A$',dial:'61',  taxLabel:'GST', taxMode:'sales_tax',    taxRate:10 },
+    CA: { sym:'CA$',dial:'1', taxLabel:'HST', taxMode:'sales_tax',    taxRate:13 }
   };
+  const cfg = CONFIGS[country] || CONFIGS['IN'];
+  const sym = cfg.sym;
+  const rs  = n => sym + n;
 
-  if (token) {
-    headers['Authorization'] = token.toLowerCase().startsWith('bearer ') ? token : `Bearer ${token}`;
+  // Normalise phone — strip non-digits, strip leading dial code if already present
+  let cleanPhone = phone.replace(/\D/g, '');
+  if (!cleanPhone.startsWith(cfg.dial)) {
+    cleanPhone = cfg.dial + cleanPhone;
   }
+  if (cleanPhone.length < 8 || cleanPhone.length > 15) {
+    return res.status(400).json({ error: 'Invalid phone number' });
+  }
+
+  // Bill number & date matching production format
+  const now    = new Date();
+  const ymd    = now.toISOString().slice(0,10).replace(/-/g,'');
+  const billNo = `RS-${ymd}-${String(Math.floor(100 + Math.random() * 900)).padStart(3,'0')}`;
+  const dateStr = now.toLocaleDateString('en-GB', { day:'numeric', month:'short', timeZone:'UTC' }) +
+                  ', ' + now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', hour12:true, timeZone:'UTC' });
+
+  let subtotal = 0;
+  items.forEach(item => { subtotal += Number(item.price) * Number(item.qty); });
+  const tax   = Math.round(subtotal * cfg.taxRate / 100);
+  const total = subtotal + tax;
+
+  // ── WhatsApp text message ────────────────────────────────────────────────
+  let msg = `*RestroSuite Demo*\n`;
+  msg += `📞 +919983721179\n\n`;
+  msg += `🧾 ${billNo}   ${dateStr}\n`;
+  msg += `Table: Walk-in / Takeaway\n`;
+  msg += `Phone: +${cleanPhone}\n\n`;
+
+  items.forEach(item => {
+    const qty = Number(item.qty);
+    const pr  = Number(item.price);
+    const tr  = item.taxRate || cfg.taxRate;
+    msg += `${qty}× ${item.name} (${tr}%)    ${rs(qty * pr)}\n`;
+  });
+
+  msg += `\nSubtotal    ${rs(subtotal)}\n`;
+
+  if (cfg.taxMode === 'cgst_sgst') {
+    const halfGst = Math.round(tax / 2);
+    msg += `CGST (2.5%)    ${rs(halfGst)}\n`;
+    msg += `SGST (2.5%)    ${rs(tax - halfGst)}\n`;
+    msg += `SAC: ${cfg.sacCode}\n`;
+  } else if (cfg.taxMode === 'vat_breakout') {
+    msg += `VAT Breakout\n`;
+    msg += `Rate ${cfg.taxRate}%    Net ${rs(subtotal)} | VAT ${rs(tax)}\n`;
+  } else {
+    msg += `${cfg.taxLabel} (${cfg.taxRate}%)    ${rs(tax)}\n`;
+  }
+
+  msg += `\n*TOTAL    ${rs(total)}*\n\n`;
+  msg += `Cash    ${rs(total)}\n\n`;
+  msg += `Thank you for dining with us!\n`;
+  msg += `*Powered by RestroSuite* — https://codearc-restrosuite.vercel.app`;
+
+  // ── Call WhatsApp gateway ────────────────────────────────────────────────
+  const baseUrl    = (process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-whatsapp-gateway.hf.space').replace(/\/$/, '');
+  const token      = process.env.WHATSAPP_GATEWAY_TOKEN || '';
+  const headers    = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
 
   try {
-    const response = await fetch(gatewayUrl, {
+    // Step 1 — send text receipt
+    const textResp = await fetch(`${baseUrl}/send`, {
       method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        phone: cleanPhone,
-        message: msg
-      })
+      headers,
+      body: JSON.stringify({ phone: cleanPhone, message: msg })
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('[Sandbox Send] Gateway error:', data);
-      return res.status(response.status).json({
-        error: data.error || `Gateway returned HTTP ${response.status}`
-      });
+    const textData = await textResp.json();
+    if (!textResp.ok) {
+      return res.status(textResp.status).json({ error: textData.error || `Gateway error ${textResp.status}` });
     }
 
-    return res.status(200).json({ success: true, cleanPhone });
+    // Step 2 — send PDF as WhatsApp document (if provided)
+    if (pdfData) {
+      try {
+        await fetch(`${baseUrl}/send`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            phone: cleanPhone,
+            pdfData,
+            filename: filename || `Receipt_${billNo}.pdf`
+          })
+        });
+      } catch (_) { /* PDF send failure is non-fatal — text already delivered */ }
+    }
+
+    return res.status(200).json({ success: true, cleanPhone, billNo });
   } catch (err) {
-    console.error('[Sandbox Send] Network error:', err.message);
-    return res.status(500).json({ error: 'Failed to contact WhatsApp gateway' });
+    return res.status(500).json({ error: 'Failed to contact WhatsApp gateway: ' + err.message });
   }
 }

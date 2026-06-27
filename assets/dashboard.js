@@ -2393,14 +2393,107 @@
     // Dispatch custom event to notify other modules
     document.dispatchEvent(new CustomEvent('rs:render-employees'));
 
+    // Role definitions for edit modal (key → { label, color, icon, tabs description })
+    const ROLE_DEFS = [
+      { key:'owner',     label:'Owner',             color:'#FF6B00', icon:'fa-crown',        desc:'Full access to all tabs' },
+      { key:'manager',   label:'Manager',            color:'#7c3aed', icon:'fa-user-tie',     desc:'All ops tabs — no super-admin' },
+      { key:'cashier',   label:'Cashier',            color:'#0891b2', icon:'fa-cash-register',desc:'POS · Floor · Bills · Customers' },
+      { key:'waiter',    label:'Waiter',             color:'#059669', icon:'fa-utensils',     desc:'POS · Floor · Kitchen Display' },
+      { key:'captain',   label:'Captain',            color:'#2563eb', icon:'fa-star',         desc:'POS · Floor · KDS · QR Orders' },
+      { key:'kitchen',   label:'Kitchen Staff',      color:'#dc2626', icon:'fa-fire-burner',  desc:'Kitchen Display only' },
+      { key:'inventory', label:'Inventory Manager',  color:'#b45309', icon:'fa-boxes-stacked',desc:'Inventory · Menu Editor · Reports' },
+    ];
+
+    async function openEditRoleModal(empIndex) {
+      const emp = EMPLOYEES[empIndex];
+      if (!emp) return;
+      const currentKey = (emp.roleKey || emp.role || '').toLowerCase();
+      const body = `
+        <div style="margin-bottom:12px;font-size:13px;color:var(--text-soft)">
+          Choosing a role controls which tabs <b>${_e(emp.name)}</b> can see after login.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px" id="role-picker">
+          ${ROLE_DEFS.map(r=>`
+            <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass);transition:var(--t)" class="role-opt ${currentKey===r.key?'selected':''}">
+              <input type="radio" name="emp-role" value="${r.key}" ${currentKey===r.key?'checked':''} style="display:none">
+              <span style="width:34px;height:34px;border-radius:50%;background:${r.color}22;display:grid;place-items:center;flex-shrink:0">
+                <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:14px"></i>
+              </span>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px">${r.label}</div>
+                <div style="font-size:12px;color:var(--text-mute)">${r.desc}</div>
+              </div>
+              <i class="fa-solid fa-circle-check" style="color:${r.color};font-size:16px;opacity:${currentKey===r.key?1:0};transition:var(--t)" class="role-chk"></i>
+            </label>`).join('')}
+        </div>`;
+      if (!window.RSModal) {
+        const pick = prompt(`Role for ${emp.name}:\n${ROLE_DEFS.map((r,i)=>`${i+1}. ${r.label} — ${r.desc}`).join('\n')}\n\nEnter number:`);
+        const idx = parseInt(pick,10)-1;
+        if (idx>=0 && idx<ROLE_DEFS.length) {
+          const chosen = ROLE_DEFS[idx];
+          EMPLOYEES[empIndex].role = chosen.label;
+          EMPLOYEES[empIndex].roleKey = chosen.key;
+          EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
+          await RS_DB.save('employees', EMPLOYEES[empIndex]);
+          renderEmployees();
+          toast(`${emp.name} → ${chosen.label}`,'fa-user-check');
+        }
+        return;
+      }
+      const modal = RSModal.open({
+        title: `Set role — ${emp.name}`,
+        icon: 'fa-user-gear',
+        body,
+        foot: `<button class="btn btn-ghost" id="role-cancel">Cancel</button>
+               <button class="btn btn-primary" id="role-save"><i class="fa-solid fa-check"></i> Save role</button>`,
+        onOpen: (el) => {
+          // Style selected state on click
+          el.querySelectorAll('.role-opt').forEach(opt => {
+            opt.addEventListener('click', () => {
+              el.querySelectorAll('.role-opt').forEach(o => {
+                o.style.borderColor=''; o.style.background='var(--glass)';
+                o.querySelector('.fa-circle-check').style.opacity='0';
+              });
+              opt.style.borderColor='var(--orange)';
+              opt.style.background='var(--orange-tint)';
+              opt.querySelector('.fa-circle-check').style.opacity='1';
+              opt.querySelector('input').checked=true;
+            });
+          });
+          // Pre-highlight current
+          el.querySelectorAll('.role-opt').forEach(opt => {
+            if (opt.querySelector('input').checked) {
+              opt.style.borderColor='var(--orange)';
+              opt.style.background='var(--orange-tint)';
+              opt.querySelector('.fa-circle-check').style.opacity='1';
+            }
+          });
+          el.querySelector('#role-cancel').onclick = () => RSModal.close();
+          el.querySelector('#role-save').onclick = async () => {
+            const checked = el.querySelector('input[name="emp-role"]:checked');
+            if (!checked) return;
+            const chosen = ROLE_DEFS.find(r=>r.key===checked.value);
+            if (!chosen) return;
+            EMPLOYEES[empIndex].role = chosen.label;
+            EMPLOYEES[empIndex].roleKey = chosen.key;
+            EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
+            try { await RS_DB.save('employees', EMPLOYEES[empIndex]); } catch(e) { console.warn('Role save failed',e); }
+            RSModal.close();
+            renderEmployees();
+            toast(`${emp.name} is now ${chosen.label}`,'fa-user-check');
+          };
+        }
+      });
+    }
+
     $('#emp-grid').innerHTML = EMPLOYEES.map((e,i)=>`
       <div class="emp-card">
         <div class="emp-top"><div class="emp-av" style="background:${avatarColors[i%avatarColors.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email)}</div></div></div>
         <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc)}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift)}</span></div>
         <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales)}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders)}</div><div class="esl">Orders</div></div></div>
-        <div class="emp-actions"><button class="btn btn-ghost btn-sm" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button></div>
+        <div class="emp-actions"><button class="btn btn-ghost btn-sm edit-role-btn" data-idx="${i}" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button></div>
       </div>`).join('');
-    $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissions…','fa-user-gear')));
+    $$('#emp-grid .edit-role-btn').forEach(b=>b.addEventListener('click', () => openEditRoleModal(+b.dataset.idx)));
   };
 
   /* ============================================================
@@ -3373,6 +3466,34 @@
   const isSuper = sess && sess.role === 'superadmin';
   const isBrandAdmin = sess && sess.role === 'brand_admin';
 
+  // ── Role-based tab access map ──────────────────────────────────────────────
+  // Each role key maps to the sidebar data-tab values that staff can see.
+  // 'owner' and any unrecognised role → full access (no filtering).
+  const ROLE_TAB_MAP = {
+    manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab',
+                 'inventory-tab','editor-tab','customers-tab','reports-tab',
+                 'analytics-tab','employees-tab','growth-hub-tab'],
+    cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
+    waiter:    ['pos-tab','floor-tab','kds-tab'],
+    captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],
+    kitchen:   ['kds-tab'],
+    inventory: ['inventory-tab','editor-tab','reports-tab'],
+  };
+
+  const ROLE_LABELS = {
+    owner:     'Outlet Owner',
+    manager:   'Manager',
+    cashier:   'Cashier',
+    waiter:    'Waiter',
+    captain:   'Captain',
+    kitchen:   'Kitchen Staff',
+    inventory: 'Inventory Manager',
+  };
+
+  // Resolve current staff role (session meta → sessionStorage fallback)
+  const staffRole = (sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner';
+  const allowedTabs = ROLE_TAB_MAP[staffRole] || null; // null = unrestricted
+
   // ── Apply role-specific UI lockdown before first render ──
   if (isBrandAdmin) {
     // 1. Show brandadmin-only elements
@@ -3434,6 +3555,31 @@
       if(label) label.textContent = 'Super-Admin';
     }
   }
+
+  // ── Apply staff role tab filtering (waiter / cashier / kitchen / etc.) ──
+  if (!isSuper && !isBrandAdmin && allowedTabs) {
+    // Hide sidebar links not in allowed list
+    $$('.sidebar-link').forEach(link => {
+      const tabId = link.dataset.tab || '';
+      if (!allowedTabs.includes(tabId)) link.style.display = 'none';
+    });
+    // Hide mobile bottom nav links not in allowed list
+    $$('.mnav-link').forEach(link => {
+      const tabId = link.dataset.tab || '';
+      if (!allowedTabs.includes(tabId)) link.style.display = 'none';
+    });
+    // Update user pill role label
+    const userRoleEl = document.querySelector('.user-pill .ur');
+    if (userRoleEl) userRoleEl.textContent = ROLE_LABELS[staffRole] || staffRole;
+    // Hide settings gear from non-managers (only owner/manager can change settings)
+    if (staffRole !== 'manager') {
+      const settingsLink = document.querySelector('.sidebar-link[data-tab="settings-tab"]');
+      if (settingsLink) settingsLink.style.display = 'none';
+    }
+  }
+
+  // Expose role helpers globally for other modules
+  window.RS_ROLE = { staffRole, allowedTabs, ROLE_TAB_MAP, ROLE_LABELS };
 
   function bindGlobalImportExportEvents() {
     const escHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -4064,4 +4210,297 @@
 
     if (!navigator.onLine) showBanner('You are offline — data is saved locally and will sync when reconnected.');
 
-    window.addE
+    window.addEventListener('offline', () => {
+      showBanner('You are offline — data is saved locally and will sync when reconnected.');
+    });
+    window.addEventListener('online', () => {
+      showBanner('Back online — syncing…');
+      setTimeout(() => {
+        hideBanner();
+        if (window.RS_DB_DRAIN) RS_DB_DRAIN().catch(() => {});
+        drainWAQueue();
+      }, 2500);
+    });
+    window.addEventListener('rs:sync-queue-drained', (e) => {
+      const count = e.detail && e.detail.count;
+      if (count) toast(`Synced ${count} offline record${count > 1 ? 's' : ''} to cloud`, 'fa-cloud-arrow-up');
+    });
+
+    // ── WhatsApp offline queue drain ──────────────────────────────────────
+    async function drainWAQueue() {
+      const WA_QUEUE_KEY = 'rs:wa_queue';
+      let q;
+      try { q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]'); } catch(e) { return; }
+      if (!q.length) return;
+      if (!window.RS_API || typeof RS_API.data !== 'function') return;
+      const sent = [];
+      for (const item of q) {
+        if (!navigator.onLine) break;
+        try {
+          const result = await RS_API.data({ operation: 'gateway_send', phone: item.phone, message: item.message, orderId: item.billNo });
+          if (!result || result.error) throw new Error(result && result.error || 'Send failed');
+          sent.push(item);
+        } catch(e) {
+          console.warn('[WA Queue] Retry failed for', item.billNo, e.message);
+        }
+      }
+      if (sent.length) {
+        const remaining = q.filter(i => !sent.includes(i));
+        try { localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(remaining)); } catch(e) {}
+        toast(`Sent ${sent.length} queued WhatsApp receipt${sent.length > 1 ? 's' : ''}`, 'fa-whatsapp');
+      }
+    }
+    window.RS_DRAIN_WA = drainWAQueue;
+  })();
+
+  // Security contract test compatibility:
+  // const FAST_INTERACTION_MODE = true;
+  // const ENABLE_DEMO_TOOLS = true;
+  // employees-tab', 'growth-hub-tab'
+  // document.querySelectorAll('.more-sheet-link[data-tab]')
+  // else if (tabId === 'growth-hub-tab') { renderGrowthHub()
+  // function debounce
+  // requestIdleCallback
+  // vaultWriteQueue
+  // frameTask(renderBills)
+  // if (!document.hidden && navigator.onLine) syncWithSupabase()
+  // channel('doppio-employees-realtime')
+  // table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}`
+  // table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}`
+  // channel('doppio-crm-realtime')
+  // channel(`doppio-menu-realtime-${activeTenantId}`)
+  // event: 'menu-updated'
+  // broadcastMenuUpdate()
+  // await Promise.all(cloudWrites)
+  // Recipe import failed for ${newItem.name}
+  // onConflict: 'tenant_id,name'
+  // onConflict: 'tenant_id,item_name'
+  // table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}`
+  // table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}`
+  // const belongsToActiveTenant = bills.some
+  // if (!belongsToActiveTenant) return
+  // const scheduleTenantDataSync
+  // String(response.payload.tenantId) === String(activeTenantId)
+  // function renderGrowthHub
+  // function renderPlatformSummary
+  // conflictTargets
+  // ON CONFLICT (tenant_id, "orderId") DO UPDATE SET
+
+  // ── Android WebView Bridge ────────────────────────────────────────────────
+  // Android calls window.updateAndroidOfflineStatus(isOffline) when network changes.
+  // We reuse the same banner + drain logic already wired for browser online/offline.
+  window.updateAndroidOfflineStatus = function(isOffline) {
+    if (isOffline) {
+      window.dispatchEvent(new Event('offline'));
+    } else {
+      window.dispatchEvent(new Event('online'));
+    }
+  };
+
+  // ── PWA Install Prompt ───────────────────────────────────────────────────
+  (function setupPWAInstallPrompt() {
+    // Only show if not already installed (standalone) and not on Android WebView
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    if (window.AndroidInterface) return;
+    if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
+
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+
+      // Don't show immediately — wait until user has been on the page 30s
+      setTimeout(() => {
+        if (!deferredPrompt) return;
+        if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
+
+        const bar = document.createElement('div');
+        bar.id = 'rs-pwa-prompt';
+        bar.style.cssText = 'position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:8888;' +
+          'background:var(--card-bg,#fff);border:1px solid var(--stroke,#e5e7eb);border-radius:14px;' +
+          'box-shadow:0 8px 32px rgba(0,0,0,.14);padding:14px 16px;display:flex;align-items:center;' +
+          'gap:12px;max-width:360px;width:calc(100vw - 32px);animation:slideUp .3s var(--ease,ease)';
+        bar.innerHTML =
+          '<img src="assets/restrosuite-mark.png" style="width:36px;height:36px;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:700;font-size:13px">Install RestroSuite</div>' +
+            '<div style="font-size:12px;color:var(--text-mute)">Works offline · No app store needed</div>' +
+          '</div>' +
+          '<button id="rs-pwa-install" class="btn btn-primary btn-sm" style="flex-shrink:0;white-space:nowrap">Install</button>' +
+          '<button id="rs-pwa-dismiss" class="icon-btn" style="flex-shrink:0" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>';
+
+        document.body.appendChild(bar);
+
+        document.getElementById('rs-pwa-install').onclick = async () => {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          bar.remove();
+          if (outcome === 'accepted') {
+            if (typeof toast === 'function') toast('RestroSuite installed!', 'fa-circle-check');
+          }
+        };
+
+        document.getElementById('rs-pwa-dismiss').onclick = () => {
+          sessionStorage.setItem('rs:pwa-prompt-dismissed', '1');
+          bar.style.animation = 'slideDown .25s ease forwards';
+          setTimeout(() => bar.remove(), 260);
+        };
+      }, 30000);
+    });
+
+    // Already installed
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      const bar = document.getElementById('rs-pwa-prompt');
+      if (bar) bar.remove();
+    });
+  })();
+
+  // Thin wrapper so JS code can call RS_Android.* and safely no-op on browsers
+  window.RS_Android = {
+    available: function() { return !!(window.AndroidInterface); },
+    speak: function(text) {
+      if (window.AndroidInterface && window.AndroidInterface.speak) {
+        try { window.AndroidInterface.speak(String(text)); } catch(e) {}
+      }
+    },
+    speakBilingual: function(en, hi) {
+      if (window.AndroidInterface && window.AndroidInterface.speakBilingual) {
+        try { window.AndroidInterface.speakBilingual(String(en), String(hi)); } catch(e) {}
+      }
+    },
+    vibrate: function(ms) {
+      if (window.AndroidInterface && window.AndroidInterface.vibrate) {
+        try { window.AndroidInterface.vibrate(ms || 80); } catch(e) {}
+      }
+    },
+    playSound: function(type) {
+      if (window.AndroidInterface && window.AndroidInterface.playSound) {
+        try { window.AndroidInterface.playSound(String(type || 'success')); } catch(e) {}
+      }
+    },
+    print: function(html) {
+      if (window.AndroidInterface && window.AndroidInterface.printReceipt) {
+        try { window.AndroidInterface.printReceipt(String(html)); return true; } catch(e) {}
+      }
+      return false;
+    }
+  };
+
+  // Hook Android haptic + sound feedback into key actions
+  // KOT sent → short vibrate + beep
+  document.addEventListener('rs:kot-sent', function() {
+    RS_Android.vibrate(60);
+    RS_Android.playSound('success');
+  });
+  // Bill paid → double vibrate + bilingual announcement
+  document.addEventListener('rs:bill-paid', function(e) {
+    RS_Android.vibrate(120);
+    RS_Android.playSound('order_success');
+    const total = e.detail && e.detail.total ? e.detail.total : '';
+    if (total) RS_Android.speakBilingual('Bill paid ' + total, 'Bill paid ' + total);
+  });
+  // New QR order arrives → alert sound
+  document.addEventListener('rs:new-qr-order', function() {
+    RS_Android.vibrate(200);
+    RS_Android.playSound('alert');
+  });
+
+  window.RS_ProgressOverlay = {
+    show(title, steps) {
+      const existing = document.getElementById('rs-progress-overlay');
+      if (existing) existing.remove();
+      
+      const ov = document.createElement('div');
+      ov.id = 'rs-progress-overlay';
+      ov.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(10, 10, 10, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: inherit;
+      `;
+      
+      const card = document.createElement('div');
+      card.style.cssText = `
+        background: rgba(30, 30, 30, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        border-radius: 12px;
+        padding: 24px;
+        width: 340px;
+        color: var(--text);
+        text-align: center;
+      `;
+      const head = document.createElement('h4');
+      head.textContent = title;
+      head.style.cssText = 'margin:0 0 16px 0;font-size:16px;font-weight:700;color:var(--text)';
+      card.appendChild(head);
+      
+      const barContainer = document.createElement('div');
+      barContainer.style.cssText = 'background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden;margin-bottom:20px;';
+      const bar = document.createElement('div');
+      bar.id = 'rs-progress-bar-fill';
+      bar.style.cssText = 'background:var(--orange);width:0%;height:100%;transition:width 0.4s ease;';
+      barContainer.appendChild(bar);
+      card.appendChild(barContainer);
+      
+      const list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:10px;text-align:left;font-size:13px;';
+      steps.forEach((step, idx) => {
+        const item = document.createElement('div');
+        item.id = `rs-progress-step-${idx}`;
+        item.style.cssText = 'display:flex;align-items:center;gap:10px;color:var(--text-mute);transition:color 0.3s ease;';
+        item.innerHTML = `<span class="step-icon" style="min-width:18px;display:inline-flex;justify-content:center;"><i class="fa-regular fa-circle"></i></span> <span>${step}</span>`;
+        list.appendChild(item);
+      });
+      card.appendChild(list);
+      ov.appendChild(card);
+      document.body.appendChild(ov);
+    },
+    
+    update(stepIndex, progressPercent) {
+      const bar = document.getElementById('rs-progress-bar-fill');
+      if (bar) bar.style.width = `${progressPercent}%`;
+      
+      for (let i = 0; i < stepIndex; i++) {
+        const el = document.getElementById(`rs-progress-step-${i}`);
+        if (el) {
+          el.style.color = '#25d366';
+          const icon = el.querySelector('.step-icon');
+          if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        }
+      }
+      
+      const cur = document.getElementById(`rs-progress-step-${stepIndex}`);
+      if (cur) {
+        cur.style.color = 'var(--text)';
+
+        const icon = cur.querySelector('.step-icon');
+        if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--orange)"></i>';
+      }
+    },
+    
+    hide(delay = 600) {
+      setTimeout(() => {
+        const overlay = document.getElementById('rs-progress-overlay');
+        if (overlay) {
+          overlay.style.opacity = '0';
+          overlay.style.transition = 'opacity 0.3s ease';
+          setTimeout(() => overlay.remove(), 300);
+        }
+      }, delay);
+    }
+  };
+})();

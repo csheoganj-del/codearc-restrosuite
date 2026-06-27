@@ -82,7 +82,30 @@
     } catch(e) {}
     return '\u20b9';
   }
-  const rs = n => getCurrencySymbol() + Math.round(n).toLocaleString('en-IN');
+
+  // Returns the RS_COUNTRIES entry for the outlet's selected country.
+  // locale and tz fields are now on every entry in country-currency-data.js.
+  function getOutletCountryEntry() {
+    try {
+      const country = (window.RS_SETTINGS || {}).set_country || 'India';
+      return (window.RS_getCountryByName && window.RS_getCountryByName(country))
+        || { locale: 'en-IN', tz: 'Asia/Kolkata' };
+    } catch(e) { return { locale: 'en-IN', tz: 'Asia/Kolkata' }; }
+  }
+
+  // BCP 47 locale for the outlet (e.g. 'en-IE' for Ireland, 'de-DE' for Germany)
+  window.RS_getOutletLocale = function() {
+    return getOutletCountryEntry().locale || 'en-IN';
+  };
+
+  // IANA timezone for the outlet (e.g. 'Europe/Dublin' for Ireland)
+  window.RS_getOutletTimezone = function() {
+    return getOutletCountryEntry().tz || 'Asia/Kolkata';
+  };
+
+  // Narrow no-break space (\u202f) gives visible gap without wrapping.
+  // Number grouping uses outlet locale so Irish bills show 1,000 not 1,00,000.
+  const rs = n => getCurrencySymbol() + '\u202f' + Math.round(n).toLocaleString(window.RS_getOutletLocale());
   const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
@@ -4130,35 +4153,4 @@
     
     update(stepIndex, progressPercent) {
       const bar = document.getElementById('rs-progress-bar-fill');
-      if (bar) bar.style.width = `${progressPercent}%`;
-      
-      for (let i = 0; i < stepIndex; i++) {
-        const el = document.getElementById(`rs-progress-step-${i}`);
-        if (el) {
-          el.style.color = '#25d366';
-          const icon = el.querySelector('.step-icon');
-          if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
-        }
-      }
-      
-      const cur = document.getElementById(`rs-progress-step-${stepIndex}`);
-      if (cur) {
-        cur.style.color = 'var(--text)';
-
-        const icon = cur.querySelector('.step-icon');
-        if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--orange)"></i>';
-      }
-    },
-    
-    hide(delay = 600) {
-      setTimeout(() => {
-        const overlay = document.getElementById('rs-progress-overlay');
-        if (overlay) {
-          overlay.style.opacity = '0';
-          overlay.style.transition = 'opacity 0.3s ease';
-          setTimeout(() => overlay.remove(), 300);
-        }
-      }, delay);
-    }
-  };
-})();
+      if (bar) bar.style.width = 

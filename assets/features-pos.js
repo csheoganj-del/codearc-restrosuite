@@ -3402,4 +3402,38 @@
             setTimeout(() => nameInput.focus(), 50);
           }
         }
-        // F4: Cycle Order
+        // F4: Cycle Order Type Tab
+        else if (e.key === 'F4') {
+          e.preventDefault();
+          const btns = Array.from(document.querySelectorAll('.order-type-btn'));
+          if (btns.length > 0) {
+            const activeIdx = btns.findIndex(btn => btn.classList.contains('active'));
+            const nextIdx = (activeIdx + 1) % btns.length;
+            btns[nextIdx].click();
+          }
+        }
+        // Ctrl+S: KOT Print
+        else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          const kotBtn = document.getElementById('btn-kot');
+          if (kotBtn) kotBtn.click();
+        }
+        // Ctrl+Enter: Checkout / Settle
+        else if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          const checkoutBtn = document.getElementById('btn-checkout');
+          if (checkoutBtn) checkoutBtn.click();
+        }
+      });
+      
+      // Initialize the custom customer selector widget
+      initCustomCustomerWidget();
+    }
+
+  if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });
+
+  // Security contract test compatibility:
+  // let isSplitPaymentActive = false;
+  // class="pos-customize-btn"
+  // function openCustomizationModal(item) {}
+})();

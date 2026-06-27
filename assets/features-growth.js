@@ -316,7 +316,26 @@
               window.RSPrint(printHtml, `Table ${t.n} QR`);
             } else {
               const win = window.open('', '_blank');
-              win.document.write(`<html><head><title>Print Table ${t.n} QR</title></head><body onload="window.print();window.close()">${printHtml}</body></html>`);
+              win.document.write(`<html><head><title>Print Table ${t.n} QR</title></head><body>${printHtml}<script>
+                window.onload = function() {
+                  const imgs = Array.from(document.getElementsByTagName('img'));
+                  if (imgs.length === 0) {
+                    window.print(); window.close();
+                  } else {
+                    let loaded = 0;
+                    const done = () => {
+                      loaded++;
+                      if (loaded === imgs.length) {
+                        setTimeout(() => { window.print(); window.close(); }, 300);
+                      }
+                    };
+                    imgs.forEach(img => {
+                      if (img.complete) done();
+                      else { img.onload = done; img.onerror = done; }
+                    });
+                  }
+                };
+              </script></body></html>`);
               win.document.close();
             }
           };
@@ -369,7 +388,26 @@
         window.RSPrint(printHtml, 'Outlet Table QRs');
       } else {
         const win = window.open('', '_blank');
-        win.document.write(`<html><head><title>Print Table QRs</title></head><body onload="window.print();window.close()">${printHtml}</body></html>`);
+        win.document.write(`<html><head><title>Print Table QRs</title></head><body>${printHtml}<script>
+          window.onload = function() {
+            const imgs = Array.from(document.getElementsByTagName('img'));
+            if (imgs.length === 0) {
+              window.print(); window.close();
+            } else {
+              let loaded = 0;
+              const done = () => {
+                loaded++;
+                if (loaded === imgs.length) {
+                  setTimeout(() => { window.print(); window.close(); }, 300);
+                }
+              };
+              imgs.forEach(img => {
+                if (img.complete) done();
+                else { img.onload = done; img.onerror = done; }
+              });
+            }
+          };
+        </script></body></html>`);
         win.document.close();
       }
     }
