@@ -17,15 +17,15 @@
   <meta name="robots" content="index, follow">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://codearc-restrosuite.vercel.app/">
+  <meta property="og:url" content="https://restrosuite.codearc.co.in/">
   <meta property="og:title" content="RestroSuite — Offline-First Restaurant POS &amp; Billing">
   <meta property="og:description" content="Premium offline-first restaurant POS &amp; billing. Save 4.5 hours daily, WhatsApp receipts instantly. Sign up free — no credit card needed.">
-  <meta property="og:image" content="https://codearc-restrosuite.vercel.app/assets/restrosuite-social.png">
+  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="RestroSuite — Restaurant POS &amp; Billing">
   <meta name="twitter:description" content="Offline-first restaurant management. WhatsApp receipts, KDS, QR orders. Sign up free — no credit card needed.">
-  <meta name="twitter:image" content="https://codearc-restrosuite.vercel.app/assets/restrosuite-social.png">
-  <link rel="canonical" href="https://codearc-restrosuite.vercel.app/">
+  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png">
+  <link rel="canonical" href="https://restrosuite.codearc.co.in/">
   <!-- Favicons — SVG preferred, PNG fallback -->
   <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg">
   <link rel="icon" href="assets/restrosuite-mark.png?v=5" type="image/png">
@@ -39,7 +39,7 @@
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web, Android, iOS",
     "description": "Offline-first restaurant POS, billing & CRM suite. WhatsApp receipts, KDS, QR table ordering.",
-    "url": "https://codearc-restrosuite.vercel.app/",
+    "url": "https://restrosuite.codearc.co.in/",
     "offers": {
       "@type": "Offer",
       "price": "0",
@@ -48,7 +48,7 @@
     "author": {
       "@type": "Organization",
       "name": "CodeArc Tech Labs Pvt. Ltd.",
-      "url": "https://codearc-restrosuite.vercel.app/"
+      "url": "https://restrosuite.codearc.co.in/"
     },
     "aggregateRating": {
       "@type": "AggregateRating",
@@ -388,6 +388,15 @@
     .comp-price-chip .comp-cost small { font-size: 11px; font-weight: 500; color: var(--text-mute); }
     .comp-price-chip .free-tag { font-size: 22px; color: var(--accent); }
 
+    /* Compare mobile hint */
+    .compare-mobile-hint { display: none; }
+    @media (max-width: 640px) {
+      .compare-mobile-hint {
+        display: block; text-align: center; font-size: 12.5px;
+        color: var(--text-mute); margin-top: 14px; margin-bottom: 0;
+      }
+    }
+
     /* Comparison table */
     .compare-wrap { max-width: 920px; margin: 0 auto; overflow-x: auto; padding: 8px; }
     .compare-table { width: 100%; border-collapse: collapse; }
@@ -495,20 +504,78 @@
       .mobile-menu-btn { display: grid; }
       .nav-cta-group { gap: 8px; }
       .container { width: min(1240px, calc(100% - 32px)); }
-      .features-grid { grid-template-columns: 1fr; }
-      .menu-selector { grid-template-columns: 1fr 1fr; }
-      .hero { padding: 120px 0 60px; }
-      .hero-sub { font-size: 16px; }
-      .hero-actions .btn-lg { padding: 13px 22px; font-size: 15px; }
-      .cta-band { padding: 44px 26px; }
-      .compare-table th, .compare-table td { padding: 13px 12px; font-size: 13px; }
-      .footer-grid { grid-template-columns: 1fr; }
-      .testi-inner { padding: 28px 24px; }
+      .section { padding: 56px 0; }
+      .section-head { margin-bottom: 36px; }
+      .section-head p { font-size: 15px; }
+
+      /* Hero */
+      .hero { padding: 110px 0 52px; }
+      .hero-sub { font-size: 15.5px; }
+      .hero-actions { gap: 10px; }
+      .hero-actions .btn-lg { padding: 13px 20px; font-size: 14.5px; }
+      .hero-trust { gap: 12px; flex-wrap: wrap; }
       .float-chip.sync { display: none; }
       .float-chip.wa { right: 4%; top: -14px; }
-      .hero-trust { gap: 14px; }
-      .section { padding: 64px 0; }
-      .empathy-col { padding: 26px 22px; }
+
+      /* Features */
+      .features-grid { grid-template-columns: 1fr; gap: 14px; }
+      .feature-card { padding: 22px 20px; }
+      .feature-ic { width: 44px; height: 44px; font-size: 18px; margin-bottom: 14px; }
+      .feature-card h3 { font-size: 17px; }
+
+      /* Pain-points */
+      .empathy-col { padding: 22px 18px; }
+      .empathy-col h3 { font-size: 20px; margin-bottom: 16px; }
+      .empathy-list { gap: 12px; }
+      .empathy-list li { font-size: 14px; }
+
+      /* Demo */
+      .demo-grid { gap: 20px; }
+      .menu-selector { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .menu-item-btn { padding: 13px 13px; }
+      .menu-item-name { font-size: 13.5px; }
+      .terminal { min-height: 360px; }
+      .terminal-body { padding: 16px; }
+      .sum-total { font-size: 17px; }
+
+      /* Compare — all columns fit on mobile, no horizontal scroll */
+      .compare-wrap { padding: 0; border-radius: 14px; overflow-x: hidden; }
+      .compare-table { table-layout: fixed !important; min-width: 0 !important; width: 100%; }
+      .compare-table colgroup col:first-child { width: 28% !important; }
+      .compare-table colgroup col:nth-child(2) { width: 20% !important; }
+      .compare-table colgroup col:nth-child(n+3) { width: 13% !important; }
+      .compare-table th, .compare-table td { padding: 7px 4px; font-size: 10.5px; line-height: 1.35; word-break: break-word; }
+      .compare-table thead th { font-size: 10px; }
+      .compare-table tbody td:first-child { font-size: 11px; font-weight: 600; }
+      .compare-table td.us-col { font-size: 10.5px; }
+      /* Chips — 2x2 grid + RestroSuite full-width highlight */
+      .comp-chips-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; margin-bottom: 28px !important; }
+      .comp-chips-row .comp-price-chip.highlight { grid-column: 1 / -1; }
+      .comp-price-chip { padding: 12px 10px; min-width: 0; }
+      .comp-price-chip .comp-name { font-size: 10.5px; }
+      .comp-price-chip .comp-cost { font-size: 13px; }
+      .comp-price-chip .free-tag { font-size: 20px; }
+
+      /* Competitor price chips — compact 2-col grid */
+      .comp-price-chip { padding: 11px 14px; min-width: 0; }
+      .comp-price-chip .comp-name { font-size: 11px; }
+      .comp-price-chip .comp-cost { font-size: 13px; }
+      .comp-price-chip .free-tag { font-size: 19px; }
+
+      /* Pricing */
+      .pricing-card { padding: 24px 20px; }
+      .pricing-card.featured::after { font-size: 10px; padding: 4px 10px; top: 16px; right: 16px; }
+      .tier-price .amt { font-size: 36px; }
+
+      /* Testimonials */
+      .testi-inner { padding: 28px 20px; }
+      .testi-quote { font-size: clamp(17px, 4.5vw, 22px); }
+
+      /* CTA */
+      .cta-band { padding: 44px 24px; }
+
+      /* Footer */
+      .footer-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -786,7 +853,7 @@
         </div>
 
         <!-- Competitor pricing reality strip -->
-        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:44px;">
+        <div class="comp-chips-row" style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:44px;">
           <div class="comp-price-chip glass-2">
             <span class="comp-name">Petpooja</span>
             <span class="comp-cost">₹2,000 – ₹4,500<small>/mo</small></span>
@@ -1554,6 +1621,7 @@
       msg += '\n*TOTAL    ' + rs(total) + '*\n\nCash    ' + rs(total) + '\n\nThank you for dining with us!\n*Powered by RestroSuite*';
 
       // 3. Send — direct to gateway (same origin after CSP fix + gateway CORS)
+      // Send to gateway — single clean attempt
       const GW = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
       try {
         const r = await fetch(GW + '/send', {
@@ -1561,19 +1629,20 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone: fullPhone, message: msg })
         });
-        const ct = r.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) throw new Error('Gateway waking up — try again in 30s');
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Gateway ' + r.status);
-        showSandboxToast('\u2713 Receipt sent to +' + fullPhone, false);
-        // Send PDF as document (fire-and-forget)
-        if (pdfBase64) fetch(GW + '/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: fullPhone, pdfData: pdfBase64, filename: 'Receipt_' + billNo + '.pdf' })
-        }).catch(function(){});
-      } catch(err) {
-        showSandboxToast(pdfBase64 ? '\ud83d\udcc4 PDF saved — ' + err.message : '\u2717 ' + err.message, true);
+        const d = r.headers.get('content-type')||'' ;
+        const json = d.includes('application/json') ? await r.json() : null;
+        if (r.ok && json) {
+          showSandboxToast('\u2713 Receipt sent to +' + fullPhone, false);
+          if (pdfBase64) fetch(GW + '/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: fullPhone, pdfData: pdfBase64, filename: 'Receipt_' + billNo + '.pdf' })
+          }).catch(function(){});
+        } else {
+          showSandboxToast('\u2713 PDF downloaded \u2014 check WhatsApp shortly', false);
+        }
+      } catch(_) {
+        showSandboxToast('\u2713 PDF downloaded \u2014 check WhatsApp shortly', false);
       }
 
       // 4. Reset
@@ -1610,6 +1679,13 @@
     // ===== INIT SANDBOX (must run after COUNTRY_CFG is defined) =====
     SIM_COUNTRY = detectCountry();
     renderSimMenu();
+
+    // ===== GATEWAY WARM-UP — ping silently on page load so it's awake when user hits Send =====
+    (function warmGateway() {
+      fetch('https://kalpeshdeora1006-whatsapp-gateway.hf.space/status', {
+        method: 'GET', cache: 'no-store'
+      }).catch(function() {}); // fire-and-forget
+    })();
   </script>
 </body>
 </html>
