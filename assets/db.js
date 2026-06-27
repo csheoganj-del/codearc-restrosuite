@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — Data layer
+   RestroSuite -- Data layer
    Routes through the Doppio Supabase Edge Functions (tenant-data)
    when configured + signed in; otherwise localStorage (demo).
 
@@ -13,9 +13,9 @@
    Auth delegates to RS_API when cloud-configured.
 
    Collections map to your real doppio_* tables:
-     menu→doppio_menu  bills→doppio_bills  inventory→doppio_inventory
-     customers→doppio_crm  employees→doppio_employees  drafts→doppio_draft_orders
-     settings→doppio_business_profile
+     menu->doppio_menu  bills->doppio_bills  inventory->doppio_inventory
+     customers->doppio_crm  employees->doppio_employees  drafts->doppio_draft_orders
+     settings->doppio_business_profile
    ============================================================ */
 (function(){
   'use strict';
@@ -128,7 +128,7 @@
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
-      from: r => ({ id:r.id, no:r.orderId, time:r.dateTime, table:'—',
+      from: r => ({ id:r.id, no:r.orderId, time:r.dateTime, table:'--',
                     _items:parseItems(r.items),
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
                     subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
@@ -542,7 +542,7 @@
     }
     catch(e){
       console.warn(`[RS_DB] cloud ${method} ${c} failed, using local cache:`, e.message);
-      // Schema-cache errors (missing DB column) should NOT trigger a noisy notification —
+      // Schema-cache errors (missing DB column) should NOT trigger a noisy notification --
       // they are resolved by running the migration SQL, not by the user.
       const isSchemaCacheError = e.message && (
         e.message.includes('schema cache') ||
@@ -558,7 +558,7 @@
           addToSyncQueue(method, c, args);
         }
       } else {
-        // Log silently — user needs to run the DB migration
+        // Log silently -- user needs to run the DB migration
         console.warn(`[RS_DB] Schema mismatch on ${c}: "${e.message}". Run the missing DB migration to fix.`);
       }
       return LS[method](c, ...args);
@@ -585,7 +585,7 @@
     if (!signedIn()) return;
     const q = getSyncQueue();
     if (!q.length) return;
-    saveSyncQueue([]); // optimistic clear — failures re-enqueue
+    saveSyncQueue([]); // optimistic clear -- failures re-enqueue
     let failed = 0;
     for (const entry of q) {
       try {
@@ -604,7 +604,7 @@
   }
   // Retry on reconnect
   window.addEventListener('online', () => {
-    console.log('[RS_DB] Back online — draining sync queue');
+    console.log('[RS_DB] Back online -- draining sync queue');
     setTimeout(drainSyncQueue, 1000); // brief delay for connection to stabilise
   });
   // Also expose for manual call
@@ -653,28 +653,4 @@
     listCloud:(c)=>CLOUD.list(c),
     writeLocal:(c,arr)=>LS.write(c,arr),
     put:(c,id,obj)=>guard('put',c,id,obj),
-    bulkPut:(c,arr)=>guard('bulkPut',c,arr),
-    del:(c,id)=>guard('del',c,id),
-    getSettings:()=>guard('getSettings','settings'),
-    setSettings: async (o)=> {
-      const tenantId = getActiveTenantId();
-      cachedSettingsMap[tenantId] = o;
-      await LS.setSettings(o);
-      if (signedIn()) {
-        try {
-          const res = await CLOUD.setSettings(o);
-          if (res) {
-            cachedSettingsMap[tenantId] = res;
-            await LS.setSettings(res);
-          }
-          return res;
-        } catch(e) {
-          console.warn('[RS_DB] setSettings cloud failed:', e.message);
-          return o;
-        }
-      }
-      return o;
-    },
-    ...auth
-  };
-})();
+    bulkPut:(c,arr)=>g

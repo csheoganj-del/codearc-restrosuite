@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — App shell: global search, notifications, Settings
+   RestroSuite -- App shell: global search, notifications, Settings
    ============================================================ */
 (function(){
   'use strict';
@@ -25,7 +25,7 @@
         if(bills.length){ html+='<div class="sr-group">Bills</div>'+bills.map(b=>`<div class="sr-item" data-go="bills-tab"><span class="si-ic"><i class="fa-solid fa-receipt"></i></span><div><div class="si-t">${b.no}</div><div class="si-s">${b.table} · ${b.pay}</div></div><span class="si-meta">${rs(b.amount)}</span></div>`).join(''); }
         if(team.length){ html+='<div class="sr-group">Team</div>'+team.map(e=>`<div class="sr-item" data-go="employees-tab"><span class="si-ic"><i class="fa-solid fa-user"></i></span><div><div class="si-t">${e.name}</div><div class="si-s">${e.role}</div></div></div>`).join(''); }
         if(pages.length){ html+='<div class="sr-group">Go to</div>'+pages.map(p=>`<div class="sr-item" data-go="${p[0]}"><span class="si-ic"><i class="fa-solid fa-${p[2]}"></i></span><div><div class="si-t">${p[1]}</div></div><span class="si-meta">Open</span></div>`).join(''); }
-        box.innerHTML = html || '<div class="sr-empty">No results for “'+q+'”</div>';
+        box.innerHTML = html || '<div class="sr-empty">No results for "'+q+'"</div>';
         box.classList.add('show');
         $$('.sr-item',box).forEach(el=> el.onclick=()=>{ RS.activateTab(el.dataset.go); box.classList.remove('show'); searchInput.value=''; });
       }
@@ -157,7 +157,7 @@
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
     function toggle(t,d,on){ return `<div class="set-row"><div class="si"><div class="st">${t}</div><div class="sd">${d}</div></div><label class="toggle"><input type="checkbox" data-skey="${skey(t)}" ${on?'checked':''}><span></span></label></div>`; }
-    // Country & currency helpers — populated from shared RS_COUNTRIES data
+    // Country & currency helpers -- populated from shared RS_COUNTRIES data
     function countrySelect(cur) {
       const countries = window.RS_COUNTRIES || [];
       if (!countries.length) return `<div><label class="fl">Country</label><input class="form-input" id="set-country" data-skey="set_country" value="${cur||'India'}" placeholder="Outlet country"></div>`;
@@ -244,7 +244,7 @@
           <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">-</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">-</div><div class="csl">Outlets</div></div><div class="cs"><div class="csv">-</div><div class="csl">Bills/mo</div></div></div>
         </div>
         <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Manage plan</button>`,
-      payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status…</span></div></div>`,
+      payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status...</span></div></div>`,
       security:`<div class="panel-head" style="margin-bottom:20px"><h3>Security &amp; PIN</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Protect sensitive actions with a 4-digit admin PIN. Staff must enter it for refunds, deletions, and other restricted operations.</p></div><div id="rs-security-panel"></div>`,
       danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
         <div style="border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);border-radius:var(--r-md);padding:20px;margin-bottom:18px">
@@ -253,14 +253,14 @@
           <button class="btn" id="btn-client-reset-data" style="background:#EF4444;color:#fff;border:none;padding:10px 16px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;"><i class="fa-solid fa-trash-can"></i> Reset Outlet Data</button>
         </div>`
     };
-    // ── Security & PIN panel ──────────────────────────────────────────────────
+    // -- Security & PIN panel --------------------------------------------------
     function initSecurityPanel(body) {
       const container = body.querySelector('#rs-security-panel');
       if (!container) return;
 
       const hasPIN = window.RSPinModal && RSPinModal.isConfigured();
 
-      // ── Sections: PIN management + Protected operations list ─────────────
+      // -- Sections: PIN management + Protected operations list -------------
       container.innerHTML = `
         <!-- PIN Status Card -->
         <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
@@ -285,7 +285,7 @@
           <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--stroke-2);display:flex;align-items:center;gap:12px;">
             <button id="sec-remove-pin" style="background:none;border:none;font-size:12px;color:#ef4444;cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-trash-can"></i> Remove PIN</button>
             <span style="color:var(--stroke-2)">|</span>
-            <span style="font-size:11.5px;color:var(--text-soft);">Master reset code: <strong style="letter-spacing:.1em;">482916</strong> — share only with business owner</span>
+            <span style="font-size:11.5px;color:var(--text-soft);">Master reset code: <strong style="letter-spacing:.1em;">482916</strong> -- share only with business owner</span>
           </div>` : ''}
         </div>
 
@@ -315,12 +315,12 @@
         <!-- Tips -->
         <div style="border:1px solid rgba(255,107,0,0.2);background:rgba(255,107,0,0.03);border-radius:var(--r-sm);padding:14px 16px;">
           <div style="font-size:12px;color:var(--text-soft);line-height:1.6;">
-            <strong style="color:#FF6B00;">Tips:</strong> Share the 4-digit PIN only with managers. The master reset code (shown above) can bypass a forgotten PIN — keep it in a safe place. PIN attempts are limited to 3 before a 30-second lockout.
+            <strong style="color:#FF6B00;">Tips:</strong> Share the 4-digit PIN only with managers. The master reset code (shown above) can bypass a forgotten PIN -- keep it in a safe place. PIN attempts are limited to 3 before a 30-second lockout.
           </div>
         </div>
       `;
 
-      // ── Bind buttons ──────────────────────────────────────────────────────
+      // -- Bind buttons ------------------------------------------------------
       container.querySelector('#sec-set-pin')?.addEventListener('click', async () => {
         if (!window.RSPinModal) return;
         const ok = await RSPinModal.setup();
@@ -350,7 +350,7 @@
       });
     }
 
-    // ── Razorpay Route onboarding panel ──────────────────────────────────────
+    // -- Razorpay Route onboarding panel --------------------------------------
     async function initRazorpayRoutePanel(body) {
       const container = body.querySelector('#rzp-route-container');
       if (!container) return;
@@ -387,7 +387,7 @@
         return;
       }
 
-      // ── Already activated ────────────────────────────────────────────────────
+      // -- Already activated ----------------------------------------------------
       if (status.razorpay_route_enabled && status.razorpay_kyc_status === 'activated') {
         container.innerHTML = `
           <div class="set-row" style="margin-bottom:16px">
@@ -395,7 +395,7 @@
             ${pill('Active', '16, 185, 129')}
           </div>
           <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.8;">
-            <div><span style="color:var(--text-soft)">Linked account:</span> <strong>${status.razorpay_account_id || '—'}</strong></div>
+            <div><span style="color:var(--text-soft)">Linked account:</span> <strong>${status.razorpay_account_id || '--'}</strong></div>
             <div><span style="color:var(--text-soft)">Settlement:</span> <strong>T+2 business days to your registered bank</strong></div>
             <div><span style="color:var(--text-soft)">Customer payment methods:</span> <strong>UPI · Cards · Netbanking · Wallets</strong></div>
           </div>
@@ -404,7 +404,7 @@
         return;
       }
 
-      // ── KYC submitted, waiting for Razorpay approval ─────────────────────────
+      // -- KYC submitted, waiting for Razorpay approval -------------------------
       if (status.razorpay_account_id && status.razorpay_kyc_status === 'pending') {
         container.innerHTML = `
           <div class="set-row" style="margin-bottom:16px">
@@ -413,18 +413,18 @@
           </div>
           <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;">
             <div style="margin-bottom:8px"><span style="color:var(--text-soft)">Linked account ID:</span> <strong>${status.razorpay_account_id}</strong></div>
-            <p style="color:var(--text-soft);line-height:1.6;margin:0;">Razorpay typically approves within 1–2 business days. RestroSuite will automatically enable Route payments the moment your account is activated. No action needed from you.</p>
+            <p style="color:var(--text-soft);line-height:1.6;margin:0;">Razorpay typically approves within 1-2 business days. RestroSuite will automatically enable Route payments the moment your account is activated. No action needed from you.</p>
           </div>
         `;
         return;
       }
 
-      // ── Not set up yet — show onboarding form ────────────────────────────────
+      // -- Not set up yet -- show onboarding form --------------------------------
       container.innerHTML = `
         <div class="set-row" style="margin-bottom:16px">
           <div class="si">
             <div class="st">Razorpay Route</div>
-            <div class="sd">Link your bank account so customer payments settle directly to you — no UTR codes, no cashier verification.</div>
+            <div class="sd">Link your bank account so customer payments settle directly to you -- no UTR codes, no cashier verification.</div>
           </div>
           ${pill('Not connected', '107, 114, 128')}
         </div>
@@ -486,7 +486,7 @@
         }
 
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Razorpay…';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Razorpay...';
         result.innerHTML = '';
 
         try {
@@ -528,7 +528,7 @@
               <div style="text-align:center;padding:30px 20px;">
                 <div style="width:52px;height:52px;border-radius:50%;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><i class="fa-solid fa-circle-check" style="font-size:24px;color:#10b981"></i></div>
                 <div style="font-weight:800;font-size:15px;margin-bottom:6px;">KYC Submitted Successfully</div>
-                <p style="font-size:13px;color:var(--text-soft);line-height:1.6;max-width:380px;margin:0 auto;">Razorpay is reviewing your account. This usually takes <strong>1–2 business days</strong>. RestroSuite will automatically activate Route payments once approved — no further action needed.</p>
+                <p style="font-size:13px;color:var(--text-soft);line-height:1.6;max-width:380px;margin:0 auto;">Razorpay is reviewing your account. This usually takes <strong>1-2 business days</strong>. RestroSuite will automatically activate Route payments once approved -- no further action needed.</p>
                 <div style="margin-top:14px;background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:10px 14px;font-size:12px;display:inline-block;">
                   Account ID: <strong>${data.account_id}</strong>
                 </div>
@@ -596,15 +596,15 @@
             if (res.qr) {
               // Speed up polling while waiting for scan
               if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
-              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings → Linked Devices → Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically…</div></div></div>`;
+              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings -> Linked Devices -> Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically...</div></div></div>`;
             } else {
-              container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Generating QR code… please wait.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Generating…</span></div>`;
+              container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Generating QR code... please wait.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Generating...</span></div>`;
             }
           } else if (res.status === 'syncing' || res.status === 'authenticated') {
-            // QR just scanned — show animated syncing UI, speed up polling to catch 'ready'
+            // QR just scanned -- show animated syncing UI, speed up polling to catch 'ready'
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
             container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">QR scanned! Syncing your WhatsApp account…</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308;animation:pulse 0.8s infinite alternate"></span> Syncing</span></div>
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">QR scanned! Syncing your WhatsApp account...</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308;animation:pulse 0.8s infinite alternate"></span> Syncing</span></div>
               <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 18px;border:1.5px solid rgba(234,179,8,0.3);border-radius:var(--r-md);background:linear-gradient(135deg,rgba(234,179,8,0.04),rgba(234,179,8,0.01));text-align:center">
                 <div style="position:relative;width:72px;height:72px">
                   <svg viewBox="0 0 72 72" style="width:72px;height:72px;transform:rotate(-90deg)">
@@ -616,8 +616,8 @@
                   </div>
                 </div>
                 <div>
-                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Connecting your account…</div>
-                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp is verifying your device.<br>This usually takes 5–15 seconds.</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Connecting your account...</div>
+                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp is verifying your device.<br>This usually takes 5-15 seconds.</div>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
                   <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#22c55e;background:rgba(34,197,94,0.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(34,197,94,0.2)"><i class="fa-solid fa-check"></i> QR Scanned</span>
@@ -638,10 +638,10 @@
             if (forceQrBtn) {
               forceQrBtn.onclick = async () => {
                 forceQrBtn.disabled = true;
-                forceQrBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting…';
+                forceQrBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
                 try {
                   await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-                } catch(e) { /* ignore — gateway restarts itself */ }
+                } catch(e) { /* ignore -- gateway restarts itself */ }
                 // Wait a moment for gateway to restart then resume normal polling
                 setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
               };
@@ -661,7 +661,7 @@
             // Speed up polling while gateway is starting
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
             container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up — this usually takes 15–45 seconds.</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up -- this usually takes 15-45 seconds.</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
               <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 18px;border:1.5px solid rgba(107,114,128,0.2);border-radius:var(--r-md);background:rgba(107,114,128,0.03);text-align:center">
                 <div style="position:relative;width:56px;height:56px">
                   <svg viewBox="0 0 56 56" style="width:56px;height:56px;transform:rotate(-90deg)">
@@ -671,7 +671,7 @@
                   <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#6b7280"><i class="fa-brands fa-whatsapp"></i></div>
                 </div>
                 <div>
-                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Initialising gateway…</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Initialising gateway...</div>
                   <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp gateway is booting up.<br>A QR code will appear shortly.</div>
                 </div>
                 <div style="border-top:1px solid rgba(107,114,128,0.15);padding-top:14px;width:100%;text-align:center">
@@ -687,7 +687,7 @@
             if (connResetBtn) {
               connResetBtn.onclick = async () => {
                 connResetBtn.disabled = true;
-                connResetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting…';
+                connResetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
                 try {
                   await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
                 } catch(e) { /* ignore */ }
@@ -820,7 +820,7 @@
 
             updateGstinLabels(curCountry);
 
-            // Country → currency + phone-prefix + tax auto-link
+            // Country -> currency + phone-prefix + tax auto-link
             const countrySel  = body.querySelector('#set-country');
             const currencySel = body.querySelector('#set-currency');
             if (countrySel && currencySel) {
@@ -959,7 +959,7 @@
         const cloud = window.RS_DB && window.RS_DB.isCloud;
         if(pill){
           pill.innerHTML = `<span class="dot dot-live"></span> ${cloud?'Cloud':'Local'}`;
-          pill.title = cloud?'Connected to Supabase — data syncs to the cloud':'Local mode — data persists in this browser. Add Supabase keys to sync.';
+          pill.title = cloud?'Connected to Supabase -- data syncs to the cloud':'Local mode -- data persists in this browser. Add Supabase keys to sync.';
         }
       }
       updatePill();
@@ -1051,7 +1051,7 @@
           pillEl.style.color = '#ef4444';
           pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
         } else if (res && res.status === 'connecting') {
-          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Starting…';
+          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Starting...';
           pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
           pillEl.style.color = '#6b7280';
           pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
