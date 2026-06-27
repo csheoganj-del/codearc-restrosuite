@@ -62,10 +62,13 @@ const DEFAULT_ALLOWED_TABS = [
 ];
 
 const ROLE_DEFAULT_TABS: Record<string, string[]> = {
-  admin: DEFAULT_ALLOWED_TABS,
-  cashier: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab"],
-  kitchen: ["kds-tab"],
-  waiter: ["qr-orders-tab"],
+  admin:            DEFAULT_ALLOWED_TABS,
+  manager:          ["pos-tab","floor-tab","qr-orders-tab","kds-tab","bills-tab","inventory-tab","editor-tab","customers-tab","reports-tab","analytics-tab","employees-tab","growth-hub-tab"],
+  cashier:          ["pos-tab","floor-tab","bills-tab","customers-tab"],
+  waiter:           ["pos-tab","floor-tab","kds-tab"],
+  captain:          ["pos-tab","floor-tab","kds-tab","qr-orders-tab"],
+  kitchen:          ["kds-tab"],
+  inventory:        ["inventory-tab","editor-tab","reports-tab"],
   customer_display: ["tokens-tab"],
 };
 
