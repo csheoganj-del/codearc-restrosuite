@@ -3486,8 +3486,9 @@
     cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
     waiter:    ['pos-tab','floor-tab','kds-tab'],
     captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],
-    kitchen:   ['kds-tab'],
-    inventory: ['inventory-tab','editor-tab','reports-tab'],
+    kitchen:          ['kds-tab'],
+    inventory:        ['inventory-tab','editor-tab','reports-tab'],
+    customer_display: ['tokens-tab'],
   };
 
   const ROLE_LABELS = {
@@ -3496,7 +3497,8 @@
     cashier:   'Cashier',
     waiter:    'Waiter',
     captain:   'Captain',
-    kitchen:   'Kitchen Staff',
+    kitchen:          'Kitchen Staff',
+    customer_display: 'Customer Display',
     inventory: 'Inventory Manager',
   };
 
