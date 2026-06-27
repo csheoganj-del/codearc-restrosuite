@@ -1377,7 +1377,7 @@
           table: r.tableNumber,
           time: getRelativeTime(r.dateTime),
           status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
-          items: (r.items || []).map(it => [`${it.qty}Ã-- ${it.name}`, it.price * it.qty]),
+          items: (r.items || []).map(it => [`${it.qty}× ${it.name}`, it.price * it.qty]),
           total: r.total
         }));
         replaceArr(QR_ORDERS, mappedQr);
@@ -1504,7 +1504,7 @@
       } else {
         o.status=nextStatus; renderQR();
       }
-      toast('Table '+(o.table.split('-')[1]||o.table)+' â†' '+statusTxt[nextStatus]);
+      toast('Table '+(o.table.split('-')[1]||o.table)+' -> '+statusTxt[nextStatus]);
     }));
     $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>toast('Table merge is not connected yet','fa-code-merge')));
     $$('#qr-grid [data-bill]').forEach(b=>b.addEventListener('click',()=>{
@@ -2351,7 +2351,7 @@
     {ic:'fa-flask-vial',bg:'bg-g',t:'Recipe Costing',d:'Plate cost & margin calculator',m:'68% margin'},
     {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'4 live'},
     {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'3.1k reach'},
-    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 â˜...'},
+    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 ★'},
     {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'412 members'}
   ];
   const renderHub = () => {
@@ -4489,4 +4489,30 @@
       for (let i = 0; i < stepIndex; i++) {
         const el = document.getElementById(`rs-progress-step-${i}`);
         if (el) {
-          el.s
+          el.style.color = '#25d366';
+          const icon = el.querySelector('.step-icon');
+          if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        }
+      }
+      
+      const cur = document.getElementById(`rs-progress-step-${stepIndex}`);
+      if (cur) {
+        cur.style.color = 'var(--text)';
+
+        const icon = cur.querySelector('.step-icon');
+        if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--orange)"></i>';
+      }
+    },
+    
+    hide(delay = 600) {
+      setTimeout(() => {
+        const overlay = document.getElementById('rs-progress-overlay');
+        if (overlay) {
+          overlay.style.opacity = '0';
+          overlay.style.transition = 'opacity 0.3s ease';
+          setTimeout(() => overlay.remove(), 300);
+        }
+      }, delay);
+    }
+  };
+})();

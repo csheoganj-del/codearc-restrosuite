@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const sym = cfg.sym;
   const rs  = n => sym + n;
 
-  // Normalise phone — strip non-digits, strip leading dial code if already present
+  // Normalise phone -- strip non-digits, strip leading dial code if already present
   let cleanPhone = phone.replace(/\D/g, '');
   if (!cleanPhone.startsWith(cfg.dial)) {
     cleanPhone = cfg.dial + cleanPhone;
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   const tax   = Math.round(subtotal * cfg.taxRate / 100);
   const total = subtotal + tax;
 
-  // ── WhatsApp text message ────────────────────────────────────────────────
+  // -- WhatsApp text message ------------------------------------------------
   let msg = `*RestroSuite Demo*\n`;
   msg += `📞 +919983721179\n\n`;
   msg += `🧾 ${billNo}   ${dateStr}\n`;
@@ -74,16 +74,16 @@ export default async function handler(req, res) {
   msg += `\n*TOTAL    ${rs(total)}*\n\n`;
   msg += `Cash    ${rs(total)}\n\n`;
   msg += `Thank you for dining with us!\n`;
-  msg += `*Powered by RestroSuite* — https://restrosuite.codearc.co.in`;
+  msg += `*Powered by RestroSuite* -- https://restrosuite.codearc.co.in`;
 
-  // ── Call WhatsApp gateway ────────────────────────────────────────────────
+  // -- Call WhatsApp gateway ------------------------------------------------
   const baseUrl    = (process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-whatsapp-gateway.hf.space').replace(/\/$/, '');
   const token      = process.env.WHATSAPP_GATEWAY_TOKEN || '';
   const headers    = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
 
   try {
-    // Step 1 — send text receipt
+    // Step 1 -- send text receipt
     const textResp = await fetch(`${baseUrl}/send`, {
       method: 'POST',
       headers,
@@ -94,4 +94,4 @@ export default async function handler(req, res) {
       return res.status(textResp.status).json({ error: textData.error || `Gateway error ${textResp.status}` });
     }
 
-    // Step 2 — send PDF 
+    // Step 2 -- send PDF 

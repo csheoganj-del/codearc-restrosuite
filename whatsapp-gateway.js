@@ -16,15 +16,15 @@ const archiver = require('archiver');
 const unzipper = require('unzipper');
 
 // ============================================================
-// HUMAN-SEND ENGINE — prevents Meta automation detection
+// HUMAN-SEND ENGINE -- prevents Meta automation detection
 // ============================================================
 //
 // How Meta bans numbers:
-//  1. COMPLAINT RATE (primary)  — >2% of recipients tap "Block/Report Spam" → flagged
-//  2. MESSAGE VELOCITY          — machine-like uniform intervals (exactly 5s every time)
-//  3. PROTOCOL FINGERPRINT      — no typing indicator, no online presence, no read receipts
-//  4. BURST PATTERN             — silent for hours then 50 msgs in 60 seconds
-//  5. NUMBER TRUST SCORE        — new number + no profile pic + no incoming msgs = low trust
+//  1. COMPLAINT RATE (primary)  -- >2% of recipients tap "Block/Report Spam" -> flagged
+//  2. MESSAGE VELOCITY          -- machine-like uniform intervals (exactly 5s every time)
+//  3. PROTOCOL FINGERPRINT      -- no typing indicator, no online presence, no read receipts
+//  4. BURST PATTERN             -- silent for hours then 50 msgs in 60 seconds
+//  5. NUMBER TRUST SCORE        -- new number + no profile pic + no incoming msgs = low trust
 //
 // This engine addresses issues 2, 3, and 4. Issue 1 is handled by only sending
 // to customers who voluntarily provided their number at checkout.
@@ -34,7 +34,7 @@ const _dailySendCount = {};
 const DAILY_LIMIT = 200; // safe ceiling per number per day
 
 // Per-tenant send queue to prevent bursting
-const _sendQueues = new Map(); // tenantId → Promise chain
+const _sendQueues = new Map(); // tenantId -> Promise chain
 
 /** Returns a random integer between min and max (inclusive) */
 function _randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -42,7 +42,7 @@ function _randInt(min, max) { return Math.floor(Math.random() * (max - min + 1))
 /** Sleep for ms milliseconds */
 function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-/** Is it a reasonable sending hour? (8am–9pm local machine time) */
+/** Is it a reasonable sending hour? (8am-9pm local machine time) */
 function _isBusinessHour() {
     const h = new Date().getHours();
     return h >= 8 && h < 21;
@@ -54,15 +54,15 @@ function _isBusinessHour() {
  *   - Random jitter so no two sends are exactly the same interval apart
  */
 function _humanDelay(messageText) {
-    // ~200 chars/sec reading speed + 80 wpm typing → about 15ms per character, capped
+    // ~200 chars/sec reading speed + 80 wpm typing -> about 15ms per character, capped
     const charDelay = Math.min((messageText || '').length * 12, 3500);
     const jitter    = _randInt(800, 2800);
-    return charDelay + jitter; // 1–6 seconds total
+    return charDelay + jitter; // 1-6 seconds total
 }
 
 /**
- * Inter-message spacing — random gap between consecutive sends.
- * Uniform timing (always 5000ms) is a dead giveaway; this varies 3–9s.
+ * Inter-message spacing -- random gap between consecutive sends.
+ * Uniform timing (always 5000ms) is a dead giveaway; this varies 3-9s.
  */
 function _betweenMessageDelay() { return _randInt(3000, 9000); }
 
@@ -78,26 +78,26 @@ function _checkDailyLimit(tenantId) {
 }
 
 /**
- * humanSend — drop-in replacement for client.sendMessage()
+ * humanSend -- drop-in replacement for client.sendMessage()
  *
  * Wraps every outbound message with:
  *   1. Daily rate-limit check (200/day per number)
- *   2. Business-hour check (warns but does not block — restaurant may need late sends)
+ *   2. Business-hour check (warns but does not block -- restaurant may need late sends)
  *   3. Typing indicator for realistic duration
  *   4. Random human-like delay before actual send
  *   5. Serial queue per tenant (no parallel bursts)
  *   6. Inter-message gap after send
  *
- * @param {object} client      — wwebjs Client instance
- * @param {string} chatId      — "phone@c.us"
- * @param {string|object} msg  — message or MessageMedia
- * @param {object} [opts]      — sendMessage options passthrough
- * @param {string} [tenantId]  — for rate-limit tracking
+ * @param {object} client      -- wwebjs Client instance
+ * @param {string} chatId      -- "phone@c.us"
+ * @param {string|object} msg  -- message or MessageMedia
+ * @param {object} [opts]      -- sendMessage options passthrough
+ * @param {string} [tenantId]  -- for rate-limit tracking
  */
 async function humanSend(client, chatId, msg, opts, tenantId) {
     tenantId = tenantId || chatId;
 
-    // ── Rate limit ────────────────────────────────────────────────────────────
+    // -- Rate limit ------------------------------------------------------------
     if (!_checkDailyLimit(tenantId)) {
         console.warn(`[HumanSend] Daily limit (${DAILY_LIMIT}) reached for ${tenantId}. Message not sent.`);
         throw new Error(`Daily WhatsApp send limit reached for this outlet. Try again tomorrow.`);
@@ -107,7 +107,7 @@ async function humanSend(client, chatId, msg, opts, tenantId) {
         console.warn(`[HumanSend] Sending outside business hours (8am-9pm) for ${tenantId}.`);
     }
 
-    // ── Queue per tenant (no burst parallelism) ───────────────────────────────
+    // -- Queue per tenant (no burst parallelism) -------------------------------
     const prev = _sendQueues.get(tenantId) || Promise.resolve();
     const next = prev.then(async () => {
         try {
@@ -220,7 +220,7 @@ if (emailConfig.user && emailConfig.pass) {
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
-        family: 4, // Force IPv4 — Hugging Face Spaces block IPv6 outbound connections
+        family: 4, // Force IPv4 -- Hugging Face Spaces block IPv6 outbound connections
         lookup: (hostname, options, callback) => {
             return dns.lookup(hostname, { family: 4 }, callback);
         },
@@ -298,7 +298,7 @@ async function sendMailHelper(to, subject, html, text = '') {
 
 const app = express();
 
-// SECURITY: CORS must be restricted — wildcard cors() allows any origin to make
+// SECURITY: CORS must be restricted -- wildcard cors() allows any origin to make
 // credentialed requests to the gateway, which is a CSRF vector. Restrict to the
 // Supabase Edge Function origin and your Vercel deployment origin.
 // GATEWAY_ALLOWED_ORIGINS must be set in environment secrets. If unset, ALL
@@ -327,7 +327,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // Multi-Tenant Gateway State Manager
 const tenantClients = new Map(); // tenantId -> TenantClientData
-// Orders already handled by the /send endpoint — realtime listener skips these
+// Orders already handled by the /send endpoint -- realtime listener skips these
 // to prevent double-sending when the POS frontend sends explicitly (e.g. PDF mode).
 const realtimeSkipOrders = new Set(); // "tenantId:orderId"
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -336,7 +336,7 @@ let recentHealthEvents = []; // last 10 events for dashboard
 let lastAlertSent = null;
 
 // ============================================================
-// HEALTH LOGGING — writes to gateway_health_log in Supabase
+// HEALTH LOGGING -- writes to gateway_health_log in Supabase
 // ============================================================
 async function logHealthEvent(event, status, details = {}) {
     const entry = { event, status, details, created_at: new Date().toISOString() };
@@ -356,7 +356,7 @@ async function logHealthEvent(event, status, details = {}) {
 }
 
 // ============================================================
-// ADMIN ALERT — sends email to admin when gateway is in trouble
+// ADMIN ALERT -- sends email to admin when gateway is in trouble
 // ============================================================
 async function sendAdminAlert(type, extraDetails = {}) {
     if (!transporter) {
@@ -364,10 +364,10 @@ async function sendAdminAlert(type, extraDetails = {}) {
         return;
     }
 
-    // Throttle alerts — don't spam more than once per 10 minutes for same type
+    // Throttle alerts -- don't spam more than once per 10 minutes for same type
     const now = Date.now();
     if (lastAlertSent && lastAlertSent.type === type && (now - lastAlertSent.time) < 10 * 60 * 1000) {
-        console.log(`[Admin Alert] Throttled — ${type} alert already sent recently.`);
+        console.log(`[Admin Alert] Throttled -- ${type} alert already sent recently.`);
         return;
     }
     lastAlertSent = { type, time: now };
@@ -496,7 +496,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
 }
 
 // ============================================================
-// SESSION PERSISTENCE — Save/Restore WhatsApp session via Supabase Storage
+// SESSION PERSISTENCE -- Save/Restore WhatsApp session via Supabase Storage
 // ============================================================
 async function saveSessionToSupabaseScoped(tenantId) {
     if (!supabaseService) {
@@ -717,7 +717,7 @@ function autoInitializeLocalSessions() {
 }
 
 // SECURITY: GATEWAY_TOKEN must be explicitly set in production. There is NO
-// default fallback — using a predictable default string is equivalent to
+// default fallback -- using a predictable default string is equivalent to
 // publishing the token in source code. The gateway will refuse all authenticated
 // requests if this variable is unset. Set it in your HuggingFace Space / Railway /
 // VPS environment secrets, or in .env.local for local development.
@@ -744,7 +744,7 @@ function maskPhone(phoneStr) {
     return clean.substring(0, 2) + '*'.repeat(clean.length - 6) + clean.substring(clean.length - 4);
 }
 
-// Token validation helper — FAIL-CLOSED.
+// Token validation helper -- FAIL-CLOSED.
 // Returns true ONLY if a token is provided AND it matches the configured secret
 // using constant-time comparison. If GATEWAY_TOKEN is empty, ALL requests are denied.
 function verifyToken(req) {
@@ -1451,7 +1451,7 @@ app.get('/', (req, res) => {
                     resultDiv.style.display = 'block';
                     if (data.code) {
                         resultDiv.innerHTML = \`
-                            <p class="details-text" style="text-align:center; font-size:12px; margin-top:12px;">Open WhatsApp → Settings → Linked Devices → Link a Device → <strong>Link with phone number instead</strong></p>
+                            <p class="details-text" style="text-align:center; font-size:12px; margin-top:12px;">Open WhatsApp -> Settings -> Linked Devices -> Link a Device -> <strong>Link with phone number instead</strong></p>
                             <div class="pair-code-display">\${data.code}</div>
                             <p class="details-text" style="text-align:center; font-size:11px; color: var(--warning);">⚠️ Enter this code in WhatsApp within 60 seconds!</p>
                         \`;
@@ -1782,7 +1782,7 @@ app.post('/send', async (req, res) => {
             const { MessageMedia } = require('whatsapp-web.js');
             const media = new MessageMedia('application/pdf', pdfData, filename || 'receipt.pdf');
             await humanSend(tenantData.client, chatId, media, {}, tenantId);
-            // Do NOT send a separate text after the PDF — the PDF IS the receipt.
+            // Do NOT send a separate text after the PDF -- the PDF IS the receipt.
         } else {
             // Send monospaced text receipt
             await humanSend(tenantData.client, chatId, message, {}, tenantId);
@@ -1901,7 +1901,7 @@ app.post('/supabase-webhook', async (req, res) => {
         phone = "91" + phone;
     }
 
-    // Wait 15s — the POS frontend auto-sends after 800ms but the full chain
+    // Wait 15s -- the POS frontend auto-sends after 800ms but the full chain
     // (jsPDF load + edge function cold start + network) can take 8-12s.
     // 15s gives enough headroom without meaningfully delaying text-only sends.
     await new Promise(r => setTimeout(r, 15000));
@@ -1941,14 +1941,14 @@ app.post('/supabase-webhook', async (req, res) => {
                     return res.json({ status: 'cancelled', reason: 'WhatsApp receipts disabled' });
                 }
 
-                // Check bill format preference — if PDF mode, skip auto-send.
+                // Check bill format preference -- if PDF mode, skip auto-send.
                 let flags = {};
                 try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
                 uiSettings = flags.ui_settings || {};
 
                 // If uiSettings couldn't be loaded, skip rather than risk sending wrong format.
                 if (!uiSettings || Object.keys(uiSettings).length === 0) {
-                    console.log(`[Webhook Skipped] uiSettings empty for tenant ${tenantId} — skipping to avoid duplicate/wrong-format send.`);
+                    console.log(`[Webhook Skipped] uiSettings empty for tenant ${tenantId} -- skipping to avoid duplicate/wrong-format send.`);
                     return res.json({ status: 'skipped', reason: 'uiSettings not available' });
                 }
 
@@ -1961,7 +1961,7 @@ app.post('/supabase-webhook', async (req, res) => {
 
                 const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
                 if (billFormat === 'Thermal PDF receipt') {
-                    console.log(`[Webhook Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped.`);
+                    console.log(`[Webhook Skipped] Tenant ${tenantId} uses PDF receipts -- auto-text skipped.`);
                     return res.json({ status: 'skipped', reason: 'Thermal PDF receipt format selected' });
                 }
             }
@@ -2058,7 +2058,7 @@ async function handleNewRegistrationNotification(record) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
         
-        const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestroSuite*`;
+        const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n-- *CodeArc RestroSuite*`;
         
         try {
             await humanSend(systemData.client, chatId, escapeLinks(msgText), { linkPreview: false }, 'system');
@@ -2512,7 +2512,7 @@ if (dbClientForRealtime) {
 
                 console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
 
-                // Wait 5s — the POS frontend auto-sends after 800ms; this gives it time
+                // Wait 5s -- the POS frontend auto-sends after 800ms; this gives it time
                 // to call /send first so we can skip if it already handled the bill (PDF mode).
                 // 15s gives enough headroom for jsPDF load + edge cold start + network.
                 await new Promise(r => setTimeout(r, 15000));
@@ -2562,7 +2562,7 @@ if (dbClientForRealtime) {
                                 return;
                             }
 
-                            // Check bill format preference — if PDF mode, skip auto-send from realtime listener.
+                            // Check bill format preference -- if PDF mode, skip auto-send from realtime listener.
                             // The POS frontend will handle PDF generation and delivery via the /send endpoint.
                             let flags = {};
                             try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
@@ -2570,7 +2570,7 @@ if (dbClientForRealtime) {
 
                             // If uiSettings couldn't be loaded, skip rather than risk sending wrong format.
                             if (!uiSettings || Object.keys(uiSettings).length === 0) {
-                                console.log(`[Realtime Skipped] uiSettings empty for tenant ${tenantId} — skipping to avoid duplicate/wrong-format send.`);
+                                console.log(`[Realtime Skipped] uiSettings empty for tenant ${tenantId} -- skipping to avoid duplicate/wrong-format send.`);
                                 return;
                             }
 
@@ -2583,7 +2583,7 @@ if (dbClientForRealtime) {
 
                             const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
                             if (billFormat === 'Thermal PDF receipt') {
-                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped. POS frontend will send PDF via /send.`);
+                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts -- auto-text skipped. POS frontend will send PDF via /send.`);
                                 return;
                             }
                         }
@@ -2594,7 +2594,7 @@ if (dbClientForRealtime) {
                     try {
                         const rawCurr = uiSettings.set_currency || '';
                         if (rawCurr) {
-                            // Handle "EUR (€)" → extract €
+                            // Handle "EUR (€)" -> extract €
                             const m = rawCurr.match(/\(([^)]+)\)/);
                             const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
                             // Convert multi-byte symbols to ASCII-safe equivalents for WhatsApp
@@ -2841,10 +2841,10 @@ function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.'
     const payLine = record.paymentMethod || 'Cash';
     const padSize = 24 - billLine.length;
     if (padSize >= payLine.length) {
-        // Bill number short enough — payment fits on same line
+        // Bill number short enough -- payment fits on same line
         msg += billLine + payLine.padStart(padSize, ' ') + '\n';
     } else {
-        // Bill number too long — put each on its own line, no truncation
+        // Bill number too long -- put each on its own line, no truncation
         msg += billLine + '\n';
         msg += `Paid: ${payLine}` + '\n';
     }
@@ -2910,7 +2910,7 @@ function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.'
 
 // ============================================================
 // ============================================================
-// DEBUG RELAY ENDPOINT — to check relay URL format safely
+// DEBUG RELAY ENDPOINT -- to check relay URL format safely
 // ============================================================
 app.get('/debug-relay', (req, res) => {
     if (!verifyToken(req)) {

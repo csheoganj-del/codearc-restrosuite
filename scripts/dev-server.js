@@ -203,7 +203,7 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
-  // /api/config — serve Supabase credentials from .env.local
+  // /api/config -- serve Supabase credentials from .env.local
   if (urlPath === '/api/config') {
     const env = loadEnv();
     const supabaseUrl = (env.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/(rest|auth|storage|functions)\/v1$/, '');
@@ -233,7 +233,7 @@ const server = http.createServer((req, res) => {
         return res.end('SUPABASE_URL not set in .env.local');
       }
       const supabaseHost = new URL(supabaseUrl).hostname;
-      console.log(`[proxy] POST ${urlPath} → ${supabaseHost}`);
+      console.log(`[proxy] POST ${urlPath} -> ${supabaseHost}`);
       return proxyToSupabase(req, res, supabaseHost, urlPath, body);
     });
     return;
@@ -249,7 +249,7 @@ const server = http.createServer((req, res) => {
       return res.end('SUPABASE_URL not set in .env.local');
     }
     const supabaseHost = new URL(supabaseUrl).hostname;
-    console.log(`[proxy] ${req.method} ${urlPath} → ${supabaseHost}`);
+    console.log(`[proxy] ${req.method} ${urlPath} -> ${supabaseHost}`);
     return proxyToSupabase(req, res, supabaseHost, urlPath);
   }
 
