@@ -1,9 +1,9 @@
 /**
- * analytics.js — Advanced analytics engine
+ * analytics.js -- Advanced analytics engine
  *
  * Computes insights from existing doppio_bills, doppio_attendance,
  * doppio_employees, and doppio_pos_popularity tables.
- * No extra DB tables needed — all derived from data you already have.
+ * No extra DB tables needed -- all derived from data you already have.
  *
  * Provides:
  *  - Hourly revenue breakdown
@@ -32,7 +32,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // -- Helpers ------------------------------------------------------------------
 
   function num(v) { return Number(v) || 0; }
 
@@ -71,7 +71,7 @@
 
   const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  // ── Factory ──────────────────────────────────────────────────────────────────
+  // -- Factory ------------------------------------------------------------------
 
   function create(options) {
     const config   = options || {};
@@ -81,7 +81,7 @@
     if (!db)       throw new Error("analytics.create: db is required");
     if (!tenantId) throw new Error("analytics.create: tenantId is required");
 
-    // ── Data loaders ──────────────────────────────────────────────────────────
+    // -- Data loaders ----------------------------------------------------------
 
     async function fetchBills(sinceIso) {
       let query = db
@@ -126,10 +126,10 @@
       return rows;
     }
 
-    // ── Revenue: Hourly ───────────────────────────────────────────────────────
+    // -- Revenue: Hourly -------------------------------------------------------
 
     /**
-     * Revenue grouped by hour of day (0–23), averaged over the requested period.
+     * Revenue grouped by hour of day (0-23), averaged over the requested period.
      * @param {{ days?: number }} opts
      * @returns {Promise<Array<{ hour: number, revenue: number, orders: number }>>}
      */
@@ -144,7 +144,7 @@
       return buckets;
     }
 
-    // ── Revenue: Daily ────────────────────────────────────────────────────────
+    // -- Revenue: Daily --------------------------------------------------------
 
     /**
      * Revenue per calendar day over the last N days.
@@ -173,7 +173,7 @@
       return result;
     }
 
-    // ── Revenue: Weekly ───────────────────────────────────────────────────────
+    // -- Revenue: Weekly -------------------------------------------------------
 
     async function weeklyRevenue({ weeks = 12 } = {}) {
       const daily = await dailyRevenue({ days: weeks * 7 });
@@ -193,7 +193,7 @@
       return byWeek;
     }
 
-    // ── Revenue: Monthly ──────────────────────────────────────────────────────
+    // -- Revenue: Monthly ------------------------------------------------------
 
     async function monthlyRevenue({ months = 6 } = {}) {
       const bills  = await fetchBills(daysAgo(months * 31));
@@ -215,7 +215,7 @@
       return result;
     }
 
-    // ── Item Popularity ───────────────────────────────────────────────────────
+    // -- Item Popularity -------------------------------------------------------
 
     /**
      * Top-selling items by quantity.
@@ -247,7 +247,7 @@
         .map((e) => ({ ...e, avg_price: e.qty_sold ? e.revenue / e.qty_sold : 0 }));
     }
 
-    // ── Payment Method Breakdown ──────────────────────────────────────────────
+    // -- Payment Method Breakdown ----------------------------------------------
 
     async function paymentBreakdown({ days = 30 } = {}) {
       const bills  = await fetchBills(daysAgo(days));
@@ -280,7 +280,7 @@
       })).sort((a, b) => b.revenue - a.revenue);
     }
 
-    // ── Peak Analysis ─────────────────────────────────────────────────────────
+    // -- Peak Analysis ---------------------------------------------------------
 
     /**
      * Identify peak hour and busiest day of week.
@@ -305,7 +305,7 @@
       return { peakHour, peakDay, byDayOfWeek: byDow };
     }
 
-    // ── Staff Activity ────────────────────────────────────────────────────────
+    // -- Staff Activity --------------------------------------------------------
 
     /**
      * Staff activity summary for a month.
@@ -349,7 +349,7 @@
       });
     }
 
-    // ── Online Order Revenue ──────────────────────────────────────────────────
+    // -- Online Order Revenue --------------------------------------------------
 
     async function onlineOrderRevenue({ days = 30 } = {}) {
       const orders  = await fetchOnlineOrders(daysAgo(days));
@@ -362,7 +362,7 @@
       }));
     }
 
-    // ── Full Dashboard Summary ────────────────────────────────────────────────
+    // -- Full Dashboard Summary ------------------------------------------------
 
     /**
      * All-in-one summary for the analytics dashboard card.
@@ -410,7 +410,7 @@
     };
   }
 
-  // ── Chart renderer helpers (no library required) ─────────────────────────────
+  // -- Chart renderer helpers (no library required) -----------------------------
 
   /**
    * Render a simple bar chart into a <canvas> element.

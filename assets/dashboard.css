@@ -63,6 +63,12 @@
 .tb-search input::placeholder { color: var(--text-faint); }
 .tb-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px; border-radius: var(--r-pill); background: var(--glass); border: 1px solid var(--stroke-2); font-size: 12.5px; font-weight: 600; color: var(--text-soft); transition: var(--t); cursor: default; }
 .tb-pill.sync { color: var(--green); border-color: oklch(0.74 0.15 158 / 0.3); background: var(--green-tint); }
+/* Named pill states — real-time sync indicator */
+.tb-pill.cloud      { color: var(--green);  border-color: oklch(0.74 0.15 158 / 0.30); background: var(--green-tint); }
+.tb-pill.syncing    { color: #b45309;        border-color: oklch(0.80 0.15 78 / 0.35);  background: var(--amber-tint); }
+.tb-pill.local-only { color: #b45309;        border-color: oklch(0.80 0.15 78 / 0.35);  background: var(--amber-tint); }
+.tb-pill.offline    { color: var(--orange);  border-color: rgba(255,107,0,0.35);         background: var(--orange-tint); }
+.tb-pill.sync-error { color: var(--red);     border-color: oklch(0.66 0.20 25 / 0.32);  background: var(--red-tint); }
 .tb-icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--stroke-2); background: var(--glass); color: var(--text-soft); display: grid; place-items: center; cursor: pointer; transition: var(--t); position: relative; }
 .tb-icon-btn:hover { color: var(--text); border-color: var(--stroke-hi); transform: translateY(-1px); }
 .tb-icon-btn .dot-notif { position: absolute; top: 8px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); border: 2px solid var(--panel-solid); }
@@ -1261,6 +1267,7 @@ body.product-guide-open {
 }
 
 @media (min-width: 761px) and (max-width: 1024px) {
+  .app { grid-template-columns: 1fr !important; }
   .sidebar-hamburger { display: flex; }
   .sidebar-overlay.active { display: block; }
   
@@ -2270,5 +2277,41 @@ body.rs-drawer-dragging {
   }
   #manage-tabs-grid label div div:last-child {
     display: none;
+  }
+}
+
+/* ── Accessibility: focus-visible outlines ─────────────────────────────── */
+/* Visible keyboard focus rings without affecting mouse users */
+:focus-visible {
+  outline: 2px solid var(--orange, #fc8019);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--orange, #fc8019);
+  outline-offset: 2px;
+}
+
+/* ── Accessibility: reduced-motion ────────────────────────────────────── */
+/* Respect the OS setting for users who are sensitive to motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Accessibility: dark-mode preference ──────────────────────────────── */
+/* If the user hasn't explicitly set a theme, honour the OS preference */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    color-scheme: dark;
   }
 }

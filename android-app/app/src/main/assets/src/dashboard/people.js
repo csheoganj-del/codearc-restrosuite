@@ -30,7 +30,7 @@
     const pf = basic * 0.12;
     const pt = gross > 0 ? 200 : 0;
 
-    // Indian Income Tax — New Regime slabs (FY 2025-26)
+    // Indian Income Tax -- New Regime slabs (FY 2025-26)
     // Standard deduction ₹75,000 applied under new regime
     const annualGross = gross * 12;
     const standardDeduction = 75000;

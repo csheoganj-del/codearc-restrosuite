@@ -1,8 +1,11 @@
 /* ============================================================
-   RestroSuite — Menu Editor: real add / edit / delete + recipe linking
+   RestroSuite -- Menu Editor: real add / edit / delete + recipe linking
    ============================================================ */
 (function(){
   'use strict';
+  // HTML escaping -- prevents XSS when inserting DB-sourced strings into innerHTML
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s);
@@ -52,9 +55,9 @@
             <div><label class="fl">Item name</label><input class="form-input" id="ed-name" placeholder="e.g. Paneer Tikka"></div>
             <div class="form-grid-2">
               <div><label class="fl">Price (${symbol})</label><input class="form-input" id="ed-price" type="number" min="0" placeholder="199"></div>
-              <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select></div>
+              <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category...</option></select></div>
             </div>
-            <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups…"></div>
+            <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups..."></div>
             </div>
             <div class="form-grid-2">
               <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
@@ -82,7 +85,7 @@
       let draftIngs = [];
       const ingsEl = $('#ed-ings'), costEl = $('#ed-costline');
       function renderIngs(){
-        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${g.name} ${g.qty}${g.unit} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
+        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${esc(g.name)} ${esc(g.qty)}${esc(g.unit)} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
           + `<span class="ing-chip add" id="ed-add-ing"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span>`;
         ingsEl.querySelectorAll('[data-i]').forEach(b=> b.onclick=()=>{ draftIngs.splice(+b.dataset.i,1); renderIngs(); });
         $('#ed-add-ing').onclick = openIngPicker;
@@ -94,12 +97,12 @@
       function openIngPicker(){
         const list = RS.INVENTORY||[];
         RSModal.open({ title:'Add ingredient', sub:'Link a raw material to this recipe', icon:'fa-flask', size:'sm',
-          body:`<input class="form-input" id="ing-q" placeholder="Search ingredient…" style="margin-bottom:12px">
+          body:`<input class="form-input" id="ing-q" placeholder="Search ingredient..." style="margin-bottom:12px">
                 <div id="ing-pick" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto"></div>`,
           onMount(modal, close){
             const q = modal.querySelector('#ing-q'), box = modal.querySelector('#ing-pick');
             function draw(){ const t=(q.value||'').toLowerCase();
-              box.innerHTML = list.filter(i=>i.name.toLowerCase().includes(t)).map(i=>`<div class="sr-item" data-n="${i.name}" data-u="${i.unit}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${i.name}</div><div class="si-s">${i.cat} · ${rs(i.cost)}/${i.unit}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
+              box.innerHTML = list.filter(i=>i.name.toLowerCase().includes(t)).map(i=>`<div class="sr-item" data-n="${esc(i.name)}" data-u="${esc(i.unit)}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${esc(i.name)}</div><div class="si-s">${esc(i.cat)} · ${rs(i.cost)}/${esc(i.unit)}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
               box.querySelectorAll('[data-n]').forEach(el=> el.onclick=()=>{ draftIngs.push({name:el.dataset.n, qty:0.1, unit:el.dataset.u}); close(); renderIngs(); });
             }
             q.addEventListener('input',draw); draw(); q.focus();
@@ -195,7 +198,7 @@
             const saved = await RS.saveOne('menu', m);
             if (saved) Object.assign(m, saved);
           }
-          RS.toast('“'+name+'” updated','fa-circle-check');
+          RS.toast('"'+name+'" updated','fa-circle-check');
         }
         else {
           const id=Math.max(0,...RS.MENU.map(x=>Number.isFinite(Number(x.id))?Number(x.id):0))+1;
@@ -205,7 +208,7 @@
             const saved = await RS.saveOne('menu', rec);
             if (saved) Object.assign(rec, saved);
           }
-          RS.toast('“'+name+'” added to menu','fa-circle-plus');
+          RS.toast('"'+name+'" added to menu','fa-circle-plus');
         }
         resetForm(); renderList(); try{ RS.renderPOS(); if(window.refreshPosCats) window.refreshPosCats(); }catch(e){}
       };
@@ -362,7 +365,7 @@
     function confirmDelete(id){
       const m = RS.MENU.find(x=>String(x.id)===String(id));
       RSModal.open({ title:'Delete item?', icon:'fa-trash', size:'sm',
-        body:`<p style="color:var(--text-soft);font-size:14.5px">Remove <b style="color:var(--text)">${m.name}</b> from the menu? This can’t be undone.</p>`,
+        body:`<p style="color:var(--text-soft);font-size:14.5px">Remove <b style="color:var(--text)">${m.name}</b> from the menu? This can't be undone.</p>`,
         foot:`<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1;background:var(--red);box-shadow:none" data-ok><i class="fa-solid fa-trash"></i> Delete</button>`,
         onMount(modal, close){ modal.querySelector('[data-x]').onclick=close; modal.querySelector('[data-ok]').onclick=()=>{ const i=RS.MENU.findIndex(x=>String(x.id)===String(id)); RS.MENU.splice(i,1); RS.removeOne&&RS.removeOne('menu',id); close(); renderList(); try{RS.renderPOS();}catch(e){} RS.toast('Item removed','fa-trash'); }; }});
     }

@@ -19,7 +19,7 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>RestroSuite Console</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="assets/restrosuite.css?v=v22-20260621">
+<link rel="stylesheet" href="assets/restrosuite.css?v=v33-20260624">
 <script>
   window.onerror = function(msg, url, line, col, error) {
     var div = document.getElementById('debug-error-banner');
@@ -29,7 +29,8 @@
       div.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;z-index:999999;background:#ef4444;color:#fff;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);line-height:1.5;';
       document.documentElement.appendChild(div);
     }
-    div.innerHTML += '<div><b>JavaScript Error:</b> ' + msg + ' at <small>' + url + ':' + line + ':' + col + '</small></div>';
+    var _e=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    div.innerHTML += '<div><b>JavaScript Error:</b> ' + _e(msg) + ' at <small>' + _e(url) + ':' + _e(line) + ':' + _e(col) + '</small></div>';
   };
   window.onunhandledrejection = function(event) {
     var div = document.getElementById('debug-error-banner');
@@ -39,7 +40,8 @@
       div.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;z-index:999999;background:#ef4444;color:#fff;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);line-height:1.5;';
       document.documentElement.appendChild(div);
     }
-    div.innerHTML += '<div><b>Promise Rejection:</b> ' + (event.reason ? event.reason.message || event.reason : event) + '</div>';
+    var _e2=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    div.innerHTML += '<div><b>Promise Rejection:</b> ' + _e2(event.reason ? event.reason.message || event.reason : event) + '</div>';
   };
 
   // Localhost development cache-buster: unregister SW and clear caches
@@ -61,11 +63,18 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v27-20260624';
-  document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
-</script>
-<script>
-  document.write('<link rel="stylesheet" href="assets/features.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v33-20260624';
+  // Inject versioned CSS links without document.write (which blocks the parser).
+  // Using createElement + insertBefore keeps them in the <head> before </head>.
+  (function() {
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__);
+    ['assets/dashboard.css', 'assets/features.css'].forEach(function(href) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href + '?v=' + ver;
+      document.head.appendChild(link);
+    });
+  })();
 </script>
 <style>
   /* mini switch for menu editor */
@@ -327,7 +336,8 @@
       <span class="tb-pill txt" id="topbar-whatsapp-status-pill" style="cursor:pointer; font-size:12px; padding:5px 10px; border-radius:20px; border:1px solid rgba(107,114,128,0.2); background:rgba(107,114,128,0.1); color:#6b7280;">
         <span id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp</span>
       </span>
-      <span class="tb-pill sync txt" id="db-mode-pill"><span class="dot dot-live"></span> Local</span>
+      <span class="tb-pill txt" id="db-mode-pill" title="Checking sync status…"><i class="fa-solid fa-spinner fa-spin" style="font-size:10px"></i>&nbsp;Loading</span>
+      <span class="tb-pill txt" id="app-version-pill" style="font-size:11px; padding:4px 9px; border-radius:20px; border:1px solid rgba(107,114,128,0.2); background:rgba(107,114,128,0.08); color:#9ca3af; font-family:monospace; cursor:default;" title="App version"></span>
       <span class="tb-pill txt"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
       <button class="tb-icon-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
       <button class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
@@ -790,11 +800,12 @@
           <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-calendar-day"></i></div><div><div class="sv">0%</div><div class="sl">Attendance</div></div></div>
         </div>
         <div class="toolbar-row">
-          <div class="seg"><button class="active">Directory</button><button>Shift roster</button><button>Attendance</button><button>Payroll</button></div>
+          <div class="seg"><button class="active">Directory</button><button>Shift roster</button><button>Attendance</button><button>Payroll</button><button>Logins</button></div>
           <div class="grow"></div>
           <button class="btn btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Add team member</button>
         </div>
         <div class="emp-grid" id="emp-grid"></div>
+      <div class="panel panel-pad subtab-pane" data-pane="logins" style="margin-top:16px"></div>
       </section>
 
       <!-- ============ CHAIN DASHBOARD ============ -->
@@ -1296,21 +1307,37 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
-<script src="assets/db.js?v=20260618-realdata"></script>
+<script src="assets/db.js?v=20260618-realdata">
+  <script src="assets/saas-core.js"></script</script>
 <script src="src/dashboard/observability.js"></script>
 <script src="src/dashboard/imports.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/bills.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/chain.js"></script>
 <script>
-  document.write('<script src="assets/country-currency-data.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/dashboard.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-pos.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-editor.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-manage.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-growth.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-extra.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="src/dashboard/onboarding.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-shell.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  // Load versioned feature scripts in order without document.write.
+  // document.write blocks the HTML parser; this approach does not.
+  (function() {
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v33-20260624');
+    var srcs = [
+      'assets/country-currency-data.js',
+      'assets/dashboard.js',
+      'assets/features-pos.js',
+      'assets/features-editor.js',
+      'assets/features-manage.js',
+      'assets/features-growth.js',
+      'assets/features-extra.js',
+      'src/dashboard/onboarding.js',
+      'assets/features-shell.js'
+    ];
+    // Load sequentially (async=false on a runtime-created script preserves order
+    // only for same-origin scripts — here they are all same-origin).
+    srcs.forEach(function(src) {
+      var s = document.createElement('script');
+      s.src = src + '?v=' + ver;
+      s.async = false;
+      document.currentScript.parentNode.appendChild(s);
+    });
+  })();
 </script>
 
 <script>
@@ -1350,3 +1377,4 @@
 </body>
 </html>
 
+                                                                                  

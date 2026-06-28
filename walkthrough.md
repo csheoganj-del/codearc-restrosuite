@@ -62,6 +62,11 @@ All changes are optimized, styled to match the RestroSuite design system, and sy
 * Implemented the **`showSettleDuesModal()`** popup to pay off outstanding dues (Cash/UPI/Card), update their credit balance, and record the settlement payment in the bill ledger. 
 * Integrated the **`RSReceipt`** modal to automatically trigger upon successful dues settlement, offering cashiers and customers options to print a formal settlement receipt or share it directly over WhatsApp.
 
+### 3. WhatsApp Session Restore Fix
+* **Problem**: When the Hugging Face Space restarted, it failed to restore the active WhatsApp session and prompted for a new QR code scan, despite having downloaded the backup zip file from Supabase Storage.
+* **Root Cause**: The gateway's session zip logic had an ignore rule matching `**/*.log`. In Chromium/Puppeteer, session keys/secrets are stored inside LevelDB databases (e.g. `IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb` and `Local Storage/leveldb`). LevelDB uses `.log` files (e.g. `000003.log`) for write-ahead logging (WAL) of the latest database writes. Because these `.log` files were excluded, the session database was corrupted or out-of-date upon restore, forcing a new QR code scan.
+* **Resolution**: Removed `**/*.log` and `**/*.txt` from the zip ignore patterns list in `whatsapp-gateway.js`. Important chromium system logs are still cleanly excluded using explicit rules (`**/LOG`, `**/LOG.old`), while LevelDB operational files (like `*.log` write-ahead logs, `*.ldb`, `CURRENT`, and `MANIFEST-*`) are now fully preserved. Session restores now execute successfully after restart.
+
 ---
 
 ## Table QR Code Printing
@@ -411,6 +416,41 @@ We have resolved the issue where the Indian GST State Code (`07` / Delhi) was pr
 - Synced the changes to the Android app (`android-app/`) and nested submodule clones via `sync-assets.ps1`.
 - Committed and pushed all updates to the remote `main` branch.
 
+---
 
+# Walkthrough - WhatsApp PDF Receipts & Settings Schema Alignment (June 24, 2026)
 
+We have successfully resolved the issue where WhatsApp receipts were double-delivered as text messages instead of PDF attachments, and resolved schema mapping mismatches in the settings module.
+
+## 1. POS Database Settings Mapping Fix
+- **Correct Column Name**: Updated `SETTINGS_MAP` in [assets/db.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/db.js#L333) to map `set_gstin` to `gst_number` (the actual column in `doppio_business_profile` table), fixing silent database update failures.
+- **Removed Mismatching Column**: Removed the mapping for `set_gst_state` from `SETTINGS_MAP` so it falls back to the generic `feature_flags.ui_settings` handling. This avoids DB schema insertion/update errors and loads successfully from the jsonb column.
+
+## 2. WhatsApp Gateway Enhancements
+- **Service Client Fallback & Placeholder Guard**: Refactored the `supabaseService` client initialization in [whatsapp-gateway.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/whatsapp-gateway.js#L36-L40) to ignore the placeholder `<service-role-key-for-gateway-storage>` string. It now sets `supabaseService` to `null` to trigger the correct local fallbacks, resolving `Invalid API key` console errors.
+- **RLS Query Bypass**: Modified the realtime listener query in [whatsapp-gateway.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/whatsapp-gateway.js#L2304) to use `supabaseService || supabase` instead of `supabase` anon client. In production, this uses the service role key to bypass RLS policies on the `doppio_business_profile` table to successfully read receipt settings.
+- **Auto-Send Delay Adjustment**: Increased the realtime listener's delay from `1.5` seconds to `5` seconds. This gives the client browser ample time to generate the PDF receipt using jsPDF and make the `/send` API request, allowing the gateway to register the order ID in `realtimeSkipOrders` and correctly skip sending a duplicate text fallback message.
+
+- **Local Client Gateway Routing / Tenant ID Injection**: Added a check in [assets/doppio-api.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/doppio-api.js#L221-L227) to automatically attach `payload.tenantId` for all gateway operations. This ensures that the local dev server (`run-server.ps1`) correctly resolves and routes the request (including the base64-encoded PDF receipt payload) to the active tenant's client instance (`ee3c35da-5223-4372-a3a6-987849d665da`) instead of routing to the default unauthenticated `'system'` client.
+
+## 3. Code Synchronization
+- Synced all modifications to `android-app/app/src/main/assets/` via `sync-assets.ps1`.
+- App version updated and verified under `v33-20260624`.
+
+---
+
+# Walkthrough - Table QR Code Print Loading Fix (June 25, 2026)
+
+We have resolved the issue where table QR code cards were printed as empty gray border outlines instead of displaying the actual QR code.
+
+## 1. Root Cause
+When printing a table QR (either a single card or a batch of all cards), the application dynamically writes the HTML structure containing the `<img>` tags pointing to the QR code generation API (`https://api.qrserver.com/v1/create-qr-code/...`).
+Previously, the print helper immediately executed `window.print()` before the browser could perform the asynchronous network requests to fetch and render the QR code images. Because the print dialog blocks background thread execution in Chromium, the images remained unloaded and blank.
+
+## 2. Logic Enhancements
+- **Asynchronous Image Load Guard** in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js): Refactored the `window.RSPrint` helper to query all `<img>` tags inside the iframe, monitor their `onload`/`onerror` events, and wait until all image assets are fully loaded and cached before executing the print command.
+- **Fallback Printer Script Waiter** in [assets/features-growth.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-growth.js): Refactored the fallback `window.open` code for both single table QR printing and batch floor table QR printing to dynamically write an inline script that waits for all images to complete loading before invoking `window.print()` and `window.close()`.
+
+## 3. Code Synchronization
+- Synchronized all web assets with the local Android application container using `powershell -File .\sync-assets.ps1`.
 

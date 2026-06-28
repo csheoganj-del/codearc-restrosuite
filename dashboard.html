@@ -29,7 +29,8 @@
       div.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;z-index:999999;background:#ef4444;color:#fff;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);line-height:1.5;';
       document.documentElement.appendChild(div);
     }
-    div.innerHTML += '<div><b>JavaScript Error:</b> ' + msg + ' at <small>' + url + ':' + line + ':' + col + '</small></div>';
+    var _e=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    div.innerHTML += '<div><b>JavaScript Error:</b> ' + _e(msg) + ' at <small>' + _e(url) + ':' + _e(line) + ':' + _e(col) + '</small></div>';
   };
   window.onunhandledrejection = function(event) {
     var div = document.getElementById('debug-error-banner');
@@ -39,7 +40,8 @@
       div.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;z-index:999999;background:#ef4444;color:#fff;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);line-height:1.5;';
       document.documentElement.appendChild(div);
     }
-    div.innerHTML += '<div><b>Promise Rejection:</b> ' + (event.reason ? event.reason.message || event.reason : event) + '</div>';
+    var _e2=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    div.innerHTML += '<div><b>Promise Rejection:</b> ' + _e2(event.reason ? event.reason.message || event.reason : event) + '</div>';
   };
 
   // Localhost development cache-buster: unregister SW and clear caches
@@ -62,10 +64,17 @@
   }
 
   window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v34-20260628';
-  document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
-</script>
-<script>
-  document.write('<link rel="stylesheet" href="assets/features.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
+  // Inject versioned CSS links without document.write (which blocks the parser).
+  // Using createElement + insertBefore keeps them in the <head> before </head>.
+  (function() {
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__);
+    ['assets/dashboard.css', 'assets/features.css'].forEach(function(href) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href + '?v=' + ver;
+      document.head.appendChild(link);
+    });
+  })();
 </script>
 <style>
   /* mini switch for menu editor */
@@ -327,7 +336,8 @@
       <span class="tb-pill txt" id="topbar-whatsapp-status-pill" style="cursor:pointer; font-size:12px; padding:5px 10px; border-radius:20px; border:1px solid rgba(107,114,128,0.2); background:rgba(107,114,128,0.1); color:#6b7280;">
         <span id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp</span>
       </span>
-      <span class="tb-pill sync txt" id="db-mode-pill"><span class="dot dot-live"></span> Local</span>
+      <span class="tb-pill txt" id="db-mode-pill" title="Checking sync status…"><i class="fa-solid fa-spinner fa-spin" style="font-size:10px"></i>&nbsp;Loading</span>
+      <span class="tb-pill txt" id="app-version-pill" style="font-size:11px; padding:4px 9px; border-radius:20px; border:1px solid rgba(107,114,128,0.2); background:rgba(107,114,128,0.08); color:#9ca3af; font-family:monospace; cursor:default;" title="App version"></span>
       <span class="tb-pill txt"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
       <button class="tb-icon-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
       <button class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
@@ -879,9 +889,36 @@
           <!-- Dynamic snapshot cards will go here -->
         </div>
         <div class="panel panel-pad">
-          <div class="panel-head"><h3>Tenant directory</h3><button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button></div>
+          <div class="panel-head" style="flex-wrap:wrap;gap:10px">
+            <h3 style="display:flex;align-items:center;gap:8px">
+              Tenant directory
+              <span id="tenant-count" style="font-size:12px;font-weight:500;color:var(--text-mute);background:var(--bg);border:1px solid var(--stroke);border-radius:20px;padding:2px 9px"></span>
+            </h3>
+            <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+              <div style="position:relative">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-mute);font-size:12px;pointer-events:none"></i>
+                <input id="tenant-search-input" placeholder="Search tenants…" style="padding:6px 10px 6px 28px;border:1px solid var(--stroke);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;width:180px;outline:none">
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button>
+              <button class="btn btn-sm" id="btn-create-tenant" style="background:var(--orange);color:#fff;border:none;gap:6px"><i class="fa-solid fa-plus"></i> New Workspace</button>
+            </div>
+          </div>
+          <!-- Bulk actions bar — shown when pending tenants exist -->
+          <div id="sa-bulk-bar" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;margin-bottom:12px">
+            <i class="fa-solid fa-user-clock" style="color:#b45309"></i>
+            <span id="sa-bulk-label" style="font-size:13px;font-weight:500;color:#b45309;flex:1"></span>
+            <button id="sa-bulk-approve-btn" class="btn btn-sm" style="background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);font-size:12px"><i class="fa-solid fa-check-double"></i> Approve all pending</button>
+          </div>
           <div class="table-scroll"><table class="data-table">
-            <thead><tr><th>Outlet</th><th>Plan</th><th>MRR</th><th>Outlets</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr>
+              <th data-sort-col="outlet" style="white-space:nowrap">Outlet <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="plan" style="white-space:nowrap">Plan <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="mrr" style="white-space:nowrap">MRR <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="outlets" style="white-space:nowrap">Outlets <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="joined" style="white-space:nowrap">Joined <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="status" style="white-space:nowrap">Status <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th>Actions</th>
+            </tr></thead>
             <tbody id="tenant-table-body"></tbody>
           </table></div>
         </div>
@@ -963,122 +1000,176 @@
 
 <!-- ===================== MOBILE BOTTOM NAV ===================== -->
 <nav class="mobile-nav">
-  <!-- Regular outlet nav (hidden for superadmin by JS) -->
-  <a class="mnav-link superadmin-hide" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i> POS</a>
-  <a class="mnav-link superadmin-hide" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i> Orders</a>
-  <a class="mnav-link superadmin-hide" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</a>
-  <a class="mnav-link superadmin-hide" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i> Bills</a>
-  <a class="mnav-link superadmin-hide" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
-  <a class="mnav-link superadmin-hide" id="mnav-more"><i class="fa-solid fa-ellipsis"></i> More</a>
-  <!-- Superadmin-only nav (shown by JS when role=superadmin) -->
-  <a class="mnav-link superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i> Tenants</a>
-  <a class="mnav-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none"><i class="fa-solid fa-server"></i> Gateway</a>
+  <a class="mnav-link" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i> POS</a>
+  <a class="mnav-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i> Orders</a>
+  <a class="mnav-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</a>
+  <a class="mnav-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i> Bills</a>
+  <a class="mnav-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
+  <a class="mnav-link" id="mnav-more"><i class="fa-solid fa-ellipsis"></i> More</a>
 </nav>
 
 <div class="toast" id="toast"></div>
 
-<!-- SAAS TENANT MANAGEMENT MODAL -->
-<div class="modal-backdrop" id="tenant-manage-modal" style="z-index: 200000; overflow-y: auto; align-items: flex-start; padding: 20px 0;">
-  <div class="glass-modal" style="max-width: 600px; width: 94%; max-height: none; overflow: visible; box-shadow: 0 10px 40px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.03); margin: auto;">
-
-    <!-- Header -->
-    <div class="modal-header" style="padding: 20px 24px 18px; border-bottom: 1px solid var(--stroke);">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 38px; height: 38px; background: linear-gradient(135deg, #FC8019 0%, #FD9139 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(252,128,25,0.28);">
-          <i class="fa-solid fa-sliders" style="font-size: 15px; color: #fff;"></i>
+<!-- SUPER-ADMIN: CREATE TENANT MODAL -->
+<div class="modal-backdrop" id="create-tenant-modal" style="z-index:200001;overflow-y:auto;align-items:flex-start;padding:20px 0">
+  <div class="glass-modal" style="max-width:520px;width:94%;max-height:none;overflow:visible;box-shadow:0 10px 40px rgba(0,0,0,0.1);margin:auto">
+    <div class="modal-header" style="padding:20px 24px 18px;border-bottom:1px solid var(--stroke)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:10px;background:rgba(252,128,25,0.1);display:flex;align-items:center;justify-content:center;color:var(--orange);font-size:18px;flex-shrink:0"><i class="fa-solid fa-store"></i></div>
+        <div>
+          <h3 style="font-size:16px;font-weight:700;margin:0">New Workspace</h3>
+          <p style="font-size:12px;color:var(--text-mute);margin:2px 0 0">Manually register a tenant workspace</p>
+        </div>
+      </div>
+      <button id="close-create-tenant-modal" style="background:none;border:none;cursor:pointer;color:var(--text-mute);font-size:20px;padding:4px;margin-left:auto"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Business name *</label>
+          <input id="ct-name" type="text" placeholder="e.g. Doppio Coffee" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
         </div>
         <div>
-          <h2 style="font-size: 16px; font-weight: 700; color: var(--text); margin: 0; letter-spacing: -0.02em; line-height: 1.2;">Workspace Management</h2>
-          <p style="font-size: 11px; color: var(--text-mute); margin: 3px 0 0; font-weight: 500;">Configure access, credentials &amp; feature gates</p>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">URL slug *</label>
+          <input id="ct-slug" type="text" placeholder="e.g. doppio-coffee" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
         </div>
       </div>
-      <button class="close-modal-btn" id="close-tenant-modal" style="width: 30px; height: 30px; border-radius: 8px; background: var(--panel); border: 1px solid var(--stroke); display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text-mute); cursor: pointer; transition: all 0.14s ease;">&times;</button>
-    </div>
-
-    <!-- Body -->
-    <div class="modal-body" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow: visible; flex-grow: 1;">
-      <input type="hidden" id="manage-tenant-id">
-
-      <!-- Outlet identity banner -->
-      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 16px; background: linear-gradient(135deg, rgba(252,128,25,0.06) 0%, rgba(252,128,25,0.02) 100%); border: 1px solid rgba(252,128,25,0.16); border-radius: 12px;">
-        <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #FC8019, #FD9139); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; color: #fff; font-weight: 800;" id="manage-tenant-avatar">D</div>
-        <div style="min-width: 0;">
-          <div id="manage-tenant-name" style="font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Outlet Name</div>
-          <div style="font-size: 11px; color: var(--text-mute); font-weight: 500; margin-top: 2px;">Registered client workspace</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Outlet type *</label>
+          <select id="ct-outlet-type" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;cursor:pointer;box-sizing:border-box">
+            <option value="cafe">☕ Café</option>
+            <option value="restaurant">🍽️ Restaurant</option>
+            <option value="qsr">🍔 QSR / Fast Food</option>
+            <option value="bakery">🥐 Bakery</option>
+            <option value="bar">🍺 Bar & Lounge</option>
+            <option value="cloud_kitchen">📦 Cloud Kitchen</option>
+            <option value="retail">🛒 Retail</option>
+          </select>
         </div>
-        <div style="margin-left: auto; flex-shrink: 0;">
-          <span id="manage-status-badge" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: 700; background: rgba(34,197,94,0.1); color: #16A34A; border: 1px solid rgba(34,197,94,0.2);">
-            <span style="width: 6px; height: 6px; border-radius: 50%; background: #22C55E; display: inline-block;"></span>Active
-          </span>
-        </div>
-      </div>
-
-      <!-- Section 1: Credentials -->
-      <div style="border: 1px solid var(--stroke); border-radius: 12px; overflow: hidden;">
-        <div style="padding: 11px 16px; background: var(--panel); border-bottom: 1px solid var(--stroke); display: flex; align-items: center; gap: 8px;">
-          <div style="width: 3px; height: 13px; background: #FC8019; border-radius: 2px; flex-shrink: 0;"></div>
-          <span style="font-size: 11px; font-weight: 600; color: var(--text);">Client credentials &amp; contact</span>
-        </div>
-        <div style="padding: 14px 16px; background: var(--panel); display: flex; flex-direction: column; gap: 12px;">
-          <!-- Row 1: Username + Password -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Admin username</label>
-              <input type="text" id="manage-username" placeholder="e.g. admin" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); box-sizing: border-box;">
-            </div>
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Reset password</label>
-              <input type="password" id="manage-password" placeholder="Leave blank to keep" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); box-sizing: border-box;">
-            </div>
-          </div>
-          <!-- Row 2: WhatsApp + Email -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">WhatsApp contact</label>
-              <input type="tel" id="manage-phone" placeholder="e.g. 919876543210" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); box-sizing: border-box;">
-            </div>
-            <div>
-              <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Owner email</label>
-              <input type="text" id="manage-email" placeholder="owner@email.com" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); box-sizing: border-box;">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section 2: Account Status -->
-      <div style="border: 1px solid var(--stroke); border-radius: 12px; overflow: hidden;">
-        <div style="padding: 11px 16px; background: var(--panel); border-bottom: 1px solid var(--stroke); display: flex; align-items: center; gap: 8px;">
-          <div style="width: 3px; height: 13px; background: #FC8019; border-radius: 2px; flex-shrink: 0;"></div>
-          <span style="font-size: 11px; font-weight: 600; color: var(--text);">Account status &amp; visibility</span>
-        </div>
-        <div style="padding: 14px 16px; background: var(--panel);">
-          <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Account status</label>
-          <select id="manage-status" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); cursor: pointer; box-sizing: border-box;">
-            <option value="pending">⏳  Pending approval</option>
-            <option value="approved">✅  Approved &amp; active</option>
-            <option value="suspended">🚫  Suspended / blocked</option>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Plan</label>
+          <select id="ct-plan" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;cursor:pointer;box-sizing:border-box">
+            <option value="starter">Starter</option>
+            <option value="growth">Growth</option>
+            <option value="enterprise">Enterprise</option>
           </select>
         </div>
       </div>
-
-      <!-- Section 2b: Subscription Plan -->
-      <div style="border: 1px solid var(--stroke); border-radius: 12px; overflow: hidden;">
-        <div style="padding: 11px 16px; background: var(--panel); border-bottom: 1px solid var(--stroke); display: flex; align-items: center; gap: 8px;">
-          <div style="width: 3px; height: 13px; background: #FC8019; border-radius: 2px; flex-shrink: 0;"></div>
-          <span style="font-size: 11px; font-weight: 600; color: var(--text);">Subscription &amp; entitlement</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Admin username *</label>
+          <input id="ct-username" type="text" placeholder="e.g. doppio-admin" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
         </div>
-        <div style="padding: 14px 16px; background: var(--panel); display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Password *</label>
+          <input id="ct-password" type="password" placeholder="Min 8 characters" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Owner email</label>
+          <input id="ct-email" type="email" placeholder="owner@example.com" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">WhatsApp phone</label>
+          <input id="ct-phone" type="tel" placeholder="91XXXXXXXXXX" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="ct-auto-approve" checked style="width:14px;height:14px;accent-color:var(--orange);cursor:pointer">
+        <label for="ct-auto-approve" style="font-size:13px;cursor:pointer;color:var(--text)">Auto-approve workspace (status = Active immediately)</label>
+      </div>
+      <div id="ct-error" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;border-top:1px solid var(--stroke)">
+        <button id="ct-cancel-btn" class="btn btn-ghost btn-sm">Cancel</button>
+        <button id="ct-submit-btn" class="btn btn-sm" style="background:var(--orange);color:#fff;border:none"><i class="fa-solid fa-plus"></i> Create Workspace</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SAAS TENANT MANAGEMENT MODAL -->
+<div class="modal-backdrop" id="tenant-manage-modal" style="z-index:200000;overflow-y:auto;align-items:flex-start;padding:24px 0">
+  <div class="glass-modal" style="max-width:640px;width:94%;max-height:none;overflow:visible;box-shadow:0 20px 60px rgba(0,0,0,0.12);margin:auto;border-radius:16px">
+
+    <!-- Header -->
+    <div style="padding:18px 24px 16px;border-bottom:1px solid var(--stroke);display:flex;align-items:center;gap:12px">
+      <div style="width:42px;height:42px;background:linear-gradient(135deg,#FC8019,#FD9139);border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;color:#fff;font-weight:800" id="manage-tenant-avatar">D</div>
+      <div style="min-width:0;flex:1">
+        <div id="manage-tenant-name" style="font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Outlet Name</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <span id="manage-status-badge" style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700"><span style="width:6px;height:6px;border-radius:50%;background:#22C55E;display:inline-block"></span>Active</span>
+          <button id="manage-copy-login-btn" title="Copy tenant login URL" style="background:none;border:1px solid var(--stroke);border-radius:6px;cursor:pointer;color:var(--text-mute);font-size:11px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px"><i class="fa-solid fa-link" style="font-size:10px"></i> Copy login URL</button>
+        </div>
+      </div>
+      <button id="close-tenant-modal" style="flex-shrink:0;width:30px;height:30px;border-radius:8px;background:var(--bg);border:1px solid var(--stroke);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--text-mute);cursor:pointer">&times;</button>
+    </div>
+    <input type="hidden" id="manage-tenant-id">
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--stroke);background:var(--bg);padding:0 24px">
+      <button class="tmtab active" data-tmtab="account" style="padding:11px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--orange);border-bottom:2px solid var(--orange);margin-bottom:-1px"><i class="fa-solid fa-id-card" style="margin-right:5px"></i>Account</button>
+      <button class="tmtab" data-tmtab="features" style="padding:11px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-mute);border-bottom:2px solid transparent;margin-bottom:-1px"><i class="fa-solid fa-toggle-on" style="margin-right:5px"></i>Features</button>
+      <button class="tmtab" data-tmtab="danger" style="padding:11px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-mute);border-bottom:2px solid transparent;margin-bottom:-1px"><i class="fa-solid fa-triangle-exclamation" style="margin-right:5px"></i>Data &amp; Danger</button>
+    </div>
+
+    <!-- TAB: Account -->
+    <div class="tm-panel" id="tm-panel-account" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+
+      <!-- Credentials -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-key" style="font-size:9px"></i> Credentials</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
-            <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Plan</label>
-            <select id="manage-plan-code" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); cursor: pointer; box-sizing: border-box;">
-              <option value="starter">Starter - 5 staff</option>
-              <option value="growth">Growth - 15 staff</option>
-              <option value="enterprise">Enterprise - 75 staff</option>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Admin username</label>
+            <input type="text" id="manage-username" placeholder="e.g. doppio-admin" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">New password</label>
+            <input type="password" id="manage-password" placeholder="Leave blank to keep" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-address-book" style="font-size:9px"></i> Contact</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">WhatsApp number</label>
+            <input type="tel" id="manage-phone" placeholder="91XXXXXXXXXX" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Owner email</label>
+            <input type="email" id="manage-email" placeholder="owner@email.com" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+
+      <!-- Status & Plan -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-layer-group" style="font-size:9px"></i> Status &amp; Subscription</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Account status</label>
+            <select id="manage-status" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
+              <option value="pending">⏳ Pending</option>
+              <option value="approved">✅ Active</option>
+              <option value="suspended">🚫 Suspended</option>
             </select>
           </div>
           <div>
-            <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Subscription status</label>
-            <select id="manage-subscription-status" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); cursor: pointer; box-sizing: border-box;">
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Plan</label>
+            <select id="manage-plan-code" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
+              <option value="starter">Starter (5 staff)</option>
+              <option value="growth">Growth (15 staff)</option>
+              <option value="enterprise">Enterprise (75 staff)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Billing</label>
+            <select id="manage-subscription-status" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
               <option value="trialing">Trialing</option>
               <option value="active">Active</option>
               <option value="past_due">Past due</option>
@@ -1088,195 +1179,120 @@
         </div>
       </div>
 
-      <!-- Section 3: Feature Gates -->
-      <div style="border: 1px solid var(--stroke); border-radius: 12px; overflow: hidden;">
-        <div style="padding: 11px 16px; background: var(--panel); border-bottom: 1px solid var(--stroke); display: flex; align-items: center; gap: 8px;">
-          <div style="width: 3px; height: 13px; background: #FC8019; border-radius: 2px; flex-shrink: 0;"></div>
-          <span style="font-size: 11px; font-weight: 600; color: var(--text);">Feature access</span>
-          <span style="margin-left: auto; font-size: 10px; color: var(--text-mute); font-weight: 500;">Toggle modules on / off</span>
-        </div>
-        <div id="manage-tabs-grid" style="padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--panel);">
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="pos-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Takeaway POS</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">Counter billing</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="qr-orders-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Live Table Orders</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">QR self-service</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="kds-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Kitchen KDS Screen</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">Display &amp; pass-through</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="tokens-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Live Token Board</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">Queue management</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="bills-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Bills Management</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">History &amp; refunds</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="inventory-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Inventory Control</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">Stock &amp; batches</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="reports-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Sales Reports</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">Analytics &amp; exports</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="editor-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Menu Editor</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">Item &amp; category manager</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="employees-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Employee Ledger</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">Staff &amp; shifts</div>
-            </div>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--stroke); cursor: pointer; background: var(--panel); user-select: none;">
-            <input type="checkbox" value="growth-hub-tab" style="accent-color: #FC8019; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer;">
-            <div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2;">Growth Hub</div>
-              <div style="font-size: 10px; color: var(--text-mute); margin-top: 2px;">SaaS business layer</div>
-            </div>
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Footer actions -->
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-top: 1px solid var(--stroke); background: var(--panel); border-radius: 0 0 16px 16px; flex-shrink: 0;">
-      <button type="button" id="delete-tenant-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(239,68,68,0.2); background: rgba(239,68,68,0.05); color: #EF4444; cursor: pointer; transition: all 0.14s ease;">
-        <i class="fa-solid fa-trash" style="font-size: 10px;"></i> Delete account
-      </button>
-
-      <button type="button" id="reset-tenant-data-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.07); color: #B45309; cursor: pointer; transition: all 0.14s ease;">
-        <i class="fa-solid fa-arrow-rotate-left" style="font-size: 10px;"></i> Reset data
-      </button>
-
-      <button type="button" id="seed-tenant-data-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.07); color: #166534; cursor: pointer; transition: all 0.14s ease;">
-        <i class="fa-solid fa-seedling" style="font-size: 10px;"></i> Load Demo Data
-      </button>
-
-      <button type="button" id="purge-tenant-data-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.07); color: #991B1B; cursor: pointer; transition: all 0.14s ease;">
-        <i class="fa-solid fa-trash-can" style="font-size: 10px;"></i> Remove Demo Data
-      </button>
-
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <button type="button" id="close-tenant-modal-btn" style="display: inline-flex; align-items: center; padding: 9px 16px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid var(--stroke); background: var(--panel); color: var(--text-mute); cursor: pointer; transition: all 0.14s ease;">
-          Cancel
-        </button>
-        <button type="button" id="save-tenant-settings-btn" style="display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; font-size: 12px; font-weight: 700; border-radius: 8px; border: none; background: linear-gradient(135deg, #FC8019 0%, #FD9139 100%); color: #fff; cursor: pointer; box-shadow: 0 4px 14px rgba(252,128,25,0.3); transition: all 0.14s ease;">
-          <i class="fa-solid fa-floppy-disk" style="font-size: 11px;"></i> Save settings
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-  </main>
-</div>
-
-  <!-- ============================================================
-       ONBOARDING TOUR OVERLAY — shown once for new workspaces
-       ============================================================ -->
-  <div id="onboarding-overlay" style="display:none; position:fixed; inset:0; z-index:99999; pointer-events:none;">
-    <!-- Clear transparent backdrop overlay (blocks clicks on dashboard without obscuring it) -->
-    <div id="onboarding-backdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.01); pointer-events:all; transition:opacity 0.3s ease;"></div>
-
-    <!-- Spotlight ring (follows target element) -->
-    <div id="onboarding-spotlight"></div>
-
-    <!-- Tour Tooltip Card -->
-    <div id="onboarding-card">
-      <!-- Card top: step badge + close -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-        <div id="tour-step-badge">
-          <span id="tour-step-icon" style="font-size:11px;">1/1</span>
-          <span id="tour-step-label">Welcome</span>
-        </div>
-        <button id="tour-skip-btn" onclick="window.endOnboardingTour()" title="Skip tour" aria-label="Skip tour">&times;</button>
-      </div>
-
-      <!-- Icon + Title -->
-      <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px;">
-        <div id="tour-feature-icon"><i class="fa-solid fa-compass"></i></div>
-        <div>
-          <h3 id="tour-title" style="margin:0 0 4px; font-size:17px; font-weight:800; line-height:1.2;">Welcome to RestroSuite</h3>
-          <p id="tour-subtitle" style="margin:0; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; opacity:0.8;">Your Complete Restaurant OS</p>
-        </div>
-      </div>
-
-      <!-- Description -->
-      <p id="tour-desc" style="font-size:13px; line-height:1.65; margin:0 0 20px; min-height:56px; opacity:0.9;">
-        Let's take a quick tour of your dashboard. We'll walk through every feature so you can get started confidently. Takes about 60 seconds.
-      </p>
-      <div id="tour-action" class="tour-first-action">
-        <strong>Start here:</strong> Complete your business profile, import your menu, and run one test order.
-      </div>
-
-      <!-- Progress dots -->
-      <div id="tour-dots" style="display:flex; gap:6px; align-items:center; margin-bottom:20px; flex-wrap:wrap;"></div>
-
-      <!-- Navigation buttons -->
-      <div style="display:flex; gap:10px; align-items:center;">
-        <button id="tour-prev-btn" onclick="window.tourNavigate(-1)">Previous</button>
-        <button id="tour-next-btn" onclick="window.tourNavigate(1)">Next</button>
-      </div>
-
-      <!-- Skip text -->
-      <div style="text-align:center; margin-top:14px;">
-        <button onclick="window.endOnboardingTour()" style="
-          background:none; border:none; color:var(--text-muted);
-          font-size:11px; cursor:pointer; font-family:'Inter',sans-serif;
-          transition:color 0.2s;
-        " onmouseover="this.style.color='var(--accent-caramel)'" onmouseout="this.style.color='var(--text-muted)'">
-          Skip tour - I will use Help &amp; Setup later
-        </button>
-      </div>
-    </div>
-  </div><!-- /#onboarding-overlay -->
-
-  <!-- Mobile Floating Cart Bar -->
-  <div id="pos-m-cart-bar" class="pos-m-cart-bar hidden">
-    <div class="mcb-left">
-      <i class="fa-solid fa-cart-shopping"></i>
+      <!-- Notes -->
       <div>
-        <span id="pos-m-cart-bar-count">0 items</span>
-        <span class="mcb-sep">·</span>
-        <span id="pos-m-cart-bar-total" style="font-family: var(--font-display); font-weight: 800; color: #fff;">₹0</span>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-note-sticky" style="font-size:9px"></i> Internal Notes</div>
+        <textarea id="manage-notes" placeholder="Account notes, support history, onboarding status…" rows="2" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--stroke)">
+        <button id="save-tenant-settings-btn" class="btn btn-sm" style="background:var(--orange);color:#fff;border:none;padding:9px 20px"><i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>Save changes</button>
       </div>
     </div>
-    <button class="mcb-btn">
-      View Cart <i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i>
-    </button>
+
+    <!-- TAB: Features -->
+    <div class="tm-panel" id="tm-panel-features" style="display:none;padding:16px 24px 20px;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:var(--text-mute)">Toggle modules on / off for this workspace</span>
+        <div style="display:flex;gap:6px">
+          <button id="manage-select-all-tabs" class="btn btn-ghost btn-sm" style="font-size:11px">Select all</button>
+          <button id="manage-deselect-all-tabs" class="btn btn-ghost btn-sm" style="font-size:11px">Clear all</button>
+        </div>
+      </div>
+      <div id="manage-tabs-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="pos-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Takeaway POS</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Counter billing</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="qr-orders-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Live Table Orders</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">QR self-service</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="kds-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Kitchen KDS</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Display &amp; pass-through</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="tokens-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Live Token Board</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Queue management</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="bills-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Bills Management</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">History &amp; refunds</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="inventory-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Inventory Control</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Stock &amp; batches</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="reports-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Sales Reports</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Analytics &amp; exports</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="editor-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Menu Editor</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Item &amp; category manager</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="employees-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Employee Ledger</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Staff &amp; shifts</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="growth-hub-tab" style="accent-color:#FC8019;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Growth Hub</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">SaaS business layer</div></div>
+        </label>
+      </div>
+      <div style="display:flex;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--stroke)">
+        <button id="save-tenant-features-btn" class="btn btn-sm" style="background:var(--orange);color:#fff;border:none;padding:9px 20px"><i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>Save features</button>
+      </div>
+    </div>
+
+    <!-- TAB: Data & Danger -->
+    <div class="tm-panel" id="tm-panel-danger" style="display:none;padding:20px 24px;flex-direction:column;gap:14px">
+
+      <!-- Data operations -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-database" style="font-size:9px"></i> Data Operations</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--stroke);border-radius:10px;background:var(--panel)">
+            <div><div style="font-size:13px;font-weight:600;color:var(--text)">Reset workspace data</div><div style="font-size:11px;color:var(--text-mute);margin-top:2px">Permanently deletes bills, menus, inventory, staff, CRM. Keeps credentials.</div></div>
+            <button id="reset-tenant-data-btn" class="btn btn-ghost btn-sm" style="flex-shrink:0;margin-left:12px;white-space:nowrap"><i class="fa-solid fa-arrow-rotate-left" style="font-size:10px"></i> Reset data</button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--stroke);border-radius:10px;background:var(--panel)">
+            <div><div style="font-size:13px;font-weight:600;color:var(--text)">Load demo data</div><div style="font-size:11px;color:var(--text-mute);margin-top:2px">Populates workspace with realistic sample menus, bills, staff and inventory.</div></div>
+            <button id="seed-tenant-data-btn" class="btn btn-ghost btn-sm" style="flex-shrink:0;margin-left:12px;white-space:nowrap"><i class="fa-solid fa-seedling" style="font-size:10px"></i> Load demo</button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--stroke);border-radius:10px;background:var(--panel)">
+            <div><div style="font-size:13px;font-weight:600;color:var(--text)">Remove demo data</div><div style="font-size:11px;color:var(--text-mute);margin-top:2px">Safely deletes only demo records. Client-added data stays intact.</div></div>
+            <button id="purge-tenant-data-btn" class="btn btn-ghost btn-sm" style="flex-shrink:0;margin-left:12px;white-space:nowrap"><i class="fa-solid fa-trash-can" style="font-size:10px"></i> Remove demo</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danger zone -->
+      <div style="border:1px solid rgba(239,68,68,0.3);border-radius:12px;overflow:hidden">
+        <div style="padding:10px 16px;background:rgba(239,68,68,0.06);border-bottom:1px solid rgba(239,68,68,0.2);display:flex;align-items:center;gap:8px">
+          <i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;font-size:12px"></i>
+          <span style="font-size:11px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.04em">Danger Zone</span>
+        </div>
+        <div style="padding:14px 16px;background:var(--panel);display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Delete this workspace</div>
+            <div style="font-size:11px;color:var(--text-mute);margin-top:2px">Permanently erases the account and cascades to all data. Cannot be undone.</div>
+          </div>
+          <button id="delete-tenant-btn" style="flex-shrink:0;margin-left:16px;display:inline-flex;align-items:center;gap:6px;padding:9px 15px;font-size:12px;font-weight:600;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#ef4444;cursor:pointer;white-space:nowrap">
+            <i class="fa-solid fa-trash" style="font-size:10px"></i> Delete workspace
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Close button (footer) -->
+    <div style="padding:12px 24px;border-top:1px solid var(--stroke);background:var(--bg);border-radius:0 0 16px 16px;display:flex;justify-content:flex-end">
+      <button id="close-tenant-modal-btn" class="btn btn-ghost btn-sm">Close</button>
+    </div>
+
   </div>
+</div>
 
   <!-- Mobile More Bottom Sheet -->
   <div id="mobile-more-sheet" style="display:none;position:fixed;inset:0;z-index:500;">
@@ -1289,9 +1305,6 @@
       <button class="mnav-more-btn" data-tab="customers-tab"><i class="fa-solid fa-address-book"></i><span>Customers</span></button>
       <button class="mnav-more-btn" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></button>
       <button class="mnav-more-btn" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Tables</span></button>
-      <!-- Superadmin-only nav links — shown by JS when role=superadmin -->
-      <button class="mnav-more-btn superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></button>
-      <button class="mnav-more-btn superadmin-only" data-tab="gateway-monitor-tab" style="display:none"><i class="fa-solid fa-server"></i><span>Gateway</span></button>
     </div>
   </div>
 
@@ -1304,21 +1317,37 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
-<script src="assets/db.js?v=20260618-realdata"></script>
+<script src="assets/db.js?v=20260618-realdata">
+  <script src="assets/saas-core.js"></script</script>
 <script src="src/dashboard/observability.js"></script>
 <script src="src/dashboard/imports.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/bills.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/chain.js"></script>
 <script>
-  document.write('<script src="assets/country-currency-data.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/dashboard.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-pos.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-editor.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-manage.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-growth.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-extra.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="src/dashboard/onboarding.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
-  document.write('<script src="assets/features-shell.js?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '"><\/script>');
+  // Load versioned feature scripts in order without document.write.
+  // document.write blocks the HTML parser; this approach does not.
+  (function() {
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v33-20260624');
+    var srcs = [
+      'assets/country-currency-data.js',
+      'assets/dashboard.js',
+      'assets/features-pos.js',
+      'assets/features-editor.js',
+      'assets/features-manage.js',
+      'assets/features-growth.js',
+      'assets/features-extra.js',
+      'src/dashboard/onboarding.js',
+      'assets/features-shell.js'
+    ];
+    // Load sequentially (async=false on a runtime-created script preserves order
+    // only for same-origin scripts — here they are all same-origin).
+    srcs.forEach(function(src) {
+      var s = document.createElement('script');
+      s.src = src + '?v=' + ver;
+      s.async = false;
+      document.currentScript.parentNode.appendChild(s);
+    });
+  })();
 </script>
 
 <script>
@@ -1358,3 +1387,4 @@
 </body>
 </html>
 
+                                                                                  

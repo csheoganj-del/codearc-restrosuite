@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — POS checkout: payment modal, KOT, receipt
+   RestroSuite -- POS checkout: payment modal, KOT, receipt
    Also defines the shared window.RSModal helper.
    ============================================================ */
 (function(){
@@ -213,9 +213,33 @@
       d.open();
       d.write(fullHtml);
       d.close();
-      f.contentWindow.focus();
-      f.contentWindow.print();
-      setTimeout(()=>f.remove(), 800);
+
+      const performPrint = () => {
+        f.contentWindow.focus();
+        f.contentWindow.print();
+        setTimeout(() => f.remove(), 1000);
+      };
+
+      const imgs = Array.from(f.contentWindow.document.getElementsByTagName('img'));
+      if (imgs.length === 0) {
+        performPrint();
+      } else {
+        let loaded = 0;
+        const checkDone = () => {
+          loaded++;
+          if (loaded === imgs.length) {
+            setTimeout(performPrint, 300);
+          }
+        };
+        imgs.forEach(img => {
+          if (img.complete) {
+            checkDone();
+          } else {
+            img.onload = checkDone;
+            img.onerror = checkDone;
+          }
+        });
+      }
     };
 
     /* ---------------- receipt builder ---------------- */
@@ -287,20 +311,20 @@
       
       return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div>${profileLines || '<div class="rcp-sub">CodeArc RestroSuite</div>'}</div>
         <hr class="rcp-hr">
-        <div class="rcp-meta"><span>${bill.no}</span><span>${bill.time}</span></div>
-        <div class="rcp-meta"><span>Table:</span><span>${bill.table}</span></div>
+        <div class="rcp-meta"><span>${esc(bill.no)}</span><span>${esc(bill.time)}</span></div>
+        <div class="rcp-meta"><span>Table:</span><span>${esc(bill.table)}</span></div>
         ${custSection}
         <hr class="rcp-hr">
         ${itemsHTML}
         <hr class="rcp-hr">
         <div class="rcp-line"><span>Subtotal</span><span>${rs(bill.sub)}</span></div>
-        ${bill.disc ? `<div class="rcp-line"><span>Discount</span><span>– ${rs(bill.disc)}</span></div>` : ''}
+        ${bill.disc ? `<div class="rcp-line"><span>Discount</span><span>- ${rs(bill.disc)}</span></div>` : ''}
         ${bill.serviceChargeAmount ? `<div class="rcp-line"><span>Service Charge (5%)</span><span>${rs(bill.serviceChargeAmount)}</span></div>` : ''}
         ${bill.liquorTaxAmount ? `<div class="rcp-line"><span>Liquor VAT</span><span>${rs(bill.liquorTaxAmount)}</span></div>` : ''}
         ${taxBreakdownHTML}
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
         <hr class="rcp-hr">
-        ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${t.method}</span><span>${rs(t.amount)}</span></div>`).join('')}
+        ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${esc(t.method)}</span><span>${rs(t.amount)}</span></div>`).join('')}
         ${bill.change?`<div class="rcp-line"><span class="q">Change</span><span>${rs(bill.change)}</span></div>`:''}
         <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
     }
@@ -365,64 +389,457 @@
 
     function loadJsPDF() {
       return new Promise((resolve, reject) => {
-        if (window.jspdf) return resolve(window.jspdf);
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        script.onload = () => {
-          resolve(window.jspdf || window.umd?.jspdf);
-        };
-        script.onerror = () => reject(new Error('Failed to load jsPDF library'));
-        document.head.appendChild(script);
+        // jsPDF UMD sets window.jspdf = { jsPDF } in browsers
+        // Some builds also set window.jsPDF directly
+        function resolveJsPDF() {
+          if (window.jspdf && window.jspdf.jsPDF) return window.jspdf;
+          if (window.jsPDF) return { jsPDF: window.jsPDF };
+          return null;
+        }
+        const existing = resolveJsPDF();
+        if (existing) return resolve(existing);
+
+        function tryLoad(src, fallbackSrc) {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => {
+            const mod = resolveJsPDF();
+            if (mod) { resolve(mod); return; }
+            if (fallbackSrc) { tryLoad(fallbackSrc, null); }
+            else reject(new Error('jsPDF loaded but class not found on window'));
+          };
+          script.onerror = () => {
+            if (fallbackSrc) {
+              console.warn('[jsPDF] Local bundle failed, trying CDN fallback...');
+              tryLoad(fallbackSrc, null);
+            } else {
+              reject(new Error('Failed to load jsPDF (local and CDN both failed)'));
+            }
+          };
+          document.head.appendChild(script);
+        }
+
+        // Try local bundle first (no CDN dependency), fall back to CDN
+        tryLoad('assets/lib/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
       });
     }
 
     async function compileThermalPDF(bill) {
       const jspdfModule = await loadJsPDF();
       const { jsPDF } = jspdfModule;
+
+      const profile = bill.taxProfile || (window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular' });
+      const country = profile.country || 'IN';
+      const taxSystem = profile.tax_system || 'GST';
+      const isIreland = (country === 'IE');
+
+      // -- Layout constants (all in mm) ------------------------------
+      const W        = 88;          // paper width (88 mm thermal printer)
+      const PAD      = 6;           // left / right padding
+      const CW       = W - PAD * 2; // usable content width
       
-      const text = receiptText(bill);
-      const lines = text.split('\n');
-      
-      const lineHeight = 4.2;
-      const padding = 5;
-      const height = Math.max(100, lines.length * lineHeight + padding * 2 + 10);
-      
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [80, height]
-      });
-      
-      doc.setFont('courier', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(0, 0, 0);
-      
-      let y = padding + 4;
-      lines.forEach(line => {
-        if (line.toUpperCase().includes('TOTAL') || line.toUpperCase().startsWith('---') || line.toUpperCase().startsWith('===')) {
-          doc.setFont('courier', 'bold');
-        } else {
-          doc.setFont('courier', 'normal');
+      const BG       = [251, 250, 247]; // #fbfaf7 -- off-white receipt paper
+      const INK      = [22, 21, 28];   // #16151c -- near-black main text
+      const MUTED    = [107, 105, 96]; // #6b6960 -- grey for sub-lines
+      const META_C   = [74, 72, 66];   // #4a4842 -- meta rows
+
+      // Render function used for both measuring and drawing
+      function renderBill(doc, isMeasurePass) {
+        let y = 5; // top margin
+
+        function setFont(style, size) {
+          if (!isMeasurePass) {
+            doc.setFont('helvetica', style);
+            doc.setFontSize(size);
+          }
         }
+
+        function setTextColor(rgb) {
+          if (!isMeasurePass) {
+            doc.setTextColor(...rgb);
+          }
+        }
+
+        function setDrawColor(rgb) {
+          if (!isMeasurePass) {
+            doc.setDrawColor(...rgb);
+          }
+        }
+
+        function setLineWidth(width) {
+          if (!isMeasurePass) {
+            doc.setLineWidth(width);
+          }
+        }
+
+        function colorInk()   { setTextColor(INK); }
+        function colorMuted() { setTextColor(MUTED); }
+        function colorMeta()  { setTextColor(META_C); }
+
+        // Draw horizontal line (dashed)
+        function drawHr() {
+          setDrawColor([201, 198, 189]); // #c9c6bd
+          setLineWidth(0.25);
+          const dashLen = 1.5;
+          const gapLen = 1.2;
+          let x = PAD;
+          while (x < W - PAD) {
+            const end = Math.min(x + dashLen, W - PAD);
+            if (!isMeasurePass) {
+              doc.line(x, y + 2.5, end, y + 2.5);
+            }
+            x += dashLen + gapLen;
+          }
+          y += 5.5; // Y height of hr
+        }
+
+        // Draw thin horizontal line (dashed)
+        function drawHrThin() {
+          setDrawColor([220, 218, 212]); // #dcdaed
+          setLineWidth(0.2);
+          let xT = PAD;
+          while (xT < W - PAD) {
+            const end = Math.min(xT + 1.2, W - PAD);
+            if (!isMeasurePass) {
+              doc.line(xT, y + 2.2, end, y + 2.2);
+            }
+            xT += 1.2 + 1;
+          }
+          y += 4.5; // Y height of hr-thin
+        }
+
+        // Draw centered logo
+        const logoText = receiptProfile.name || 'Outlet';
+        setFont('bold', 15); // matches 20px
+        colorInk();
+        if (!isMeasurePass) {
+          doc.text(logoText, W / 2, y + 5.5, { align: 'center' });
+        }
+        y += 7.5;
+
+        // Sub lines (address, phone, etc.)
+        const subLinesData = [
+          receiptProfile.address,
+          receiptProfile.phone ? 'Phone ' + receiptProfile.phone : '',
+          (country === 'IN' && profile.state_code) ? 'State Code: ' + profile.state_code : '',
+          profile.tax_registration_no ? (profile.tax_system || 'GST') + ' No: ' + profile.tax_registration_no : ''
+        ].filter(Boolean);
+
+        setFont('normal', 8.5); // matches 11px
+        colorMuted();
+        subLinesData.forEach(text => {
+          const actualDoc = doc || new jsPDF();
+          const lines = actualDoc.splitTextToSize(text, CW);
+          lines.forEach(sl => {
+            if (!isMeasurePass) {
+              doc.text(sl, W / 2, y + 3, { align: 'center' });
+            }
+            y += 4.5;
+          });
+        });
+
+        // Separator
+        drawHr();
+
+        // Metadata rows
+        setFont('normal', 8.7); // matches 11.5px
+        colorMeta();
+        const metaRows = [
+          { left: bill.no, right: bill.time },
+          { left: 'Table:', right: bill.table }
+        ];
+        const custName = bill.customer || 'Walk-in';
+        if (custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
+          metaRows.push({ left: 'Customer:', right: custName });
+          if (bill.customerPhone) metaRows.push({ left: 'Phone:', right: bill.customerPhone });
+          if (bill.customerGst) metaRows.push({ left: (profile.tax_system || 'GST') + ' Reg:', right: bill.customerGst });
+        } else {
+          metaRows.push({ left: 'Customer:', right: 'Walk-in' });
+        }
+
+        metaRows.forEach(row => {
+          if (!isMeasurePass) {
+            doc.text(String(row.left), PAD, y + 3.5);
+            doc.text(String(row.right), W - PAD, y + 3.5, { align: 'right' });
+          }
+          y += 4.8;
+        });
+
+        // Separator
+        drawHr();
+
+        // Items
+        setFont('normal', 9.4); // matches 12.5px
+        bill.items.forEach(i => {
+          const catLabel  = i.taxCategory || i.tax_category;
+          const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
+          
+          const qtyStr = `${i.qty}\u00d7 `;
+          const nameStr = i.name + (isIreland ? ` (${rateLabel})` : '');
+          const priceStr = rs(i.price * i.qty);
+
+          const actualDoc = doc || new jsPDF();
+          const rightW = actualDoc.getTextWidth(priceStr) + 1;
+          const leftMax = CW - rightW;
+          const qtyW = actualDoc.getTextWidth(qtyStr);
+
+          // Word wrap nameStr
+          const words = nameStr.split(' ');
+          let firstLine = '';
+          let wordIndex = 0;
+          
+          while (wordIndex < words.length) {
+            const testLine = firstLine ? firstLine + ' ' + words[wordIndex] : words[wordIndex];
+            const testW = actualDoc.getTextWidth(testLine);
+            if (testW > leftMax - qtyW) {
+              break;
+            }
+            firstLine = testLine;
+            wordIndex++;
+          }
+          
+          if (!firstLine && words.length > 0) {
+            firstLine = words[0];
+            wordIndex = 1;
+          }
+          
+          const remainingText = words.slice(wordIndex).join(' ');
+
+          if (!isMeasurePass) {
+            // Draw Qty (Muted)
+            doc.setTextColor(...MUTED);
+            doc.text(qtyStr, PAD, y + 4);
+            // Draw Name (Ink)
+            doc.setTextColor(...INK);
+            doc.text(firstLine, PAD + qtyW, y + 4);
+            // Draw Price (Ink)
+            doc.text(priceStr, W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5; // row height for first line
+
+          if (remainingText) {
+            const remainingLines = actualDoc.splitTextToSize(remainingText, leftMax);
+            remainingLines.forEach(line => {
+              if (!isMeasurePass) {
+                doc.setTextColor(...INK);
+                doc.text(line, PAD, y + 3.5);
+              }
+              y += 4.5;
+            });
+          }
+        });
+
+        // Separator
+        drawHr();
+
+        // Totals
+        setFont('normal', 9.4); // matches 12.5px
+        colorInk();
         
-        const isCenter = line.startsWith('   ') || line.includes('dining with us') || line.includes('Powered by') || line === (receiptProfile.name || 'Outlet');
-        if (isCenter) {
-          const textWidth = doc.getTextWidth(line.trim());
-          const x = (80 - textWidth) / 2;
-          doc.text(line.trim(), x, y);
+        const totalsRows = [
+          { left: 'Subtotal', right: rs(bill.sub) }
+        ];
+        if (bill.disc) totalsRows.push({ left: 'Discount', right: '\u2013 ' + rs(bill.disc) });
+        if (bill.serviceChargeAmount) totalsRows.push({ left: 'Service Charge (5%)', right: rs(bill.serviceChargeAmount) });
+        if (bill.liquorTaxAmount) totalsRows.push({ left: 'Liquor VAT', right: rs(bill.liquorTaxAmount) });
+
+        totalsRows.forEach(row => {
+          if (!isMeasurePass) {
+            doc.text(row.left, PAD, y + 4);
+            doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5;
+        });
+
+        // Tax breakdown
+        if (profile.gst_scheme === 'composition' && country === 'IN') {
+          setFont('italic', 8.2);
+          colorMuted();
+          const msg = 'Composition taxable person, not eligible to collect tax';
+          const actualDoc = doc || new jsPDF();
+          const scLines = actualDoc.splitTextToSize(msg, CW);
+          scLines.forEach(sl => {
+            if (!isMeasurePass) {
+              doc.text(sl, W / 2, y + 3, { align: 'center' });
+            }
+            y += 4.5;
+          });
         } else {
-          doc.text(line, padding, y);
+          const summary = bill.taxSummary || [];
+          if (summary.length > 0) {
+            drawHrThin();
+            if (country === 'IN') {
+              setFont('normal', 9.4);
+              colorInk();
+              const halfGst = Math.round((bill.gst || 0) / 2);
+              const gstLines = [
+                { left: 'CGST (2.5%)', right: rs(halfGst) },
+                { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
+              ];
+              gstLines.forEach(row => {
+                if (!isMeasurePass) {
+                  doc.text(row.left, PAD, y + 4);
+                  doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+                }
+                y += 5.5;
+              });
+              
+              setFont('normal', 8.2);
+              colorMuted();
+              if (!isMeasurePass) {
+                doc.text('SAC 9963', PAD, y + 3);
+              }
+              y += 4.5;
+            } else {
+              setFont('bold', 8.2);
+              colorMuted();
+              if (!isMeasurePass) {
+                doc.text('VAT Breakout', PAD, y + 3);
+              }
+              y += 4.5;
+
+              setFont('normal', 8.2);
+              summary.forEach(band => {
+                const leftText = 'Rate ' + band.percent + '%';
+                const rightText = 'Net ' + rs(band.net) + ' | VAT ' + rs(band.tax);
+                if (!isMeasurePass) {
+                  doc.text(leftText, PAD, y + 3);
+                  doc.text(rightText, W - PAD, y + 3, { align: 'right' });
+                }
+                y += 4.5;
+              });
+            }
+          } else if (bill.gst > 0) {
+            drawHrThin();
+            setFont('normal', 9.4);
+            colorInk();
+            const halfGst = Math.round((bill.gst || 0) / 2);
+            const gstLines = [
+              { left: 'CGST (2.5%)', right: rs(halfGst) },
+              { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
+            ];
+            gstLines.forEach(row => {
+              if (!isMeasurePass) {
+                doc.text(row.left, PAD, y + 4);
+                doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+              }
+              y += 5.5;
+            });
+          }
         }
-        y += lineHeight;
-      });
-      
+
+        // Total
+        setFont('bold', 12.75); // matches 17px
+        colorInk();
+        if (!isMeasurePass) {
+          doc.text('TOTAL', PAD, y + 5.5);
+          doc.text(rs(bill.grand), W - PAD, y + 5.5, { align: 'right' });
+        }
+        y += 8.5;
+
+        // Separator
+        drawHr();
+
+        // Tenders
+        setFont('normal', 9.4);
+        colorInk();
+        const tenders = bill.tenders || [];
+        if (tenders.length > 0) {
+          tenders.forEach(t => {
+            if (!isMeasurePass) {
+              doc.text(t.method, PAD, y + 4);
+              doc.text(rs(t.amount), W - PAD, y + 4, { align: 'right' });
+            }
+            y += 5.5;
+          });
+        } else {
+          if (!isMeasurePass) {
+            doc.text('Cash', PAD, y + 4);
+            doc.text(rs(bill.grand), W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5;
+        }
+
+        if (bill.change) {
+          if (!isMeasurePass) {
+            doc.text('Change', PAD, y + 4);
+            doc.text(rs(bill.change), W - PAD, y + 4, { align: 'right' });
+          }
+          y += 5.5;
+        }
+
+        // Footer
+        y += 4; // margin-top before footer
+        setFont('normal', 8.5); // matches 11px
+        colorMuted();
+        if (!isMeasurePass) {
+          doc.text('Thank you for dining with us!', W / 2, y + 3.5, { align: 'center' });
+        }
+        y += 4.5;
+        setFont('bold', 8.5); // matches 11px
+        colorInk();
+        if (!isMeasurePass) {
+          doc.text('Powered by RestroSuite', W / 2, y + 3.5, { align: 'center' });
+        }
+        y += 9.5; // margin-bottom
+
+        return y;
+      }
+
+      // Pass 1: Measure height of the receipt content
+      const totalH = renderBill(null, true);
+
+      // Pass 2: Generate PDF with exact height
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, totalH] });
+
+      // Draw background color
+      doc.setFillColor(...BG);
+      doc.rect(0, 0, W, totalH, 'F');
+
+      // Draw content
+      renderBill(doc, false);
+
       return doc.output('datauristring');
     }
 
+
+    // Double-send guard: prevents auto-send + manual click from both firing for the same bill
+    const _waSendingBills = new Set();
+
     async function shareReceiptViaWhatsApp(bill) {
+      if (_waSendingBills.has(bill.no)) return; // already sending this bill
+      _waSendingBills.add(bill.no);
+      try { await _doShareReceiptViaWhatsApp(bill); } finally { _waSendingBills.delete(bill.no); }
+    }
+
+    async function _doShareReceiptViaWhatsApp(bill) {
       let phone = bill.customerPhone;
       if (!phone || phone.trim() === '' || phone === 'null') {
-        phone = prompt("Enter customer's WhatsApp number (with country code, e.g. 353852258004):");
+        // Use a proper modal dialog instead of the deprecated browser prompt()
+        phone = await new Promise(resolve => {
+          const ov = document.createElement('div');
+          ov.className = 'rs-overlay';
+          ov.innerHTML = `<div class="rs-modal sm">
+            <div class="rs-mhead"><span class="rs-mtitle"><i class="fa-brands fa-whatsapp"></i> WhatsApp Number</span><button class="rs-mclose icon-btn"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="rs-mbody" style="padding:18px 20px 8px">
+              <label class="field-label">Customer WhatsApp (with country code)</label>
+              <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric" placeholder="e.g. 919876543210" style="margin-top:6px" autocomplete="tel">
+              <p style="font-size:12px;color:var(--text-mute);margin-top:8px">Include country code without +. Example: 91 for India.</p>
+            </div>
+            <div class="rs-mfoot"><button class="rs-mcancel btn-ghost">Cancel</button><button class="rs-mok btn-primary"><i class="fa-brands fa-whatsapp"></i> Send</button></div>
+          </div>`;
+          document.body.appendChild(ov);
+          const inp = ov.querySelector('#wa-phone-input');
+          const ok  = ov.querySelector('.rs-mok');
+          const cancel = ov.querySelector('.rs-mcancel');
+          const close  = ov.querySelector('.rs-mclose');
+          inp.focus();
+          const finish = val => { document.body.removeChild(ov); resolve(val); };
+          ok.onclick     = () => finish(inp.value.trim() || null);
+          cancel.onclick = () => finish(null);
+          close.onclick  = () => finish(null);
+          inp.onkeydown  = e => { if(e.key==='Enter') ok.click(); if(e.key==='Escape') finish(null); };
+        });
         if (phone === null) return; // User cancelled
         phone = phone.replace(/\D/g, '');
         if (phone) {
@@ -446,119 +863,78 @@
       const settings = window.RS_SETTINGS || {};
       const format = settings.set_whatsapp_bill_format || 'Text receipt';
       const isPdf = (format === 'Thermal PDF receipt');
+      console.log('[WhatsApp] bill format setting:', format, '| isPdf:', isPdf);
 
-      const steps = ['Preparing receipt document...', 'Connecting to WhatsApp Gateway...', 'Delivering billing message...'];
-      if (window.RS_ProgressOverlay) {
-        window.RS_ProgressOverlay.show('Sending WhatsApp Bill', steps);
-        window.RS_ProgressOverlay.update(0, 15);
-      }
-
-      let text = receiptText(bill);
-      let pdfBase64 = null;
-
-      try {
-        if (isPdf) {
-          const pdfDataUrl = await compileThermalPDF(bill);
-          pdfBase64 = pdfDataUrl.split(',')[1];
-        }
-        
-        if (window.RS_ProgressOverlay) {
-          window.RS_ProgressOverlay.update(1, 45);
-        }
-        
-        let gatewayReady = false;
-        if (window.RS_DB && RS_DB.mode === 'local') {
-          gatewayReady = true;
-        } else {
-          try {
-            if (window.RS_API && typeof RS_API.data === 'function') {
-              if (RS_API.zeroCostLaunchMode) {
-                gatewayReady = true;
-              } else {
-                const gatewayStatus = await RS_API.data({ operation: 'gateway_status' });
-                if (gatewayStatus && gatewayStatus.status === 'ready') {
-                  gatewayReady = true;
-                }
-              }
-            }
-          } catch(e) {
-            console.warn('Failed to check gateway status via API:', e.message);
-          }
-        }
-
-        if (window.RS_ProgressOverlay) {
-          window.RS_ProgressOverlay.update(2, 75);
-        }
-
-        if (gatewayReady) {
-          const payload = {
-            operation: 'gateway_send',
-            phone: phone,
-            message: text,
-            orderId: bill.no
-          };
-          if (isPdf && pdfBase64) {
-            payload.pdfData = pdfBase64;
-            payload.filename = `receipt-${bill.no}.pdf`;
-          }
-          
-          if (window.RS_API && typeof RS_API.data === 'function') {
-            const res = await RS_API.data(payload);
-            if (res && res.error) {
-              throw new Error(res.error);
-            }
-            if (window.RS_ProgressOverlay) {
-              window.RS_ProgressOverlay.update(3, 100);
-              window.RS_ProgressOverlay.hide();
-            }
-            RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
-            return;
-          }
-        }
-        
-        throw new Error('Gateway not ready or API offline');
-
-      } catch(err) {
-        console.warn('Gateway send failed, falling back to manual redirect:', err.message);
-        if (window.RS_ProgressOverlay) {
-          window.RS_ProgressOverlay.hide();
-        }
-        
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        let phoneVal = phone || '';
-        phoneVal = phoneVal.replace(/\D/g, '');
-        
+      // Fire-and-forget: runs in background, with offline queue fallback.
+      (async () => {
         try {
-          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            await navigator.clipboard.writeText(text);
-          }
-        } catch(clipErr) {
-          console.warn('Clipboard write failed:', clipErr.message);
-        }
+          const text = receiptText(bill);
+          let pdfBase64 = null;
 
-        const encodedText = encodeURIComponent(text);
-        let waUrl = '';
-        if (isMobile) {
-          waUrl = phoneVal ? `https://wa.me/${phoneVal}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`;
-        } else {
-          waUrl = phoneVal ? `https://web.whatsapp.com/send?phone=${phoneVal}&text=${encodedText}` : `https://web.whatsapp.com/send?text=${encodedText}`;
+          if (isPdf) {
+            console.log('[WhatsApp BG] Generating PDF...');
+            const pdfDataUrl = await compileThermalPDF(bill);
+            pdfBase64 = pdfDataUrl ? (pdfDataUrl.split(',')[1] || null) : null;
+            if (!pdfBase64) throw new Error('PDF generation failed -- check jsPDF library.');
+            console.log('[WhatsApp BG] PDF ready, base64 length:', pdfBase64.length);
+          }
+
+          if (!navigator.onLine) throw new Error('offline');
+          if (!window.RS_API || typeof RS_API.data !== 'function') throw new Error('WhatsApp API not available');
+
+          const sendPayload = { operation: 'gateway_send', phone, message: text, orderId: bill.no };
+          if (isPdf && pdfBase64) {
+            sendPayload.pdfData = pdfBase64;
+            sendPayload.filename = `receipt-${bill.no}.pdf`;
+          }
+          console.log('[WhatsApp BG] Sending. hasPdf:', !!(isPdf && pdfBase64));
+
+          const sendResult = await RS_API.data(sendPayload).catch(err => { throw err; });
+          if (sendResult && sendResult.error) throw new Error(sendResult.error);
+
+          RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
+        } catch(err) {
+          console.warn('[WhatsApp BG] Send failed:', err.message);
+          // Queue for retry when back online
+          const isOffline = err.message === 'offline' || !navigator.onLine;
+          const WA_QUEUE_KEY = 'rs:wa_queue';
+          try {
+            const q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]');
+            q.push({ phone, billNo: bill.no, message: receiptText(bill), queuedAt: Date.now() });
+            localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(q));
+            if (isOffline) {
+              RS.toast('Offline -- receipt queued, will send when back online', 'fa-clock');
+            } else {
+              RS.toast('WhatsApp send failed -- queued for retry', 'fa-clock');
+            }
+          } catch(qErr) {
+            RS.toast('WhatsApp: ' + (err.message || 'Send failed'), 'fa-triangle-exclamation');
+          }
         }
-        window.open(waUrl, '_blank', 'noopener,noreferrer');
-        RS.toast('WhatsApp manual receipt ready', 'fa-whatsapp');
-      }
+      })();
+      // Return immediately -- no blocking, no spinner
     }
 
     function showReceipt(bill){
       const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`;
+      const autoSendSettings = window.RS_SETTINGS || {};
+      const autoSendOn = autoSendSettings.set_auto_send_receipts !== false
+                      && autoSendSettings.set_auto_send_receipts !== 'false';
+      const hasPhone = bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null';
+      // Always show the WhatsApp button \u2014 sending is background so cashier can resend if needed.
+      const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>`;
       RSModal.open({
         title:'Bill settled', sub:`${bill.no} \u00b7 ${rs(bill.grand)}`, icon:'fa-circle-check', size:'sm',
         body:`<div class="receipt-paper">${receiptHTML(bill)}</div>`,
-        foot:`<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+        foot:`${waBtn}
               <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
         onMount(modal, close){
           modal.querySelector('#rc-print').onclick = ()=> RSPrint(printHtml, 'Receipt '+bill.no);
-          modal.querySelector('#rc-wa').onclick = ()=> RSReceipt.share(bill);
+          const waEl = modal.querySelector('#rc-wa');
+          if (waEl && waEl.tagName === 'BUTTON') {
+            waEl.onclick = ()=> RSReceipt.share(bill);
+          }
           modal.querySelector('#rc-new').onclick = close;
         }
       });
@@ -723,11 +1099,11 @@
       if (backdrop) backdrop.style.display = 'none';
     }
 
-    /* ─── Draggable drawer system ─────────────────────────────────────────────
+    /* --- Draggable drawer system ---------------------------------------------
        Drag handle = .csd-header  (the title bar of each drawer)
        Position saved in localStorage as rs_drawer_pos_<id>  { left, top }
        On restore the saved left/top override the CSS right/bottom defaults.
-    ──────────────────────────────────────────────────────────────────────── */
+    ------------------------------------------------------------------------ */
     function makeDrawerDraggable(drawer) {
       if (!drawer) return;
       const id     = drawer.id;
@@ -737,7 +1113,7 @@
       const STORAGE_KEY = 'rs_drawer_pos_' + id;
       let isDragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
 
-      /* ── Restore saved position ── */
+      /* -- Restore saved position -- */
       function applyStoredPos() {
         if (window.innerWidth <= 1024) {
           drawer.style.left = '';
@@ -845,7 +1221,7 @@
       observer.observe(drawer, { attributes: true, attributeFilter: ['class'] });
     }
 
-    /* ─── Resizable drawer system (v2 – transform:scale) ────────────────────────
+    /* --- Resizable drawer system (v2 - transform:scale) ------------------------
        HOW IT WORKS
        ════════════
        1.  A  .csd-scale-wrap  div is injected inside the drawer, wrapping the
@@ -854,10 +1230,10 @@
        2.  `transform: scale(ratio)` on the wrap shrinks/grows everything visually.
        3.  The outer drawer is set to  BASE_W × ratio  (width) and
            BASE_H × ratio  (height, measured after first open).
-       4.  `overflow: hidden` on the drawer acts as a perfect viewport — no clip,
+       4.  `overflow: hidden` on the drawer acts as a perfect viewport -- no clip,
            no scrollbar, no cut content.
        5.  Sizes saved to localStorage as rs_drawer_size_<id> { w, h }.
-    ─────────────────────────────────────────────────────────────────────────── */
+    --------------------------------------------------------------------------- */
     function makeDrawerResizable(drawer) {
       if (!drawer) return;
       const id       = drawer.id;
@@ -866,7 +1242,7 @@
       const MIN_W = 140, MAX_W = 560;
       const MIN_H = 100, MAX_H = 800;
 
-      /* ── 1.  Wrap header + body in a scale container ── */
+      /* -- 1.  Wrap header + body in a scale container -- */
       const hEl = drawer.querySelector('.csd-header');
       const bEl = drawer.querySelector('.csd-body');
       if (!hEl || !bEl) return;
@@ -883,7 +1259,7 @@
       wrap.appendChild(hEl);
       wrap.appendChild(bEl);
 
-      /* ── 2.  Inject resize handles ── */
+      /* -- 2.  Inject resize handles -- */
       [
         ['csd-rh-e',  'e' ],
         ['csd-rh-s',  's' ],
@@ -897,11 +1273,11 @@
         drawer.appendChild(el);
       });
 
-      /* ── 3.  Measure natural content height ────────────────────────────────
+      /* -- 3.  Measure natural content height --------------------------------
          Called once after the first open.
          Strips every height constraint (max-height, transform, explicit height)
          so scrollHeight gives the TRUE content height, not a clipped value.
-      ──────────────────────────────────────────────────────────────────────── */
+      ------------------------------------------------------------------------ */
       let BASE_H = null;
       function measureBaseH() {
         if (BASE_H !== null) return;
@@ -935,7 +1311,7 @@
         wrap.style.transform = saved.wrapT;
       }
 
-      /* ── 4.  Core: apply a scale ratio to the whole drawer ── */
+      /* -- 4.  Core: apply a scale ratio to the whole drawer -- */
       function applySize(targetW, targetH) {
         if (window.innerWidth <= 1024) {
           drawer.style.width = '';
@@ -963,7 +1339,7 @@
         wrap.style.transform = `scale(${scale})`;
 
         if (targetH != null) {
-          // Explicit height drag — respect user's chosen height
+          // Explicit height drag -- respect user's chosen height
           const h = Math.min(Math.max(targetH, MIN_H), MAX_H);
           drawer.style.height  = h + 'px';
           // Give the wrap enough internal height (in content space) to fill the viewport
@@ -974,15 +1350,15 @@
           const h = Math.round(BASE_H * scale);
           drawer.style.height  = h + 'px';
           wrap.style.height    = BASE_H + 'px';   // wrap stays at unscaled content height
-          bEl.style.overflowY  = 'auto';           // auto not hidden — denominations never vanish
+          bEl.style.overflowY  = 'auto';           // auto not hidden -- denominations never vanish
         } else {
-          // BASE_H not yet measured — let drawer auto-size this render
+          // BASE_H not yet measured -- let drawer auto-size this render
           drawer.style.height  = '';
           wrap.style.height    = '';
         }
       }
 
-      /* ── 5.  Save / restore ── */
+      /* -- 5.  Save / restore -- */
       function saveSize() {
         try {
           localStorage.setItem(SIZE_KEY, JSON.stringify({
@@ -1014,7 +1390,7 @@
       // Add resize window listener to reset sizing if view shrinks
       window.addEventListener('resize', restoreSize);
 
-      /* ── 6.  Resize drag tracking ── */
+      /* -- 6.  Resize drag tracking -- */
       let isResizing = false, rDir = '';
       let rStartX, rStartY, rStartW, rStartH, rStartLeft;
 
@@ -1100,7 +1476,7 @@
 
 
     function refreshPaymentPanel(opts){
-      // opts.allowOpen = true  → only set when user EXPLICITLY clicks a payment method btn
+      // opts.allowOpen = true  -> only set when user EXPLICITLY clicks a payment method btn
       // Without it, tab-switches and cart re-renders just sync state without popping the drawer
       const allowOpen = opts && opts.allowOpen;
       console.log('[DEBUG] refreshPaymentPanel entered. paymentState.method =', paymentState.method, 'allowOpen =', allowOpen);
@@ -1243,7 +1619,7 @@
         };
       });
 
-      // ── Initialise drag-to-reposition + resize for both drawers ──
+      // -- Initialise drag-to-reposition + resize for both drawers --
       makeDrawerDraggable(document.getElementById('cash-drawer'));
       makeDrawerDraggable(document.getElementById('split-drawer'));
       makeDrawerResizable(document.getElementById('cash-drawer'));
@@ -1315,7 +1691,7 @@
         }
 
         const bill = {
-          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}),
+          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true,timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
           table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
           tenders: customTenders || [{ method: payMethod, amount: receivedVal }], change: changeVal || 0,
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
@@ -1332,6 +1708,8 @@
             taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge };
           RS.BILLS.unshift(billRow);
           if (RS.saveOne) await RS.saveOne('bills',billRow);
+          // Deduct recipe ingredients from inventory (non-blocking)
+          if (RS.deductInventoryForBill) RS.deductInventoryForBill(billRow);
           const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
           if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
             RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
@@ -1348,6 +1726,19 @@
         resetCustomerFields();
         resetPayment();
         showReceipt(bill);
+        // Android bridge: haptic + audio feedback on successful payment
+        document.dispatchEvent(new CustomEvent('rs:bill-paid', { detail: { total: bill.grand || bill.amount || '' } }));
+
+        // Auto-send WhatsApp receipt if enabled in settings
+        try {
+          const autoSendSettings = window.RS_SETTINGS || {};
+          const autoSendEnabled = autoSendSettings.set_auto_send_receipts !== false && autoSendSettings.set_auto_send_receipts !== 'false';
+          if (autoSendEnabled && bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null') {
+            setTimeout(() => { shareReceiptViaWhatsApp(bill); }, 800);
+          }
+        } catch(autoSendErr) {
+          console.warn('Auto-send WhatsApp failed:', autoSendErr.message);
+        }
 
         if (window.RS_DB) {
           try {
@@ -1587,7 +1978,7 @@
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
       const tok = RS.seedToken();
       const kotInner = `<div class="kot-h"><span class="kt">KOT ${tok}</span><span style="font-weight:700">${cust.table}</span></div>
-        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'})} · ${totals.count} items</div>
+        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'})} · ${totals.count} items</div>
         ${totals.items.map(i=>`<div class="kot-item"><span class="kq">${i.qty}×</span><span>${i.name}</span></div>`).join('')}`;
       RSModal.open({
         title:'Kitchen ticket', sub:'Token '+tok, icon:'fa-fire', size:'sm',
@@ -1767,7 +2158,7 @@
               gst: r.customerGst || '',
               count: (r.items || []).reduce((sum, item) => sum + (item.qty || 1), 0),
               total: r.total || 0,
-              time: r.time || new Date().toLocaleTimeString('en-IN', {hour: 'numeric', minute: '2-digit', hour12: true}),
+              time: r.time || new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN', {hour: 'numeric', minute: '2-digit', hour12: true, timeZone: window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
               orderType: r.orderType || orderTypeKey,
               deliveryAddress: r.deliveryAddress || '',
               deliveryCharge: r.deliveryCharge || '',
@@ -1800,7 +2191,7 @@
         gst: cust.gst, 
         count: totals.count, 
         total: totals.grand, 
-        time: new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}),
+        time: new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
         orderType: orderTypeKey
       };
       
@@ -2279,7 +2670,7 @@
       if (btnSaveNew) {
         btnSaveNew.addEventListener('click', async () => {
           const name = nameInput.value.trim();
-          const phone = phoneInput.value.trim();
+          const phone = (window.RS_getFullPhoneNumber ? window.RS_getFullPhoneNumber(phoneInput) : phoneInput.value).trim();
           if (!name || !phone) {
             RS.toast('Name and phone are required', 'fa-circle-exclamation');
             return;
@@ -2910,7 +3301,7 @@
               syncDeliveryFieldsFromDraft(null);
             }
           } else {
-            // No DB at all — use localStorage per-tab snapshot
+            // No DB at all -- use localStorage per-tab snapshot
             lsApplyTabCart('Delivery');
             syncDeliveryFieldsFromDraft(null);
           }
@@ -2939,7 +3330,7 @@
               lsApplyTabCart('Takeaway');
             }
           } else {
-            // No DB at all — use localStorage per-tab snapshot
+            // No DB at all -- use localStorage per-tab snapshot
             lsApplyTabCart('Takeaway');
           }
           

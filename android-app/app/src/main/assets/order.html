@@ -399,6 +399,7 @@
   // ── URL PARAMS ──
   const params = new URLSearchParams(location.search);
   const slug  = params.get('tenant') || params.get('outlet') || '';
+  function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
   const tNum  = params.get('table') || '';
 
   function slugToName(s){ return s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
@@ -413,8 +414,8 @@
     const rest = parts.slice(1).join(' ');
     
     document.getElementById('rest-name').innerHTML = 
-      '<span class="logo-doppio">' + first + '</span>' + 
-      (rest ? '<span class="logo-cafe">' + rest + '</span>' : '');
+      '<span class="logo-doppio">' + escHtml(first) + '</span>' + 
+      (rest ? '<span class="logo-cafe">' + escHtml(rest) + '</span>' : '');
       
     document.getElementById('hero-sub').textContent = 'Order directly from your table at ' + nameVal + '. Fresh and fast!';
   }
@@ -613,14 +614,14 @@
     grid.innerHTML = list.map(function(item){
       var inC = cart.find(function(c){ return c.name===item.name; });
       var qty = inC ? inC.qty : 0;
-      var sn  = item.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return '<div class="card" onclick="addItem(\''+sn+'\')">'+
+      var sn  = escHtml(item.name);
+      return '<div class="card" onclick="addItem(\''+sn+'\'">'+
         '<div class="card-bar"></div>'+
-        (item.image ? '<img class="card-img show" src="'+item.image+'" alt="'+item.name+'" loading="lazy">' : '')+
+        (item.image ? '<img class="card-img show" src="'+escHtml(item.image)+'" alt="'+escHtml(item.name)+'" loading="lazy">' : '')+
         (item.bestseller ? '<span class="best-tag">Best Seller</span>' : '')+
         '<div class="card-body">'+
-          '<div class="card-name">'+item.name+'</div>'+
-          (item.description ? '<div class="card-desc">'+item.description+'</div>' : '')+
+          '<div class="card-name">'+escHtml(item.name)+'</div>'+
+          (item.description ? '<div class="card-desc">'+escHtml(item.description)+'</div>' : '')+
           '<div class="card-footer">'+
             '<span class="card-price">'+(window.currencySymbol || '₹')+item.price+'</span>'+
             (qty>0
@@ -691,10 +692,10 @@
     var el = document.getElementById('cart-list');
     if(!cart.length){ el.innerHTML='<div class="cart-empty"><i class="fa-solid fa-basket-shopping"></i><p>Cart is empty</p></div>'; return; }
     el.innerHTML = cart.map(function(item){
-      var sn = item.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var sn = escHtml(item.name);
       return '<div class="cart-row">'+
         '<div class="cart-info">'+
-          '<div class="cart-name">'+item.name+'</div>'+
+          '<div class="cart-name">'+escHtml(item.name)+'</div>'+
           '<div class="cart-unit">'+(window.currencySymbol || '₹')+item.price+' each</div>'+
         '</div>'+
         '<div class="cart-ctrl">'+
@@ -751,7 +752,7 @@
     document.getElementById('r-id').textContent = 'Order ID: '+order.orderId;
     document.getElementById('r-total').textContent = (window.currencySymbol || '₹')+order.total;
     document.getElementById('r-items').innerHTML = order.items.map(function(i){
-      return '<div class="r-item"><span>'+i.name+' x'+i.qty+'</span><span>'+(window.currencySymbol || '₹')+(i.price*i.qty)+'</span></div>';
+      return '<div class="r-item"><span>'+escHtml(i.name)+' x'+i.qty+'</span><span>'+(window.currencySymbol || '₹')+(i.price*i.qty)+'</span></div>';
     }).join('');
     document.getElementById('success').classList.add('on');
     confetti();
