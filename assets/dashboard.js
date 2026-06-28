@@ -2657,8 +2657,14 @@
       const name = t.name || t.tenant_name || t.slug || 'Unknown';
       const slug = t.slug || t.tenant_slug || '';
       const isPending = statusKey === 'pending';
+      const isSuspended = statusKey === 'suspended';
       const approveBtn = isPending
-        ? `<button class="btn btn-sm quick-approve-btn" style="background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Quick-approve this workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-check"></i> Approve</button>`
+        ? `<button class="btn btn-sm quick-approve-btn" style="background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Approve this workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-check"></i> Approve</button>`
+        : '';
+      const suspendBtn = !isPending
+        ? isSuspended
+          ? `<button class="btn btn-sm quick-reactivate-btn" style="background:rgba(34,197,94,0.08);color:#16a34a;border:1px solid rgba(34,197,94,0.2);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Reactivate workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-rotate-left"></i> Reactivate</button>`
+          : `<button class="btn btn-sm quick-suspend-btn" style="background:rgba(239,68,68,0.06);color:#dc2626;border:1px solid rgba(239,68,68,0.18);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Suspend workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-ban"></i> Suspend</button>`
         : '';
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
@@ -2670,8 +2676,8 @@
         <td>
           <div class="row-actions" style="gap:5px">
             ${approveBtn}
-            <button class="icon-act copy-login-btn" title="Copy tenant login URL" data-slug="${_e(slug)}" style="font-size:13px"><i class="fa-solid fa-link"></i></button>
-            <button class="icon-act manage-tenant-btn" title="Manage workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-gear"></i></button>
+            ${suspendBtn}
+            <button class="icon-act manage-tenant-btn" title="Manage workspace" data-tid="${_e(t.id||'')}" style="font-size:13px"><i class="fa-solid fa-gear"></i></button>
           </div>
         </td>
       </tr>`;
@@ -2700,17 +2706,48 @@
       });
     });
 
-    // Bind copy-login buttons
-    tbody.querySelectorAll('.copy-login-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    // Bind suspend buttons
+    tbody.querySelectorAll('.quick-suspend-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const slug = btn.getAttribute('data-slug');
-        const origin = location.origin + location.pathname.replace(/\/[^/]*$/, '');
-        const url = `${origin}/login.html?tenant=${encodeURIComponent(slug)}`;
+        const tid = btn.getAttribute('data-tid');
+        const t = _cachedTenants.find(x => String(x.id) === String(tid));
+        if (!t) return;
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
         try {
-          navigator.clipboard.writeText(url).then(() => toast('Login URL copied to clipboard!', 'fa-link'));
+          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'suspended',
+            username: t.username, plan_code: t.plan_code || 'starter',
+            subscription_status: t.subscription_status || 'active',
+            allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
+          t.status = 'suspended';
+          toast(`${t.name || 'Workspace'} suspended.`, 'fa-ban');
+          renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
         } catch (err) {
-          prompt('Copy tenant login URL:', url);
+          toast('Suspend failed: ' + (err.message || err), 'fa-circle-exclamation');
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-ban"></i> Suspend';
+        }
+      });
+    });
+
+    // Bind reactivate buttons
+    tbody.querySelectorAll('.quick-reactivate-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-tid');
+        const t = _cachedTenants.find(x => String(x.id) === String(tid));
+        if (!t) return;
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'approved',
+            username: t.username, plan_code: t.plan_code || 'starter',
+            subscription_status: t.subscription_status || 'active',
+            allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
+          t.status = 'approved';
+          toast(`${t.name || 'Workspace'} reactivated!`, 'fa-rotate-left');
+          renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
+        } catch (err) {
+          toast('Reactivate failed: ' + (err.message || err), 'fa-circle-exclamation');
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Reactivate';
         }
       });
     });
@@ -2966,6 +3003,28 @@
           }
         }
       });
+
+      // Reset to Account tab
+      document.querySelectorAll('.tmtab').forEach((tb, i) => {
+        tb.style.color = i === 0 ? 'var(--orange)' : 'var(--text-mute)';
+        tb.style.borderBottomColor = i === 0 ? 'var(--orange)' : 'transparent';
+      });
+      document.querySelectorAll('.tm-panel').forEach((p, i) => {
+        p.style.display = i === 0 ? 'flex' : 'none';
+      });
+
+      // Wire copy-login button in modal header
+      const copyLoginBtn = document.getElementById('manage-copy-login-btn');
+      if (copyLoginBtn) {
+        const slug = (tenant.slug || tenant.username || '').toLowerCase().replace(/\s+/g, '-');
+        copyLoginBtn.onclick = () => {
+          const origin = location.origin + location.pathname.replace(/\/[^\/]*$/, '');
+          const url = `${origin}/login.html?tenant=${encodeURIComponent(slug)}`;
+          navigator.clipboard.writeText(url)
+            .then(() => toast('Login URL copied!', 'fa-link'))
+            .catch(() => prompt('Copy tenant login URL:', url));
+        };
+      }
 
       modal.classList.add('active');
     } catch (err) {
@@ -3265,6 +3324,77 @@
             }
           }
         );
+      });
+    }
+
+    // ── Tab switching ──────────────────────────────────────────
+    document.querySelectorAll('.tmtab').forEach(tab => {
+      if (!tab.dataset.listenerBound) {
+        tab.dataset.listenerBound = 'true';
+        tab.addEventListener('click', () => {
+          const target = tab.getAttribute('data-tmtab');
+          document.querySelectorAll('.tmtab').forEach(t => {
+            const active = t.getAttribute('data-tmtab') === target;
+            t.style.color = active ? 'var(--orange)' : 'var(--text-mute)';
+            t.style.borderBottomColor = active ? 'var(--orange)' : 'transparent';
+          });
+          document.querySelectorAll('.tm-panel').forEach(p => {
+            p.style.display = p.id === `tm-panel-${target}` ? 'flex' : 'none';
+          });
+        });
+      }
+    });
+
+    // ── Select All / Clear All (Features tab) ─────────────────
+    const selAll = document.getElementById('manage-select-all-tabs');
+    const clrAll = document.getElementById('manage-deselect-all-tabs');
+    if (selAll && !selAll.dataset.listenerBound) {
+      selAll.dataset.listenerBound = 'true';
+      selAll.addEventListener('click', () => {
+        document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]').forEach(cb => {
+          cb.checked = true;
+          const card = cb.closest('label');
+          if (card) { card.style.borderColor = 'rgba(252,128,25,0.45)'; card.style.background = 'rgba(252,128,25,0.06)'; }
+        });
+      });
+    }
+    if (clrAll && !clrAll.dataset.listenerBound) {
+      clrAll.dataset.listenerBound = 'true';
+      clrAll.addEventListener('click', () => {
+        document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]').forEach(cb => {
+          cb.checked = false;
+          const card = cb.closest('label');
+          if (card) { card.style.borderColor = 'var(--stroke)'; card.style.background = 'var(--panel)'; }
+        });
+      });
+    }
+
+    // ── Save Features button ───────────────────────────────────
+    const saveFeaturesBtn = document.getElementById('save-tenant-features-btn');
+    if (saveFeaturesBtn && !saveFeaturesBtn.dataset.listenerBound) {
+      saveFeaturesBtn.dataset.listenerBound = 'true';
+      saveFeaturesBtn.addEventListener('click', async () => {
+        try {
+          const tenantId = document.getElementById('manage-tenant-id').value;
+          const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
+          const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+          const t = _cachedTenants.find(x => String(x.id) === String(tenantId));
+          if (!t) return;
+          saveFeaturesBtn.disabled = true; saveFeaturesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+          await RS_API.admin({ action: 'update_tenant', tenant_id: tenantId,
+            username: t.username, status: t.status, plan_code: t.plan_code || 'starter',
+            subscription_status: t.subscription_status || 'active',
+            allowed_tabs, phone: t.phone || '', email: t.email || '' });
+          if (t) t.allowed_tabs = allowed_tabs;
+          toast('Feature access updated!', 'fa-toggle-on');
+          closeTenantModal();
+          renderTenantTable();
+        } catch (err) {
+          toast('Error saving features: ' + err.message, 'fa-circle-exclamation');
+        } finally {
+          saveFeaturesBtn.disabled = false;
+          saveFeaturesBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>Save features';
+        }
       });
     }
   }
@@ -4010,19 +4140,16 @@
         bulkBtn.dataset.wired = '1';
         bulkBtn.addEventListener('click', () => bulkApproveAllPending());
       }
-      // 18. Wire super-admin toggle — click to sign out of super-admin mode
+      // 18. Hide Super-Admin toggle in sidebar — redundant (logout is in Settings modal)
       const saToggle = document.getElementById('role-switch');
-      if (saToggle && !saToggle.dataset.saasClick) {
-        saToggle.dataset.saasClick = '1';
-        saToggle.style.cursor = 'pointer';
-        saToggle.title = 'Click to sign out of Super-Admin mode';
-        saToggle.addEventListener('click', () => {
-          confirmDangerAction(
-            'Sign out of Super-Admin?',
-            'You will be redirected to the login page. Super-Admin session will end.',
-            () => { if (window.RS_API) RS_API.logout(); location.href = 'login.html'; }
-          );
-        });
+      if (saToggle) {
+        // Hide the entire toggle row (parent li / wrapper)
+        let hideEl = saToggle;
+        for (let i = 0; i < 4; i++) {
+          if (hideEl.parentElement) hideEl = hideEl.parentElement;
+          if (hideEl.tagName === 'LI' || hideEl.classList.contains('sb-item') || hideEl.classList.contains('role-switch-wrap')) break;
+        }
+        hideEl.style.display = 'none';
       }
       // 14. Hide version number pill — developer noise, not useful for super-admin
       const versionPill = document.getElementById('app-version-pill');
