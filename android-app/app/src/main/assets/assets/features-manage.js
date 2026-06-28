@@ -1,9 +1,9 @@
 /* ============================================================
-   RestroSuite — Inventory & Employees sub-tabs
+   RestroSuite -- Inventory & Employees sub-tabs
    ============================================================ */
 (function(){
   'use strict';
-  // HTML escaping — prevents XSS when inserting DB-sourced strings into innerHTML
+  // HTML escaping -- prevents XSS when inserting DB-sourced strings into innerHTML
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
@@ -83,7 +83,7 @@
                 sub: 'Link a raw material to this recipe',
                 icon: 'fa-flask',
                 size: 'sm',
-                body: `<input class="form-input" id="ing-q" placeholder="Search ingredient…" style="margin-bottom:12px">
+                body: `<input class="form-input" id="ing-q" placeholder="Search ingredient..." style="margin-bottom:12px">
                       <div id="ing-pick" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto"></div>`,
                 onMount(subModal, subClose) {
                   const q = subModal.querySelector('#ing-q'), box = subModal.querySelector('#ing-pick');
@@ -399,7 +399,7 @@
                 items: r.items,
                 value: r.value,
                 status: r.status,
-                date: r.date ? new Date(r.date).toLocaleDateString('en-IN', {day:'numeric', month:'short'}) : '—'
+                date: r.date ? new Date(r.date).toLocaleDateString('en-IN', {day:'numeric', month:'short'}) : '--'
               });
             });
           }
@@ -439,7 +439,7 @@
             ATT.push({
               name:e.name,role:e.role,rc:e.rc,
               inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
+              outT:['--','18:05','22:10','17:30','--','18:00'][i%6],
               status:['present','present','present','present','late','present'][i%6]
             });
           });
@@ -455,7 +455,7 @@
             ATT.push({
               name:e.name,role:e.role,rc:e.rc,
               inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
+              outT:['--','18:05','22:10','17:30','--','18:00'][i%6],
               status:['present','present','present','present','late','present'][i%6]
             });
           });
@@ -484,7 +484,7 @@
           <div class="panel panel-pad subtab-pane" data-pane="payroll">
             <div class="panel-head"><h3>Payroll · June 2026</h3><button class="btn btn-primary btn-sm"><i class="fa-solid fa-money-check-dollar"></i> Run payroll</button></div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Base</th><th>Incentive</th><th>Deductions</th><th>Net pay</th></tr></thead><tbody>
-            ${currentPay.map(p=>`<tr><td><b>${p.name}</b></td><td><span class="role-tag ${p.rc}">${p.role}</span></td><td>${rs(p.base)}</td><td style="color:var(--green)">+${rs(p.inc)}</td><td style="color:var(--red)">– ${rs(p.ded)}</td><td class="td-strong">${rs(p.net)}</td></tr>`).join('')}
+            ${currentPay.map(p=>`<tr><td><b>${p.name}</b></td><td><span class="role-tag ${p.rc}">${p.role}</span></td><td>${rs(p.base)}</td><td style="color:var(--green)">+${rs(p.inc)}</td><td style="color:var(--red)">- ${rs(p.ded)}</td><td class="td-strong">${rs(p.net)}</td></tr>`).join('')}
             <tr><td colspan="5" style="text-align:right"><b style="color:var(--text)">Total payout</b></td><td><b style="color:var(--orange);font-size:15px">${rs(currentPay.reduce((a,p)=>a+p.net,0))}</b></td></tr>
             </tbody></table></div>
           </div>`;
@@ -508,8 +508,8 @@
                 name: r.employeeName || emp.name || 'Unknown',
                 role: emp.role || 'Staff',
                 rc: emp.rc || 'r-waiter',
-                inT: r.clockInTime || '—',
-                outT: r.clockOutTime || '—',
+                inT: r.clockInTime || '--',
+                outT: r.clockOutTime || '--',
                 status: r.status || 'present'
               });
             });
@@ -523,7 +523,290 @@
         drawPanes();
       }
 
-      wireSeg('#employees-tab', ['directory','roster','attendance','payroll']);
+      wireSeg('#employees-tab', ['directory','roster','attendance','payroll','logins']);
+
+      // -- Staff Logins subtab ----------------------------------------------
+      const STAFF_ROLES = [
+        { key:'manager',   label:'Manager',           color:'#7c3aed', icon:'fa-user-tie'     },
+        { key:'cashier',   label:'Cashier',           color:'#0891b2', icon:'fa-cash-register' },
+        { key:'waiter',    label:'Waiter',            color:'#059669', icon:'fa-utensils'      },
+        { key:'captain',   label:'Captain',           color:'#2563eb', icon:'fa-star'          },
+        { key:'kitchen',   label:'Kitchen Staff',     color:'#dc2626', icon:'fa-fire-burner'   },
+        { key:'inventory', label:'Inventory Manager', color:'#b45309', icon:'fa-boxes-stacked' },
+      ];
+
+      // Cache for loaded staff users
+      let staffUsers = [];
+      let staffUsage = {};
+
+      async function loadStaffUsers() {
+        const loginPane = sec.querySelector('[data-pane="logins"]');
+        if (!loginPane) return;
+        if (!window.RS_API || !RS_API.staffUsers) {
+          loginPane.innerHTML = '<div class="sr-empty">Staff account management requires cloud mode.</div>';
+          return;
+        }
+        loginPane.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading staff accounts...</div>';
+        try {
+          const res = await RS_API.staffUsers({ action: 'list_users' });
+          staffUsers = res.users || [];
+          staffUsage = res.usage || {};
+          renderStaffLogins(loginPane);
+        } catch(e) {
+          loginPane.innerHTML = `<div class="sr-empty" style="color:var(--red)"><i class="fa-solid fa-circle-exclamation"></i> ${e.message}</div>`;
+        }
+      }
+
+      function renderStaffLogins(loginPane) {
+        const used = staffUsage.active_staff || staffUsers.length;
+        const max  = staffUsage.max_staff || '--';
+        loginPane.innerHTML = `
+          <div class="panel-head" style="margin-bottom:16px">
+            <div>
+              <h3>Staff Login Accounts</h3>
+              <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${used} of ${max} accounts used</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="sl-add-btn"><i class="fa-solid fa-user-plus"></i> Add staff account</button>
+          </div>
+          ${staffUsers.length === 0
+            ? `<div class="sr-empty">No staff accounts yet. Add one to let staff log in with their own credentials.</div>`
+            : `<div class="table-scroll"><table class="data-table">
+                <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr></thead>
+                <tbody>
+                ${staffUsers.map((u,i) => {
+                  const rd = STAFF_ROLES.find(r=>r.key===u.role) || { label: u.role, color:'#888', icon:'fa-user' };
+                  const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : 'Never';
+                  return `<tr>
+                    <td><b>${safe(u.display_name || u.username)}</b></td>
+                    <td style="font-family:monospace;font-size:13px;color:var(--text-soft)">${safe(u.username)}</td>
+                    <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:${rd.color}"><i class="fa-solid ${rd.icon}"></i>${rd.label}</span></td>
+                    <td><span class="pill ${u.status==='active'?'pill-green':'pill-red'}" style="padding:2px 9px;font-size:11px">${u.status}</span></td>
+                    <td style="font-size:12px;color:var(--text-mute)">${lastLogin}</td>
+                    <td>
+                      <div style="display:flex;gap:6px;justify-content:flex-end">
+                        <button class="btn btn-ghost btn-sm sl-edit-btn" data-idx="${i}" title="Edit role / status"><i class="fa-solid fa-pen"></i></button>
+                        <button class="icon-act sl-pwd-btn" data-idx="${i}" title="Reset password"><i class="fa-solid fa-key"></i></button>
+                        <button class="icon-act ${u.status==='active'?'danger':''} sl-toggle-btn" data-idx="${i}" data-status="${u.status}" title="${u.status==='active'?'Suspend':'Reactivate'}">
+                          <i class="fa-solid ${u.status==='active'?'fa-ban':'fa-circle-check'}"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>`;
+                }).join('')}
+                </tbody>
+              </table></div>`
+          }`;
+
+        // -- Add account --
+        loginPane.querySelector('#sl-add-btn')?.addEventListener('click', () => openAddStaffModal(loginPane));
+
+        // -- Edit role/status --
+        loginPane.querySelectorAll('.sl-edit-btn').forEach(b => b.addEventListener('click', () => openEditStaffModal(loginPane, +b.dataset.idx)));
+
+        // -- Reset password --
+        loginPane.querySelectorAll('.sl-pwd-btn').forEach(b => b.addEventListener('click', () => openResetPwdModal(loginPane, +b.dataset.idx)));
+
+        // -- Suspend / reactivate --
+        loginPane.querySelectorAll('.sl-toggle-btn').forEach(b => b.addEventListener('click', async () => {
+          const u = staffUsers[+b.dataset.idx];
+          const newStatus = b.dataset.status === 'active' ? 'suspended' : 'active';
+          const verb = newStatus === 'suspended' ? 'Suspend' : 'Reactivate';
+          if (!confirm(`${verb} account for ${u.display_name || u.username}?`)) return;
+          try {
+            await RS_API.staffUsers({ action:'update_user', user_id:u.id, status:newStatus });
+            RS.toast(`${u.display_name || u.username} ${newStatus}`, newStatus==='active'?'fa-circle-check':'fa-ban');
+            loadStaffUsers();
+          } catch(e) { RS.toast(e.message,'fa-circle-exclamation'); }
+        }));
+      }
+
+      function openAddStaffModal(loginPane) {
+        const body = `
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="form-group">
+              <label class="form-label">Display name</label>
+              <input id="sl-dname" class="form-control" placeholder="e.g. Ravi Kumar" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Username <span style="color:var(--text-mute);font-size:11px">(staff will type this to log in)</span></label>
+              <input id="sl-uname" class="form-control" placeholder="e.g. ravi.kumar" autocomplete="off" style="font-family:monospace">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="sl-role-grid">
+                ${STAFF_ROLES.map(r=>`
+                  <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass)" class="sl-role-opt">
+                    <input type="radio" name="sl-role" value="${r.key}" style="display:none">
+                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:13px;width:16px;text-align:center"></i>
+                    <span style="font-size:13px;font-weight:600">${r.label}</span>
+                  </label>`).join('')}
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Temporary password <span style="color:var(--text-mute);font-size:11px">(min 10 chars -- share with staff)</span></label>
+              <input id="sl-pwd" class="form-control" type="text" placeholder="e.g. Welcome@2025" autocomplete="new-password">
+            </div>
+            <div id="sl-add-err" style="color:var(--red);font-size:12.5px;display:none"></div>
+          </div>`;
+
+        if (!window.RSModal) {
+          const name = prompt('Display name?'); if (!name) return;
+          const uname = prompt('Username?'); if (!uname) return;
+          const roleIdx = prompt('Role:\n'+STAFF_ROLES.map((r,i)=>`${i+1}. ${r.label}`).join('\n')+'\nEnter number:');
+          const role = STAFF_ROLES[parseInt(roleIdx,10)-1]?.key; if (!role) return;
+          const pwd = prompt('Temporary password (min 10 chars)?'); if (!pwd || pwd.length < 10) return;
+          RS_API.staffUsers({ action:'create_user', display_name:name, username:uname, role, password:pwd })
+            .then(() => { RS.toast(`${name} added`,'fa-user-plus'); loadStaffUsers(); })
+            .catch(e => alert(e.message));
+          return;
+        }
+
+        RSModal.open({
+          title:'Add staff account', icon:'fa-user-plus', body,
+          foot:`<button class="btn btn-ghost" id="sl-cancel-add">Cancel</button>
+                <button class="btn btn-primary" id="sl-confirm-add"><i class="fa-solid fa-user-plus"></i> Create account</button>`,
+          onOpen: el => {
+            // Role picker highlight
+            el.querySelectorAll('.sl-role-opt').forEach(opt => {
+              opt.addEventListener('click', () => {
+                el.querySelectorAll('.sl-role-opt').forEach(o => { o.style.borderColor=''; o.style.background='var(--glass)'; });
+                opt.style.borderColor='var(--orange)'; opt.style.background='var(--orange-tint)';
+                opt.querySelector('input').checked = true;
+              });
+            });
+            el.querySelector('#sl-cancel-add').onclick = () => RSModal.close();
+            el.querySelector('#sl-confirm-add').onclick = async () => {
+              const errEl = el.querySelector('#sl-add-err');
+              const name  = el.querySelector('#sl-dname').value.trim();
+              const uname = el.querySelector('#sl-uname').value.trim();
+              const role  = el.querySelector('input[name="sl-role"]:checked')?.value;
+              const pwd   = el.querySelector('#sl-pwd').value;
+              if (!name)  { errEl.textContent='Display name is required.'; errEl.style.display='block'; return; }
+              if (!uname) { errEl.textContent='Username is required.'; errEl.style.display='block'; return; }
+              if (!role)  { errEl.textContent='Select a role.'; errEl.style.display='block'; return; }
+              if (pwd.length < 10) { errEl.textContent='Password must be at least 10 characters.'; errEl.style.display='block'; return; }
+              const btn = el.querySelector('#sl-confirm-add');
+              btn.disabled = true; btn.textContent = 'Creating...';
+              try {
+                await RS_API.staffUsers({ action:'create_user', display_name:name, username:uname, role, password:pwd });
+                RSModal.close();
+                RS.toast(`${name} account created`,'fa-user-plus');
+                loadStaffUsers();
+              } catch(e) {
+                errEl.textContent = e.message; errEl.style.display='block';
+                btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-user-plus"></i> Create account';
+              }
+            };
+          }
+        });
+      }
+
+      function openEditStaffModal(loginPane, idx) {
+        const u = staffUsers[idx]; if (!u) return;
+        const curRole = u.role;
+        const body = `
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="form-group">
+              <label class="form-label">Display name</label>
+              <input id="sle-dname" class="form-control" value="${safe(u.display_name||u.username)}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                ${STAFF_ROLES.map(r=>`
+                  <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;border:1px solid ${r.key===curRole?'var(--orange)':'var(--stroke-2)'};cursor:pointer;background:${r.key===curRole?'var(--orange-tint)':'var(--glass)'}" class="sl-role-opt">
+                    <input type="radio" name="sle-role" value="${r.key}" ${r.key===curRole?'checked':''} style="display:none">
+                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:13px;width:16px;text-align:center"></i>
+                    <span style="font-size:13px;font-weight:600">${r.label}</span>
+                  </label>`).join('')}
+              </div>
+            </div>
+            <div id="sle-err" style="color:var(--red);font-size:12.5px;display:none"></div>
+          </div>`;
+
+        if (!window.RSModal) {
+          const newRole = prompt('Role:\n'+STAFF_ROLES.map((r,i)=>`${i+1}. ${r.label}`).join('\n')+'\nEnter number:');
+          const role = STAFF_ROLES[parseInt(newRole,10)-1]?.key; if (!role) return;
+          RS_API.staffUsers({ action:'update_user', user_id:u.id, role })
+            .then(() => { RS.toast('Role updated','fa-user-check'); loadStaffUsers(); })
+            .catch(e => alert(e.message));
+          return;
+        }
+
+        RSModal.open({
+          title:`Edit -- ${u.display_name||u.username}`, icon:'fa-user-gear', body,
+          foot:`<button class="btn btn-ghost" id="sle-cancel">Cancel</button>
+                <button class="btn btn-primary" id="sle-save"><i class="fa-solid fa-check"></i> Save changes</button>`,
+          onOpen: el => {
+            el.querySelectorAll('.sl-role-opt').forEach(opt => {
+              opt.addEventListener('click', () => {
+                el.querySelectorAll('.sl-role-opt').forEach(o => { o.style.borderColor=''; o.style.background='var(--glass)'; });
+                opt.style.borderColor='var(--orange)'; opt.style.background='var(--orange-tint)';
+                opt.querySelector('input').checked = true;
+              });
+            });
+            el.querySelector('#sle-cancel').onclick = () => RSModal.close();
+            el.querySelector('#sle-save').onclick = async () => {
+              const errEl = el.querySelector('#sle-err');
+              const dname = el.querySelector('#sle-dname').value.trim();
+              const role  = el.querySelector('input[name="sle-role"]:checked')?.value;
+              if (!dname) { errEl.textContent='Name required.'; errEl.style.display='block'; return; }
+              if (!role)  { errEl.textContent='Select a role.'; errEl.style.display='block'; return; }
+              try {
+                await RS_API.staffUsers({ action:'update_user', user_id:u.id, role, display_name:dname });
+                RSModal.close(); RS.toast('Staff account updated','fa-user-check'); loadStaffUsers();
+              } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+            };
+          }
+        });
+      }
+
+      function openResetPwdModal(loginPane, idx) {
+        const u = staffUsers[idx]; if (!u) return;
+        const body = `
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="font-size:13px;color:var(--text-soft)">Set a new temporary password for <b>${safe(u.display_name||u.username)}</b>. Share it with them -- they can change it after login.</div>
+            <div class="form-group">
+              <label class="form-label">New password <span style="color:var(--text-mute);font-size:11px">(min 10 chars)</span></label>
+              <input id="slp-pwd" class="form-control" type="text" placeholder="e.g. NewPass@2025" autocomplete="new-password">
+            </div>
+            <div id="slp-err" style="color:var(--red);font-size:12.5px;display:none"></div>
+          </div>`;
+
+        if (!window.RSModal) {
+          const pwd = prompt('New password (min 10 chars)?'); if (!pwd || pwd.length < 10) return;
+          RS_API.staffUsers({ action:'reset_password', user_id:u.id, password:pwd })
+            .then(() => RS.toast('Password reset','fa-key'))
+            .catch(e => alert(e.message));
+          return;
+        }
+
+        RSModal.open({
+          title:`Reset password -- ${u.display_name||u.username}`, icon:'fa-key', body,
+          foot:`<button class="btn btn-ghost" id="slp-cancel">Cancel</button>
+                <button class="btn btn-primary" id="slp-confirm"><i class="fa-solid fa-key"></i> Reset password</button>`,
+          onOpen: el => {
+            el.querySelector('#slp-cancel').onclick = () => RSModal.close();
+            el.querySelector('#slp-confirm').onclick = async () => {
+              const errEl = el.querySelector('#slp-err');
+              const pwd = el.querySelector('#slp-pwd').value;
+              if (pwd.length < 10) { errEl.textContent='Min 10 characters.'; errEl.style.display='block'; return; }
+              try {
+                await RS_API.staffUsers({ action:'reset_password', user_id:u.id, password:pwd });
+                RSModal.close(); RS.toast('Password reset successfully','fa-key');
+              } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+            };
+          }
+        });
+      }
+
+      // Load staff logins when that subtab becomes active
+      sec.addEventListener('click', e => {
+        const btn = e.target.closest('.seg button');
+        if (btn && btn.textContent.trim().toLowerCase() === 'logins') {
+          setTimeout(() => loadStaffUsers(), 50);
+        }
+      });
     }
 
     enhanceInventory();
