@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — Inventory & Employees sub-tabs
+   RestroSuite -- Inventory & Employees sub-tabs
    ============================================================ */
 (function(){
   'use strict';
@@ -80,7 +80,7 @@
                 sub: 'Link a raw material to this recipe',
                 icon: 'fa-flask',
                 size: 'sm',
-                body: `<input class="form-input" id="ing-q" placeholder="Search ingredient…" style="margin-bottom:12px">
+                body: `<input class="form-input" id="ing-q" placeholder="Search ingredient..." style="margin-bottom:12px">
                       <div id="ing-pick" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto"></div>`,
                 onMount(subModal, subClose) {
                   const q = subModal.querySelector('#ing-q'), box = subModal.querySelector('#ing-pick');
@@ -396,7 +396,7 @@
                 items: r.items,
                 value: r.value,
                 status: r.status,
-                date: r.date ? new Date(r.date).toLocaleDateString('en-IN', {day:'numeric', month:'short'}) : '—'
+                date: r.date ? new Date(r.date).toLocaleDateString('en-IN', {day:'numeric', month:'short'}) : '--'
               });
             });
           }
@@ -436,7 +436,7 @@
             ATT.push({
               name:e.name,role:e.role,rc:e.rc,
               inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
+              outT:['--','18:05','22:10','17:30','--','18:00'][i%6],
               status:['present','present','present','present','late','present'][i%6]
             });
           });
@@ -452,7 +452,7 @@
             ATT.push({
               name:e.name,role:e.role,rc:e.rc,
               inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['—','18:05','22:10','17:30','—','18:00'][i%6],
+              outT:['--','18:05','22:10','17:30','--','18:00'][i%6],
               status:['present','present','present','present','late','present'][i%6]
             });
           });
@@ -473,7 +473,7 @@
             </tbody></table></div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="attendance">
-            <div class="panel-head"><h3>Today’s attendance</h3><span class="pill pill-green" style="padding:4px 11px">${ATT.filter(a=>a.status!=='absent').length}/${ATT.length} present</span></div>
+            <div class="panel-head"><h3>Today's attendance</h3><span class="pill pill-green" style="padding:4px 11px">${ATT.filter(a=>a.status!=='absent').length}/${ATT.length} present</span></div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Clock in</th><th>Clock out</th><th>Status</th></tr></thead><tbody>
             ${ATT.map(a=>`<tr><td><b>${a.name}</b></td><td><span class="role-tag ${a.rc}">${a.role}</span></td><td class="td-strong">${a.inT}</td><td>${a.outT}</td><td><span class="pill ${attPill[a.status]}" style="padding:3px 9px;text-transform:capitalize">${a.status}</span></td></tr>`).join('')}
             </tbody></table></div>
@@ -481,7 +481,7 @@
           <div class="panel panel-pad subtab-pane" data-pane="payroll">
             <div class="panel-head"><h3>Payroll · June 2026</h3><button class="btn btn-primary btn-sm"><i class="fa-solid fa-money-check-dollar"></i> Run payroll</button></div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Base</th><th>Incentive</th><th>Deductions</th><th>Net pay</th></tr></thead><tbody>
-            ${currentPay.map(p=>`<tr><td><b>${p.name}</b></td><td><span class="role-tag ${p.rc}">${p.role}</span></td><td>${rs(p.base)}</td><td style="color:var(--green)">+${rs(p.inc)}</td><td style="color:var(--red)">– ${rs(p.ded)}</td><td class="td-strong">${rs(p.net)}</td></tr>`).join('')}
+            ${currentPay.map(p=>`<tr><td><b>${p.name}</b></td><td><span class="role-tag ${p.rc}">${p.role}</span></td><td>${rs(p.base)}</td><td style="color:var(--green)">+${rs(p.inc)}</td><td style="color:var(--red)">- ${rs(p.ded)}</td><td class="td-strong">${rs(p.net)}</td></tr>`).join('')}
             <tr><td colspan="5" style="text-align:right"><b style="color:var(--text)">Total payout</b></td><td><b style="color:var(--orange);font-size:15px">${rs(currentPay.reduce((a,p)=>a+p.net,0))}</b></td></tr>
             </tbody></table></div>
           </div>`;
@@ -505,8 +505,8 @@
                 name: r.employeeName || emp.name || 'Unknown',
                 role: emp.role || 'Staff',
                 rc: emp.rc || 'r-waiter',
-                inT: r.clockInTime || '—',
-                outT: r.clockOutTime || '—',
+                inT: r.clockInTime || '--',
+                outT: r.clockOutTime || '--',
                 status: r.status || 'present'
               });
             });

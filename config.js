@@ -1,13 +1,13 @@
 /**
- * config.js — RestroSuite runtime configuration loader
+ * config.js -- RestroSuite runtime configuration loader
  *
  * Loaded via <script src="/config.js"> BEFORE any inline scripts.
  * Sets window.__configReady (a Promise) that resolves once /api/config has
- * been fetched. dashboard.js awaits this promise before initialising — this
+ * been fetched. dashboard.js awaits this promise before initialising -- this
  * replaces the deprecated synchronous XHR and keeps the main thread free.
  *
  * Android WebView can inject window.ENV_SUPABASE_URL / window.ENV_SUPABASE_ANON_KEY
- * directly — those values take precedence and the fetch is skipped entirely.
+ * directly -- those values take precedence and the fetch is skipped entirely.
  *
  * The old CONFIG object (used by android-app/assets/config.js) is also re-exported
  * here for backward compatibility with any existing references.
@@ -37,18 +37,18 @@
     }, extra || {});
   }
 
-  // ── Android WebView path ─────────────────────────────────────────────────────
+  // -- Android WebView path -----------------------------------------------------
   // Values injected by the native app before page load take precedence.
   if (window.ENV_SUPABASE_URL && window.ENV_SUPABASE_ANON_KEY) {
     var nativeUrl = normalizeSupabaseUrl(window.ENV_SUPABASE_URL);
     applyConfig(nativeUrl, window.ENV_SUPABASE_ANON_KEY);
-    // Resolve immediately — no network fetch needed.
+    // Resolve immediately -- no network fetch needed.
     window.__configReady = Promise.resolve();
     return;
   }
 
-  // ── Vercel / web path ────────────────────────────────────────────────────────
-  // Async fetch — does NOT block the main thread. dashboard.js awaits
+  // -- Vercel / web path --------------------------------------------------------
+  // Async fetch -- does NOT block the main thread. dashboard.js awaits
   // window.__configReady before using window.__SUPABASE_URL__ or window.CONFIG.
   window.__configReady = fetch('/api/config')
     .then(function (response) {

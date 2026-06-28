@@ -1,12 +1,12 @@
 /* ============================================================
-   RestroSuite — Country & Currency Data
+   RestroSuite -- Country & Currency Data
    Comprehensive list of countries with their currencies.
    Used by: login.html (registration), features-shell.js (settings)
    ============================================================ */
 (function () {
   'use strict';
 
-  /* ---------- Full country → currency map ---------- */
+  /* ---------- Full country -> currency map ---------- */
   window.RS_COUNTRIES = [
     { name: 'Afghanistan',           code: 'AF', dial: '93',  currency: 'AFN (؋)',  symbol: '؋', currencyCode: 'AFN', currencyName: 'Afghan Afghani' },
     { name: 'Albania',               code: 'AL', dial: '355', currency: 'ALL (L)',  symbol: 'L', currencyCode: 'ALL', currencyName: 'Albanian Lek' },
@@ -238,7 +238,7 @@
     return window.RS_COUNTRIES.find(c => c.dial === d) || null;
   };
 
-  /** Converts a 2-letter ISO country code to its flag emoji. E.g. 'IE' → '🇮🇪' */
+  /** Converts a 2-letter ISO country code to its flag emoji. E.g. 'IE' -> '🇮🇪' */
   window.RS_countryFlag = function(code) {
     if (!code || code.length !== 2) return '🌐';
     return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
@@ -280,7 +280,7 @@
     // Search inside picker
     const srch = document.createElement('input');
     srch.type = 'text';
-    srch.placeholder = 'Search country or code…';
+    srch.placeholder = 'Search country or code...';
     srch.style.cssText = 'padding:9px 12px;border:none;border-bottom:1px solid var(--stroke-2);background:var(--glass);color:var(--text);font-size:13px;outline:none;font-family:inherit;flex-shrink:0;';
 
     const list = document.createElement('div');
@@ -375,11 +375,11 @@
 
   /**
    * Creates a premium custom dropdown widget that wraps a native <select> element.
-   * The native <select> remains hidden but keeps its value in sync — so all existing
+   * The native <select> remains hidden but keeps its value in sync -- so all existing
    * form listeners (collect, onchange, etc.) continue working with zero changes.
    *
    * Usage:  RS_createCustomDropdown(selectElement)
-   *   – OR –  RS_createCustomDropdown(selectElement, { searchable: true })
+   *   - OR -  RS_createCustomDropdown(selectElement, { searchable: true })
    */
   window.RS_createCustomDropdown = function(nativeSel, opts) {
     if (!nativeSel || nativeSel.dataset.cdWrapped) return; // already wrapped
@@ -474,7 +474,7 @@
       searchWrap.style.cssText = 'padding:6px 8px 2px;';
       searchInput = document.createElement('input');
       searchInput.type = 'text';
-      searchInput.placeholder = 'Search…';
+      searchInput.placeholder = 'Search...';
       searchInput.style.cssText = 'width:100%;padding:7px 10px;border:1px solid var(--stroke-2);border-radius:var(--r-xs);background:var(--glass);color:var(--text);font-size:13px;outline:none;font-family:inherit;';
       searchInput.addEventListener('input', () => renderMenuItems(searchInput.value));
       searchInput.addEventListener('focus', () => { searchInput.style.borderColor = 'var(--orange)'; });

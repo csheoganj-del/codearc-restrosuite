@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — Doppio backend API client
+   RestroSuite -- Doppio backend API client
    Talks to the existing Supabase Edge Functions:
      • tenant-access  (login / register / session / recovery)
      • tenant-data    (tenant-scoped CRUD on doppio_* tables)
@@ -32,6 +32,11 @@
   const BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '' : REMOTE_BASE;
   const ANON = String(cfg.anonKey || '').trim();
   const CONFIGURED = !!(REMOTE_BASE && ANON);
+  // Sync to window globals so config.js consumers (realtime, supabaseClient) see the URL
+  if (CONFIGURED && !window.__SUPABASE_URL__) {
+    window.__SUPABASE_URL__ = REMOTE_BASE;
+    window.__SUPABASE_ANON_KEY__ = ANON;
+  }
 
   const SS = window.sessionStorage;
   const LS_SESS = window.localStorage; // persistent session storage
@@ -152,7 +157,7 @@
     async register(payload){
       // payload: { name, slug, outlet_type, email, phone, username, password }
       if(!CONFIGURED) {
-        // Demo/unconfigured mode: do NOT store a session — registration creates a PENDING
+        // Demo/unconfigured mode: do NOT store a session -- registration creates a PENDING
         // outlet that must be approved before login. Storing a session here would bypass
         // the approval gate and auto-redirect to dashboard.
         await new Promise(r => setTimeout(r, 600));
@@ -192,7 +197,7 @@
         if (err.status === 401 || err.status === 403) {
           return null;
         }
-        // Network error or offline — keep the local session alive
+        // Network error or offline -- keep the local session alive
         throw err;
       }
     },
@@ -318,10 +323,4 @@
       }
       
       const adminToken = ssGet('superadmin_admin_token');
-      if(!adminToken) throw new Error("Superadmin session expired. Please log in again.");
-      return post('tenant-admin', { action, ...payload }, adminToken, 'Superadmin request failed');
-    }
-  };
-
-  window.RS_API = api;
-})();
+      if

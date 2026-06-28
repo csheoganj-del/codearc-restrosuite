@@ -21,6 +21,8 @@
  *   subscription.cancelled
  *   subscription.completed
  *   payment.failed
+ *   payment.captured        ← Route: marks QR order as Paid, triggers transfer
+ *   account.activated       ← Route: enables Route payments for the restaurant
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -202,6 +204,86 @@ Deno.serve(async (req: Request): Promise<Response> => {
         return new Response("DB error", { status: 500 });
       }
       console.log(`Payment failed for tenant ${failedTenantUsername}`);
+      break;
+    }
+
+    // ── Route: payment captured — mark QR order as Paid ──────────────────────
+    case "payment.captured": {
+      const paymentEntity = (
+        payload.payload as Record<string, unknown>
+      )?.payment?.entity as Record<string, unknown> | undefined;
+
+      if (!paymentEntity) {
+        console.warn("payment.captured: no payment entity");
+        break;
+      }
+
+      const notes = (paymentEntity.notes as Record<string, string>) ?? {};
+      const orderId    = notes.order_id    || String(paymentEntity.receipt || "");
+      const tenantSlug = notes.tenant_slug || "";
+
+      if (!orderId || !tenantSlug) {
+        console.warn("payment.captured: missing order_id or tenant_slug in notes", notes);
+        break;
+      }
+
+      // Fetch tenant
+      const { data: routeTenant } = await supabase
+        .from("saas_tenants")
+        .select("id")
+        .eq("slug", tenantSlug)
+        .maybeSingle();
+
+      if (!routeTenant) {
+        console.error("payment.captured: tenant not found for slug", tenantSlug);
+        break;
+      }
+
+      // Mark the pending order as Paid
+      const { error: updateErr } = await supabase
+        .from("doppio_pending_orders")
+        .update({
+          status:        "Paid",
+          paymentMethod: "Razorpay",
+        })
+        .eq("tenant_id", routeTenant.id)
+        .eq("orderId", orderId);
+
+      if (updateErr) {
+        console.error("payment.captured: failed to update order status", updateErr);
+        return new Response("DB error", { status: 500 });
+      }
+
+      console.log(`Order ${orderId} marked Paid via Razorpay Route for tenant ${tenantSlug}`);
+      break;
+    }
+
+    // ── Route: linked account KYC activated — enable Route payments ───────────
+    case "account.activated": {
+      const accountEntity = (
+        payload.payload as Record<string, unknown>
+      )?.account?.entity as Record<string, unknown> | undefined;
+
+      const accountId = (accountEntity?.id as string) || "";
+      if (!accountId) {
+        console.warn("account.activated: no account id in payload");
+        break;
+      }
+
+      const { error: activateErr } = await supabase
+        .from("saas_tenants")
+        .update({
+          razorpay_route_enabled: true,
+          razorpay_kyc_status:    "activated",
+        })
+        .eq("razorpay_account_id", accountId);
+
+      if (activateErr) {
+        console.error("account.activated: DB update failed", activateErr);
+        return new Response("DB error", { status: 500 });
+      }
+
+      console.log(`Razorpay Route activated for account ${accountId}`);
       break;
     }
 

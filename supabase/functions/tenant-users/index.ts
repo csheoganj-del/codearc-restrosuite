@@ -32,13 +32,20 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 const ROLE_DEFAULT_TABS: Record<string, string[]> = {
   admin: [
-    "pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab",
+    "pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab",
     "editor-tab", "crm-tab", "tax-tab", "online-tab", "kds-tab", "tokens-tab",
-    "employees-tab", "growth-hub-tab",
+    "employees-tab", "growth-hub-tab", "customers-tab", "analytics-tab",
   ],
-  cashier: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab"],
+  manager: [
+    "pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab",
+    "inventory-tab", "editor-tab", "customers-tab", "reports-tab",
+    "analytics-tab", "employees-tab", "growth-hub-tab",
+  ],
+  cashier: ["pos-tab", "floor-tab", "bills-tab", "customers-tab"],
+  waiter:  ["pos-tab", "floor-tab", "kds-tab"],
+  captain: ["pos-tab", "floor-tab", "kds-tab", "qr-orders-tab"],
   kitchen: ["kds-tab"],
-  waiter: ["qr-orders-tab"],
+  inventory: ["inventory-tab", "editor-tab", "reports-tab"],
   customer_display: ["tokens-tab"],
 };
 
