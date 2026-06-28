@@ -556,6 +556,16 @@
 
     /** Apply vertical constraints to the UI (hide tabs, rename labels) */
     applyToUI: function() {
+      const sess = window.RS_API ? window.RS_API.session() : null;
+      const isSuper = sess && sess.role === 'superadmin';
+      if (isSuper) {
+        document.querySelectorAll('.sidebar-link, .mnav-link').forEach(function(el) {
+          const isSa = el.classList.contains('superadmin-only');
+          el.style.display = isSa ? (el.classList.contains('sidebar-link') || el.classList.contains('mnav-link') ? 'flex' : '') : 'none';
+        });
+        return;
+      }
+
       const v = VERTICALS[_active] || VERTICALS.restaurant;
       const activeTabs = new Set(v.tabs || []);
 
