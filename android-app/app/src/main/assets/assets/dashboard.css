@@ -2340,3 +2340,132 @@ textarea:focus-visible,
     color-scheme: dark;
   }
 }
+
+/* ── Gateway Monitor & Incidents Mobile Fixes ── */
+.app-incident-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--stroke);
+  background: var(--panel);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.app-incident-card div {
+  min-width: 0; /* key to allowing child text wrap in flex container */
+}
+.app-incident-card strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.app-incident-card span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-soft);
+  margin-top: 4px;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+.app-incident-card code {
+  display: block;
+  background: var(--bg);
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  color: #ef4444;
+  border: 1px solid var(--stroke);
+  max-height: 120px;
+  overflow-y: auto;
+}
+.app-incident-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.app-incident-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-soft);
+  text-transform: uppercase;
+  border: 1px solid var(--stroke);
+}
+.app-incident-pill.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+.app-incident-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.app-incident-actions time {
+  font-size: 11px;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+.app-incident-resolve-btn {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  background: var(--green) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  /* WhatsApp Gateway status card wrap */
+  .gw-status {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+  .gw-status #saas-gateway-status {
+    margin-left: 66px !important;
+    margin-top: 4px;
+  }
+  .gw-status .gw-ic {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 20px !important;
+  }
+  .gw-status .gw-t {
+    font-size: 14.5px !important;
+  }
+  .gw-status .gw-s {
+    font-size: 11.5px !important;
+  }
+
+  /* Incident card stack on small viewports */
+  @media (max-width: 480px) {
+    .app-incident-card {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 10px !important;
+    }
+    .app-incident-actions {
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      border-top: 1px dashed var(--stroke);
+      padding-top: 8px;
+      width: 100%;
+    }
+  }
+}
