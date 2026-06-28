@@ -4071,17 +4071,7 @@
     $$('.superadmin-hide').forEach(el => {
       el.style.display = 'none';
     });
-  } else {
-    // Hide superadmin-only elements
-    $$('.superadmin-only').forEach(el => {
-      el.style.display = 'none';
-    });
-    // Show regular mobile bottom nav items
-    $$('.superadmin-hide').forEach(el => {
-      el.style.display = el.classList.contains('mnav-link') ? 'flex' : '';
-    });
-    // 3. Hide ghost sidebar section labels (OPERATIONS, MANAGE, GROW) that
-    //    belong to the regular dashboard and bleed into the super-admin view
+    // 3. Hide ghost sidebar section labels (OPERATIONS, MANAGE, GROW)
     $$('.sb-section:not(.superadmin-only):not(.brandadmin-only)').forEach(el => {
       el.style.display = 'none';
     });
@@ -4179,6 +4169,15 @@
       const supportDrop = document.querySelector('.support-dropdown');
       if (supportDrop) supportDrop.style.display = 'none';
     }, 300);
+  } else {
+    // Hide superadmin-only elements
+    $$('.superadmin-only').forEach(el => {
+      el.style.display = 'none';
+    });
+    // Show regular mobile bottom nav items
+    $$('.superadmin-hide').forEach(el => {
+      el.style.display = el.classList.contains('mnav-link') ? 'flex' : '';
+    });
   }
 
   // -- Apply staff role tab filtering (waiter / cashier / kitchen / etc.) --
