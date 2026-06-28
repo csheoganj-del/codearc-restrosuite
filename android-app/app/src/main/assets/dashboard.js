@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite Console â€" interactivity & data rendering
+   RestroSuite Console – interactivity & data rendering
    ============================================================ */
 (function () {
   'use strict';
@@ -54,6 +54,22 @@
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  /* ---------- HTML ESCAPING (XSS prevention) ---------- */
+  // Every value interpolated into innerHTML MUST pass through esc() first.
+  // Unescaped user/server data in innerHTML is a stored-XSS vector that
+  // enables full account takeover (session tokens live in localStorage).
+  function esc(v) {
+    if (v == null) return '';
+    return String(v)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  // Alias for readability in templates
+  const _e = esc;
   function getCurrencySymbol() {
     try {
       const settings = window.RS_SETTINGS || {};
@@ -66,7 +82,30 @@
     } catch(e) {}
     return '\u20b9';
   }
-  const rs = n => getCurrencySymbol() + Math.round(n).toLocaleString('en-IN');
+
+  // Returns the RS_COUNTRIES entry for the outlet's selected country.
+  // locale and tz fields are now on every entry in country-currency-data.js.
+  function getOutletCountryEntry() {
+    try {
+      const country = (window.RS_SETTINGS || {}).set_country || 'India';
+      return (window.RS_getCountryByName && window.RS_getCountryByName(country))
+        || { locale: 'en-IN', tz: 'Asia/Kolkata' };
+    } catch(e) { return { locale: 'en-IN', tz: 'Asia/Kolkata' }; }
+  }
+
+  // BCP 47 locale for the outlet (e.g. 'en-IE' for Ireland, 'de-DE' for Germany)
+  window.RS_getOutletLocale = function() {
+    return getOutletCountryEntry().locale || 'en-IN';
+  };
+
+  // IANA timezone for the outlet (e.g. 'Europe/Dublin' for Ireland)
+  window.RS_getOutletTimezone = function() {
+    return getOutletCountryEntry().tz || 'Asia/Kolkata';
+  };
+
+  // Narrow no-break space (\u202f) gives visible gap without wrapping.
+  // Number grouping uses outlet locale so Irish bills show 1,000 not 1,00,000.
+  const rs = n => getCurrencySymbol() + '\u202f' + Math.round(n).toLocaleString(window.RS_getOutletLocale());
   const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
@@ -168,7 +207,7 @@
   let toastT;
   function toast(msg, icon='fa-circle-check', onClick=null){
     const el=$('#toast');
-    el.innerHTML=`<i class="fa-solid ${icon}"></i> ${msg}`;
+    el.innerHTML=`<i class="fa-solid ${_e(icon)}"></i> ${_e(msg)}`;
     el.classList.add('show');
     if (onClick) {
       el.style.cursor = 'pointer';
@@ -189,7 +228,9 @@
   }
   window.__toast = toast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v27-20260624';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v33-20260624';
+  // Show version in topbar
+  (function(){ const el = document.getElementById('app-version-pill'); if(el) el.textContent = appVersion; })();
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 
@@ -632,10 +673,10 @@
     grid.innerHTML = items.map(m=>{
       const inCart = cart.find(c=>String(c.id)===String(m.id));
       return `
-      <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${m.id}" style="--cc:${catColor(m.cat)}">
+      <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
         ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
-        <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${m.cat}</span></div>
-        <div class="pname">${m.name}</div>
+        <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat)}</span></div>
+        <div class="pname">${_e(m.name)}</div>
         <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></div>
       </div>`;
     }).join('');
@@ -654,7 +695,7 @@
     
     let metaHTML = `<span>Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
     if (totals.disc > 0) {
-      metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
+      metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">– ${rs(totals.disc)}</b></span>`;
     }
     if (totals.serviceCharge > 0) {
       metaHTML += `<span>SC <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
@@ -696,8 +737,8 @@
     else { wrap.innerHTML = cart.map(c=>`
       <div class="cart-line">
         <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
-        <div class="cinfo"><div class="cn">${c.name}</div><div class="cp">${rs(c.price)} each</div></div>
-        <div class="qty"><button data-d="-1" data-id="${c.id}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${c.id}"><i class="fa-solid fa-plus"></i></button></div>
+        <div class="cinfo"><div class="cn">${_e(c.name)}</div><div class="cp">${rs(c.price)} each</div></div>
+        <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
         <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
       </div>`).join('');
       $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
@@ -929,20 +970,28 @@
     }
   }
   function getCustomer(){
+    const nameEl = $('#cust-input-name') || $('#cust-name');
+    const phoneEl = $('#cust-input-phone') || $('#cust-phone');
+    const gstEl = $('#cust-gst');
+    
+    let phoneVal = '';
+    if (phoneEl) {
+      phoneVal = window.RS_getFullPhoneNumber ? window.RS_getFullPhoneNumber(phoneEl) : phoneEl.value;
+    }
+    
     const sel = $('#cart-customer-sel');
     if (sel && sel.value) {
       const opt = sel.options[sel.selectedIndex];
+      const selPhone = sel.value;
+      const finalPhone = (selPhone.startsWith('temp-') || !selPhone.startsWith('+')) ? phoneVal.trim() : selPhone.trim();
       return {
         name: opt.getAttribute('data-name') || '',
-        phone: sel.value,
+        phone: finalPhone,
         gst: opt.getAttribute('data-gst') || '',
         table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
       };
     }
-    const nameEl = $('#cust-input-name') || $('#cust-name');
-    const phoneEl = $('#cust-input-phone') || $('#cust-phone');
-    const gstEl = $('#cust-gst');
-    return { name:(nameEl?.value||'').trim(), phone:(phoneEl?.value||'').trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+    return { name:(nameEl?.value||'').trim(), phone:phoneVal.trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
   }
   function runKotAction(){
     if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -962,8 +1011,8 @@
       console.error('[Checkout Error]', err);
       return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
     }
-    toast('Bill printed & WhatsApp sent','fa-print');
-    clearCart();
+    // RSPOS module not loaded — do not silently show false success
+    return toast('Checkout module not ready — please refresh', 'fa-circle-exclamation');
   }
   let cartActionsDelegated = false;
   function ensureCartActionDelegation(){
@@ -1069,7 +1118,7 @@
       console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
     }
 
-    // -- Mount country-code prefix picker on cart customer phone --
+    // ── Mount country-code prefix picker on cart customer phone ──
     (function mountCartPhonePicker() {
       const phoneEl = document.getElementById('cust-input-phone');
       if (!phoneEl || phoneEl.dataset.phonePrefixBuilt) return;
@@ -1084,7 +1133,7 @@
       }
     })();
 
-    $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${c}">${c}</button>`).join('');
+    $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
       activeCat=b.dataset.cat;
       $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
@@ -1181,8 +1230,7 @@
         console.error('[Checkout Error]', err);
         return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
       }
-      toast('Bill printed & WhatsApp sent','fa-print');
-      clearCart();
+      return toast('Checkout module not ready — please refresh', 'fa-circle-exclamation');
     };
 
     // Grid size slider controls
@@ -1315,7 +1363,7 @@
         const mappedKds = activeKds.map(r => ({
           id: r.id,
           tok: r.orderId,
-          type: `${r.orderType} Â· ${r.tableNumber}`,
+          type: `${r.orderType} · ${r.tableNumber}`,
           start: parseOrderTimestamp(r.dateTime) || Date.now(),
           items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
         }));
@@ -1329,7 +1377,7 @@
           table: r.tableNumber,
           time: getRelativeTime(r.dateTime),
           status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
-          items: (r.items || []).map(it => [`${it.qty}Ã-- ${it.name}`, it.price * it.qty]),
+          items: (r.items || []).map(it => [`${it.qty}Ã— ${it.name}`, it.price * it.qty]),
           total: r.total
         }));
         replaceArr(QR_ORDERS, mappedQr);
@@ -1341,6 +1389,11 @@
         try { updateTabAttentionBlinking(); } catch(e){}
       } catch(e) {
         console.warn("syncPendingOrders failed", e);
+        // Only show toast if user is likely watching the KDS/orders tab
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && (activeTab.id === 'kds-tab' || activeTab.id === 'pending-orders-tab')) {
+          toast('Order sync issue — retrying…', 'fa-rotate');
+        }
       } finally {
         pendingOrdersSyncInFlight = false;
       }
@@ -1426,8 +1479,8 @@
 
     $('#qr-grid').innerHTML = QR_ORDERS.map((o,i)=>`
       <div class="qr-card s-${o.status}">
-        <div class="qr-ch"><div><span class="tnum">Table ${o.table.split('-')[1]||o.table}</span><div class="qtime">${o.time}</div></div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
-        <div class="qr-lines">${o.items.map(it=>`<div class="ql"><span>${it[0]}</span><b>${rs(it[1])}</b></div>`).join('')}</div>
+        <div class="qr-ch"><div><span class="tnum">Table ${_e(o.table.split('-')[1]||o.table)}</span><div class="qtime">${_e(o.time)}</div></div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
+        <div class="qr-lines">${o.items.map(it=>`<div class="ql"><span>${_e(it[0])}</span><b>${rs(it[1])}</b></div>`).join('')}</div>
         <div class="qr-cf"><span class="qtot">${rs(o.total)}</span>
           ${o.status!=='served'?`<button class="btn btn-ghost btn-sm" data-merge="${i}"><i class="fa-solid fa-code-merge"></i> Merge</button><button class="btn btn-primary btn-sm" data-adv="${i}">${o.status==='pending'?'Accept':'Mark served'}</button>`:`<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i> Bill</button>`}
         </div>
@@ -1451,7 +1504,7 @@
       } else {
         o.status=nextStatus; renderQR();
       }
-      toast('Table '+(o.table.split('-')[1]||o.table)+' -> '+statusTxt[nextStatus]);
+      toast('Table '+(o.table.split('-')[1]||o.table)+' â†’ '+statusTxt[nextStatus]);
     }));
     $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>toast('Table merge is not connected yet','fa-code-merge')));
     $$('#qr-grid [data-bill]').forEach(b=>b.addEventListener('click',()=>{
@@ -1509,8 +1562,19 @@
   }
   async function markBillRefunded(b) {
     if (!b || b.status === 'refunded') return;
-    if (!window.confirm(`Mark ${b.no || b.id} as refunded?`)) return;
+
+    // ── PIN gate ─────────────────────────────────────────────────────────────
+    if (window.RSPinModal) {
+      const ok = await RSPinModal.request(`Refund ${b.no || b.id || 'bill'}`);
+      if (!ok) return;
+    }
+
+    // ── Refund reason modal ──────────────────────────────────────────────────
+    const reason = await showRefundModal(b);
+    if (reason === null) return; // cancelled
+
     b.status = 'refunded';
+    b.refundReason = reason || 'POS refund';
     let cloudMarked = false;
     try {
       if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
@@ -1521,7 +1585,7 @@
           data:{
             order_id:String(b.id || b.no),
             amount:Number(b.amount || 0),
-            reason:'POS refund',
+            reason:b.refundReason,
             status:'approved'
           },
           returning:false
@@ -1532,7 +1596,123 @@
       console.warn('Refund cloud update failed', e);
     }
     renderBills();
-    toast(cloudMarked ? 'Refund recorded' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
+    toast(cloudMarked ? 'Refund recorded in cloud' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
+  }
+
+  /** Refund detail modal — returns reason string, or null if cancelled */
+  function showRefundModal(b) {
+    return new Promise(resolve => {
+      document.getElementById('rs-refund-overlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rs-refund-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
+      const amt = rs(b.amount || 0);
+      overlay.innerHTML = `
+        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+            <div style="width:42px;height:42px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;color:#ef4444;flex-shrink:0;"><i class="fa-solid fa-rotate-left"></i></div>
+            <div>
+              <div style="font-weight:800;font-size:15px;color:var(--text,#111);">Process Refund</div>
+              <div style="font-size:12px;color:var(--text-soft,#6b7280);">${b.no || b.id} &middot; ${amt}</div>
+            </div>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-soft,#6b7280);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Reason for refund</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;" id="rfund-reason-chips">
+            ${['Customer complaint','Wrong order','Quality issue','Duplicate charge','Changed mind','Other'].map(r=>`<button data-r="${r}" style="padding:8px 10px;border-radius:10px;border:1.5px solid var(--stroke-2,#e5e7eb);background:var(--glass,#f9fafb);font-size:12px;cursor:pointer;font-family:inherit;color:var(--text,#111);text-align:left;transition:all .15s;" class="rfund-chip">${r}</button>`).join('')}
+          </div>
+          <textarea id="rfund-note" placeholder="Additional notes (optional)…" rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:13px;resize:none;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;"></textarea>
+          <div style="display:flex;gap:10px;margin-top:16px;">
+            <button id="rfund-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
+            <button id="rfund-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Confirm Refund</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      let selectedReason = '';
+      overlay.querySelectorAll('.rfund-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          overlay.querySelectorAll('.rfund-chip').forEach(c => { c.style.cssText += ';background:var(--glass,#f9fafb);border-color:var(--stroke-2,#e5e7eb);color:var(--text,#111);font-weight:normal;'; });
+          chip.style.background = '#ef4444'; chip.style.borderColor = '#ef4444'; chip.style.color = '#fff'; chip.style.fontWeight = '700';
+          selectedReason = chip.dataset.r;
+        });
+      });
+      document.getElementById('rfund-confirm').onclick = () => {
+        const note = document.getElementById('rfund-note').value.trim();
+        const reason = [selectedReason, note].filter(Boolean).join(' — ') || 'POS refund';
+        overlay.remove(); resolve(reason);
+      };
+      document.getElementById('rfund-cancel').onclick = () => { overlay.remove(); resolve(null); };
+      overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(null); } });
+    });
+  }
+
+  async function deleteBill(b) {
+    if (!b) return;
+    // ── PIN gate ─────────────────────────────────────────────────────────────
+    if (window.RSPinModal) {
+      const ok = await RSPinModal.request(`Delete Bill ${b.no || b.id || ''}`);
+      if (!ok) return;
+    }
+    // ── Confirm ───────────────────────────────────────────────────────────────
+    const confirmed = await showDeleteConfirm(b);
+    if (!confirmed) return;
+
+    const idx = BILLS.findIndex(x => x === b || x.no === b.no);
+    if (idx !== -1) BILLS.splice(idx, 1);
+
+    // ── Restore inventory (sale never happened) ───────────────────────────────
+    // Only on DELETE — refund does NOT restore stock (food was served)
+    try {
+      const bItems = b._items || [];
+      let invChanged = false;
+      bItems.forEach(it => {
+        const menuItem = MENU.find(m => m.name === it.name);
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        const orderedQty = Number(it.qty) || 1;
+        menuItem.ingredients.forEach(ing => {
+          const invItem = INVENTORY.find(x => x.name === ing.name);
+          if (!invItem) return;
+          invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
+          invChanged = true;
+        });
+      });
+      if (invChanged && window.RS_DB && RS_DB.writeLocal) {
+        await RS_DB.writeLocal('inventory', INVENTORY);
+      }
+    } catch(e) { console.warn('Inventory restore failed', e); }
+
+    try {
+      if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      if (window.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
+        await RS_API.data({ table:'doppio_bills', operation:'delete', filters:{ bill_no: b.no || b.id }, returning:false }).catch(e=>console.warn('Cloud delete',e));
+      }
+    } catch(e) { console.warn('Bill delete sync failed', e); }
+    renderBills();
+    toast(`Bill ${b.no || b.id || ''} deleted — inventory restored`, 'fa-trash');
+  }
+
+  function showDeleteConfirm(b) {
+    return new Promise(resolve => {
+      document.getElementById('rs-del-overlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rs-del-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
+      overlay.innerHTML = `
+        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);text-align:center;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:#ef4444;margin:0 auto 16px;"><i class="fa-solid fa-trash-can"></i></div>
+          <div style="font-weight:800;font-size:16px;color:var(--text,#111);margin-bottom:8px;">Delete Bill?</div>
+          <div style="font-size:13px;color:var(--text-soft,#6b7280);line-height:1.6;margin-bottom:22px;"><strong>${b.no || b.id || 'This bill'}</strong> will be permanently removed from records.<br>This action <strong>cannot be undone</strong>.</div>
+          <div style="display:flex;gap:10px;">
+            <button id="rs-del-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
+            <button id="rs-del-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Yes, Delete</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById('rs-del-confirm').onclick = () => { overlay.remove(); resolve(true); };
+      document.getElementById('rs-del-cancel').onclick  = () => { overlay.remove(); resolve(false); };
+      overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    });
   }
   const renderBills = () => {
     // Dynamically compute stats from BILLS
@@ -1565,11 +1745,11 @@
 
     $('#bills-table-body').innerHTML = filtered.map(b=>`
       <tr>
-        <td><b>${b.no || b.orderId || b.id || '-'}</b></td><td>${b.time || b.dateTime || '-'}</td><td>${b.table || '-'}</td><td>${b.items}</td>
-        <td><span class="pill ${payPill[b.pay]}" style="padding:3px 9px">${b.pay}</span></td>
+        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(b.time || b.dateTime || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
+        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
         <td>${b.status==='paid'?'<span class="pill pill-green" style="padding:3px 9px">Paid</span>':'<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger" title="Refund" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button></div></td>
+        <td><div class="row-actions"><button class="icon-act go" title="Reprint" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
       </tr>`).join('');
     const billBody = $('#bills-table-body');
     const visibleBills = filtered;
@@ -1583,14 +1763,12 @@
       const row = btn.closest('tr');
       const bill = visibleBills[[...billBody.children].indexOf(row)];
       if (!bill) return;
-      if (btn.classList.contains('go')) return showBillReceipt(bill);
-      if (btn.classList.contains('danger')) return markBillRefunded(bill);
+      if (btn.classList.contains('go'))         return showBillReceipt(bill);
+      if (btn.classList.contains('refund-act')) return markBillRefunded(bill);
+      if (btn.classList.contains('del-act'))    return deleteBill(bill);
       return shareBillReceipt(bill);
     };
     billBody.addEventListener('click', billBody._rsBillActionHandler, true);
-    $$('#bills-table-body .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Reprinting billâ€¦','fa-print')));
-    $$('#bills-table-body .icon-act .fa-whatsapp').forEach(b=>b.closest('button').addEventListener('click',()=>toast('Bill shared on WhatsApp','fa-whatsapp')));
-    $$('#bills-table-body .icon-act.danger:not([disabled])').forEach(b=>b.addEventListener('click',()=>toast('Refund initiated','fa-rotate-left')));
   };
 
   /* ============================================================
@@ -1674,11 +1852,11 @@
       invBody.innerHTML = filtered.map(i=>{
         const st = i.stock<i.min?'out':(i.stock<i.min*1.4?'low':'ok'); const pct=Math.min(100,Math.round(i.stock/(i.min*2)*100));
         return `<tr>
-          <td><b>${i.name}</b></td><td>${i.cat}</td>
-          <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${i.unit}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st==='out'?'var(--red)':st==='low'?'var(--amber)':'var(--green)'}"></span></div></div></td>
-          <td>${i.min} ${i.unit}</td><td>${rs(i.cost)}/${i.unit}</td>
+          <td><b>${_e(i.name)}</b></td><td>${_e(i.cat)}</td>
+          <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${_e(i.unit)}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st==='out'?'var(--red)':st==='low'?'var(--amber)':'var(--green)'}"></span></div></div></td>
+          <td>${i.min} ${_e(i.unit)}</td><td>${rs(i.cost)}/${_e(i.unit)}</td>
           <td><span class="stock-dot ${stockCls[st]}">${st==='out'?'Reorder':st==='low'?'Low':'Healthy'}</span></td>
-          <td><div class="row-actions"><button class="icon-act go" title="Restock"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit"><i class="fa-solid fa-pen"></i></button></div></td>
+          <td><div class="row-actions"><button class="icon-act go" title="Restock" aria-label="Restock ${_e(i.name)}"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit" aria-label="Edit ${_e(i.name)}"><i class="fa-solid fa-pen"></i></button></div></td>
         </tr>`; }).join('');
 
       $$('#inv-table-body .icon-act.go').forEach(b => {
@@ -1754,6 +1932,7 @@
                 } catch (e) {
                   console.warn('Failed to save PO', e);
                   finishOperationStatus('Failed to create PO', 'error');
+                  toast('Failed to save purchase order — saved locally', 'fa-circle-exclamation');
                 }
               };
             }
@@ -1771,18 +1950,18 @@
           const ings = m.ingredients || [];
           const cost = ings.reduce((a,g)=>a+g.qty*invCost(g.name),0);
           const margin = m.price && cost ? Math.round((1-cost/m.price)*100) : (m.price?100:0);
-          const ingText = ings.length ? ings.map(g=>`${g.qty}${g.unit} ${g.name}`).join(', ') : '<span style="color:var(--text-mute)">No recipe â€" click âœ  to define</span>';
+          const ingText = ings.length ? ings.map(g=>`${_e(g.qty)}${_e(g.unit)} ${_e(g.name)}`).join(', ') : '<span style=”color:var(--text-mute)”>No recipe — click ✎ to define</span>';
           return `<tr>
-            <td><div style="display:flex;align-items:center;gap:9px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${m.name}</b></div></td>
-            <td>${m.cat}</td>
-            <td style="max-width:220px;font-size:12px">${ingText}</td>
-            <td class="td-strong">${cost?rs(cost):'â€"'}</td>
-            <td class="td-strong">${rs(m.price)}</td>
-            <td><span class="stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}">${cost?margin+'%':'â€"'}</span></td>
-            <td><button class="icon-act go" data-recipe-edit="${m.id}" title="Define recipe"><i class="fa-solid fa-pen"></i></button></td>
+            <td><div style=”display:flex;align-items:center;gap:9px”><span class=”veg ${m.veg?'':'nonveg'}”></span><b>${_e(m.name)}</b></div></td>
+            <td>${_e(m.cat)}</td>
+            <td style=”max-width:220px;font-size:12px”>${ingText}</td>
+            <td class=”td-strong”>${cost?rs(cost):'—'}</td>
+            <td class=”td-strong”>${rs(m.price)}</td>
+            <td><span class=”stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}”>${cost?margin+'%':'—'}</span></td>
+            <td><button class=”icon-act go” data-recipe-edit=”${_e(m.id)}” title=”Define recipe”><i class=”fa-solid fa-pen”></i></button></td>
           </tr>`;
         }).join('')
-        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet â€" add items in Menu Editor first</td></tr>';
+        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet – add items in Menu Editor first</td></tr>';
 
       // clicking recipe edit navigates to menu editor and opens that item
       $$('#recipe-table-body [data-recipe-edit]').forEach(btn => {
@@ -1868,146 +2047,238 @@
   const renderEditor = () => {
     $('#editor-list').innerHTML = MENU.map(m=>`
       <tr>
-        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${m.name}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} Â· ${m.cat}</div></div></div></td>
-        <td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td>
+        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${_e(m.name)}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${_e(m.cat)}</div></div></div></td>
+        <td>${_e(m.cat)}</td><td class="td-strong">${rs(m.price)}</td>
         <td><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></td>
         <td><label class="switch-mini"><input type="checkbox" ${m.stock!=='out'?'checked':''}><span></span></label></td>
-        <td><div class="row-actions"><button class="icon-act go" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" title="Recipe"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
+        <td><div class="row-actions"><button class="icon-act go" title="Edit" aria-label="Edit ${_e(m.name)}"><i class="fa-solid fa-pen"></i></button><button class="icon-act" title="Recipe" aria-label="Recipe for ${_e(m.name)}"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" title="Delete" aria-label="Delete ${_e(m.name)}"><i class="fa-solid fa-trash"></i></button></div></td>
       </tr>`).join('');
-    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editorâ€¦','fa-pen')));
+    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editor…','fa-pen')));
     $$('#editor-list .icon-act.danger').forEach(b=>b.addEventListener('click',()=>toast('Item removed','fa-trash')));
   };
 
   /* ============================================================
      REPORTS
      ============================================================ */
-  const renderReports = () => {
-    const paidBills = BILLS.filter(b => b.status === 'paid');
-    
-    // Calculate stats
-    const totalRevenue = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const totalOrders = paidBills.length;
-    const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    
-    // Estimate GST collected (assume 5% average)
-    const netTaxableSales = Math.round(totalRevenue / 1.05);
-    const gstCollected = totalRevenue - netTaxableSales;
-    
-    const reportsTab = document.getElementById('reports-tab');
-    if (reportsTab) {
-      const svElements = reportsTab.querySelectorAll('.stat-row .stat-card .sv');
-      if (svElements.length >= 4) {
-        svElements[0].textContent = totalRevenue > 0 ? rs(totalRevenue) : '₹0';
-        svElements[1].textContent = totalOrders;
-        svElements[2].textContent = aov > 0 ? rs(aov) : '₹0';
-        svElements[3].textContent = gstCollected > 0 ? rs(gstCollected) : '₹0';
-      }
-      
-      const tbody = reportsTab.querySelector('.panel table.data-table tbody');
-      if (tbody) {
-        tbody.innerHTML = `
-          <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">${rs(gstCollected)}</td></tr>
-          <tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">${rs(0)}</td></tr>
-          <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">${rs(netTaxableSales)}</td></tr>
-          <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">${rs(gstCollected)}</b></td></tr>
-        `;
-      }
-    }
+  const renderReports = (period) => {
+    period = period || 'Last 30 days';
+    const days = period==='Today'?1:period==='This week'?7:period==='This month'?30:period==='Last 90 days'?90:30;
+    const now = Date.now();
+    const cutoff = now - days * 86400000;
+    const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
 
-    // Daily revenue chart
-    const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const dayVals = [0, 0, 0, 0, 0, 0, 0];
-    
-    paidBills.forEach(b => {
-      if (b.time) {
-        const todayDay = new Date().getDay();
-        const index = (todayDay + 6) % 7;
-        dayVals[index] += b.amount || 0;
-      }
+    const paidBills = BILLS.filter(b => {
+      if (b.status !== 'paid') return false;
+      const t = b.dateTime ? new Date(b.dateTime).getTime() : (b.time ? new Date(b.time).getTime() : 0);
+      return t >= cutoff;
     });
 
-    const maxVal = Math.max(...dayVals) || 1;
-    const hasDailyData = dayVals.some(v => v > 0);
-    
-    if (!hasDailyData) {
-      $('#chart-revenue').innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-mute); font-size:12px; grid-column:1/-1; width:100%;">No sales trend data available</div>`;
-    } else {
-      $('#chart-revenue').innerHTML = days.map((d,i)=>`<div class="cbar"><div class="bar" style="height:0" data-h="${dayVals[i]/maxVal*100}"><span class="bv">${rs(dayVals[i])}</span></div><span class="bl">${d}</span></div>`).join('');
-      setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
-    }
-    
-    // Payment mix donut
-    const payCounts = { UPI: 0, Cash: 0, Card: 0, Due: 0 };
+    const totalRevenue = paidBills.reduce((sum,b)=>sum+(b.amount||b.total||0),0);
+    const totalOrders = paidBills.length;
+    const aov = totalOrders>0 ? Math.round(totalRevenue/totalOrders) : 0;
+
+    // Tax: use stored fields when available, else estimate by tax category
+    let gst5=0, gst12=0, gst18=0, gst28=0;
     paidBills.forEach(b => {
-      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
-        b.tenders.forEach(t => {
-          const method = t.method || 'Cash';
-          if (payCounts[method] !== undefined) {
-            payCounts[method] += Number(t.amount || 0);
-          }
+      if (b.taxSummary && typeof b.taxSummary === 'object') {
+        Object.entries(b.taxSummary).forEach(([rate, obj]) => {
+          const tax = (obj && obj.tax) ? obj.tax : 0;
+          if (rate==='5') gst5+=tax;
+          else if (rate==='12') gst12+=tax;
+          else if (rate==='18') gst18+=tax;
+          else if (rate==='28') gst28+=tax;
+          else gst5+=tax;
         });
       } else {
-        const method = b.pay || b.paymentMethod || 'Cash';
-        if (payCounts[method] !== undefined) {
-          payCounts[method] += b.amount || 0;
-        }
+        // Fallback estimate
+        gst5 += Math.round((b.cgst||0) + (b.sgst||0));
+        if (!b.cgst && !b.sgst) gst5 += Math.round((b.amount||0)/1.05*0.05);
       }
     });
-    const payTotal = payCounts.UPI + payCounts.Cash + payCounts.Card + payCounts.Due;
-    
-    if (payTotal === 0) {
-      $('#donut-pay').style.background = 'var(--glass-2)';
-      $('#donut-pay .donut-center .dc-v').textContent = '₹0';
-      $('#legend-pay').innerHTML = `<div style="color:var(--text-mute); font-size:12px; margin-top:10px; text-align:center;">No payments recorded</div>`;
-    } else {
-      const keys = ['UPI', 'Cash', 'Card', 'Due'];
-      const colors = { UPI: 'var(--violet)', Cash: 'var(--green)', Card: 'var(--orange)', Due: 'var(--red)' };
-      
-      let pcts = keys.map(k => Math.round((payCounts[k] / payTotal) * 100));
-      const sum = pcts.reduce((a,b)=>a+b, 0);
-      if (sum !== 100) {
-        let adjustIdx = pcts.findIndex(p => p > 0);
-        if (adjustIdx !== -1) {
-          pcts[adjustIdx] += (100 - sum);
-        }
-      }
-      
-      const payMix = keys.map((k, i) => [k, pcts[i], colors[k]]).filter(p => p[1] > 0);
-      
-      let acc=0; const seg=payMix.map(p=>{const s=`${p[2]} ${acc}% ${acc+p[1]}%`;acc+=p[1];return s;}).join(',');
-      $('#donut-pay').style.background=seg ? `conic-gradient(${seg})` : 'var(--glass-2)';
-      $('#donut-pay .donut-center .dc-v').textContent = totalRevenue > 0 ? rs(totalRevenue) : '₹0';
-      $('#legend-pay').innerHTML=payMix.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${p[0]}<span class="lg-val">${p[1]}%</span></div>`).join('');
+    const totalGST = gst5+gst12+gst18+gst28;
+    const netSales = totalRevenue - totalGST;
+
+    // Daily revenue (days slots, oldest→newest)
+    const dailySlots = Array(days).fill(0);
+    const dailyLabels = [];
+    for (let i=days-1;i>=0;i--) {
+      const d = new Date(now - i*86400000);
+      dailyLabels.push(days<=7 ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] : (d.getDate()+'/'+((d.getMonth()+1))));
     }
-    
-    // Category sales distribution
+    paidBills.forEach(b => {
+      const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+      const age = Math.floor((now-t)/86400000);
+      if (age>=0 && age<days) dailySlots[days-1-age] += (b.amount||b.total||0);
+    });
+    const maxSlot = Math.max(...dailySlots,1);
+    const hasDailyData = dailySlots.some(v=>v>0);
+
+    // Payment mix
+    const payMap = {};
+    paidBills.forEach(b => {
+      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
+        b.tenders.forEach(t => { const m=t.method||'Cash'; payMap[m]=(payMap[m]||0)+Number(t.amount||0); });
+      } else {
+        const m=b.pay||b.paymentMethod||'Cash'; payMap[m]=(payMap[m]||0)+(b.amount||0);
+      }
+    });
+    const payTotal = Object.values(payMap).reduce((a,v)=>a+v,0)||1;
+    const payColors = {Cash:'var(--green)',UPI:'var(--violet)',Card:'var(--orange)',Due:'var(--red)',Stripe:'var(--blue-soft)',Online:'var(--violet-soft)'};
+    const payEntries = Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
+    let acc=0;
+    const payMix = payEntries.map(([name,val])=>{
+      const pct=Math.round(val/payTotal*100);
+      return [name,pct,payColors[name]||'var(--amber)'];
+    }).filter(p=>p[1]>0);
+    let conicAcc=0;
+    const seg = payMix.map(p=>{const s=`${p[2]} ${conicAcc}% ${conicAcc+p[1]}%`;conicAcc+=p[1];return s;}).join(',');
+
+    // Category breakdown from _items
     const catSales = {};
     paidBills.forEach(b => {
-      if (typeof b.items === 'string') {
-        b.items.split(',').forEach(itemStr => {
-          const cleanStr = itemStr.trim();
-          const menuItem = MENU.find(m => cleanStr.startsWith(m.name) || cleanStr.includes(m.name));
-          const cat = menuItem ? menuItem.cat : 'Others';
-          const qtyMatch = cleanStr.match(/\sx(\d+)/);
-          const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-          const price = menuItem ? menuItem.price : 100;
-          catSales[cat] = (catSales[cat] || 0) + (price * qty);
+      (b._items||[]).forEach(it => {
+        if (!it||!it.name) return;
+        const cat = it.category||it.cat||'Uncategorized';
+        catSales[cat] = (catSales[cat]||0) + (it.price||0)*(it.qty||1);
+      });
+      // fallback: parse old string-format items
+      if (!b._items || !b._items.length) {
+        const items = typeof b.items==='string' ? b.items.split(',') : [];
+        items.forEach(str => {
+          const m = MENU.find(x=>str.trim().startsWith(x.name));
+          if (m) { const cat=m.cat||'Uncategorized'; catSales[cat]=(catSales[cat]||0)+(m.price||0); }
         });
       }
     });
+    const catTotal = Object.values(catSales).reduce((a,v)=>a+v,0)||1;
+    const sortedCats = Object.entries(catSales).sort((a,b)=>b[1]-a[1]).map(([name,val])=>[name,Math.round(val/catTotal*100)]);
 
-    const catTotal = Object.values(catSales).reduce((a,b)=>a+b, 0);
-    if (catTotal === 0) {
-      $('#cat-bars').innerHTML = `<div style="color:var(--text-mute); font-size:12px; text-align:center; padding:20px;">No category sales data available</div>`;
-    } else {
-      const sortedCats = Object.entries(catSales).sort((a,b)=>b[1]-a[1]).map(entry => {
-        const pct = Math.round(entry[1] / catTotal * 100);
-        return [entry[0], pct];
+    // Top items table
+    const itemMap = {};
+    paidBills.forEach(b => {
+      (b._items||[]).forEach(it => {
+        if (!it||!it.name) return;
+        if (!itemMap[it.name]) itemMap[it.name]={qty:0,rev:0};
+        itemMap[it.name].qty += (it.qty||1);
+        itemMap[it.name].rev += (it.price||0)*(it.qty||1);
       });
-      $('#cat-bars').innerHTML=sortedCats.map(c=>`<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${c[0]}</span><b style="color:var(--text)">${c[1]}%</b></div><div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div></div>`).join('');
-      setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
-    }
+    });
+    const topItems = Object.entries(itemMap).sort((a,b)=>b[1].rev-a[1].rev).slice(0,6);
+
+    const tab = document.getElementById('reports-tab');
+    if (!tab) return;
+
+    tab.innerHTML = `
+      <div class="toolbar-row" style="margin-bottom:4px">
+        <span class="eyebrow">${period}</span>
+        <div class="grow"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${['Today','This week','This month','Last 30 days','Last 90 days'].map(p=>
+            `<button class="btn btn-sm ${p===period?'btn-primary':'btn-ghost'}" onclick="window._renderReports('${p}')">${p}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(totalRevenue)}</div><div class="sl">Revenue</div><div class="sd">${period}</div></div></div>
+        <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">${totalOrders}</div><div class="sl">Orders</div><div class="sd">bills generated</div></div></div>
+        <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">${rs(aov)}</div><div class="sl">Avg order value</div></div></div>
+        <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">${rs(totalGST)}</div><div class="sl">GST collected</div></div></div>
+      </div>
+
+      <div class="report-grid">
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">${period} · hover for value</span></div>
+          <div class="chart-bars" id="chart-revenue">
+            ${hasDailyData
+              ? dailySlots.map((v,i)=>`<div class="cbar"><div class="bar" style="height:0" data-h="${Math.round(v/maxSlot*100)}"><span class="bv">${rs(v)}</span></div><span class="bl">${dailyLabels[i]}</span></div>`).join('')
+              : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px;width:100%">No sales data for this period</div>`
+            }
+          </div>
+        </div>
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Payment mix</h3></div>
+          <div class="donut-wrap">
+            <div class="donut" id="donut-pay" style="${seg?`background:conic-gradient(${seg})`:'background:var(--glass-2)'}">
+              <div class="donut-center"><div class="dc-v">${rs(totalRevenue)}</div><div class="dc-l">collected</div></div>
+            </div>
+            <div class="legend" id="legend-pay">
+              ${payMix.length>0
+                ? payMix.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${_e(p[0])}<span class="lg-val">${p[1]}%</span></div>`).join('')
+                : '<div style="color:var(--text-mute);font-size:12px;margin-top:10px;text-align:center">No payments recorded</div>'
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-grid" style="margin-top:16px">
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Top categories by revenue</h3></div>
+          <div id="cat-bars">
+            ${sortedCats.length>0
+              ? sortedCats.map(c=>`<div style="margin-bottom:13px">
+                  <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${_e(c[0])}</span><b style="color:var(--text)">${c[1]}%</b></div>
+                  <div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div>
+                </div>`).join('')
+              : '<div style="color:var(--text-mute);font-size:12px;text-align:center;padding:20px">No category data yet</div>'
+            }
+          </div>
+        </div>
+        <div class="panel panel-pad">
+          <div class="panel-head"><h3>Tax summary</h3></div>
+          <table class="data-table"><tbody>
+            <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">${rs(gst5)}</td></tr>
+            ${gst12>0?`<tr><td>GST @ 12%</td><td class="td-strong" style="text-align:right">${rs(gst12)}</td></tr>`:''}
+            ${gst18>0?`<tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">${rs(gst18)}</td></tr>`:''}
+            ${gst28>0?`<tr><td>GST @ 28% (luxury)</td><td class="td-strong" style="text-align:right">${rs(gst28)}</td></tr>`:''}
+            <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">${rs(netSales)}</td></tr>
+            <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">${rs(totalGST)}</b></td></tr>
+          </tbody></table>
+          <button class="btn btn-ghost btn-block" id="btn-download-gstr" style="margin-top:14px"><i class="fa-solid fa-file-arrow-down"></i> Download GSTR-ready CSV</button>
+        </div>
+      </div>
+
+      ${topItems.length>0?`
+      <div class="panel panel-pad" style="margin-top:16px">
+        <div class="panel-head"><h3>Top items by revenue</h3><span class="pill">${period}</span></div>
+        <table class="data-table"><thead><tr><th>#</th><th>Item</th><th>Qty sold</th><th style="text-align:right">Revenue</th></tr></thead><tbody>
+          ${topItems.map(([name,d],i)=>`<tr><td style="color:var(--text-mute);width:24px">${i+1}</td><td><b>${_e(name)}</b></td><td>${d.qty}</td><td style="text-align:right;color:var(--green)">${rs(d.rev)}</td></tr>`).join('')}
+        </tbody></table>
+      </div>`:''}
+    `;
+
+    // Animate bars
+    setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
+    setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
+
+    // GSTR CSV download
+    const gstrBtn = document.getElementById('btn-download-gstr');
+    if (gstrBtn) gstrBtn.onclick = () => {
+      const rows = [['Bill No','Date','Customer','Amount','GST 5%','GST 12%','GST 18%','GST 28%','Payment Method']];
+      paidBills.forEach(b => {
+        const ts = b.taxSummary||{};
+        rows.push([
+          b.no||b.id||'',
+          b.dateTime ? new Date(b.dateTime).toLocaleDateString('en-IN') : '',
+          b.customerName||'Walk-in Guest',
+          b.amount||b.total||0,
+          ts['5']?ts['5'].tax||0:0,
+          ts['12']?ts['12'].tax||0:0,
+          ts['18']?ts['18'].tax||0:0,
+          ts['28']?ts['28'].tax||0:0,
+          b.pay||b.paymentMethod||''
+        ]);
+      });
+      const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+      a.download = 'GSTR_report_'+new Date().toISOString().slice(0,10)+'.csv';
+      a.click();
+      toast('GSTR CSV downloaded','fa-file-arrow-down');
+    };
   };
+  window._renderReports = (p) => renderReports(p);
 
   /* ============================================================
      KDS
@@ -2033,8 +2304,8 @@
 
     $('#kds-grid').innerHTML = KDS.map((o,i)=>`
       <div class="kds-card" data-k="${i}">
-        <div class="kds-h"><div><div class="ktok">${o.tok}</div><div class="ktype">${o.type}</div></div><span class="kds-timer" data-start="${o.start}">0:00</span></div>
-        <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${it[0]}Ã--</span><div><span class="kn">${it[1]}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${it[2]}</div>`:''}</div></div>`).join('')}</div>
+        <div class="kds-h"><div><div class="ktok">${_e(o.tok)}</div><div class="ktype">${_e(o.type)}</div></div><span class="kds-timer" data-start="${_e(o.start)}">0:00</span></div>
+        <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${_e(it[0])}×</span><div><span class="kn">${_e(it[1])}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${_e(it[2])}</div>`:''}</div></div>`).join('')}</div>
         <div class="kds-foot"><button class="btn btn-primary btn-block" data-done="${i}"><i class="fa-solid fa-check"></i> Mark ready</button></div>
       </div>`).join('');
     $$('#kds-grid .kds-item').forEach(it=> it.addEventListener('click',()=>it.classList.toggle('done')));
@@ -2080,17 +2351,17 @@
     {ic:'fa-flask-vial',bg:'bg-g',t:'Recipe Costing',d:'Plate cost & margin calculator',m:'68% margin'},
     {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'4 live'},
     {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'3.1k reach'},
-    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 â˜...'},
+    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 â˜…'},
     {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'412 members'}
   ];
   const renderHub = () => {
     $('#hub-grid').innerHTML = HUB.map(h=>`
       <div class="hub-card">
         <div class="hub-ic ${h.bg}"><i class="fa-solid ${h.ic}"></i></div>
-        <h4>${h.t}</h4><p>${h.d}</p>
-        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${h.m}</span>
+        <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
+        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(h.m)}</span>
       </div>`).join('');
-    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'â€¦','fa-arrow-up-right-from-square')));
+    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'…','fa-arrow-up-right-from-square')));
   };
 
   /* ============================================================
@@ -2124,12 +2395,12 @@
 
     $('#emp-grid').innerHTML = EMPLOYEES.map((e,i)=>`
       <div class="emp-card">
-        <div class="emp-top"><div class="emp-av" style="background:${avatarColors[i%avatarColors.length]}">${initials(e.name)}</div><div style="flex:1"><div class="en">${e.name}</div><div class="ee">${e.email}</div></div></div>
-        <div style="margin-bottom:14px"><span class="role-tag ${e.rc}">${e.role}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${e.shift}</span></div>
-        <div class="emp-stats"><div class="es"><div class="esv">${e.sales}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${e.orders}</div><div class="esl">Orders</div></div></div>
-        <div class="emp-actions"><button class="btn btn-ghost btn-sm" style="flex:1"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove"><i class="fa-solid fa-user-minus"></i></button></div>
+        <div class="emp-top"><div class="emp-av" style="background:${avatarColors[i%avatarColors.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email)}</div></div></div>
+        <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc)}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift)}</span></div>
+        <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales)}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders)}</div><div class="esl">Orders</div></div></div>
+        <div class="emp-actions"><button class="btn btn-ghost btn-sm" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button></div>
       </div>`).join('');
-    $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissionsâ€¦','fa-user-gear')));
+    $$('#emp-grid .btn-ghost').forEach(b=>b.addEventListener('click',()=>toast('Editing role & permissions…','fa-user-gear')));
   };
 
   /* ============================================================
@@ -2214,7 +2485,7 @@
   const renderSuper = async () => {
     const tbody = $('#tenant-table-body');
     if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registryâ€¦</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry…</td></tr>';
     renderPlatformSummary([]);
     try {
       let tenants = [];
@@ -2252,16 +2523,16 @@
         const statusKey = (t.status||'active').toLowerCase();
         const statusCls = tStatus[statusKey] || 't-active';
         const statusText = t.status ? (t.status.charAt(0).toUpperCase()+t.status.slice(1).replace(/_/g,' ')) : 'Active';
-        const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : 'â€"';
+        const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : '–';
         const mrr = t.mrr || 0;
         const name = t.name || t.tenant_name || t.slug || 'Unknown';
         const slug = t.slug || t.tenant_slug || '';
         return `<tr>
-          <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${initials(name)}</div><div><b>${name}</b><div style="font-size:11px;color:var(--text-mute)">${slug}</div></div></div></td>
-          <td><span class="pill ${planLabel.toLowerCase()} ${pillCls}" style="padding:3px 9px">${planLabel}</span></td>
-          <td class="td-strong">${mrr?rs(mrr):'â€"'}</td><td>${t.outlet_count||1}</td><td>${joined}</td>
-          <td><span class="tenant-status ${statusCls}">${statusText}</span></td>
-          <td><div class="row-actions"><button class="icon-act manage-tenant-btn" title="Manage" data-tid="${t.id||''}"><i class="fa-solid fa-gear"></i></button></div></td>
+          <td><div style=”display:flex;align-items:center;gap:11px”><div class=”avatar-sm” style=”background:${avatarColors[name.length%avatarColors.length]}”>${_e(initials(name))}</div><div><b>${_e(name)}</b><div style=”font-size:11px;color:var(--text-mute)”>${_e(slug)}</div></div></div></td>
+          <td><span class=”pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}” style=”padding:3px 9px”>${_e(planLabel)}</span></td>
+          <td class=”td-strong”>${mrr?rs(mrr):'—'}</td><td>${_e(t.outlet_count||1)}</td><td>${_e(joined)}</td>
+          <td><span class=”tenant-status ${_e(statusCls)}”>${_e(statusText)}</span></td>
+          <td><div class=”row-actions”><button class=”icon-act manage-tenant-btn” title=”Manage” data-tid=”${_e(t.id||'')}”><i class=”fa-solid fa-gear”></i></button></div></td>
         </tr>`;
       }).join('');
 
@@ -2278,7 +2549,7 @@
         });
       });
     } catch(err) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${err.message||'Failed to load tenants'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message||'Failed to load tenants')}</td></tr>`;
     }
   };
 
@@ -2322,7 +2593,7 @@
         statusBadge.style.background = b.bg;
         statusBadge.style.borderColor = b.border;
         statusBadge.style.color = b.color;
-        statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${b.dot};display:inline-block;"></span>${b.label}`;
+        statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${_e(b.dot)};display:inline-block;"></span>${_e(b.label)}`;
       }
 
       if (usernameEl) usernameEl.value = tenant.username || '';
@@ -2706,7 +2977,7 @@
           <article class="app-incident-card">
             <div style="flex: 1; min-width: 0;">
               <strong>${escHtml(report.error_message || 'Unknown application error')}</strong>
-              <span>${escHtml(report.tenant_slug || 'unknown workspace')} Â· ${escHtml(report.source || 'dashboard')} Â· ${escHtml(report.url_path || 'unknown path')}</span>
+              <span>${escHtml(report.tenant_slug || 'unknown workspace')} · ${escHtml(report.source || 'dashboard')} · ${escHtml(report.url_path || 'unknown path')}</span>
               ${stack}
               <div class="app-incident-meta">
                 <span class="app-incident-pill ${escHtml(severity)}">${escHtml(severity)}</span>
@@ -2858,6 +3129,54 @@
     getModalRoot,
     seedToken:()=>{ window.__tok = (window.__tok||122)+1; return 'A-'+window.__tok; },
     BILLS, INVENTORY, EMPLOYEES, QR_ORDERS,
+
+    // ── Inventory deduction/restoration helpers ───────────────────────────────
+    // Called after bill is generated. Deducts recipe ingredients from stock.
+    deductInventoryForBill(billRow) {
+      const items = billRow._items || [];
+      if (!items.length) return;
+      let changed = false;
+      items.forEach(it => {
+        const menuItem = MENU.find(m => m.name === it.name);
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        const orderedQty = Number(it.qty) || 1;
+        menuItem.ingredients.forEach(ing => {
+          const invItem = INVENTORY.find(x => x.name === ing.name);
+          if (!invItem) return;
+          invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(ing.qty) || 0) * orderedQty);
+          changed = true;
+        });
+      });
+      if (changed) {
+        if (window.RS_DB && RS_DB.writeLocal) RS_DB.writeLocal('inventory', INVENTORY).catch(() => {});
+        const rendered = document.querySelector('#inventory-tab.active');
+        if (rendered && window.RS && RS.render) RS.render('inventory-tab');
+      }
+    },
+
+    // Called ONLY when deleting a bill (not on refund). Adds stock back.
+    restoreInventoryForBill(billRow) {
+      const items = billRow._items || [];
+      if (!items.length) return;
+      let changed = false;
+      items.forEach(it => {
+        const menuItem = MENU.find(m => m.name === it.name);
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        const orderedQty = Number(it.qty) || 1;
+        menuItem.ingredients.forEach(ing => {
+          const invItem = INVENTORY.find(x => x.name === ing.name);
+          if (!invItem) return;
+          invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
+          changed = true;
+        });
+      });
+      if (changed) {
+        if (window.RS_DB && RS_DB.writeLocal) RS_DB.writeLocal('inventory', INVENTORY).catch(() => {});
+        const rendered = document.querySelector('#inventory-tab.active');
+        if (rendered && window.RS && RS.render) RS.render('inventory-tab');
+      }
+    },
+
     // ---- persistence ----
     save(coll){ const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES}; const arr=map[coll]; if(window.RS_DB&&arr) return RS_DB.bulkPut(coll, arr.map(x=>({...x}))); return Promise.resolve(); },
     saveOne(coll,obj){ if(window.RS_DB) return RS_DB.put(coll, obj.id, {...obj}); return Promise.resolve(); },
@@ -3017,7 +3336,7 @@
     const curTab=document.querySelector('.tab-content.active'); if(curTab && renderers[curTab.id]) { try{ renderers[curTab.id](); }catch(e){} }
     
     // 2. Fetch fresh data from the cloud in parallel (non-blocking)
-    // Wait for /api/config to resolve before checking cloud mode -- without this,
+    // Wait for /api/config to resolve before checking cloud mode — without this,
     // RS_API.configured is still false (empty URL) on the first load in a new browser,
     // so the cloud fetch is skipped and a blank menu is shown until a hard refresh.
     if (window.__configReady) { try { await window.__configReady; } catch(e) {} }
@@ -3047,6 +3366,7 @@
       setupTenantDataRealtime();
     }catch(e){ console.warn('sync pending orders/realtime failed', e); }
     document.dispatchEvent(new CustomEvent('rs:hydrated'));
+    if(window.RS_SAAS) RS_SAAS.applyToUI();
   }
 
   /* ---------- boot ---------- */
@@ -3063,7 +3383,7 @@
   const isSuper = sess && sess.role === 'superadmin';
   const isBrandAdmin = sess && sess.role === 'brand_admin';
 
-  // -- Apply role-specific UI lockdown before first render --
+  // ── Apply role-specific UI lockdown before first render ──
   if (isBrandAdmin) {
     // 1. Show brandadmin-only elements
     $$('.brandadmin-only').forEach(el => {
@@ -3090,11 +3410,11 @@
     $$('.brandadmin-only').forEach(el => el.style.display = 'none');
   }
 
-  // â"€â"€ Apply superadmin-specific UI lockdown before first render â"€â"€
+  // â”€â”€ Apply superadmin-specific UI lockdown before first render â”€â”€
   if (isSuper) {
-    // 1. Show superadmin-only elements (sidebar links, mobile nav, section labels)
+    // 1. Show superadmin-only elements (sidebar links, section labels)
     $$('.superadmin-only').forEach(el => {
-      el.style.display = el.classList.contains('sidebar-link') || el.classList.contains('mnav-link') ? 'flex' : '';
+      el.style.display = el.classList.contains('sidebar-link') ? 'flex' : '';
     });
     // 2. Hide all regular sidebar links (keep only superadmin ones)
     $$('.sidebar-link').forEach(link => {
@@ -3103,8 +3423,6 @@
         link.style.display = 'none';
       }
     });
-    // 2b. Hide regular mobile bottom nav items for superadmin
-    $$('.superadmin-hide').forEach(el => { el.style.display = 'none'; });
     // 3. Update sidebar branding for superadmin
     const brandName = $('#sidebar-brand-name');
     const brandType = $('#sidebar-brand-type');
@@ -3698,11 +4016,11 @@
   (window.__configReady || Promise.resolve()).then(() => {
     if(window.RS_API && RS_API.configured){
       RS_API.validateSession().then(sess => {
-        // null = server confirmed token is invalid/expired -> redirect
-        if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
+        // null = server confirmed token is invalid/expired → redirect
+        if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href=’login.html’; }
       }).catch(() => {
-        // Network error / Supabase offline -- keep user on dashboard, don't log them out
-        console.warn('[RS] validateSession network error -- keeping local session alive.');
+        // Network error / Supabase offline — keep user on dashboard, don’t log them out
+        console.warn(‘[RS] validateSession network error — keeping local session alive.’);
       });
     }
   }).catch(()=>{});
@@ -3716,7 +4034,7 @@
     });
   });
 
-  // superadmin toggle (role switch demo) -- only show for non-superadmin users
+  // superadmin toggle (role switch demo) — only show for non-superadmin users
   if(!isSuper) {
     const roleSwitch = $('#role-switch');
     if (roleSwitch) roleSwitch.style.display = 'none';
@@ -3731,105 +4049,31 @@
     try { updateTabAttentionBlinking(); } catch(e) {}
   }, 2000);
 
-  // Security contract test compatibility:
-  // const FAST_INTERACTION_MODE = true;
-  // const ENABLE_DEMO_TOOLS = true;
-  // employees-tab', 'growth-hub-tab'
-  // document.querySelectorAll('.more-sheet-link[data-tab]')
-  // else if (tabId === 'growth-hub-tab') { renderGrowthHub()
-  // function debounce
-  // requestIdleCallback
-  // vaultWriteQueue
-  // frameTask(renderBills)
-  // if (!document.hidden && navigator.onLine) syncWithSupabase()
-  // channel('doppio-employees-realtime')
-  // table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}`
-  // table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}`
-  // channel('doppio-crm-realtime')
-  // channel(`doppio-menu-realtime-${activeTenantId}`)
-  // event: 'menu-updated'
-  // broadcastMenuUpdate()
-  // await Promise.all(cloudWrites)
-  // Recipe import failed for ${newItem.name}
-  // onConflict: 'tenant_id,name'
-  // onConflict: 'tenant_id,item_name'
-  // table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}`
-  // table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}`
-  // const belongsToActiveTenant = bills.some
-  // if (!belongsToActiveTenant) return
-  // const scheduleTenantDataSync
-  // String(response.payload.tenantId) === String(activeTenantId)
-  // function renderGrowthHub
-  // function renderPlatformSummary
-  // conflictTargets
-  // ON CONFLICT (tenant_id, "orderId") DO UPDATE SET
-  window.RS_ProgressOverlay = {
-    show(title, steps) {
-      const existing = document.getElementById('rs-progress-overlay');
-      if (existing) existing.remove();
-      
-      const ov = document.createElement('div');
-      ov.id = 'rs-progress-overlay';
-      ov.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(10, 10, 10, 0.75);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: inherit;
-      `;
-      
-      const card = document.createElement('div');
-      card.style.cssText = `
-        background: rgba(30, 30, 30, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        border-radius: 12px;
-        padding: 24px;
-        width: 340px;
-        color: var(--text);
-        text-align: center;
-      `;
-      
-      const head = document.createElement('h4');
-      head.textContent = title;
-      head.style.cssText = 'margin:0 0 16px 0;font-size:16px;font-weight:700;color:var(--text)';
-      card.appendChild(head);
-      
-      const barContainer = document.createElement('div');
-      barContainer.style.cssText = 'background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden;margin-bottom:20px;';
-      const bar = document.createElement('div');
-      bar.id = 'rs-progress-bar-fill';
-      bar.style.cssText = 'background:var(--orange);width:0%;height:100%;transition:width 0.4s ease;';
-      barContainer.appendChild(bar);
-      card.appendChild(barContainer);
-      
-      const list = document.createElement('div');
-      list.style.cssText = 'display:flex;flex-direction:column;gap:10px;text-align:left;font-size:13px;';
-      steps.forEach((step, idx) => {
-        const item = document.createElement('div');
-        item.id = `rs-progress-step-${idx}`;
-        item.style.cssText = 'display:flex;align-items:center;gap:10px;color:var(--text-mute);transition:color 0.3s ease;';
-        item.innerHTML = `<span class="step-icon" style="min-width:18px;display:inline-flex;justify-content:center;"><i class="fa-regular fa-circle"></i></span> <span>${step}</span>`;
-        list.appendChild(item);
-      });
-      card.appendChild(list);
-      ov.appendChild(card);
-      document.body.appendChild(ov);
-    },
-    
-    update(stepIndex, progressPercent) {
-      const bar = document.getElementById('rs-progress-bar-fill');
-      if (bar) bar.style.width = `${progressPercent}%`;
-      
-      for (let i = 0; i < stepIndex; i++) {
-        const el = document.getElementById(`rs-progress-step-${i}`);
-        if (el) {
-          el.style.color = '#25d366';
+  // ── Offline / Online connectivity banner ──────────────────────────────────
+  (function setupConnectivityBanner() {
+    let banner = document.getElementById('rs-offline-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'rs-offline-banner';
+      banner.setAttribute('role', 'alert');
+      banner.setAttribute('aria-live', 'polite');
+      banner.style.cssText = [
+        'position:fixed','bottom:0','left:0','right:0','z-index:99998',
+        'background:#1a1a1a','color:#fff','font-size:13px','font-weight:600',
+        'padding:10px 18px','display:none','align-items:center','gap:10px',
+        'border-top:2px solid var(--orange,#e85d26)',
+        'box-shadow:0 -2px 12px rgba(0,0,0,.4)'
+      ].join(';');
+      banner.innerHTML = '<i class="fa-solid fa-wifi-slash" style="color:var(--orange,#e85d26)"></i>&nbsp;<span id="rs-offline-msg">You are offline — data is saved locally and will sync when reconnected.</span>';
+      document.body.appendChild(banner);
+    }
+    function showBanner(msg) {
+      const msgEl = document.getElementById('rs-offline-msg');
+      if (msgEl) msgEl.textContent = msg;
+      banner.style.display = 'flex';
+    }
+    function hideBanner() { banner.style.display = 'none'; }
+
+    if (!navigator.onLine) showBanner('You are offline — data is saved locally and will sync when reconnected.');
+
+    window.addE

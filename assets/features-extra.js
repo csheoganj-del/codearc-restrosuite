@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — Token Display, Tax & GST, Advanced Analytics
+   RestroSuite -- Token Display, Tax & GST, Advanced Analytics
    ============================================================ */
 (function(){
   'use strict';
@@ -278,7 +278,7 @@
               ${periodBills.length > 0 ? periodBills.map(b => {
                 const c = Math.round((b.gst || 0) / 2);
                 const isECO = b.channel === 'ecommerce_9_5';
-                return `<tr><td><b>${b.no || b.orderId}</b></td><td>${b.customerName || 'Guest'}</td><td>${b.dateTime.split('T')[0]}</td><td class="td-strong">${rs(b.subtotal)}</td><td>${isECO?'—':rs(c)}</td><td>${isECO?'—':rs(b.gst - c)}</td><td>${isECO?rs(b.gst):'—'}</td><td>${b.liquorTaxAmount ? rs(b.liquorTaxAmount) : '—'}</td><td class="td-strong">${rs(b.amount || b.total)}</td></tr>`;
+                return `<tr><td><b>${b.no || b.orderId}</b></td><td>${b.customerName || 'Guest'}</td><td>${b.dateTime.split('T')[0]}</td><td class="td-strong">${rs(b.subtotal)}</td><td>${isECO?'--':rs(c)}</td><td>${isECO?'--':rs(b.gst - c)}</td><td>${isECO?rs(b.gst):'--'}</td><td>${b.liquorTaxAmount ? rs(b.liquorTaxAmount) : '--'}</td><td class="td-strong">${rs(b.amount || b.total)}</td></tr>`;
               }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--text-mute)">No invoices logged in this month</td></tr>'}
               </tbody></table></div>
             </div>

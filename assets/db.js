@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — Data layer
+   RestroSuite -- Data layer
    Routes through the Doppio Supabase Edge Functions (tenant-data)
    when configured + signed in; otherwise localStorage (demo).
 
@@ -13,9 +13,9 @@
    Auth delegates to RS_API when cloud-configured.
 
    Collections map to your real doppio_* tables:
-     menu→doppio_menu  bills→doppio_bills  inventory→doppio_inventory
-     customers→doppio_crm  employees→doppio_employees  drafts→doppio_draft_orders
-     settings→doppio_business_profile
+     menu->doppio_menu  bills->doppio_bills  inventory->doppio_inventory
+     customers->doppio_crm  employees->doppio_employees  drafts->doppio_draft_orders
+     settings->doppio_business_profile
    ============================================================ */
 (function(){
   'use strict';
@@ -127,7 +127,7 @@
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
-      from: r => ({ id:r.id, no:r.orderId, time:r.dateTime, table:'—',
+      from: r => ({ id:r.id, no:r.orderId, time:r.dateTime, table:'--',
                     _items:parseItems(r.items),
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
                     subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
@@ -328,6 +328,16 @@
   };
 
   /* ---------------- CLOUD (tenant-data) ---------------- */
+  // Bridge: the CLOUD methods below call API.select/insert/update/remove.
+  // These are provided by RS_API (doppio-api.js). Using a lazy proxy so the
+  // reference always points at the current RS_API even if it is replaced later.
+  const API = {
+    select(...a) { return window.RS_API.select(...a); },
+    insert(...a) { return window.RS_API.insert(...a); },
+    update(...a) { return window.RS_API.update(...a); },
+    remove(...a) { return window.RS_API.remove(...a); },
+  };
+
   const SETTINGS_MAP = {
     set_restaurant_name:'business_name', set_outlet_name:'business_name', set_address:'address',
     set_phone:'phone', set_gstin:'gstin', set_gst_state:'gst_state'
@@ -567,23 +577,4 @@
     getSettings:()=>guard('getSettings','settings'),
     setSettings: async (o)=> {
       const tenantId = getActiveTenantId();
-      cachedSettingsMap[tenantId] = o;
-      await LS.setSettings(o);
-      if (signedIn()) {
-        try {
-          const res = await CLOUD.setSettings(o);
-          if (res) {
-            cachedSettingsMap[tenantId] = res;
-            await LS.setSettings(res);
-          }
-          return res;
-        } catch(e) {
-          console.warn('[RS_DB] setSettings cloud failed:', e.message);
-          return o;
-        }
-      }
-      return o;
-    },
-    ...auth
-  };
-})();
+   

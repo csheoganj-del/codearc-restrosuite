@@ -774,7 +774,7 @@
           });
       }
 
-      // Self Checkout Summary
+      // ── Self Checkout Summary ────────────────────────────────────────────────
       function renderCheckoutSummary() {
         const orderList = getPendingOrderList();
         const checkoutBox = document.getElementById('checkout-box');
@@ -785,86 +785,156 @@
         }
 
         const runningTotal = orderList.reduce((sum, ord) => sum + Number(ord.total || 0), 0);
-
         if (runningTotal <= 0) {
           checkoutBox.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Your bill is settled.</p>`;
           return;
         }
 
         const symbol = window.currencySymbol || '₹';
-        const isUpiSupported = (symbol === '₹');
-        const upiVpa = upiVpaAddress || "merchant@upi"; // Fallback VPA
-        const upiName = document.getElementById('brand-logo').textContent || "Doppio Cafe";
         const latestOrder = orderList[orderList.length - 1];
-
-        // Format UPI deep link
-        const upiUrl = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${runningTotal.toFixed(2)}&tr=${latestOrder.orderId}&tn=Table%20${table}%20Bill&cu=INR`;
-        const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
-
-        let paymentMethodHtml = '';
-        if (isUpiSupported) {
-          paymentMethodHtml = `
-            <div class="upi-box">
-              <p style="font-size:13px; color:var(--text-muted); text-align:center;">Scan below to pay directly via any UPI app</p>
-              <div class="qr-container">
-                <img src="${qrCodeApiUrl}" class="qr-img" alt="UPI QR Code">
-              </div>
-              <a href="${upiUrl}" class="btn" style="text-decoration:none;"><i class="fa-solid fa-mobile-screen-button"></i> Pay via UPI App</a>
-            </div>
-
-            <div class="utr-form">
-              <p style="font-size:12px; font-weight:600; color:var(--text-muted);">After payment, enter the 12-digit UTR/Ref code to auto-verify:</p>
-              <input type="number" class="input-field" id="utr-input" placeholder="e.g. 123456789012" minlength="12" maxlength="12">
-              <button class="btn" onclick="submitUtrCode('${latestOrder.orderId}')" style="background:#111827;"><i class="fa-solid fa-shield-halved"></i> Submit UTR Code</button>
-            </div>
-          `;
-        } else {
-          paymentMethodHtml = `
-            <div style="text-align: center; margin-top: 20px; padding: 20px; border-radius: var(--r-sm); background: rgba(17,24,39,0.03); border: 1px solid var(--border);">
-              <i class="fa-solid fa-credit-card" style="font-size: 28px; color: var(--brand); margin-bottom: 8px;"></i>
-              <p style="font-size: 15px; font-weight: 700; color: var(--text);">Pay at Counter</p>
-              <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Please present this bill summary to the waiter or cashier to complete your payment.</p>
-            </div>
-          `;
-        }
+        const outletName = document.getElementById('brand-logo').textContent || 'Restaurant';
 
         checkoutBox.innerHTML = `
           <div class="bill-summary">
             <div class="bill-row">
               <span>Running Bill (Table ${table})</span>
-              <span>${symbol}${runningTotal}</span>
+              <span>${symbol}${runningTotal.toFixed(2)}</span>
             </div>
             <div class="bill-row bill-total">
               <span>Grand Total</span>
-              <span>${symbol}${runningTotal}</span>
+              <span>${symbol}${runningTotal.toFixed(2)}</span>
             </div>
           </div>
-          ${paymentMethodHtml}
+          <div id="pay-action-area" style="margin-top: 8px;"></div>
         `;
+
+        const payArea = document.getElementById('pay-action-area');
+
+        // Try Razorpay Route first (Indian ₹ outlets with Route enabled)
+        if (symbol === '₹') {
+          configPromise.then(() => {
+            // Ask our edge function to create a Razorpay order
+            fetch((SU ? SU + '/functions/v1/razorpay-route' : '/functions/v1/razorpay-route'), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SK,
+                'Authorization': 'Bearer ' + SK
+              },
+              body: JSON.stringify({
+                action:      'create_order',
+                tenant_slug: slug,
+                order_id:    latestOrder.orderId,
+                amount:      runningTotal,
+                table:       table
+              })
+            })
+            .then(r => r.json())
+            .then(res => {
+              if (res.rzp_order_id && res.rzp_key) {
+                // Razorpay Route is enabled — show Razorpay Checkout button
+                payArea.innerHTML = `
+                  <button class="btn" id="btn-rzp-pay" style="margin-top:4px;">
+                    <i class="fa-solid fa-bolt"></i> Pay ${symbol}${runningTotal.toFixed(2)} via Razorpay
+                  </button>
+                  <p style="font-size:11px; color:var(--text-muted); text-align:center; margin-top:8px;">
+                    UPI · Cards · Netbanking — payment goes directly to ${outletName}
+                  </p>
+                `;
+                document.getElementById('btn-rzp-pay').onclick = () => openRazorpayCheckout({
+                  key:      res.rzp_key,
+                  orderId:  res.rzp_order_id,
+                  amount:   res.amount,
+                  name:     outletName,
+                  table,
+                  internalOrderId: latestOrder.orderId
+                });
+              } else {
+                // Route not enabled for this outlet — fallback to UPI VPA QR
+                renderUpiVpaFallback(payArea, runningTotal, symbol, latestOrder, outletName);
+              }
+            })
+            .catch(() => {
+              renderUpiVpaFallback(payArea, runningTotal, symbol, latestOrder, outletName);
+            });
+          });
+        } else {
+          // Non-INR (Ireland etc.) — Pay at Counter until Stripe is wired up
+          payArea.innerHTML = `
+            <div style="text-align:center; margin-top:20px; padding:20px; border-radius:var(--r-sm); background:rgba(17,24,39,0.03); border:1px solid var(--border);">
+              <i class="fa-solid fa-credit-card" style="font-size:28px; color:var(--brand); margin-bottom:8px;"></i>
+              <p style="font-size:15px; font-weight:700; color:var(--text);">Pay at Counter</p>
+              <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Present this bill to the waiter or cashier to complete payment.</p>
+            </div>
+          `;
+        }
       }
 
-      window.submitUtrCode = function(orderId) {
-        const val = document.getElementById('utr-input').value.trim();
-        if (val.length !== 12) {
-          showToast("Please enter a valid 12-digit UTR/Ref code.");
+      // Fallback: show restaurant's own UPI VPA QR (no UTR needed, cashier settles manually)
+      function renderUpiVpaFallback(container, total, symbol, latestOrder, outletName) {
+        const upiVpa  = upiVpaAddress || '';
+        if (!upiVpa) {
+          container.innerHTML = `
+            <div style="text-align:center; padding:20px; border-radius:var(--r-sm); border:1px solid var(--border);">
+              <p style="font-size:14px; font-weight:700;">Pay at Counter</p>
+              <p style="font-size:12px; color:var(--text-muted); margin-top:4px;">Ask the waiter to settle your bill.</p>
+            </div>`;
           return;
         }
+        const upiUrl  = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(outletName)}&am=${total.toFixed(2)}&tr=${latestOrder.orderId}&tn=Table%20${table}%20Bill&cu=INR`;
+        const qrUrl   = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+        container.innerHTML = `
+          <div class="upi-box">
+            <p style="font-size:13px; color:var(--text-muted); text-align:center;">Scan to pay via any UPI app</p>
+            <div class="qr-container"><img src="${qrUrl}" class="qr-img" alt="UPI QR"></div>
+            <a href="${upiUrl}" class="btn" style="text-decoration:none;"><i class="fa-solid fa-mobile-screen-button"></i> Open UPI App</a>
+            <p style="font-size:11px; color:var(--text-muted); text-align:center;">Show payment confirmation to the waiter</p>
+          </div>`;
+      }
 
-        apiCall('create_notification', {
-          title: `Table ${table} Payment Check`,
-          message: `UTR submitted: ${val} for Order ID: ${orderId}`,
-          type: 'payment_alert'
-        })
-        .then(res => {
-          if (res.success) {
-            showToast("UTR code submitted. Waiting for cashier approval.");
-            closeModal('checkout-modal');
-          } else {
-            showToast("Failed to submit verification. Try again.");
-          }
-        })
-        .catch(() => showToast("Connection failed. Try again."));
-      };
+      // ── Razorpay Checkout (Route) ────────────────────────────────────────────
+      function openRazorpayCheckout({ key, orderId, amount, name, table, internalOrderId }) {
+        // Load Razorpay JS on demand
+        function launchCheckout() {
+          const options = {
+            key,
+            amount,
+            currency:    'INR',
+            name,
+            description: `Table ${table} Bill`,
+            order_id:    orderId,
+            theme:       { color: '#FF6B00' },
+            handler: function(response) {
+              // Payment successful — Razorpay webhook will mark order Paid in DB
+              // Update localStorage optimistically so tracker shows Paid
+              try {
+                const orders = JSON.parse(localStorage.getItem('doppio_pending_qr_orders') || '[]');
+                const updated = orders.map(o => o.orderId === internalOrderId ? { ...o, paid: true } : o);
+                localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(updated));
+              } catch(e) {}
+              closeModal('checkout-modal');
+              showToast('Payment successful! Enjoy your meal.');
+            },
+            modal: {
+              ondismiss: function() {
+                showToast('Payment cancelled.');
+              }
+            }
+          };
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+        }
+
+        if (window.Razorpay) {
+          launchCheckout();
+        } else {
+          const s = document.createElement('script');
+          s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          s.onload = launchCheckout;
+          s.onerror = () => showToast('Could not load payment. Try again.');
+          document.head.appendChild(s);
+        }
+      }
 
       // Handle offline status alerts
       window.addEventListener('online', () => document.getElementById('offline-banner').style.display = 'none');

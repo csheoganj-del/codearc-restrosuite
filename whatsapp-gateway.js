@@ -16,21 +16,162 @@ const archiver = require('archiver');
 const unzipper = require('unzipper');
 
 // ============================================================
+// HUMAN-SEND ENGINE -- prevents Meta automation detection
+// ============================================================
+//
+// How Meta bans numbers:
+//  1. COMPLAINT RATE (primary)  -- >2% of recipients tap "Block/Report Spam" -> flagged
+//  2. MESSAGE VELOCITY          -- machine-like uniform intervals (exactly 5s every time)
+//  3. PROTOCOL FINGERPRINT      -- no typing indicator, no online presence, no read receipts
+//  4. BURST PATTERN             -- silent for hours then 50 msgs in 60 seconds
+//  5. NUMBER TRUST SCORE        -- new number + no profile pic + no incoming msgs = low trust
+//
+// This engine addresses issues 2, 3, and 4. Issue 1 is handled by only sending
+// to customers who voluntarily provided their number at checkout.
+
+// Per-tenant daily send counter { tenantId: { date, count } }
+const _dailySendCount = {};
+const DAILY_LIMIT = 200; // safe ceiling per number per day
+
+// Per-tenant send queue to prevent bursting
+const _sendQueues = new Map(); // tenantId -> Promise chain
+
+/** Returns a random integer between min and max (inclusive) */
+function _randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+/** Sleep for ms milliseconds */
+function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/** Is it a reasonable sending hour? (8am-9pm local machine time) */
+function _isBusinessHour() {
+    const h = new Date().getHours();
+    return h >= 8 && h < 21;
+}
+
+/**
+ * Human-like delay before sending a message:
+ *   - Short "typing" pause proportional to message length (simulates reading+typing)
+ *   - Random jitter so no two sends are exactly the same interval apart
+ */
+function _humanDelay(messageText) {
+    // ~200 chars/sec reading speed + 80 wpm typing -> about 15ms per character, capped
+    const charDelay = Math.min((messageText || '').length * 12, 3500);
+    const jitter    = _randInt(800, 2800);
+    return charDelay + jitter; // 1-6 seconds total
+}
+
+/**
+ * Inter-message spacing -- random gap between consecutive sends.
+ * Uniform timing (always 5000ms) is a dead giveaway; this varies 3-9s.
+ */
+function _betweenMessageDelay() { return _randInt(3000, 9000); }
+
+/** Check and increment daily counter. Returns false if limit reached. */
+function _checkDailyLimit(tenantId) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!_dailySendCount[tenantId] || _dailySendCount[tenantId].date !== today) {
+        _dailySendCount[tenantId] = { date: today, count: 0 };
+    }
+    if (_dailySendCount[tenantId].count >= DAILY_LIMIT) return false;
+    _dailySendCount[tenantId].count++;
+    return true;
+}
+
+/**
+ * humanSend -- drop-in replacement for client.sendMessage()
+ *
+ * Wraps every outbound message with:
+ *   1. Daily rate-limit check (200/day per number)
+ *   2. Business-hour check (warns but does not block -- restaurant may need late sends)
+ *   3. Typing indicator for realistic duration
+ *   4. Random human-like delay before actual send
+ *   5. Serial queue per tenant (no parallel bursts)
+ *   6. Inter-message gap after send
+ *
+ * @param {object} client      -- wwebjs Client instance
+ * @param {string} chatId      -- "phone@c.us"
+ * @param {string|object} msg  -- message or MessageMedia
+ * @param {object} [opts]      -- sendMessage options passthrough
+ * @param {string} [tenantId]  -- for rate-limit tracking
+ */
+async function humanSend(client, chatId, msg, opts, tenantId) {
+    tenantId = tenantId || chatId;
+
+    // -- Rate limit ------------------------------------------------------------
+    if (!_checkDailyLimit(tenantId)) {
+        console.warn(`[HumanSend] Daily limit (${DAILY_LIMIT}) reached for ${tenantId}. Message not sent.`);
+        throw new Error(`Daily WhatsApp send limit reached for this outlet. Try again tomorrow.`);
+    }
+
+    if (!_isBusinessHour()) {
+        console.warn(`[HumanSend] Sending outside business hours (8am-9pm) for ${tenantId}.`);
+    }
+
+    // -- Queue per tenant (no burst parallelism) -------------------------------
+    const prev = _sendQueues.get(tenantId) || Promise.resolve();
+    const next = prev.then(async () => {
+        try {
+            // 1. Go online
+            try { await client.sendPresenceUpdate('available', chatId); } catch(_) {}
+
+            // 2. Show typing indicator
+            let chat;
+            try {
+                chat = await client.getChatById(chatId);
+                await chat.sendStateTyping();
+            } catch(_) {}
+
+            // 3. Wait a human-realistic duration
+            const msgText = typeof msg === 'string' ? msg : (msg?.caption || '');
+            await _sleep(_humanDelay(msgText));
+
+            // 4. Send the actual message
+            const result = await client.sendMessage(chatId, msg, opts || {});
+
+            // 5. Clear typing state
+            try { if (chat) await chat.clearState(); } catch(_) {}
+
+            // 6. Go back to idle presence
+            try { await client.sendPresenceUpdate('paused', chatId); } catch(_) {}
+
+            // 7. Post-send gap before next message can fire
+            await _sleep(_betweenMessageDelay());
+
+            return result;
+        } catch (err) {
+            // Still do the post-send gap so next queued message isn't fired instantly
+            await _sleep(_betweenMessageDelay());
+            throw err;
+        }
+    });
+
+    _sendQueues.set(tenantId, next.catch(() => {})); // don't let rejection break the chain
+    return next;
+}
+
+// ============================================================
 // SUPABASE CLIENTS
 // ============================================================
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://htkauiibuejetimfiavs.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.warn('[Config] SUPABASE_URL or SUPABASE_ANON_KEY is not set. Supabase-dependent features (realtime, health log) will be disabled.');
+}
 
 // Service-role key for Supabase Storage access (set as env variable in HuggingFace Secrets)
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // Anon client for Realtime
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-    realtime: { transport: ws }
-});
+const supabase = (SUPABASE_URL && SUPABASE_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_KEY, { realtime: { transport: ws } })
+    : null;
 
 // Service client for Storage (session backup) + health log
-const supabaseService = SUPABASE_SERVICE_KEY
+const hasServiceKey = SUPABASE_URL &&
+                      SUPABASE_SERVICE_KEY &&
+                      SUPABASE_SERVICE_KEY.trim() !== '' &&
+                      !SUPABASE_SERVICE_KEY.startsWith('<');
+const supabaseService = hasServiceKey
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { realtime: { transport: ws } })
     : null;
 
@@ -79,7 +220,7 @@ if (emailConfig.user && emailConfig.pass) {
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
-        family: 4, // Force IPv4 — Hugging Face Spaces block IPv6 outbound connections
+        family: 4, // Force IPv4 -- Hugging Face Spaces block IPv6 outbound connections
         lookup: (hostname, options, callback) => {
             return dns.lookup(hostname, { family: 4 }, callback);
         },
@@ -157,19 +298,45 @@ async function sendMailHelper(to, subject, html, text = '') {
 
 const app = express();
 
-// Enable CORS for POS dashboard requests
-app.use(cors());
-app.use(express.json());
+// SECURITY: CORS must be restricted -- wildcard cors() allows any origin to make
+// credentialed requests to the gateway, which is a CSRF vector. Restrict to the
+// Supabase Edge Function origin and your Vercel deployment origin.
+// GATEWAY_ALLOWED_ORIGINS must be set in environment secrets. If unset, ALL
+// cross-origin requests are blocked (fail-closed). Example:
+//   GATEWAY_ALLOWED_ORIGINS=https://restrosuite.codearc.co.in,https://htkauiibuejetimfiavs.supabase.co
+const GATEWAY_ALLOWED_ORIGINS_RAW = (process.env.GATEWAY_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+if (GATEWAY_ALLOWED_ORIGINS_RAW.length === 0) {
+    console.warn('[Security] GATEWAY_ALLOWED_ORIGINS is not set. All cross-origin requests will be blocked. Set it in environment secrets.');
+}
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (server-to-server, curl, Postman in same-origin context)
+        if (!origin) return callback(null, true);
+        // Fail-closed: if no origins are configured, block all cross-origin requests
+        if (GATEWAY_ALLOWED_ORIGINS_RAW.length === 0) {
+            return callback(new Error('CORS: no allowed origins configured'));
+        }
+        if (GATEWAY_ALLOWED_ORIGINS_RAW.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('CORS origin not allowed'));
+    },
+    credentials: true,
+}));
+app.use(express.json({ limit: '10mb' }));
 
 // Multi-Tenant Gateway State Manager
 const tenantClients = new Map(); // tenantId -> TenantClientData
+// Orders already handled by the /send endpoint -- realtime listener skips these
+// to prevent double-sending when the POS frontend sends explicitly (e.g. PDF mode).
+const realtimeSkipOrders = new Set(); // "tenantId:orderId"
 const MAX_RECONNECT_ATTEMPTS = 5;
 let totalMessagesSent = 0;
 let recentHealthEvents = []; // last 10 events for dashboard
 let lastAlertSent = null;
 
 // ============================================================
-// HEALTH LOGGING — writes to gateway_health_log in Supabase
+// HEALTH LOGGING -- writes to gateway_health_log in Supabase
 // ============================================================
 async function logHealthEvent(event, status, details = {}) {
     const entry = { event, status, details, created_at: new Date().toISOString() };
@@ -189,7 +356,7 @@ async function logHealthEvent(event, status, details = {}) {
 }
 
 // ============================================================
-// ADMIN ALERT — sends email to admin when gateway is in trouble
+// ADMIN ALERT -- sends email to admin when gateway is in trouble
 // ============================================================
 async function sendAdminAlert(type, extraDetails = {}) {
     if (!transporter) {
@@ -197,10 +364,10 @@ async function sendAdminAlert(type, extraDetails = {}) {
         return;
     }
 
-    // Throttle alerts — don't spam more than once per 10 minutes for same type
+    // Throttle alerts -- don't spam more than once per 10 minutes for same type
     const now = Date.now();
     if (lastAlertSent && lastAlertSent.type === type && (now - lastAlertSent.time) < 10 * 60 * 1000) {
-        console.log(`[Admin Alert] Throttled — ${type} alert already sent recently.`);
+        console.log(`[Admin Alert] Throttled -- ${type} alert already sent recently.`);
         return;
     }
     lastAlertSent = { type, time: now };
@@ -329,7 +496,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
 }
 
 // ============================================================
-// SESSION PERSISTENCE — Save/Restore WhatsApp session via Supabase Storage
+// SESSION PERSISTENCE -- Save/Restore WhatsApp session via Supabase Storage
 // ============================================================
 async function saveSessionToSupabaseScoped(tenantId) {
     if (!supabaseService) {
@@ -393,8 +560,6 @@ async function saveSessionToSupabaseScoped(tenantId) {
                     '**/AmountExtractionHeuristicRegexes/**',
                     '**/FileTypePolicies/**',
                     '**/ZxcvbnData/**',
-                    '**/*.log',
-                    '**/*.txt',
                     // Extra optimization: exclude heavy IndexedDB blobs, network sessions, extensions and storage logs
                     '**/*.blob',
                     '**/*.blob/**',
@@ -528,22 +693,48 @@ function autoInitializeLocalSessions() {
     if (!fs.existsSync(authDataPath)) return;
     try {
         const files = fs.readdirSync(authDataPath);
+        const tenantIds = [];
         for (const file of files) {
             if (file.startsWith('session-')) {
                 const tenantId = file.substring(8);
-                if (tenantId) {
-                    console.log(`[Startup Auto-Restore] Found local session directory for tenant: ${tenantId}`);
-                    getOrCreateClient(tenantId);
+                if (tenantId && tenantId !== 'system') {
+                    tenantIds.push(tenantId);
                 }
             }
         }
+
+        // Initialize non-system tenants sequentially with a 15-second delay to prevent CPU thrashing
+        tenantIds.forEach((tenantId, index) => {
+            const delayMs = (index + 1) * 15000; // start 15s after system client is initialized
+            setTimeout(() => {
+                console.log(`[Startup Auto-Restore] Initializing driver for tenant: ${tenantId} (after ${delayMs / 1000}s stagger delay)`);
+                getOrCreateClient(tenantId);
+            }, delayMs);
+        });
     } catch(err) {
         console.error('[Startup Auto-Restore Error] Failed to scan local sessions:', err.message);
     }
 }
 
-// Read secret token from environment variable (configured as a secret in HuggingFace Space)
-const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || process.env.WHATSAPP_GATEWAY_TOKEN || 'local-dev-gateway-token';
+// SECURITY: GATEWAY_TOKEN must be explicitly set in production. There is NO
+// default fallback -- using a predictable default string is equivalent to
+// publishing the token in source code. The gateway will refuse all authenticated
+// requests if this variable is unset. Set it in your HuggingFace Space / Railway /
+// VPS environment secrets, or in .env.local for local development.
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || process.env.WHATSAPP_GATEWAY_TOKEN || '';
+
+// Constant-time string comparison for token verification. Prevents timing
+// side-channel attacks where an attacker can infer the correct token byte-by-byte
+// by measuring response times. Always compares the full length.
+function timingSafeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const aBuf = Buffer.from(a, 'utf8');
+    const bBuf = Buffer.from(b, 'utf8');
+    if (aBuf.length !== bBuf.length) return false;
+    let diff = 0;
+    for (let i = 0; i < aBuf.length; i++) diff |= aBuf[i] ^ bBuf[i];
+    return diff === 0;
+}
 
 // Utility to mask phone numbers in logs to prevent customer data leaks
 function maskPhone(phoneStr) {
@@ -553,12 +744,12 @@ function maskPhone(phoneStr) {
     return clean.substring(0, 2) + '*'.repeat(clean.length - 6) + clean.substring(clean.length - 4);
 }
 
-// Token validation helper
+// Token validation helper -- FAIL-CLOSED.
+// Returns true ONLY if a token is provided AND it matches the configured secret
+// using constant-time comparison. If GATEWAY_TOKEN is empty, ALL requests are denied.
 function verifyToken(req) {
     if (!GATEWAY_TOKEN) {
-        // Fail-closed: if the token is not configured, deny all requests.
-        // Set GATEWAY_TOKEN in your HuggingFace Space secrets to enable access.
-        console.warn('[Security] GATEWAY_TOKEN is not set. All authenticated endpoints are blocked. Configure it in environment secrets.');
+        console.warn('[Security] GATEWAY_TOKEN is not set. All authenticated endpoints are blocked. Set GATEWAY_TOKEN in environment secrets.');
         return false;
     }
     
@@ -575,7 +766,8 @@ function verifyToken(req) {
         }
     }
     
-    return token === GATEWAY_TOKEN;
+    if (!token) return false;
+    return timingSafeEqual(token, GATEWAY_TOKEN);
 }
 
 const os = require('os');
@@ -602,6 +794,10 @@ function getOrCreateClient(tenantId) {
             clientId: tid,
             dataPath: authDataPath
         }),
+        webVersionCache: {
+            type: 'remote',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1042095497-alpha.html'
+        },
         puppeteer: {
             handleSIGINT: false,
             protocolTimeout: 0,
@@ -610,17 +806,7 @@ function getOrCreateClient(tenantId) {
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--disable-cache',
-                '--disk-cache-size=0',
-                '--media-cache-size=0',
-                '--aggressive-cache-discard',
-                '--disable-async-dns',
-                '--disable-extensions',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                '--disable-gpu'
             ]
         }
     });
@@ -644,11 +830,15 @@ function getOrCreateClient(tenantId) {
                 if (tenantClients.get(tid) === tenantData) {
                     tenantClients.delete(tid);
                 }
-                try { await client.destroy(); } catch (_) {}
+                try {
+                    const destroyPromise = client.destroy();
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                    await Promise.race([destroyPromise, timeoutPromise]);
+                } catch (_) {}
                 // Trigger a fresh client instantiation
                 getOrCreateClient(tid);
             }
-        }, 180000); // 3 minutes watchdog
+        }, 120000); // 120 seconds watchdog (2 minutes) to allow slow cloud starts
     };
 
     const clearWatchdog = () => {
@@ -1261,7 +1451,7 @@ app.get('/', (req, res) => {
                     resultDiv.style.display = 'block';
                     if (data.code) {
                         resultDiv.innerHTML = \`
-                            <p class="details-text" style="text-align:center; font-size:12px; margin-top:12px;">Open WhatsApp → Settings → Linked Devices → Link a Device → <strong>Link with phone number instead</strong></p>
+                            <p class="details-text" style="text-align:center; font-size:12px; margin-top:12px;">Open WhatsApp -> Settings -> Linked Devices -> Link a Device -> <strong>Link with phone number instead</strong></p>
                             <div class="pair-code-display">\${data.code}</div>
                             <p class="details-text" style="text-align:center; font-size:11px; color: var(--warning);">⚠️ Enter this code in WhatsApp within 60 seconds!</p>
                         \`;
@@ -1430,9 +1620,19 @@ app.post('/logout', async (req, res) => {
         if (tenantClients.has(tenantId)) {
             const tenantData = tenantClients.get(tenantId);
             if (tenantData.status === 'ready') {
-                await tenantData.client.logout();
+                try {
+                    const logoutPromise = tenantData.client.logout();
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Logout timeout')), 5000));
+                    await Promise.race([logoutPromise, timeoutPromise]);
+                } catch (logoutErr) {
+                    console.log(`[Logout Warning] Logout failed or timed out for tenant ${tenantId}:`, logoutErr.message);
+                }
             }
-            try { await tenantData.client.destroy(); } catch (_) {}
+            try {
+                const destroyPromise = tenantData.client.destroy();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                await Promise.race([destroyPromise, timeoutPromise]);
+            } catch (_) {}
             
             // Delete auth folder locally
             const tenantFolder = path.join(authDataPath, `session-${tenantId}`);
@@ -1480,9 +1680,11 @@ async function performReset(req, res, format = 'json') {
             const tenantData = tenantClients.get(tenantId);
             try {
                 console.log(`[Reset] Closing active Puppeteer browser session for tenant ${tenantId}...`);
-                await tenantData.client.destroy();
+                const destroyPromise = tenantData.client.destroy();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                await Promise.race([destroyPromise, timeoutPromise]);
             } catch (destroyErr) {
-                console.log(`[Reset Warning] Failed to destroy client cleanly for tenant ${tenantId} (safe to ignore):`, destroyErr.message);
+                console.log(`[Reset Warning] Failed to destroy client cleanly or timed out for tenant ${tenantId} (safe to ignore):`, destroyErr.message);
             }
             tenantClients.delete(tenantId);
         }
@@ -1579,15 +1781,22 @@ app.post('/send', async (req, res) => {
         if (pdfData) {
             const { MessageMedia } = require('whatsapp-web.js');
             const media = new MessageMedia('application/pdf', pdfData, filename || 'receipt.pdf');
-            await tenantData.client.sendMessage(chatId, media);
-            // Do NOT send a separate text after the PDF — the PDF IS the receipt.
+            await humanSend(tenantData.client, chatId, media, {}, tenantId);
+            // Do NOT send a separate text after the PDF -- the PDF IS the receipt.
         } else {
             // Send monospaced text receipt
-            await tenantData.client.sendMessage(chatId, message);
+            await humanSend(tenantData.client, chatId, message, {}, tenantId);
         }
-        
+
         console.log(`[Manual Sent] WhatsApp receipt successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
-        
+
+        // Mark this order as handled so the realtime listener doesn't double-send
+        if (orderId) {
+            const skipKey = `${tenantId}:${orderId}`;
+            realtimeSkipOrders.add(skipKey);
+            setTimeout(() => realtimeSkipOrders.delete(skipKey), 60_000); // clean up after 60s
+        }
+
         // Tag sending activity securely for this tenant
         await logHealthEvent('send_receipt', 'ok', {
             tenant_id: tenantId,
@@ -1597,7 +1806,7 @@ app.post('/send', async (req, res) => {
         });
 
         // Broadcast success back to Supabase Realtime
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -1625,7 +1834,7 @@ app.post('/send', async (req, res) => {
         });
         
         // Broadcast failure back to Supabase Realtime
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -1680,6 +1889,7 @@ app.post('/supabase-webhook', async (req, res) => {
     
     let phone = record.customerPhone;
     const orderId = record.orderId;
+    const tenantId = record.tenant_id;
 
     if (!phone || phone.trim() === '' || phone === 'null') {
         console.log(`[Webhook] Ignored: No phone number provided for bill ${orderId}`);
@@ -1691,19 +1901,102 @@ app.post('/supabase-webhook', async (req, res) => {
         phone = "91" + phone;
     }
 
+    // Wait 15s -- the POS frontend auto-sends after 800ms but the full chain
+    // (jsPDF load + edge function cold start + network) can take 8-12s.
+    // 15s gives enough headroom without meaningfully delaying text-only sends.
+    await new Promise(r => setTimeout(r, 15000));
+
+    // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
+    if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
+        console.log(`[Webhook Skipped] Order ${orderId} already handled by frontend via /send.`);
+        return res.json({ status: 'skipped', reason: 'Order already handled via /send' });
+    }
+
     try {
         const chatId = `${phone}@c.us`;
-        const message = formatReceiptText(record);
-        const tenantId = record.tenant_id;
+        let uiSettings = {};
+        
+        // Fetch dynamic business profile for this tenant
+        let tenantProfile = { ...businessProfile };
+        if (tenantId) {
+            const dbClient = supabaseService || supabase;
+            const { data: profiles, error: profileErr } = await dbClient
+                .from('doppio_business_profile')
+                .select('*')
+                .eq('tenant_id', tenantId);
+            
+            if (profileErr) {
+                console.error(`[Webhook Error] Failed to fetch profile for tenant ${tenantId}:`, profileErr.message);
+            }
+            
+            if (profiles && profiles.length > 0) {
+                tenantProfile.name = profiles[0].business_name || tenantProfile.name;
+                tenantProfile.address = profiles[0].address || tenantProfile.address;
+                tenantProfile.phone = profiles[0].phone || tenantProfile.phone;
+                tenantProfile.gstEnabled = profiles[0].gst_enabled !== false;
+                
+                // Check if WhatsApp is enabled in tenant business settings
+                if (profiles[0].whatsapp_enabled === false) {
+                    console.log(`[Webhook Cancelled] WhatsApp receipts are disabled in settings for tenant ${tenantId}.`);
+                    return res.json({ status: 'cancelled', reason: 'WhatsApp receipts disabled' });
+                }
+
+                // Check bill format preference -- if PDF mode, skip auto-send.
+                let flags = {};
+                try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
+                uiSettings = flags.ui_settings || {};
+
+                // If uiSettings couldn't be loaded, skip rather than risk sending wrong format.
+                if (!uiSettings || Object.keys(uiSettings).length === 0) {
+                    console.log(`[Webhook Skipped] uiSettings empty for tenant ${tenantId} -- skipping to avoid duplicate/wrong-format send.`);
+                    return res.json({ status: 'skipped', reason: 'uiSettings not available' });
+                }
+
+                // Check if auto-send is disabled
+                const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
+                if (!autoSendEnabled) {
+                    console.log(`[Webhook Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
+                    return res.json({ status: 'skipped', reason: 'Auto-send receipts disabled' });
+                }
+
+                const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
+                if (billFormat === 'Thermal PDF receipt') {
+                    console.log(`[Webhook Skipped] Tenant ${tenantId} uses PDF receipts -- auto-text skipped.`);
+                    return res.json({ status: 'skipped', reason: 'Thermal PDF receipt format selected' });
+                }
+            }
+        }
+
+        // Extract tenant currency symbol (WhatsApp-safe ASCII version)
+        let currSymbol = 'Rs.';
+        try {
+            const rawCurr = uiSettings.set_currency || '';
+            if (rawCurr) {
+                const m = rawCurr.match(/\(([^)]+)\)/);
+                const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
+                currSymbol = sym
+                    .replace(/₹/g, 'Rs.')
+                    .replace(/€/g, 'EUR')
+                    .replace(/£/g, 'GBP')
+                    .replace(/¥/g, 'JPY')
+                    .replace(/₩/g, 'KRW')
+                    .replace(/₺/g, 'TRY')
+                    .replace(/₴/g, 'UAH');
+            }
+        } catch(currErr) {
+            console.warn('[Webhook] Failed to parse currency symbol:', currErr.message);
+        }
+
+        const message = formatReceiptText(record, tenantProfile, currSymbol);
         const tenantData = getOrCreateClient(tenantId);
         if (tenantData.status !== 'ready') {
             throw new Error(`WhatsApp gateway for tenant ${tenantId} is not connected.`);
         }
-        await tenantData.client.sendMessage(chatId, message);
+        await humanSend(tenantData.client, chatId, message, {}, tenantId);
         console.log(`[Webhook Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId}`);
         
         // Broadcast success
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -1719,7 +2012,7 @@ app.post('/supabase-webhook', async (req, res) => {
         res.json({ status: 'success', message: 'Message sent successfully via Webhook' });
     } catch (err) {
         console.error(`[Webhook Error] Failed to send receipt:`, err.message);
-        if (orderId) {
+        if (orderId && supabase) {
             const channel = supabase.channel('whatsapp-billing-status');
             channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -1765,10 +2058,10 @@ async function handleNewRegistrationNotification(record) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
         
-        const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n— *CodeArc RestroSuite*`;
+        const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n-- *CodeArc RestroSuite*`;
         
         try {
-            await systemData.client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
+            await humanSend(systemData.client, chatId, escapeLinks(msgText), { linkPreview: false }, 'system');
             console.log(`[Realtime WhatsApp] Registration confirmation sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('registration_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -2049,7 +2342,7 @@ async function handleApprovalNotification(record) {
         const msgText = `Dear Partner,\n\nWe are pleased to inform you that your registration request for *${name}* has been reviewed and approved by the CodeArc Operations Team. Your account is now fully active.\n\n*Access Credentials:*\n• *Outlet ID (Slug):* ${slug}\n• *Administrator Username:* ${username}\n\n*Management Portal Link:* https://restrosuite.codearc.co.in/login.html\n\nYou may now log in to the portal to configure your outlet settings, menu inventory, and employee rosters.\n\nShould you require any assistance or launch support, please contact our support desk at hello@codearc.co.in.\n\nSincerely,\n*CodeArc Operations Team*`;
         
         try {
-            await systemData.client.sendMessage(chatId, escapeLinks(msgText), { linkPreview: false });
+            await humanSend(systemData.client, chatId, escapeLinks(msgText), { linkPreview: false }, 'system');
             console.log(`[Realtime WhatsApp] Account approval alert sent to +${maskPhone(targetPhone)}`);
             await logHealthEvent('approval_whatsapp_sent', 'ok', { phone: targetPhone, name });
         } catch (err) {
@@ -2201,174 +2494,213 @@ async function runNotificationPollingFallback() {
 // NATIVE SUPABASE REALTIME DB LISTENERS
 // ======================================================
 const dbClientForRealtime = supabaseService || supabase;
-const realtimeChannel = dbClientForRealtime
-    .channel('doppio-realtime-listener')
-    .on(
-        'postgres_changes',
-        {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'doppio_bills'
-        },
-        async (payload) => {
-            const record = payload.new;
-            const orderId = record.orderId;
-            let phone = record.customerPhone;
-            const tenantId = record.tenant_id;
+if (dbClientForRealtime) {
+    const realtimeChannel = dbClientForRealtime
+        .channel('doppio-realtime-listener')
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'doppio_bills'
+            },
+            async (payload) => {
+                const record = payload.new;
+                const orderId = record.orderId;
+                let phone = record.customerPhone;
+                const tenantId = record.tenant_id;
 
-            console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
+                console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
 
-            if (!phone || phone.trim() === '' || phone === 'null') {
-                console.log(`[Realtime Triggered] Ignored: No phone number provided for bill ${orderId}`);
-                return;
-            }
+                // Wait 5s -- the POS frontend auto-sends after 800ms; this gives it time
+                // to call /send first so we can skip if it already handled the bill (PDF mode).
+                // 15s gives enough headroom for jsPDF load + edge cold start + network.
+                await new Promise(r => setTimeout(r, 15000));
 
-            phone = phone.replace(/\D/g, '');
-            if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
-                phone = "91" + phone;
-            }
-
-            try {
-                const chatId = `${phone}@c.us`;
-                
-                // Fetch dynamic business profile for this tenant
-                let tenantProfile = { ...businessProfile };
-                if (tenantId) {
-                    const { data: profiles } = await supabase
-                        .from('doppio_business_profile')
-                        .select('*')
-                        .eq('tenant_id', tenantId);
-                    
-                    if (profiles && profiles.length > 0) {
-                        tenantProfile.name = profiles[0].business_name || tenantProfile.name;
-                        tenantProfile.address = profiles[0].address || tenantProfile.address;
-                        tenantProfile.phone = profiles[0].phone || tenantProfile.phone;
-                        tenantProfile.gstEnabled = profiles[0].gst_enabled !== false;
-                        
-                        // Check if WhatsApp is enabled in tenant business settings
-                        if (profiles[0].whatsapp_enabled === false) {
-                            console.log(`[Realtime Cancelled] WhatsApp receipts are disabled in settings for tenant ${tenantId}.`);
-                            return;
-                        }
-
-                        // Check bill format preference — if PDF mode, skip auto-send from realtime listener.
-                        // The POS frontend will handle PDF generation and delivery via the /send endpoint.
-                        let flags = {};
-                        try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
-                        const uiSettings = flags.ui_settings || {};
-                        const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
-                        if (billFormat === 'Thermal PDF receipt') {
-                            console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts — auto-text skipped. POS frontend will send PDF via /send.`);
-                            return;
-                        }
-                    }
+                // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
+                if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
+                    console.log(`[Realtime Skipped] Order ${orderId} already handled by frontend via /send.`);
+                    return;
                 }
 
-                // Extract tenant currency symbol (WhatsApp-safe ASCII version)
-                let currSymbol = 'Rs.';
+                if (!phone || phone.trim() === '' || phone === 'null') {
+                    console.log(`[Realtime Triggered] Ignored: No phone number provided for bill ${orderId}`);
+                    return;
+                }
+
+                phone = phone.replace(/\D/g, '');
+                if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
+                    phone = "91" + phone;
+                }
+
                 try {
-                    const rawCurr = uiSettings.set_currency || '';
-                    if (rawCurr) {
-                        // Handle "EUR (€)" → extract €
-                        const m = rawCurr.match(/\(([^)]+)\)/);
-                        const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
-                        // Convert multi-byte symbols to ASCII-safe equivalents for WhatsApp
-                        currSymbol = sym
-                            .replace(/₹/g, 'Rs.')
-                            .replace(/€/g, 'EUR')
-                            .replace(/£/g, 'GBP')
-                            .replace(/¥/g, 'JPY')
-                            .replace(/₩/g, 'KRW')
-                            .replace(/₺/g, 'TRY')
-                            .replace(/₴/g, 'UAH');
-                    }
-                } catch(currErr) {
-                    console.warn('[Realtime] Failed to parse currency symbol:', currErr.message);
-                }
-
-                // Format clean text receipt (matching POS frontend format)
-                const message = formatReceiptText(record, tenantProfile, currSymbol);
-                
-                // Dispatch message via Whatsapp
-                const tenantData = getOrCreateClient(tenantId);
-                if (tenantData.status === 'ready') {
-                    await tenantData.client.sendMessage(chatId, message);
-                    console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
+                    const chatId = `${phone}@c.us`;
+                    let uiSettings = {};
                     
-                    // Broadcast success back to POS Web Clients
-                    const broadcastChannel = supabase.channel('whatsapp-billing-status');
-                    broadcastChannel.subscribe(async (status) => {
-                        if (status === 'SUBSCRIBED') {
-                            await broadcastChannel.send({
-                                type: 'broadcast',
-                                event: 'status',
-                                payload: { orderId, status: 'success' }
-                            });
-                            supabase.removeChannel(broadcastChannel);
+                    // Fetch dynamic business profile for this tenant
+                    let tenantProfile = { ...businessProfile };
+                    if (tenantId) {
+                        const dbClient = supabaseService || supabase;
+                        const { data: profiles, error: profileErr } = await dbClient
+                            .from('doppio_business_profile')
+                            .select('*')
+                            .eq('tenant_id', tenantId);
+                        
+                        if (profileErr) {
+                            console.error(`[Realtime Error] Failed to fetch profile for tenant ${tenantId}:`, profileErr.message);
                         }
-                    });
-                } else {
-                    console.warn(`[Realtime Delay] WhatsApp gateway for tenant ${tenantId} not connected (Status: ${tenantData.status}). Cannot dispatch message.`);
-                }
-            } catch (err) {
-                console.error(`[Realtime Error] Failed to send receipt for order ${orderId} to +${phone}:`, err.message);
-                
-                // Broadcast failure back to POS Web Clients
-                const broadcastChannel = supabase.channel('whatsapp-billing-status');
-                broadcastChannel.subscribe(async (status) => {
-                    if (status === 'SUBSCRIBED') {
-                        await broadcastChannel.send({
-                            type: 'broadcast',
-                            event: 'status',
-                            payload: { orderId, status: 'failed', error: err.message }
-                        });
-                        supabase.removeChannel(broadcastChannel);
-                    }
-                });
-            }
-        }
-    )
-    .on(
-        'postgres_changes',
-        {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'saas_tenants'
-        },
-        async (payload) => {
-            const record = payload.new;
-            console.log(`[Realtime SaaS] Detected new registration insert: ${record.name} (${record.slug})`);
-            await handleNewRegistrationNotification(record);
-        }
-    )
-    .on(
-        'postgres_changes',
-        {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'saas_tenants'
-        },
-        async (payload) => {
-            const oldRecord = payload.old;
-            const newRecord = payload.new;
-            
-            // Check if status transitioned from pending to approved
-            // Note: If replica identity full is not set, oldRecord might only contain the ID.
-            // In that case, we fall back to checking if newRecord status is 'approved' and oldRecord.status was undefined (or not 'approved').
-            const oldStatus = oldRecord ? oldRecord.status : null;
-            const newStatus = newRecord ? newRecord.status : null;
-            
-            console.log(`[Realtime SaaS] Detected tenant update: ${newRecord.name} (Status: ${oldStatus} -> ${newStatus})`);
-            
-            if (newStatus === 'approved' && oldStatus !== 'approved') {
-                await handleApprovalNotification(newRecord);
-            }
-        }
-    );
+                        
+                        if (profiles && profiles.length > 0) {
+                            tenantProfile.name = profiles[0].business_name || tenantProfile.name;
+                            tenantProfile.address = profiles[0].address || tenantProfile.address;
+                            tenantProfile.phone = profiles[0].phone || tenantProfile.phone;
+                            tenantProfile.gstEnabled = profiles[0].gst_enabled !== false;
+                            
+                            // Check if WhatsApp is enabled in tenant business settings
+                            if (profiles[0].whatsapp_enabled === false) {
+                                console.log(`[Realtime Cancelled] WhatsApp receipts are disabled in settings for tenant ${tenantId}.`);
+                                return;
+                            }
 
-realtimeChannel.subscribe((status) => {
-    console.log(`[Realtime Sub] Connected to Supabase Postgres Replication status: ${status}`);
-});
+                            // Check bill format preference -- if PDF mode, skip auto-send from realtime listener.
+                            // The POS frontend will handle PDF generation and delivery via the /send endpoint.
+                            let flags = {};
+                            try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
+                            uiSettings = flags.ui_settings || {};
+
+                            // If uiSettings couldn't be loaded, skip rather than risk sending wrong format.
+                            if (!uiSettings || Object.keys(uiSettings).length === 0) {
+                                console.log(`[Realtime Skipped] uiSettings empty for tenant ${tenantId} -- skipping to avoid duplicate/wrong-format send.`);
+                                return;
+                            }
+
+                            // Check if auto-send is disabled
+                            const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
+                            if (!autoSendEnabled) {
+                                console.log(`[Realtime Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
+                                return;
+                            }
+
+                            const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
+                            if (billFormat === 'Thermal PDF receipt') {
+                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts -- auto-text skipped. POS frontend will send PDF via /send.`);
+                                return;
+                            }
+                        }
+                    }
+
+                    // Extract tenant currency symbol (WhatsApp-safe ASCII version)
+                    let currSymbol = 'Rs.';
+                    try {
+                        const rawCurr = uiSettings.set_currency || '';
+                        if (rawCurr) {
+                            // Handle "EUR (€)" -> extract €
+                            const m = rawCurr.match(/\(([^)]+)\)/);
+                            const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
+                            // Convert multi-byte symbols to ASCII-safe equivalents for WhatsApp
+                            currSymbol = sym
+                                .replace(/₹/g, 'Rs.')
+                                .replace(/€/g, 'EUR')
+                                .replace(/£/g, 'GBP')
+                                .replace(/¥/g, 'JPY')
+                                .replace(/₩/g, 'KRW')
+                                .replace(/₺/g, 'TRY')
+                                .replace(/₴/g, 'UAH');
+                        }
+                    } catch(currErr) {
+                        console.warn('[Realtime] Failed to parse currency symbol:', currErr.message);
+                    }
+
+                    // Format clean text receipt (matching POS frontend format)
+                    const message = formatReceiptText(record, tenantProfile, currSymbol);
+                    
+                    // Dispatch message via Whatsapp
+                    const tenantData = getOrCreateClient(tenantId);
+                    if (tenantData.status === 'ready') {
+                        await humanSend(tenantData.client, chatId, message, {}, tenantId);
+                        console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
+                        
+                        // Broadcast success back to POS Web Clients
+                        if (supabase) {
+                            const broadcastChannel = supabase.channel('whatsapp-billing-status');
+                            broadcastChannel.subscribe(async (status) => {
+                                if (status === 'SUBSCRIBED') {
+                                    await broadcastChannel.send({
+                                        type: 'broadcast',
+                                        event: 'status',
+                                        payload: { orderId, status: 'success' }
+                                    });
+                                    supabase.removeChannel(broadcastChannel);
+                                }
+                            });
+                        }
+                    } else {
+                        console.warn(`[Realtime Delay] WhatsApp gateway for tenant ${tenantId} not connected (Status: ${tenantData.status}). Cannot dispatch message.`);
+                    }
+                } catch (err) {
+                    console.error(`[Realtime Error] Failed to send receipt for order ${orderId} to +${phone}:`, err.message);
+                    
+                    // Broadcast failure back to POS Web Clients
+                    if (supabase) {
+                        const broadcastChannel = supabase.channel('whatsapp-billing-status');
+                        broadcastChannel.subscribe(async (status) => {
+                            if (status === 'SUBSCRIBED') {
+                                await broadcastChannel.send({
+                                    type: 'broadcast',
+                                    event: 'status',
+                                    payload: { orderId, status: 'failed', error: err.message }
+                                });
+                                supabase.removeChannel(broadcastChannel);
+                            }
+                        });
+                    }
+                }
+            }
+        )
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'saas_tenants'
+            },
+            async (payload) => {
+                const record = payload.new;
+                console.log(`[Realtime SaaS] Detected new registration insert: ${record.name} (${record.slug})`);
+                await handleNewRegistrationNotification(record);
+            }
+        )
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'saas_tenants'
+            },
+            async (payload) => {
+                const oldRecord = payload.old;
+                const newRecord = payload.new;
+                
+                // Check if status transitioned from pending to approved
+                // Note: If replica identity full is not set, oldRecord might only contain the ID.
+                // In that case, we fall back to checking if newRecord status is 'approved' and oldRecord.status was undefined (or not 'approved').
+                const oldStatus = oldRecord ? oldRecord.status : null;
+                const newStatus = newRecord ? newRecord.status : null;
+                
+                console.log(`[Realtime SaaS] Detected tenant update: ${newRecord.name} (Status: ${oldStatus} -> ${newStatus})`);
+                
+                if (newStatus === 'approved' && oldStatus !== 'approved') {
+                    await handleApprovalNotification(newRecord);
+                }
+            }
+        );
+
+    realtimeChannel.subscribe((status) => {
+        console.log(`[Realtime Sub] Connected to Supabase Postgres Replication status: ${status}`);
+    });
+} else {
+    console.warn('[Realtime] Supabase clients not initialized. Postgres realtime listener is disabled.');
+}
 
 // ======================================================
 // MONOSPACE RECEIPT FORMATTER UTILITIES
@@ -2505,16 +2837,16 @@ function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.'
     msg += centerText24(profile.phone) + '\n';
     msg += borderDouble + '\n\n';
     
-    let leftBill = `Bill: ${record.orderId}`;
-    let rightPay = record.paymentMethod || 'Cash';
-    if (rightPay.length > 8) {
-        rightPay = rightPay.slice(0, 8);
-    }
-    const padSize = 24 - leftBill.length;
-    if (padSize < rightPay.length) {
-        msg += leftBill.slice(0, 24 - rightPay.length) + rightPay + '\n';
+    const billLine = `Bill: ${record.orderId}`;
+    const payLine = record.paymentMethod || 'Cash';
+    const padSize = 24 - billLine.length;
+    if (padSize >= payLine.length) {
+        // Bill number short enough -- payment fits on same line
+        msg += billLine + payLine.padStart(padSize, ' ') + '\n';
     } else {
-        msg += leftBill + rightPay.padStart(padSize, ' ') + '\n';
+        // Bill number too long -- put each on its own line, no truncation
+        msg += billLine + '\n';
+        msg += `Paid: ${payLine}` + '\n';
     }
     
     const dateOnly = record.dateTime ? record.dateTime.split(',')[0] : new Date().toLocaleDateString('en-IN');
@@ -2578,7 +2910,7 @@ function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.'
 
 // ============================================================
 // ============================================================
-// DEBUG RELAY ENDPOINT — to check relay URL format safely
+// DEBUG RELAY ENDPOINT -- to check relay URL format safely
 // ============================================================
 app.get('/debug-relay', (req, res) => {
     if (!verifyToken(req)) {
@@ -2676,149 +3008,4 @@ app.get('/test-relay-call', async (req, res) => {
         headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(postData),
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        },
-        timeout: 10000
-    };
-    
-    const request = https.request(url, options, (response) => {
-        let body = '';
-        response.on('data', chunk => body += chunk);
-        response.on('end', () => {
-            res.json({
-                statusCode: response.statusCode,
-                headers: response.headers,
-                body: body
-            });
-        });
-    });
-    request.on('error', err => res.json({ error: err.message }));
-    request.write(postData);
-    request.end();
-});
-
-// HEALTH ENDPOINT — for UptimeRobot / external monitors
-// ============================================================
-app.get('/health', (req, res) => {
-    const systemData = tenantClients.get('system') || { status: 'disconnected' };
-    res.json({
-        ok: true,
-        status: systemData.status,
-        uptime: Math.floor(process.uptime()),
-        time: new Date().toISOString()
-    });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-    console.log('\n======================================================');
-    console.log(` RestroSuite WhatsApp Gateway running at:`);
-    console.log(` http://localhost:${PORT}`);
-    console.log('======================================================');
-    try {
-        const commitHash = require('child_process').execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-        console.log(`[Startup] Code version commit: ${commitHash}`);
-    } catch (err) {
-        console.log(`[Startup] Code version commit lookup failed (git not installed or no repo).`);
-    }
-
-    // Ensure storage bucket file size limit is set correctly (150MB) to allow session backup
-    if (supabaseService) {
-        try {
-            console.log('[Startup] Ensuring storage bucket limits are set correctly...');
-            const bucketTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
-            await Promise.race([
-                supabaseService.storage.updateBucket(SESSION_BUCKET, {
-                    public: false,
-                    fileSizeLimit: 157286400 // 150MB
-                }),
-                bucketTimeout
-            ]);
-            console.log('[Startup] Storage bucket configured.');
-        } catch (err) {
-            console.warn('[Startup Storage Config Warning]', err.message === 'timeout' ? 'Bucket update timed out — skipping.' : err.message);
-        }
-    }
-
-    try {
-        const healthTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
-        await Promise.race([logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() }), healthTimeout]);
-    } catch (err) {
-        console.warn('[Startup Health Log Warning] Skipped:', err.message);
-    }
-
-    // Clean up any stale lock/socket/cookie files from a previous run first
-    console.log('[Startup] Cleaning up any stale browser lock/socket/cookie files...');
-    cleanupStaleLockFiles(authDataPath);
-
-    // Attempt to restore WhatsApp sessions from Supabase Storage
-    console.log('[Startup] Attempting to restore WhatsApp sessions from Supabase Storage...');
-    try {
-        const restoreTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
-        await Promise.race([restoreSessionsFromSupabase(), restoreTimeout]);
-    } catch (err) {
-        console.warn('[Startup Session Restore Warning] Timed out or failed:', err.message);
-    }
-
-    // Send startup alert email (informational only)
-    try {
-        const alertTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
-        await Promise.race([sendAdminAlert('startup', { sessionRestored: true }), alertTimeout]);
-    } catch (err) {
-        console.warn('[Startup Alert Warning] Skipped:', err.message);
-    }
-
-    console.log('[Startup] Initializing WhatsApp drivers...');
-    try {
-        console.log('[Startup Init Shield] Cleaning up stale browser lock/socket/cookie files immediately before launch...');
-        cleanupStaleLockFiles(authDataPath);
-    } catch (err) {
-        console.error('[Startup Init Shield Error]', err.message);
-    }
-
-    // Initialize SuperAdmin / system client
-    getOrCreateClient('system');
-    
-    // Auto-initialize other tenant clients that have local sessions
-    autoInitializeLocalSessions();
-
-    // Start database notification polling fallback (every 60 seconds)
-    if (supabaseService) {
-        console.log('[Startup] Starting database notification polling fallback...');
-        setTimeout(runNotificationPollingFallback, 5000); // Initial run in 5s
-        setInterval(runNotificationPollingFallback, 60000); // Run every 60s
-    }
-
-    // ============================================================
-    // KEEP-ALIVE SELF-PING — prevents HuggingFace Space from sleeping
-    // Pings own /health endpoint every 4 minutes so the space stays
-    // warm 24/7 even on the free tier.
-    // ============================================================
-    const selfUrl = process.env.SPACE_HOST
-        ? `https://${process.env.SPACE_HOST}/health`
-        : `http://localhost:${PORT}/health`;
-
-    const https = require('https');
-    const http  = require('http');
-
-    function selfPing() {
-        const lib = selfUrl.startsWith('https') ? https : http;
-        const req = lib.get(selfUrl, (res) => {
-            const systemData = tenantClients.get('system') || { status: 'disconnected' };
-            console.log(`[Keep-Alive] Self-ping OK — status ${res.statusCode} (gateway: ${systemData.status})`);
-        });
-        req.on('error', (err) => {
-            console.warn(`[Keep-Alive] Self-ping failed: ${err.message}`);
-        });
-        req.end();
-    }
-
-    // First ping after 30s, then every 4 minutes
-    setTimeout(() => {
-        selfPing();
-        setInterval(selfPing, 4 * 60 * 1000);
-    }, 30000);
-
-    console.log(`[Keep-Alive] Self-ping scheduler started → ${selfUrl} (every 4 min)`);
-});
-
+   

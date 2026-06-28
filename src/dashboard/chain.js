@@ -138,7 +138,7 @@
                 <button class="btn btn-primary btn-xs" onclick="RestroSuite.chain.approveTransfer(${idx})" style="padding: 3px 8px; font-size:11px;">Approve</button>
                 <button class="btn btn-ghost btn-xs text-danger" onclick="RestroSuite.chain.cancelTransfer(${idx})" style="padding: 3px 8px; font-size:11px;">Decline</button>
               </div>
-            ` : `<span style="color:var(--text-mute); font-size:12px;">—</span>`}
+            ` : `<span style="color:var(--text-mute); font-size:12px;">--</span>`}
           </td>
         </tr>
       `;

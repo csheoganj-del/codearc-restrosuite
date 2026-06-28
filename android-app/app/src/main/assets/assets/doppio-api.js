@@ -32,6 +32,11 @@
   const BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '' : REMOTE_BASE;
   const ANON = String(cfg.anonKey || '').trim();
   const CONFIGURED = !!(REMOTE_BASE && ANON);
+  // Sync to window globals so config.js consumers (realtime, supabaseClient) see the URL
+  if (CONFIGURED && !window.__SUPABASE_URL__) {
+    window.__SUPABASE_URL__ = REMOTE_BASE;
+    window.__SUPABASE_ANON_KEY__ = ANON;
+  }
 
   const SS = window.sessionStorage;
   const LS_SESS = window.localStorage; // persistent session storage

@@ -19,7 +19,7 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>RestroSuite Console</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="assets/restrosuite.css?v=v22-20260621">
+<link rel="stylesheet" href="assets/restrosuite.css?v=v34-20260628">
 <script>
   window.onerror = function(msg, url, line, col, error) {
     var div = document.getElementById('debug-error-banner');
@@ -61,7 +61,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v27-20260624';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v34-20260628';
   document.write('<link rel="stylesheet" href="assets/dashboard.css?v=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__) + '">');
 </script>
 <script>
@@ -790,11 +790,12 @@
           <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-calendar-day"></i></div><div><div class="sv">0%</div><div class="sl">Attendance</div></div></div>
         </div>
         <div class="toolbar-row">
-          <div class="seg"><button class="active">Directory</button><button>Shift roster</button><button>Attendance</button><button>Payroll</button></div>
+          <div class="seg"><button class="active">Directory</button><button>Shift roster</button><button>Attendance</button><button>Payroll</button><button>Logins</button></div>
           <div class="grow"></div>
           <button class="btn btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Add team member</button>
         </div>
         <div class="emp-grid" id="emp-grid"></div>
+      <div class="panel panel-pad subtab-pane" data-pane="logins" style="margin-top:16px"></div>
       </section>
 
       <!-- ============ CHAIN DASHBOARD ============ -->
@@ -962,12 +963,16 @@
 
 <!-- ===================== MOBILE BOTTOM NAV ===================== -->
 <nav class="mobile-nav">
-  <a class="mnav-link" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i> POS</a>
-  <a class="mnav-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i> Orders</a>
-  <a class="mnav-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</a>
-  <a class="mnav-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i> Bills</a>
-  <a class="mnav-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
-  <a class="mnav-link" id="mnav-more"><i class="fa-solid fa-ellipsis"></i> More</a>
+  <!-- Regular outlet nav (hidden for superadmin by JS) -->
+  <a class="mnav-link superadmin-hide" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i> POS</a>
+  <a class="mnav-link superadmin-hide" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i> Orders</a>
+  <a class="mnav-link superadmin-hide" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</a>
+  <a class="mnav-link superadmin-hide" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i> Bills</a>
+  <a class="mnav-link superadmin-hide" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
+  <a class="mnav-link superadmin-hide" id="mnav-more"><i class="fa-solid fa-ellipsis"></i> More</a>
+  <!-- Superadmin-only nav (shown by JS when role=superadmin) -->
+  <a class="mnav-link superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i> Tenants</a>
+  <a class="mnav-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none"><i class="fa-solid fa-server"></i> Gateway</a>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -1284,6 +1289,9 @@
       <button class="mnav-more-btn" data-tab="customers-tab"><i class="fa-solid fa-address-book"></i><span>Customers</span></button>
       <button class="mnav-more-btn" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></button>
       <button class="mnav-more-btn" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Tables</span></button>
+      <!-- Superadmin-only nav links — shown by JS when role=superadmin -->
+      <button class="mnav-more-btn superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></button>
+      <button class="mnav-more-btn superadmin-only" data-tab="gateway-monitor-tab" style="display:none"><i class="fa-solid fa-server"></i><span>Gateway</span></button>
     </div>
   </div>
 
