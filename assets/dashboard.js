@@ -2743,6 +2743,7 @@
       }
       renderPlatformSummary(_cachedTenants);
       renderTenantTable();
+      updateBulkBar();
 
       // Wire sort headers (only once)
       document.querySelectorAll('th[data-sort-col]').forEach(th => {
@@ -2760,6 +2761,136 @@
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
     }
   };
+
+  // ── Bulk Actions ────────────────────────────────────────────────────────
+  function updateBulkBar() {
+    const bar = document.getElementById('sa-bulk-bar');
+    const label = document.getElementById('sa-bulk-label');
+    if (!bar || !label) return;
+    const pending = _cachedTenants.filter(t => t.status === 'pending');
+    if (pending.length > 0) {
+      bar.style.display = 'flex';
+      label.textContent = `${pending.length} workspace${pending.length > 1 ? 's' : ''} waiting for approval`;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
+  async function bulkApproveAllPending() {
+    const pending = _cachedTenants.filter(t => t.status === 'pending');
+    if (!pending.length) return toast('No pending workspaces to approve.', 'fa-circle-info');
+    const btn = document.getElementById('sa-bulk-approve-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving…'; }
+    let done = 0, failed = 0;
+    for (const t of pending) {
+      try {
+        await RS_API.admin({ action: 'update_tenant', tenant_id: t.id, status: 'approved',
+          username: t.username, plan_code: t.plan_code || 'starter',
+          subscription_status: t.subscription_status || 'active',
+          allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
+        t.status = 'approved';
+        done++;
+      } catch(e) { failed++; }
+    }
+    renderPlatformSummary(_cachedTenants);
+    renderTenantTable();
+    updateBulkBar();
+    toast(`${done} workspace${done !== 1 ? 's' : ''} approved${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Approve all pending'; }
+  }
+
+  // ── Create Tenant Modal ─────────────────────────────────────────────────
+  function openCreateTenantModal() {
+    const modal = document.getElementById('create-tenant-modal');
+    if (!modal) return;
+    // Clear form
+    ['ct-name','ct-slug','ct-username','ct-password','ct-email','ct-phone'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const errEl = document.getElementById('ct-error');
+    if (errEl) errEl.style.display = 'none';
+    const autoApprove = document.getElementById('ct-auto-approve');
+    if (autoApprove) autoApprove.checked = true;
+
+    // Auto-generate slug and username from name
+    const nameEl = document.getElementById('ct-name');
+    const slugEl = document.getElementById('ct-slug');
+    const userEl = document.getElementById('ct-username');
+    if (nameEl && !nameEl.dataset.slugWired) {
+      nameEl.dataset.slugWired = '1';
+      nameEl.addEventListener('input', () => {
+        const base = nameEl.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        if (slugEl) slugEl.value = base;
+        if (userEl) userEl.value = base ? base + '-admin' : '';
+      });
+    }
+
+    if (!modal.dataset.eventsBound) {
+      modal.dataset.eventsBound = '1';
+      document.getElementById('close-create-tenant-modal').addEventListener('click', () => modal.classList.remove('active'));
+      document.getElementById('ct-cancel-btn').addEventListener('click', () => modal.classList.remove('active'));
+      modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
+
+      document.getElementById('ct-submit-btn').addEventListener('click', async () => {
+        const name = document.getElementById('ct-name').value.trim();
+        const slug = document.getElementById('ct-slug').value.trim();
+        const outlet_type = document.getElementById('ct-outlet-type').value;
+        const plan_code = document.getElementById('ct-plan').value;
+        const username = document.getElementById('ct-username').value.trim();
+        const password = document.getElementById('ct-password').value;
+        const email = document.getElementById('ct-email').value.trim();
+        const phone = document.getElementById('ct-phone').value.trim();
+        const autoApproveChecked = document.getElementById('ct-auto-approve').checked;
+
+        const errEl = document.getElementById('ct-error');
+        const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
+        errEl.style.display = 'none';
+
+        if (!name) return showErr('Business name is required.');
+        if (!slug || !/^[a-z0-9-]+$/.test(slug)) return showErr('Slug must be lowercase letters, numbers and hyphens only.');
+        if (!username) return showErr('Admin username is required.');
+        if (!password || password.length < 6) return showErr('Password must be at least 6 characters.');
+
+        const btn = document.getElementById('ct-submit-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating…';
+
+        try {
+          await RS_API.register({ name, slug, outlet_type, email, phone, username, password });
+          // If auto-approve, immediately approve by finding and updating the new tenant
+          if (autoApproveChecked) {
+            try {
+              // Refresh tenant list to get the new tenant's ID
+              const out = await RS_API.admin({ action: 'list_tenants' }).catch(() => ({ tenants: [] }));
+              const allTenants = (out && out.tenants) || [];
+              const newTenant = allTenants.find(t => t.slug === slug || t.username === username);
+              if (newTenant && newTenant.id) {
+                await RS_API.admin({ action: 'update_tenant', tenant_id: newTenant.id, status: 'approved',
+                  username, plan_code, subscription_status: 'active',
+                  allowed_tabs: newTenant.allowed_tabs || [], phone, email });
+                newTenant.status = 'approved';
+                newTenant.plan_code = plan_code;
+              }
+              _cachedTenants = allTenants;
+            } catch(e) { /* approval failed silently — tenant still created */ }
+          }
+          modal.classList.remove('active');
+          toast(`Workspace "${name}" created${autoApproveChecked ? ' & approved' : ' (pending approval)'}!`, 'fa-store');
+          renderPlatformSummary(_cachedTenants);
+          renderTenantTable();
+          updateBulkBar();
+        } catch (err) {
+          showErr(err.message || 'Failed to create workspace. Check details and try again.');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-plus"></i> Create Workspace';
+        }
+      });
+    }
+
+    modal.classList.add('active');
+  }
 
   function openTenantManageModal(tenant) {
     try {
@@ -3864,6 +3995,41 @@
           toast(`Logged in as ${uname} · Role: ${role} · ${tenantCount} tenants loaded`, 'fa-user-shield');
         });
       }
+      // 13. Hide Help & Setup button — irrelevant in super-admin context
+      const helpBtn = document.getElementById('open-product-guide-btn');
+      if (helpBtn) helpBtn.style.display = 'none';
+      // 16. Wire New Workspace button
+      const newTenantBtn = document.getElementById('btn-create-tenant');
+      if (newTenantBtn && !newTenantBtn.dataset.wired) {
+        newTenantBtn.dataset.wired = '1';
+        newTenantBtn.addEventListener('click', () => openCreateTenantModal());
+      }
+      // 17. Wire bulk approve button
+      const bulkBtn = document.getElementById('sa-bulk-approve-btn');
+      if (bulkBtn && !bulkBtn.dataset.wired) {
+        bulkBtn.dataset.wired = '1';
+        bulkBtn.addEventListener('click', () => bulkApproveAllPending());
+      }
+      // 18. Wire super-admin toggle — click to sign out of super-admin mode
+      const saToggle = document.getElementById('role-switch');
+      if (saToggle && !saToggle.dataset.saasClick) {
+        saToggle.dataset.saasClick = '1';
+        saToggle.style.cursor = 'pointer';
+        saToggle.title = 'Click to sign out of Super-Admin mode';
+        saToggle.addEventListener('click', () => {
+          confirmDangerAction(
+            'Sign out of Super-Admin?',
+            'You will be redirected to the login page. Super-Admin session will end.',
+            () => { if (window.RS_API) RS_API.logout(); location.href = 'login.html'; }
+          );
+        });
+      }
+      // 14. Hide version number pill — developer noise, not useful for super-admin
+      const versionPill = document.getElementById('app-version-pill');
+      if (versionPill) versionPill.style.display = 'none';
+      // 15. Hide Support dropdown — super-admin doesn't need client support links
+      const supportDrop = document.querySelector('.support-dropdown');
+      if (supportDrop) supportDrop.style.display = 'none';
     }, 300);
   }
 
