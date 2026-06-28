@@ -401,8 +401,8 @@
               </select>
             </div>
           </div>
-          <!-- Plan picker hidden during free-trial period — auto-set to "free" -->
-          <input type="hidden" id="reg-plan" value="free">
+          <!-- Plan picker hidden during free-trial period — auto-set to "starter" -->
+          <input type="hidden" id="reg-plan" value="starter">
           <div class="step-actions">
             <button type="button" class="btn btn-primary btn-block btn-lg" id="reg-next">Continue to owner details <i class="fa-solid fa-arrow-right"></i></button>
           </div>
@@ -1171,20 +1171,24 @@
 
   async function sendWhatsAppOTP(phone, code, purpose){
     const msg = `Your RestroSuite ${purpose === 'recovery' ? 'password reset' : 'verification'} code is: *${code}*\n\nValid for 10 minutes. Never share this code.`;
-    // Call public send_otp endpoint — no session required
-    const supabaseUrl = (window.__SUPABASE_URL__ || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');
+    // Wait for runtime config to load (async fetch in config.js)
+    try { await (window.__configReady || Promise.resolve()); } catch(e){}
+    const endpoint = (window.CONFIG && window.CONFIG.functions && window.CONFIG.functions.tenantPublic) ||
+      ((window.__SUPABASE_URL__ || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '') + '/functions/v1/tenant-public');
     const anonKey = window.__SUPABASE_ANON_KEY__ || '';
-    if(supabaseUrl && anonKey){
+    console.log('[OTP] endpoint:', endpoint, '| anonKey:', anonKey ? 'set' : 'MISSING');
+    if(endpoint && anonKey && !endpoint.startsWith('/functions')){
       try {
-        const res = await fetch(`${supabaseUrl}/functions/v1/tenant-public`, {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
           body: JSON.stringify({ action: 'send_otp', phone, message: msg })
         });
         const data = await res.json().catch(() => ({}));
+        console.log('[OTP] response:', res.status, data);
         if(res.ok && data.sent) return { sent:true, demo:false };
-        console.warn('send_otp failed:', data.error || res.status);
-      } catch(e){ console.warn('send_otp fetch error:', e); }
+        console.warn('[OTP] send_otp failed:', data.error || res.status);
+      } catch(e){ console.warn('[OTP] fetch error:', e); }
     }
     // Demo fallback — show OTP on screen (only if gateway unreachable)
     return { sent:false, demo:true, code };
