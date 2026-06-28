@@ -4140,16 +4140,12 @@
         bulkBtn.dataset.wired = '1';
         bulkBtn.addEventListener('click', () => bulkApproveAllPending());
       }
-      // 18. Hide Super-Admin toggle in sidebar — redundant (logout is in Settings modal)
+      // 18. Hide Super-Admin toggle in sidebar — target .sb-foot directly
       const saToggle = document.getElementById('role-switch');
       if (saToggle) {
-        // Hide the entire toggle row (parent li / wrapper)
-        let hideEl = saToggle;
-        for (let i = 0; i < 4; i++) {
-          if (hideEl.parentElement) hideEl = hideEl.parentElement;
-          if (hideEl.tagName === 'LI' || hideEl.classList.contains('sb-item') || hideEl.classList.contains('role-switch-wrap')) break;
-        }
-        hideEl.style.display = 'none';
+        const sbFoot = saToggle.closest('.sb-foot') || saToggle.parentElement;
+        if (sbFoot) sbFoot.style.display = 'none';
+        else saToggle.style.display = 'none';
       }
       // 14. Hide version number pill — developer noise, not useful for super-admin
       const versionPill = document.getElementById('app-version-pill');
