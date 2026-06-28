@@ -112,6 +112,45 @@ serve(async (req) => {
   try {
     const payload = await req.json();
     const action = String(payload?.action || "");
+
+    // ── Public OTP send (no tenant/session required) ──────────────────────────
+    if (action === "send_otp") {
+      const phone = String(payload.phone || "").replace(/\D/g, "");
+      const message = String(payload.message || "").trim();
+      if (!phone || phone.length < 10 || !message) {
+        return jsonResponse({ error: "Invalid phone or message." }, 400, req);
+      }
+      // Rate limit: 5 OTPs per phone per 10 minutes
+      const otpBucket = await sha256Hex(`otp:${phone}`);
+      const { data: rlData, error: rlErr } = await supabaseAdmin.rpc("consume_api_rate_limit", {
+        p_bucket: otpBucket,
+        p_limit: 5,
+        p_window_seconds: 600,
+      });
+      if (rlErr || !rlData) {
+        return jsonResponse({ error: "Too many OTP requests. Please wait before trying again." }, 429, req);
+      }
+      const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || "https://kalpeshdeora1006-whatsapp-gateway.hf.space").replace(/\/+$/, "");
+      const gatewayToken = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || "";
+      try {
+        const gwRes = await fetch(`${gatewayUrl}/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${gatewayToken}` },
+          body: JSON.stringify({ phone, message }),
+        });
+        if (!gwRes.ok) {
+          const gwErr = await gwRes.text();
+          console.error("send_otp gateway error:", gwErr);
+          return jsonResponse({ error: "Failed to send OTP via WhatsApp." }, 502, req);
+        }
+        return jsonResponse({ sent: true }, 200, req);
+      } catch (e) {
+        console.error("send_otp fetch error:", e);
+        return jsonResponse({ error: "Failed to reach WhatsApp gateway." }, 502, req);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const tenantSlug = normalizeSlug(payload.tenant_slug);
     const rateLimit = await checkRateLimit(req, action, tenantSlug);
     if (!rateLimit.allowed) {

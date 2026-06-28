@@ -1,5 +1,5 @@
 /**
- * RestroSuite — Interactive Customer Web Platform
+ * RestroSuite -- Interactive Customer Web Platform
  * Contains the custom 2D Canvas Physics Engine and the Complete Rupee-Priced Interactive Menu Database
  */
 
@@ -19,7 +19,7 @@ window.addEventListener('DOMContentLoaded', () => {
     return /^(https:\/\/|\/|images\/)/i.test(url) ? escHtml(url) : '';
   }
 
-  // Credentials loaded at runtime by /config.js → /api/config (Vercel env vars).
+  // Credentials loaded at runtime by /config.js -> /api/config (Vercel env vars).
   let supabaseClient = null;
   let DEFAULT_SUPABASE_URL = '';
   let DEFAULT_SUPABASE_KEY = '';
@@ -44,16 +44,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ==========================================
   // 0. IMMEDIATE TENANT BRANDING FROM URL
-  // Applied synchronously — no API call needed.
+  // Applied synchronously -- no API call needed.
   // When a customer scans a QR (home.html?tenant=bloom-cafe&table=3)
   // the page instantly shows the right restaurant name.
   // ==========================================
   (function applyUrlTenantBranding() {
     const p = new URLSearchParams(window.location.search);
     const slug = p.get('tenant') || p.get('outlet') || '';
-    if (!slug) return; // No tenant in URL → show default Doppio page
+    if (!slug) return; // No tenant in URL -> show default Doppio page
 
-    // Convert slug like "bloom-cafe" → "Bloom Cafe"
+    // Convert slug like "bloom-cafe" -> "Bloom Cafe"
     const slugName = slug
       .replace(/-/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase())
@@ -85,7 +85,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Update hero desc
     const heroDesc = document.querySelector('.hero-content p');
     if (heroDesc) {
-      heroDesc.innerHTML = `Browse our full menu and place your order directly from your table at <strong>${slugName}</strong>. Fast, fresh, and made just for you!`;
+      heroDesc.innerHTML = `Browse our full menu and place your order directly from your table at <strong>${escHtml(slugName)}</strong>. Fast, fresh, and made just for you!`;
     }
 
     // Update interactive menu section title
@@ -106,7 +106,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Update UPI merchant name if present
     const merchantNameEl = document.querySelector('.merchant-name');
     if (merchantNameEl) {
-      merchantNameEl.innerHTML = `${slugName} <i class="fa-solid fa-circle-check" style="color:#c98a4a;"></i>`;
+      merchantNameEl.innerHTML = `${escHtml(slugName)} <i class="fa-solid fa-circle-check" style="color:#c98a4a;"></i>`;
     }
   })();
 
@@ -766,7 +766,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ==========================================
   // 3. STAFF LOGIN PORTAL LOGIC
-  // (Login is handled by login.html — this modal redirects there)
+  // (Login is handled by login.html -- this modal redirects there)
   // ==========================================
   const loginBtn = document.getElementById('cta-reserve');
   const loginModal = document.getElementById('login-modal');

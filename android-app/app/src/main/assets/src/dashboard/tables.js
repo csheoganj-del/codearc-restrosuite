@@ -1,5 +1,5 @@
 /**
- * tables.js — Table management: layout, reservations, waitlist
+ * tables.js -- Table management: layout, reservations, waitlist
  *
  * Responsibilities:
  *  - CRUD for table layout (doppio_table_layout)
@@ -27,7 +27,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  // ── Status constants ─────────────────────────────────────────────────────────
+  // -- Status constants ---------------------------------------------------------
 
   const TABLE_STATUS = {
     AVAILABLE: "available",
@@ -50,7 +50,7 @@
     NO_SHOW:   "no_show"
   };
 
-  // ── Factory ──────────────────────────────────────────────────────────────────
+  // -- Factory ------------------------------------------------------------------
 
   /**
    * @param {object} options
@@ -65,7 +65,7 @@
     if (!db)       throw new Error("tables.create: db is required");
     if (!tenantId) throw new Error("tables.create: tenantId is required");
 
-    // ── Table Layout ───────────────────────────────────────────────────────────
+    // -- Table Layout -----------------------------------------------------------
 
     /** Return all tables, ordered by section then table_number */
     async function listTables() {
@@ -154,7 +154,7 @@
       }, { available: 0, occupied: 0, reserved: 0, blocked: 0 });
     }
 
-    // ── Reservations ───────────────────────────────────────────────────────────
+    // -- Reservations -----------------------------------------------------------
 
     /**
      * List reservations.
@@ -267,7 +267,7 @@
       }
     }
 
-    // ── Waitlist ───────────────────────────────────────────────────────────────
+    // -- Waitlist ---------------------------------------------------------------
 
     /** Get active waitlist entries (status = 'waiting'), oldest first */
     async function listWaitlist() {
@@ -367,7 +367,7 @@
     };
   }
 
-  // ── UI Helpers ───────────────────────────────────────────────────────────────
+  // -- UI Helpers ---------------------------------------------------------------
 
   const STATUS_COLOR = {
     available: "#10b981",

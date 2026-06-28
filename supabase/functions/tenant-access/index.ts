@@ -62,10 +62,13 @@ const DEFAULT_ALLOWED_TABS = [
 ];
 
 const ROLE_DEFAULT_TABS: Record<string, string[]> = {
-  admin: DEFAULT_ALLOWED_TABS,
-  cashier: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab"],
-  kitchen: ["kds-tab"],
-  waiter: ["qr-orders-tab"],
+  admin:            DEFAULT_ALLOWED_TABS,
+  manager:          ["pos-tab","floor-tab","qr-orders-tab","kds-tab","bills-tab","inventory-tab","editor-tab","customers-tab","reports-tab","analytics-tab","employees-tab","growth-hub-tab"],
+  cashier:          ["pos-tab","floor-tab","bills-tab","customers-tab"],
+  waiter:           ["pos-tab","floor-tab","kds-tab"],
+  captain:          ["pos-tab","floor-tab","kds-tab","qr-orders-tab"],
+  kitchen:          ["kds-tab"],
+  inventory:        ["inventory-tab","editor-tab","reports-tab"],
   customer_display: ["tokens-tab"],
 };
 
@@ -196,7 +199,9 @@ async function hashPassword(password: string) {
 
 async function verifyPassword(password: string, storedHash: string) {
   if (!storedHash.startsWith("pbkdf2$")) {
-    return await sha256Hex(password) === storedHash;
+    // Legacy SHA-256 hashes — compared constant-time, but note SHA-256 alone
+    // is unsalted and only kept for backward compatibility during login upgrade.
+    return timingSafeEqualString(await sha256Hex(password), storedHash);
   }
 
   const [, iterationText, salt, expected] = storedHash.split("$");
@@ -220,7 +225,7 @@ async function verifyPassword(password: string, storedHash: string) {
     key,
     256,
   );
-  return encodeBase64Url(new Uint8Array(derived)) === expected;
+  return timingSafeEqualString(encodeBase64Url(new Uint8Array(derived)), expected);
 }
 
 function encodeBase64Url(bytes: Uint8Array) {
@@ -250,6 +255,19 @@ async function signValue(value: string, secret: string) {
   return encodeBase64Url(new Uint8Array(signature));
 }
 
+// Constant-time string comparison — prevents timing side-channel attacks on
+// HMAC signature and password-derivation comparisons. A naive ===
+// short-circuits on the first mismatched byte, leaking information about the
+// expected value one byte at a time. Always scans every byte.
+function timingSafeEqualString(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  return diff === 0;
+}
+
 async function createSignedSessionToken(payload: Record<string, unknown>) {
   if (!SUPERADMIN_SESSION_SECRET) return null;
   const payloadEncoded = encodeBase64Url(new TextEncoder().encode(JSON.stringify({
@@ -266,7 +284,7 @@ async function verifySignedSessionToken(token: string) {
   if (!payloadEncoded || !signature) return { ok: false, error: "Invalid session token." };
 
   const expectedSignature = await signValue(payloadEncoded, SUPERADMIN_SESSION_SECRET);
-  if (expectedSignature !== signature) return { ok: false, error: "Invalid session token." };
+  if (!timingSafeEqualString(expectedSignature, signature)) return { ok: false, error: "Invalid session token." };
 
   try {
     const payloadText = new TextDecoder().decode(decodeBase64Url(payloadEncoded));
@@ -789,7 +807,20 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   if (!name || !slug || !username || !password) {
     return jsonResponse({ error: "Outlet name, outlet ID, username, and password are required." }, 400, req);
   }
- 
+
+  // Input length limits — prevent oversized payloads and database abuse
+  if (name.length > 100) return jsonResponse({ error: "Outlet name must be 100 characters or fewer." }, 400, req);
+  if (slug.length > 40)  return jsonResponse({ error: "Outlet ID must be 40 characters or fewer." }, 400, req);
+  if (username.length > 40) return jsonResponse({ error: "Username must be 40 characters or fewer." }, 400, req);
+  if (password.length > 128) return jsonResponse({ error: "Password must be 128 characters or fewer." }, 400, req);
+  if (email.length > 254)    return jsonResponse({ error: "Email address is too long." }, 400, req);
+  if (phone.length > 20)     return jsonResponse({ error: "Phone number is too long." }, 400, req);
+
+  // Email format validation
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return jsonResponse({ error: "Please enter a valid email address." }, 400, req);
+  }
+
   if (password.length < 10) {
     return jsonResponse({ error: "Password must be at least 10 characters." }, 400, req);
   }

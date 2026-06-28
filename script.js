@@ -85,7 +85,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Update hero desc
     const heroDesc = document.querySelector('.hero-content p');
     if (heroDesc) {
-      heroDesc.innerHTML = `Browse our full menu and place your order directly from your table at <strong>${slugName}</strong>. Fast, fresh, and made just for you!`;
+      heroDesc.innerHTML = `Browse our full menu and place your order directly from your table at <strong>${escHtml(slugName)}</strong>. Fast, fresh, and made just for you!`;
     }
 
     // Update interactive menu section title
@@ -106,7 +106,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Update UPI merchant name if present
     const merchantNameEl = document.querySelector('.merchant-name');
     if (merchantNameEl) {
-      merchantNameEl.innerHTML = `${slugName} <i class="fa-solid fa-circle-check" style="color:#c98a4a;"></i>`;
+      merchantNameEl.innerHTML = `${escHtml(slugName)} <i class="fa-solid fa-circle-check" style="color:#c98a4a;"></i>`;
     }
   })();
 

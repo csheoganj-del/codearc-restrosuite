@@ -1,5 +1,5 @@
 /**
- * aggregators.js — Swiggy / Zomato online order integration
+ * aggregators.js -- Swiggy / Zomato online order integration
  *
  * Responsibilities:
  *  - Poll aggregator APIs for new orders
@@ -26,7 +26,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  // ── Constants ────────────────────────────────────────────────────────────────
+  // -- Constants ----------------------------------------------------------------
 
   const PLATFORMS = { SWIGGY: "swiggy", ZOMATO: "zomato", CUSTOM: "custom" };
 
@@ -40,10 +40,10 @@
     CANCELLED:  "cancelled"
   };
 
-  // ── Normalizers (platform payload → common order shape) ──────────────────────
+  // -- Normalizers (platform payload -> common order shape) ----------------------
 
   /**
-   * Swiggy Partner API response → common order.
+   * Swiggy Partner API response -> common order.
    * Docs: https://partner.swiggy.com/docs (requires approved partner access)
    */
   function normalizeSwiggy(raw) {
@@ -73,7 +73,7 @@
   }
 
   /**
-   * Zomato Partner API response → common order.
+   * Zomato Partner API response -> common order.
    * Docs: https://www.zomato.com/business (requires partner dashboard access)
    */
   function normalizeZomato(raw) {
@@ -102,7 +102,7 @@
     };
   }
 
-  // ── Core Factory ─────────────────────────────────────────────────────────────
+  // -- Core Factory -------------------------------------------------------------
 
   /**
    * @param {object} options
@@ -121,7 +121,7 @@
     if (!db)       throw new Error("aggregators.create: db is required");
     if (!tenantId) throw new Error("aggregators.create: tenantId is required");
 
-    // ── Private helpers ────────────────────────────────────────────────────────
+    // -- Private helpers --------------------------------------------------------
 
     function emit(event) {
       listeners.forEach((fn) => { try { fn(event); } catch (_) {} });
@@ -197,7 +197,7 @@
       if (error) throw new Error("Failed to save online orders: " + error.message);
     }
 
-    // ── Public API ─────────────────────────────────────────────────────────────
+    // -- Public API -------------------------------------------------------------
 
     /**
      * Poll all enabled platforms and persist new orders.
@@ -318,7 +318,7 @@
     };
   }
 
-  // ── Utility: render an order card (returns HTML string) ─────────────────────
+  // -- Utility: render an order card (returns HTML string) ---------------------
 
   function renderOrderCard(order) {
     const badge = {
@@ -338,7 +338,7 @@
       : "📦 Online";
 
     const itemsHtml = (order.items || [])
-      .map((i) => `<li>${i.quantity}× ${i.name} — ₹${(i.price * i.quantity).toFixed(2)}</li>`)
+      .map((i) => `<li>${i.quantity}× ${i.name} -- ₹${(i.price * i.quantity).toFixed(2)}</li>`)
       .join("");
 
     const actions = {

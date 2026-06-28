@@ -30,11 +30,14 @@ node.zip
 .wwebjs_auth (1)/
 .wwebjs_cache/
 
-# Sensitive config (contains passwords)
+# Sensitive config (contains passwords / secrets)
 email-config.json
 .env
 .env.*
 !*.env.example
+# Belt-and-suspenders: .env.local was force-added historically and may
+# still be tracked despite the .env.* glob above. Keep it explicit.
+/.env.local
 
 # Sample/dev files
 sample_dashboard.css
@@ -55,7 +58,12 @@ res.txt
 
 # Logs and temporary files
 *.log
+test_sec.log
+test_sec_utf8.log
 .thumbnail
 uploads/
 backups/
 temp_backup/
+
+# Windows reserved device name (created accidentally by redirect errors)
+nul

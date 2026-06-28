@@ -1,9 +1,12 @@
 /* ============================================================
-   RestroSuite — Growth Hub screens + parity tabs
+   RestroSuite -- Growth Hub screens + parity tabs
    (Online aggregator orders, Customers/CRM, Floor & tables)
    ============================================================ */
 (function(){
   'use strict';
+  // HTML escaping -- prevents XSS when inserting DB-sourced strings into innerHTML
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -313,7 +316,26 @@
               window.RSPrint(printHtml, `Table ${t.n} QR`);
             } else {
               const win = window.open('', '_blank');
-              win.document.write(`<html><head><title>Print Table ${t.n} QR</title></head><body onload="window.print();window.close()">${printHtml}</body></html>`);
+              win.document.write(`<html><head><title>Print Table ${t.n} QR</title></head><body>${printHtml}<script>
+                window.onload = function() {
+                  const imgs = Array.from(document.getElementsByTagName('img'));
+                  if (imgs.length === 0) {
+                    window.print(); window.close();
+                  } else {
+                    let loaded = 0;
+                    const done = () => {
+                      loaded++;
+                      if (loaded === imgs.length) {
+                        setTimeout(() => { window.print(); window.close(); }, 300);
+                      }
+                    };
+                    imgs.forEach(img => {
+                      if (img.complete) done();
+                      else { img.onload = done; img.onerror = done; }
+                    });
+                  }
+                };
+              </script></body></html>`);
               win.document.close();
             }
           };
@@ -366,7 +388,26 @@
         window.RSPrint(printHtml, 'Outlet Table QRs');
       } else {
         const win = window.open('', '_blank');
-        win.document.write(`<html><head><title>Print Table QRs</title></head><body onload="window.print();window.close()">${printHtml}</body></html>`);
+        win.document.write(`<html><head><title>Print Table QRs</title></head><body>${printHtml}<script>
+          window.onload = function() {
+            const imgs = Array.from(document.getElementsByTagName('img'));
+            if (imgs.length === 0) {
+              window.print(); window.close();
+            } else {
+              let loaded = 0;
+              const done = () => {
+                loaded++;
+                if (loaded === imgs.length) {
+                  setTimeout(() => { window.print(); window.close(); }, 300);
+                }
+              };
+              imgs.forEach(img => {
+                if (img.complete) done();
+                else { img.onload = done; img.onerror = done; }
+              });
+            }
+          };
+        </script></body></html>`);
         win.document.close();
       }
     }
@@ -457,13 +498,13 @@
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(Math.round(totalSpend/total))}</div><div class="sl">Avg lifetime spend</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-a" style="background: rgba(255, 79, 0, 0.1); color: var(--orange);"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="crm-total-dues">${rs(totalDues)}</div><div class="sl">Total Outstanding Dues</div></div></div>
         </div>
-        <div class="toolbar-row"><div class="pos-search grow" style="max-width:320px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone…"></div><div class="grow"></div><button class="btn btn-ghost btn-sm"><i class="fa-brands fa-whatsapp"></i> Broadcast</button><button class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button></div>
+        <div class="toolbar-row"><div class="pos-search grow" style="max-width:320px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone..."></div><div class="grow"></div><button class="btn btn-ghost btn-sm"><i class="fa-brands fa-whatsapp"></i> Broadcast</button><button class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button></div>
         <div class="crm-grid" id="crm-grid"></div>`;
       const grid = $('#crm-grid');
       function draw(q=''){ const t=q.toLowerCase();
         grid.innerHTML = CUSTOMERS.filter(c=>c.name.toLowerCase().includes(t)||c.phone.includes(t)).map((c,i)=>`
           <div class="crm-card" data-i="${CUSTOMERS.indexOf(c)}">
-            <div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[c.name.length%RS.avatarColors.length]}">${RS.initials(c.name)}</div><div style="flex:1"><div class="crm-name">${c.name} <span class="tier-badge ${tierCls[c.tier||'silver']}">${c.tier||'silver'}</span>${c.dues > 0 ? `<span class="pill pill-orange" style="margin-left:6px; font-size:10px; padding: 2px 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Due: ${rs(c.dues)}</span>` : ''}</div><div class="crm-phone">${c.phone}</div></div></div>
+            <div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[c.name.length%RS.avatarColors.length]}">${RS.initials(c.name)}</div><div style="flex:1"><div class="crm-name">${esc(c.name)} <span class="tier-badge ${esc(tierCls[c.tier||'silver'])}">${esc(c.tier||'silver')}</span>${c.dues > 0 ? `<span class="pill pill-orange" style="margin-left:6px; font-size:10px; padding: 2px 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Due: ${rs(c.dues)}</span>` : ''}</div><div class="crm-phone">${esc(c.phone)}</div></div></div>
             <div class="crm-stats"><div class="cs"><div class="csv">${c.visits||0}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend||0)}</div><div class="csl">Spent</div></div><div class="cs"><div class="csv" style="font-size:12px">${c.last||'never'}</div><div class="csl">Last order</div></div></div>
           </div>`).join('') || '<div class="sr-empty">No customers found</div>';
         $$('.crm-card',grid).forEach(el=> el.onclick=()=> customerModal(CUSTOMERS[+el.dataset.i]));
@@ -818,12 +859,12 @@
       let records = [];
 
       if(name==='Reservations'){ 
-        icon='fa-calendar-check'; sub='Today’s bookings'; size='lg';
+        icon='fa-calendar-check'; sub="Today's bookings"; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('reservations'); } catch(e){}
         }
         body = records && records.length 
-          ? table(['Time','Guest','Pax','Table','Status'], records.map(r=>`<tr><td class="td-strong">${r.time || '—'}</td><td>${r.guestName || '—'}</td><td>${r.pax || 2}</td><td>${r.tableNumber || '—'}</td><td><span class="pill ${r.status==='confirmed'?'pill-green':r.status==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${r.status || 'confirmed'}</span></td></tr>`).join('')) 
+          ? table(['Time','Guest','Pax','Table','Status'], records.map(r=>`<tr><td class="td-strong">${r.time || '--'}</td><td>${r.guestName || '--'}</td><td>${r.pax || 2}</td><td>${r.tableNumber || '--'}</td><td><span class="pill ${r.status==='confirmed'?'pill-green':r.status==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${r.status || 'confirmed'}</span></td></tr>`).join('')) 
           : '<div class="sr-empty">No reservations for today</div>'; 
       }
       else if(name==='Support Tickets'){ 
