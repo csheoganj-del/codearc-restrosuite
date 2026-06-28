@@ -2090,6 +2090,211 @@ body.rs-drawer-dragging {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ============================================================
+   SUPER-ADMIN / GATEWAY MONITOR — SAAS SNAPSHOT CARDS
+   ============================================================ */
+.saas-snapshot-card {
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: var(--t);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.saas-snapshot-card:hover, .saas-snapshot-card.active-filter {
+  border-color: rgba(252,128,25,0.45);
+  background: rgba(252,128,25,0.04);
+}
+.saas-snapshot-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.saas-snapshot-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.saas-snapshot-card-value {
+  font-size: 26px;
+  font-weight: 800;
+  font-family: var(--font-display);
+  color: var(--text);
+  line-height: 1.1;
+}
+.saas-snapshot-card-subtitle {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+/* Pending approval banner */
+.saas-pending-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: var(--r-sm);
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-soft);
+  flex-wrap: wrap;
+}
+
+/* App incidents empty state */
+.app-incidents-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--text-mute);
+  font-size: 12px;
+  text-align: center;
+}
+.app-incidents-empty i { font-size: 20px; color: var(--green); }
+.app-incidents-empty strong { font-size: 13px; color: var(--text-soft); }
+
+/* ============================================================
+   SUPER-ADMIN / GATEWAY MONITOR — MOBILE RESPONSIVE FIXES
+   ============================================================ */
+@media (max-width: 760px) {
+  /* Snapshot summary cards — 2-col on mobile */
+  #saas-platform-summary {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* ── Super-admin panel head ── */
+  #super-admin-tab .panel-head {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  /* Heading row takes full width */
+  #super-admin-tab .panel-head h3 {
+    font-size: 15px;
+    margin: 0;
+  }
+  /* Control bar wrapper takes full row and wraps */
+  #super-admin-tab .panel-head > div {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+  /* Search input container takes full width on mobile */
+  #super-admin-tab .panel-head > div > div {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+  #super-admin-tab .panel-head #tenant-search-input {
+    width: 100% !important;
+    font-size: 12.5px;
+  }
+  /* Buttons take 50% each on mobile */
+  #super-admin-tab #btn-export-tenants,
+  #super-admin-tab #btn-create-tenant {
+    flex: 1 1 calc(50% - 4px) !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+    font-size: 11.5px !important;
+    margin: 0 !important;
+  }
+  /* Hide Export button text, keep icon only (save space) */
+  #super-admin-tab #btn-export-tenants span,
+  #super-admin-tab #btn-export-tenants .btn-label {
+    display: none;
+  }
+  /* Pending approval — take full row, flex between text and button */
+  #super-admin-tab .panel-head #sa-bulk-approve-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  /* ── Tenant table: hide MRR (col 3), Outlets (col 4), Joined (col 5) ── */
+  #super-admin-tab .data-table thead th:nth-child(3),
+  #super-admin-tab .data-table tbody td:nth-child(3),
+  #super-admin-tab .data-table thead th:nth-child(4),
+  #super-admin-tab .data-table tbody td:nth-child(4),
+  #super-admin-tab .data-table thead th:nth-child(5),
+  #super-admin-tab .data-table tbody td:nth-child(5) {
+    display: none !important;
+  }
+  /* Tighter table cell padding for better mobile fit */
+  #super-admin-tab .data-table td,
+  #super-admin-tab .data-table th {
+    padding: 8px 10px !important;
+  }
+  /* Compact outlet name cell */
+  #super-admin-tab .data-table td:first-child b {
+    font-size: 12px;
+  }
+  #super-admin-tab .data-table td:first-child div[style*="font-size:11px"],
+  #super-admin-tab .data-table td:first-child div[style*="font-size: 11px"] {
+    display: none;
+  }
+  /* Compact action buttons */
+  #super-admin-tab .data-table .row-actions { display: flex; gap: 4px; }
+  #super-admin-tab .data-table .quick-approve-btn span,
+  #super-admin-tab .data-table .btn-label { display: none; }
+
+  /* ── Gateway Monitor ── */
+  #gateway-monitor-tab .terminal {
+    height: 220px !important;
+    min-height: 180px !important;
+  }
+
+  /* ── Tenant manage modal ── */
+  #tenant-manage-modal .glass-modal {
+    width: 96% !important;
+    margin: 8px auto !important;
+  }
+  #tenant-manage-modal .modal-body {
+    padding: 14px 16px !important;
+  }
+  #tenant-manage-modal .modal-header {
+    padding: 14px 16px 12px !important;
+  }
+  /* Collapse 2-col grids to 1-col */
+  #tenant-manage-modal [style*="grid-template-columns: 1fr 1fr"],
+  #tenant-manage-modal [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Stack footer buttons */
+  #tenant-manage-modal [style*="justify-content: space-between"][style*="border-top"] {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #tenant-manage-modal #save-tenant-settings-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  /* Feature gates grid — tighter 2-col */
+  #manage-tabs-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+  #manage-tabs-grid label {
+    padding: 8px 10px !important;
+  }
+  #manage-tabs-grid label div div:first-child {
+    font-size: 11px !important;
+  }
+  #manage-tabs-grid label div div:last-child {
+    display: none;
+  }
+}
+
 /* ── Accessibility: focus-visible outlines ─────────────────────────────── */
 /* Visible keyboard focus rings without affecting mouse users */
 :focus-visible {

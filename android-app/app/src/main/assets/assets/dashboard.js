@@ -2503,6 +2503,9 @@
      SUPER-ADMIN & GATEWAY MONITOR SYSTEMS
      ============================================================ */
   let superAdminFilter = 'all';
+  let superAdminSearch = '';
+  let superAdminSort = { col: 'joined', dir: 'desc' };
+  let _cachedTenants = [];
   let saasGatewayPollingInterval = null;
 
   function escHtml(str) {
@@ -2558,16 +2561,21 @@
     const paidTier = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code)).length;
     const risk = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status)).length;
     const conversion = total ? Math.round((paidTier / total) * 100) : 0;
+    const totalMrr = tenants.reduce((sum, t) => sum + (Number(t.mrr) || 0), 0);
+    const mrrDisplay = totalMrr > 0 ? rs(totalMrr) : '₹0';
     target.innerHTML = [
       saasSnapshotCard('Workspaces', total, `${active} active outlets`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
       saasSnapshotCard('Pending Approvals', pending, pending ? 'Requires review' : 'Queue is clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
       saasSnapshotCard('Conversion Rate', `${conversion}%`, `${paidTier} paid / ${total} total`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
-      saasSnapshotCard('At-Risk Accounts', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk')
+      saasSnapshotCard('At-Risk Accounts', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk'),
+      saasSnapshotCard('Platform MRR', mrrDisplay, `${total} tenants tracked`, 'fa-solid fa-indian-rupee-sign', 'mrr', superAdminFilter === 'mrr')
     ].join('');
 
     target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
       item.addEventListener('click', async () => {
-        superAdminFilter = item.getAttribute('data-filter');
+        const f = item.getAttribute('data-filter');
+        if (f === 'mrr') return; // MRR card is display-only, not a filter
+        superAdminFilter = f;
         await renderSuper();
       });
     });
@@ -2575,76 +2583,372 @@
 
   const tStatus={active:'t-active',approved:'t-active',trial:'t-trial',pending:'t-trial',suspended:'t-suspended',past_due:'t-suspended',canceled:'t-suspended'};
 
+  // Render tenant table from cached data (no network call)
+  function renderTenantTable() {
+    const tbody = $('#tenant-table-body');
+    if (!tbody) return;
+
+    let filtered = _cachedTenants.slice();
+
+    // Status filter
+    if (superAdminFilter === 'pending') filtered = filtered.filter(t => t.status === 'pending');
+    else if (superAdminFilter === 'paid') filtered = filtered.filter(t => ['growth','enterprise'].includes(t.plan_code));
+    else if (superAdminFilter === 'risk') filtered = filtered.filter(t => ['past_due','canceled'].includes(t.subscription_status));
+
+    // Text search
+    const q = (superAdminSearch || '').toLowerCase().trim();
+    if (q) {
+      filtered = filtered.filter(t => {
+        const fields = [t.name, t.tenant_name, t.slug, t.email, t.phone, t.username, t.plan_code, t.status];
+        return fields.some(f => f && String(f).toLowerCase().includes(q));
+      });
+    }
+
+    // Sort
+    const { col, dir } = superAdminSort;
+    filtered.sort((a, b) => {
+      let va, vb;
+      if (col === 'outlet') { va = (a.name || a.tenant_name || '').toLowerCase(); vb = (b.name || b.tenant_name || '').toLowerCase(); }
+      else if (col === 'plan') { va = (a.plan_code || '').toLowerCase(); vb = (b.plan_code || '').toLowerCase(); }
+      else if (col === 'mrr') { va = Number(a.mrr) || 0; vb = Number(b.mrr) || 0; }
+      else if (col === 'outlets') { va = Number(a.outlet_count) || 1; vb = Number(b.outlet_count) || 1; }
+      else if (col === 'joined') { va = a.created_at || ''; vb = b.created_at || ''; }
+      else if (col === 'status') { va = (a.status || '').toLowerCase(); vb = (b.status || '').toLowerCase(); }
+      else { va = a.created_at || ''; vb = b.created_at || ''; }
+      if (va < vb) return dir === 'asc' ? -1 : 1;
+      if (va > vb) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    // Update count badge
+    const countEl = document.getElementById('tenant-count');
+    if (countEl) countEl.textContent = `${filtered.length} of ${_cachedTenants.length}`;
+
+    // Update sort headers
+    document.querySelectorAll('th[data-sort-col]').forEach(th => {
+      const c = th.getAttribute('data-sort-col');
+      const icon = th.querySelector('.sort-icon');
+      if (!icon) return;
+      if (c === col) {
+        icon.className = `sort-icon fa-solid ${dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`;
+        icon.style.color = 'var(--orange)';
+      } else {
+        icon.className = 'sort-icon fa-solid fa-sort';
+        icon.style.color = 'var(--text-mute)';
+        icon.style.opacity = '0.4';
+      }
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>${q ? `No tenants match "${_e(q)}"` : `No tenants found for filter "${_e(superAdminFilter)}".`}</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(t => {
+      const planLabel = t.plan_name || t.plan_code || 'Starter';
+      const isChain = ['chain','enterprise'].includes((t.plan_code||'').toLowerCase());
+      const isGrowth = (t.plan_code||'').toLowerCase() === 'growth';
+      const pillCls = isChain ? 'pill-violet' : isGrowth ? 'pill-orange' : '';
+      const statusKey = (t.status || 'active').toLowerCase();
+      const statusCls = tStatus[statusKey] || 't-active';
+      const statusText = t.status ? (t.status.charAt(0).toUpperCase() + t.status.slice(1).replace(/_/g,' ')) : 'Active';
+      const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { month:'short', year:'numeric' }) : '-';
+      const mrr = t.mrr || 0;
+      const name = t.name || t.tenant_name || t.slug || 'Unknown';
+      const slug = t.slug || t.tenant_slug || '';
+      const isPending = statusKey === 'pending';
+      const isSuspended = statusKey === 'suspended';
+      const approveBtn = isPending
+        ? `<button class="btn btn-sm quick-approve-btn" style="background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Approve this workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-check"></i> Approve</button>`
+        : '';
+      const suspendBtn = !isPending
+        ? isSuspended
+          ? `<button class="btn btn-sm quick-reactivate-btn" style="background:rgba(34,197,94,0.08);color:#16a34a;border:1px solid rgba(34,197,94,0.2);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Reactivate workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-rotate-left"></i> Reactivate</button>`
+          : `<button class="btn btn-sm quick-suspend-btn" style="background:rgba(239,68,68,0.06);color:#dc2626;border:1px solid rgba(239,68,68,0.18);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Suspend workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-ban"></i> Suspend</button>`
+        : '';
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
+        <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
+        <td class="td-strong">${mrr ? rs(mrr) : '--'}</td>
+        <td>${_e(t.outlet_count || 1)}</td>
+        <td>${_e(joined)}</td>
+        <td><span class="tenant-status ${_e(statusCls)}">${_e(statusText)}</span></td>
+        <td>
+          <div class="row-actions" style="gap:5px">
+            ${approveBtn}
+            ${suspendBtn}
+            <button class="icon-act manage-tenant-btn" title="Manage workspace" data-tid="${_e(t.id||'')}" style="font-size:13px"><i class="fa-solid fa-gear"></i></button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    // Bind quick-approve buttons
+    tbody.querySelectorAll('.quick-approve-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-tid');
+        const t = _cachedTenants.find(x => String(x.id) === String(tid));
+        if (!t) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'approved' });
+          t.status = 'approved';
+          toast(`${t.name || 'Workspace'} approved!`, 'fa-circle-check');
+          renderPlatformSummary(_cachedTenants);
+          renderTenantTable();
+        } catch (err) {
+          toast('Approval failed: ' + (err.message || err), 'fa-circle-exclamation');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-check"></i> Approve';
+        }
+      });
+    });
+
+    // Bind suspend buttons
+    tbody.querySelectorAll('.quick-suspend-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-tid');
+        const t = _cachedTenants.find(x => String(x.id) === String(tid));
+        if (!t) return;
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'suspended',
+            username: t.username, plan_code: t.plan_code || 'starter',
+            subscription_status: t.subscription_status || 'active',
+            allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
+          t.status = 'suspended';
+          toast(`${t.name || 'Workspace'} suspended.`, 'fa-ban');
+          renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
+        } catch (err) {
+          toast('Suspend failed: ' + (err.message || err), 'fa-circle-exclamation');
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-ban"></i> Suspend';
+        }
+      });
+    });
+
+    // Bind reactivate buttons
+    tbody.querySelectorAll('.quick-reactivate-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-tid');
+        const t = _cachedTenants.find(x => String(x.id) === String(tid));
+        if (!t) return;
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'approved',
+            username: t.username, plan_code: t.plan_code || 'starter',
+            subscription_status: t.subscription_status || 'active',
+            allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
+          t.status = 'approved';
+          toast(`${t.name || 'Workspace'} reactivated!`, 'fa-rotate-left');
+          renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
+        } catch (err) {
+          toast('Reactivate failed: ' + (err.message || err), 'fa-circle-exclamation');
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Reactivate';
+        }
+      });
+    });
+
+    // Bind manage buttons
+    tbody.querySelectorAll('.manage-tenant-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tenantId = btn.getAttribute('data-tid');
+        const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
+        if (tenant) openTenantManageModal(tenant);
+        else toast('Tenant details not found.', 'fa-circle-exclamation');
+      });
+    });
+  }
+
   const renderSuper = async () => {
     const tbody = $('#tenant-table-body');
-    if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
     renderPlatformSummary([]);
     try {
-      let tenants = [];
-      if(window.RS_API) {
+      if (window.RS_API) {
+        // ── Wait for Supabase config to load (async race condition fix) ──
+        // /api/config is fetched async at boot; renderSuper fires after 300ms
+        // which can be faster than the network round-trip. Poll up to 4s.
+        if (!RS_API.configured) {
+          await new Promise(resolve => {
+            let tries = 0;
+            const poll = setInterval(() => {
+              if (RS_API.configured || ++tries >= 40) { clearInterval(poll); resolve(); }
+            }, 100);
+          });
+        }
+        // If still not configured after waiting, session is genuinely missing
+        if (!RS_API.configured) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Supabase not reachable — check your internet connection and reload the page.</td></tr>';
+          return;
+        }
         const out = await Promise.race([
           RS_API.admin({ action: 'list_tenants' }).catch(err => ({ error: err && err.message ? err.message : String(err), tenants: [] })),
-          new Promise(resolve => setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 8000))
+          new Promise(resolve => setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 10000))
         ]);
-        if(out && out.error) console.warn('Superadmin tenant registry unavailable:', out.error);
-        if(out && Array.isArray(out.tenants)) tenants = out.tenants;
+        if (out && out.error) console.warn('Superadmin tenant registry unavailable:', out.error);
+        if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
+        // If we got an auth error, show a helpful message with retry
+        if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login.html\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
+          return;
+        }
       }
-      
-      renderPlatformSummary(tenants);
+      renderPlatformSummary(_cachedTenants);
+      renderTenantTable();
+      updateBulkBar();
 
-      // Filter tenants based on active superAdminFilter
-      let filteredTenants = tenants;
-      if (superAdminFilter === 'pending') {
-        filteredTenants = tenants.filter(t => t.status === 'pending');
-      } else if (superAdminFilter === 'paid') {
-        filteredTenants = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code));
-      } else if (superAdminFilter === 'risk') {
-        filteredTenants = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status));
-      }
-
-      if (filteredTenants.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>No client food outlets found for filter "${superAdminFilter}".</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = filteredTenants.map(t=>{
-        const planLabel = t.plan_name || t.plan_code || 'Starter';
-        const isChain = ['chain','enterprise'].includes((t.plan_code||'').toLowerCase());
-        const isGrowth = (t.plan_code||'').toLowerCase() === 'growth';
-        const pillCls = isChain?'pill-violet':isGrowth?'pill-orange':'';
-        const statusKey = (t.status||'active').toLowerCase();
-        const statusCls = tStatus[statusKey] || 't-active';
-        const statusText = t.status ? (t.status.charAt(0).toUpperCase()+t.status.slice(1).replace(/_/g,' ')) : 'Active';
-        const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : '-';
-        const mrr = t.mrr || 0;
-        const name = t.name || t.tenant_name || t.slug || 'Unknown';
-        const slug = t.slug || t.tenant_slug || '';
-        return `<tr>
-          <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
-          <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
-          <td class="td-strong">${mrr?rs(mrr):'--'}</td><td>${_e(t.outlet_count||1)}</td><td>${_e(joined)}</td>
-          <td><span class="tenant-status ${_e(statusCls)}">${_e(statusText)}</span></td>
-          <td><div class="row-actions"><button class="icon-act manage-tenant-btn" title="Manage" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-gear"></i></button></div></td>
-        </tr>`;
-      }).join('');
-
-      tbody.querySelectorAll('.manage-tenant-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          const tenantId = btn.getAttribute('data-tid');
-          const tenant = tenants.find(t => String(t.id) === String(tenantId));
-          if (tenant) {
-            openTenantManageModal(tenant);
-          } else {
-            toast('Tenant details not found in local cache.', 'fa-circle-exclamation');
-          }
+      // Wire sort headers (only once)
+      document.querySelectorAll('th[data-sort-col]').forEach(th => {
+        if (th.dataset.sortBound) return;
+        th.dataset.sortBound = '1';
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+          const c = th.getAttribute('data-sort-col');
+          if (superAdminSort.col === c) superAdminSort.dir = superAdminSort.dir === 'asc' ? 'desc' : 'asc';
+          else { superAdminSort.col = c; superAdminSort.dir = 'asc'; }
+          renderTenantTable();
         });
       });
-    } catch(err) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message||'Failed to load tenants')}</td></tr>`;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
     }
   };
+
+  // ── Bulk Actions ────────────────────────────────────────────────────────
+  function updateBulkBar() {
+    const bar = document.getElementById('sa-bulk-bar');
+    const label = document.getElementById('sa-bulk-label');
+    if (!bar || !label) return;
+    const pending = _cachedTenants.filter(t => t.status === 'pending');
+    if (pending.length > 0) {
+      bar.style.display = 'flex';
+      label.textContent = `${pending.length} workspace${pending.length > 1 ? 's' : ''} waiting for approval`;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
+  async function bulkApproveAllPending() {
+    const pending = _cachedTenants.filter(t => t.status === 'pending');
+    if (!pending.length) return toast('No pending workspaces to approve.', 'fa-circle-info');
+    const btn = document.getElementById('sa-bulk-approve-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving…'; }
+    let done = 0, failed = 0;
+    for (const t of pending) {
+      try {
+        await RS_API.admin({ action: 'update_tenant', tenant_id: t.id, status: 'approved',
+          username: t.username, plan_code: t.plan_code || 'starter',
+          subscription_status: t.subscription_status || 'active',
+          allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
+        t.status = 'approved';
+        done++;
+      } catch(e) { failed++; }
+    }
+    renderPlatformSummary(_cachedTenants);
+    renderTenantTable();
+    updateBulkBar();
+    toast(`${done} workspace${done !== 1 ? 's' : ''} approved${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Approve all pending'; }
+  }
+
+  // ── Create Tenant Modal ─────────────────────────────────────────────────
+  function openCreateTenantModal() {
+    const modal = document.getElementById('create-tenant-modal');
+    if (!modal) return;
+    // Clear form
+    ['ct-name','ct-slug','ct-username','ct-password','ct-email','ct-phone'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const errEl = document.getElementById('ct-error');
+    if (errEl) errEl.style.display = 'none';
+    const autoApprove = document.getElementById('ct-auto-approve');
+    if (autoApprove) autoApprove.checked = true;
+
+    // Auto-generate slug and username from name
+    const nameEl = document.getElementById('ct-name');
+    const slugEl = document.getElementById('ct-slug');
+    const userEl = document.getElementById('ct-username');
+    if (nameEl && !nameEl.dataset.slugWired) {
+      nameEl.dataset.slugWired = '1';
+      nameEl.addEventListener('input', () => {
+        const base = nameEl.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        if (slugEl) slugEl.value = base;
+        if (userEl) userEl.value = base ? base + '-admin' : '';
+      });
+    }
+
+    if (!modal.dataset.eventsBound) {
+      modal.dataset.eventsBound = '1';
+      document.getElementById('close-create-tenant-modal').addEventListener('click', () => modal.classList.remove('active'));
+      document.getElementById('ct-cancel-btn').addEventListener('click', () => modal.classList.remove('active'));
+      modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
+
+      document.getElementById('ct-submit-btn').addEventListener('click', async () => {
+        const name = document.getElementById('ct-name').value.trim();
+        const slug = document.getElementById('ct-slug').value.trim();
+        const outlet_type = document.getElementById('ct-outlet-type').value;
+        const plan_code = document.getElementById('ct-plan').value;
+        const username = document.getElementById('ct-username').value.trim();
+        const password = document.getElementById('ct-password').value;
+        const email = document.getElementById('ct-email').value.trim();
+        const phone = document.getElementById('ct-phone').value.trim();
+        const autoApproveChecked = document.getElementById('ct-auto-approve').checked;
+
+        const errEl = document.getElementById('ct-error');
+        const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
+        errEl.style.display = 'none';
+
+        if (!name) return showErr('Business name is required.');
+        if (!slug || !/^[a-z0-9-]+$/.test(slug)) return showErr('Slug must be lowercase letters, numbers and hyphens only.');
+        if (!username) return showErr('Admin username is required.');
+        if (!password || password.length < 6) return showErr('Password must be at least 6 characters.');
+
+        const btn = document.getElementById('ct-submit-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating…';
+
+        try {
+          await RS_API.register({ name, slug, outlet_type, email, phone, username, password });
+          // If auto-approve, immediately approve by finding and updating the new tenant
+          if (autoApproveChecked) {
+            try {
+              // Refresh tenant list to get the new tenant's ID
+              const out = await RS_API.admin({ action: 'list_tenants' }).catch(() => ({ tenants: [] }));
+              const allTenants = (out && out.tenants) || [];
+              const newTenant = allTenants.find(t => t.slug === slug || t.username === username);
+              if (newTenant && newTenant.id) {
+                await RS_API.admin({ action: 'update_tenant', tenant_id: newTenant.id, status: 'approved',
+                  username, plan_code, subscription_status: 'active',
+                  allowed_tabs: newTenant.allowed_tabs || [], phone, email });
+                newTenant.status = 'approved';
+                newTenant.plan_code = plan_code;
+              }
+              _cachedTenants = allTenants;
+            } catch(e) { /* approval failed silently — tenant still created */ }
+          }
+          modal.classList.remove('active');
+          toast(`Workspace "${name}" created${autoApproveChecked ? ' & approved' : ' (pending approval)'}!`, 'fa-store');
+          renderPlatformSummary(_cachedTenants);
+          renderTenantTable();
+          updateBulkBar();
+        } catch (err) {
+          showErr(err.message || 'Failed to create workspace. Check details and try again.');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-plus"></i> Create Workspace';
+        }
+      });
+    }
+
+    modal.classList.add('active');
+  }
 
   function openTenantManageModal(tenant) {
     try {
@@ -2698,6 +3002,11 @@
       if (emailEl) emailEl.value = tenant.email || '';
       if (planCodeEl) planCodeEl.value = tenant.plan_code || 'starter';
       if (subscriptionStatusEl) subscriptionStatusEl.value = tenant.subscription_status || 'active';
+      // Notes field — stored in localStorage keyed by tenant ID (no backend needed)
+      const notesEl = document.getElementById('manage-notes');
+      if (notesEl) {
+        try { notesEl.value = localStorage.getItem(`sa-note-${tenant.id}`) || ''; } catch(e) { notesEl.value = ''; }
+      }
 
       const allowed = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [];
       const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
@@ -2716,6 +3025,28 @@
         }
       });
 
+      // Reset to Account tab
+      document.querySelectorAll('.tmtab').forEach((tb, i) => {
+        tb.style.color = i === 0 ? 'var(--orange)' : 'var(--text-mute)';
+        tb.style.borderBottomColor = i === 0 ? 'var(--orange)' : 'transparent';
+      });
+      document.querySelectorAll('.tm-panel').forEach((p, i) => {
+        p.style.display = i === 0 ? 'flex' : 'none';
+      });
+
+      // Wire copy-login button in modal header
+      const copyLoginBtn = document.getElementById('manage-copy-login-btn');
+      if (copyLoginBtn) {
+        const slug = (tenant.slug || tenant.username || '').toLowerCase().replace(/\s+/g, '-');
+        copyLoginBtn.onclick = () => {
+          const origin = location.origin + location.pathname.replace(/\/[^\/]*$/, '');
+          const url = `${origin}/login.html?tenant=${encodeURIComponent(slug)}`;
+          navigator.clipboard.writeText(url)
+            .then(() => toast('Login URL copied!', 'fa-link'))
+            .catch(() => prompt('Copy tenant login URL:', url));
+        };
+      }
+
       modal.classList.add('active');
     } catch (err) {
       console.error(err);
@@ -2726,6 +3057,106 @@
   function closeTenantModal() {
     const modal = document.getElementById('tenant-manage-modal');
     if (modal) modal.classList.remove('active');
+  }
+
+  // ── Super-Admin Settings Modal ──────────────────────────────────────────
+  function openSuperAdminSettingsModal() {
+    let m = document.getElementById('sa-settings-modal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'sa-settings-modal';
+      m.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px)';
+      const sess = window.RS_API ? RS_API.session() : null;
+      const uname = (sess && sess.username) || 'codearc-superadmin';
+      const tenantId = (sess && sess.tenant_id) || '';
+      m.innerHTML = `
+        <div style="background:var(--panel);border:1px solid var(--stroke);border-radius:16px;padding:28px 32px;width:min(480px,90vw);box-shadow:0 20px 60px rgba(0,0,0,0.35)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <h3 style="font-size:16px;margin:0;display:flex;align-items:center;gap:8px"><i class="fa-solid fa-shield-halved" style="color:var(--orange)"></i> Super-Admin Settings</h3>
+            <button id="close-sa-settings" style="background:none;border:none;cursor:pointer;color:var(--text-mute);font-size:18px;padding:4px"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="background:rgba(252,128,25,0.06);border:1px solid rgba(252,128,25,0.15);border-radius:10px;padding:14px 16px">
+              <div style="font-size:12px;color:var(--text-mute);margin-bottom:4px">Logged in as</div>
+              <div style="font-weight:600;font-size:15px">${_e(uname)}</div>
+              <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Role: SaaS Super-Admin · Tenant ID: ${_e(tenantId || 'root')}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:12px;font-weight:600;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Platform</div>
+              <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px">
+                <span><i class="fa-solid fa-moon" style="width:16px;margin-right:6px;color:var(--text-mute)"></i>Dark mode</span>
+                <button id="sa-theme-toggle" class="btn btn-ghost btn-sm" style="min-width:80px">
+                  ${document.documentElement.classList.contains('dark') ? '<i class="fa-solid fa-sun"></i> Light' : '<i class="fa-solid fa-moon"></i> Dark'}
+                </button>
+              </label>
+              <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px">
+                <span><i class="fa-solid fa-sidebar" style="width:16px;margin-right:6px;color:var(--text-mute)"></i>Collapse sidebar</span>
+                <button id="sa-sidebar-toggle" class="btn btn-ghost btn-sm"><i class="fa-solid fa-arrow-left-to-line"></i> Toggle</button>
+              </label>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:12px;font-weight:600;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Data</div>
+              <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px">
+                <span><i class="fa-solid fa-download" style="width:16px;margin-right:6px;color:var(--text-mute)"></i>Export all tenants</span>
+                <button id="sa-export-btn" class="btn btn-ghost btn-sm"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+              </label>
+            </div>
+            <div style="border-top:1px solid var(--stroke);padding-top:14px;display:flex;gap:10px;justify-content:flex-end">
+              <button id="sa-settings-logout" class="btn btn-danger btn-sm"><i class="fa-solid fa-right-from-bracket"></i> Sign out</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(m);
+      document.getElementById('close-sa-settings').onclick = () => m.remove();
+      m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+      const themeBtn = document.getElementById('sa-theme-toggle');
+      if (themeBtn) themeBtn.onclick = () => {
+        const tt = document.getElementById('theme-toggle');
+        if (tt) tt.click();
+        m.remove();
+      };
+      const sbBtn = document.getElementById('sa-sidebar-toggle');
+      if (sbBtn) sbBtn.onclick = () => {
+        const sb = document.getElementById('sb-collapse');
+        if (sb) sb.click();
+        m.remove();
+      };
+      const expBtn = document.getElementById('sa-export-btn');
+      if (expBtn) expBtn.onclick = () => {
+        m.remove();
+        const exportBtn2 = document.getElementById('btn-export-tenants');
+        if (exportBtn2) exportBtn2.click();
+      };
+      const logoutBtn = document.getElementById('sa-settings-logout');
+      if (logoutBtn) logoutBtn.onclick = () => {
+        m.remove();
+        if (window.RS_API) RS_API.logout();
+        location.href = 'login.html';
+      };
+    } else {
+      m.remove();
+    }
+  }
+
+  // ── Super-Admin Delete Confirmation Modal ───────────────────────────────
+  function confirmDangerAction(title, body, onConfirm) {
+    const m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;z-index:11000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px)';
+    m.innerHTML = `
+      <div style="background:var(--panel);border:1px solid rgba(239,68,68,0.4);border-radius:14px;padding:24px 28px;width:min(420px,90vw);box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px">
+          <div style="flex-shrink:0;width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:18px"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div><div style="font-weight:700;font-size:15px;margin-bottom:4px">${title}</div><div style="font-size:13px;color:var(--text-mute);line-height:1.5">${body}</div></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost btn-sm" id="danger-cancel">Cancel</button>
+          <button class="btn btn-danger btn-sm" id="danger-confirm"><i class="fa-solid fa-trash-can"></i> Yes, proceed</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    document.getElementById('danger-cancel').onclick = () => m.remove();
+    document.getElementById('danger-confirm').onclick = () => { m.remove(); onConfirm(); };
+    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
   }
 
   function initTenantManageModalEvents() {
@@ -2785,10 +3216,18 @@
 
           if (password !== '') updates.password = password;
 
+          // Save notes locally
+          const notesVal = (document.getElementById('manage-notes') || {}).value || '';
+          try { localStorage.setItem(`sa-note-${tenantId}`, notesVal); } catch(e) {}
+
           await RS_API.admin({ action: 'update_tenant', ...updates });
+          // Update cache so table reflects status/plan change immediately
+          const idx = _cachedTenants.findIndex(t => String(t.id) === String(tenantId));
+          if (idx !== -1) Object.assign(_cachedTenants[idx], { username, status, plan_code, subscription_status, phone, email, allowed_tabs });
           closeTenantModal();
+          renderPlatformSummary(_cachedTenants);
+          renderTenantTable();
           toast("Client configurations saved successfully!");
-          await renderSuper();
         } catch (err) {
           console.error(err);
           toast("Error saving settings: " + err.message, "fa-circle-exclamation");
@@ -2799,101 +3238,183 @@
     const deleteTenantBtn = document.getElementById('delete-tenant-btn');
     if (deleteTenantBtn && !deleteTenantBtn.dataset.listenerBound) {
       deleteTenantBtn.dataset.listenerBound = 'true';
-      deleteTenantBtn.addEventListener('click', async () => {
-        try {
-          const tenantId = document.getElementById('manage-tenant-id').value;
-          const tenantName = document.getElementById('manage-tenant-name').textContent;
-
-          if (confirm(`Are you absolutely sure you want to DELETE: ${tenantName}?\n\nThis will permanently erase their registration and cascade delete all their data!`)) {
-            await RS_API.admin({ action: 'delete_tenant', tenant_id: tenantId });
-            closeTenantModal();
-            toast("Client account successfully deleted.");
-            await renderSuper();
+      deleteTenantBtn.addEventListener('click', () => {
+        const tenantId = document.getElementById('manage-tenant-id').value;
+        const tenantName = document.getElementById('manage-tenant-name').textContent;
+        confirmDangerAction(
+          'Delete workspace permanently?',
+          `This will <strong>permanently erase</strong> the account and all data for <strong>${_e(tenantName)}</strong>. This cannot be undone.`,
+          async () => {
+            try {
+              await RS_API.admin({ action: 'delete_tenant', tenant_id: tenantId });
+              closeTenantModal();
+              _cachedTenants = _cachedTenants.filter(t => String(t.id) !== String(tenantId));
+              renderPlatformSummary(_cachedTenants);
+              renderTenantTable();
+              toast('Client account permanently deleted.', 'fa-circle-check');
+            } catch (err) {
+              console.error(err);
+              toast('Error deleting client: ' + err.message, 'fa-circle-exclamation');
+            }
           }
-        } catch (err) {
-          console.error(err);
-          toast("Error deleting client: " + err.message, "fa-circle-exclamation");
-        }
+        );
       });
     }
 
     const resetTenantDataBtn = document.getElementById('reset-tenant-data-btn');
     if (resetTenantDataBtn && !resetTenantDataBtn.dataset.listenerBound) {
       resetTenantDataBtn.dataset.listenerBound = 'true';
-      resetTenantDataBtn.addEventListener('click', async () => {
-        try {
-          const tenantId = document.getElementById('manage-tenant-id').value;
-          const tenantName = document.getElementById('manage-tenant-name').textContent;
-
-          if (!confirm(`âš ï¸  RESET DATA for: ${tenantName}?\n\nThis will PERMANENTLY DELETE all of their operations data (bills, menus, inventory, staff, CRM, recipes).\n\nThe account credentials and options will be kept. Proceed?`)) return;
-
-          resetTenantDataBtn.disabled = true;
-          resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-
-          await RS_API.admin({ action: 'reset_tenant_data', tenant_id: tenantId });
-          closeTenantModal();
-          toast(`Workspace reset to factory fresh!`);
-          await renderSuper();
-        } catch (err) {
-          console.error(err);
-          toast("System error resetting data: " + err.message, "fa-circle-exclamation");
-        } finally {
-          resetTenantDataBtn.disabled = false;
-          resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left" style="font-size: 10px;"></i> Reset data';
-        }
+      resetTenantDataBtn.addEventListener('click', () => {
+        const tenantId = document.getElementById('manage-tenant-id').value;
+        const tenantName = document.getElementById('manage-tenant-name').textContent;
+        confirmDangerAction(
+          'Reset all operations data?',
+          `This will <strong>permanently delete</strong> all bills, menus, inventory, staff, CRM and recipes for <strong>${_e(tenantName)}</strong>. Account credentials and settings will be kept.`,
+          async () => {
+            resetTenantDataBtn.disabled = true;
+            resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+            try {
+              await RS_API.admin({ action: 'reset_tenant_data', tenant_id: tenantId });
+              closeTenantModal();
+              toast('Workspace reset to factory fresh!', 'fa-rotate-right');
+              await renderSuper();
+            } catch (err) {
+              console.error(err);
+              toast('System error resetting data: ' + err.message, 'fa-circle-exclamation');
+            } finally {
+              resetTenantDataBtn.disabled = false;
+              resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left" style="font-size: 10px;"></i> Reset data';
+            }
+          }
+        );
       });
     }
 
     const seedTenantDataBtn = document.getElementById('seed-tenant-data-btn');
     if (seedTenantDataBtn && !seedTenantDataBtn.dataset.listenerBound) {
       seedTenantDataBtn.dataset.listenerBound = 'true';
-      seedTenantDataBtn.addEventListener('click', async () => {
-        try {
-          const tenantId = document.getElementById('manage-tenant-id').value;
-          const tenantName = document.getElementById('manage-tenant-name').textContent;
-
-          if (!confirm(`âš ï¸  LOAD DEMO DATA for: ${tenantName}?\n\nThis will automatically populate this workspace with a realistic set of menu, inventory, recipes, staff, and bills history. Operational data will be reset. Proceed?`)) return;
-
-          seedTenantDataBtn.disabled = true;
-          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
-
-          await RS_API.admin({ action: 'seed_tenant_data', tenant_id: tenantId });
-          closeTenantModal();
-          toast(`Demo records loaded successfully!`);
-          await renderSuper();
-        } catch (err) {
-          console.error(err);
-          toast("Error loading demo data: " + err.message, "fa-circle-exclamation");
-        } finally {
-          seedTenantDataBtn.disabled = false;
-          seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-seedling" style="font-size: 10px;"></i> Load Demo Data';
-        }
+      seedTenantDataBtn.addEventListener('click', () => {
+        const tenantId = document.getElementById('manage-tenant-id').value;
+        const tenantName = document.getElementById('manage-tenant-name').textContent;
+        confirmDangerAction(
+          'Load demo data into this workspace?',
+          `This will populate <strong>${_e(tenantName)}</strong>'s workspace with a realistic set of menu, inventory, recipes, staff and bill history. Existing operational data will be reset.`,
+          async () => {
+            seedTenantDataBtn.disabled = true;
+            seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
+            try {
+              await RS_API.admin({ action: 'seed_tenant_data', tenant_id: tenantId });
+              closeTenantModal();
+              toast('Demo records loaded successfully!', 'fa-seedling');
+              await renderSuper();
+            } catch (err) {
+              console.error(err);
+              toast('Error loading demo data: ' + err.message, 'fa-circle-exclamation');
+            } finally {
+              seedTenantDataBtn.disabled = false;
+              seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-seedling" style="font-size: 10px;"></i> Load Demo Data';
+            }
+          }
+        );
       });
     }
 
     const purgeTenantDataBtn = document.getElementById('purge-tenant-data-btn');
     if (purgeTenantDataBtn && !purgeTenantDataBtn.dataset.listenerBound) {
       purgeTenantDataBtn.dataset.listenerBound = 'true';
-      purgeTenantDataBtn.addEventListener('click', async () => {
+      purgeTenantDataBtn.addEventListener('click', () => {
+        const tenantId = document.getElementById('manage-tenant-id').value;
+        const tenantName = document.getElementById('manage-tenant-name').textContent;
+        confirmDangerAction(
+          'Remove demo data?',
+          `This will safely delete <em>only</em> the demo data records from <strong>${_e(tenantName)}</strong>'s workspace. Client-added data will remain intact.`,
+          async () => {
+            purgeTenantDataBtn.disabled = true;
+            purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging...';
+            try {
+              await RS_API.admin({ action: 'purge_demo_data', tenant_id: tenantId });
+              closeTenantModal();
+              toast('Demo records removed successfully!', 'fa-trash-can');
+              await renderSuper();
+            } catch (err) {
+              console.error(err);
+              toast('Error purging demo data: ' + err.message, 'fa-circle-exclamation');
+            } finally {
+              purgeTenantDataBtn.disabled = false;
+              purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="font-size: 10px;"></i> Remove Demo Data';
+            }
+          }
+        );
+      });
+    }
+
+    // ── Tab switching ──────────────────────────────────────────
+    document.querySelectorAll('.tmtab').forEach(tab => {
+      if (!tab.dataset.listenerBound) {
+        tab.dataset.listenerBound = 'true';
+        tab.addEventListener('click', () => {
+          const target = tab.getAttribute('data-tmtab');
+          document.querySelectorAll('.tmtab').forEach(t => {
+            const active = t.getAttribute('data-tmtab') === target;
+            t.style.color = active ? 'var(--orange)' : 'var(--text-mute)';
+            t.style.borderBottomColor = active ? 'var(--orange)' : 'transparent';
+          });
+          document.querySelectorAll('.tm-panel').forEach(p => {
+            p.style.display = p.id === `tm-panel-${target}` ? 'flex' : 'none';
+          });
+        });
+      }
+    });
+
+    // ── Select All / Clear All (Features tab) ─────────────────
+    const selAll = document.getElementById('manage-select-all-tabs');
+    const clrAll = document.getElementById('manage-deselect-all-tabs');
+    if (selAll && !selAll.dataset.listenerBound) {
+      selAll.dataset.listenerBound = 'true';
+      selAll.addEventListener('click', () => {
+        document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]').forEach(cb => {
+          cb.checked = true;
+          const card = cb.closest('label');
+          if (card) { card.style.borderColor = 'rgba(252,128,25,0.45)'; card.style.background = 'rgba(252,128,25,0.06)'; }
+        });
+      });
+    }
+    if (clrAll && !clrAll.dataset.listenerBound) {
+      clrAll.dataset.listenerBound = 'true';
+      clrAll.addEventListener('click', () => {
+        document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]').forEach(cb => {
+          cb.checked = false;
+          const card = cb.closest('label');
+          if (card) { card.style.borderColor = 'var(--stroke)'; card.style.background = 'var(--panel)'; }
+        });
+      });
+    }
+
+    // ── Save Features button ───────────────────────────────────
+    const saveFeaturesBtn = document.getElementById('save-tenant-features-btn');
+    if (saveFeaturesBtn && !saveFeaturesBtn.dataset.listenerBound) {
+      saveFeaturesBtn.dataset.listenerBound = 'true';
+      saveFeaturesBtn.addEventListener('click', async () => {
         try {
           const tenantId = document.getElementById('manage-tenant-id').value;
-          const tenantName = document.getElementById('manage-tenant-name').textContent;
-
-          if (!confirm(`âš ï¸  REMOVE DEMO DATA for: ${tenantName}?\n\nThis will safely delete ONLY the demo data records. Client-added data will remain intact. Proceed?`)) return;
-
-          purgeTenantDataBtn.disabled = true;
-          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging...';
-
-          await RS_API.admin({ action: 'purge_demo_data', tenant_id: tenantId });
+          const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
+          const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+          const t = _cachedTenants.find(x => String(x.id) === String(tenantId));
+          if (!t) return;
+          saveFeaturesBtn.disabled = true; saveFeaturesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+          await RS_API.admin({ action: 'update_tenant', tenant_id: tenantId,
+            username: t.username, status: t.status, plan_code: t.plan_code || 'starter',
+            subscription_status: t.subscription_status || 'active',
+            allowed_tabs, phone: t.phone || '', email: t.email || '' });
+          if (t) t.allowed_tabs = allowed_tabs;
+          toast('Feature access updated!', 'fa-toggle-on');
           closeTenantModal();
-          toast(`Demo records removed successfully!`);
-          await renderSuper();
+          renderTenantTable();
         } catch (err) {
-          console.error(err);
-          toast("Error purging demo data: " + err.message, "fa-circle-exclamation");
+          toast('Error saving features: ' + err.message, 'fa-circle-exclamation');
         } finally {
-          purgeTenantDataBtn.disabled = false;
-          purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="font-size: 10px;"></i> Remove Demo Data';
+          saveFeaturesBtn.disabled = false;
+          saveFeaturesBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>Save features';
         }
       });
     }
@@ -3533,7 +4054,7 @@
     $$('.brandadmin-only').forEach(el => el.style.display = 'none');
   }
 
-  // â"€â"€ Apply superadmin-specific UI lockdown before first render â"€â"€
+  // ── Apply superadmin-specific UI lockdown before first render ──
   if (isSuper) {
     // 1. Show superadmin-only elements (sidebar links, section labels)
     $$('.superadmin-only').forEach(el => {
@@ -3542,30 +4063,109 @@
     // 2. Hide all regular sidebar links (keep only superadmin ones)
     $$('.sidebar-link').forEach(link => {
       const tabId = link.dataset.tab || '';
-      if(tabId !== 'super-admin-tab' && tabId !== 'gateway-monitor-tab') {
+      if (tabId !== 'super-admin-tab' && tabId !== 'gateway-monitor-tab') {
         link.style.display = 'none';
       }
     });
-    // 3. Update sidebar branding for superadmin
+    // 3. Hide ghost sidebar section labels (OPERATIONS, MANAGE, GROW) that
+    //    belong to the regular dashboard and bleed into the super-admin view
+    $$('.sb-section:not(.superadmin-only):not(.brandadmin-only)').forEach(el => {
+      el.style.display = 'none';
+    });
+    // 4. Update sidebar branding for superadmin
     const brandName = $('#sidebar-brand-name');
     const brandType = $('#sidebar-brand-type');
-    if(brandName) brandName.textContent = 'RESTRO';
-    if(brandType) brandType.textContent = 'Suite';
-    // 4. Update user pill
+    if (brandName) brandName.textContent = 'RESTRO';
+    if (brandType) brandType.textContent = 'Suite';
+    // 5. Update user pill
     const userNameEl = document.querySelector('.user-pill .un');
     const userRoleEl = document.querySelector('.user-pill .ur');
-    if(userNameEl && sess.username) userNameEl.textContent = sess.username.charAt(0).toUpperCase() + sess.username.slice(1);
-    if(userRoleEl) userRoleEl.textContent = 'SaaS Super-Admin';
-    // 5. Hide non-superadmin header elements
+    if (userNameEl && sess.username) userNameEl.textContent = sess.username.charAt(0).toUpperCase() + sess.username.slice(1);
+    if (userRoleEl) userRoleEl.textContent = 'SaaS Super-Admin';
+    // 6. Hide non-superadmin header elements
     const headerCenter = document.querySelector('.header-center-metrics');
-    if(headerCenter) headerCenter.style.display = 'none';
-    // 6. Turn on the role switch toggle
+    if (headerCenter) headerCenter.style.display = 'none';
+    // 7. Turn on the role switch toggle
     const rsSwitch = $('#role-switch');
-    if(rsSwitch) {
+    if (rsSwitch) {
       rsSwitch.classList.add('on');
       const label = $('#role-switch-label');
-      if(label) label.textContent = 'Super-Admin';
+      if (label) label.textContent = 'Super-Admin';
     }
+    // 8. Hide Settings button — not relevant in super-admin mode
+    setTimeout(() => {
+      const openSet = document.getElementById('open-settings');
+      if (openSet) openSet.style.display = 'none';
+      // 9. Wire topbar search to tenant text filter
+      const tbSearchInput = document.querySelector('.tb-search input');
+      if (tbSearchInput) {
+        tbSearchInput.placeholder = 'Search tenants…';
+        tbSearchInput.addEventListener('input', () => {
+          superAdminSearch = tbSearchInput.value;
+          renderTenantTable();
+        });
+      }
+      // 10. Wire inline tenant search input (above table)
+      const inlineSearch = document.getElementById('tenant-search-input');
+      if (inlineSearch) {
+        inlineSearch.addEventListener('input', () => {
+          superAdminSearch = inlineSearch.value;
+          const tbSearchInput2 = document.querySelector('.tb-search input');
+          if (tbSearchInput2) tbSearchInput2.value = inlineSearch.value;
+          renderTenantTable();
+        });
+      }
+      // 11. Cloud status pill — show informative popover on click
+      const cloudPill = document.getElementById('db-mode-pill');
+      if (cloudPill && !cloudPill.dataset.saasClick) {
+        cloudPill.dataset.saasClick = '1';
+        cloudPill.style.cursor = 'pointer';
+        cloudPill.title = 'Click to check cloud sync status';
+        cloudPill.addEventListener('click', () => {
+          const mode = cloudPill.textContent.trim();
+          const detail = window.RS_LAST_CLOUD_ERROR ? `⚠️ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : '✅ No recent sync errors.';
+          toast(`Cloud status: ${mode} — ${detail}`, 'fa-cloud');
+        });
+      }
+      // 12. Profile card click — show superadmin info
+      const userPill = document.querySelector('.user-pill');
+      if (userPill && !userPill.dataset.saasClick) {
+        userPill.dataset.saasClick = '1';
+        userPill.style.cursor = 'pointer';
+        userPill.title = 'View session info';
+        userPill.addEventListener('click', () => {
+          const s = window.RS_API ? RS_API.session() : null;
+          const uname = (s && s.username) || 'codearc-superadmin';
+          const role = (s && s.role) || 'superadmin';
+          const tenantCount = _cachedTenants.length;
+          toast(`Logged in as ${uname} · Role: ${role} · ${tenantCount} tenants loaded`, 'fa-user-shield');
+        });
+      }
+      // 13. Hide Help & Setup button — irrelevant in super-admin context
+      const helpBtn = document.getElementById('open-product-guide-btn');
+      if (helpBtn) helpBtn.style.display = 'none';
+      // 16. Wire New Workspace button
+      const newTenantBtn = document.getElementById('btn-create-tenant');
+      if (newTenantBtn && !newTenantBtn.dataset.wired) {
+        newTenantBtn.dataset.wired = '1';
+        newTenantBtn.addEventListener('click', () => openCreateTenantModal());
+      }
+      // 17. Wire bulk approve button
+      const bulkBtn = document.getElementById('sa-bulk-approve-btn');
+      if (bulkBtn && !bulkBtn.dataset.wired) {
+        bulkBtn.dataset.wired = '1';
+        bulkBtn.addEventListener('click', () => bulkApproveAllPending());
+      }
+      // 18. Hide only the role-switch toggle button (not the whole sb-foot)
+      const saToggle = document.getElementById('role-switch');
+      if (saToggle) saToggle.style.display = 'none';
+      // 14. Hide version number pill — developer noise, not useful for super-admin
+      const versionPill = document.getElementById('app-version-pill');
+      if (versionPill) versionPill.style.display = 'none';
+      // 15. Hide Support dropdown — super-admin doesn't need client support links
+      const supportDrop = document.querySelector('.support-dropdown');
+      if (supportDrop) supportDrop.style.display = 'none';
+    }, 300);
   }
 
   // -- Apply staff role tab filtering (waiter / cashier / kitchen / etc.) --
@@ -4129,7 +4729,7 @@
           const csv = [
             headers.join(','),
             ...tenants.map(t => {
-              return `"${t.id || ''}","${(t.name || t.tenant_name || '').replace(/"/g, '""')}","${t.slug || ''}","${t.outlet_type || ''}","${t.email || ''}","${t.phone || ''}","${t.username || ''}","${t.status || ''}","${t.plan_code || ''}","${t.subscription_status || ''}",${t.mrr || 0},"${t.created_at || ''}"`;
+              return `"${t.id || ''}","${(t.name || t.tenant_name || '').replace(/"/g, '""')}","${t.slug || ''}","${t.outlet_type || ''}","${t.email || ''}","${t.phone || ''}","${t.username || ''}","${t.status || ''}","${t.plan_code || ''}",tus || ''}",${t.mrr || 0},"${t.created_at || ''}"`;
             })
           ].join('\n');
           RS.downloadFile(csv, 'text/csv;charset=utf-8;', `tenants-export-${fileDate()}.csv`);
@@ -4159,15 +4759,11 @@
   if(!isSuper && !isBrandAdmin) hydrate();
 
   // validate the stored session against the backend; only bounce if server explicitly rejects it
-  // Await __configReady first so RS_API.configured is true even on first new-browser load
-  // (without this the guard is false and validateSession is silently skipped).
   (window.__configReady || Promise.resolve()).then(() => {
     if(window.RS_API && RS_API.configured){
       RS_API.validateSession().then(sess => {
-        // null = server confirmed token is invalid/expired -> redirect
         if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
       }).catch(() => {
-        // Network error / Supabase offline -- keep user on dashboard, don't log them out
         console.warn('[RS] validateSession network error -- keeping local session alive.');
       });
     }
@@ -4197,324 +4793,4 @@
     try { updateTabAttentionBlinking(); } catch(e) {}
   }, 2000);
 
-  // -- Offline / Online connectivity banner ----------------------------------
-  (function setupConnectivityBanner() {
-    let banner = document.getElementById('rs-offline-banner');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'rs-offline-banner';
-      banner.setAttribute('role', 'alert');
-      banner.setAttribute('aria-live', 'polite');
-      banner.style.cssText = [
-        'position:fixed','bottom:0','left:0','right:0','z-index:99998',
-        'background:#1a1a1a','color:#fff','font-size:13px','font-weight:600',
-        'padding:10px 18px','display:none','align-items:center','gap:10px',
-        'border-top:2px solid var(--orange,#e85d26)',
-        'box-shadow:0 -2px 12px rgba(0,0,0,.4)'
-      ].join(';');
-      banner.innerHTML = '<i class="fa-solid fa-wifi-slash" style="color:var(--orange,#e85d26)"></i>&nbsp;<span id="rs-offline-msg">You are offline -- data is saved locally and will sync when reconnected.</span>';
-      document.body.appendChild(banner);
-    }
-    function showBanner(msg) {
-      const msgEl = document.getElementById('rs-offline-msg');
-      if (msgEl) msgEl.textContent = msg;
-      banner.style.display = 'flex';
-    }
-    function hideBanner() { banner.style.display = 'none'; }
-
-    if (!navigator.onLine) showBanner('You are offline -- data is saved locally and will sync when reconnected.');
-
-    window.addEventListener('offline', () => {
-      showBanner('You are offline -- data is saved locally and will sync when reconnected.');
-    });
-    window.addEventListener('online', () => {
-      showBanner('Back online -- syncing...');
-      setTimeout(() => {
-        hideBanner();
-        if (window.RS_DB_DRAIN) RS_DB_DRAIN().catch(() => {});
-        drainWAQueue();
-      }, 2500);
-    });
-    window.addEventListener('rs:sync-queue-drained', (e) => {
-      const count = e.detail && e.detail.count;
-      if (count) toast(`Synced ${count} offline record${count > 1 ? 's' : ''} to cloud`, 'fa-cloud-arrow-up');
-    });
-
-    // -- WhatsApp offline queue drain --------------------------------------
-    async function drainWAQueue() {
-      const WA_QUEUE_KEY = 'rs:wa_queue';
-      let q;
-      try { q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]'); } catch(e) { return; }
-      if (!q.length) return;
-      if (!window.RS_API || typeof RS_API.data !== 'function') return;
-      const sent = [];
-      for (const item of q) {
-        if (!navigator.onLine) break;
-        try {
-          const result = await RS_API.data({ operation: 'gateway_send', phone: item.phone, message: item.message, orderId: item.billNo });
-          if (!result || result.error) throw new Error(result && result.error || 'Send failed');
-          sent.push(item);
-        } catch(e) {
-          console.warn('[WA Queue] Retry failed for', item.billNo, e.message);
-        }
-      }
-      if (sent.length) {
-        const remaining = q.filter(i => !sent.includes(i));
-        try { localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(remaining)); } catch(e) {}
-        toast(`Sent ${sent.length} queued WhatsApp receipt${sent.length > 1 ? 's' : ''}`, 'fa-whatsapp');
-      }
-    }
-    window.RS_DRAIN_WA = drainWAQueue;
-  })();
-
-  // Security contract test compatibility:
-  // const FAST_INTERACTION_MODE = true;
-  // const ENABLE_DEMO_TOOLS = true;
-  // employees-tab', 'growth-hub-tab'
-  // document.querySelectorAll('.more-sheet-link[data-tab]')
-  // else if (tabId === 'growth-hub-tab') { renderGrowthHub()
-  // function debounce
-  // requestIdleCallback
-  // vaultWriteQueue
-  // frameTask(renderBills)
-  // if (!document.hidden && navigator.onLine) syncWithSupabase()
-  // channel('doppio-employees-realtime')
-  // table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}`
-  // table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}`
-  // channel('doppio-crm-realtime')
-  // channel(`doppio-menu-realtime-${activeTenantId}`)
-  // event: 'menu-updated'
-  // broadcastMenuUpdate()
-  // await Promise.all(cloudWrites)
-  // Recipe import failed for ${newItem.name}
-  // onConflict: 'tenant_id,name'
-  // onConflict: 'tenant_id,item_name'
-  // table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}`
-  // table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}`
-  // const belongsToActiveTenant = bills.some
-  // if (!belongsToActiveTenant) return
-  // const scheduleTenantDataSync
-  // String(response.payload.tenantId) === String(activeTenantId)
-  // function renderGrowthHub
-  // function renderPlatformSummary
-  // conflictTargets
-  // ON CONFLICT (tenant_id, "orderId") DO UPDATE SET
-
-  // -- Android WebView Bridge ------------------------------------------------
-  // Android calls window.updateAndroidOfflineStatus(isOffline) when network changes.
-  // We reuse the same banner + drain logic already wired for browser online/offline.
-  window.updateAndroidOfflineStatus = function(isOffline) {
-    if (isOffline) {
-      window.dispatchEvent(new Event('offline'));
-    } else {
-      window.dispatchEvent(new Event('online'));
-    }
-  };
-
-  // -- PWA Install Prompt ---------------------------------------------------
-  (function setupPWAInstallPrompt() {
-    // Only show if not already installed (standalone) and not on Android WebView
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-    if (window.AndroidInterface) return;
-    if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
-
-    let deferredPrompt = null;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-
-      // Don't show immediately -- wait until user has been on the page 30s
-      setTimeout(() => {
-        if (!deferredPrompt) return;
-        if (sessionStorage.getItem('rs:pwa-prompt-dismissed')) return;
-
-        const bar = document.createElement('div');
-        bar.id = 'rs-pwa-prompt';
-        bar.style.cssText = 'position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:8888;' +
-          'background:var(--card-bg,#fff);border:1px solid var(--stroke,#e5e7eb);border-radius:14px;' +
-          'box-shadow:0 8px 32px rgba(0,0,0,.14);padding:14px 16px;display:flex;align-items:center;' +
-          'gap:12px;max-width:360px;width:calc(100vw - 32px);animation:slideUp .3s var(--ease,ease)';
-        bar.innerHTML =
-          '<img src="assets/restrosuite-mark.png" style="width:36px;height:36px;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="font-weight:700;font-size:13px">Install RestroSuite</div>' +
-            '<div style="font-size:12px;color:var(--text-mute)">Works offline · No app store needed</div>' +
-          '</div>' +
-          '<button id="rs-pwa-install" class="btn btn-primary btn-sm" style="flex-shrink:0;white-space:nowrap">Install</button>' +
-          '<button id="rs-pwa-dismiss" class="icon-btn" style="flex-shrink:0" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>';
-
-        document.body.appendChild(bar);
-
-        document.getElementById('rs-pwa-install').onclick = async () => {
-          if (!deferredPrompt) return;
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          deferredPrompt = null;
-          bar.remove();
-          if (outcome === 'accepted') {
-            if (typeof toast === 'function') toast('RestroSuite installed!', 'fa-circle-check');
-          }
-        };
-
-        document.getElementById('rs-pwa-dismiss').onclick = () => {
-          sessionStorage.setItem('rs:pwa-prompt-dismissed', '1');
-          bar.style.animation = 'slideDown .25s ease forwards';
-          setTimeout(() => bar.remove(), 260);
-        };
-      }, 30000);
-    });
-
-    // Already installed
-    window.addEventListener('appinstalled', () => {
-      deferredPrompt = null;
-      const bar = document.getElementById('rs-pwa-prompt');
-      if (bar) bar.remove();
-    });
-  })();
-
-  // Thin wrapper so JS code can call RS_Android.* and safely no-op on browsers
-  window.RS_Android = {
-    available: function() { return !!(window.AndroidInterface); },
-    speak: function(text) {
-      if (window.AndroidInterface && window.AndroidInterface.speak) {
-        try { window.AndroidInterface.speak(String(text)); } catch(e) {}
-      }
-    },
-    speakBilingual: function(en, hi) {
-      if (window.AndroidInterface && window.AndroidInterface.speakBilingual) {
-        try { window.AndroidInterface.speakBilingual(String(en), String(hi)); } catch(e) {}
-      }
-    },
-    vibrate: function(ms) {
-      if (window.AndroidInterface && window.AndroidInterface.vibrate) {
-        try { window.AndroidInterface.vibrate(ms || 80); } catch(e) {}
-      }
-    },
-    playSound: function(type) {
-      if (window.AndroidInterface && window.AndroidInterface.playSound) {
-        try { window.AndroidInterface.playSound(String(type || 'success')); } catch(e) {}
-      }
-    },
-    print: function(html) {
-      if (window.AndroidInterface && window.AndroidInterface.printReceipt) {
-        try { window.AndroidInterface.printReceipt(String(html)); return true; } catch(e) {}
-      }
-      return false;
-    }
-  };
-
-  // Hook Android haptic + sound feedback into key actions
-  // KOT sent -> short vibrate + beep
-  document.addEventListener('rs:kot-sent', function() {
-    RS_Android.vibrate(60);
-    RS_Android.playSound('success');
-  });
-  // Bill paid -> double vibrate + bilingual announcement
-  document.addEventListener('rs:bill-paid', function(e) {
-    RS_Android.vibrate(120);
-    RS_Android.playSound('order_success');
-    const total = e.detail && e.detail.total ? e.detail.total : '';
-    if (total) RS_Android.speakBilingual('Bill paid ' + total, 'Bill paid ' + total);
-  });
-  // New QR order arrives -> alert sound
-  document.addEventListener('rs:new-qr-order', function() {
-    RS_Android.vibrate(200);
-    RS_Android.playSound('alert');
-  });
-
-  window.RS_ProgressOverlay = {
-    show(title, steps) {
-      const existing = document.getElementById('rs-progress-overlay');
-      if (existing) existing.remove();
-      
-      const ov = document.createElement('div');
-      ov.id = 'rs-progress-overlay';
-      ov.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(10, 10, 10, 0.75);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: inherit;
-      `;
-      
-      const card = document.createElement('div');
-      card.style.cssText = `
-        background: rgba(30, 30, 30, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        border-radius: 12px;
-        padding: 24px;
-        width: 340px;
-        color: var(--text);
-        text-align: center;
-      `;
-      const head = document.createElement('h4');
-      head.textContent = title;
-      head.style.cssText = 'margin:0 0 16px 0;font-size:16px;font-weight:700;color:var(--text)';
-      card.appendChild(head);
-      
-      const barContainer = document.createElement('div');
-      barContainer.style.cssText = 'background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden;margin-bottom:20px;';
-      const bar = document.createElement('div');
-      bar.id = 'rs-progress-bar-fill';
-      bar.style.cssText = 'background:var(--orange);width:0%;height:100%;transition:width 0.4s ease;';
-      barContainer.appendChild(bar);
-      card.appendChild(barContainer);
-      
-      const list = document.createElement('div');
-      list.style.cssText = 'display:flex;flex-direction:column;gap:10px;text-align:left;font-size:13px;';
-      steps.forEach((step, idx) => {
-        const item = document.createElement('div');
-        item.id = `rs-progress-step-${idx}`;
-        item.style.cssText = 'display:flex;align-items:center;gap:10px;color:var(--text-mute);transition:color 0.3s ease;';
-        item.innerHTML = `<span class="step-icon" style="min-width:18px;display:inline-flex;justify-content:center;"><i class="fa-regular fa-circle"></i></span> <span>${step}</span>`;
-        list.appendChild(item);
-      });
-      card.appendChild(list);
-      ov.appendChild(card);
-      document.body.appendChild(ov);
-    },
-    
-    update(stepIndex, progressPercent) {
-      const bar = document.getElementById('rs-progress-bar-fill');
-      if (bar) bar.style.width = `${progressPercent}%`;
-      
-      for (let i = 0; i < stepIndex; i++) {
-        const el = document.getElementById(`rs-progress-step-${i}`);
-        if (el) {
-          el.style.color = '#25d366';
-          const icon = el.querySelector('.step-icon');
-          if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
-        }
-      }
-      
-      const cur = document.getElementById(`rs-progress-step-${stepIndex}`);
-      if (cur) {
-        cur.style.color = 'var(--text)';
-
-        const icon = cur.querySelector('.step-icon');
-        if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--orange)"></i>';
-      }
-    },
-    
-    hide(delay = 600) {
-      setTimeout(() => {
-        const overlay = document.getElementById('rs-progress-overlay');
-        if (overlay) {
-          overlay.style.opacity = '0';
-          overlay.style.transition = 'opacity 0.3s ease';
-          setTimeout(() => overlay.remove(), 300);
-        }
-      }, delay);
-    }
-  };
 })();

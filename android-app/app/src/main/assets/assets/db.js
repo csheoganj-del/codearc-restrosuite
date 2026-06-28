@@ -665,23 +665,4 @@
     getSettings:()=>guard('getSettings','settings'),
     setSettings: async (o)=> {
       const tenantId = getActiveTenantId();
-      cachedSettingsMap[tenantId] = o;
-      await LS.setSettings(o);
-      if (signedIn()) {
-        try {
-          const res = await CLOUD.setSettings(o);
-          if (res) {
-            cachedSettingsMap[tenantId] = res;
-            await LS.setSettings(res);
-          }
-          return res;
-        } catch(e) {
-          console.warn('[RS_DB] setSettings cloud failed:', e.message);
-          return o;
-        }
-      }
-      return o;
-    },
-    ...auth
-  };
-})();
+   
