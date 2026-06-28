@@ -2771,12 +2771,33 @@
     renderPlatformSummary([]);
     try {
       if (window.RS_API) {
+        // ── Wait for Supabase config to load (async race condition fix) ──
+        // /api/config is fetched async at boot; renderSuper fires after 300ms
+        // which can be faster than the network round-trip. Poll up to 4s.
+        if (!RS_API.configured) {
+          await new Promise(resolve => {
+            let tries = 0;
+            const poll = setInterval(() => {
+              if (RS_API.configured || ++tries >= 40) { clearInterval(poll); resolve(); }
+            }, 100);
+          });
+        }
+        // If still not configured after waiting, session is genuinely missing
+        if (!RS_API.configured) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Supabase not reachable — check your internet connection and reload the page.</td></tr>';
+          return;
+        }
         const out = await Promise.race([
           RS_API.admin({ action: 'list_tenants' }).catch(err => ({ error: err && err.message ? err.message : String(err), tenants: [] })),
-          new Promise(resolve => setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 8000))
+          new Promise(resolve => setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 10000))
         ]);
         if (out && out.error) console.warn('Superadmin tenant registry unavailable:', out.error);
         if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
+        // If we got an auth error, show a helpful message with retry
+        if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href='login.html'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
+          return;
+        }
       }
       renderPlatformSummary(_cachedTenants);
       renderTenantTable();
