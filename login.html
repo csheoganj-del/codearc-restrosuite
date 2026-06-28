@@ -1171,14 +1171,22 @@
 
   async function sendWhatsAppOTP(phone, code, purpose){
     const msg = `Your RestroSuite ${purpose === 'recovery' ? 'password reset' : 'verification'} code is: *${code}*\n\nValid for 10 minutes. Never share this code.`;
-    // Try RS_API gateway_send (needs session OR localhost)
-    if(window.RS_API){
+    // Call public send_otp endpoint — no session required
+    const supabaseUrl = (window.__SUPABASE_URL__ || '').trim().replace(/\/+$/, '').replace(/\/(rest|functions)\/v1$/, '');
+    const anonKey = window.__SUPABASE_ANON_KEY__ || '';
+    if(supabaseUrl && anonKey){
       try {
-        await RS_API.data({ operation:'gateway_send', phone, message:msg });
-        return { sent:true, demo:false };
-      } catch(e){ /* no session yet — fall through to demo */ }
+        const res = await fetch(`${supabaseUrl}/functions/v1/tenant-public`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ action: 'send_otp', phone, message: msg })
+        });
+        const data = await res.json().catch(() => ({}));
+        if(res.ok && data.sent) return { sent:true, demo:false };
+        console.warn('send_otp failed:', data.error || res.status);
+      } catch(e){ console.warn('send_otp fetch error:', e); }
     }
-    // Demo fallback — show OTP on screen
+    // Demo fallback — show OTP on screen (only if gateway unreachable)
     return { sent:false, demo:true, code };
   }
 
