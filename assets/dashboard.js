@@ -2795,7 +2795,7 @@
         if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
         // If we got an auth error, show a helpful message with retry
         if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href='login.html'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login.html\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
           return;
         }
       }
