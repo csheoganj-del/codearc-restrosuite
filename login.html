@@ -6,6 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<!-- Theme init BEFORE render to prevent FOUC -->
+<script>(function(){try{var t=localStorage.getItem('rs-theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -32,7 +34,6 @@
 </script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
-<script src="assets/db.js"></script>
 <script src="assets/country-currency-data.js"></script>
 <style>
   body { min-height: 100vh; display: flex; flex-direction: column; }
@@ -193,6 +194,25 @@
   .shake { animation: shake .45s var(--ease); }
   @keyframes shake { 10%,90%{transform:translateX(-1px);} 30%,70%{transform:translateX(-5px);} 50%{transform:translateX(5px);} }
 
+  /* password strength meter */
+  .pwd-strength { margin-top: 6px; }
+  .pwd-strength-bar { display: flex; gap: 4px; margin-bottom: 5px; }
+  .pwd-strength-bar span { flex: 1; height: 4px; border-radius: 2px; background: var(--stroke-2); transition: background .3s; }
+  .pwd-strength-label { font-size: 11.5px; font-weight: 600; color: var(--text-mute); }
+  .pwd-s1 .pwd-strength-bar span:nth-child(1) { background: var(--red); }
+  .pwd-s2 .pwd-strength-bar span:nth-child(-n+2) { background: #f59e0b; }
+  .pwd-s3 .pwd-strength-bar span:nth-child(-n+3) { background: #3b82f6; }
+  .pwd-s4 .pwd-strength-bar span:nth-child(-n+4) { background: var(--green); }
+  .pwd-s1 .pwd-strength-label { color: var(--red); }
+  .pwd-s2 .pwd-strength-label { color: #f59e0b; }
+  .pwd-s3 .pwd-strength-label { color: #3b82f6; }
+  .pwd-s4 .pwd-strength-label { color: var(--green); }
+
+  /* confirm password match indicator */
+  .confirm-match { font-size: 11.5px; font-weight: 600; margin-top: 3px; display: none; }
+  .confirm-match.ok { color: var(--green); display: block; }
+  .confirm-match.bad { color: var(--red); display: block; }
+
   @media (max-width: 920px) { .access-main { grid-template-columns: 1fr; } .access-story { min-height: auto; order: 2; } .login-container { order: 1; } }
   @media (max-width: 540px) { .login-card { padding: 26px 22px; } .form-grid { grid-template-columns: 1fr; } }
 </style>
@@ -260,15 +280,15 @@
       </div>
 
       <div class="tab-header" role="tablist">
-        <button class="tab-btn active" id="tab-login-btn" type="button" role="tab" aria-selected="true">Sign in</button>
-        <button class="tab-btn" id="tab-register-btn" type="button" role="tab" aria-selected="false">Register outlet</button>
+        <button class="tab-btn active" id="tab-login-btn" type="button" role="tab" aria-selected="true" aria-controls="login-form">Sign in</button>
+        <button class="tab-btn" id="tab-register-btn" type="button" role="tab" aria-selected="false" aria-controls="register-form">Register outlet</button>
       </div>
 
       <div class="alert err" id="error-box" role="alert"><i class="fa-solid fa-circle-exclamation"></i><span></span></div>
       <div class="alert ok" id="success-box" role="status"><i class="fa-solid fa-circle-check"></i><span></span></div>
 
       <!-- LOGIN -->
-      <form id="login-form" role="tabpanel">
+      <form id="login-form" role="tabpanel" aria-labelledby="tab-login-btn">
         <div class="form-group">
           <label for="tenant-id">Workspace / Outlet ID</label>
           <div class="input-wrap"><i class="fa-solid fa-hotel lead"></i>
@@ -298,7 +318,7 @@
       </form>
 
       <!-- REGISTER (multi-step) -->
-      <form id="register-form" style="display:none">
+      <form id="register-form" role="tabpanel" aria-labelledby="tab-register-btn" style="display:none">
         <div class="steps-bar">
           <div class="step-node active" id="snode-1"><span class="step-dot">1</span><span class="step-label">Outlet</span></div>
           <div class="step-line"><span id="step-progress"></span></div>
@@ -317,7 +337,7 @@
             <div class="form-group">
               <label for="reg-slug">Workspace code</label>
               <div class="input-wrap"><i class="fa-solid fa-link lead"></i>
-                <input type="text" id="reg-slug" class="form-input" placeholder="royal-dhaba" autocapitalize="none" spellcheck="false" required>
+                <input type="text" id="reg-slug" class="form-input" placeholder="royal-dhaba" autocapitalize="none" spellcheck="false" maxlength="32" required>
               </div>
               <div class="field-status" id="slug-status"></div>
             </div>
@@ -389,6 +409,18 @@
               <input type="password" id="reg-password" class="form-input" placeholder="At least 10 characters" autocomplete="new-password" minlength="10" required>
               <button class="toggle-pwd" type="button" data-toggle="reg-password" aria-label="Show password"><i class="fa-solid fa-eye"></i></button>
             </div>
+            <div class="pwd-strength" id="pwd-strength-wrap" style="display:none">
+              <div class="pwd-strength-bar"><span></span><span></span><span></span><span></span></div>
+              <div class="pwd-strength-label" id="pwd-strength-label"></div>
+            </div>
+          </div>
+          <div class="form-group full">
+            <label for="reg-password-confirm">Confirm password</label>
+            <div class="input-wrap"><i class="fa-solid fa-shield-halved lead"></i>
+              <input type="password" id="reg-password-confirm" class="form-input" placeholder="Repeat your password" autocomplete="new-password" minlength="10" required>
+              <button class="toggle-pwd" type="button" data-toggle="reg-password-confirm" aria-label="Show confirm password"><i class="fa-solid fa-eye"></i></button>
+            </div>
+            <div class="confirm-match" id="confirm-match-status"></div>
           </div>
           <div class="form-group full">
             <label for="reg-whatsapp">WhatsApp mobile number</label>
@@ -396,7 +428,7 @@
               <select id="reg-country-code" class="phone-prefix">
                 <option value="91" selected>🇮🇳 +91</option>
               </select>
-              <input type="tel" id="reg-whatsapp" class="form-input" placeholder="98765 43210" autocomplete="tel" required>
+              <input type="tel" id="reg-whatsapp" class="form-input" placeholder="98765 43210" autocomplete="tel" minlength="7" maxlength="15" pattern="[0-9\s\-]{7,15}" required>
               <i class="fa-brands fa-whatsapp wa"></i>
             </div>
             <p class="field-help">Receipts &amp; account alerts are sent here. We never share it.</p>
@@ -446,7 +478,7 @@
       <div class="otp-row" id="otp-row">
         <input maxlength="1" inputmode="numeric" aria-label="digit 1"><input maxlength="1" inputmode="numeric" aria-label="digit 2"><input maxlength="1" inputmode="numeric" aria-label="digit 3"><input maxlength="1" inputmode="numeric" aria-label="digit 4"><input maxlength="1" inputmode="numeric" aria-label="digit 5"><input maxlength="1" inputmode="numeric" aria-label="digit 6">
       </div>
-      <p class="resend">Didn't get it? <button type="button" class="link-btn" id="resend-code">Resend code</button></p>
+      <p class="resend">Didn't get it? <button type="button" class="link-btn" id="resend-code">Resend code</button> <span id="resend-timer" style="display:none;color:var(--text-mute);font-size:12px"></span></p>
       <button type="submit" class="btn btn-primary btn-block btn-lg">Verify code <i class="fa-solid fa-arrow-right"></i></button>
     </form>
 
@@ -473,6 +505,7 @@
 <script>
   const root = document.documentElement, tt = document.getElementById('theme-toggle');
   const setTheme = t => { root.setAttribute('data-theme', t); tt.innerHTML = t==='dark'?'<i class="fa-solid fa-moon"></i>':'<i class="fa-solid fa-sun"></i>'; try{localStorage.setItem('rs-theme',t)}catch(e){} };
+  // Apply saved theme (head script already set attribute; this syncs the icon)
   setTheme((()=>{try{return localStorage.getItem('rs-theme')||'light'}catch(e){return 'light'}})());
   tt.onclick = () => setTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');
 
@@ -817,7 +850,7 @@
   function showOk(m){errBox.classList.remove('show');okBox.querySelector('span').textContent=m;okBox.classList.add('show');}
   function hideAlerts(){errBox.classList.remove('show');okBox.classList.remove('show');}
 
-  // login submit — real auth via tenant-access edge function (demo fallback when unconfigured)
+  // login submit — real auth via tenant-access edge function
   loginForm.onsubmit=async e=>{
     e.preventDefault();
     const slug=document.getElementById('tenant-id').value.trim().toLowerCase(), u=document.getElementById('username').value.trim(), p=document.getElementById('password').value;
@@ -825,17 +858,70 @@
     if(!slug||!u||!p){showErr('Please fill in your outlet ID, username and password.');loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);return;}
     const btn=document.getElementById('login-submit'); const orig=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying…'; btn.disabled=true;
     try{
-      if(window.RS_API){ await RS_API.login({ slug, username:u, password:p, remember }); }
-      else { await new Promise(r=>setTimeout(r,600)); }
-      showOk('Verified — opening your console…');
-      setTimeout(()=>location.href='dashboard.html',700);
+      if(window.RS_API && RS_API.configured){
+        await RS_API.login({ slug, username:u, password:p, remember });
+        showOk('Verified — opening your console…');
+        setTimeout(()=>location.href='dashboard.html',700);
+      } else {
+        // Demo / local mode: look up a locally registered outlet
+        btn.innerHTML=orig; btn.disabled=false;
+        const localKey = 'rs_v2:'+slug+':settings';
+        let found = false;
+        try { found = !!localStorage.getItem(localKey); } catch(e) {}
+        if(found){
+          showOk('Demo mode — opening your console…');
+          try{ localStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_id', slug); }catch(e){}
+          setTimeout(()=>location.href='dashboard.html',700);
+        } else {
+          showErr('Outlet "'+slug+'" not found. Register it first or configure Supabase to sign in to a live outlet.');
+          loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
+        }
+      }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;
-      showErr(err.message||'Sign in failed. Check your credentials.');
+      showErr(err.message||'Sign in failed. Check your outlet ID and credentials.');
       loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
     }
   };
 
+
+  // password strength meter
+  (function(){
+    const pwdInp=document.getElementById('reg-password');
+    const wrap=document.getElementById('pwd-strength-wrap');
+    const label=document.getElementById('pwd-strength-label');
+    const levels=['','Weak','Fair','Good','Strong'];
+    function score(p){
+      let s=0;
+      if(p.length>=10)s++;
+      if(/[A-Z]/.test(p)&&/[a-z]/.test(p))s++;
+      if(/\d/.test(p))s++;
+      if(/[^A-Za-z0-9]/.test(p))s++;
+      return s;
+    }
+    pwdInp.oninput=()=>{
+      const v=pwdInp.value;
+      if(!v){wrap.style.display='none';wrap.className='pwd-strength';return;}
+      wrap.style.display='block';
+      const s=score(v);
+      wrap.className='pwd-strength pwd-s'+s;
+      label.textContent=levels[s]||'Weak';
+      // also recheck confirm
+      document.getElementById('reg-password-confirm').dispatchEvent(new Event('input'));
+    };
+  })();
+
+  // confirm password live match
+  (function(){
+    const confirm=document.getElementById('reg-password-confirm');
+    const status=document.getElementById('confirm-match-status');
+    confirm.oninput=()=>{
+      const a=document.getElementById('reg-password').value, b=confirm.value;
+      if(!b){status.className='confirm-match';return;}
+      if(a===b){status.className='confirm-match ok';status.textContent='✓ Passwords match';}
+      else{status.className='confirm-match bad';status.textContent='✕ Passwords do not match';}
+    };
+  })();
 
   // auto slug generation from name
   const regName = document.getElementById('reg-name');
@@ -891,37 +977,50 @@
   regForm.onsubmit=async e=>{
     e.preventDefault();
     if(!document.getElementById('reg-terms').checked){showErr('Please accept the Terms & Privacy Policy.');return;}
+    // Confirm password check
+    const pass = document.getElementById('reg-password').value;
+    const passConfirm = document.getElementById('reg-password-confirm').value;
+    if(pass !== passConfirm){showErr('Passwords do not match. Please re-enter your password.');document.getElementById('reg-password-confirm').focus();return;}
+    if(pass.length < 10){showErr('Password must be at least 10 characters.');document.getElementById('reg-password').focus();return;}
+    // WhatsApp validation
+    const phoneDigits = document.getElementById('reg-whatsapp').value.replace(/\D/g,'');
+    if(phoneDigits.length < 7 || phoneDigits.length > 15){showErr('Enter a valid WhatsApp number (7–15 digits).');document.getElementById('reg-whatsapp').focus();return;}
     const btn=document.getElementById('reg-submit'); const orig=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Creating…'; btn.disabled=true;
-    const email=document.getElementById('reg-email').value.trim(), pass=document.getElementById('reg-password').value;
+    const email=document.getElementById('reg-email').value.trim();
     const ccVal = document.getElementById('reg-country-code').value.replace(/\D/g, '');
-    const phoneVal = document.getElementById('reg-whatsapp').value.replace(/\D/g, '');
-    const phone = ccVal + phoneVal;
+    const phone = ccVal + phoneDigits;
+    const countryVal = document.getElementById('reg-country').value;
+    const currencyVal = document.getElementById('reg-currency').value;
     const payload={ name:document.getElementById('reg-name').value.trim(), slug:slug.value.trim(),
                     outlet_type:document.getElementById('reg-type').value, plan_code:document.getElementById('reg-plan').value,
-                    country:document.getElementById('reg-country').value,
+                    country:countryVal, currency:currencyVal,
+                    address:document.getElementById('reg-address').value.trim(),
                     email, phone, username:email, password:pass };
     try{
       if(window.RS_API && RS_API.configured){
         const r = await RS_API.register(payload);
         showOk(r.message || 'Registration submitted! Once CodeArc approves your outlet you can sign in.');
-        // Registration creates a PENDING outlet — it must be approved before login. Send them to the sign-in tab, prefilled.
+        // Registration creates a PENDING outlet — send them to sign-in tab, prefilled.
         setTimeout(()=>{ tabLogin.click(); const t=document.getElementById('tenant-id'); if(t)t.value=payload.slug; const un=document.getElementById('username'); if(un)un.value=email; }, 2200);
       } else {
         const tenantId = payload.slug;
         const activeKey = 'rs_v2:' + tenantId + ':settings';
-        const countryVal = document.getElementById('reg-country').value;
         const taxInfo = window.RS_getCountryTaxInfo ? window.RS_getCountryTaxInfo(countryVal) : { label: 'GST', rate: 5 };
         const localSettings = {
           set_restaurant_name: payload.name,
           set_outlet_name: payload.name,
           set_country: countryVal,
-          set_currency: document.getElementById('reg-currency').value,
+          set_currency: currencyVal,
+          set_address: payload.address,
           set_tax_label: taxInfo.label,
           set_tax_rate_percent: taxInfo.rate,
           set_calculate_taxes: true
         };
-        try { localStorage.setItem(activeKey, JSON.stringify(localSettings)); } catch(e) {}
-
+        try {
+          localStorage.setItem(activeKey, JSON.stringify(localSettings));
+          localStorage.setItem('tenant_id', tenantId);
+          sessionStorage.setItem('tenant_id', tenantId);
+        } catch(e) {}
         showOk('Outlet created! Redirecting to your new console…');
         setTimeout(()=>location.href='dashboard.html',900);
       }
@@ -933,20 +1032,130 @@
 
   // recovery modal
   const modal=document.getElementById('recovery-modal');
-  document.getElementById('open-recovery-btn').onclick=()=>{modal.classList.add('active');modal.setAttribute('aria-hidden','false');};
-  document.getElementById('close-recovery-btn').onclick=()=>{modal.classList.remove('active');modal.setAttribute('aria-hidden','true');};
-  modal.onclick=e=>{if(e.target===modal){modal.classList.remove('active');modal.setAttribute('aria-hidden','true');}};
+  let recoveryStep = 'email'; // tracks current valid step
+
+  function openModal(){
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden','false');
+    recoveryStep = 'email';
+    rstep('email');
+    setTimeout(()=>{ const f=modal.querySelector('input'); if(f)f.focus(); }, 50);
+  }
+  function closeModal(){
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden','true');
+    document.getElementById('open-recovery-btn').focus();
+  }
+
+  document.getElementById('open-recovery-btn').onclick = openModal;
+  document.getElementById('close-recovery-btn').onclick = closeModal;
+  modal.onclick = e => { if(e.target===modal) closeModal(); };
+
+  // Escape key closes modal
+  document.addEventListener('keydown', e => {
+    if(e.key==='Escape' && modal.classList.contains('active')) closeModal();
+  });
+
+  // Focus trap inside modal
+  modal.addEventListener('keydown', e => {
+    if(e.key !== 'Tab') return;
+    const focusable = [...modal.querySelectorAll('button, input, a, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(el=>!el.disabled);
+    if(!focusable.length) return;
+    const first=focusable[0], last=focusable[focusable.length-1];
+    if(e.shiftKey){ if(document.activeElement===first){e.preventDefault();last.focus();} }
+    else { if(document.activeElement===last){e.preventDefault();first.focus();} }
+  });
+
   function rstep(which){
-    document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.rstep===which));
+    document.querySelectorAll('.rtab').forEach(t=>{
+      const isTarget = t.dataset.rstep===which;
+      t.classList.toggle('active', isTarget);
+      // Disable tabs for steps not yet reached (prevent bypassing)
+      const order = {email:0, code:1, reset:2};
+      const reachable = order[t.dataset.rstep] <= order[recoveryStep];
+      t.disabled = !reachable;
+      t.style.opacity = reachable ? '' : '0.45';
+      t.style.cursor = reachable ? '' : 'not-allowed';
+    });
     document.querySelectorAll('.rform').forEach(f=>f.classList.toggle('on',f.dataset.rform===which));
   }
-  document.querySelectorAll('.rtab').forEach(t=>t.onclick=()=>rstep(t.dataset.rstep));
-  document.getElementById('recovery-request-form').onsubmit=e=>{e.preventDefault();document.getElementById('recovery-email-echo').textContent=document.getElementById('recovery-email').value||'your email';rstep('code');document.querySelector('#otp-row input').focus();};
-  document.getElementById('recovery-code-form').onsubmit=e=>{e.preventDefault();rstep('reset');};
-  document.getElementById('recovery-reset-form').onsubmit=e=>{e.preventDefault();const a=document.getElementById('recovery-new-password').value,b=document.getElementById('recovery-confirm-password').value;if(a!==b){showErr('Passwords do not match.');return;}modal.classList.remove('active');showTab('login');showOk('Password updated — you can sign in now.');};
-  // otp autoadvance
+  document.querySelectorAll('.rtab').forEach(t=>t.onclick=()=>{
+    const order={email:0,code:1,reset:2};
+    if(order[t.dataset.rstep]<=order[recoveryStep]) rstep(t.dataset.rstep);
+  });
+
+  document.getElementById('recovery-request-form').onsubmit=e=>{
+    e.preventDefault();
+    const emailVal=document.getElementById('recovery-email').value.trim();
+    if(!emailVal){document.getElementById('recovery-email').focus();return;}
+    const btn=e.target.querySelector('button[type="submit"]'); const orig=btn.innerHTML;
+    btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; btn.disabled=true;
+    // Simulate / real send
+    setTimeout(()=>{
+      btn.innerHTML=orig; btn.disabled=false;
+      document.getElementById('recovery-email-echo').textContent=emailVal;
+      recoveryStep='code'; rstep('code');
+      otp[0].focus();
+      startResendCooldown();
+    }, 800);
+  };
+
+  document.getElementById('recovery-code-form').onsubmit=e=>{
+    e.preventDefault();
+    const code=otp.map(i=>i.value).join('');
+    if(code.length<6){
+      otp.forEach(i=>i.style.borderColor='var(--red)');
+      setTimeout(()=>otp.forEach(i=>i.style.borderColor=''),1800);
+      return;
+    }
+    recoveryStep='reset'; rstep('reset');
+    document.getElementById('recovery-new-password').focus();
+  };
+
+  document.getElementById('recovery-reset-form').onsubmit=e=>{
+    e.preventDefault();
+    const a=document.getElementById('recovery-new-password').value, b=document.getElementById('recovery-confirm-password').value;
+    if(a.length<10){showErr('New password must be at least 10 characters.');return;}
+    if(a!==b){showErr('Passwords do not match.');document.getElementById('recovery-confirm-password').focus();return;}
+    const btn=e.target.querySelector('button[type="submit"]'); const orig=btn.innerHTML;
+    btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Updating…'; btn.disabled=true;
+    setTimeout(()=>{
+      btn.innerHTML=orig; btn.disabled=false;
+      closeModal(); showTab('login'); showOk('Password updated — you can sign in now.');
+    }, 700);
+  };
+
+  // OTP autoadvance + paste support
   const otp=[...document.querySelectorAll('#otp-row input')];
-  otp.forEach((inp,i)=>{inp.oninput=()=>{inp.value=inp.value.replace(/\D/g,'');if(inp.value&&i<otp.length-1)otp[i+1].focus();};inp.onkeydown=e=>{if(e.key==='Backspace'&&!inp.value&&i>0)otp[i-1].focus();};});
+  otp.forEach((inp,i)=>{
+    inp.oninput=()=>{inp.value=inp.value.replace(/\D/g,'').slice(0,1);if(inp.value&&i<otp.length-1)otp[i+1].focus();};
+    inp.onkeydown=e=>{if(e.key==='Backspace'&&!inp.value&&i>0)otp[i-1].focus();};
+    inp.onpaste=e=>{
+      e.preventDefault();
+      const text=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'');
+      if(!text) return;
+      [...text.slice(0,6)].forEach((ch,k)=>{ if(otp[k]) otp[k].value=ch; });
+      const next=Math.min(text.length, 5); otp[next].focus();
+    };
+  });
+
+  // Resend cooldown (30 seconds)
+  let resendTimer=null;
+  function startResendCooldown(){
+    const btn=document.getElementById('resend-code'), timerEl=document.getElementById('resend-timer');
+    let secs=30; btn.disabled=true; btn.style.opacity='0.45';
+    timerEl.style.display='inline'; timerEl.textContent='('+secs+'s)';
+    clearInterval(resendTimer);
+    resendTimer=setInterval(()=>{
+      secs--;
+      if(secs<=0){ clearInterval(resendTimer); btn.disabled=false; btn.style.opacity=''; timerEl.style.display='none'; }
+      else { timerEl.textContent='('+secs+'s)'; }
+    },1000);
+  }
+  document.getElementById('resend-code').onclick=()=>{
+    otp.forEach(i=>i.value=''); otp[0].focus();
+    startResendCooldown();
+  };
 </script>
 </body>
 </html>

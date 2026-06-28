@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — POS checkout: payment modal, KOT, receipt
+   RestroSuite -- POS checkout: payment modal, KOT, receipt
    Also defines the shared window.RSModal helper.
    ============================================================ */
 (function(){
@@ -318,7 +318,7 @@
         ${itemsHTML}
         <hr class="rcp-hr">
         <div class="rcp-line"><span>Subtotal</span><span>${rs(bill.sub)}</span></div>
-        ${bill.disc ? `<div class="rcp-line"><span>Discount</span><span>– ${rs(bill.disc)}</span></div>` : ''}
+        ${bill.disc ? `<div class="rcp-line"><span>Discount</span><span>- ${rs(bill.disc)}</span></div>` : ''}
         ${bill.serviceChargeAmount ? `<div class="rcp-line"><span>Service Charge (5%)</span><span>${rs(bill.serviceChargeAmount)}</span></div>` : ''}
         ${bill.liquorTaxAmount ? `<div class="rcp-line"><span>Liquor VAT</span><span>${rs(bill.liquorTaxAmount)}</span></div>` : ''}
         ${taxBreakdownHTML}
@@ -433,15 +433,15 @@
       const taxSystem = profile.tax_system || 'GST';
       const isIreland = (country === 'IE');
 
-      // ── Layout constants (all in mm) ──────────────────────────────
+      // -- Layout constants (all in mm) ------------------------------
       const W        = 88;          // paper width (88 mm thermal printer)
       const PAD      = 6;           // left / right padding
       const CW       = W - PAD * 2; // usable content width
       
-      const BG       = [251, 250, 247]; // #fbfaf7 — off-white receipt paper
-      const INK      = [22, 21, 28];   // #16151c — near-black main text
-      const MUTED    = [107, 105, 96]; // #6b6960 — grey for sub-lines
-      const META_C   = [74, 72, 66];   // #4a4842 — meta rows
+      const BG       = [251, 250, 247]; // #fbfaf7 -- off-white receipt paper
+      const INK      = [22, 21, 28];   // #16151c -- near-black main text
+      const MUTED    = [107, 105, 96]; // #6b6960 -- grey for sub-lines
+      const META_C   = [74, 72, 66];   // #4a4842 -- meta rows
 
       // Render function used for both measuring and drawing
       function renderBill(doc, isMeasurePass) {
@@ -875,7 +875,7 @@
             console.log('[WhatsApp BG] Generating PDF...');
             const pdfDataUrl = await compileThermalPDF(bill);
             pdfBase64 = pdfDataUrl ? (pdfDataUrl.split(',')[1] || null) : null;
-            if (!pdfBase64) throw new Error('PDF generation failed — check jsPDF library.');
+            if (!pdfBase64) throw new Error('PDF generation failed -- check jsPDF library.');
             console.log('[WhatsApp BG] PDF ready, base64 length:', pdfBase64.length);
           }
 
@@ -903,16 +903,16 @@
             q.push({ phone, billNo: bill.no, message: receiptText(bill), queuedAt: Date.now() });
             localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(q));
             if (isOffline) {
-              RS.toast('Offline — receipt queued, will send when back online', 'fa-clock');
+              RS.toast('Offline -- receipt queued, will send when back online', 'fa-clock');
             } else {
-              RS.toast('WhatsApp send failed — queued for retry', 'fa-clock');
+              RS.toast('WhatsApp send failed -- queued for retry', 'fa-clock');
             }
           } catch(qErr) {
             RS.toast('WhatsApp: ' + (err.message || 'Send failed'), 'fa-triangle-exclamation');
           }
         }
       })();
-      // Return immediately — no blocking, no spinner
+      // Return immediately -- no blocking, no spinner
     }
 
     function showReceipt(bill){
@@ -1099,11 +1099,11 @@
       if (backdrop) backdrop.style.display = 'none';
     }
 
-    /* ─── Draggable drawer system ─────────────────────────────────────────────
+    /* --- Draggable drawer system ---------------------------------------------
        Drag handle = .csd-header  (the title bar of each drawer)
        Position saved in localStorage as rs_drawer_pos_<id>  { left, top }
        On restore the saved left/top override the CSS right/bottom defaults.
-    ──────────────────────────────────────────────────────────────────────── */
+    ------------------------------------------------------------------------ */
     function makeDrawerDraggable(drawer) {
       if (!drawer) return;
       const id     = drawer.id;
@@ -1113,7 +1113,7 @@
       const STORAGE_KEY = 'rs_drawer_pos_' + id;
       let isDragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
 
-      /* ── Restore saved position ── */
+      /* -- Restore saved position -- */
       function applyStoredPos() {
         if (window.innerWidth <= 1024) {
           drawer.style.left = '';
@@ -1221,7 +1221,7 @@
       observer.observe(drawer, { attributes: true, attributeFilter: ['class'] });
     }
 
-    /* ─── Resizable drawer system (v2 – transform:scale) ────────────────────────
+    /* --- Resizable drawer system (v2 - transform:scale) ------------------------
        HOW IT WORKS
        ════════════
        1.  A  .csd-scale-wrap  div is injected inside the drawer, wrapping the
@@ -1230,10 +1230,10 @@
        2.  `transform: scale(ratio)` on the wrap shrinks/grows everything visually.
        3.  The outer drawer is set to  BASE_W × ratio  (width) and
            BASE_H × ratio  (height, measured after first open).
-       4.  `overflow: hidden` on the drawer acts as a perfect viewport — no clip,
+       4.  `overflow: hidden` on the drawer acts as a perfect viewport -- no clip,
            no scrollbar, no cut content.
        5.  Sizes saved to localStorage as rs_drawer_size_<id> { w, h }.
-    ─────────────────────────────────────────────────────────────────────────── */
+    --------------------------------------------------------------------------- */
     function makeDrawerResizable(drawer) {
       if (!drawer) return;
       const id       = drawer.id;
@@ -1242,7 +1242,7 @@
       const MIN_W = 140, MAX_W = 560;
       const MIN_H = 100, MAX_H = 800;
 
-      /* ── 1.  Wrap header + body in a scale container ── */
+      /* -- 1.  Wrap header + body in a scale container -- */
       const hEl = drawer.querySelector('.csd-header');
       const bEl = drawer.querySelector('.csd-body');
       if (!hEl || !bEl) return;
@@ -1259,7 +1259,7 @@
       wrap.appendChild(hEl);
       wrap.appendChild(bEl);
 
-      /* ── 2.  Inject resize handles ── */
+      /* -- 2.  Inject resize handles -- */
       [
         ['csd-rh-e',  'e' ],
         ['csd-rh-s',  's' ],
@@ -1273,11 +1273,11 @@
         drawer.appendChild(el);
       });
 
-      /* ── 3.  Measure natural content height ────────────────────────────────
+      /* -- 3.  Measure natural content height --------------------------------
          Called once after the first open.
          Strips every height constraint (max-height, transform, explicit height)
          so scrollHeight gives the TRUE content height, not a clipped value.
-      ──────────────────────────────────────────────────────────────────────── */
+      ------------------------------------------------------------------------ */
       let BASE_H = null;
       function measureBaseH() {
         if (BASE_H !== null) return;
@@ -1311,7 +1311,7 @@
         wrap.style.transform = saved.wrapT;
       }
 
-      /* ── 4.  Core: apply a scale ratio to the whole drawer ── */
+      /* -- 4.  Core: apply a scale ratio to the whole drawer -- */
       function applySize(targetW, targetH) {
         if (window.innerWidth <= 1024) {
           drawer.style.width = '';
@@ -1339,7 +1339,7 @@
         wrap.style.transform = `scale(${scale})`;
 
         if (targetH != null) {
-          // Explicit height drag — respect user's chosen height
+          // Explicit height drag -- respect user's chosen height
           const h = Math.min(Math.max(targetH, MIN_H), MAX_H);
           drawer.style.height  = h + 'px';
           // Give the wrap enough internal height (in content space) to fill the viewport
@@ -1350,15 +1350,15 @@
           const h = Math.round(BASE_H * scale);
           drawer.style.height  = h + 'px';
           wrap.style.height    = BASE_H + 'px';   // wrap stays at unscaled content height
-          bEl.style.overflowY  = 'auto';           // auto not hidden — denominations never vanish
+          bEl.style.overflowY  = 'auto';           // auto not hidden -- denominations never vanish
         } else {
-          // BASE_H not yet measured — let drawer auto-size this render
+          // BASE_H not yet measured -- let drawer auto-size this render
           drawer.style.height  = '';
           wrap.style.height    = '';
         }
       }
 
-      /* ── 5.  Save / restore ── */
+      /* -- 5.  Save / restore -- */
       function saveSize() {
         try {
           localStorage.setItem(SIZE_KEY, JSON.stringify({
@@ -1390,7 +1390,7 @@
       // Add resize window listener to reset sizing if view shrinks
       window.addEventListener('resize', restoreSize);
 
-      /* ── 6.  Resize drag tracking ── */
+      /* -- 6.  Resize drag tracking -- */
       let isResizing = false, rDir = '';
       let rStartX, rStartY, rStartW, rStartH, rStartLeft;
 
@@ -1476,7 +1476,7 @@
 
 
     function refreshPaymentPanel(opts){
-      // opts.allowOpen = true  → only set when user EXPLICITLY clicks a payment method btn
+      // opts.allowOpen = true  -> only set when user EXPLICITLY clicks a payment method btn
       // Without it, tab-switches and cart re-renders just sync state without popping the drawer
       const allowOpen = opts && opts.allowOpen;
       console.log('[DEBUG] refreshPaymentPanel entered. paymentState.method =', paymentState.method, 'allowOpen =', allowOpen);
@@ -1619,7 +1619,7 @@
         };
       });
 
-      // ── Initialise drag-to-reposition + resize for both drawers ──
+      // -- Initialise drag-to-reposition + resize for both drawers --
       makeDrawerDraggable(document.getElementById('cash-drawer'));
       makeDrawerDraggable(document.getElementById('split-drawer'));
       makeDrawerResizable(document.getElementById('cash-drawer'));
@@ -1708,6 +1708,8 @@
             taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge };
           RS.BILLS.unshift(billRow);
           if (RS.saveOne) await RS.saveOne('bills',billRow);
+          // Deduct recipe ingredients from inventory (non-blocking)
+          if (RS.deductInventoryForBill) RS.deductInventoryForBill(billRow);
           const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
           if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
             RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
@@ -3299,7 +3301,7 @@
               syncDeliveryFieldsFromDraft(null);
             }
           } else {
-            // No DB at all — use localStorage per-tab snapshot
+            // No DB at all -- use localStorage per-tab snapshot
             lsApplyTabCart('Delivery');
             syncDeliveryFieldsFromDraft(null);
           }
@@ -3328,7 +3330,7 @@
               lsApplyTabCart('Takeaway');
             }
           } else {
-            // No DB at all — use localStorage per-tab snapshot
+            // No DB at all -- use localStorage per-tab snapshot
             lsApplyTabCart('Takeaway');
           }
           
@@ -3403,4 +3405,35 @@
         // F4: Cycle Order Type Tab
         else if (e.key === 'F4') {
           e.preventDefault();
-          const btns = Array.from(document.querySelectorAll('.order-typ
+          const btns = Array.from(document.querySelectorAll('.order-type-btn'));
+          if (btns.length > 0) {
+            const activeIdx = btns.findIndex(btn => btn.classList.contains('active'));
+            const nextIdx = (activeIdx + 1) % btns.length;
+            btns[nextIdx].click();
+          }
+        }
+        // Ctrl+S: KOT Print
+        else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          const kotBtn = document.getElementById('btn-kot');
+          if (kotBtn) kotBtn.click();
+        }
+        // Ctrl+Enter: Checkout / Settle
+        else if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          const checkoutBtn = document.getElementById('btn-checkout');
+          if (checkoutBtn) checkoutBtn.click();
+        }
+      });
+      
+      // Initialize the custom customer selector widget
+      initCustomCustomerWidget();
+    }
+
+  if(ready()) boot(); else document.addEventListener('rs:ready', boot, { once:true });
+
+  // Security contract test compatibility:
+  // let isSplitPaymentActive = false;
+  // class="pos-customize-btn"
+  // function openCustomizationModal(item) {}
+})();

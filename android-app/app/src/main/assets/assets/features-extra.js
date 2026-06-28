@@ -1,9 +1,9 @@
 /* ============================================================
-   RestroSuite — Token Display, Tax & GST, Advanced Analytics
+   RestroSuite -- Token Display, Tax & GST, Advanced Analytics
    ============================================================ */
 (function(){
   'use strict';
-  // HTML escaping — prevents XSS when inserting DB-sourced strings into innerHTML
+  // HTML escaping -- prevents XSS when inserting DB-sourced strings into innerHTML
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
@@ -292,7 +292,7 @@
               ${periodBills.length > 0 ? periodBills.map(b => {
                 const c = Math.round((b.gst || 0) / 2);
                 const isECO = b.channel === 'ecommerce_9_5';
-                return `<tr><td><b>${b.no || b.orderId}</b></td><td>${b.customerName || 'Guest'}</td><td>${b.dateTime.split('T')[0]}</td><td class="td-strong">${rs(b.subtotal)}</td><td>${isECO?'—':rs(c)}</td><td>${isECO?'—':rs(b.gst - c)}</td><td>${isECO?rs(b.gst):'—'}</td><td>${b.liquorTaxAmount ? rs(b.liquorTaxAmount) : '—'}</td><td class="td-strong">${rs(b.amount || b.total)}</td></tr>`;
+                return `<tr><td><b>${b.no || b.orderId}</b></td><td>${b.customerName || 'Guest'}</td><td>${b.dateTime.split('T')[0]}</td><td class="td-strong">${rs(b.subtotal)}</td><td>${isECO?'--':rs(c)}</td><td>${isECO?'--':rs(b.gst - c)}</td><td>${isECO?rs(b.gst):'--'}</td><td>${b.liquorTaxAmount ? rs(b.liquorTaxAmount) : '--'}</td><td class="td-strong">${rs(b.amount || b.total)}</td></tr>`;
               }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--text-mute)">No invoices logged in this month</td></tr>'}
               </tbody></table></div>
             </div>
@@ -809,7 +809,7 @@
       data.forEach(d=>{ const frac=d[1]/100; const len=frac*C; segs+=`<circle r="42" cx="60" cy="60" fill="none" stroke="${d[2]}" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-acc*C}" transform="rotate(-90 60 60)"/>`; acc+=frac; });
       return `<svg viewBox="0 0 120 120" style="width:150px;height:150px">${segs}<text x="60" y="56" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="800" font-family="Plus Jakarta Sans">100%</text><text x="60" y="72" text-anchor="middle" fill="var(--text-mute)" font-size="9">payments</text></svg>`;
     }
-    // ── Analytics: build data from real bills ────────────────────────────────
+    // -- Analytics: build data from real bills --------------------------------
     function anDays(period){ return period==='Last 7 days'?7:period==='Last 90 days'?90:30; }
 
     function buildAnalytics(bills, days){
@@ -829,7 +829,7 @@
       const todayRev = filtered.filter(function(b){ return new Date(b.dateTime).getTime()>=todayStart; })
                                .reduce(function(a,b){ return a+(b.amount||b.total||0); },0);
 
-      // Daily trend array (days slots, oldest→newest)
+      // Daily trend array (days slots, oldest->newest)
       const daily = Array(days).fill(0);
       filtered.forEach(function(b){
         const age = Math.floor((now - new Date(b.dateTime).getTime()) / 86400000);
@@ -894,7 +894,7 @@
       period = period || 'Last 30 days';
       const days = anDays(period);
       const sec = $('#analytics-tab');
-      sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px"></i><div style="margin-top:12px;font-size:13px">Loading analytics…</div></div>';
+      sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px"></i><div style="margin-top:12px;font-size:13px">Loading analytics...</div></div>';
 
       RS_DB.list('doppio_bills').then(function(allBills){
         const d = buildAnalytics(allBills||[], days);

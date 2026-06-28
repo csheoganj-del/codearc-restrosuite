@@ -5,4 +5,4 @@ Disallow: /dashboard.html
 Disallow: /login
 Disallow: /login.html
 
-Sitemap: https://codearc-restrosuite.vercel.app/sitemap.xml
+Sitemap: https://restrosuite.codearc.co.in/sitemap.xml

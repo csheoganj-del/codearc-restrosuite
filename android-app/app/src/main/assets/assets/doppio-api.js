@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — Doppio backend API client
+   RestroSuite -- Doppio backend API client
    Talks to the existing Supabase Edge Functions:
      • tenant-access  (login / register / session / recovery)
      • tenant-data    (tenant-scoped CRUD on doppio_* tables)
@@ -41,7 +41,7 @@
 
   // SECURITY: the demo/mock fallback below can fabricate a full session for ANY
   // slug/role (including superadmin) when Supabase is misconfigured or unreachable.
-  // In production this is an auth bypass — a transient /api/config failure would
+  // In production this is an auth bypass -- a transient /api/config failure would
   // silently log any visitor in as admin. Demo mode must ONLY be available on a
   // local developer machine. Never enable it for a real hostname (incl. Vercel
   // previews, custom domains, or the Android WebView which uses file:// origins).
@@ -208,7 +208,7 @@
     async register(payload){
       // payload: { name, slug, outlet_type, email, phone, username, password }
       if(!CONFIGURED) {
-        // Demo/unconfigured mode: do NOT store a session — registration creates a PENDING
+        // Demo/unconfigured mode: do NOT store a session -- registration creates a PENDING
         // outlet that must be approved before login. Storing a session here would bypass
         // the approval gate and auto-redirect to dashboard.
         await new Promise(r => setTimeout(r, 600));
@@ -249,7 +249,7 @@
         if (err.status === 401 || err.status === 403) {
           return null;
         }
-        // Network error or offline — keep the local session alive
+        // Network error or offline -- keep the local session alive
         throw err;
       }
     },
@@ -265,7 +265,7 @@
     async data(payload){
       const token = ssGet(K.token);
       // Gateway operations (send/status/logs/reset) don't require a Supabase session
-      // when running on localhost — the local dev server authenticates with the gateway directly.
+      // when running on localhost -- the local dev server authenticates with the gateway directly.
       const GATEWAY_OPS = ['gateway_status','gateway_send','gateway_logs','gateway_reset','gateway_logout'];
       const isGatewayOp = payload && GATEWAY_OPS.includes(payload.operation);
       
@@ -384,14 +384,52 @@
       const adminToken = ssGet('superadmin_admin_token');
       if(!adminToken) throw new Error("Superadmin session expired. Please log in again.");
       return post('tenant-admin', { action, ...payload }, adminToken, 'Superadmin request failed');
-    }
+    },
+
+    // -- Staff account management (tenant-users edge function) -------------
+    // Requires an active admin/owner session token.
+    async staffUsers({ action, ...payload }) {
+      const token = ssGet(K.token);
+      if (!token) throw new Error('Not signed in.');
+
+      if (!CONFIGURED) {
+        // Mock mode -- use sessionStorage as a fake DB
+        await new Promise(r => setTimeout(r, 300));
+        const store = () => JSON.parse(sessionStorage.getItem('mock_staff_users') || '[]');
+        const save  = (d) => sessionStorage.setItem('mock_staff_users', JSON.stringify(d));
+
+        if (action === 'list_users') {
+          return { users: store(), usage: { active_staff: store().length, max_staff: 15 }, plan: { code: 'growth', name: 'Growth' } };
+        }
+        if (action === 'create_user') {
+          const users = store();
+          if (users.find(u => u.username === payload.username)) throw new Error('That username already exists in this workspace.');
+          const user = { id: 'mock-' + Date.now(), username: payload.username, display_name: payload.display_name, role: payload.role, status: 'active', allowed_tabs: [], created_at: new Date().toISOString() };
+          users.push(user); save(users);
+          return { user };
+        }
+        if (action === 'update_user') {
+          const users = store();
+          const idx = users.findIndex(u => u.id === payload.user_id);
+          if (idx === -1) throw new Error('Staff account was not found.');
+          users[idx] = { ...users[idx], ...( payload.role !== undefined ? { role: payload.role } : {} ), ...( payload.status !== undefined ? { status: payload.status } : {} ), ...( payload.display_name !== undefined ? { display_name: payload.display_name } : {} ) };
+          save(users); return { user: users[idx] };
+        }
+        if (action === 'reset_password') return { success: true };
+        if (action === 'revoke_user_sessions') return { success: true };
+        if (action === 'audit_logs') return { logs: [] };
+        throw new Error('Unknown action');
+      }
+
+      return post('tenant-users', { action, ...payload }, token, 'Staff account operation failed');
+    },
   };
 
   window.RS_API = api;
 
   /* ---------------- GLOBAL ERROR BOUNDARY ---------------- */
   // Catches any unhandled promise rejection across the whole app and surfaces
-  // a non-blocking "Something went wrong — reload?" banner. This prevents the
+  // a non-blocking "Something went wrong -- reload?" banner. This prevents the
   // dashboard from silently half-rendering on network errors or unexpected
   // exceptions (e.g. JSON parse failures on non-200 responses).
   window.addEventListener('unhandledrejection', function(event) {
