@@ -55,12 +55,19 @@
   .access-story .brand-name { color: #fff; }
   .access-story .brand-name .codearc { color: rgba(255,255,255,0.6); }
 
-  .story-slides { position: relative; margin: 36px 0 28px; min-height: 188px; }
+  .story-slides { position: relative; margin: 28px 0 22px; min-height: 188px; }
   .story-slide { position: absolute; inset: 0; opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease), transform .6s var(--ease); pointer-events: none; }
   .story-slide.on { opacity: 1; transform: none; pointer-events: auto; }
   .story-stat { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
   .story-stat .big { font-family: var(--font-display); font-weight: 800; font-size: 60px; line-height: 1; letter-spacing: -0.04em; color: #fff; }
   .story-stat .suf { font-family: var(--font-display); font-weight: 700; font-size: 22px; color: var(--orange); }
+
+  /* Currency flip animation */
+  @keyframes sym-flip-in { from { opacity:0; transform: rotateY(90deg) scale(0.7); } to { opacity:1; transform: rotateY(0deg) scale(1); } }
+  .sym-flip { display:inline-block; animation: sym-flip-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+  .plan-sym { display:inline-block; transition: opacity .2s; }
+  .plan-sym.flip { animation: sym-flip-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+  .plan-inr-note { font-size: 10px; font-weight: 500; opacity: 0.65; letter-spacing: 0; vertical-align: middle; }
   .story-slide h2 { color: #fff; font-size: 25px; margin-bottom: 10px; letter-spacing: -0.02em; }
   .story-slide p { color: rgba(255,255,255,0.74); font-size: 15px; max-width: 380px; }
 
@@ -68,9 +75,9 @@
   .story-dots button { width: 8px; height: 8px; border-radius: 99px; border: none; background: rgba(255,255,255,0.3); cursor: pointer; padding: 0; transition: var(--t); }
   .story-dots button.on { width: 26px; background: var(--orange); }
 
-  .story-feats { display: grid; gap: 12px; }
-  .story-feat { display: flex; align-items: center; gap: 13px; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500; }
-  .story-feat i { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 14px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); color: #fff; flex: none; }
+  .story-feats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+  .story-feat { display: flex; align-items: center; gap: 11px; color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500; line-height: 1.35; }
+  .story-feat i { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-size: 13px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); color: #fff; flex: none; }
 
   /* ===== marketing panel — LIGHT MODE adaptation ===== */
   [data-theme="light"] .access-story { background: linear-gradient(165deg, rgba(255,79,0,0.16) 0%, #fff 62%); border-color: var(--stroke-2); }
@@ -248,9 +255,19 @@
           <p>Keep ringing up orders through power cuts and dead zones — everything syncs to the cloud the moment you reconnect.</p>
         </div>
         <div class="story-slide">
-          <div class="story-stat"><span class="big" data-count="0" data-prefix="₹">0</span><span class="suf">setup cost</span></div>
+          <div class="story-stat"><span class="big" id="stat-zero-cost" data-count="0" data-prefix="₹">0</span><span class="suf" id="stat-zero-suf">setup cost</span></div>
           <h2>Zero hardware to buy.</h2>
           <p>Runs on the phone, tablet or laptop you already own. Live in minutes, not weeks.</p>
+        </div>
+        <div class="story-slide">
+          <div class="story-stat"><span class="big" data-count="3">0</span><span class="suf">sec · order to KDS</span></div>
+          <h2>Tap once. Kitchen sees it instantly.</h2>
+          <p>Each KOT reaches the kitchen display in under 3 seconds via real-time sync — no polling, no shouting, no paper slips.</p>
+        </div>
+        <div class="story-slide">
+          <div class="story-stat"><span class="big" data-count="1">0</span><span class="suf">app · all channels</span></div>
+          <h2>Dine-in, takeaway, QR & delivery.</h2>
+          <p>Tables, QR-scan ordering, takeaway counter and delivery aggregators — managed from a single dashboard in real time.</p>
         </div>
       </div>
 
@@ -258,7 +275,10 @@
 
       <div class="story-feats">
         <div class="story-feat"><i class="fa-solid fa-shield-halved"></i> Role-controlled access for every staff member</div>
-        <div class="story-feat"><i class="fa-brands fa-whatsapp"></i> GST receipts delivered to WhatsApp instantly</div>
+        <div class="story-feat" id="feat-tax-receipt"><i class="fa-brands fa-whatsapp"></i> <span id="feat-tax-label">GST</span> receipts delivered to WhatsApp instantly</div>
+        <div class="story-feat"><i class="fa-solid fa-qrcode"></i> QR table ordering — no app download needed</div>
+        <div class="story-feat"><i class="fa-solid fa-chart-line"></i> Live sales reports &amp; automatic daily close-out</div>
+        <div class="story-feat"><i class="fa-solid fa-credit-card"></i> UPI · card · cash · wallet — every payment mode</div>
         <div class="story-feat"><i class="fa-solid fa-lock"></i> Bank-grade encryption · your data stays yours</div>
       </div>
     </div>
@@ -377,10 +397,10 @@
           <div class="form-group full">
             <label>Choose your plan</label>
             <div class="plan-pick" id="plan-pick">
-              <div class="plan-opt" data-plan="free"><span class="plan-radio"></span><div><div class="pn">Free / Demo</div><div class="pd">Full POS simulator &amp; training database</div></div><span class="pp">₹0</span></div>
-              <div class="plan-opt" data-plan="starter"><span class="plan-radio"></span><div><div class="pn">Starter</div><div class="pd">Offline POS &amp; billing essentials</div></div><span class="pp">₹499</span></div>
-              <div class="plan-opt sel" data-plan="growth"><span class="plan-radio"></span><div><div class="pn">Growth <span class="pill pill-orange" style="padding:2px 8px;font-size:10px">Popular</span></div><div class="pd">Full suite — QR, KDS, CRM, reports</div></div><span class="pp">₹749</span></div>
-              <div class="plan-opt" data-plan="chain"><span class="plan-radio"></span><div><div class="pn">Chain</div><div class="pd">Multi-outlet central control</div></div><span class="pp">₹1,999</span></div>
+              <div class="plan-opt" data-plan="free"><span class="plan-radio"></span><div><div class="pn">Free / Demo</div><div class="pd">Full POS simulator &amp; training database</div></div><span class="pp"><span class="plan-sym">₹</span>0</span></div>
+              <div class="plan-opt" data-plan="starter"><span class="plan-radio"></span><div><div class="pn">Starter</div><div class="pd">Offline POS &amp; billing essentials</div></div><span class="pp"><span class="plan-sym">₹</span>499 <small class="plan-inr-note"></small></span></div>
+              <div class="plan-opt sel" data-plan="growth"><span class="plan-radio"></span><div><div class="pn">Growth <span class="pill pill-orange" style="padding:2px 8px;font-size:10px">Popular</span></div><div class="pd">Full suite — QR, KDS, CRM, reports</div></div><span class="pp"><span class="plan-sym">₹</span>749 <small class="plan-inr-note"></small></span></div>
+              <div class="plan-opt" data-plan="chain"><span class="plan-radio"></span><div><div class="pn">Chain</div><div class="pd">Multi-outlet central control</div></div><span class="pp"><span class="plan-sym">₹</span>1,999 <small class="plan-inr-note"></small></span></div>
             </div>
             <input type="hidden" id="reg-plan" value="growth">
           </div>
@@ -803,6 +823,120 @@
     })();
   })();
 
+
+  // ── Country-aware marketing panel ──────────────────────────────────────
+  (function applyCountryLocale() {
+    // Timezone → locale info. Most precise match first, then prefix fallbacks below.
+    const TZ_MAP = {
+      // India
+      'Asia/Kolkata':{'sym':'₹','code':'INR','tax':'GST','isInr':true},
+      'Asia/Calcutta':{'sym':'₹','code':'INR','tax':'GST','isInr':true},
+      // United Kingdom
+      'Europe/London':{'sym':'£','code':'GBP','tax':'VAT','isInr':false},
+      'Europe/Belfast':{'sym':'£','code':'GBP','tax':'VAT','isInr':false},
+      // Australia
+      'Australia/Sydney':{'sym':'A$','code':'AUD','tax':'GST','isInr':false},
+      'Australia/Melbourne':{'sym':'A$','code':'AUD','tax':'GST','isInr':false},
+      'Australia/Brisbane':{'sym':'A$','code':'AUD','tax':'GST','isInr':false},
+      'Australia/Perth':{'sym':'A$','code':'AUD','tax':'GST','isInr':false},
+      'Australia/Adelaide':{'sym':'A$','code':'AUD','tax':'GST','isInr':false},
+      // Singapore
+      'Asia/Singapore':{'sym':'S$','code':'SGD','tax':'GST','isInr':false},
+      // UAE
+      'Asia/Dubai':{'sym':'AED','code':'AED','tax':'VAT','isInr':false},
+      // Saudi Arabia
+      'Asia/Riyadh':{'sym':'SAR','code':'SAR','tax':'VAT','isInr':false},
+      // Kuwait / Bahrain / Qatar / Oman
+      'Asia/Kuwait':{'sym':'KWD','code':'KWD','tax':'VAT','isInr':false},
+      'Asia/Bahrain':{'sym':'BHD','code':'BHD','tax':'VAT','isInr':false},
+      'Asia/Qatar':{'sym':'QAR','code':'QAR','tax':'VAT','isInr':false},
+      'Asia/Muscat':{'sym':'OMR','code':'OMR','tax':'VAT','isInr':false},
+      // New Zealand
+      'Pacific/Auckland':{'sym':'NZ$','code':'NZD','tax':'GST','isInr':false},
+      // Canada
+      'America/Toronto':{'sym':'C$','code':'CAD','tax':'GST','isInr':false},
+      'America/Vancouver':{'sym':'C$','code':'CAD','tax':'GST','isInr':false},
+      'America/Winnipeg':{'sym':'C$','code':'CAD','tax':'GST','isInr':false},
+      'America/Edmonton':{'sym':'C$','code':'CAD','tax':'GST','isInr':false},
+      // Japan
+      'Asia/Tokyo':{'sym':'¥','code':'JPY','tax':'Consumption Tax','isInr':false},
+      // Malaysia
+      'Asia/Kuala_Lumpur':{'sym':'RM','code':'MYR','tax':'SST','isInr':false},
+      // Sri Lanka
+      'Asia/Colombo':{'sym':'Rs','code':'LKR','tax':'VAT','isInr':false},
+      // Bangladesh
+      'Asia/Dhaka':{'sym':'৳','code':'BDT','tax':'VAT','isInr':false},
+      // Nepal
+      'Asia/Kathmandu':{'sym':'Rs','code':'NPR','tax':'VAT','isInr':false},
+      'Asia/Katmandu':{'sym':'Rs','code':'NPR','tax':'VAT','isInr':false},
+      // South Africa
+      'Africa/Johannesburg':{'sym':'R','code':'ZAR','tax':'VAT','isInr':false},
+      // Nigeria
+      'Africa/Lagos':{'sym':'₦','code':'NGN','tax':'VAT','isInr':false},
+      // Kenya
+      'Africa/Nairobi':{'sym':'KSh','code':'KES','tax':'VAT','isInr':false},
+    };
+
+    // Prefix fallbacks for timezone regions not in exact map
+    const TZ_PREFIX = [
+      {p:'America/',  d:{sym:'$',   code:'USD', tax:'Sales Tax',       isInr:false}},
+      {p:'Europe/',   d:{sym:'€',   code:'EUR', tax:'VAT',             isInr:false}},
+      {p:'Africa/',   d:{sym:'',    code:'',    tax:'Tax',             isInr:false}},
+      {p:'Asia/',     d:{sym:'$',   code:'',    tax:'Tax',             isInr:false}},
+      {p:'Pacific/',  d:{sym:'$',   code:'',    tax:'Tax',             isInr:false}},
+    ];
+
+    const tz = (Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '') || '';
+    let locale = TZ_MAP[tz];
+    if (!locale) {
+      for (const {p, d} of TZ_PREFIX) {
+        if (tz.startsWith(p)) { locale = d; break; }
+      }
+    }
+    // Default fallback → India
+    if (!locale) locale = {sym:'₹', code:'INR', tax:'GST', isInr:true};
+
+    // ── 1. Slide 3 counter prefix ──────────────────────────────────────
+    const zeroCostEl = document.getElementById('stat-zero-cost');
+    if (zeroCostEl && locale.sym !== '₹') {
+      // Animate flip after short delay so it's visible on slide entry
+      zeroCostEl.dataset.prefix = locale.sym;
+      zeroCostEl.innerHTML = '<span class="sym-flip">' + locale.sym + '</span>0';
+    }
+
+    // ── 2. Tax label in feature list ──────────────────────────────────
+    const taxLabelEl = document.getElementById('feat-tax-label');
+    if (taxLabelEl) {
+      if (locale.tax !== 'GST') {
+        // Animate the label swap
+        taxLabelEl.style.transition = 'opacity .2s';
+        taxLabelEl.style.opacity = '0';
+        setTimeout(() => {
+          taxLabelEl.textContent = locale.tax;
+          taxLabelEl.style.opacity = '1';
+        }, 400);
+      }
+    }
+
+    // ── 3. Plan price currency symbols ────────────────────────────────
+    if (locale.sym && locale.sym !== '₹') {
+      const symEls = document.querySelectorAll('.plan-sym');
+      const noteEls = document.querySelectorAll('.plan-inr-note');
+      symEls.forEach((el, i) => {
+        setTimeout(() => {
+          el.textContent = locale.sym;
+          el.classList.add('flip');
+          // Remove class after animation so it can re-trigger if needed
+          setTimeout(() => el.classList.remove('flip'), 500);
+        }, 600 + i * 80);
+      });
+      // Show "billed in INR" note for paid plans (not the free tier)
+      noteEls.forEach(el => {
+        el.textContent = '· billed in ₹';
+      });
+    }
+  })();
+  // ────────────────────────────────────────────────────────────────────
 
   // counters
   const fmt = n => n%1?n.toFixed(1):Math.round(n);
