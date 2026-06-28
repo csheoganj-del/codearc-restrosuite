@@ -2085,6 +2085,20 @@ body.rs-drawer-dragging {
 .phone-country-picker .pcp-item .pcp-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .phone-country-picker .pcp-item .pcp-dial { color: var(--text-soft); font-size: 11px; flex: none; }
 
+/* ── Super-admin controls styling (desktop) ── */
+.sa-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.sa-search-wrapper {
+  position: relative;
+}
+.sa-search-wrapper input {
+  width: 180px;
+}
+
 @keyframes fadeInDown {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -2171,35 +2185,27 @@ body.rs-drawer-dragging {
     grid-template-columns: 1fr 1fr !important;
   }
 
-  /* ── Super-admin panel head ── */
+  /* ── Super-admin panel head controls ── */
   #super-admin-tab .panel-head {
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 10px !important;
+    gap: 12px !important;
   }
-  /* Heading row takes full width */
-  #super-admin-tab .panel-head h3 {
-    font-size: 15px;
-    margin: 0;
-  }
-  /* Control bar wrapper takes full row and wraps */
-  #super-admin-tab .panel-head > div {
+  .sa-controls {
     display: flex !important;
     flex-wrap: wrap !important;
-    gap: 8px !important;
     width: 100% !important;
     margin-left: 0 !important;
+    gap: 8px !important;
   }
-  /* Search input container takes full width on mobile */
-  #super-admin-tab .panel-head > div > div {
+  .sa-search-wrapper {
     flex: 1 1 100% !important;
     width: 100% !important;
   }
-  #super-admin-tab .panel-head #tenant-search-input {
+  .sa-search-wrapper input {
     width: 100% !important;
-    font-size: 12.5px;
+    font-size: 13px !important;
   }
-  /* Buttons take 50% each on mobile */
   #super-admin-tab #btn-export-tenants,
   #super-admin-tab #btn-create-tenant {
     flex: 1 1 calc(50% - 4px) !important;
@@ -2219,6 +2225,10 @@ body.rs-drawer-dragging {
     flex-shrink: 0;
     font-size: 11px;
     padding: 6px 10px;
+  }
+  /* Reduce panel padding on mobile to make room for table and controls */
+  .panel-pad {
+    padding: 12px !important;
   }
 
   /* ── Tenant table: hide MRR (col 3), Outlets (col 4), Joined (col 5) ── */
