@@ -4140,13 +4140,9 @@
         bulkBtn.dataset.wired = '1';
         bulkBtn.addEventListener('click', () => bulkApproveAllPending());
       }
-      // 18. Hide Super-Admin toggle in sidebar — target .sb-foot directly
+      // 18. Hide only the role-switch toggle button (not the whole sb-foot)
       const saToggle = document.getElementById('role-switch');
-      if (saToggle) {
-        const sbFoot = saToggle.closest('.sb-foot') || saToggle.parentElement;
-        if (sbFoot) sbFoot.style.display = 'none';
-        else saToggle.style.display = 'none';
-      }
+      if (saToggle) saToggle.style.display = 'none';
       // 14. Hide version number pill — developer noise, not useful for super-admin
       const versionPill = document.getElementById('app-version-pill');
       if (versionPill) versionPill.style.display = 'none';
