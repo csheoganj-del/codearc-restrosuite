@@ -368,23 +368,15 @@
               <input type="text" id="reg-name" class="form-input" placeholder="e.g. Royal Restaurant &amp; Dhaba" autocomplete="organization" required>
             </div>
           </div>
+          <!-- Outlet type hidden — defaulting to "restaurant" until per-type workflows are ready -->
+          <input type="hidden" id="reg-type" value="restaurant">
           <div class="form-grid">
-            <div class="form-group">
+            <div class="form-group full">
               <label for="reg-slug">Workspace code</label>
               <div class="input-wrap"><i class="fa-solid fa-link lead"></i>
                 <input type="text" id="reg-slug" class="form-input" placeholder="royal-dhaba" autocapitalize="none" spellcheck="false" maxlength="32" required>
               </div>
               <div class="field-status" id="slug-status"></div>
-            </div>
-            <div class="form-group">
-              <label for="reg-type">Outlet type</label>
-              <select id="reg-type" class="form-input no-icon">
-                <option value="restaurant">Restaurant</option>
-                <option value="cafe">Café / Bakery</option>
-                <option value="dhaba">Dhaba / Diner</option>
-                <option value="cart">Food Cart / Truck</option>
-                <option value="cloud">Cloud Kitchen</option>
-              </select>
             </div>
           </div>
           <div class="form-group full">
