@@ -409,16 +409,8 @@
               </select>
             </div>
           </div>
-          <div class="form-group full">
-            <label>Choose your plan</label>
-            <div class="plan-pick" id="plan-pick">
-              <div class="plan-opt" data-plan="free"><span class="plan-radio"></span><div><div class="pn">Free / Demo</div><div class="pd">Full POS simulator &amp; training database</div></div><span class="pp"><span class="plan-sym">₹</span>0</span></div>
-              <div class="plan-opt" data-plan="starter"><span class="plan-radio"></span><div><div class="pn">Starter</div><div class="pd">Offline POS &amp; billing essentials</div></div><span class="pp"><span class="plan-sym">₹</span>499 <small class="plan-inr-note"></small></span></div>
-              <div class="plan-opt sel" data-plan="growth"><span class="plan-radio"></span><div><div class="pn">Growth <span class="pill pill-orange" style="padding:2px 8px;font-size:10px">Popular</span></div><div class="pd">Full suite — QR, KDS, CRM, reports</div></div><span class="pp"><span class="plan-sym">₹</span>749 <small class="plan-inr-note"></small></span></div>
-              <div class="plan-opt" data-plan="chain"><span class="plan-radio"></span><div><div class="pn">Chain</div><div class="pd">Multi-outlet central control</div></div><span class="pp"><span class="plan-sym">₹</span>1,999 <small class="plan-inr-note"></small></span></div>
-            </div>
-            <input type="hidden" id="reg-plan" value="growth">
-          </div>
+          <!-- Plan picker hidden during free-trial period — auto-set to "free" -->
+          <input type="hidden" id="reg-plan" value="free">
           <div class="step-actions">
             <button type="button" class="btn btn-primary btn-block btn-lg" id="reg-next">Continue to owner details <i class="fa-solid fa-arrow-right"></i></button>
           </div>
