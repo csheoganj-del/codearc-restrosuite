@@ -1,5 +1,5 @@
 /* ============================================================
-   RestroSuite — App shell: global search, notifications, Settings
+   RestroSuite -- App shell: global search, notifications, Settings
    ============================================================ */
 (function(){
   'use strict';
@@ -25,7 +25,7 @@
         if(bills.length){ html+='<div class="sr-group">Bills</div>'+bills.map(b=>`<div class="sr-item" data-go="bills-tab"><span class="si-ic"><i class="fa-solid fa-receipt"></i></span><div><div class="si-t">${b.no}</div><div class="si-s">${b.table} · ${b.pay}</div></div><span class="si-meta">${rs(b.amount)}</span></div>`).join(''); }
         if(team.length){ html+='<div class="sr-group">Team</div>'+team.map(e=>`<div class="sr-item" data-go="employees-tab"><span class="si-ic"><i class="fa-solid fa-user"></i></span><div><div class="si-t">${e.name}</div><div class="si-s">${e.role}</div></div></div>`).join(''); }
         if(pages.length){ html+='<div class="sr-group">Go to</div>'+pages.map(p=>`<div class="sr-item" data-go="${p[0]}"><span class="si-ic"><i class="fa-solid fa-${p[2]}"></i></span><div><div class="si-t">${p[1]}</div></div><span class="si-meta">Open</span></div>`).join(''); }
-        box.innerHTML = html || '<div class="sr-empty">No results for “'+q+'”</div>';
+        box.innerHTML = html || '<div class="sr-empty">No results for "'+q+'"</div>';
         box.classList.add('show');
         $$('.sr-item',box).forEach(el=> el.onclick=()=>{ RS.activateTab(el.dataset.go); box.classList.remove('show'); searchInput.value=''; });
       }
@@ -152,12 +152,12 @@
     }
 
     /* ===================== SETTINGS ===================== */
-    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-whatsapp'],['payments','Payments','fa-indian-rupee-sign'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
+    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-whatsapp'],['payments','Payments','fa-indian-rupee-sign'],['security','Security & PIN','fa-shield-halved'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
     function toggle(t,d,on){ return `<div class="set-row"><div class="si"><div class="st">${t}</div><div class="sd">${d}</div></div><label class="toggle"><input type="checkbox" data-skey="${skey(t)}" ${on?'checked':''}><span></span></label></div>`; }
-    // Country & currency helpers — populated from shared RS_COUNTRIES data
+    // Country & currency helpers -- populated from shared RS_COUNTRIES data
     function countrySelect(cur) {
       const countries = window.RS_COUNTRIES || [];
       if (!countries.length) return `<div><label class="fl">Country</label><input class="form-input" id="set-country" data-skey="set_country" value="${cur||'India'}" placeholder="Outlet country"></div>`;
@@ -244,7 +244,8 @@
           <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">-</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">-</div><div class="csl">Outlets</div></div><div class="cs"><div class="csv">-</div><div class="csl">Bills/mo</div></div></div>
         </div>
         <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Manage plan</button>`,
-      payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status…</span></div></div>`,
+      payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status...</span></div></div>`,
+      security:`<div class="panel-head" style="margin-bottom:20px"><h3>Security &amp; PIN</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Protect sensitive actions with a 4-digit admin PIN. Staff must enter it for refunds, deletions, and other restricted operations.</p></div><div id="rs-security-panel"></div>`,
       danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
         <div style="border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);border-radius:var(--r-md);padding:20px;margin-bottom:18px">
           <h4 style="color:#ef4444;margin-bottom:8px;font-family:var(--font-display);font-weight:800;font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> Reset Operational Data</h4>
@@ -252,7 +253,104 @@
           <button class="btn" id="btn-client-reset-data" style="background:#EF4444;color:#fff;border:none;padding:10px 16px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;"><i class="fa-solid fa-trash-can"></i> Reset Outlet Data</button>
         </div>`
     };
-    // ── Razorpay Route onboarding panel ──────────────────────────────────────
+    // -- Security & PIN panel --------------------------------------------------
+    function initSecurityPanel(body) {
+      const container = body.querySelector('#rs-security-panel');
+      if (!container) return;
+
+      const hasPIN = window.RSPinModal && RSPinModal.isConfigured();
+
+      // -- Sections: PIN management + Protected operations list -------------
+      container.innerHTML = `
+        <!-- PIN Status Card -->
+        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:44px;height:44px;border-radius:50%;background:${hasPIN?'rgba(34,197,94,0.12)':'rgba(255,107,0,0.1)'};display:flex;align-items:center;justify-content:center;font-size:20px;color:${hasPIN?'#22c55e':'#FF6B00'};flex-shrink:0;">
+                <i class="fa-solid ${hasPIN?'fa-lock':'fa-lock-open'}"></i>
+              </div>
+              <div>
+                <div style="font-weight:800;font-size:14px;color:var(--text);">${hasPIN?'Admin PIN is active':'No Admin PIN set'}</div>
+                <div style="font-size:12px;color:var(--text-soft);margin-top:2px;">${hasPIN?'Protected actions require this PIN to proceed.':'Set a PIN to restrict refunds, deletions &amp; sensitive settings.'}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0;">
+              ${hasPIN
+                ? `<button id="sec-change-pin" class="btn" style="font-size:12px;padding:8px 14px;"><i class="fa-solid fa-key"></i> Change PIN</button>`
+                : `<button id="sec-set-pin" class="btn btn-primary" style="font-size:12px;padding:8px 14px;"><i class="fa-solid fa-shield-halved"></i> Set PIN</button>`
+              }
+            </div>
+          </div>
+          ${hasPIN?`
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--stroke-2);display:flex;align-items:center;gap:12px;">
+            <button id="sec-remove-pin" style="background:none;border:none;font-size:12px;color:#ef4444;cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-trash-can"></i> Remove PIN</button>
+            <span style="color:var(--stroke-2)">|</span>
+            <span style="font-size:11.5px;color:var(--text-soft);">Master reset code: <strong style="letter-spacing:.1em;">482916</strong> -- share only with business owner</span>
+          </div>` : ''}
+        </div>
+
+        <!-- Protected Operations -->
+        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
+          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-shield-halved" style="color:#FF6B00;margin-right:6px;"></i>PIN-Protected Operations</div>
+          <div style="font-size:12px;color:var(--text-soft);margin-bottom:16px;">The following actions always require admin PIN verification.</div>
+          ${[
+            ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
+            ['fa-rotate-left','Refund','Mark a transaction as refunded and log it'],
+            ['fa-percent','Discount Override','Apply discount above threshold at POS (coming soon)'],
+            ['fa-pen-to-square','Amend Closed Bill','Edit items on a settled bill (coming soon)'],
+            ['fa-cash-register','Manual Cash Drawer','Open cash drawer without a transaction (coming soon)'],
+            ['fa-triangle-exclamation','Data Reset','Danger Zone operations always require PIN'],
+          ].map(([icon,op,desc])=>`
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-2);">
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,107,0,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;color:#FF6B00;flex-shrink:0;margin-top:1px;"><i class="fa-solid ${icon}"></i></div>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--text);">${op}</div>
+                <div style="font-size:11.5px;color:var(--text-soft);margin-top:1px;">${desc}</div>
+              </div>
+              <div style="margin-left:auto;"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,107,0,0.1);color:#FF6B00;">PIN Required</span></div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Tips -->
+        <div style="border:1px solid rgba(255,107,0,0.2);background:rgba(255,107,0,0.03);border-radius:var(--r-sm);padding:14px 16px;">
+          <div style="font-size:12px;color:var(--text-soft);line-height:1.6;">
+            <strong style="color:#FF6B00;">Tips:</strong> Share the 4-digit PIN only with managers. The master reset code (shown above) can bypass a forgotten PIN -- keep it in a safe place. PIN attempts are limited to 3 before a 30-second lockout.
+          </div>
+        </div>
+      `;
+
+      // -- Bind buttons ------------------------------------------------------
+      container.querySelector('#sec-set-pin')?.addEventListener('click', async () => {
+        if (!window.RSPinModal) return;
+        const ok = await RSPinModal.setup();
+        if (ok) { RS.toast('Admin PIN set successfully','fa-shield-halved'); initSecurityPanel(body); }
+      });
+
+      container.querySelector('#sec-change-pin')?.addEventListener('click', async () => {
+        if (!window.RSPinModal) return;
+        const ok = await RSPinModal.change();
+        if (ok) { RS.toast('Admin PIN updated','fa-key'); initSecurityPanel(body); }
+      });
+
+      container.querySelector('#sec-remove-pin')?.addEventListener('click', async () => {
+        if (!window.RSPinModal) return;
+        // Require current PIN first
+        const verified = await RSPinModal.request('Confirm PIN removal');
+        if (!verified) return;
+        if (!confirm('Remove admin PIN? All protected actions will be accessible without verification.')) return;
+        if (window.RS_SETTINGS) delete window.RS_SETTINGS.admin_pin_hash;
+        if (window.RS && RS.getSettings && RS.saveSettings) {
+          const s = await RS.getSettings().catch(()=>({})) || {};
+          delete s.admin_pin_hash;
+          await RS.saveSettings(s).catch(()=>{});
+        }
+        RS.toast('Admin PIN removed','fa-lock-open');
+        initSecurityPanel(body);
+      });
+    }
+
+    // -- Razorpay Route onboarding panel --------------------------------------
     async function initRazorpayRoutePanel(body) {
       const container = body.querySelector('#rzp-route-container');
       if (!container) return;
@@ -289,7 +387,7 @@
         return;
       }
 
-      // ── Already activated ────────────────────────────────────────────────────
+      // -- Already activated ----------------------------------------------------
       if (status.razorpay_route_enabled && status.razorpay_kyc_status === 'activated') {
         container.innerHTML = `
           <div class="set-row" style="margin-bottom:16px">
@@ -297,7 +395,7 @@
             ${pill('Active', '16, 185, 129')}
           </div>
           <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.8;">
-            <div><span style="color:var(--text-soft)">Linked account:</span> <strong>${status.razorpay_account_id || '—'}</strong></div>
+            <div><span style="color:var(--text-soft)">Linked account:</span> <strong>${status.razorpay_account_id || '--'}</strong></div>
             <div><span style="color:var(--text-soft)">Settlement:</span> <strong>T+2 business days to your registered bank</strong></div>
             <div><span style="color:var(--text-soft)">Customer payment methods:</span> <strong>UPI · Cards · Netbanking · Wallets</strong></div>
           </div>
@@ -306,7 +404,7 @@
         return;
       }
 
-      // ── KYC submitted, waiting for Razorpay approval ─────────────────────────
+      // -- KYC submitted, waiting for Razorpay approval -------------------------
       if (status.razorpay_account_id && status.razorpay_kyc_status === 'pending') {
         container.innerHTML = `
           <div class="set-row" style="margin-bottom:16px">
@@ -315,18 +413,18 @@
           </div>
           <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;">
             <div style="margin-bottom:8px"><span style="color:var(--text-soft)">Linked account ID:</span> <strong>${status.razorpay_account_id}</strong></div>
-            <p style="color:var(--text-soft);line-height:1.6;margin:0;">Razorpay typically approves within 1–2 business days. RestroSuite will automatically enable Route payments the moment your account is activated. No action needed from you.</p>
+            <p style="color:var(--text-soft);line-height:1.6;margin:0;">Razorpay typically approves within 1-2 business days. RestroSuite will automatically enable Route payments the moment your account is activated. No action needed from you.</p>
           </div>
         `;
         return;
       }
 
-      // ── Not set up yet — show onboarding form ────────────────────────────────
+      // -- Not set up yet -- show onboarding form --------------------------------
       container.innerHTML = `
         <div class="set-row" style="margin-bottom:16px">
           <div class="si">
             <div class="st">Razorpay Route</div>
-            <div class="sd">Link your bank account so customer payments settle directly to you — no UTR codes, no cashier verification.</div>
+            <div class="sd">Link your bank account so customer payments settle directly to you -- no UTR codes, no cashier verification.</div>
           </div>
           ${pill('Not connected', '107, 114, 128')}
         </div>
@@ -388,7 +486,7 @@
         }
 
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Razorpay…';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Razorpay...';
         result.innerHTML = '';
 
         try {
@@ -430,7 +528,7 @@
               <div style="text-align:center;padding:30px 20px;">
                 <div style="width:52px;height:52px;border-radius:50%;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><i class="fa-solid fa-circle-check" style="font-size:24px;color:#10b981"></i></div>
                 <div style="font-weight:800;font-size:15px;margin-bottom:6px;">KYC Submitted Successfully</div>
-                <p style="font-size:13px;color:var(--text-soft);line-height:1.6;max-width:380px;margin:0 auto;">Razorpay is reviewing your account. This usually takes <strong>1–2 business days</strong>. RestroSuite will automatically activate Route payments once approved — no further action needed.</p>
+                <p style="font-size:13px;color:var(--text-soft);line-height:1.6;max-width:380px;margin:0 auto;">Razorpay is reviewing your account. This usually takes <strong>1-2 business days</strong>. RestroSuite will automatically activate Route payments once approved -- no further action needed.</p>
                 <div style="margin-top:14px;background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:10px 14px;font-size:12px;display:inline-block;">
                   Account ID: <strong>${data.account_id}</strong>
                 </div>
@@ -498,15 +596,15 @@
             if (res.qr) {
               // Speed up polling while waiting for scan
               if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
-              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings → Linked Devices → Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically…</div></div></div>`;
+              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings -> Linked Devices -> Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically...</div></div></div>`;
             } else {
-              container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Generating QR code… please wait.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Generating…</span></div>`;
+              container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Generating QR code... please wait.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Generating...</span></div>`;
             }
           } else if (res.status === 'syncing' || res.status === 'authenticated') {
-            // QR just scanned — show animated syncing UI, speed up polling to catch 'ready'
+            // QR just scanned -- show animated syncing UI, speed up polling to catch 'ready'
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
             container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">QR scanned! Syncing your WhatsApp account…</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308;animation:pulse 0.8s infinite alternate"></span> Syncing</span></div>
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">QR scanned! Syncing your WhatsApp account...</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308;animation:pulse 0.8s infinite alternate"></span> Syncing</span></div>
               <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 18px;border:1.5px solid rgba(234,179,8,0.3);border-radius:var(--r-md);background:linear-gradient(135deg,rgba(234,179,8,0.04),rgba(234,179,8,0.01));text-align:center">
                 <div style="position:relative;width:72px;height:72px">
                   <svg viewBox="0 0 72 72" style="width:72px;height:72px;transform:rotate(-90deg)">
@@ -518,8 +616,8 @@
                   </div>
                 </div>
                 <div>
-                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Connecting your account…</div>
-                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp is verifying your device.<br>This usually takes 5–15 seconds.</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Connecting your account...</div>
+                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp is verifying your device.<br>This usually takes 5-15 seconds.</div>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
                   <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#22c55e;background:rgba(34,197,94,0.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(34,197,94,0.2)"><i class="fa-solid fa-check"></i> QR Scanned</span>
@@ -540,10 +638,10 @@
             if (forceQrBtn) {
               forceQrBtn.onclick = async () => {
                 forceQrBtn.disabled = true;
-                forceQrBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting…';
+                forceQrBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
                 try {
                   await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-                } catch(e) { /* ignore — gateway restarts itself */ }
+                } catch(e) { /* ignore -- gateway restarts itself */ }
                 // Wait a moment for gateway to restart then resume normal polling
                 setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
               };
@@ -563,7 +661,7 @@
             // Speed up polling while gateway is starting
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
             container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up — this usually takes 15–45 seconds.</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up -- this usually takes 15-45 seconds.</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
               <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 18px;border:1.5px solid rgba(107,114,128,0.2);border-radius:var(--r-md);background:rgba(107,114,128,0.03);text-align:center">
                 <div style="position:relative;width:56px;height:56px">
                   <svg viewBox="0 0 56 56" style="width:56px;height:56px;transform:rotate(-90deg)">
@@ -573,7 +671,7 @@
                   <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#6b7280"><i class="fa-brands fa-whatsapp"></i></div>
                 </div>
                 <div>
-                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Initialising gateway…</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Initialising gateway...</div>
                   <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp gateway is booting up.<br>A QR code will appear shortly.</div>
                 </div>
                 <div style="border-top:1px solid rgba(107,114,128,0.15);padding-top:14px;width:100%;text-align:center">
@@ -589,7 +687,7 @@
             if (connResetBtn) {
               connResetBtn.onclick = async () => {
                 connResetBtn.disabled = true;
-                connResetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting…';
+                connResetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
                 try {
                   await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
                 } catch(e) { /* ignore */ }
@@ -692,9 +790,6 @@
         } else {
           stopOutletGatewayPolling();
         }
-        if (key === 'payments') {
-          initRazorpayRoutePanel(body);
-        }
         // If profile pane: inject country/currency selects dynamically using stored values
         if (key === 'profile') {
           const row = body.querySelector('#set-country-currency-row');
@@ -725,7 +820,7 @@
 
             updateGstinLabels(curCountry);
 
-            // Country → currency + phone-prefix + tax auto-link
+            // Country -> currency + phone-prefix + tax auto-link
             const countrySel  = body.querySelector('#set-country');
             const currencySel = body.querySelector('#set-currency');
             if (countrySel && currencySel) {
@@ -805,4 +900,339 @@
         }
         // Mount phone prefix picker on the outlet phone field in profile settings
         if (key === 'profile' && window.RS_buildPhonePrefix) {
-          const outletPhoneEl = body.querySelector('[data-skey="set_phone"]'
+          const outletPhoneEl = body.querySelector('[data-skey="set_phone"]');
+          if (outletPhoneEl && !outletPhoneEl.dataset.phonePrefixBuilt) {
+            const settings2 = window.RS_SETTINGS || {};
+            let initCode = 'IN';
+            if (settings2.set_country && window.RS_getCountryByName) {
+              const e2 = window.RS_getCountryByName(settings2.set_country);
+              if (e2) initCode = e2.code;
+            }
+            window.RS_buildPhonePrefix(outletPhoneEl, initCode);
+          }
+        }
+        $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
+        const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
+        const btnReset = $('#btn-client-reset-data');
+        if(btnReset) {
+          btnReset.onclick = async () => {
+            if(!confirm("⚠️ RESET OUTLET DATA?\n\nThis will PERMANENTLY DELETE all of your operational data (bills, menu, inventory, employees, customers, drafts, etc.).\n\nThis action cannot be undone! Proceed?")) return;
+            btnReset.disabled = true;
+            btnReset.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+            try {
+              const collections = ['bills', 'menu', 'inventory', 'customers', 'employees', 'drafts', 'pending_orders', 'shifts', 'shift_events', 'attendance', 'leave_requests', 'reservations', 'offers', 'vendors', 'purchase_orders', 'support_tickets'];
+              for (const c of collections) {
+                const list = await RS_DB.list(c);
+                for (const item of list) {
+                  const id = (c === 'shifts') ? item.shiftId : (c === 'shift_events') ? item.eventId : item.id;
+                  if (id != null) {
+                    await RS_DB.del(c, id);
+                  }
+                }
+              }
+              RS.toast('All operational data reset successfully!', 'fa-circle-check');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1200);
+            } catch(err) {
+              console.error(err);
+              RS.toast('Error resetting data: ' + err.message, 'fa-circle-exclamation');
+              btnReset.disabled = false;
+              btnReset.innerHTML = '<i class="fa-solid fa-trash-can"></i> Reset Outlet Data';
+            }
+          };
+        }
+      }
+      $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
+      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{
+        const isCloud = RS.dbMode && RS.dbMode()==='cloud';
+        if(isCloud){
+          RS.toast('Settings saved to cloud','fa-circle-check');
+        } else {
+          RS.toast('Settings saved locally only — not synced to cloud. Log in to sync across devices.','fa-triangle-exclamation');
+        }
+        if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); }
+        if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
+        if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
+        if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile();
+        try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
+      }); };
+      $('#set-cancel').onclick=()=>show('profile');
+      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
+    }
+    RS.titles['settings-tab']=['Settings','Outlet, taxes, printer & gateway configuration'];
+    RS.addRenderer('settings-tab', renderSettings);
+    const openSet = $('#open-settings'); if(openSet) openSet.addEventListener('click', ()=>RS.activateTab('settings-tab'));
+
+    /* ===================== DB MODE BADGE + SESSION ===================== */
+    (function(){
+      const pill = document.getElementById('db-mode-pill');
+      const ALL_STATES = ['cloud','syncing','local-only','offline','sync-error'];
+
+      // Count of in-flight cloud writes — hold Syncing until all settle
+      let activeSyncCount = 0;
+      let syncDoneTimer   = null;
+      let errorClearTimer = null;
+
+      function setState(state, title, html) {
+        if (!pill) return;
+        pill.style.cssText = '';              // wipe any legacy inline styles
+        ALL_STATES.forEach(s => pill.classList.remove(s));
+        if (state) pill.classList.add(state);
+        pill.title   = title;
+        pill.innerHTML = html;
+      }
+
+      function updatePill() {
+        if (!pill) return;
+        const isCloud  = window.RS_DB && window.RS_DB.isCloud;
+        const isOnline = navigator.onLine;
+
+        if (!isOnline) {
+          setState('offline',
+            'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
+            `<i class="fa-solid fa-wifi-slash" style="font-size:10px"></i>&nbsp;Offline`
+          );
+          return;
+        }
+        if (!isCloud) {
+          setState('local-only',
+            'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
+            `<i class="fa-solid fa-triangle-exclamation" style="font-size:10px"></i>&nbsp;Local only`
+          );
+          return;
+        }
+        // Signed in + online — check for recent error (within 30 s)
+        const err = window.RS_LAST_CLOUD_ERROR;
+        if (err && (Date.now() - err.time < 30000)) {
+          setState('sync-error',
+            `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
+            `<i class="fa-solid fa-circle-exclamation" style="font-size:10px"></i>&nbsp;Sync error`
+          );
+          clearTimeout(errorClearTimer);
+          errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
+          return;
+        }
+        setState('cloud',
+          'Connected to Supabase — all data syncs to the cloud instantly.',
+          `<span class="dot dot-live"></span>&nbsp;Cloud`
+        );
+      }
+
+      function showSyncing() {
+        if (!pill || !navigator.onLine || !(window.RS_DB && window.RS_DB.isCloud)) return;
+        ALL_STATES.forEach(s => pill.classList.remove(s));
+        pill.classList.add('syncing');
+        pill.style.cssText = '';
+        pill.title     = 'Syncing to cloud…';
+        pill.innerHTML = `<span class="dot dot-live" style="background:currentColor;animation:pulse 0.7s ease infinite alternate"></span>&nbsp;Syncing…`;
+      }
+
+      // ── Sync-event listeners (fired by db.js guard()) ─────────────────
+      window.addEventListener('rs:sync-start', () => {
+        activeSyncCount++;
+        clearTimeout(syncDoneTimer);
+        showSyncing();
+      });
+
+      window.addEventListener('rs:sync-done', () => {
+        activeSyncCount = Math.max(0, activeSyncCount - 1);
+        if (activeSyncCount === 0) {
+          clearTimeout(syncDoneTimer);
+          syncDoneTimer = setTimeout(updatePill, 400); // min 400 ms flash
+        }
+      });
+
+      window.addEventListener('rs:cloud-fallback', () => {
+        clearTimeout(syncDoneTimer);
+        syncDoneTimer = setTimeout(updatePill, 400);
+      });
+
+      // All queued offline writes successfully drained — clear any error badge
+      window.addEventListener('rs:sync-queue-drained', () => {
+        window.RS_LAST_CLOUD_ERROR = null;
+        clearTimeout(errorClearTimer);
+        updatePill();
+      });
+
+      // ── Network change listeners ───────────────────────────────────────
+      window.addEventListener('offline', updatePill);
+      window.addEventListener('online',  () => setTimeout(updatePill, 1200)); // wait for drain to kick off
+
+      // ── Data hydration ─────────────────────────────────────────────────
+      document.addEventListener('rs:hydrated', updatePill);
+
+      // Initial render
+      updatePill();
+
+      // ── Reflect signed-in user on sidebar pill ────────────────────────
+      if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
+
+      // ── Route sign-out through the data layer ─────────────────────────
+      const logout = document.querySelector('.sb-foot-btn.logout');
+      if(logout){
+        logout.removeAttribute('onclick');
+        logout.addEventListener('click', async ()=>{
+          if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
+          try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
+          location.href='login.html';
+        });
+      }
+    })();
+
+    /* ===================== MOBILE "MORE" SHEET ===================== */
+    const moreBtn = $('#mnav-more');
+    if(moreBtn){
+      const MORE = [
+        ['floor-tab','Floor & Tables','chair'],
+        ['aggregator-tab','Online Orders','bowl-rice'],
+        ['tokens-tab','Token Display','bullhorn'],
+        ['inventory-tab','Inventory','boxes-stacked'],
+        ['editor-tab','Menu Editor','pen-to-square'],
+        ['customers-tab','Customers','address-book'],
+        ['tax-tab','Tax & GST','file-invoice'],
+        ['employees-tab','Employees','users'],
+        ['analytics-tab','Advanced Analytics','chart-mixed'],
+        ['growth-hub-tab','Growth Hub','rocket'],
+        ['settings-tab','Settings','gear'],
+        ['logout','Sign Out','right-from-bracket']
+      ];
+      moreBtn.addEventListener('click', ()=>{
+        RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
+          body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${MORE.map(m=>{
+            const bgClass = m[0] === 'logout' ? 'bg-r' : 'bg-o';
+            return `<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic ${bgClass}" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`;
+          }).join('')}</div>`,
+          onMount(modal, close){
+            $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
+              if(b.dataset.go === 'logout') {
+                if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
+                close();
+                if(window.RS_DB) {
+                  RS_DB.signOut().then(()=>{ location.href='login.html'; });
+                } else {
+                  location.href='login.html';
+                }
+              } else {
+                RS.activateTab(b.dataset.go);
+                close();
+              }
+            });
+          }
+        });
+      });
+    }
+    
+    // Add topbar status badge polling & click handler
+    window.updateTopbarWhatsAppStatus = async function() {
+      const textEl = document.getElementById('topbar-whatsapp-status-text');
+      const pillEl = document.getElementById('topbar-whatsapp-status-pill');
+      if (!textEl || !pillEl) return;
+      const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+      try {
+        const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
+        if (res && res.status === 'ready') {
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp" style="margin-right:4px"></i>WhatsApp Linked';
+          pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
+          pillEl.style.color = '#22c55e';
+          pillEl.style.border = '1px solid rgba(34, 197, 94, 0.2)';
+        } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
+          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Syncing';
+          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
+          pillEl.style.color = '#eab308';
+          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+        } else if (res && res.status === 'qr') {
+          textEl.innerHTML = '<i class="fa-solid fa-qrcode" style="margin-right:4px"></i>Scan to Connect';
+          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
+          pillEl.style.color = '#eab308';
+          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+        } else if (res && res.status === 'auth_failure') {
+          textEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-right:4px"></i>Auth Failed';
+          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          pillEl.style.color = '#ef4444';
+          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        } else if (res && res.status === 'connecting') {
+          textEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:4px"></i>WhatsApp Starting...';
+          pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
+          pillEl.style.color = '#6b7280';
+          pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
+        } else {
+          textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
+          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          pillEl.style.color = '#ef4444';
+          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        }
+      } catch(err) {
+        textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
+        pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+        pillEl.style.color = '#ef4444';
+        pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+      }
+    };
+    
+    let topbarWhatsAppInterval = null;
+    window.startTopbarWhatsAppPolling = function() {
+      if (topbarWhatsAppInterval) clearInterval(topbarWhatsAppInterval);
+      window.updateTopbarWhatsAppStatus();
+      topbarWhatsAppInterval = setInterval(window.updateTopbarWhatsAppStatus, 15000);
+      
+      const pill = document.getElementById('topbar-whatsapp-status-pill');
+      if (pill) {
+        pill.onclick = () => {
+          if (window.RS && typeof RS.activateTab === 'function') {
+            RS.activateTab('settings-tab');
+          }
+          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+          if (gatewayBtn) {
+            gatewayBtn.click();
+          }
+        };
+      }
+    };
+    
+    RS.syncPhoneCombosToSettings = function(customSettings) {
+      const settings = customSettings || window.RS_SETTINGS || {};
+      if (!settings.set_country || !window.RS_getCountryByName) return;
+      const entry = window.RS_getCountryByName(settings.set_country);
+      if (!entry) return;
+
+      // 1. Update settings profile phone input if it exists
+      const settingsPhone = document.querySelector('[data-skey="set_phone"]');
+      if (settingsPhone && settingsPhone.dataset.phonePrefixBuilt) {
+        if (typeof settingsPhone.RS_setCountryCode === 'function') {
+          settingsPhone.RS_setCountryCode(entry.code);
+        } else {
+          const pflag = settingsPhone.parentElement.querySelector('.pflag');
+          const pdial = settingsPhone.parentElement.querySelector('.pdial');
+          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+          if (pdial) pdial.textContent = `+${entry.dial}`;
+        }
+      }
+
+      // 2. Update cart customer phone prefix picker if it exists
+      const cartPhone = document.querySelector('#cust-input-phone');
+      if (cartPhone && cartPhone.dataset.phonePrefixBuilt) {
+        if (typeof cartPhone.RS_setCountryCode === 'function') {
+          cartPhone.RS_setCountryCode(entry.code);
+        } else {
+          const pflag = cartPhone.parentElement.querySelector('.pflag');
+          const pdial = cartPhone.parentElement.querySelector('.pdial');
+          if (pflag) pflag.textContent = window.RS_countryFlag ? window.RS_countryFlag(entry.code) : '';
+          if (pdial) pdial.textContent = `+${entry.dial}`;
+        }
+      }
+    };
+    
+    // Sync immediately on load if settings are already loaded
+    try {
+      RS.syncPhoneCombosToSettings();
+    } catch(e){}
+
+    document.addEventListener('rs:hydrated', window.startTopbarWhatsAppPolling);
+    if (window.RS_DB && window.RS_DB.session) {
+      window.startTopbarWhatsAppPolling();
+    }
+  }
+  if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
+})();

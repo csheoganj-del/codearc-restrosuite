@@ -1,9 +1,9 @@
 /* ============================================================
-   RestroSuite — Menu Editor: real add / edit / delete + recipe linking
+   RestroSuite -- Menu Editor: real add / edit / delete + recipe linking
    ============================================================ */
 (function(){
   'use strict';
-  // HTML escaping — prevents XSS when inserting DB-sourced strings into innerHTML
+  // HTML escaping -- prevents XSS when inserting DB-sourced strings into innerHTML
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function boot(){
@@ -55,9 +55,9 @@
             <div><label class="fl">Item name</label><input class="form-input" id="ed-name" placeholder="e.g. Paneer Tikka"></div>
             <div class="form-grid-2">
               <div><label class="fl">Price (${symbol})</label><input class="form-input" id="ed-price" type="number" min="0" placeholder="199"></div>
-              <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category…</option></select></div>
+              <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category...</option></select></div>
             </div>
-            <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups…"></div>
+            <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups..."></div>
             </div>
             <div class="form-grid-2">
               <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
@@ -97,7 +97,7 @@
       function openIngPicker(){
         const list = RS.INVENTORY||[];
         RSModal.open({ title:'Add ingredient', sub:'Link a raw material to this recipe', icon:'fa-flask', size:'sm',
-          body:`<input class="form-input" id="ing-q" placeholder="Search ingredient…" style="margin-bottom:12px">
+          body:`<input class="form-input" id="ing-q" placeholder="Search ingredient..." style="margin-bottom:12px">
                 <div id="ing-pick" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto"></div>`,
           onMount(modal, close){
             const q = modal.querySelector('#ing-q'), box = modal.querySelector('#ing-pick');
@@ -198,7 +198,7 @@
             const saved = await RS.saveOne('menu', m);
             if (saved) Object.assign(m, saved);
           }
-          RS.toast('“'+name+'” updated','fa-circle-check');
+          RS.toast('"'+name+'" updated','fa-circle-check');
         }
         else {
           const id=Math.max(0,...RS.MENU.map(x=>Number.isFinite(Number(x.id))?Number(x.id):0))+1;
@@ -208,7 +208,7 @@
             const saved = await RS.saveOne('menu', rec);
             if (saved) Object.assign(rec, saved);
           }
-          RS.toast('“'+name+'” added to menu','fa-circle-plus');
+          RS.toast('"'+name+'" added to menu','fa-circle-plus');
         }
         resetForm(); renderList(); try{ RS.renderPOS(); if(window.refreshPosCats) window.refreshPosCats(); }catch(e){}
       };
@@ -365,7 +365,7 @@
     function confirmDelete(id){
       const m = RS.MENU.find(x=>String(x.id)===String(id));
       RSModal.open({ title:'Delete item?', icon:'fa-trash', size:'sm',
-        body:`<p style="color:var(--text-soft);font-size:14.5px">Remove <b style="color:var(--text)">${m.name}</b> from the menu? This can’t be undone.</p>`,
+        body:`<p style="color:var(--text-soft);font-size:14.5px">Remove <b style="color:var(--text)">${m.name}</b> from the menu? This can't be undone.</p>`,
         foot:`<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1;background:var(--red);box-shadow:none" data-ok><i class="fa-solid fa-trash"></i> Delete</button>`,
         onMount(modal, close){ modal.querySelector('[data-x]').onclick=close; modal.querySelector('[data-ok]').onclick=()=>{ const i=RS.MENU.findIndex(x=>String(x.id)===String(id)); RS.MENU.splice(i,1); RS.removeOne&&RS.removeOne('menu',id); close(); renderList(); try{RS.renderPOS();}catch(e){} RS.toast('Item removed','fa-trash'); }; }});
     }
