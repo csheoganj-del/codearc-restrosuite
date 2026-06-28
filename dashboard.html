@@ -1000,12 +1000,17 @@
 
 <!-- ===================== MOBILE BOTTOM NAV ===================== -->
 <nav class="mobile-nav">
-  <a class="mnav-link" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i> POS</a>
-  <a class="mnav-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i> Orders</a>
-  <a class="mnav-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</a>
-  <a class="mnav-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i> Bills</a>
-  <a class="mnav-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
-  <a class="mnav-link" id="mnav-more"><i class="fa-solid fa-ellipsis"></i> More</a>
+  <a class="mnav-link superadmin-hide" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i> POS</a>
+  <a class="mnav-link superadmin-hide" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i> Orders</a>
+  <a class="mnav-link superadmin-hide" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</a>
+  <a class="mnav-link superadmin-hide" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i> Bills</a>
+  <a class="mnav-link superadmin-hide" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
+  <a class="mnav-link superadmin-hide" id="mnav-more"><i class="fa-solid fa-ellipsis"></i> More</a>
+
+  <!-- Super-admin specific mobile nav links -->
+  <a class="mnav-link superadmin-only" data-tab="super-admin-tab" style="display:none;"><i class="fa-solid fa-user-shield"></i> Admin</a>
+  <a class="mnav-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none;"><i class="fa-solid fa-server"></i> Gateway</a>
+  <a class="mnav-link logout superadmin-only" style="display:none;"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </nav>
 
 <div class="toast" id="toast"></div>

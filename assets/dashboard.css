@@ -2173,30 +2173,40 @@ body.rs-drawer-dragging {
 
   /* ── Super-admin panel head ── */
   #super-admin-tab .panel-head {
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
   }
   /* Heading row takes full width */
   #super-admin-tab .panel-head h3 {
-    font-size: 14px;
-    flex: 1 1 auto;
-    min-width: 0;
+    font-size: 15px;
+    margin: 0;
   }
-  /* Search input inside panel-head stretches to fill remaining space */
-  #super-admin-tab .panel-head input[type="text"],
-  #super-admin-tab .panel-head input[type="search"],
-  #super-admin-tab .panel-head input:not([type="checkbox"]):not([type="radio"]) {
-    flex: 1 1 120px;
-    min-width: 0;
-    font-size: 12px;
+  /* Control bar wrapper takes full row and wraps */
+  #super-admin-tab .panel-head > div {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-left: 0 !important;
   }
-  /* Shrink Export & New Workspace buttons on mobile */
+  /* Search input container takes full width on mobile */
+  #super-admin-tab .panel-head > div > div {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+  #super-admin-tab .panel-head #tenant-search-input {
+    width: 100% !important;
+    font-size: 12.5px;
+  }
+  /* Buttons take 50% each on mobile */
   #super-admin-tab #btn-export-tenants,
   #super-admin-tab #btn-create-tenant {
-    padding: 6px 10px;
-    font-size: 11px;
-    flex-shrink: 0;
+    flex: 1 1 calc(50% - 4px) !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+    font-size: 11.5px !important;
+    margin: 0 !important;
   }
   /* Hide Export button text, keep icon only (save space) */
   #super-admin-tab #btn-export-tenants span,
@@ -2218,7 +2228,12 @@ body.rs-drawer-dragging {
   #super-admin-tab .data-table tbody td:nth-child(4),
   #super-admin-tab .data-table thead th:nth-child(5),
   #super-admin-tab .data-table tbody td:nth-child(5) {
-    display: none;
+    display: none !important;
+  }
+  /* Tighter table cell padding for better mobile fit */
+  #super-admin-tab .data-table td,
+  #super-admin-tab .data-table th {
+    padding: 8px 10px !important;
   }
   /* Compact outlet name cell */
   #super-admin-tab .data-table td:first-child b {
