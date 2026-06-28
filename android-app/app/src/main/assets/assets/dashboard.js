@@ -4056,9 +4056,9 @@
 
   // ── Apply superadmin-specific UI lockdown before first render ──
   if (isSuper) {
-    // 1. Show superadmin-only elements (sidebar links, section labels)
+    // 1. Show superadmin-only elements (sidebar links, mobile nav, section labels)
     $$('.superadmin-only').forEach(el => {
-      el.style.display = el.classList.contains('sidebar-link') ? 'flex' : '';
+      el.style.display = el.classList.contains('sidebar-link') || el.classList.contains('mnav-link') ? 'flex' : '';
     });
     // 2. Hide all regular sidebar links (keep only superadmin ones)
     $$('.sidebar-link').forEach(link => {
@@ -4066,6 +4066,19 @@
       if (tabId !== 'super-admin-tab' && tabId !== 'gateway-monitor-tab') {
         link.style.display = 'none';
       }
+    });
+    // 2b. Hide regular mobile bottom nav items for superadmin
+    $$('.superadmin-hide').forEach(el => {
+      el.style.display = 'none';
+    });
+  } else {
+    // Hide superadmin-only elements
+    $$('.superadmin-only').forEach(el => {
+      el.style.display = 'none';
+    });
+    // Show regular mobile bottom nav items
+    $$('.superadmin-hide').forEach(el => {
+      el.style.display = el.classList.contains('mnav-link') ? 'flex' : '';
     });
     // 3. Hide ghost sidebar section labels (OPERATIONS, MANAGE, GROW) that
     //    belong to the regular dashboard and bleed into the super-admin view
