@@ -889,9 +889,29 @@
           <!-- Dynamic snapshot cards will go here -->
         </div>
         <div class="panel panel-pad">
-          <div class="panel-head"><h3>Tenant directory</h3><button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button></div>
+          <div class="panel-head" style="flex-wrap:wrap;gap:10px">
+            <h3 style="display:flex;align-items:center;gap:8px">
+              Tenant directory
+              <span id="tenant-count" style="font-size:12px;font-weight:500;color:var(--text-mute);background:var(--bg);border:1px solid var(--stroke);border-radius:20px;padding:2px 9px"></span>
+            </h3>
+            <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+              <div style="position:relative">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-mute);font-size:12px;pointer-events:none"></i>
+                <input id="tenant-search-input" placeholder="Search tenants…" style="padding:6px 10px 6px 28px;border:1px solid var(--stroke);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;width:180px;outline:none">
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button>
+            </div>
+          </div>
           <div class="table-scroll"><table class="data-table">
-            <thead><tr><th>Outlet</th><th>Plan</th><th>MRR</th><th>Outlets</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr>
+              <th data-sort-col="outlet" style="white-space:nowrap">Outlet <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="plan" style="white-space:nowrap">Plan <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="mrr" style="white-space:nowrap">MRR <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="outlets" style="white-space:nowrap">Outlets <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="joined" style="white-space:nowrap">Joined <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="status" style="white-space:nowrap">Status <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th>Actions</th>
+            </tr></thead>
             <tbody id="tenant-table-body"></tbody>
           </table></div>
         </div>
@@ -1047,6 +1067,10 @@
               <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Owner email</label>
               <input type="text" id="manage-email" placeholder="owner@email.com" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); box-sizing: border-box;">
             </div>
+          </div>
+          <div style="margin-top:12px">
+            <label style="font-size: 10px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase;">Internal notes (visible to super-admin only)</label>
+            <textarea id="manage-notes" placeholder="Add account notes, support history, onboarding status…" rows="3" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--stroke); font-size: 13px; color: var(--text); outline: none; background: var(--panel); box-sizing: border-box; resize: vertical; font-family: inherit; line-height: 1.5;"></textarea>
           </div>
         </div>
       </div>
