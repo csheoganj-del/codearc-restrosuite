@@ -4092,15 +4092,10 @@
       const label = $('#role-switch-label');
       if (label) label.textContent = 'Super-Admin';
     }
-    // 8. Override Settings button — in super-admin mode open a dedicated settings overlay
+    // 8. Hide Settings button — not relevant in super-admin mode
     setTimeout(() => {
       const openSet = document.getElementById('open-settings');
-      if (openSet) {
-        // Remove any existing handler set by features-shell.js
-        const clone = openSet.cloneNode(true);
-        openSet.parentNode.replaceChild(clone, openSet);
-        clone.addEventListener('click', () => openSuperAdminSettingsModal());
-      }
+      if (openSet) openSet.style.display = 'none';
       // 9. Wire topbar search to tenant text filter
       const tbSearchInput = document.querySelector('.tb-search input');
       if (tbSearchInput) {
