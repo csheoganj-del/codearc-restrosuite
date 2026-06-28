@@ -900,7 +900,14 @@
                 <input id="tenant-search-input" placeholder="Search tenants…" style="padding:6px 10px 6px 28px;border:1px solid var(--stroke);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;width:180px;outline:none">
               </div>
               <button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button>
+              <button class="btn btn-sm" id="btn-create-tenant" style="background:var(--orange);color:#fff;border:none;gap:6px"><i class="fa-solid fa-plus"></i> New Workspace</button>
             </div>
+          </div>
+          <!-- Bulk actions bar — shown when pending tenants exist -->
+          <div id="sa-bulk-bar" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;margin-bottom:12px">
+            <i class="fa-solid fa-user-clock" style="color:#b45309"></i>
+            <span id="sa-bulk-label" style="font-size:13px;font-weight:500;color:#b45309;flex:1"></span>
+            <button id="sa-bulk-approve-btn" class="btn btn-sm" style="background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);font-size:12px"><i class="fa-solid fa-check-double"></i> Approve all pending</button>
           </div>
           <div class="table-scroll"><table class="data-table">
             <thead><tr>
@@ -1002,6 +1009,85 @@
 </nav>
 
 <div class="toast" id="toast"></div>
+
+<!-- SUPER-ADMIN: CREATE TENANT MODAL -->
+<div class="modal-backdrop" id="create-tenant-modal" style="z-index:200001;overflow-y:auto;align-items:flex-start;padding:20px 0">
+  <div class="glass-modal" style="max-width:520px;width:94%;max-height:none;overflow:visible;box-shadow:0 10px 40px rgba(0,0,0,0.1);margin:auto">
+    <div class="modal-header" style="padding:20px 24px 18px;border-bottom:1px solid var(--stroke)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:10px;background:rgba(252,128,25,0.1);display:flex;align-items:center;justify-content:center;color:var(--orange);font-size:18px;flex-shrink:0"><i class="fa-solid fa-store"></i></div>
+        <div>
+          <h3 style="font-size:16px;font-weight:700;margin:0">New Workspace</h3>
+          <p style="font-size:12px;color:var(--text-mute);margin:2px 0 0">Manually register a tenant workspace</p>
+        </div>
+      </div>
+      <button id="close-create-tenant-modal" style="background:none;border:none;cursor:pointer;color:var(--text-mute);font-size:20px;padding:4px;margin-left:auto"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Business name *</label>
+          <input id="ct-name" type="text" placeholder="e.g. Doppio Coffee" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">URL slug *</label>
+          <input id="ct-slug" type="text" placeholder="e.g. doppio-coffee" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Outlet type *</label>
+          <select id="ct-outlet-type" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;cursor:pointer;box-sizing:border-box">
+            <option value="cafe">☕ Café</option>
+            <option value="restaurant">🍽️ Restaurant</option>
+            <option value="qsr">🍔 QSR / Fast Food</option>
+            <option value="bakery">🥐 Bakery</option>
+            <option value="bar">🍺 Bar & Lounge</option>
+            <option value="cloud_kitchen">📦 Cloud Kitchen</option>
+            <option value="retail">🛒 Retail</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Plan</label>
+          <select id="ct-plan" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;cursor:pointer;box-sizing:border-box">
+            <option value="starter">Starter</option>
+            <option value="growth">Growth</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Admin username *</label>
+          <input id="ct-username" type="text" placeholder="e.g. doppio-admin" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Password *</label>
+          <input id="ct-password" type="password" placeholder="Min 8 characters" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Owner email</label>
+          <input id="ct-email" type="email" placeholder="owner@example.com" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">WhatsApp phone</label>
+          <input id="ct-phone" type="tel" placeholder="91XXXXXXXXXX" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="ct-auto-approve" checked style="width:14px;height:14px;accent-color:var(--orange);cursor:pointer">
+        <label for="ct-auto-approve" style="font-size:13px;cursor:pointer;color:var(--text)">Auto-approve workspace (status = Active immediately)</label>
+      </div>
+      <div id="ct-error" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;border-top:1px solid var(--stroke)">
+        <button id="ct-cancel-btn" class="btn btn-ghost btn-sm">Cancel</button>
+        <button id="ct-submit-btn" class="btn btn-sm" style="background:var(--orange);color:#fff;border:none"><i class="fa-solid fa-plus"></i> Create Workspace</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- SAAS TENANT MANAGEMENT MODAL -->
 <div class="modal-backdrop" id="tenant-manage-modal" style="z-index: 200000; overflow-y: auto; align-items: flex-start; padding: 20px 0;">
