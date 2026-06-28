@@ -1129,9 +1129,13 @@
       const pillEl = document.getElementById('topbar-whatsapp-status-pill');
       if (!textEl || !pillEl) return;
       const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
-      const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+      const isSuperAdmin = sessionMeta.role === 'superadmin' || sessionMeta.role === 'super_admin';
       try {
-        const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
+        // Superadmin uses tenant-admin endpoint (no tenantId) so the gateway returns platform status.
+        // Regular tenants use tenant-data with their own tenantId.
+        const res = isSuperAdmin
+          ? await RS_API.admin({ action: 'gateway_status' })
+          : await RS_API.data({ operation: 'gateway_status' });
         if (res && res.status === 'ready') {
           textEl.innerHTML = '<i class="fa-brands fa-whatsapp" style="margin-right:4px"></i>WhatsApp Linked';
           pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
