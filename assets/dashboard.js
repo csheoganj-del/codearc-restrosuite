@@ -126,6 +126,60 @@
     return !!(sess && sess.role === 'superadmin');
   };
 
+  function renderImpersonationBanner() {
+    const existing = document.getElementById('rs-impersonation-banner');
+    const info = window.RS_API && RS_API.impersonation ? RS_API.impersonation() : null;
+    if (!info) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'rs-impersonation-banner';
+    banner.className = 'rs-impersonation-banner';
+    banner.innerHTML = `
+      <div>
+        <strong><i class="fa-solid fa-user-shield"></i> Viewing as ${_e(info.name || info.slug || 'client workspace')}</strong>
+        <span>${_e(info.slug || info.id || '')}</span>
+      </div>
+      <button type="button" id="rs-exit-impersonation-btn"><i class="fa-solid fa-arrow-left"></i> Exit to Super-Admin</button>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById('rs-exit-impersonation-btn')?.addEventListener('click', () => {
+      try {
+        if (window.RS_API && RS_API.exitTenantImpersonation && RS_API.exitTenantImpersonation()) {
+          location.href = 'dashboard.html#super-admin-tab';
+          location.reload();
+        }
+      } catch (err) {
+        toast('Could not return to Super-Admin: ' + (err.message || err), 'fa-circle-exclamation');
+      }
+    });
+  }
+
+  async function openTenantDashboard(tenant, button) {
+    if (!tenant) return toast('Tenant details not found.', 'fa-circle-exclamation');
+    const previous = button ? button.innerHTML : '';
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    }
+    try {
+      if (!window.RS_API || !RS_API.impersonateTenant) throw new Error('Impersonation is not available.');
+      await RS_API.impersonateTenant(tenant);
+      toast(`Opening ${tenant.name || tenant.tenant_name || tenant.slug || 'workspace'} dashboard...`, 'fa-arrow-right-to-bracket');
+      location.href = 'dashboard.html#pos-tab';
+      location.reload();
+    } catch (err) {
+      toast('Could not open workspace: ' + (err.message || err), 'fa-circle-exclamation');
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = previous;
+      }
+    }
+  }
+
   const titles = {
     'pos-tab':['Point of Sale','Ring up takeaway & dine-in orders'],
     'qr-orders-tab':['QR Orders','Incoming orders from tables & delivery'],
@@ -2666,6 +2720,9 @@
           ? `<button class="btn btn-sm quick-reactivate-btn" style="background:rgba(34,197,94,0.08);color:#16a34a;border:1px solid rgba(34,197,94,0.2);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Reactivate workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-rotate-left"></i> Reactivate</button>`
           : `<button class="btn btn-sm quick-suspend-btn" style="background:rgba(239,68,68,0.06);color:#dc2626;border:1px solid rgba(239,68,68,0.18);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Suspend workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-ban"></i> Suspend</button>`
         : '';
+      const dashboardBtn = !isPending && !isSuspended
+        ? `<button class="icon-act open-tenant-dashboard-btn" title="Open workspace dashboard" data-tid="${_e(t.id||'')}" style="font-size:13px;color:var(--orange)"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>`
+        : '';
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
         <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
@@ -2677,6 +2734,7 @@
           <div class="row-actions" style="gap:5px">
             ${approveBtn}
             ${suspendBtn}
+            ${dashboardBtn}
             <button class="icon-act manage-tenant-btn" title="Manage workspace" data-tid="${_e(t.id||'')}" style="font-size:13px"><i class="fa-solid fa-gear"></i></button>
           </div>
         </td>
@@ -2753,6 +2811,16 @@
     });
 
     // Bind manage buttons
+    tbody.querySelectorAll('.open-tenant-dashboard-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tenantId = btn.getAttribute('data-tid');
+        const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
+        openTenantDashboard(tenant, btn);
+      });
+    });
+
     tbody.querySelectorAll('.manage-tenant-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -3045,6 +3113,14 @@
             .then(() => toast('Login URL copied!', 'fa-link'))
             .catch(() => prompt('Copy tenant login URL:', url));
         };
+      }
+
+      const openDashboardBtn = document.getElementById('manage-open-dashboard-btn');
+      if (openDashboardBtn) {
+        const canOpen = !['pending', 'suspended'].includes(String(tenant.status || '').toLowerCase());
+        openDashboardBtn.disabled = !canOpen;
+        openDashboardBtn.title = canOpen ? 'Open this workspace dashboard' : 'Only active workspaces can be opened';
+        openDashboardBtn.onclick = () => openTenantDashboard(tenant, openDashboardBtn);
       }
 
       modal.classList.add('active');
@@ -3996,6 +4072,7 @@
   const sess = window.RS_API ? RS_API.session() : null;
   const isSuper = sess && sess.role === 'superadmin';
   const isBrandAdmin = sess && sess.role === 'brand_admin';
+  renderImpersonationBanner();
 
   // -- Role-based tab access map ----------------------------------------------
   // Each role key maps to the sidebar data-tab values that staff can see.
@@ -4042,7 +4119,7 @@
     // 3. Update user pill
     const userNameEl = document.querySelector('.user-pill .un');
     const userRoleEl = document.querySelector('.user-pill .ur');
-    if (userNameEl && sess.username) userNameEl.textContent = sess.username.charAt(0).toUpperCase() + sess.username.slice(1);
+    if (userNameEl && sess && sess.username) userNameEl.textContent = sess.username.charAt(0).toUpperCase() + sess.username.slice(1);
     if (userRoleEl) userRoleEl.textContent = 'Corporate HQ Admin';
     // 4. Hide non-brandadmin metrics
     const headerCenter = document.querySelector('.header-center-metrics');
@@ -4083,7 +4160,7 @@
     // 5. Update user pill
     const userNameEl = document.querySelector('.user-pill .un');
     const userRoleEl = document.querySelector('.user-pill .ur');
-    if (userNameEl && sess.username) userNameEl.textContent = sess.username.charAt(0).toUpperCase() + sess.username.slice(1);
+    if (userNameEl && sess && sess.username) userNameEl.textContent = sess.username.charAt(0).toUpperCase() + sess.username.slice(1);
     if (userRoleEl) userRoleEl.textContent = 'SaaS Super-Admin';
     // 6. Hide non-superadmin header elements
     const headerCenter = document.querySelector('.header-center-metrics');

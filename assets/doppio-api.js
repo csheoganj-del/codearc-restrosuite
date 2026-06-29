@@ -62,6 +62,9 @@
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',
               tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display',
               persist:'rs_session_persistent' };
+  const SESSION_KEYS = [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,'superadmin_admin_token'];
+  const IMP_ORIGIN_KEY = 'rs_superadmin_impersonation_origin';
+  const IMP_TARGET_KEY = 'rs_superadmin_impersonation_target';
 
   if (!cfg.url || !cfg.anonKey) {
     const configSource = window.__configReady || Promise.resolve();
@@ -109,8 +112,30 @@
     }
   }
   function ssClear(){
-    [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,'superadmin_admin_token']
+    SESSION_KEYS
       .forEach(k=>{ SS.removeItem(k); LS_SESS.removeItem(k); });
+    SS.removeItem(IMP_ORIGIN_KEY);
+    SS.removeItem(IMP_TARGET_KEY);
+  }
+  function clearActiveSession(){
+    SESSION_KEYS.forEach(k=>{ SS.removeItem(k); LS_SESS.removeItem(k); });
+  }
+  function readSessionSnapshot(){
+    const snapshot = {};
+    SESSION_KEYS.forEach(k => {
+      if (LS_SESS.getItem(k) !== null) snapshot[k] = { storage:'local', value:LS_SESS.getItem(k) };
+      else if (SS.getItem(k) !== null) snapshot[k] = { storage:'session', value:SS.getItem(k) };
+    });
+    return snapshot;
+  }
+  function restoreSessionSnapshot(snapshot){
+    clearActiveSession();
+    Object.keys(snapshot || {}).forEach(k => {
+      const entry = snapshot[k] || {};
+      if (typeof entry.value !== 'string') return;
+      if (entry.storage === 'local') LS_SESS.setItem(k, entry.value);
+      else SS.setItem(k, entry.value);
+    });
   }
 
   function storeSession(s, remember){
@@ -129,6 +154,7 @@
     store(K.display, s.display_name || s.username || '');
     store(K.persist, persist ? '1' : '0');
     if(s.admin_token) ssSet('superadmin_admin_token', s.admin_token, persist);
+    else { SS.removeItem('superadmin_admin_token'); LS_SESS.removeItem('superadmin_admin_token'); }
   }
 
   async function post(fn, body, token, fallbackMsg){
@@ -347,6 +373,24 @@
         if (action === 'reset_tenant_data' || action === 'seed_tenant_data' || action === 'purge_demo_data') {
           return { message: 'Action mock-executed successfully', errors: [] };
         }
+        if (action === 'create_impersonation_session') {
+          let list = JSON.parse(sessionStorage.getItem('mock_tenants_v2') || '[]');
+          const tenant = list.find(t => String(t.id) === String(payload.tenant_id));
+          if (!tenant) throw new Error('Client workspace was not found.');
+          if ((tenant.status || 'approved') !== 'approved') throw new Error('Only active workspaces can be opened.');
+          return {
+            session: {
+              tenant_id: tenant.id,
+              tenant_slug: tenant.slug || tenant.tenant_slug || '',
+              tenant_name: tenant.name || tenant.tenant_name || 'Client Workspace',
+              username: 'superadmin:support',
+              display_name: 'Support Access',
+              role: 'admin',
+              allowed_tabs: tenant.allowed_tabs || ['pos-tab','qr-orders-tab','bills-tab','inventory-tab','editor-tab','reports-tab','kds-tab','employees-tab','growth-hub-tab'],
+              session_token: 'demo-impersonation-token'
+            }
+          };
+        }
         if (action === 'list_error_reports') {
           let reports = sessionStorage.getItem('mock_incidents_v2');
           if (!reports) {
@@ -428,6 +472,42 @@
       }
 
       return post('tenant-users', { action, ...payload }, token, 'Staff account operation failed');
+    },
+
+    async impersonateTenant(tenant){
+      const current = api.session();
+      if (!current || current.role !== 'superadmin') throw new Error('Superadmin session required.');
+      if (!tenant || !tenant.id) throw new Error('Tenant details not found.');
+      const origin = readSessionSnapshot();
+      const out = await api.admin({ action:'create_impersonation_session', tenant_id: tenant.id });
+      if (!out || !out.session || !out.session.session_token) throw new Error('Could not open tenant dashboard.');
+      clearActiveSession();
+      storeSession(out.session, false);
+      SS.setItem(IMP_ORIGIN_KEY, JSON.stringify(origin));
+      SS.setItem(IMP_TARGET_KEY, JSON.stringify({
+        id: out.session.tenant_id || tenant.id,
+        slug: out.session.tenant_slug || tenant.slug || '',
+        name: out.session.tenant_name || tenant.name || tenant.tenant_name || 'Client Workspace',
+        started_at: new Date().toISOString()
+      }));
+      try { localStorage.setItem('rs_active_tab', 'pos-tab'); } catch(e) {}
+      return out.session;
+    },
+
+    exitTenantImpersonation(){
+      const raw = SS.getItem(IMP_ORIGIN_KEY);
+      if (!raw) return false;
+      const snapshot = JSON.parse(raw);
+      restoreSessionSnapshot(snapshot);
+      SS.removeItem(IMP_ORIGIN_KEY);
+      SS.removeItem(IMP_TARGET_KEY);
+      try { localStorage.setItem('rs_active_tab', 'super-admin-tab'); } catch(e) {}
+      return true;
+    },
+
+    impersonation(){
+      try { return JSON.parse(SS.getItem(IMP_TARGET_KEY) || 'null'); }
+      catch(e) { return null; }
     },
   };
 
