@@ -160,6 +160,12 @@
   .alert.show { display: flex; }
   .alert.err { background: var(--red-tint); color: var(--red); border: 1px solid oklch(0.66 0.20 25 / 0.3); }
   .alert.ok { background: var(--green-tint); color: var(--green); border: 1px solid oklch(0.74 0.15 158 / 0.3); }
+  .offline-resume { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; padding: 13px; border-radius: var(--r-sm); background: var(--green-tint); border: 1px solid oklch(0.74 0.15 158 / 0.28); }
+  .offline-resume[hidden] { display: none; }
+  .offline-resume .or-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: var(--green); margin-bottom: 3px; }
+  .offline-resume .or-title { font-size: 13.5px; font-weight: 800; color: var(--text); }
+  .offline-resume .or-sub { font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+  .offline-resume .btn { flex: none; padding: 9px 12px; font-size: 12.5px; box-shadow: none; }
 
   .note { display: flex; gap: 9px; margin-top: 15px; font-size: 12px; color: var(--text-mute); align-items: flex-start; }
   .note i { color: var(--orange); margin-top: 2px; }
@@ -349,6 +355,14 @@
           <button type="button" class="link-btn" id="open-recovery-btn">Forgot password?</button>
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="login-submit">Sign in securely <i class="fa-solid fa-right-to-bracket"></i></button>
+        <div class="offline-resume" id="offline-resume" hidden>
+          <div>
+            <div class="or-kicker" id="offline-resume-mode">Saved session</div>
+            <div class="or-title" id="offline-resume-title">Continue to dashboard</div>
+            <div class="or-sub" id="offline-resume-sub">Use this device's saved workspace session.</div>
+          </div>
+          <button type="button" class="btn btn-primary" id="continue-offline-btn"><i class="fa-solid fa-arrow-right-to-bracket"></i> Continue</button>
+        </div>
         <div class="note"><i class="fa-solid fa-shield-halved"></i><span>Your outlet, role and subscription status are verified before dashboard access is granted.</span></div>
       </form>
 
@@ -1036,12 +1050,71 @@
   function showErr(m){okBox.classList.remove('show');errBox.querySelector('span').textContent=m;errBox.classList.add('show');}
   function showOk(m){errBox.classList.remove('show');okBox.querySelector('span').textContent=m;okBox.classList.add('show');}
   function hideAlerts(){errBox.classList.remove('show');okBox.classList.remove('show');}
+  const offlineResume=document.getElementById('offline-resume');
+  const offlineResumeMode=document.getElementById('offline-resume-mode');
+  const offlineResumeTitle=document.getElementById('offline-resume-title');
+  const offlineResumeSub=document.getElementById('offline-resume-sub');
+  const continueOfflineBtn=document.getElementById('continue-offline-btn');
+  function savedClientSession(){
+    try {
+      const s = window.RS_API && RS_API.session ? RS_API.session() : null;
+      if (!s || !s.token) return null;
+      if (s.role === 'superadmin' || s.role === 'brand_admin') return null;
+      return s;
+    } catch(e) {
+      return null;
+    }
+  }
+  function sessionLabel(s){
+    return s.tenant_name || s.tenant_slug || s.username || 'saved workspace';
+  }
+  function updateOfflineResume(){
+    const s = savedClientSession();
+    if (!offlineResume) return;
+    if (!s) {
+      offlineResume.hidden = true;
+      return;
+    }
+    offlineResume.hidden = false;
+    offlineResumeMode.textContent = navigator.onLine ? 'Saved session' : 'Offline access';
+    offlineResumeTitle.textContent = navigator.onLine ? 'Continue to dashboard' : 'Continue offline';
+    offlineResumeSub.textContent = `${sessionLabel(s)}${s.username ? ' - ' + s.username : ''}`;
+    const tenantInput = document.getElementById('tenant-id');
+    const userInput = document.getElementById('username');
+    if (tenantInput && !tenantInput.value && s.tenant_slug) tenantInput.value = s.tenant_slug;
+    if (userInput && !userInput.value && s.username) userInput.value = s.username;
+  }
+  if (continueOfflineBtn) {
+    continueOfflineBtn.onclick = () => {
+      const s = savedClientSession();
+      if (!s) {
+        showErr('No saved workspace session found on this device. Sign in online once before using offline access.');
+        return;
+      }
+      showOk(navigator.onLine ? 'Opening your dashboard...' : 'Opening offline dashboard...');
+      setTimeout(()=>location.href='dashboard.html',250);
+    };
+  }
+  window.addEventListener('online', updateOfflineResume);
+  window.addEventListener('offline', updateOfflineResume);
+  updateOfflineResume();
 
   // login submit — real auth via tenant-access edge function
   loginForm.onsubmit=async e=>{
     e.preventDefault();
     const slug=document.getElementById('tenant-id').value.trim().toLowerCase(), u=document.getElementById('username').value.trim(), p=document.getElementById('password').value;
     const remember = document.getElementById('remember-me').checked;
+    if(!navigator.onLine){
+      const saved = savedClientSession();
+      if(saved){
+        showOk('Offline mode - opening your saved dashboard...');
+        setTimeout(()=>location.href='dashboard.html',350);
+      } else {
+        showErr('No saved workspace session found on this device. Sign in online once before using offline access.');
+        loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
+      }
+      return;
+    }
     if(!slug||!u||!p){showErr('Please fill in your outlet ID, username and password.');loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);return;}
     const btn=document.getElementById('login-submit'); const orig=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying…'; btn.disabled=true;
     try{
@@ -1066,6 +1139,12 @@
       }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;
+      if(savedClientSession() && (err.status === 0 || /failed to fetch|connection failed|network/i.test(err.message || ''))){
+        updateOfflineResume();
+        showErr('Cloud is not reachable. Use Continue offline to open the saved dashboard on this device.');
+        loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
+        return;
+      }
       showErr(err.message||'Sign in failed. Check your outlet ID and credentials.');
       loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
     }
