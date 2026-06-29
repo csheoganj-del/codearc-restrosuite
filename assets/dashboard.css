@@ -65,6 +65,7 @@
 .tb-pill.sync { color: var(--green); border-color: oklch(0.74 0.15 158 / 0.3); background: var(--green-tint); }
 /* Named pill states — real-time sync indicator */
 .tb-pill.cloud      { color: var(--green);  border-color: oklch(0.74 0.15 158 / 0.30); background: var(--green-tint); }
+.tb-pill.superadmin-cloud { color: var(--green); border-color: oklch(0.74 0.15 158 / 0.30); background: var(--green-tint); }
 .tb-pill.syncing    { color: #b45309;        border-color: oklch(0.80 0.15 78 / 0.35);  background: var(--amber-tint); }
 .tb-pill.local-only { color: #b45309;        border-color: oklch(0.80 0.15 78 / 0.35);  background: var(--amber-tint); }
 .tb-pill.offline    { color: var(--orange);  border-color: rgba(255,107,0,0.35);         background: var(--orange-tint); }
