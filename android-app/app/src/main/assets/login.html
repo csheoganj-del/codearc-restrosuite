@@ -1099,6 +1099,15 @@
   window.addEventListener('offline', updateOfflineResume);
   updateOfflineResume();
 
+  async function waitForRuntimeConfig(){
+    if (window.__configReady) {
+      try { await window.__configReady; } catch(e) {}
+    }
+    if (window.RS_API && RS_API.refreshConfig) {
+      RS_API.refreshConfig();
+    }
+  }
+
   // login submit — real auth via tenant-access edge function
   loginForm.onsubmit=async e=>{
     e.preventDefault();
@@ -1118,11 +1127,15 @@
     if(!slug||!u||!p){showErr('Please fill in your outlet ID, username and password.');loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);return;}
     const btn=document.getElementById('login-submit'); const orig=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying…'; btn.disabled=true;
     try{
+      await waitForRuntimeConfig();
       if(window.RS_API && RS_API.configured){
         await RS_API.login({ slug, username:u, password:p, remember });
         showOk('Verified — opening your console…');
         setTimeout(()=>location.href='dashboard.html',700);
       } else {
+        if(slug === 'superadmin'){
+          throw new Error('Super-Admin is cloud-only. Please wait a moment and try again.');
+        }
         // Demo / local mode: look up a locally registered outlet
         btn.innerHTML=orig; btn.disabled=false;
         const localKey = 'rs_v2:'+slug+':settings';

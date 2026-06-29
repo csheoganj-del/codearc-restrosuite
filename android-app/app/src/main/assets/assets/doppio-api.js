@@ -42,6 +42,20 @@
     }
   }
 
+  function absorbRuntimeConfig() {
+    if (!window.__SUPABASE_URL__ || !window.__SUPABASE_ANON_KEY__) return false;
+    cfg = { url: window.__SUPABASE_URL__, anonKey: window.__SUPABASE_ANON_KEY__ };
+    if (window.CONFIG) {
+      enableDemoTools = !!window.CONFIG.enableDemoTools;
+      zeroCostLaunchMode = !!window.CONFIG.zeroCostLaunchMode;
+    } else {
+      enableDemoTools = !!window.__enableDemoTools;
+      zeroCostLaunchMode = !!window.__zeroCostLaunchMode;
+    }
+    recomputeConfig();
+    return CONFIGURED;
+  }
+
   // Run initial recompute synchronously
   recomputeConfig();
 
@@ -67,15 +81,7 @@
     const configSource = window.__configReady || Promise.resolve();
     configSource.then(() => {
       if (window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__) {
-        cfg = { url: window.__SUPABASE_URL__, anonKey: window.__SUPABASE_ANON_KEY__ };
-        if (window.CONFIG) {
-          enableDemoTools = !!window.CONFIG.enableDemoTools;
-          zeroCostLaunchMode = !!window.CONFIG.zeroCostLaunchMode;
-        } else {
-          enableDemoTools = !!window.__enableDemoTools;
-          zeroCostLaunchMode = !!window.__zeroCostLaunchMode;
-        }
-        recomputeConfig();
+        absorbRuntimeConfig();
       } else if (!cfg.url || !cfg.anonKey) {
         fetch('/api/config')
           .then(r => r.ok ? r.json() : null)
@@ -186,10 +192,12 @@
     supabaseClient: supabaseClient,
     enableDemoTools: enableDemoTools,
     zeroCostLaunchMode: zeroCostLaunchMode,
+    refreshConfig: absorbRuntimeConfig,
 
     async checkSlug(slug){ const r = await post('tenant-access', { action:'check_slug', slug }, ANON, 'Could not check availability'); return r.available === true; },
 
     async login({ slug, username, password, remember }){
+      if (!CONFIGURED) absorbRuntimeConfig();
       if(!CONFIGURED) {
         if (isSuperadminSlug(slug)) {
           throw new Error('Super-Admin is cloud-only. Connect Supabase and sign in through the cloud backend.');
