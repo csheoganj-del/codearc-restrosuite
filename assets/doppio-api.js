@@ -294,7 +294,10 @@
 
     session(){ const t = ssGet(K.token); if(!t) return null;
       const role = ssGet(K.role);
-      if (role === 'superadmin' && !CONFIGURED) return null;
+      if (role === 'superadmin' && !CONFIGURED) {
+        absorbRuntimeConfig();
+        if (!CONFIGURED && !ssGet('superadmin_admin_token')) return null;
+      }
       return { token:t, tenant_id:ssGet(K.tid), tenant_slug:ssGet(K.slug), tenant_name:ssGet(K.name),
                username:ssGet(K.user), role, display_name:ssGet(K.display),
                allowed_tabs: JSON.parse(ssGet(K.tabs)||'[]') }; },

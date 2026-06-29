@@ -59,7 +59,13 @@
     };
   })();
 
+  function refreshRuntimeConfig() {
+    try {
+      if (window.RS_API && RS_API.refreshConfig) RS_API.refreshConfig();
+    } catch(e) {}
+  }
   function isCloudConfigured() {
+    refreshRuntimeConfig();
     return !!(window.RS_API && window.RS_API.configured);
   }
   function isTenantDataSession() {
