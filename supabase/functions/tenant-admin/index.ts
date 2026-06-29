@@ -31,6 +31,25 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+const PLAN_ENTITLEMENTS: Record<string, { name: string; allowedTabs: string[] }> = {
+  free: {
+    name: "Free / Demo",
+    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab"],
+  },
+  starter: {
+    name: "Starter",
+    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+  },
+  growth: {
+    name: "Growth",
+    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab", "editor-tab", "crm-tab", "tax-tab", "online-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+  },
+  enterprise: {
+    name: "Enterprise",
+    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab", "editor-tab", "crm-tab", "tax-tab", "online-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+  },
+};
+
 const TABLES_TO_RESET = [
   "doppio_bills",
   "doppio_pending_orders",
@@ -98,6 +117,27 @@ async function signValue(value: string, secret: string) {
   );
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
   return encodeBase64Url(new Uint8Array(signature));
+}
+
+async function createSignedSessionToken(payload: Record<string, unknown>) {
+  if (!SUPERADMIN_SESSION_SECRET) return null;
+  const payloadEncoded = encodeBase64Url(new TextEncoder().encode(JSON.stringify({
+    ...payload,
+    exp: Date.now() + (2 * 60 * 60 * 1000),
+  })));
+  const signature = await signValue(payloadEncoded, SUPERADMIN_SESSION_SECRET);
+  return `${payloadEncoded}.${signature}`;
+}
+
+function planFor(code: unknown) {
+  return PLAN_ENTITLEMENTS[String(code || "starter")] || PLAN_ENTITLEMENTS.starter;
+}
+
+function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
+  const planTabs = planFor(planCode).allowedTabs;
+  return Array.isArray(tenantTabs) && tenantTabs.length > 0
+    ? tenantTabs.map(String)
+    : planTabs;
 }
 
 // Constant-time string comparison — prevents timing side-channel attacks on
@@ -386,6 +426,76 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
     }
   }
   return jsonResponse({ success: true }, 200, req);
+}
+
+async function createImpersonationSession(payload: Record<string, unknown>, req: Request, verifiedPayload: Record<string, unknown>) {
+  const tenantId = String(payload.tenant_id || "").trim();
+  if (!tenantId) return jsonResponse({ error: "Tenant ID is required." }, 400, req);
+
+  const { data: tenant, error } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("id, name, slug, username, status, allowed_tabs, data_reset_at, plan_code, subscription_status, subscription_current_period_end, auth_version")
+    .eq("id", tenantId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("create_impersonation_session lookup failed:", error);
+    return jsonResponse({ error: "Failed to load workspace." }, 500, req);
+  }
+  if (!tenant) return jsonResponse({ error: "Client workspace was not found." }, 404, req);
+  if (tenant.status !== "approved") return jsonResponse({ error: "Only active workspaces can be opened." }, 403, req);
+  if (!["active", "trialing"].includes(String(tenant.subscription_status || "active"))) {
+    return jsonResponse({ error: "Workspace subscription is not active." }, 402, req);
+  }
+
+  const actor = String(verifiedPayload.username || "superadmin");
+  const sessionToken = await createSignedSessionToken({
+    role: "admin",
+    username: `superadmin:${actor}`,
+    tenant_id: tenant.id,
+    tenant_slug: tenant.slug,
+    legacy_owner: true,
+    auth_version: tenant.auth_version,
+    impersonated_by: actor,
+  });
+
+  if (!sessionToken) {
+    return jsonResponse({ error: "Authentication service is misconfigured: session signing secret is missing." }, 500, req);
+  }
+
+  const plan = planFor(tenant.plan_code);
+  const allowedTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
+
+  const { error: auditError } = await supabaseAdmin.from("tenant_audit_logs").insert({
+    tenant_id: tenant.id,
+    actor_user_id: null,
+    actor_username: actor,
+    actor_role: "superadmin",
+    action: "superadmin.impersonation.start",
+    target_type: "saas_tenants",
+    target_id: tenant.id,
+    metadata: { tenant_slug: tenant.slug },
+  });
+  if (auditError) console.error("impersonation audit log failed:", auditError);
+
+  return jsonResponse({
+    session: {
+      username: `superadmin:${actor}`,
+      display_name: `Support: ${actor}`,
+      role: "admin",
+      tenant_id: tenant.id,
+      tenant_slug: tenant.slug,
+      tenant_name: tenant.name,
+      allowed_tabs: allowedTabs,
+      data_reset_at: tenant.data_reset_at || null,
+      plan_code: tenant.plan_code || "starter",
+      plan_name: plan.name,
+      subscription_status: tenant.subscription_status || "active",
+      subscription_current_period_end: tenant.subscription_current_period_end || null,
+      session_token: sessionToken,
+      impersonated_by: actor,
+    },
+  }, 200, req);
 }
 
 async function resetTenantData(payload: Record<string, unknown>, req: Request) {
@@ -804,6 +914,7 @@ serve(async (req) => {
     if (action === "bulk_delete") return await bulkDelete(payload, req);
     if (action === "delete_tenant") return await deleteTenant(payload, req);
     if (action === "update_tenant") return await updateTenant(payload, req);
+    if (action === "create_impersonation_session") return await createImpersonationSession(payload, req, verified.payload as Record<string, unknown>);
     if (action === "reset_tenant_data") return await resetTenantData(payload, req);
     if (action === "seed_tenant_data") return await seedTenantData(payload, req);
     if (action === "purge_demo_data") return await purgeTenantDemoData(payload, req);
