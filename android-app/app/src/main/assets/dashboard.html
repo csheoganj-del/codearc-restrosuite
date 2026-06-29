@@ -995,7 +995,7 @@
       </section>
 
     </div>
-  </div>
+  </main>
 </div>
 
 <!-- ===================== MOBILE BOTTOM NAV ===================== -->
@@ -1106,6 +1106,7 @@
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
           <span id="manage-status-badge" style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700"><span style="width:6px;height:6px;border-radius:50%;background:#22C55E;display:inline-block"></span>Active</span>
           <button id="manage-copy-login-btn" title="Copy tenant login URL" style="background:none;border:1px solid var(--stroke);border-radius:6px;cursor:pointer;color:var(--text-mute);font-size:11px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px"><i class="fa-solid fa-link" style="font-size:10px"></i> Copy login URL</button>
+          <button id="manage-open-dashboard-btn" title="Open workspace dashboard" style="background:rgba(252,128,25,0.08);border:1px solid rgba(252,128,25,0.28);border-radius:6px;cursor:pointer;color:var(--orange);font-size:11px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px"><i class="fa-solid fa-arrow-right-to-bracket" style="font-size:10px"></i> View dashboard</button>
         </div>
       </div>
       <button id="close-tenant-modal" style="flex-shrink:0;width:30px;height:30px;border-radius:8px;background:var(--bg);border:1px solid var(--stroke);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--text-mute);cursor:pointer">&times;</button>
@@ -1313,6 +1314,31 @@
     </div>
   </div>
 
+  <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:100000;pointer-events:none;">
+    <div id="onboarding-backdrop" style="position:absolute;inset:0;pointer-events:auto;"></div>
+    <div id="onboarding-spotlight"></div>
+    <aside id="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">
+        <span id="tour-step-badge"><span id="tour-step-icon">1/1</span><span id="tour-step-label">Setup</span></span>
+        <button id="tour-skip-btn" type="button" aria-label="Close setup tour" onclick="window.endOnboardingTour && window.endOnboardingTour()">&times;</button>
+      </div>
+      <div style="display:flex;gap:13px;align-items:flex-start;margin-bottom:12px;">
+        <div id="tour-feature-icon"><i class="fa-solid fa-compass"></i></div>
+        <div>
+          <h3 id="tour-title" style="margin:0 0 6px;font-size:18px;line-height:1.25;color:var(--text);">Workspace setup</h3>
+          <p id="tour-subtitle" style="margin:0;color:var(--text-soft);font-size:13px;line-height:1.45;"></p>
+        </div>
+      </div>
+      <p id="tour-desc" style="margin:0 0 12px;color:var(--text-soft);font-size:13px;line-height:1.55;"></p>
+      <div id="tour-action" style="padding:11px 12px;border:1px solid var(--stroke);border-radius:10px;background:var(--orange-tint);color:var(--text);font-size:12.5px;line-height:1.45;margin-bottom:14px;"></div>
+      <div id="tour-dots" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="tour-prev-btn" type="button" onclick="window.tourNavigate && window.tourNavigate(-1)">Back</button>
+        <button id="tour-next-btn" type="button" onclick="window.tourNavigate && window.tourNavigate(1)">Next</button>
+      </div>
+    </aside>
+  </div>
+
   <div id="rs-modal-root"></div>
 
 <script>
@@ -1322,8 +1348,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
-<script src="assets/db.js?v=20260618-realdata">
-  <script src="assets/saas-core.js"></script</script>
+<script src="assets/db.js?v=20260618-realdata"></script>
+<script src="assets/saas-core.js"></script>
 <script src="src/dashboard/observability.js"></script>
 <script src="src/dashboard/imports.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/bills.js?v=20260618-importsync3"></script>
@@ -1391,5 +1417,3 @@
 </script>
 </body>
 </html>
-
-                                                                                  

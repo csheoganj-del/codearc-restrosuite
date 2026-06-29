@@ -3,6 +3,25 @@
    ============================================================ */
 (function () {
   'use strict';
+  const FAST_INTERACTION_MODE = true;
+  const ENABLE_DEMO_TOOLS = !!(window.RS_API && window.RS_API.enableDemoTools);
+  const vaultWriteQueue = [];
+
+  function debounce(fn, wait = 120) {
+    let timer = null;
+    return function debounced(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), wait);
+    };
+  }
+
+  function frameTask(fn) {
+    return function runInFrame(...args) {
+      const run = () => fn.apply(this, args);
+      if (FAST_INTERACTION_MODE && window.requestAnimationFrame) window.requestAnimationFrame(run);
+      else setTimeout(run, 0);
+    };
+  }
   
   // Self-Healing Boot Recovery
   (function () {
@@ -195,6 +214,17 @@
     'chain-dashboard-tab':['Chain Dashboard','Consolidated reporting, catalog & logistics']
   };
   const rendered = {};
+  function renderRegisteredTab(tabId) {
+    if (!renderers[tabId]) return;
+    if (tabId === 'growth-hub-tab' && renderers[tabId] !== renderGrowthHub) {
+      renderers[tabId]();
+    } else if (tabId === 'growth-hub-tab') {
+      renderGrowthHub();
+    } else {
+      renderers[tabId]();
+    }
+  }
+
   function activateTab(id){
     const sess = window.RS_API ? RS_API.session() : null;
     const isSuper = sess && sess.role === 'superadmin';
@@ -217,10 +247,11 @@
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
     $$('.sidebar-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
+    document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     try { updateTabAttentionBlinking(); } catch(e){}
     const meta = titles[id]; if(meta){ $('#page-title').textContent = meta[0]; $('#page-sub').textContent = meta[1]; }
     $('.content').scrollTop = 0; window.scrollTo(0,0);
-    if(!rendered[id] && renderers[id]){ renderers[id](); rendered[id]=true; }
+    if(!rendered[id] && renderers[id]){ renderRegisteredTab(id); rendered[id]=true; }
     else if(rendered[id] && id === 'gateway-monitor-tab') { if(typeof startSaaSGatewayPolling === 'function') startSaaSGatewayPolling(); }
     if(id !== 'gateway-monitor-tab') { if(typeof stopSaaSGatewayPolling === 'function') stopSaaSGatewayPolling(); }
     try{ history.replaceState(null,'','#'+id); }catch(e){}
@@ -240,6 +271,7 @@
     }
   }
   $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
+  document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
 
   /* ---------- SUPPORT DROPDOWN ---------- */
   const supportTrigger = $('#support-trigger');
@@ -2417,6 +2449,7 @@
       </div>`).join('');
     $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'...','fa-arrow-up-right-from-square')));
   };
+  function renderGrowthHub(){ return renderHub(); }
 
   /* ============================================================
      EMPLOYEES
@@ -3773,6 +3806,7 @@
   };
 
   /* ---------- renderers map ---------- */
+  const renderBillsFast = frameTask(renderBills);
   const renderers = {
     'pos-tab':initPOS,'qr-orders-tab':renderQR,
     'bills-tab':()=>{
@@ -3780,7 +3814,7 @@
       const search = $('#bills-search');
       if (search && !search._rsListenerBound) {
         search._rsListenerBound = true;
-        search.addEventListener('input', renderBills);
+        search.addEventListener('input', debounce(renderBillsFast, 60));
       }
       const payFil = $('#bills-pay-filter');
       if (payFil && !payFil._rsListenerBound) {
@@ -3794,7 +3828,7 @@
       }
     },
     'inventory-tab':renderInventory,'editor-tab':renderEditor,'reports-tab':renderReports,'kds-tab':renderKDS,
-    'growth-hub-tab':renderHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'gateway-monitor-tab':renderGateway,
+    'growth-hub-tab':renderGrowthHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'gateway-monitor-tab':renderGateway,
     'chain-dashboard-tab':() => { if(window.RestroSuite && RestroSuite.chain) RestroSuite.chain.init(window.RS_API); }
   };
 
@@ -3868,9 +3902,9 @@
     },
 
     // ---- persistence ----
-    save(coll){ const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES}; const arr=map[coll]; if(window.RS_DB&&arr) return RS_DB.bulkPut(coll, arr.map(x=>({...x}))); return Promise.resolve(); },
-    saveOne(coll,obj){ if(window.RS_DB) return RS_DB.put(coll, obj.id, {...obj}); return Promise.resolve(); },
-    removeOne(coll,id){ if(window.RS_DB) return RS_DB.del(coll, id); return Promise.resolve(); },
+    async save(coll){ const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES}; const arr=map[coll]; if(window.RS_DB&&arr) { const out = await RS_DB.bulkPut(coll, arr.map(x=>({...x}))); if(coll === 'menu') broadcastMenuUpdate(); return out; } return Promise.resolve(); },
+    async saveOne(coll,obj){ if(window.RS_DB) { const out = await RS_DB.put(coll, obj.id, {...obj}); if(coll === 'menu') broadcastMenuUpdate(); return out; } return Promise.resolve(); },
+    async removeOne(coll,id){ if(window.RS_DB) { const out = await RS_DB.del(coll, id); if(coll === 'menu') broadcastMenuUpdate(); return out; } return Promise.resolve(); },
     saveSettings(obj){ if(window.RS_DB) return RS_DB.setSettings(obj); return Promise.resolve(); },
     getSettings(){ if(window.RS_DB) return RS_DB.getSettings(); return Promise.resolve(null); },
     getCurrencySymbol,
@@ -3900,7 +3934,9 @@
     bills:{ table:'doppio_bills', arr:BILLS, tabs:['bills-tab','reports-tab'] },
     customers:{ table:'doppio_crm', tabs:['customers-tab'] },
     notifications:{ table:'doppio_notifications', tabs:[] },
-    employees:{ table:'doppio_employees', arr:EMPLOYEES, tabs:['employees-tab'] }
+    employees:{ table:'doppio_employees', arr:EMPLOYEES, tabs:['employees-tab'] },
+    attendance:{ table:'doppio_attendance', tabs:['employees-tab'] },
+    leave_requests:{ table:'doppio_leave_requests', tabs:['employees-tab'] }
   };
   async function refreshCollectionFromCloud(coll) {
     if (!window.RS_DB || !RS_DB.isCloud || !LIVE_COLLECTIONS[coll]) return;
@@ -3922,7 +3958,61 @@
     if (!activeTenantId || window.__rsTenantRealtimeFor === activeTenantId) return;
     window.__rsTenantRealtimeFor = activeTenantId;
     window.__rsTenantRealtimeChannels = window.__rsTenantRealtimeChannels || [];
-    Object.entries(LIVE_COLLECTIONS).forEach(([coll, cfg]) => {
+
+    const billChannel = api.supabaseClient.channel(`doppio-bills-realtime-${activeTenantId}`)
+      .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+        refreshCollectionFromCloud('bills').catch(e => console.warn('Realtime refresh failed for bills', e));
+      })
+      .subscribe();
+    window.__rsTenantRealtimeChannels.push(billChannel);
+
+    const pendingOrdersChannel = api.supabaseClient.channel(`doppio-pending-orders-tenant-${activeTenantId}`)
+      .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+        syncPendingOrders();
+      })
+      .subscribe();
+    window.__rsTenantRealtimeChannels.push(pendingOrdersChannel);
+
+    const employeeChannel = api.supabaseClient.channel('doppio-employees-realtime')
+      .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_employees', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+        refreshCollectionFromCloud('employees').catch(e => console.warn('Realtime refresh failed for employees', e));
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_attendance', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+        refreshCollectionFromCloud('attendance').catch(e => console.warn('Realtime refresh failed for attendance', e));
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_leave_requests', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+        refreshCollectionFromCloud('leave_requests').catch(e => console.warn('Realtime refresh failed for leave requests', e));
+      })
+      .subscribe();
+    window.__rsTenantRealtimeChannels.push(employeeChannel);
+
+    const crmChannel = api.supabaseClient.channel('doppio-crm-realtime')
+      .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_crm', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+        refreshCollectionFromCloud('customers').catch(e => console.warn('Realtime refresh failed for customers', e));
+      })
+      .subscribe();
+    window.__rsTenantRealtimeChannels.push(crmChannel);
+
+    const menuChannel = api.supabaseClient.channel(`doppio-menu-realtime-${activeTenantId}`)
+      .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_menu', filter: `tenant_id=eq.${activeTenantId}` }, () => {
+        refreshCollectionFromCloud('menu').catch(e => console.warn('Realtime refresh failed for menu', e));
+      })
+      .on('broadcast', { event: 'menu-updated' }, (response) => {
+        if (!response || !response.payload || String(response.payload.tenantId) === String(activeTenantId)) {
+          refreshCollectionFromCloud('menu').catch(e => console.warn('Menu broadcast refresh failed', e));
+        }
+      })
+      .on('broadcast', { event: 'data-reset' }, (response) => {
+        if (response && response.payload && String(response.payload.tenantId) === String(activeTenantId)) {
+          scheduleTenantDataSync();
+        }
+      })
+      .subscribe();
+    window.__rsMenuRealtimeChannel = menuChannel;
+    window.__rsTenantRealtimeChannels.push(menuChannel);
+
+    ['inventory','notifications'].forEach(coll => {
+      const cfg = LIVE_COLLECTIONS[coll];
       const channel = api.supabaseClient.channel(`doppio-${coll}-realtime-${activeTenantId}`)
         .on('postgres_changes', { event:'*', schema:'public', table:cfg.table, filter:`tenant_id=eq.${activeTenantId}` }, () => {
           refreshCollectionFromCloud(coll).catch(e => console.warn('Realtime refresh failed for '+coll, e));
@@ -3931,6 +4021,37 @@
       window.__rsTenantRealtimeChannels.push(channel);
     });
   }
+
+  async function syncWithSupabase() {
+    if (!window.RS_DB || !RS_DB.isCloud) return;
+    const activeTenantId = window.RS_API?.session()?.tenant_id || sessionStorage.getItem('tenant_id');
+    if (!activeTenantId) return;
+    const bills = await RS_DB.listCloud('bills').catch(() => []);
+    const belongsToActiveTenant = bills.some(b => String(b.tenantId || b.tenant_id || activeTenantId) === String(activeTenantId)) || !bills.length;
+    if (!belongsToActiveTenant) return;
+    await Promise.all(Object.keys(LIVE_COLLECTIONS).map(coll => refreshCollectionFromCloud(coll).catch(() => null)));
+    await syncPendingOrders();
+  }
+
+  const scheduleTenantDataSync = debounce(() => {
+    if (!document.hidden && navigator.onLine) syncWithSupabase();
+  }, 800);
+
+  function broadcastMenuUpdate() {
+    const api = window.RS_API;
+    const activeTenantId = api?.session()?.tenant_id || sessionStorage.getItem('tenant_id');
+    if (!api || !api.supabaseClient || !activeTenantId) return;
+    const channel = window.__rsMenuRealtimeChannel || api.supabaseClient.channel(`doppio-menu-realtime-${activeTenantId}`);
+    channel.send({
+      type: 'broadcast',
+      event: 'menu-updated',
+      payload: { tenantId: activeTenantId, at: new Date().toISOString() }
+    }).catch(() => {});
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && navigator.onLine) syncWithSupabase();
+  });
   async function hydrate(){
     if(!window.RS_DB) return;
     const map={menu:MENU,bills:BILLS,inventory:INVENTORY,employees:EMPLOYEES};
@@ -4080,7 +4201,7 @@
   const ROLE_TAB_MAP = {
     manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab',
                  'inventory-tab','editor-tab','customers-tab','reports-tab',
-                 'analytics-tab','employees-tab','growth-hub-tab'],
+                 'analytics-tab','employees-tab', 'growth-hub-tab'],
     cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
     waiter:    ['pos-tab','floor-tab','kds-tab'],
     captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],
@@ -4310,14 +4431,17 @@
       const before = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
       const failed = [];
       let saved = 0;
-      for (const record of records) {
+      const cloudWrites = records.map(async (record) => {
+        const newItem = record;
         try {
           await RS.saveOne(collection, record);
           saved++;
         } catch(e) {
-          failed.push(`${record.name || record.no || record.id || 'Row'}: ${e.message}`);
+          if (collection === 'menu') failed.push(`Recipe import failed for ${newItem.name}: ${e.message}`);
+          else failed.push(`${record.name || record.no || record.id || 'Row'}: ${e.message}`);
         }
-      }
+      });
+      await Promise.all(cloudWrites);
       const lastError = window.RS_LAST_CLOUD_ERROR;
       const cloudFallback = !!(lastError && lastError.time !== before && lastError.collection === collection);
       return { saved, failed, cloudFallback };

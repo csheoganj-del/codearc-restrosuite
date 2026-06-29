@@ -1479,12 +1479,9 @@
       // opts.allowOpen = true  -> only set when user EXPLICITLY clicks a payment method btn
       // Without it, tab-switches and cart re-renders just sync state without popping the drawer
       const allowOpen = opts && opts.allowOpen;
-      console.log('[DEBUG] refreshPaymentPanel entered. paymentState.method =', paymentState.method, 'allowOpen =', allowOpen);
       const totals = RS.getTotals();
-      console.log('[DEBUG] refreshPaymentPanel totals =', JSON.stringify(totals));
       const note = document.getElementById('pay-method-note');
       const checkoutBtn = document.getElementById('btn-checkout');
-      console.log('[DEBUG] refreshPaymentPanel checkoutBtn =', !!checkoutBtn);
       if(!checkoutBtn) return;
       document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.classList.toggle('active', btn.dataset.payMethod === paymentState.method));
       if(note) note.textContent = paymentState.method;
@@ -1492,7 +1489,6 @@
 
       // Only open / close drawers when user explicitly triggered (e.g. clicking Cash/Split btn)
       if (paymentState.method === 'Cash') {
-        console.log('[DEBUG] refreshPaymentPanel: handling Cash method');
         const receivedInput = document.getElementById('inline-cash-received');
         if (receivedInput) {
           const currentVal = Number(receivedInput.value) || 0;
@@ -1503,12 +1499,10 @@
           }
         }
         if (allowOpen) {
-          console.log('[DEBUG] refreshPaymentPanel: calling openDrawer(cash-drawer)');
           openDrawer('cash-drawer');
         }
         updateInlineChange();
       } else if (paymentState.method === 'Split') {
-        console.log('[DEBUG] refreshPaymentPanel: handling Split method');
         const splitCash = document.getElementById('split-cash');
         const splitUpi  = document.getElementById('split-upi');
         const splitCard = document.getElementById('split-card');
@@ -1525,12 +1519,10 @@
         }
         isSplitPaymentActive = true;
         if (allowOpen) {
-          console.log('[DEBUG] refreshPaymentPanel: calling openDrawer(split-drawer)');
           openDrawer('split-drawer');
         }
         updateSplitChange();
       } else {
-        console.log('[DEBUG] refreshPaymentPanel: closing drawers');
         closeAllDrawers();
         isSplitPaymentActive = false;
       }
@@ -1538,12 +1530,9 @@
 
     function wirePaymentPanel(){
       const methods = document.getElementById('cart-pay-methods');
-      console.log('[DEBUG] wirePaymentPanel: methods element found =', !!methods);
       if(methods) {
         methods.addEventListener('click', e=>{
-          console.log('[DEBUG] cart-pay-methods click event triggered');
           const btn = e.target.closest('[data-pay-method]');
-          console.log('[DEBUG] cart-pay-methods click closest button found =', !!btn, btn ? btn.dataset.payMethod : null);
           if(!btn) return;
           paymentState.method = btn.dataset.payMethod;
           // Pass allowOpen:true so the drawer opens on explicit user click
@@ -1553,25 +1542,19 @@
 
       // Close drawer buttons
       const cashClose = document.getElementById('cash-drawer-close');
-      console.log('[DEBUG] cash-drawer-close element found =', !!cashClose);
       cashClose?.addEventListener('click', () => {
-        console.log('[DEBUG] cash-drawer-close clicked');
         closeAllDrawers();
       });
 
       const splitClose = document.getElementById('split-drawer-close');
-      console.log('[DEBUG] split-drawer-close element found =', !!splitClose);
       splitClose?.addEventListener('click', () => {
-        console.log('[DEBUG] split-drawer-close clicked');
         closeAllDrawers();
         isSplitPaymentActive = false;
       });
 
       // Backdrop click-outside close with animation (CSS handles it)
       const backdrop = document.getElementById('cpay-drawer-backdrop');
-      console.log('[DEBUG] cpay-drawer-backdrop element found =', !!backdrop);
       backdrop?.addEventListener('click', () => {
-        console.log('[DEBUG] cpay-drawer-backdrop clicked');
         closeAllDrawers();
       });
 
