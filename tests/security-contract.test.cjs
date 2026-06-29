@@ -33,6 +33,14 @@ test("login uses the tenant access backend", () => {
   assert.doesNotMatch(login, /superadmin.*admin.*bypass/i);
 });
 
+test("superadmin never uses local demo data", () => {
+  const api = read("assets/doppio-api.js");
+  assert.match(api, /Super-Admin is cloud-only/);
+  assert.match(api, /isSuperadminSlug\(slug\)/);
+  assert.doesNotMatch(api, /demo-admin-token/);
+  assert.doesNotMatch(api, /mock_tenants_v2/);
+});
+
 test("public ordering uses the tenant public backend", () => {
   const customerApp = read("script.js");
   assert.match(customerApp, /functions\/v1\/tenant-public/);
