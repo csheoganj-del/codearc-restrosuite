@@ -967,7 +967,7 @@
     /* ===================== DB MODE BADGE + SESSION ===================== */
     (function(){
       const pill = document.getElementById('db-mode-pill');
-      const ALL_STATES = ['cloud','syncing','local-only','offline','sync-error'];
+      const ALL_STATES = ['cloud','syncing','local-only','offline','sync-error','superadmin-cloud'];
 
       // Count of in-flight cloud writes — hold Syncing until all settle
       let activeSyncCount = 0;
@@ -987,11 +987,20 @@
         if (!pill) return;
         const isCloud  = window.RS_DB && window.RS_DB.isCloud;
         const isOnline = navigator.onLine;
+        const session = window.RS_API && RS_API.session ? RS_API.session() : null;
+        const isSuperAdmin = session && session.role === 'superadmin';
 
         if (!isOnline) {
           setState('offline',
             'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
             `<i class="fa-solid fa-wifi-slash" style="font-size:10px"></i>&nbsp;Offline`
+          );
+          return;
+        }
+        if (isSuperAdmin) {
+          setState('superadmin-cloud',
+            'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
+            `<span class="dot dot-live"></span>&nbsp;Cloud admin`
           );
           return;
         }
