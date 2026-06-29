@@ -81,7 +81,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  console.log(`Received order webhook for tenant ${tenantId}:`, JSON.stringify(payload));
+  console.log(`Received order webhook for tenant ${tenantId}`);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false }
@@ -112,7 +112,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Build the pending order row
     const pendingOrderRow = {
-      tenant_id: Number(tenantId),
+      tenant_id: tenantId,
       orderId,
       customerName,
       customerPhone,
