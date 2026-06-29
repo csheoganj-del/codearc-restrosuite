@@ -62,13 +62,19 @@
   function isCloudConfigured() {
     return !!(window.RS_API && window.RS_API.configured);
   }
-  function signedIn(){ return isCloudConfigured() && !!(window.RS_API && window.RS_API.session()); }
+  function isTenantDataSession() {
+    if (!isCloudConfigured() || !window.RS_API || !window.RS_API.session) return false;
+    const s = window.RS_API.session();
+    if (!s) return false;
+    return s.role !== 'superadmin' && s.role !== 'brand_admin';
+  }
+  function signedIn(){ return isTenantDataSession(); }
   function mode(){ return signedIn() ? 'cloud' : 'local'; }
 
   function getActiveTenantId() {
     if (isCloudConfigured() && window.RS_API && window.RS_API.session) {
       const s = window.RS_API.session();
-      if (s && s.tenant_id) return s.tenant_id;
+      if (s && s.role !== 'superadmin' && s.role !== 'brand_admin' && s.tenant_id) return s.tenant_id;
     }
     try {
       const tid = sessionStorage.getItem('tenant_id');
