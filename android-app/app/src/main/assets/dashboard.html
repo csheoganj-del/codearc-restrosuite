@@ -1346,6 +1346,7 @@
   (function(){ const c=document.getElementById('clock'); function tick(){ const d=new Date(); c.textContent=d.toLocaleString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}); } tick(); setInterval(tick,30000); })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+<script src="assets/qrcode.min.js"></script>
 <script src="config.js"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>

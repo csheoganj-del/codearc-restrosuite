@@ -1297,7 +1297,46 @@
       }
       $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
     }));
-    $('#disc-input')?.addEventListener('input', e=>{ discountPct=Math.min(100,Math.max(0,+e.target.value||0)); renderCart(); });
+    let lastAuthorizedDiscount = 0;
+    $('#disc-input')?.addEventListener('input', e=>{
+      const val = Math.min(100,Math.max(0,+e.target.value||0));
+      if (val <= 10) {
+        discountPct = val;
+        renderCart();
+      }
+    });
+    $('#disc-input')?.addEventListener('change', async e=>{
+      const val = Math.min(100,Math.max(0,+e.target.value||0));
+      if (val > 10) {
+        if (val === lastAuthorizedDiscount) {
+          discountPct = val;
+          renderCart();
+          return;
+        }
+        if (window.RSPinModal) {
+          e.target.disabled = true;
+          const ok = await RSPinModal.request('Discount Override');
+          e.target.disabled = false;
+          if (ok) {
+            discountPct = val;
+            lastAuthorizedDiscount = val;
+            renderCart();
+            toast('Discount override approved', 'fa-percent');
+          } else {
+            e.target.value = discountPct > 0 ? discountPct : '';
+            toast('Discount override rejected', 'fa-circle-xmark');
+            renderCart();
+          }
+        } else {
+          discountPct = val;
+          renderCart();
+        }
+      } else {
+        discountPct = val;
+        lastAuthorizedDiscount = val;
+        renderCart();
+      }
+    });
     $('#btn-kot').onclick = () => {
       if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
       try {

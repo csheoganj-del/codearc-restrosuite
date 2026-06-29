@@ -655,6 +655,8 @@
             if (res.currencySymbol) {
               window.currencySymbol = res.currencySymbol;
             }
+            window.stripeEnabled = res.stripeEnabled || false;
+            window.stripeAccountId = res.stripeAccountId || null;
           })
           .catch(err => console.error("Branding failed to fetch:", err));
       }
@@ -819,6 +821,15 @@
               <button class="btn" onclick="submitUtrCode('${latestOrder.orderId}')" style="background:#111827;"><i class="fa-solid fa-shield-halved"></i> Submit UTR Code</button>
             </div>
           `;
+        } else if (window.stripeEnabled) {
+          paymentMethodHtml = `
+            <div style="text-align: center; margin-top: 20px; padding: 20px; border-radius: var(--r-sm); background: rgba(17,24,39,0.03); border: 1px solid var(--border);">
+              <i class="fa-solid fa-credit-card" style="font-size: 28px; color: var(--brand); margin-bottom: 8px;"></i>
+              <p style="font-size: 15px; font-weight: 700; color: var(--text);">Pay Online via Stripe</p>
+              <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom: 16px;">Secure card, Apple Pay, & Google Pay processing.</p>
+              <button class="btn" onclick="payViaStripe('${latestOrder.orderId}', ${runningTotal})" style="background: #635bff; color: #fff; border: none; font-weight: 700;"><i class="fa-solid fa-credit-card"></i> Pay ${symbol}${runningTotal.toFixed(2)} with Card</button>
+            </div>
+          `;
         } else {
           paymentMethodHtml = `
             <div style="text-align: center; margin-top: 20px; padding: 20px; border-radius: var(--r-sm); background: rgba(17,24,39,0.03); border: 1px solid var(--border);">
@@ -865,6 +876,38 @@
           }
         })
         .catch(() => showToast("Connection failed. Try again."));
+      };
+
+      window.payViaStripe = function(orderId, amount) {
+        showToast("Initiating secure card checkout...");
+        
+        fetch(SU + '/functions/v1/stripe-connect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SK
+          },
+          body: JSON.stringify({
+            action: 'create_checkout_session',
+            tenant_slug: slug,
+            order_id: orderId,
+            amount: amount,
+            table: table,
+            currency: (window.currencySymbol === '€') ? 'EUR' : 'EUR'
+          })
+        })
+        .then(r => r.json())
+        .then(res => {
+          if (res.checkout_url) {
+            window.location.href = res.checkout_url;
+          } else {
+            showToast("Checkout failed: " + (res.error || "unknown error"));
+          }
+        })
+        .catch(err => {
+          console.error("Stripe payment init error:", err);
+          showToast("Network error. Please try again.");
+        });
       };
 
       // Handle offline status alerts

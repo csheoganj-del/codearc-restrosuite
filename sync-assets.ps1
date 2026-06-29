@@ -21,6 +21,7 @@ $FilesToCopy = @(
     "order.html",
     "tokens.html",
     "404.html",
+    "bill.html",
     "app-update.json",
     "config.js",
     "supabase_migration.sql",

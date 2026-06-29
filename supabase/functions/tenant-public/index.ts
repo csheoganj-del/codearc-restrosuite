@@ -87,7 +87,7 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
 async function getApprovedTenant(slug: string) {
   const { data, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, status, plan_code, subscription_status")
+    .select("id, name, status, plan_code, subscription_status, stripe_enabled, stripe_account_id")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -205,7 +205,9 @@ serve(async (req) => {
         tenantPhone: profileData?.phone || "",
         upiVpa: profileData?.upi_vpa || "",
         currencySymbol,
-        feature_flags: featureFlags
+        feature_flags: featureFlags,
+        stripeEnabled: (tenant as any).stripe_enabled || false,
+        stripeAccountId: (tenant as any).stripe_account_id || null
       }, 200, req);
     }
 
@@ -421,6 +423,101 @@ serve(async (req) => {
       }
 
       return jsonResponse({ success: true }, 200, req);
+    }
+
+    if (action === "get_public_bill") {
+      const billNo = String(payload.bill_no || "").trim();
+      if (!billNo) {
+        return jsonResponse({ error: "Invalid bill number." }, 400, req);
+      }
+
+      // Fetch the bill from the tenant's outlet bills
+      const { data: billData, error: billError } = await supabaseAdmin
+        .from("doppio_bills")
+        .select("id, orderId, dateTime, table, items, subtotal, discount, serviceChargeAmount, gst, cgst, sgst, total, paymentMethod, tenders, change, customerName, customerPhone")
+        .eq("tenant_id", tenant.id)
+        .or(`orderId.eq."${billNo}",id.eq."${billNo}"`)
+        .maybeSingle();
+
+      if (billError) {
+        console.error("tenant-public get_public_bill failed:", billError);
+        return jsonResponse({ error: "Failed to fetch bill details." }, 500, req);
+      }
+      if (!billData) {
+        return jsonResponse({ error: "Bill not found." }, 404, req);
+      }
+
+      // Fetch outlet business profile for tax label / address etc.
+      const { data: profileData } = await supabaseAdmin
+        .from("doppio_business_profile")
+        .select("name, address, phone, gstin, feature_flags")
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+
+      let taxLabel = "GST";
+      let currencySymbol = "₹";
+      let currencyVal = "INR (₹)";
+      let countryName = "India";
+      let locale = "en-IN";
+      if (profileData?.feature_flags) {
+        try {
+          const featureFlags = typeof profileData.feature_flags === "string"
+            ? JSON.parse(profileData.feature_flags)
+            : profileData.feature_flags;
+          const uiSettings = featureFlags.ui_settings || {};
+          taxLabel = uiSettings.set_tax_label || "GST";
+          currencyVal = uiSettings.set_currency || "INR (₹)";
+          const match = currencyVal.match(/\(([^)]+)\)/);
+          if (match) currencySymbol = match[1];
+          countryName = uiSettings.set_country || "India";
+          
+          const countryLower = countryName.toLowerCase();
+          if (countryLower.includes("ireland") || countryLower.includes("eu") || countryLower === "ie") {
+            locale = "en-IE";
+          }
+        } catch (e) {
+          console.warn("Failed to parse profile config flags:", e);
+        }
+      }
+
+      // Format items array if stored as JSON in database
+      let parsedItems = [];
+      try {
+        parsedItems = typeof billData.items === "string"
+          ? JSON.parse(billData.items)
+          : (billData.items || []);
+      } catch {
+        parsedItems = [];
+      }
+
+      const formattedBill = {
+        no: billData.orderId || billData.id || "Invoice",
+        time: billData.dateTime ? new Date(billData.dateTime).toLocaleString(locale, { hour: 'numeric', minute: '2-digit', hour12: true, day: '2-digit', month: 'short' }) : "",
+        tableNumber: billData.table || "Walk-in",
+        items: parsedItems,
+        subtotal: Number(billData.subtotal || 0),
+        discount: Number(billData.discount || 0),
+        serviceChargeAmount: Number(billData.serviceChargeAmount || 0),
+        gst: Number(billData.gst || 0),
+        total: Number(billData.total || 0),
+        paymentMethod: billData.paymentMethod || "Cash",
+        customerName: billData.customerName || "Walk-in",
+        customerPhone: billData.customerPhone || ""
+      };
+
+      return jsonResponse({
+        bill: formattedBill,
+        profile: {
+          name: profileData?.name || tenant.name || "Doppio Cafe",
+          address: profileData?.address || "",
+          phone: profileData?.phone || "",
+          tax_registration_no: profileData?.gstin || "",
+          tax_label: taxLabel
+        },
+        country: countryName,
+        locale,
+        currency: currencyVal
+      }, 200, req);
     }
 
     return jsonResponse({ error: "Unsupported action." }, 400, req);
