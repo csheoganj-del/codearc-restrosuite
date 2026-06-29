@@ -45,12 +45,9 @@
   // Run initial recompute synchronously
   recomputeConfig();
 
-  // SECURITY: the demo/mock fallback below can fabricate a full session for ANY
-  // slug/role (including superadmin) when Supabase is misconfigured or unreachable.
-  // In production this is an auth bypass -- a transient /api/config failure would
-  // silently log any visitor in as admin. Demo mode must ONLY be available on a
-  // local developer machine. Never enable it for a real hostname (incl. Vercel
-  // previews, custom domains, or the Android WebView which uses file:// origins).
+  // SECURITY: the demo/mock fallback below can fabricate local tenant sessions
+  // when Supabase is misconfigured or unreachable. Demo mode must ONLY be
+  // available on a local developer machine. Super-Admin is never mocked.
   const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   // Android WebView injects window.ENV_SUPABASE_URL, so CONFIGURED is true there.
   // An explicit opt-in flag (window.RS_ALLOW_DEMO = true) can still enable demo
@@ -62,6 +59,9 @@
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',
               tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display',
               persist:'rs_session_persistent' };
+  const SESSION_KEYS = [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,'superadmin_admin_token'];
+  const IMP_ORIGIN_KEY = 'rs_superadmin_impersonation_origin';
+  const IMP_TARGET_KEY = 'rs_superadmin_impersonation_target';
 
   if (!cfg.url || !cfg.anonKey) {
     const configSource = window.__configReady || Promise.resolve();
@@ -109,8 +109,33 @@
     }
   }
   function ssClear(){
-    [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,'superadmin_admin_token']
+    SESSION_KEYS
       .forEach(k=>{ SS.removeItem(k); LS_SESS.removeItem(k); });
+    SS.removeItem(IMP_ORIGIN_KEY);
+    SS.removeItem(IMP_TARGET_KEY);
+  }
+  function clearActiveSession(){
+    SESSION_KEYS.forEach(k=>{ SS.removeItem(k); LS_SESS.removeItem(k); });
+  }
+  function readSessionSnapshot(){
+    const snapshot = {};
+    SESSION_KEYS.forEach(k => {
+      if (LS_SESS.getItem(k) !== null) snapshot[k] = { storage:'local', value:LS_SESS.getItem(k) };
+      else if (SS.getItem(k) !== null) snapshot[k] = { storage:'session', value:SS.getItem(k) };
+    });
+    return snapshot;
+  }
+  function restoreSessionSnapshot(snapshot){
+    clearActiveSession();
+    Object.keys(snapshot || {}).forEach(k => {
+      const entry = snapshot[k] || {};
+      if (typeof entry.value !== 'string') return;
+      if (entry.storage === 'local') LS_SESS.setItem(k, entry.value);
+      else SS.setItem(k, entry.value);
+    });
+  }
+  function isSuperadminSlug(slug){
+    return String(slug || '').trim().toLowerCase() === 'superadmin';
   }
 
   function storeSession(s, remember){
@@ -129,6 +154,7 @@
     store(K.display, s.display_name || s.username || '');
     store(K.persist, persist ? '1' : '0');
     if(s.admin_token) ssSet('superadmin_admin_token', s.admin_token, persist);
+    else { SS.removeItem('superadmin_admin_token'); LS_SESS.removeItem('superadmin_admin_token'); }
   }
 
   async function post(fn, body, token, fallbackMsg){
@@ -165,6 +191,9 @@
 
     async login({ slug, username, password, remember }){
       if(!CONFIGURED) {
+        if (isSuperadminSlug(slug)) {
+          throw new Error('Super-Admin is cloud-only. Connect Supabase and sign in through the cloud backend.');
+        }
         // SECURITY: Demo/mock auth is only permitted when enableDemoTools is explicitly
         // set to true (controlled by the server-side /api/config endpoint). In production
         // this flag is always false; the unconfigured path is a fatal misconfiguration.
@@ -178,13 +207,7 @@
         let tenantName = 'Demo Restaurant';
         let allowedTabs = ['pos-tab', 'qr-orders-tab', 'bills-tab', 'inventory-tab', 'editor-tab', 'reports-tab', 'kds-tab', 'growth-hub-tab', 'employees-tab'];
 
-        if (slug === 'superadmin') {
-          role = 'superadmin';
-          tenantId = 'superadmin';
-          tenantSlug = 'superadmin';
-          tenantName = 'SaaS Platform Owner';
-          allowedTabs = ['super-admin-tab', 'gateway-monitor-tab'];
-        } else if (slug === 'brand-admin' || slug === 'brandadmin') {
+        if (slug === 'brand-admin' || slug === 'brandadmin') {
           role = 'brand_admin';
           tenantId = 'brand-admin';
           tenantSlug = 'brand-admin';
@@ -199,8 +222,7 @@
           username: username || 'demo',
           role: role,
           allowed_tabs: allowedTabs,
-          session_token: role === 'superadmin' ? '' : 'demo-session-token',
-          admin_token: role === 'superadmin' ? 'demo-admin-token' : ''
+          session_token: 'demo-session-token'
         };
         storeSession(mockSession, remember !== false);
         return mockSession;
@@ -229,6 +251,8 @@
     async validateSession(){
       if(!CONFIGURED) {
         if (!enableDemoTools) return null;
+        const localSession = api.session();
+        if (localSession && localSession.role === 'superadmin') return null;
         return api.session();
       }
       const token = ssGet(K.token);
@@ -261,8 +285,10 @@
     },
 
     session(){ const t = ssGet(K.token); if(!t) return null;
+      const role = ssGet(K.role);
+      if (role === 'superadmin' && !CONFIGURED) return null;
       return { token:t, tenant_id:ssGet(K.tid), tenant_slug:ssGet(K.slug), tenant_name:ssGet(K.name),
-               username:ssGet(K.user), role:ssGet(K.role), display_name:ssGet(K.display),
+               username:ssGet(K.user), role, display_name:ssGet(K.display),
                allowed_tabs: JSON.parse(ssGet(K.tabs)||'[]') }; },
 
     logout(){ ssClear(); },
@@ -298,94 +324,7 @@
     /* ---------------- SUPER-ADMIN (tenant-admin) ---------------- */
     async admin({ action, ...payload }){
       if(!CONFIGURED) {
-        if (!enableDemoTools) throw new Error('Application is not configured.');
-        await new Promise(r=>setTimeout(r,300));
-        if (action === 'list_tenants') {
-          let list = sessionStorage.getItem('mock_tenants_v2');
-          if (!list) {
-            const defaults = [];
-            sessionStorage.setItem('mock_tenants_v2', JSON.stringify(defaults));
-            list = JSON.stringify(defaults);
-          }
-          return { tenants: JSON.parse(list) };
-        }
-        if (action === 'update_tenant') {
-          let list = JSON.parse(sessionStorage.getItem('mock_tenants_v2') || '[]');
-          const idx = list.findIndex(t => String(t.id) === String(payload.tenant_id));
-          if (idx !== -1) {
-            const planNames = { free: 'Free / Demo', starter: 'Starter', growth: 'Growth', enterprise: 'Enterprise' };
-            const mrrValues = { free: 0, starter: 1499, growth: 2999, enterprise: 9999 };
-            list[idx] = {
-              ...list[idx],
-              username: payload.username,
-              status: payload.status,
-              plan_code: payload.plan_code,
-              plan_name: planNames[payload.plan_code] || 'Starter',
-              mrr: mrrValues[payload.plan_code] || 1499,
-              subscription_status: payload.subscription_status,
-              allowed_tabs: payload.allowed_tabs,
-              phone: payload.phone,
-              email: payload.email
-            };
-            sessionStorage.setItem('mock_tenants_v2', JSON.stringify(list));
-          }
-          return { message: 'Tenant updated successfully' };
-        }
-        if (action === 'delete_tenant') {
-          let list = JSON.parse(sessionStorage.getItem('mock_tenants_v2') || '[]');
-          list = list.filter(t => String(t.id) !== String(payload.tenant_id));
-          sessionStorage.setItem('mock_tenants_v2', JSON.stringify(list));
-          return { message: 'Tenant deleted successfully' };
-        }
-        if (action === 'bulk_delete') {
-          let list = JSON.parse(sessionStorage.getItem('mock_tenants_v2') || '[]');
-          const idsToDelete = (payload.tenant_ids || []).map(id => String(id));
-          list = list.filter(t => !idsToDelete.includes(String(t.id)));
-          sessionStorage.setItem('mock_tenants_v2', JSON.stringify(list));
-          return { message: 'Tenants bulk deleted successfully' };
-        }
-        if (action === 'reset_tenant_data' || action === 'seed_tenant_data' || action === 'purge_demo_data') {
-          return { message: 'Action mock-executed successfully', errors: [] };
-        }
-        if (action === 'list_error_reports') {
-          let reports = sessionStorage.getItem('mock_incidents_v2');
-          if (!reports) {
-            const defaults = [];
-            sessionStorage.setItem('mock_incidents_v2', JSON.stringify(defaults));
-            reports = JSON.stringify(defaults);
-          }
-          let parsed = JSON.parse(reports);
-          if (payload.status) {
-            parsed = parsed.filter(r => r.status === payload.status);
-          }
-          return { reports: parsed };
-        }
-        if (action === 'resolve_error_report') {
-          let reports = JSON.parse(sessionStorage.getItem('mock_incidents_v2') || '[]');
-          const idx = reports.findIndex(r => r.id === payload.report_id);
-          if (idx !== -1) {
-            reports[idx].status = 'resolved';
-            sessionStorage.setItem('mock_incidents_v2', JSON.stringify(reports));
-          }
-          return { message: 'Incident resolved' };
-        }
-        if (action === 'gateway_status') {
-          return {
-            status: 'ready',
-            authenticated: true,
-            number: '919983721179',
-            qr: '',
-            sessionSavedAt: new Date().toISOString(),
-            sessionRestoredAt: new Date().toISOString(),
-            reconnectAttempts: 0,
-            totalMessagesSent: 12408,
-            recentHealthEvents: []
-          };
-        }
-        if (action === 'gateway_logs') {
-          return { logs: [] };
-        }
-        return { error: 'Unknown action' };
+        throw new Error('Super-Admin is cloud-only. Connect Supabase before using platform controls.');
       }
       const adminToken = ssGet('superadmin_admin_token');
       if(!adminToken) throw new Error("Superadmin session expired. Please log in again.");
@@ -428,6 +367,42 @@
       }
 
       return post('tenant-users', { action, ...payload }, token, 'Staff account operation failed');
+    },
+
+    async impersonateTenant(tenant){
+      const current = api.session();
+      if (!current || current.role !== 'superadmin') throw new Error('Superadmin session required.');
+      if (!tenant || !tenant.id) throw new Error('Tenant details not found.');
+      const origin = readSessionSnapshot();
+      const out = await api.admin({ action:'create_impersonation_session', tenant_id: tenant.id });
+      if (!out || !out.session || !out.session.session_token) throw new Error('Could not open tenant dashboard.');
+      clearActiveSession();
+      storeSession(out.session, false);
+      SS.setItem(IMP_ORIGIN_KEY, JSON.stringify(origin));
+      SS.setItem(IMP_TARGET_KEY, JSON.stringify({
+        id: out.session.tenant_id || tenant.id,
+        slug: out.session.tenant_slug || tenant.slug || '',
+        name: out.session.tenant_name || tenant.name || tenant.tenant_name || 'Client Workspace',
+        started_at: new Date().toISOString()
+      }));
+      try { localStorage.setItem('rs_active_tab', 'pos-tab'); } catch(e) {}
+      return out.session;
+    },
+
+    exitTenantImpersonation(){
+      const raw = SS.getItem(IMP_ORIGIN_KEY);
+      if (!raw) return false;
+      const snapshot = JSON.parse(raw);
+      restoreSessionSnapshot(snapshot);
+      SS.removeItem(IMP_ORIGIN_KEY);
+      SS.removeItem(IMP_TARGET_KEY);
+      try { localStorage.setItem('rs_active_tab', 'super-admin-tab'); } catch(e) {}
+      return true;
+    },
+
+    impersonation(){
+      try { return JSON.parse(SS.getItem(IMP_TARGET_KEY) || 'null'); }
+      catch(e) { return null; }
     },
   };
 

@@ -20,7 +20,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const WEBHOOK_SECRET = Deno.env.get("AGGREGATOR_WEBHOOK_SECRET") || "restrosuite-webhook-secret-2026";
+const WEBHOOK_SECRET = Deno.env.get("AGGREGATOR_WEBHOOK_SECRET") || "";
 
 Deno.serve(async (req: Request): Promise<Response> => {
   // CORS Headers
@@ -38,15 +38,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }
 
+  if (!WEBHOOK_SECRET) {
+    console.error("AGGREGATOR_WEBHOOK_SECRET is not configured");
+    return new Response(JSON.stringify({ error: "Webhook secret not configured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+  }
+
   // 1. Authorize the Webhook Request
   const authHeader = req.headers.get("Authorization");
   const url = new URL(req.url);
-  const tokenParam = url.searchParams.get("token");
 
-  // Validate authorization token (either in header or query parameter)
-  const isAuthorized = 
-    (authHeader === `Bearer ${WEBHOOK_SECRET}`) || 
-    (tokenParam === WEBHOOK_SECRET);
+  // Validate authorization token. Keep the shared secret out of URLs and logs.
+  const isAuthorized = authHeader === `Bearer ${WEBHOOK_SECRET}`;
 
   if (!isAuthorized) {
     console.error("Unauthorized webhook ingestion attempt");

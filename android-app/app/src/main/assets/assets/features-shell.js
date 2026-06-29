@@ -296,9 +296,6 @@
           ${[
             ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
             ['fa-rotate-left','Refund','Mark a transaction as refunded and log it'],
-            ['fa-percent','Discount Override','Apply discount above threshold at POS (coming soon)'],
-            ['fa-pen-to-square','Amend Closed Bill','Edit items on a settled bill (coming soon)'],
-            ['fa-cash-register','Manual Cash Drawer','Open cash drawer without a transaction (coming soon)'],
             ['fa-triangle-exclamation','Data Reset','Danger Zone operations always require PIN'],
           ].map(([icon,op,desc])=>`
             <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-2);">
@@ -967,7 +964,7 @@
     /* ===================== DB MODE BADGE + SESSION ===================== */
     (function(){
       const pill = document.getElementById('db-mode-pill');
-      const ALL_STATES = ['cloud','syncing','local-only','offline','sync-error'];
+      const ALL_STATES = ['cloud','syncing','local-only','offline','sync-error','superadmin-cloud'];
 
       // Count of in-flight cloud writes — hold Syncing until all settle
       let activeSyncCount = 0;
@@ -987,11 +984,20 @@
         if (!pill) return;
         const isCloud  = window.RS_DB && window.RS_DB.isCloud;
         const isOnline = navigator.onLine;
+        const session = window.RS_API && RS_API.session ? RS_API.session() : null;
+        const isSuperAdmin = session && session.role === 'superadmin';
 
         if (!isOnline) {
           setState('offline',
             'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
             `<i class="fa-solid fa-wifi-slash" style="font-size:10px"></i>&nbsp;Offline`
+          );
+          return;
+        }
+        if (isSuperAdmin) {
+          setState('superadmin-cloud',
+            'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
+            `<span class="dot dot-live"></span>&nbsp;Cloud admin`
           );
           return;
         }

@@ -296,9 +296,6 @@
           ${[
             ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
             ['fa-rotate-left','Refund','Mark a transaction as refunded and log it'],
-            ['fa-percent','Discount Override','Apply discount above threshold at POS (coming soon)'],
-            ['fa-pen-to-square','Amend Closed Bill','Edit items on a settled bill (coming soon)'],
-            ['fa-cash-register','Manual Cash Drawer','Open cash drawer without a transaction (coming soon)'],
             ['fa-triangle-exclamation','Data Reset','Danger Zone operations always require PIN'],
           ].map(([icon,op,desc])=>`
             <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-2);">
