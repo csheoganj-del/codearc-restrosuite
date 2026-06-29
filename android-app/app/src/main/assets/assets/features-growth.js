@@ -267,12 +267,23 @@
         }});
     }
 
-    function showSingleTableQR(t) {
+    async function showSingleTableQR(t) {
       if (!window.RSModal) return;
       const tenantName = sessionStorage.getItem('tenant_name') || 'Doppio Cafe';
       const tenantSlug = sessionStorage.getItem('tenant_slug') || 'doppiocl';
       const orderUrl = `https://restrosuite.codearc.co.in/qr-order.html?tenant=${tenantSlug}&table=${t.n}`;
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(orderUrl)}`;
+      
+      let qrCodeUrl = '';
+      if (window.QRCode) {
+        try {
+          qrCodeUrl = await QRCode.toDataURL(orderUrl, { width: 250, margin: 1 });
+        } catch (e) {
+          console.error('[QR generation failed]', e);
+          qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(orderUrl)}`;
+        }
+      } else {
+        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(orderUrl)}`;
+      }
       
       const body = `
         <div style="text-align: center; padding: 10px 0;">
@@ -343,21 +354,36 @@
       });
     }
 
-    function showAllTableQRs() {
+    async function showAllTableQRs() {
       const tenantName = sessionStorage.getItem('tenant_name') || 'Doppio Cafe';
       const tenantSlug = sessionStorage.getItem('tenant_slug') || 'doppiocl';
       
-      const cardsHtml = TABLES.map(t => {
+      const qrPromises = TABLES.map(async t => {
         const orderUrl = `https://restrosuite.codearc.co.in/qr-order.html?tenant=${tenantSlug}&table=${t.n}`;
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(orderUrl)}`;
+        let qrCodeUrl = '';
+        if (window.QRCode) {
+          try {
+            qrCodeUrl = await QRCode.toDataURL(orderUrl, { width: 200, margin: 1 });
+          } catch (e) {
+            qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(orderUrl)}`;
+          }
+        } else {
+          qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(orderUrl)}`;
+        }
+        return { tableNum: t.n, qrCodeUrl };
+      });
+
+      const tableQrs = await Promise.all(qrPromises);
+
+      const cardsHtml = tableQrs.map(t => {
         return `
           <div class="qr-print-card" style="text-align: center; border: 1.5px solid #111; padding: 24px 15px; border-radius: 12px; background: #fff; page-break-inside: avoid; display: flex; flex-direction: column; align-items: center; justify-content: center;">
             <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 18px; color: #111; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">${tenantName}</div>
             <div style="font-size: 10px; color: #555; margin-bottom: 15px;">Scan to view menu & order</div>
             <div style="display: inline-block; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background: #fff; margin-bottom: 15px;">
-              <img src="${qrCodeUrl}" style="width: 140px; height: 140px; display: block;" />
+              <img src="${t.qrCodeUrl}" style="width: 140px; height: 140px; display: block;" />
             </div>
-            <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 24px; color: #FF6B00; margin-bottom: 4px;">TABLE ${t.n}</div>
+            <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 24px; color: #FF6B00; margin-bottom: 4px;">TABLE ${t.tableNum}</div>
             <div style="font-size: 9px; color: #777;">Powered by RestroSuite</div>
           </div>
         `;

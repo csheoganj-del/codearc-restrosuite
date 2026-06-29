@@ -352,6 +352,9 @@
       const container = body.querySelector('#rzp-route-container');
       if (!container) return;
 
+      const country = (window.RS_SETTINGS && RS_SETTINGS.set_country) || 'India';
+      const isStripe = (country.toLowerCase() === 'ireland' || country.toLowerCase() === 'ie' || country.toLowerCase() !== 'india');
+
       function renderError(msg) {
         container.innerHTML = `<div style="padding:14px;border:1px solid rgba(239,68,68,0.25);border-radius:var(--r-sm);background:rgba(239,68,68,0.04);color:#ef4444;font-size:13px;">${msg}</div>`;
       }
@@ -360,15 +363,176 @@
         return `<span class="pill" style="padding:5px 12px;background:rgba(${color},0.12);color:rgb(${color})"><span class="dot" style="background:rgb(${color})"></span>${text}</span>`;
       }
 
-      // Fetch current Route status from edge function
+      const supabaseUrl = window.__SUPABASE_URL__ || '';
+      const supabaseKey = window.__SUPABASE_ANON_KEY__ || '';
+      const session = window.RS_API && RS_API.session && RS_API.session();
+      const token   = session && (session.access_token || session.token);
+      if (!supabaseUrl || !token) {
+        renderError('Not authenticated');
+        return;
+      }
+
+      if (isStripe) {
+        // --- STRIPE CONNECT EXPRESS PATH ---
+        let status = null;
+        try {
+          const res = await fetch(`${supabaseUrl}/functions/v1/stripe-connect`, {
+            method: 'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'apikey':        supabaseKey,
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({ action: 'get_account' }),
+          });
+          status = await res.json();
+        } catch(e) {
+          renderError('Could not load Stripe Connect status. Please refresh and try again.');
+          return;
+        }
+
+        if (status.stripe_enabled && status.stripe_kyc_status === 'active') {
+          container.innerHTML = `
+            <div class="set-row" style="margin-bottom:16px">
+              <div class="si"><div class="st">Stripe Connect</div><div class="sd">Dine-in QR card payments go directly to your Stripe account.</div></div>
+              ${pill('Connected & Active', '16, 185, 129')}
+            </div>
+            <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.8;">
+              <div><span style="color:var(--text-soft)">Stripe Account ID:</span> <strong>${status.stripe_account_id || '--'}</strong></div>
+              <div><span style="color:var(--text-soft)">Settlement:</span> <strong>Directly to your registered bank account via Stripe</strong></div>
+              <div><span style="color:var(--text-soft)">Customer payment methods:</span> <strong>Credit/Debit Cards · Apple Pay · Google Pay</strong></div>
+            </div>
+            <p style="font-size:11.5px;color:var(--text-soft);margin-top:10px;">To update your bank details or KYC, click "Onboard/Manage" to visit Stripe Dashboard.</p>
+            <div style="margin-top:14px;">
+              <button class="btn btn-primary" id="btn-stripe-manage"><i class="fa-solid fa-arrow-up-right-from-square"></i> Manage Stripe Account</button>
+            </div>
+          `;
+          container.querySelector('#btn-stripe-manage').onclick = async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Getting link...';
+            try {
+              const res = await fetch(`${supabaseUrl}/functions/v1/stripe-connect`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type':  'application/json',
+                  'apikey':        supabaseKey,
+                  'Authorization': 'Bearer ' + token,
+                },
+                body: JSON.stringify({ action: 'onboard_account', country: 'IE' }),
+              });
+              const data = await res.json();
+              if (data.onboarding_url) {
+                window.location.href = data.onboarding_url;
+              } else {
+                toast('Failed to get dashboard link: ' + (data.error || 'unknown error'), 'fa-circle-exclamation');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i> Manage Stripe Account';
+              }
+            } catch (err) {
+              toast('Connection failed', 'fa-circle-exclamation');
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i> Manage Stripe Account';
+            }
+          };
+          return;
+        }
+
+        // -- Setup in progress / pending --
+        if (status.stripe_account_id) {
+          container.innerHTML = `
+            <div class="set-row" style="margin-bottom:16px">
+              <div class="si"><div class="st">Stripe Connect</div><div class="sd">Stripe account created but onboarding is incomplete.</div></div>
+              ${pill('Incomplete Setup', '234, 179, 8')}
+            </div>
+            <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.6;margin-bottom:14px;">
+              <div><span style="color:var(--text-soft)">Stripe Account ID:</span> <strong>${status.stripe_account_id}</strong></div>
+              <p style="color:var(--text-soft);margin-top:6px;">Please complete the Stripe Express onboarding verification to start accepting card payments from customers.</p>
+            </div>
+            <button class="btn btn-primary" id="btn-stripe-resume"><i class="fa-brands fa-stripe"></i> Complete Stripe Setup</button>
+          `;
+          container.querySelector('#btn-stripe-resume').onclick = async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Redirecting...';
+            try {
+              const res = await fetch(`${supabaseUrl}/functions/v1/stripe-connect`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type':  'application/json',
+                  'apikey':        supabaseKey,
+                  'Authorization': 'Bearer ' + token,
+                },
+                body: JSON.stringify({ action: 'onboard_account', country: 'IE' }),
+              });
+              const data = await res.json();
+              if (data.onboarding_url) {
+                window.location.href = data.onboarding_url;
+              } else {
+                toast('Error: ' + (data.error || 'onboarding failed'), 'fa-circle-exclamation');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Complete Stripe Setup';
+              }
+            } catch (err) {
+              toast('Connection failed', 'fa-circle-exclamation');
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Complete Stripe Setup';
+            }
+          };
+          return;
+        }
+
+        // -- Not connected --
+        container.innerHTML = `
+          <div class="set-row" style="margin-bottom:16px">
+            <div class="si">
+              <div class="st">Stripe Connect</div>
+              <div class="sd">Configure card payments for your outlet. Settles directly to your bank account via Stripe.</div>
+            </div>
+            ${pill('Not connected', '107, 114, 128')}
+          </div>
+          <div style="background:rgba(255,107,0,0.04);border:1px solid rgba(255,107,0,0.2);border-radius:var(--r-sm);padding:12px 14px;font-size:12.5px;color:var(--text-soft);line-height:1.6;margin-bottom:18px;">
+            <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-right:6px"></i>
+            <strong style="color:var(--text)">Direct Settlements.</strong> QR order card payments go straight to your Stripe Connected account. RestroSuite never touches your funds.
+          </div>
+          <button class="btn btn-primary" id="btn-stripe-connect" style="min-width:180px;">
+            <i class="fa-brands fa-stripe"></i> Connect Stripe Account
+          </button>
+        `;
+        container.querySelector('#btn-stripe-connect').onclick = async function() {
+          const btn = this;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting Stripe...';
+          try {
+            const res = await fetch(`${supabaseUrl}/functions/v1/stripe-connect`, {
+              method: 'POST',
+              headers: {
+                'Content-Type':  'application/json',
+                'apikey':        supabaseKey,
+                'Authorization': 'Bearer ' + token,
+              },
+              body: JSON.stringify({ action: 'onboard_account', country: 'IE' }),
+            });
+            const data = await res.json();
+            if (data.onboarding_url) {
+              window.location.href = data.onboarding_url;
+            } else {
+              toast('Error: ' + (data.error || 'onboarding failed'), 'fa-circle-exclamation');
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Connect Stripe Account';
+            }
+          } catch(err) {
+            toast('Network error. Please try again.', 'fa-circle-exclamation');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Connect Stripe Account';
+          }
+        };
+        return;
+      }
+
+      // --- RAZORPAY COMPATIBILITY PATH (India) ---
       let status = null;
       try {
-        const supabaseUrl = window.__SUPABASE_URL__ || '';
-        const supabaseKey = window.__SUPABASE_ANON_KEY__ || '';
-        const session = window.RS_API && RS_API.session && RS_API.session();
-        const token   = session && (session.access_token || session.token);
-        if (!supabaseUrl || !token) throw new Error('Not authenticated');
-
         const res = await fetch(`${supabaseUrl}/functions/v1/razorpay-route`, {
           method: 'POST',
           headers: {

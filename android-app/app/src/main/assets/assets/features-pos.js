@@ -243,7 +243,7 @@
     };
 
     /* ---------------- receipt builder ---------------- */
-    function receiptHTML(bill){
+    function receiptHTML(bill, qrDataUri){
       const profile = bill.taxProfile || (window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular' });
       const country = profile.country || 'IN';
       const taxSystem = profile.tax_system || 'GST';
@@ -326,6 +326,12 @@
         <hr class="rcp-hr">
         ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${esc(t.method)}</span><span>${rs(t.amount)}</span></div>`).join('')}
         ${bill.change?`<div class="rcp-line"><span class="q">Change</span><span>${rs(bill.change)}</span></div>`:''}
+        ${qrDataUri ? `
+          <div class="rcp-center" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--stroke-2);display:flex;flex-direction:column;align-items:center;">
+            <div style="font-size:10px;color:var(--text-soft);margin-bottom:6px;text-align:center;">Scan to view digital bill</div>
+            <img src="${qrDataUri}" style="width:100px;height:100px;display:block;" />
+          </div>
+        ` : ''}
         <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
     }
 
@@ -860,72 +866,44 @@
         }
       }
 
-      const settings = window.RS_SETTINGS || {};
-      const format = settings.set_whatsapp_bill_format || 'Text receipt';
-      const isPdf = (format === 'Thermal PDF receipt');
-      console.log('[WhatsApp] bill format setting:', format, '| isPdf:', isPdf);
-
-      // Fire-and-forget: runs in background, with offline queue fallback.
-      (async () => {
-        try {
-          const text = receiptText(bill);
-          let pdfBase64 = null;
-
-          if (isPdf) {
-            console.log('[WhatsApp BG] Generating PDF...');
-            const pdfDataUrl = await compileThermalPDF(bill);
-            pdfBase64 = pdfDataUrl ? (pdfDataUrl.split(',')[1] || null) : null;
-            if (!pdfBase64) throw new Error('PDF generation failed -- check jsPDF library.');
-            console.log('[WhatsApp BG] PDF ready, base64 length:', pdfBase64.length);
-          }
-
-          if (!navigator.onLine) throw new Error('offline');
-          if (!window.RS_API || typeof RS_API.data !== 'function') throw new Error('WhatsApp API not available');
-
-          const sendPayload = { operation: 'gateway_send', phone, message: text, orderId: bill.no };
-          if (isPdf && pdfBase64) {
-            sendPayload.pdfData = pdfBase64;
-            sendPayload.filename = `receipt-${bill.no}.pdf`;
-          }
-          console.log('[WhatsApp BG] Sending. hasPdf:', !!(isPdf && pdfBase64));
-
-          const sendResult = await RS_API.data(sendPayload).catch(err => { throw err; });
-          if (sendResult && sendResult.error) throw new Error(sendResult.error);
-
-          RS.toast('Receipt sent via WhatsApp!', 'fa-whatsapp');
-        } catch(err) {
-          console.warn('[WhatsApp BG] Send failed:', err.message);
-          // Queue for retry when back online
-          const isOffline = err.message === 'offline' || !navigator.onLine;
-          const WA_QUEUE_KEY = 'rs:wa_queue';
-          try {
-            const q = JSON.parse(localStorage.getItem(WA_QUEUE_KEY) || '[]');
-            q.push({ phone, billNo: bill.no, message: receiptText(bill), queuedAt: Date.now() });
-            localStorage.setItem(WA_QUEUE_KEY, JSON.stringify(q));
-            if (isOffline) {
-              RS.toast('Offline -- receipt queued, will send when back online', 'fa-clock');
-            } else {
-              RS.toast('WhatsApp send failed -- queued for retry', 'fa-clock');
-            }
-          } catch(qErr) {
-            RS.toast('WhatsApp: ' + (err.message || 'Send failed'), 'fa-triangle-exclamation');
-          }
-        }
-      })();
-      // Return immediately -- no blocking, no spinner
+      const text = receiptText(bill);
+      const cleanPhone = phone.replace(/\D/g, '');
+      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+      RS.toast('WhatsApp receipt ready!', 'fa-whatsapp');
     }
 
-    function showReceipt(bill){
-      const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`;
+    function generateReceiptQrDataUri(bill) {
+      return new Promise((resolve) => {
+        if (!window.QRCode) {
+          resolve(null);
+          return;
+        }
+        const tenantSlug = sessionStorage.getItem('tenant_slug') || 'bbb';
+        const digitalUrl = `https://restrosuite.codearc.co.in/bill/${tenantSlug}/${bill.no}`;
+        QRCode.toDataURL(digitalUrl, { width: 120, margin: 1 }, (err, url) => {
+          if (err) {
+            console.error('[QR Generation Error]', err);
+            resolve(null);
+          } else {
+            resolve(url);
+          }
+        });
+      });
+    }
+
+    async function showReceipt(bill){
+      const qrDataUri = await generateReceiptQrDataUri(bill);
+      const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
       const autoSendSettings = window.RS_SETTINGS || {};
       const autoSendOn = autoSendSettings.set_auto_send_receipts !== false
                       && autoSendSettings.set_auto_send_receipts !== 'false';
       const hasPhone = bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null';
-      // Always show the WhatsApp button \u2014 sending is background so cashier can resend if needed.
+      // Always show the WhatsApp button — sending is background so cashier can resend if needed.
       const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>`;
       RSModal.open({
         title:'Bill settled', sub:`${bill.no} \u00b7 ${rs(bill.grand)}`, icon:'fa-circle-check', size:'sm',
-        body:`<div class="receipt-paper">${receiptHTML(bill)}</div>`,
+        body:`<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
         foot:`${waBtn}
               <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
@@ -944,8 +922,9 @@
       html: receiptHTML,
       text: receiptText,
       show: showReceipt,
-      print(bill){
-        RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill)}</div>`, 'Receipt '+bill.no);
+      async print(bill){
+        const qrDataUri = await generateReceiptQrDataUri(bill);
+        RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`, 'Receipt '+bill.no);
       },
       share(bill){
         shareReceiptViaWhatsApp(bill);
