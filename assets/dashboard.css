@@ -1313,7 +1313,7 @@ body.product-guide-open {
   -webkit-backdrop-filter: blur(2px);
 }
 
-@media (min-width: 761px) and (max-width: 1024px) {
+@media (max-width: 1180px) {
   .app { grid-template-columns: 1fr !important; }
   .sidebar-hamburger { display: flex; }
   .sidebar-overlay.active { display: block; }
