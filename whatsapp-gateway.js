@@ -216,9 +216,6 @@ const SESSION_FILE_NAME = 'session.zip';
 const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'csheoganj@gmail.com';
 const ADMIN_ALERT_WHATSAPP = process.env.ADMIN_ALERT_WHATSAPP || '919983721179'; // +91 99837 21179
 
-// Configure Nodemailer for Free Gmail SMTP sending (Made by Antigravity)
-const fs = require('fs');
-const path = require('path');
 const nodemailer = require('nodemailer');
 
 let emailConfig = {
