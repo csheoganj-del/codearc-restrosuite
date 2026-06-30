@@ -695,31 +695,14 @@ async function restoreSessionsFromSupabase() {
     }
 }
 
+// LAZY INIT: Sessions are NOT auto-connected on startup.
+// Connections are established only when a restaurant owner requests a QR code
+// or when an API call is made for that tenant. This prevents HuggingFace from
+// flagging outgoing WebSocket connections during container startup.
 function autoInitializeLocalSessions() {
-    if (!fs.existsSync(authDataPath)) return;
-    try {
-        const files = fs.readdirSync(authDataPath);
-        const tenantIds = [];
-        for (const file of files) {
-            if (file.startsWith('session-')) {
-                const tenantId = file.substring(8);
-                if (tenantId && tenantId !== 'system') {
-                    tenantIds.push(tenantId);
-                }
-            }
-        }
-
-        // Initialize non-system tenants sequentially with a 15-second delay to prevent CPU thrashing
-        tenantIds.forEach((tenantId, index) => {
-            const delayMs = (index + 1) * 15000; // start 15s after system client is initialized
-            setTimeout(() => {
-                console.log(`[Startup Auto-Restore] Initializing driver for tenant: ${tenantId} (after ${delayMs / 1000}s stagger delay)`);
-                getOrCreateClient(tenantId);
-            }, delayMs);
-        });
-    } catch(err) {
-        console.error('[Startup Auto-Restore Error] Failed to scan local sessions:', err.message);
-    }
+    // Intentionally disabled: lazy initialization prevents HF from pausing the Space.
+    // Tenants reconnect automatically when their first API request arrives.
+    console.log('[Lazy Init] Session auto-restore is disabled. Clients connect on first request.');
 }
 
 // SECURITY: GATEWAY_TOKEN must be explicitly set in production. There is NO
@@ -3141,19 +3124,12 @@ app.listen(PORT, async () => {
         console.warn('[Startup Alert Warning] Skipped:', err.message);
     }
 
-    console.log('[Startup] Initializing WhatsApp drivers...');
-    try {
-        console.log('[Startup Init Shield] Cleaning up stale browser lock/socket/cookie files immediately before launch...');
-        cleanupStaleLockFiles(authDataPath);
-    } catch (err) {
-        console.error('[Startup Init Shield Error]', err.message);
-    }
-
-    // Initialize SuperAdmin / system client
-    getOrCreateClient('system');
-    
-    // Auto-initialize other tenant clients that have local sessions
-    autoInitializeLocalSessions();
+    // LAZY INIT: Do NOT auto-connect WhatsApp on startup.
+    // HuggingFace flags spaces that open outgoing WebSocket connections during boot.
+    // Connections are established on-demand when a tenant first makes an API request.
+    console.log('[Startup] Lazy init mode: WhatsApp connections will be established on first request.');
+    console.log('[Startup] Server is ready. Waiting for tenant requests to initialize WhatsApp...');
+    autoInitializeLocalSessions(); // No-op in lazy mode — just logs
 
     // Start database notification polling fallback (every 60 seconds)
     if (supabaseService) {
