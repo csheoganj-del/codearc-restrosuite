@@ -184,7 +184,7 @@ async function run() {
         // Diagnose the reason
         if (r.status === 401) log(WARN, 'Token mismatch -- check GATEWAY_TOKEN in .env.local vs run-gateway.ps1');
         if (r.status === 400) log(WARN, 'Missing/invalid body fields -- check phone format or pdfData');
-        if (r.status === 413) log(WARN, 'PDF too large -- Express body limit exceeded (fix: app.use(express.json({ limit: "10mb" })))');
+        if (r.status === 413) log(WARN, 'PDF too large -- Express body limit exceeded (fix: app.use(express.json({ limit: "75mb" })))');
         failed++;
       }
     } catch (e) {
@@ -262,7 +262,7 @@ async function run() {
 
     if (r.status === 413) {
       log(FAIL, 'Express returned 413 Payload Too Large -- body size limit is too small!');
-      log(WARN, 'Fix: change  app.use(express.json())  to  app.use(express.json({ limit: "10mb" }))');
+      log(WARN, 'Fix: change  app.use(express.json())  to  app.use(express.json({ limit: "75mb" }))');
       failed++;
     } else if (r.status === 401 || r.status === 400 || r.status === 200) {
       // 401 = token check happened = body was parsed = no size issue

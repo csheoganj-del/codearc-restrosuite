@@ -5,7 +5,8 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
 });
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const QRCodeLib = require('qrcode');
 const express = require('express');
@@ -97,6 +98,12 @@ function _checkDailyLimit(tenantId) {
 async function humanSend(client, chatId, msg, opts, tenantId) {
     tenantId = tenantId || chatId;
 
+    // Translate c.us to s.whatsapp.net for Baileys JID format compatibility
+    let cleanJid = chatId;
+    if (cleanJid && cleanJid.endsWith('@c.us')) {
+        cleanJid = cleanJid.replace('@c.us', '@s.whatsapp.net');
+    }
+
     // -- Rate limit ------------------------------------------------------------
     if (!_checkDailyLimit(tenantId)) {
         console.warn(`[HumanSend] Daily limit (${DAILY_LIMIT}) reached for ${tenantId}. Message not sent.`);
@@ -112,29 +119,27 @@ async function humanSend(client, chatId, msg, opts, tenantId) {
     const next = prev.then(async () => {
         try {
             // 1. Go online
-            try { await client.sendPresenceUpdate('available', chatId); } catch(_) {}
+            try { await client.sendPresenceUpdate('available', cleanJid); } catch(_) {}
 
             // 2. Show typing indicator
-            let chat;
-            try {
-                chat = await client.getChatById(chatId);
-                await chat.sendStateTyping();
-            } catch(_) {}
+            try { await client.sendPresenceUpdate('composing', cleanJid); } catch(_) {}
 
             // 3. Wait a human-realistic duration
-            const msgText = typeof msg === 'string' ? msg : (msg?.caption || '');
+            const msgText = typeof msg === 'string' ? msg : (msg?.text || msg?.caption || '');
             await _sleep(_humanDelay(msgText));
 
             // 4. Send the actual message
-            const result = await client.sendMessage(chatId, msg, opts || {});
+            let result;
+            if (typeof msg === 'string') {
+                result = await client.sendMessage(cleanJid, { text: msg }, opts || {});
+            } else {
+                result = await client.sendMessage(cleanJid, msg, opts || {});
+            }
 
-            // 5. Clear typing state
-            try { if (chat) await chat.clearState(); } catch(_) {}
+            // 5. Clear typing state / Go back to idle presence
+            try { await client.sendPresenceUpdate('paused', cleanJid); } catch(_) {}
 
-            // 6. Go back to idle presence
-            try { await client.sendPresenceUpdate('paused', chatId); } catch(_) {}
-
-            // 7. Post-send gap before next message can fire
+            // 6. Post-send gap before next message can fire
             await _sleep(_betweenMessageDelay());
 
             return result;
@@ -780,47 +785,10 @@ if (!process.env.AUTH_DATA_PATH && os.platform() === 'win32') {
 
 // Initialize WhatsApp client with local session caching
 // Multi-Tenant Client Factory
-function getOrCreateClient(tenantId) {
-    const tid = (tenantId && String(tenantId).trim()) ? String(tenantId).trim() : 'system';
+// Multi-Tenant Client Factory
+async function initializeBaileysClient(tid, tenantData) {
+    const tenantFolder = path.join(authDataPath, `session-${tid}`);
     
-    if (tenantClients.has(tid)) {
-        return tenantClients.get(tid);
-    }
-
-    console.log(`[Multi-Tenant] Initializing client instance for tenant: ${tid}`);
-
-    const client = new Client({
-        authStrategy: new LocalAuth({
-            clientId: tid,
-            dataPath: authDataPath
-        }),
-        webVersionCache: {
-            type: 'remote',
-            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1042095497-alpha.html'
-        },
-        puppeteer: {
-            handleSIGINT: false,
-            protocolTimeout: 0,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
-            ]
-        }
-    });
-
-    const tenantData = {
-        client,
-        status: 'connecting',
-        qr: null,
-        number: null,
-        sessionSavedAt: null,
-        reconnectAttempts: 0,
-        watchdogTimer: null
-    };
-
     const startWatchdog = () => {
         if (tenantData.watchdogTimer) clearTimeout(tenantData.watchdogTimer);
         tenantData.watchdogTimer = setTimeout(async () => {
@@ -830,11 +798,9 @@ function getOrCreateClient(tenantId) {
                 if (tenantClients.get(tid) === tenantData) {
                     tenantClients.delete(tid);
                 }
-                try {
-                    const destroyPromise = client.destroy();
-                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
-                    await Promise.race([destroyPromise, timeoutPromise]);
-                } catch (_) {}
+                if (tenantData.client) {
+                    try { tenantData.client.end(); } catch (_) {}
+                }
                 // Trigger a fresh client instantiation
                 getOrCreateClient(tid);
             }
@@ -848,116 +814,138 @@ function getOrCreateClient(tenantId) {
         }
     };
 
-    startWatchdog();
-
-    client.on('qr', async (qr) => {
-        clearWatchdog();
-        tenantData.status = 'qr';
-        tenantData.number = null;
-        try {
-            tenantData.qr = await QRCodeLib.toDataURL(qr);
-            console.log(`[QR] New QR code generated for tenant: ${tid}`);
-            if (tid === 'system') {
-                console.log('\n==================================================================');
-                console.log('   SCAN THIS QR CODE WITH YOUR WHATSAPP APP TO LINK YOUR ACCOUNT   ');
-                console.log('==================================================================\n');
-                qrcode.generate(qr, { small: true });
-                console.log('\nInstructions: Open WhatsApp > Settings > Linked Devices > Link a Device.');
-            }
-        } catch (err) {
-            console.error(`[QR Error] Failed to generate QR URL for tenant ${tid}:`, err);
-        }
-        await logHealthEvent('qr_generated', 'warning', { tenantId: tid });
-    });
-    client.on('authenticated', async () => {
-        clearWatchdog();
-        tenantData.status = 'authenticating';
-        tenantData.qr = null;
-        console.log(`[Authenticated] Tenant ${tid} successfully authenticated. Syncing...`);
-        await logHealthEvent('authenticated', 'ok', { tenantId: tid });
-    });
-
-    client.on('loading_screen', async (percent, message) => {
-        clearWatchdog();
-        if (tenantData.status === 'ready') {
-            console.log(`[Loading Screen] Tenant ${tid}: ${percent}% - ${message} (Ignored because already ready)`);
-            return;
-        }
-        tenantData.status = 'syncing';
-        tenantData.syncProgress = { percent, message };
-        tenantData.qr = null;
-        console.log(`[Loading Screen] Tenant ${tid}: ${percent}% - ${message}`);
-    });
-
-    client.on('ready', async () => {
-        clearWatchdog();
-        tenantData.status = 'ready';
-        tenantData.qr = null;
-        tenantData.number = client.info?.wid?.user || 'Unknown Device';
-        tenantData.sessionSavedAt = new Date().toISOString();
-        tenantData.reconnectAttempts = 0;
-        console.log(`[Multi-Tenant Ready] Tenant ${tid} is connected as +${tenantData.number}`);
+    try {
+        startWatchdog();
         
-        if (supabaseService) {
-            await saveSessionToSupabaseScoped(tid);
-        }
-        await logHealthEvent('connected', 'ok', { tenantId: tid, number: tenantData.number });
-    });
+        const { state, saveCreds } = await useMultiFileAuthState(tenantFolder);
+        
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            logger: pino({ level: 'silent' }),
+            browser: ['RestroSuite Gateway', 'Chrome', '1.0.0']
+        });
 
-    client.on('auth_failure', async (msg) => {
-        clearWatchdog();
-        tenantData.status = 'auth_failure';
-        tenantData.qr = null;
-        tenantData.number = null;
-        console.error(`[Auth Failure] Tenant ${tid}:`, msg);
-        await logHealthEvent('auth_failure', 'error', { tenantId: tid, message: String(msg) });
-    });
+        // Set the client reference on tenantData
+        tenantData.client = sock;
 
-    client.on('disconnected', async (reason) => {
-        clearWatchdog();
-        tenantData.status = 'disconnected';
-        tenantData.qr = null;
-        tenantData.number = null;
-        console.log(`[Disconnected] Tenant ${tid} disconnected:`, reason);
-        await logHealthEvent('disconnected', 'warning', { tenantId: tid, reason });
-
-        async function attemptReconnect() {
-            if (tenantData.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                console.error(`[Reconnect] Tenant ${tid}: All attempts exhausted.`);
-                await logHealthEvent('reconnect_failed', 'error', { tenantId: tid, attempts: tenantData.reconnectAttempts, reason });
-                return;
+        // Custom destroy/logout mappings for compatibility with calling code
+        sock.destroy = async () => {
+            clearWatchdog();
+            try { sock.end(); } catch (_) {}
+        };
+        sock.logout = async () => {
+            clearWatchdog();
+            try {
+                await sock.logout();
+            } catch (_) {
+                try { sock.end(); } catch (__) {}
             }
-            tenantData.reconnectAttempts++;
-            const delayMs = 10000 * tenantData.reconnectAttempts;
-            console.log(`[Reconnect] Tenant ${tid}: Attempt ${tenantData.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000}s...`);
-            setTimeout(async () => {
-                try {
-                    await client.initialize();
-                } catch (err) {
-                    console.error(`[Reconnect] Tenant ${tid} attempt failed:`, err.message);
-                    await attemptReconnect();
-                }
-            }, delayMs);
-        }
-        attemptReconnect();
-    });
+        };
 
-    const originalInitialize = client.initialize;
-    client.initialize = function() {
-        try {
-            const tenantFolder = path.join(authDataPath, `session-${tid}`);
-            cleanupStaleLockFiles(tenantFolder);
-        } catch(e) {
-            console.error(`[Cleanup Error] Tenant ${tid} cleanup failed:`, e.message);
-        }
-        return originalInitialize.apply(this, arguments);
+        sock.ev.on('creds.update', saveCreds);
+
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            
+            if (qr) {
+                clearWatchdog();
+                tenantData.status = 'qr';
+                tenantData.number = null;
+                try {
+                    tenantData.qr = await QRCodeLib.toDataURL(qr);
+                    console.log(`[QR] New QR code generated for tenant: ${tid}`);
+                    if (tid === 'system') {
+                        console.log('\n==================================================================');
+                        console.log('   SCAN THIS QR CODE WITH YOUR WHATSAPP APP TO LINK YOUR ACCOUNT   ');
+                        console.log('==================================================================\n');
+                        qrcode.generate(qr, { small: true });
+                        console.log('\nInstructions: Open WhatsApp > Settings > Linked Devices > Link a Device.');
+                    }
+                } catch (err) {
+                    console.error(`[QR Error] Failed to generate QR URL for tenant ${tid}:`, err);
+                }
+                await logHealthEvent('qr_generated', 'warning', { tenantId: tid });
+            }
+
+            if (connection === 'close') {
+                clearWatchdog();
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                
+                console.log(`[Disconnected] Tenant ${tid} connection closed:`, lastDisconnect?.error?.message, `, reconnecting:`, shouldReconnect);
+                tenantData.status = shouldReconnect ? 'connecting' : 'disconnected';
+                tenantData.qr = null;
+                tenantData.number = null;
+                
+                await logHealthEvent('disconnected', shouldReconnect ? 'warning' : 'error', { 
+                    tenantId: tid, 
+                    reason: lastDisconnect?.error?.message 
+                });
+
+                if (shouldReconnect) {
+                    // Reconnect logic
+                    if (tenantData.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                        console.error(`[Reconnect] Tenant ${tid}: All attempts exhausted.`);
+                        await logHealthEvent('reconnect_failed', 'error', { tenantId: tid, attempts: tenantData.reconnectAttempts });
+                        return;
+                    }
+                    tenantData.reconnectAttempts++;
+                    const delayMs = 10000 * tenantData.reconnectAttempts;
+                    console.log(`[Reconnect] Tenant ${tid}: Attempt ${tenantData.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000}s...`);
+                    setTimeout(() => {
+                        if (tenantClients.get(tid) === tenantData) {
+                            initializeBaileysClient(tid, tenantData);
+                        }
+                    }, delayMs);
+                }
+            } else if (connection === 'open') {
+                clearWatchdog();
+                tenantData.status = 'ready';
+                tenantData.qr = null;
+                tenantData.number = sock.user.id.split(':')[0] || sock.user.id.split('@')[0];
+                tenantData.sessionSavedAt = new Date().toISOString();
+                tenantData.reconnectAttempts = 0;
+                console.log(`[Multi-Tenant Ready] Tenant ${tid} is connected as +${tenantData.number}`);
+                
+                if (supabaseService) {
+                    await saveSessionToSupabaseScoped(tid);
+                }
+                await logHealthEvent('connected', 'ok', { tenantId: tid, number: tenantData.number });
+            }
+        });
+
+    } catch (err) {
+        clearWatchdog();
+        console.error(`[Initialization Error] Tenant ${tid} failed:`, err.message);
+        tenantData.status = 'error';
+    }
+}
+
+function getOrCreateClient(tenantId) {
+    const tid = (tenantId && String(tenantId).trim()) ? String(tenantId).trim() : 'system';
+    
+    if (tenantClients.has(tid)) {
+        return tenantClients.get(tid);
+    }
+
+    console.log(`[Multi-Tenant] Initializing client instance for tenant: ${tid}`);
+
+    const tenantData = {
+        client: null,
+        status: 'connecting',
+        qr: null,
+        number: null,
+        sessionSavedAt: null,
+        reconnectAttempts: 0,
+        watchdogTimer: null
     };
 
-    client.initialize().catch(err => {
-        console.error(`[Initialization Error] Tenant ${tid} failed:`, err.message);
-    });
-
     tenantClients.set(tid, tenantData);
+
+    // Run async Baileys client initialization
+    initializeBaileysClient(tid, tenantData);
+
     return tenantData;
 }
 
@@ -1779,8 +1767,11 @@ app.post('/send', async (req, res) => {
         const chatId = `${phone}@c.us`;
         
         if (pdfData) {
-            const { MessageMedia } = require('whatsapp-web.js');
-            const media = new MessageMedia('application/pdf', pdfData, filename || 'receipt.pdf');
+            const media = {
+                document: Buffer.from(pdfData, 'base64'),
+                mimetype: 'application/pdf',
+                fileName: filename || 'receipt.pdf'
+            };
             await humanSend(tenantData.client, chatId, media, {}, tenantId);
             // Do NOT send a separate text after the PDF -- the PDF IS the receipt.
         } else {
@@ -3008,4 +2999,148 @@ app.get('/test-relay-call', async (req, res) => {
         headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(postData),
-   
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        timeout: 10000
+    };
+    
+    const request = https.request(url, options, (response) => {
+        let body = '';
+        response.on('data', chunk => body += chunk);
+        response.on('end', () => {
+            res.json({
+                statusCode: response.statusCode,
+                headers: response.headers,
+                body: body
+            });
+        });
+    });
+    request.on('error', err => res.json({ error: err.message }));
+    request.write(postData);
+    request.end();
+});
+
+// HEALTH ENDPOINT -- for UptimeRobot / external monitors
+// ============================================================
+app.get('/health', (req, res) => {
+    const systemData = tenantClients.get('system') || { status: 'disconnected' };
+    res.json({
+        ok: true,
+        status: systemData.status,
+        uptime: Math.floor(process.uptime()),
+        time: new Date().toISOString()
+    });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, async () => {
+    console.log('\n======================================================');
+    console.log(` RestroSuite WhatsApp Gateway running at:`);
+    console.log(` http://localhost:${PORT}`);
+    console.log('======================================================');
+    try {
+        const commitHash = require('child_process').execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+        console.log(`[Startup] Code version commit: ${commitHash}`);
+    } catch (err) {
+        console.log(`[Startup] Code version commit lookup failed (git not installed or no repo).`);
+    }
+
+    // Ensure storage bucket file size limit is set correctly (150MB) to allow session backup
+    if (supabaseService) {
+        try {
+            console.log('[Startup] Ensuring storage bucket limits are set correctly...');
+            const bucketTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+            await Promise.race([
+                supabaseService.storage.updateBucket(SESSION_BUCKET, {
+                    public: false,
+                    fileSizeLimit: 157286400 // 150MB
+                }),
+                bucketTimeout
+            ]);
+            console.log('[Startup] Storage bucket configured.');
+        } catch (err) {
+            console.warn('[Startup Storage Config Warning]', err.message === 'timeout' ? 'Bucket update timed out — skipping.' : err.message);
+        }
+    }
+
+    try {
+        const healthTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+        await Promise.race([logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() }), healthTimeout]);
+    } catch (err) {
+        console.warn('[Startup Health Log Warning] Skipped:', err.message);
+    }
+
+    // Clean up any stale lock/socket/cookie files from a previous run first
+    console.log('[Startup] Cleaning up any stale browser lock/socket/cookie files...');
+    cleanupStaleLockFiles(authDataPath);
+
+    // Attempt to restore WhatsApp sessions from Supabase Storage
+    console.log('[Startup] Attempting to restore WhatsApp sessions from Supabase Storage...');
+    try {
+        const restoreTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
+        await Promise.race([restoreSessionsFromSupabase(), restoreTimeout]);
+    } catch (err) {
+        console.warn('[Startup Session Restore Warning] Timed out or failed:', err.message);
+    }
+
+    // Send startup alert email (informational only)
+    try {
+        const alertTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
+        await Promise.race([sendAdminAlert('startup', { sessionRestored: true }), alertTimeout]);
+    } catch (err) {
+        console.warn('[Startup Alert Warning] Skipped:', err.message);
+    }
+
+    console.log('[Startup] Initializing WhatsApp drivers...');
+    try {
+        console.log('[Startup Init Shield] Cleaning up stale browser lock/socket/cookie files immediately before launch...');
+        cleanupStaleLockFiles(authDataPath);
+    } catch (err) {
+        console.error('[Startup Init Shield Error]', err.message);
+    }
+
+    // Initialize SuperAdmin / system client
+    getOrCreateClient('system');
+    
+    // Auto-initialize other tenant clients that have local sessions
+    autoInitializeLocalSessions();
+
+    // Start database notification polling fallback (every 60 seconds)
+    if (supabaseService) {
+        console.log('[Startup] Starting database notification polling fallback...');
+        setTimeout(runNotificationPollingFallback, 5000); // Initial run in 5s
+        setInterval(runNotificationPollingFallback, 60000); // Run every 60s
+    }
+
+    // ============================================================
+    // KEEP-ALIVE SELF-PING -- prevents HuggingFace Space from sleeping
+    // Pings own /health endpoint every 4 minutes so the space stays
+    // warm 24/7 even on the free tier.
+    // ============================================================
+    const selfUrl = process.env.SPACE_HOST
+        ? `https://${process.env.SPACE_HOST}/health`
+        : `http://localhost:${PORT}/health`;
+
+    const https = require('https');
+    const http  = require('http');
+
+    function selfPing() {
+        const lib = selfUrl.startsWith('https') ? https : http;
+        const req = lib.get(selfUrl, (res) => {
+            const systemData = tenantClients.get('system') || { status: 'disconnected' };
+            console.log(`[Keep-Alive] Self-ping OK — status ${res.statusCode} (gateway: ${systemData.status})`);
+        });
+        req.on('error', (err) => {
+            console.warn(`[Keep-Alive] Self-ping failed: ${err.message}`);
+        });
+        req.end();
+    }
+
+    // First ping after 30s, then every 4 minutes
+    setTimeout(() => {
+        selfPing();
+        setInterval(selfPing, 4 * 60 * 1000);
+    }, 30000);
+
+    console.log(`[Keep-Alive] Self-ping scheduler started → ${selfUrl} (every 4 min)`);
+});
