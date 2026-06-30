@@ -228,7 +228,7 @@ function getGatewayUrlAndToken() {
   }
 
   if (!url) {
-    url = "https://kalpeshdeora1006-whatsapp-gateway.hf.space";
+    url = "https://kalpeshdeora1006-restrosuite-gateway.hf.space";
   }
 
   url = url.trim().replace(/\/+$/, "");

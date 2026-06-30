@@ -291,7 +291,7 @@ function getGatewayUrlAndToken() {
   const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
 
   if (!url) {
-    url = "https://kalpeshdeora1006-whatsapp-gateway.hf.space";
+    url = "https://kalpeshdeora1006-restrosuite-gateway.hf.space";
   }
 
   url = url.trim().replace(/\/+$/, "");
