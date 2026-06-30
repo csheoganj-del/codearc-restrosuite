@@ -1620,29 +1620,27 @@
       }
       msg += '\n*TOTAL    ' + rs(total) + '*\n\nCash    ' + rs(total) + '\n\nThank you for dining with us!\n*Powered by RestroSuite*';
 
-      // 3. Send — direct to gateway (same origin after CSP fix + gateway CORS)
-      // Send to gateway — single clean attempt
-      const GW = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+      // 3. Send through our server route so the private gateway token stays server-side.
       try {
-        const r = await fetch(GW + '/send', {
+        const r = await fetch('/api/sandbox-send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: fullPhone, message: msg })
+          body: JSON.stringify({
+            phone: fullPhone,
+            items: items,
+            country: SIM_COUNTRY,
+            pdfData: pdfBase64,
+            filename: 'Receipt_' + billNo + '.pdf'
+          })
         });
-        const d = r.headers.get('content-type')||'' ;
-        const json = d.includes('application/json') ? await r.json() : null;
-        if (r.ok && json) {
+        const json = await r.json().catch(function() { return {}; });
+        if (r.ok && json && json.ok) {
           showSandboxToast('\u2713 Receipt sent to +' + fullPhone, false);
-          if (pdfBase64) fetch(GW + '/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: fullPhone, pdfData: pdfBase64, filename: 'Receipt_' + billNo + '.pdf' })
-          }).catch(function(){});
         } else {
-          showSandboxToast('\u2713 PDF downloaded \u2014 check WhatsApp shortly', false);
+          showSandboxToast(json.error || 'WhatsApp gateway failed. PDF downloaded only.', true);
         }
-      } catch(_) {
-        showSandboxToast('\u2713 PDF downloaded \u2014 check WhatsApp shortly', false);
+      } catch(err) {
+        showSandboxToast('WhatsApp gateway unreachable. PDF downloaded only.', true);
       }
 
       // 4. Reset
