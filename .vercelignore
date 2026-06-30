@@ -1,0 +1,23 @@
+.env
+.env.*
+!.env.example
+.git
+.vercel
+node_modules
+node_modules_old
+.wwebjs_auth
+.wwebjs_auth (1)
+.wwebjs_cache
+backups
+uploads
+*.log
+test_sec.log
+test_sec_utf8.log
+.gradle
+.android-home
+.tmp-gradle-build
+**/build
+*.apk
+*.aar
+*.jks
+*.keystore

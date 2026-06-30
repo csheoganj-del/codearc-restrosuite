@@ -33,7 +33,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 const ROLE_DEFAULT_TABS: Record<string, string[]> = {
   admin: [
     "pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab",
-    "editor-tab", "crm-tab", "tax-tab", "online-tab", "kds-tab", "tokens-tab",
+    "editor-tab", "crm-tab", "customers-tab", "tax-tab", "online-tab", "aggregator-tab", "kds-tab", "tokens-tab",
     "employees-tab", "growth-hub-tab", "customers-tab", "analytics-tab",
   ],
   manager: [
@@ -53,7 +53,7 @@ const PLAN_ENTITLEMENTS: Record<string, { name: string; maxStaff: number; allowe
   starter: {
     name: "Starter",
     maxStaff: 5,
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "customers-tab"],
   },
   growth: {
     name: "Growth",
@@ -404,6 +404,20 @@ serve(async (req) => {
       }).eq("id", targetId).eq("tenant_id", admin.tenantId);
       if (error) throw error;
       await writeAudit(admin, "staff.sessions_revoked", targetId);
+      return jsonResponse({ success: true }, 200, req);
+    }
+
+    if (action === "delete_user") {
+      if (targetId === admin.actorUserId) {
+        return jsonResponse({ error: "You cannot delete your own administrator account." }, 400, req);
+      }
+      await writeAudit(admin, "staff.delete", targetId, { role: current.role, status: current.status });
+      const { error } = await supabaseAdmin
+        .from("tenant_users")
+        .delete()
+        .eq("id", targetId)
+        .eq("tenant_id", admin.tenantId);
+      if (error) throw error;
       return jsonResponse({ success: true }, 200, req);
     }
 

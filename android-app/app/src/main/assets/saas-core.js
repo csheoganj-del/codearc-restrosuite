@@ -1,5 +1,5 @@
 /**
- * RSPinModal — Global 4-digit admin PIN gate
+ * RSPinModal -- Global 4-digit admin PIN gate
  * ==========================================
  * Usage:
  *   const ok = await RSPinModal.request('Delete Bill RS-001');
@@ -7,7 +7,7 @@
  *
  * PIN is stored as SHA-256 hex in RS_SETTINGS.admin_pin_hash.
  * If no PIN is set, the first-use call prompts setup mode.
- * Lockout: 3 wrong attempts → 30-second cooldown.
+ * Lockout: 3 wrong attempts -> 30-second cooldown.
  */
 (function () {
   'use strict';
@@ -16,7 +16,6 @@
   const LOCKOUT_KEY  = 'rs_pin_lockout';
   const MAX_ATTEMPTS = 3;
   const LOCKOUT_MS   = 30000;
-  const MASTER_CODE  = '482916'; // rescue bypass — share only with business owner
 
   async function sha256(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -166,7 +165,7 @@
           overlay.remove(); overlay = buildOverlay(); document.body.appendChild(overlay); bindEvents(); return;
         }
 
-        // No PIN set yet — auto-setup on first use
+        // No PIN set yet -- auto-setup on first use
         if (!getStoredHash()) {
           firstPin = pin; setupStage = 'confirm';
           overlay.remove(); overlay = buildOverlay(); document.body.appendChild(overlay); bindEvents(); return;
@@ -239,8 +238,8 @@
     overlay.innerHTML = `<div id="rs-pin-box">
       <div id="rs-pin-icon"><i class="fa-solid fa-circle-question"></i></div>
       <div id="rs-pin-title">Forgot PIN?</div>
-      <div id="rs-pin-label" style="text-align:center;line-height:1.6;">Enter the <strong>master reset code</strong> sent with your account<br>${adminEmail ? `(<strong>${adminEmail}</strong>)` : ''}<br>or contact your RestroSuite account owner.</div>
-      <input id="rs-reset-code" type="text" placeholder="Master reset code" maxlength="6" autocomplete="off"
+      <div id="rs-pin-label" style="text-align:center;line-height:1.6;">Enter the reset code issued by your account owner<br>${adminEmail ? `(<strong>${adminEmail}</strong>)` : ''}<br>or contact RestroSuite support.</div>
+      <input id="rs-reset-code" type="text" placeholder="Reset code" maxlength="64" autocomplete="off"
         style="width:100%;padding:12px 14px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:18px;text-align:center;letter-spacing:6px;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;">
       <div id="rs-pin-error"></div>
       <button id="rs-reset-submit" style="width:100%;padding:12px;background:#FF6B00;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Verify &amp; Reset</button>
@@ -250,7 +249,16 @@
 
     document.getElementById('rs-reset-submit').onclick = async () => {
       const val = (document.getElementById('rs-reset-code').value || '').trim();
-      if (val !== MASTER_CODE) { document.getElementById('rs-pin-error').textContent = 'Invalid reset code.'; return; }
+      const errorEl = document.getElementById('rs-pin-error');
+      if (!val) { errorEl.textContent = 'Reset code is required.'; return; }
+      try {
+        if (!window.RS_API || !RS_API.data) throw new Error('PIN reset verification is unavailable.');
+        const verified = await RS_API.data({ operation: 'verify_pin_reset_code', code: val });
+        if (!verified || verified.valid !== true) throw new Error('Invalid reset code.');
+      } catch (e) {
+        errorEl.textContent = (e && e.message) || 'Invalid reset code.';
+        return;
+      }
       if (window.RS_SETTINGS) delete window.RS_SETTINGS.admin_pin_hash;
       if (window.RS && RS.getSettings && RS.saveSettings) {
         const s = await RS.getSettings().catch(() => ({})) || {};
@@ -271,7 +279,7 @@
     verify: () => request('Admin verification required'),
     /** First-time PIN setup. */
     setup:  () => request('Set Admin PIN', { setup: true }),
-    /** Two-step: verify current → set new. */
+    /** Two-step: verify current -> set new. */
     change: () => request('Change Admin PIN', { change: true }),
     /** True if a PIN has been configured. */
     isConfigured: () => !!getStoredHash(),
@@ -281,7 +289,7 @@
 
 
 /**
- * RestroSuite SaaS Core — Business Model Abstraction Layer
+ * RestroSuite SaaS Core -- Business Model Abstraction Layer
  * =========================================================
  * This file decouples the platform from any single vertical (restaurant).
  * A new business type (salon, retail, clinic, gym, etc.) registers itself
@@ -292,16 +300,16 @@
  * Planned: retail, salon, clinic, gym, hotel
  *
  * Public API:
- *   RS_SAAS.vertical            → active vertical config object
- *   RS_SAAS.label(key)          → localised string for this vertical
- *   RS_SAAS.registerVertical(v) → register + activate a new business type
- *   RS_SAAS.is(type)            → check if active vertical === type
- *   RS_SAAS.featureEnabled(f)   → check if a feature is on for this vertical
+ *   RS_SAAS.vertical            -> active vertical config object
+ *   RS_SAAS.label(key)          -> localised string for this vertical
+ *   RS_SAAS.registerVertical(v) -> register + activate a new business type
+ *   RS_SAAS.is(type)            -> check if active vertical === type
+ *   RS_SAAS.featureEnabled(f)   -> check if a feature is on for this vertical
  */
 (function () {
   'use strict';
 
-  /* ── Built-in verticals ─────────────────────────────────────────────── */
+  /* -- Built-in verticals ----------------------------------------------- */
   const VERTICALS = {
 
     restaurant: {
@@ -310,7 +318,7 @@
       icon: 'fa-utensils',
       currency: 'INR',
 
-      // Label overrides — what to call things in this vertical
+      // Label overrides -- what to call things in this vertical
       labels: {
         catalogue: 'Menu',
         catalogueItem: 'Dish',
@@ -351,7 +359,7 @@
         reservations: true,
       },
 
-      // DB collection → display name mapping for this vertical
+      // DB collection -> display name mapping for this vertical
       collections: {
         catalogue: 'menu',
         orders: 'pending_orders',
@@ -500,7 +508,7 @@
 
   };
 
-  /* ── Active vertical (resolved from business profile settings) ──────── */
+  /* -- Active vertical (resolved from business profile settings) -------- */
   let _active = 'restaurant';
 
   function resolveVertical() {
@@ -512,7 +520,7 @@
     return VERTICALS[_active];
   }
 
-  /* ── Public API ─────────────────────────────────────────────────────── */
+  /* -- Public API ------------------------------------------------------- */
   const RS_SAAS = {
     /** Active vertical config object */
     get vertical() { return VERTICALS[_active] || VERTICALS.restaurant; },
@@ -556,6 +564,16 @@
 
     /** Apply vertical constraints to the UI (hide tabs, rename labels) */
     applyToUI: function() {
+      const sess = window.RS_API ? window.RS_API.session() : null;
+      const isSuper = sess && sess.role === 'superadmin';
+      if (isSuper) {
+        document.querySelectorAll('.sidebar-link, .mnav-link').forEach(function(el) {
+          const isSa = el.classList.contains('superadmin-only');
+          el.style.display = isSa ? (el.classList.contains('sidebar-link') || el.classList.contains('mnav-link') ? 'flex' : '') : 'none';
+        });
+        return;
+      }
+
       const v = VERTICALS[_active] || VERTICALS.restaurant;
       const activeTabs = new Set(v.tabs || []);
 

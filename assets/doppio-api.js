@@ -373,6 +373,12 @@
         }
         if (action === 'reset_password') return { success: true };
         if (action === 'revoke_user_sessions') return { success: true };
+        if (action === 'delete_user') {
+          const users = store();
+          const next = users.filter(u => u.id !== payload.user_id);
+          if (next.length === users.length) throw new Error('Staff account was not found.');
+          save(next); return { success: true };
+        }
         if (action === 'audit_logs') return { logs: [] };
         throw new Error('Unknown action');
       }

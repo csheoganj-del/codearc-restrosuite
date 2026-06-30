@@ -16,7 +16,6 @@
   const LOCKOUT_KEY  = 'rs_pin_lockout';
   const MAX_ATTEMPTS = 3;
   const LOCKOUT_MS   = 30000;
-  const MASTER_CODE  = '482916'; // rescue bypass -- share only with business owner
 
   async function sha256(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -239,8 +238,8 @@
     overlay.innerHTML = `<div id="rs-pin-box">
       <div id="rs-pin-icon"><i class="fa-solid fa-circle-question"></i></div>
       <div id="rs-pin-title">Forgot PIN?</div>
-      <div id="rs-pin-label" style="text-align:center;line-height:1.6;">Enter the <strong>master reset code</strong> sent with your account<br>${adminEmail ? `(<strong>${adminEmail}</strong>)` : ''}<br>or contact your RestroSuite account owner.</div>
-      <input id="rs-reset-code" type="text" placeholder="Master reset code" maxlength="6" autocomplete="off"
+      <div id="rs-pin-label" style="text-align:center;line-height:1.6;">Enter the reset code issued by your account owner<br>${adminEmail ? `(<strong>${adminEmail}</strong>)` : ''}<br>or contact RestroSuite support.</div>
+      <input id="rs-reset-code" type="text" placeholder="Reset code" maxlength="64" autocomplete="off"
         style="width:100%;padding:12px 14px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:18px;text-align:center;letter-spacing:6px;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;">
       <div id="rs-pin-error"></div>
       <button id="rs-reset-submit" style="width:100%;padding:12px;background:#FF6B00;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Verify &amp; Reset</button>
@@ -250,7 +249,16 @@
 
     document.getElementById('rs-reset-submit').onclick = async () => {
       const val = (document.getElementById('rs-reset-code').value || '').trim();
-      if (val !== MASTER_CODE) { document.getElementById('rs-pin-error').textContent = 'Invalid reset code.'; return; }
+      const errorEl = document.getElementById('rs-pin-error');
+      if (!val) { errorEl.textContent = 'Reset code is required.'; return; }
+      try {
+        if (!window.RS_API || !RS_API.data) throw new Error('PIN reset verification is unavailable.');
+        const verified = await RS_API.data({ operation: 'verify_pin_reset_code', code: val });
+        if (!verified || verified.valid !== true) throw new Error('Invalid reset code.');
+      } catch (e) {
+        errorEl.textContent = (e && e.message) || 'Invalid reset code.';
+        return;
+      }
       if (window.RS_SETTINGS) delete window.RS_SETTINGS.admin_pin_hash;
       if (window.RS && RS.getSettings && RS.saveSettings) {
         const s = await RS.getSettings().catch(() => ({})) || {};
