@@ -1558,7 +1558,24 @@ app.get('/debug-poll', async (req, res) => {
 app.get('/status', (req, res) => {
     const isAuthorized = verifyToken(req);
     const tenantId = req.headers['x-tenant-id'] || 'system';
-    const tenantData = getOrCreateClient(tenantId);
+    
+    // LAZY INIT: Only initialize the client if it already exists, OR if the request is authorized.
+    // This prevents unauthorized status checks (e.g. from container boot health checks before secrets are configured)
+    // from spin-starting the WhatsApp driver and triggering network connection loops.
+    let tenantData;
+    if (tenantClients.has(tenantId)) {
+        tenantData = tenantClients.get(tenantId);
+    } else if (isAuthorized) {
+        tenantData = getOrCreateClient(tenantId);
+    } else {
+        tenantData = {
+            status: 'disconnected',
+            qr: null,
+            number: null,
+            sessionSavedAt: null,
+            reconnectAttempts: 0
+        };
+    }
 
     if (isAuthorized) {
         res.json({
@@ -1572,7 +1589,7 @@ app.get('/status', (req, res) => {
             recentHealthEvents
         });
     } else {
-        // Return the real status so the dashboard can show QR or connecting states.
+        // Return the real status so the dashboard can show QR or connecting states if active.
         // The QR image is only included when status is 'qr' (it's a one-time-use code and expires automatically).
         // Sensitive data (phone number, session metadata, health events) is always withheld.
         res.json({
