@@ -33,7 +33,7 @@ const unzipper = require('unzipper');
 
 // Per-tenant daily send counter { tenantId: { date, count } }
 const _dailySendCount = {};
-const DAILY_LIMIT = 200; // safe ceiling per number per day
+const DAILY_LIMIT = process.env.DAILY_LIMIT ? parseInt(process.env.DAILY_LIMIT, 10) : 250; // safe ceiling per number per day
 
 // Per-tenant send queue to prevent bursting
 const _sendQueues = new Map(); // tenantId -> Promise chain
@@ -365,8 +365,8 @@ async function logHealthEvent(event, status, details = {}) {
 // ADMIN ALERT -- sends email to admin when gateway is in trouble
 // ============================================================
 async function sendAdminAlert(type, extraDetails = {}) {
-    if (!transporter) {
-        console.warn('[Admin Alert] Email transporter not configured. Alert not sent.');
+    if (!transporter && !emailConfig.relayUrl) {
+        console.warn('[Admin Alert] Email transporter and relay URL are not configured. Alert not sent.');
         return;
     }
 
@@ -870,11 +870,25 @@ async function initializeBaileysClient(tid, tenantData) {
                     reason: lastDisconnect?.error?.message 
                 });
 
+                // Send email alert for central system disconnect
+                if (tid === 'system') {
+                    sendAdminAlert(shouldReconnect ? 'disconnected' : 'qr_needed', {
+                        attempts: tenantData.reconnectAttempts,
+                        reason: lastDisconnect?.error?.message || 'Connection closed by remote peer'
+                    });
+                }
+
                 if (shouldReconnect) {
                     // Reconnect logic
                     if (tenantData.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
                         console.error(`[Reconnect] Tenant ${tid}: All attempts exhausted.`);
                         await logHealthEvent('reconnect_failed', 'error', { tenantId: tid, attempts: tenantData.reconnectAttempts });
+                        
+                        if (tid === 'system') {
+                            sendAdminAlert('qr_needed', {
+                                reason: 'All reconnect attempts exhausted. Manual QR scan required.'
+                            });
+                        }
                         return;
                     }
                     tenantData.reconnectAttempts++;
@@ -895,6 +909,14 @@ async function initializeBaileysClient(tid, tenantData) {
                 tenantData.reconnectAttempts = 0;
                 console.log(`[Multi-Tenant Ready] Tenant ${tid} is connected as +${tenantData.number}`);
                 
+                // Send email alert that system gateway is online
+                if (tid === 'system') {
+                    sendAdminAlert('online', {
+                        number: tenantData.number,
+                        sessionSaved: true
+                    });
+                }
+
                 if (supabaseService) {
                     await saveSessionToSupabaseScoped(tid);
                 }
