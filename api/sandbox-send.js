@@ -27,14 +27,15 @@ export default async function handler(req, res) {
   }
 
   const gatewayUrl = (process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-whatsapp-gateway.hf.space').replace(/\/$/, '');
-  const gatewayToken = process.env.WHATSAPP_GATEWAY_TOKEN || process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || '';
+  const gatewayToken = (process.env.WHATSAPP_GATEWAY_TOKEN || process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || '').trim();
   if (!gatewayToken) {
     return res.status(503).json({ error: 'WhatsApp gateway token is not configured on the server.' });
   }
 
   const headers = {
     'Content-Type': 'application/json',
-    Authorization: gatewayToken.toLowerCase().startsWith('bearer ') ? gatewayToken : `Bearer ${gatewayToken}`
+    Authorization: gatewayToken.toLowerCase().startsWith('bearer ') ? gatewayToken : `Bearer ${gatewayToken}`,
+    'x-gateway-token': gatewayToken.toLowerCase().startsWith('bearer ') ? gatewayToken.slice(7).trim() : gatewayToken
   };
 
   const now = new Date();
@@ -76,6 +77,11 @@ export default async function handler(req, res) {
   });
   const textData = await readGatewayResponse(textResp);
   if (!textResp.ok) {
+    if (textResp.status === 401) {
+      return res.status(401).json({
+        error: 'Gateway rejected the token. Update WHATSAPP_GATEWAY_TOKEN in Vercel so it exactly matches the gateway GATEWAY_TOKEN.'
+      });
+    }
     return res.status(textResp.status).json({ error: textData.error || `Gateway error ${textResp.status}` });
   }
 
