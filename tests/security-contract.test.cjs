@@ -350,6 +350,9 @@ test("dashboard interactions are optimized for instant feedback", () => {
   const dashboardRealtimeMigration = read("supabase/migrations/20260609090000_client_dashboard_realtime.sql");
   assert.match(dashboardRealtimeMigration, /ALTER PUBLICATION supabase_realtime ADD TABLE/);
   assert.match(dashboardRealtimeMigration, /doppio_menu_tenant_name_uidx/);
+  const inventoryNotificationsRealtimeMigration = read("supabase/migrations/20260630090000_enable_inventory_notifications_realtime.sql");
+  assert.match(inventoryNotificationsRealtimeMigration, /doppio_inventory/);
+  assert.match(inventoryNotificationsRealtimeMigration, /doppio_notifications/);
   assert.match(dashboard, /function debounce/);
   assert.match(dashboard, /requestIdleCallback/);
   assert.match(dashboard, /vaultWriteQueue/);
@@ -373,6 +376,9 @@ test("dashboard interactions are optimized for instant feedback", () => {
   assert.match(dashboard, /const belongsToActiveTenant = bills\.some/);
   assert.match(dashboard, /if \(!belongsToActiveTenant\) return/);
   assert.match(dashboard, /const scheduleTenantDataSync/);
+  assert.match(read("supabase/functions/tenant-data/index.ts"), /realtime\/v1\/api\/broadcast/);
+  assert.match(dashboard, /channel\(`rs-tenant-\$\{activeTenantId\}`\)/);
+  assert.match(dashboard, /event:'tenant-data-changed'/);
   assert.match(dashboard, /String\(response\.payload\.tenantId\) === String\(activeTenantId\)/);
   assert.doesNotMatch(dashboard, /event: 'data-reset' \}, \(response\) => \{\s*return;/);
   assert.doesNotMatch(dashboard, /localStorage\.setItem\('doppio_pending_qr_orders', JSON\.stringify\(mock\)\)/);

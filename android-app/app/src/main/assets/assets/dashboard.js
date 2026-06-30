@@ -1700,6 +1700,7 @@
 
     b.status = 'refunded';
     b.refundReason = reason || 'POS refund';
+    b.refundedAt = new Date().toISOString();
     let cloudMarked = false;
     try {
       if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
@@ -1715,6 +1716,14 @@
           },
           returning:false
         });
+        const billFilters = Number.isFinite(Number(b.id))
+          ? [{ operator:'eq', column:'id', value:Number(b.id) }]
+          : [{ operator:'eq', column:'orderId', value:String(b.no || b.orderId || '') }];
+        await RS_API.update('doppio_bills', {
+          status:'refunded',
+          refund_reason:b.refundReason,
+          refunded_at:b.refundedAt
+        }, billFilters, { returning:false });
         cloudMarked = true;
       }
     } catch(e) {
@@ -2486,7 +2495,14 @@
         <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
         <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(h.m)}</span>
       </div>`).join('');
-    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>toast('Opening '+c.querySelector('h4').textContent+'...','fa-arrow-up-right-from-square')));
+    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>{
+      const screen = c.querySelector('h4')?.textContent || '';
+      if(window.RS && typeof RS.openGrowthHubScreen === 'function') {
+        RS.openGrowthHubScreen(screen);
+        return;
+      }
+      toast('Growth Hub module is still loading. Try again in a moment.','fa-arrow-up-right-from-square');
+    }));
   };
   function renderGrowthHub(){ return renderHub(); }
 
@@ -3883,7 +3899,7 @@
     titles, addRenderer:(id,fn)=>{
       renderers[id]=fn;
       const active = document.querySelector('.tab-content.active')?.id;
-      if(active === id && !rendered[id]) {
+      if(active === id) {
         const meta = titles[id];
         if(meta){ $('#page-title').textContent = meta[0]; $('#page-sub').textContent = meta[1]; }
         try { fn(); rendered[id]=true; } catch(e){ console.warn('Renderer failed for '+id, e); }
@@ -3997,6 +4013,20 @@
     if (!activeTenantId || window.__rsTenantRealtimeFor === activeTenantId) return;
     window.__rsTenantRealtimeFor = activeTenantId;
     window.__rsTenantRealtimeChannels = window.__rsTenantRealtimeChannels || [];
+    const tableToCollection = Object.fromEntries(Object.entries(LIVE_COLLECTIONS).map(([coll, cfg]) => [cfg.table, coll]));
+
+    const tenantBroadcastChannel = api.supabaseClient.channel(`rs-tenant-${activeTenantId}`)
+      .on('broadcast', { event:'tenant-data-changed' }, (response) => {
+        const payload = response && response.payload ? response.payload : {};
+        const coll = tableToCollection[payload.table];
+        if (coll) {
+          refreshCollectionFromCloud(coll).catch(e => console.warn('Realtime broadcast refresh failed for '+coll, e));
+        } else {
+          scheduleTenantDataSync();
+        }
+      })
+      .subscribe();
+    window.__rsTenantRealtimeChannels.push(tenantBroadcastChannel);
 
     const billChannel = api.supabaseClient.channel(`doppio-bills-realtime-${activeTenantId}`)
       .on('postgres_changes', { event:'*', schema:'public', table: 'doppio_bills', filter: `tenant_id=eq.${activeTenantId}` }, () => {
