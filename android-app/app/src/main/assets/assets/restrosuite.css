@@ -129,12 +129,14 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: "cv05","ss01";
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 h1, h2, h3, h4, h5 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.025em; line-height: 1.05; color: var(--text); }
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; }
-::selection { background: rgba(255,79,0,0.28); color: #fff; }
+::selection { background: #ffb085; color: #141016; }
 :focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 
 img { max-width: 100%; display: block; }
