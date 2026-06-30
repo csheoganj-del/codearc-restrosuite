@@ -4,6 +4,7 @@
   "private": true,
   "description": "RestroSuite zero-cost restaurant SaaS on Vercel and Supabase, with an optional WhatsApp gateway add-on.",
   "scripts": {
+    "start": "node whatsapp-gateway.js",
     "start:gateway": "node whatsapp-gateway.js",
     "check:free-tier": "node scripts/check-free-tier.cjs",
     "test": "node --test tests/*.test.cjs",
