@@ -1591,12 +1591,11 @@
 
       if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…'; }
 
-      // 1. Generate PDF + download locally
+      // 1. Generate PDF for WhatsApp delivery
       var pdfBase64 = null;
       try {
         const pdfDoc = await buildPdfReceipt(num, items, tax, total, billNo);
         if (pdfDoc) {
-          pdfDoc.save('RestroSuite_Receipt_' + billNo + '.pdf');
           pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
         }
       } catch(_) {}
@@ -1635,12 +1634,12 @@
         });
         const json = await r.json().catch(function() { return {}; });
         if (r.ok && json && json.ok) {
-          showSandboxToast('\u2713 Receipt sent to +' + fullPhone, false);
+          showSandboxToast('\u2713 ' + (json.pdfSent ? 'PDF receipt' : 'Receipt text') + ' sent to +' + fullPhone, false);
         } else {
-          showSandboxToast(json.error || 'WhatsApp gateway failed. PDF downloaded only.', true);
+          showSandboxToast(json.error || 'WhatsApp gateway failed. PDF not sent.', true);
         }
       } catch(err) {
-        showSandboxToast('WhatsApp gateway unreachable. PDF downloaded only.', true);
+        showSandboxToast('WhatsApp gateway unreachable. PDF not sent.', true);
       }
 
       // 4. Reset
