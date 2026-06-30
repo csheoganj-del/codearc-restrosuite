@@ -87,7 +87,7 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
 async function getApprovedTenant(slug: string) {
   const { data, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, status, plan_code, subscription_status, stripe_enabled, stripe_account_id")
+    .select("id, name, status, plan_code, subscription_status")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -178,7 +178,7 @@ serve(async (req) => {
 
       const { data: profileData } = await supabaseAdmin
         .from("doppio_business_profile")
-        .select("name, address, phone, upi_vpa, feature_flags")
+        .select("business_name, address, phone, upi_vpa, feature_flags")
         .eq("tenant_id", tenant.id)
         .maybeSingle();
 
@@ -200,7 +200,7 @@ serve(async (req) => {
 
       return jsonResponse({
         menu: data || [],
-        tenantName: profileData?.name || tenant.name || "Doppio Cafe",
+        tenantName: profileData?.business_name || tenant.name || "Doppio Cafe",
         tenantAddress: profileData?.address || "",
         tenantPhone: profileData?.phone || "",
         upiVpa: profileData?.upi_vpa || "",
@@ -450,7 +450,7 @@ serve(async (req) => {
       // Fetch outlet business profile for tax label / address etc.
       const { data: profileData } = await supabaseAdmin
         .from("doppio_business_profile")
-        .select("name, address, phone, gstin, feature_flags")
+        .select("business_name, address, phone, gst_number, feature_flags")
         .eq("tenant_id", tenant.id)
         .maybeSingle();
 
@@ -508,10 +508,10 @@ serve(async (req) => {
       return jsonResponse({
         bill: formattedBill,
         profile: {
-          name: profileData?.name || tenant.name || "Doppio Cafe",
+          name: profileData?.business_name || tenant.name || "Doppio Cafe",
           address: profileData?.address || "",
           phone: profileData?.phone || "",
-          tax_registration_no: profileData?.gstin || "",
+          tax_registration_no: profileData?.gst_number || "",
           tax_label: taxLabel
         },
         country: countryName,

@@ -96,9 +96,9 @@ restrosuite/
 ### 3. Admin PIN system (RSPinModal)
 - **Location**: top of `saas-core.js` as an IIFE before the RS_SAAS code
 - **PIN storage**: SHA-256 hash stored in `RS_SETTINGS.admin_pin_hash`, persisted to settings DB
-- **Features**: 4-dot visual UI, physical keyboard support, 3-attempt lockout (30 seconds), forgot PIN via master reset code `482916`
+- **Features**: 4-dot visual UI, physical keyboard support, 3-attempt lockout (30 seconds), forgot PIN via server-verified reset code
 - **Modes**: `request(label)` = verify, `setup()` = first-time set, `change()` = verify current then set new
-- **Flows**: setup (enter → confirm), change (verify current → enter new → confirm new), forgot (enter master code → set new)
+- **Flows**: setup (enter → confirm), change (verify current → enter new → confirm new), forgot (server verifies reset code → set new)
 
 ### 4. Bill delete + refund with PIN gate
 - **Delete bill**: trash icon on each bill row → PIN gate → confirm dialog → removes from BILLS array → restores inventory → syncs to cloud. Toast: "Bill deleted — inventory restored"
@@ -116,7 +116,7 @@ restrosuite/
 - New nav item in Settings: "Security & PIN" with `fa-shield-halved` icon
 - Shows PIN status (active/not set), Set/Change/Remove PIN buttons
 - Lists all PIN-protected operations: Delete Bill, Refund, Discount Override (coming), Amend Bill (coming), Cash Drawer (coming), Data Reset
-- Master reset code `482916` shown with warning
+- Reset code is verified server-side; the reset value is not shown in the client
 
 ### 7. WhatsApp gateway humanisation (anti-ban)
 - **File**: `whatsapp-gateway.js`

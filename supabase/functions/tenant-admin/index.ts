@@ -235,6 +235,13 @@ function getGatewayUrlAndToken() {
   return { url, token: token.trim() };
 }
 
+function planMonthlyRupees(planCode: unknown) {
+  const code = String(planCode || "starter").toLowerCase();
+  if (code === "growth") return 1499;
+  if (code === "enterprise") return 4999;
+  return 0;
+}
+
 async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Request) {
   const { url, token } = getGatewayUrlAndToken();
   const targetUrl = `${url}${path}`;
@@ -284,6 +291,83 @@ async function listTenants(req: Request) {
   }
 
   return jsonResponse({ tenants: data || [] }, 200, req);
+}
+
+async function getPlatformStats(req: Request) {
+  const { data: tenants, error } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("id, status, plan_code, subscription_status");
+  if (error) {
+    console.error("get_platform_stats tenants failed:", error);
+    return jsonResponse({ error: "Failed to load platform stats." }, 500, req);
+  }
+
+  const { count: userCount } = await supabaseAdmin
+    .from("tenant_users")
+    .select("id", { count: "exact", head: true });
+
+  const rows = tenants || [];
+  const stats = {
+    tenants_total: rows.length,
+    tenants_active: rows.filter((t: any) => ["approved", "active"].includes(String(t.status))).length,
+    tenants_pending: rows.filter((t: any) => String(t.status) === "pending").length,
+    tenants_at_risk: rows.filter((t: any) => ["past_due", "canceled"].includes(String(t.subscription_status))).length,
+    paid_tenants: rows.filter((t: any) => ["growth", "enterprise"].includes(String(t.plan_code))).length,
+    platform_mrr: rows.reduce((sum: number, t: any) => sum + planMonthlyRupees(t.plan_code), 0),
+    users_total: userCount || 0,
+  };
+  return jsonResponse({ stats }, 200, req);
+}
+
+async function listUsers(req: Request) {
+  const [{ data: tenants, error: tenantError }, { data: users, error: userError }] = await Promise.all([
+    supabaseAdmin.from("saas_tenants").select("id, name, slug"),
+    supabaseAdmin.from("tenant_users").select("id, tenant_id, username, display_name, role, status, last_login_at, created_at").order("created_at", { ascending: false }).limit(500),
+  ]);
+  if (tenantError || userError) {
+    console.error("list_users failed:", tenantError || userError);
+    return jsonResponse({ error: "Failed to load platform users." }, 500, req);
+  }
+  const tenantById = new Map((tenants || []).map((t: any) => [String(t.id), t]));
+  const mapped = (users || []).map((user: any) => {
+    const tenant = (tenantById.get(String(user.tenant_id)) || {}) as any;
+    return {
+      ...user,
+      tenant_name: tenant.name || "",
+      tenant_slug: tenant.slug || "",
+    };
+  });
+  return jsonResponse({ users: mapped }, 200, req);
+}
+
+async function getBilling(req: Request) {
+  const { data: tenants, error } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("id, name, slug, plan_code, subscription_status, subscription_current_period_end, created_at")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) {
+    console.error("get_billing tenants failed:", error);
+    return jsonResponse({ error: "Failed to load billing data." }, 500, req);
+  }
+
+  const { data: invoices, error: invoiceError } = await supabaseAdmin
+    .from("doppio_saas_invoices")
+    .select("id, tenant_id, invoice_number, plan_code, amount, currency, status, due_date, paid_at")
+    .order("due_date", { ascending: false })
+    .limit(500);
+  if (invoiceError) console.warn("get_billing invoices unavailable:", invoiceError.message);
+
+  const billing = (tenants || []).map((tenant: any) => ({
+    tenant_id: tenant.id,
+    tenant_name: tenant.name,
+    tenant_slug: tenant.slug,
+    plan_code: tenant.plan_code || "starter",
+    subscription_status: tenant.subscription_status || "active",
+    subscription_current_period_end: tenant.subscription_current_period_end || null,
+    mrr: planMonthlyRupees(tenant.plan_code),
+  }));
+  return jsonResponse({ billing, invoices: invoiceError ? [] : (invoices || []) }, 200, req);
 }
 
 async function listErrorReports(payload: Record<string, unknown>, req: Request) {
@@ -909,6 +993,9 @@ serve(async (req) => {
     const action = String(payload?.action || "");
 
     if (action === "list_tenants") return await listTenants(req);
+    if (action === "get_platform_stats") return await getPlatformStats(req);
+    if (action === "list_users") return await listUsers(req);
+    if (action === "get_billing") return await getBilling(req);
     if (action === "list_error_reports") return await listErrorReports(payload, req);
     if (action === "resolve_error_report") return await resolveErrorReport(payload, req);
     if (action === "bulk_delete") return await bulkDelete(payload, req);

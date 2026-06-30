@@ -285,7 +285,7 @@
           <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--stroke-2);display:flex;align-items:center;gap:12px;">
             <button id="sec-remove-pin" style="background:none;border:none;font-size:12px;color:#ef4444;cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-trash-can"></i> Remove PIN</button>
             <span style="color:var(--stroke-2)">|</span>
-            <span style="font-size:11.5px;color:var(--text-soft);">Master reset code: <strong style="letter-spacing:.1em;">482916</strong> -- share only with business owner</span>
+            <span style="font-size:11.5px;color:var(--text-soft);">Forgotten PIN resets require a server-verified reset code from the account owner.</span>
           </div>` : ''}
         </div>
 
@@ -312,7 +312,7 @@
         <!-- Tips -->
         <div style="border:1px solid rgba(255,107,0,0.2);background:rgba(255,107,0,0.03);border-radius:var(--r-sm);padding:14px 16px;">
           <div style="font-size:12px;color:var(--text-soft);line-height:1.6;">
-            <strong style="color:#FF6B00;">Tips:</strong> Share the 4-digit PIN only with managers. The master reset code (shown above) can bypass a forgotten PIN -- keep it in a safe place. PIN attempts are limited to 3 before a 30-second lockout.
+            <strong style="color:#FF6B00;">Tips:</strong> Share the 4-digit PIN only with managers. Forgotten PIN resets are verified by the backend, and PIN attempts are limited to 3 before a 30-second lockout.
           </div>
         </div>
       `;

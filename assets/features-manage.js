@@ -589,6 +589,7 @@
                         <button class="icon-act ${u.status==='active'?'danger':''} sl-toggle-btn" data-idx="${i}" data-status="${u.status}" title="${u.status==='active'?'Suspend':'Reactivate'}">
                           <i class="fa-solid ${u.status==='active'?'fa-ban':'fa-circle-check'}"></i>
                         </button>
+                        <button class="icon-act danger sl-delete-btn" data-idx="${i}" title="Delete account"><i class="fa-solid fa-user-minus"></i></button>
                       </div>
                     </td>
                   </tr>`;
@@ -615,6 +616,17 @@
           try {
             await RS_API.staffUsers({ action:'update_user', user_id:u.id, status:newStatus });
             RS.toast(`${u.display_name || u.username} ${newStatus}`, newStatus==='active'?'fa-circle-check':'fa-ban');
+            loadStaffUsers();
+          } catch(e) { RS.toast(e.message,'fa-circle-exclamation'); }
+        }));
+
+        // -- Delete account --
+        loginPane.querySelectorAll('.sl-delete-btn').forEach(b => b.addEventListener('click', async () => {
+          const u = staffUsers[+b.dataset.idx];
+          if (!confirm(`Delete account for ${u.display_name || u.username}? This cannot be undone.`)) return;
+          try {
+            await RS_API.staffUsers({ action:'delete_user', user_id:u.id });
+            RS.toast(`${u.display_name || u.username} deleted`, 'fa-user-minus');
             loadStaffUsers();
           } catch(e) { RS.toast(e.message,'fa-circle-exclamation'); }
         }));

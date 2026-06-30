@@ -13,13 +13,37 @@
     /* ===================== TOKEN DISPLAY ===================== */
     const PREPARING = [];
     const READY = [];
-    function renderTokens(){
+    const ANNOUNCED_TOKEN_KEY = 'rs_last_announced_token';
+    async function loadTokenOrders(){
+      if(!window.RS_DB) return;
+      const rows = await RS_DB.list('pending_orders').catch(() => []);
+      PREPARING.length = 0;
+      READY.length = 0;
+      (rows || []).forEach(row => {
+        const status = String(row.status || '').toLowerCase();
+        const itemCount = (row.items || []).reduce((sum, item) => sum + (Number(item.qty) || 1), 0);
+        const mapped = {
+          tok: row.orderId || row.id,
+          type: row.tableNumber || row.orderType || 'Order',
+          items: itemCount,
+          min: Math.max(0, Math.round((Date.now() - new Date(row.dateTime || Date.now()).getTime()) / 60000))
+        };
+        if(status.includes('ready')) READY.push(mapped);
+        else if(status.includes('accept') || status.includes('prepar') || status.includes('pending')) PREPARING.push(mapped);
+      });
+    }
+    async function renderTokens(){
       const sec = $('#tokens-tab');
+      if(!sec) return;
+      sec.innerHTML = '<div class="sr-empty">Loading token board...</div>';
+      await loadTokenOrders();
+      const announced = localStorage.getItem(ANNOUNCED_TOKEN_KEY) || '';
       sec.innerHTML = `
         <div class="token-board-head glass-row">
           <div class="row" style="gap:11px"><span class="tb-ic"><i class="fa-solid fa-bullhorn"></i></span><div><div style="font-weight:700;font-size:15px">Customer Token Monitor</div><div style="font-size:12px;color:var(--text-mute)">Mount this screen at your pickup counter</div></div></div>
           <span class="pill pill-green"><span class="dot dot-live"></span> Live · auto-refresh</span>
         </div>
+        ${announced ? `<div class="panel panel-pad" style="margin-bottom:14px;text-align:center;border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.06)"><div style="font-size:12px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Now serving</div><div style="font-size:38px;font-weight:900;color:var(--text);line-height:1.1;margin-top:4px">${esc(announced)}</div></div>` : ''}
         <div class="token-board">
           <div class="token-col">
             <div class="token-col-h preparing"><i class="fa-solid fa-fire"></i> Preparing · ${PREPARING.length}</div>
@@ -30,7 +54,11 @@
             <div class="token-list">${READY.map(t=>`<div class="token-chip rdy" data-tok="${esc(t.tok)}"><div class="tk">${esc(t.tok)}</div><div class="tmeta">${esc(t.type)} · ${esc(t.items)} items</div><div class="tcall"><i class="fa-solid fa-bell"></i> Now serving</div></div>`).join('')}</div>
           </div>
         </div>`;
-      $$('.token-chip.rdy',sec).forEach(c=> c.onclick=()=> RS.toast('Announced '+c.dataset.tok+' at counter','fa-bullhorn'));
+      $$('.token-chip.rdy',sec).forEach(c=> c.onclick=()=> {
+        localStorage.setItem(ANNOUNCED_TOKEN_KEY, c.dataset.tok || '');
+        RS.toast('Announced '+c.dataset.tok+' at counter','fa-bullhorn');
+        renderTokens();
+      });
     }
     RS.titles['tokens-tab']=['Token Display','Customer-facing pickup token board'];
     RS.addRenderer('tokens-tab', renderTokens);
@@ -112,6 +140,83 @@
             document.head.appendChild(script);
           }
           tryLoad('assets/lib/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        });
+      }
+
+      async function openTaxRatesEditor() {
+        const allRates = window.RS_DB
+          ? await RS_DB.list('tax_rates').catch(() => window.RS_TAX_RATES || [])
+          : (window.RS_TAX_RATES || []);
+        const rates = (allRates || []).filter(r => String(r.country || '').toUpperCase() === String(country).toUpperCase());
+        const rowHtml = (r = {}) => `
+          <div class="tax-rate-row" data-id="${esc(r.id || '')}" style="display:grid;grid-template-columns:1fr 1.4fr 90px 120px 70px 36px;gap:8px;align-items:center;margin-bottom:8px">
+            <input class="form-input tr-code" value="${esc(r.rateCode || r.rate_code || '')}" placeholder="Rate code">
+            <input class="form-input tr-label" value="${esc(r.label || '')}" placeholder="Label">
+            <input class="form-input tr-percent" type="number" step="0.01" value="${esc(r.percent || 0)}" placeholder="%">
+            <input class="form-input tr-from" type="date" value="${esc(r.validFrom || r.valid_from || new Date().toISOString().slice(0,10))}">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-soft)"><input class="tr-itc" type="checkbox" ${r.itcAllowed || r.itc_allowed ? 'checked' : ''}> ITC</label>
+            <button class="icon-act danger tr-del" title="Remove tax slab" type="button"><i class="fa-solid fa-trash-can"></i></button>
+          </div>`;
+
+        RSModal.open({
+          title: 'Tax Slabs',
+          sub: `${country} date-effective rates`,
+          icon: 'fa-percent',
+          size: 'lg',
+          body: `
+            <div id="tax-rate-editor">
+              <div style="display:grid;grid-template-columns:1fr 1.4fr 90px 120px 70px 36px;gap:8px;margin-bottom:6px;font-size:11px;font-weight:800;color:var(--text-soft);text-transform:uppercase">
+                <span>Code</span><span>Label</span><span>Rate</span><span>Valid from</span><span>Input</span><span></span>
+              </div>
+              <div id="tax-rate-rows">${(rates.length ? rates : [{ country, rateCode: `${country}_TAX_5`, label: 'Default rate', percent: isIreland ? 13.5 : 5 }]).map(rowHtml).join('')}</div>
+            </div>
+          `,
+          foot: `<button class="btn btn-ghost" id="tax-rate-add"><i class="fa-solid fa-plus"></i> Add slab</button><div class="grow"></div><button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" id="tax-rate-save"><i class="fa-solid fa-check"></i> Save slabs</button>`,
+          onMount(modal, close) {
+            const rowsEl = modal.querySelector('#tax-rate-rows');
+            modal.querySelector('[data-cancel]').onclick = close;
+            modal.querySelector('#tax-rate-add').onclick = () => rowsEl.insertAdjacentHTML('beforeend', rowHtml({
+              country,
+              rateCode: `${country}_TAX_${Date.now().toString().slice(-4)}`,
+              label: '',
+              percent: 0
+            }));
+            rowsEl.addEventListener('click', async e => {
+              const btn = e.target.closest('.tr-del');
+              if (!btn) return;
+              const row = btn.closest('.tax-rate-row');
+              const id = row?.dataset.id;
+              row?.remove();
+              if (id && window.RS_DB) await RS_DB.del('tax_rates', id).catch(() => {});
+            });
+            modal.querySelector('#tax-rate-save').onclick = async () => {
+              const saved = [];
+              for (const row of rowsEl.querySelectorAll('.tax-rate-row')) {
+                const code = row.querySelector('.tr-code').value.trim();
+                const label = row.querySelector('.tr-label').value.trim();
+                const percent = Number(row.querySelector('.tr-percent').value || 0);
+                if (!code || !label || !Number.isFinite(percent)) continue;
+                const record = {
+                  id: row.dataset.id || `${country}_${code}_${Date.now()}`,
+                  country,
+                  rateCode: code,
+                  label,
+                  percent,
+                  validFrom: row.querySelector('.tr-from').value || new Date().toISOString().slice(0,10),
+                  validTo: null,
+                  itcAllowed: row.querySelector('.tr-itc').checked,
+                  notes: ''
+                };
+                if (window.RS_DB) await RS_DB.put('tax_rates', record.id, record);
+                saved.push(record);
+              }
+              const otherRates = (window.RS_TAX_RATES || []).filter(r => String(r.country || '').toUpperCase() !== String(country).toUpperCase());
+              window.RS_TAX_RATES = [...otherRates, ...saved];
+              RS.toast('Tax slabs updated', 'fa-circle-check');
+              close();
+              updateTaxView();
+            };
+          }
         });
       }
 
@@ -341,7 +446,7 @@
         // Wire event handlers
         // Rates configuration button
         const ratesBtn = document.getElementById('tax-rates-btn');
-        if (ratesBtn) ratesBtn.onclick = () => RS.toast('Opening tax rates editor...', 'fa-pen');
+        if (ratesBtn) ratesBtn.onclick = openTaxRatesEditor;
 
         // CSV Export
         const csvBtn = document.getElementById('tax-csv');

@@ -47,17 +47,21 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 const DEFAULT_ALLOWED_TABS = [
   "pos-tab",
+  "floor-tab",
   "qr-orders-tab",
   "bills-tab",
   "inventory-tab",
   "reports-tab",
   "editor-tab",
   "crm-tab",
+  "customers-tab",
   "tax-tab",
   "online-tab",
+  "aggregator-tab",
   "kds-tab",
   "tokens-tab",
   "employees-tab",
+  "analytics-tab",
   "growth-hub-tab",
 ];
 
@@ -77,13 +81,13 @@ const PLAN_ENTITLEMENTS: Record<string, { name: string; maxStaff: number; monthl
     name: "Free / Demo",
     maxStaff: 2,
     monthlyOrderLimit: 50,
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab"],
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "customers-tab"],
   },
   starter: {
     name: "Starter",
     maxStaff: 5,
     monthlyOrderLimit: 300,
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "customers-tab"],
   },
   growth: {
     name: "Growth",

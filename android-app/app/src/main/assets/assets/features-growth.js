@@ -443,8 +443,66 @@
     /* ===================== ONLINE / AGGREGATOR ORDERS ===================== */
     const ONLINE = [];
     const platName = {zomato:'Zomato',swiggy:'Swiggy',ondc:'ONDC'};
-    function renderAgg(){
+    function detectPlatform(order){
+      const raw = `${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''}`.toLowerCase();
+      if(raw.includes('swiggy') || raw.includes('swi-')) return 'swiggy';
+      if(raw.includes('ondc') || raw.includes('ond-')) return 'ondc';
+      return 'zomato';
+    }
+    function isOnlineOrder(order){
+      const raw = `${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''}`.toLowerCase();
+      return raw.includes('online') || raw.includes('delivery') || /(^|[^a-z])(zom|swi|ond)-/.test(raw);
+    }
+    function aggStatus(status){
+      const s = String(status || '').toLowerCase();
+      if(s.includes('reject') || s.includes('cancel')) return 'rejected';
+      if(s.includes('ready') || s.includes('pickup')) return 'ready';
+      if(s.includes('accept') || s.includes('prepar')) return 'preparing';
+      return 'new';
+    }
+    async function refreshOnlineOrders(){
+      if(!window.RS_DB) return;
+      const rows = await RS_DB.list('pending_orders').catch(e => {
+        console.warn("Failed loading online orders from DB", e);
+        return [];
+      });
+      ONLINE.length = 0;
+      (rows || [])
+        .filter(row => isOnlineOrder(row) && !/reject|cancel|picked|delivered/.test(String(row.status || '').toLowerCase()))
+        .forEach(row => {
+        ONLINE.push({
+          id: row.id,
+          row,
+          plat: detectPlatform(row),
+          oid: row.orderId || row.id,
+          cust: row.customerName || 'Online customer',
+          area: row.tableNumber || row.orderType || 'Delivery',
+          items: (row.items || []).map(it => `${it.qty || 1}x ${it.name || 'Item'}`),
+          total: Number(row.total || 0),
+          status: aggStatus(row.status),
+          prep: row.prep || 10
+        });
+      });
+    }
+    async function persistOnlineStatus(idx, persistedStatus, message, icon){
+      const order = ONLINE[idx];
+      if(!order) return;
+      order.row.status = persistedStatus;
+      try {
+        if(window.RS_DB) await RS_DB.put('pending_orders', order.id, order.row);
+        if(window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders();
+        RS.toast(message, icon);
+        renderAgg();
+      } catch(e) {
+        console.warn("Failed updating online order status", e);
+        RS.toast('Online order update failed', 'fa-circle-exclamation');
+      }
+    }
+    async function renderAgg(){
       const sec = $('#aggregator-tab');
+      if(!sec) return;
+      sec.innerHTML = '<div class="sr-empty">Loading online orders...</div>';
+      await refreshOnlineOrders();
       // Update Online Orders sidebar badge dynamically
       const newAndPrep = ONLINE.filter(o => o.status === 'new' || o.status === 'preparing').length;
       const onlineBadge = document.querySelector('.sidebar-link[data-tab="aggregator-tab"] .badge-count');
@@ -464,8 +522,8 @@
           <div class="agg-card" data-i="${i}">
             <div class="agg-top ${o.plat}"><i class="fa-solid ${o.plat==='ondc'?'fa-network-wired':'fa-bowl-food'}"></i><span class="plat">${platName[o.plat]}</span><span class="oid">${o.oid}</span></div>
             <div class="agg-body">
-              <div class="agg-cust"><div><div class="cn">${o.cust}</div><div class="ct">${o.area}</div></div><span class="pill ${o.status==='new'?'pill-amber':o.status==='preparing'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${o.status}</span></div>
-              <div class="agg-items">${o.items.join('<br>')}</div>
+              <div class="agg-cust"><div><div class="cn">${esc(o.cust)}</div><div class="ct">${esc(o.area)}</div></div><span class="pill ${o.status==='new'?'pill-amber':o.status==='preparing'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(o.status)}</span></div>
+              <div class="agg-items">${o.items.map(esc).join('<br>')}</div>
               <div class="agg-foot"><span class="at">${rs(o.total)}</span>
                 ${o.status==='new'?`<button class="btn btn-ghost btn-sm" data-rej="${i}">Reject</button><button class="btn btn-primary btn-sm" data-acc="${i}"><i class="fa-solid fa-check"></i> Accept</button>`
                 : o.status==='preparing'?`<span class="agg-prep"><i class="fa-solid fa-clock"></i> ${o.prep}m left</span><button class="btn btn-primary btn-sm" data-ready="${i}">Mark ready</button>`
@@ -477,6 +535,14 @@
       $$('[data-ready]',sec).forEach(b=>b.onclick=()=>{ ONLINE[+b.dataset.ready].status='ready'; renderAgg(); RS.toast('Marked ready for pickup','fa-bell-concierge'); });
       $$('[data-rej]',sec).forEach(b=>b.onclick=()=>RS.toast('Order rejected','fa-xmark'));
       $$('[data-rider]',sec).forEach(b=>b.onclick=()=>RS.toast('Rider on the way','fa-motorcycle'));
+      if(!ONLINE.length) {
+        const grid = $('.agg-grid', sec);
+        if(grid) grid.innerHTML = '<div class="sr-empty">No online orders received yet</div>';
+      }
+      $$('[data-acc]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.acc, 'Accepted', 'Order accepted - KOT fired','fa-check'));
+      $$('[data-ready]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.ready, 'Ready', 'Marked ready for pickup','fa-bell-concierge'));
+      $$('[data-rej]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.rej, 'Rejected', 'Order rejected','fa-xmark'));
+      $$('[data-rider]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.rider, 'Picked Up', 'Rider pickup recorded','fa-motorcycle'));
     }
     RS.titles['aggregator-tab']=['Online Orders','Zomato, Swiggy & ONDC orders']; RS.addRenderer('aggregator-tab', renderAgg);
 
@@ -865,14 +931,14 @@
 
     /* ===================== GROWTH HUB SCREENS ===================== */
     const HUB = [
-      {ic:'fa-calendar-check',bg:'bg-o',t:'Reservations',d:'Manage table bookings & waitlist',m:'8 today'},
-      {ic:'fa-headset',bg:'bg-v',t:'Support Tickets',d:'Customer queries & complaints',m:'2 open'},
-      {ic:'fa-truck-ramp-box',bg:'bg-t',t:'Purchase Orders',d:'Raise & track supplier POs',m:'3 pending'},
-      {ic:'fa-flask-vial',bg:'bg-g',t:'Recipe Costing',d:'Plate cost & margin calculator',m:'live'},
-      {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'4 live'},
-      {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'3.1k reach'},
-      {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 rating'},
-      {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'412 members'}
+      {ic:'fa-calendar-check',bg:'bg-o',t:'Reservations',d:'Manage table bookings & waitlist',m:'Open module'},
+      {ic:'fa-headset',bg:'bg-v',t:'Support Tickets',d:'Customer queries & complaints',m:'Open module'},
+      {ic:'fa-truck-ramp-box',bg:'bg-t',t:'Purchase Orders',d:'Raise & track supplier POs',m:'Open module'},
+      {ic:'fa-flask-vial',bg:'bg-g',t:'Recipe Costing',d:'Plate cost & margin calculator',m:'Open module'},
+      {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'Open module'},
+      {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'Open module'},
+      {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'Open module'},
+      {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'Open module'}
     ];
     function renderHub(){
       const grid = $('#hub-grid');
@@ -1110,6 +1176,7 @@
         }
       });
     }
+    RS.openGrowthHubScreen = hubScreen;
     RS.addRenderer('growth-hub-tab', renderHub);
   }
   if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });

@@ -144,7 +144,9 @@
                     _items:parseItems(r.items),
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
                     subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
-                    amount:num(r.total), pay:r.paymentMethod, status:'paid',
+                    amount:num(r.total), pay:r.paymentMethod, status:r.status || 'paid',
+                    refundReason:r.refund_reason || '',
+                    refundedAt:r.refunded_at || '',
                     customerName:r.customerName, customerPhone:r.customerPhone,
                     tenders:parseTenders(r.tenders), change:num(r.change),
                     taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
@@ -162,7 +164,10 @@
                   channel: o.channel || 'dine_in',
                   tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
                   liquor_tax_amount: num(o.liquorTaxAmount),
-                  service_charge_amount: num(o.serviceChargeAmount) })
+                  service_charge_amount: num(o.serviceChargeAmount),
+                  status: o.status || 'paid',
+                  refund_reason: o.refundReason || '',
+                  refunded_at: o.refundedAt || null })
     },
     tax_rates: {
       table:'doppio_tax_rates', pk:'id', clientId:true,
@@ -361,6 +366,28 @@
     set_restaurant_name:'business_name', set_outlet_name:'business_name', set_address:'address',
     set_phone:'phone', set_gstin:'gst_number'
   };
+
+  function defaultBusinessName() {
+    try {
+      const s = window.RS_API && RS_API.session ? RS_API.session() : null;
+      const raw = s?.tenant_name || s?.tenant_slug || sessionStorage.getItem('tenant_slug') || 'My Restaurant';
+      return String(raw).replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    } catch(e) {
+      return 'My Restaurant';
+    }
+  }
+
+  async function ensureBusinessProfile() {
+    const body = {
+      business_name: defaultBusinessName(),
+      address: '',
+      phone: '',
+      feature_flags: {}
+    };
+    const res = await API.upsert(conflictTargets.businessProfile.table, body, conflictTargets.businessProfile.onConflict);
+    return Array.isArray(res) ? res[0] : res;
+  }
+
   const CLOUD = {
     async list(c){
       const m=MAP[c]; if(!m) return [];
@@ -404,8 +431,8 @@
       return true;
     },
     async getSettings(){
-      const row = await API.select('doppio_business_profile', { maybeSingle:true });
-      if(!row) return null;
+      let row = await API.select('doppio_business_profile', { maybeSingle:true });
+      if(!row) row = await ensureBusinessProfile();
       const out={}; for(const k in SETTINGS_MAP){ if(row[SETTINGS_MAP[k]]!=null) out[k]=row[SETTINGS_MAP[k]]; }
       out.set_gst = row.gst_enabled ? '5%' : '0%';
       
