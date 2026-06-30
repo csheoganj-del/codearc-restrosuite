@@ -67,3 +67,6 @@ temp_backup/
 
 # Windows reserved device name (created accidentally by redirect errors)
 nul
+
+# Agent files
+.gemini/
