@@ -26,6 +26,9 @@ function getCorsHeaders(req: Request) {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const SUPERADMIN_SESSION_SECRET = Deno.env.get("SUPERADMIN_SESSION_SECRET") || "";
+const PIN_RESET_CODE_HASH = Deno.env.get("PIN_RESET_CODE_HASH")
+  || Deno.env.get("MASTER_PIN_RESET_HASH")
+  || "";
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -70,8 +73,8 @@ const TENANT_TABLES = new Set([
 ]);
 
 const TABLE_TAB_ACCESS: Record<string, string[]> = {
-  doppio_aggregator_config: ["pos-tab", "editor-tab", "online-tab", "growth-hub-tab"],
-  doppio_online_orders: ["pos-tab", "online-tab", "growth-hub-tab"],
+  doppio_aggregator_config: ["pos-tab", "editor-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
+  doppio_online_orders: ["pos-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
   doppio_table_layout: ["pos-tab", "growth-hub-tab"],
   doppio_waitlist: ["pos-tab", "crm-tab", "growth-hub-tab"],
   doppio_menu: ["pos-tab", "editor-tab", "online-tab"],
@@ -79,13 +82,13 @@ const TABLE_TAB_ACCESS: Record<string, string[]> = {
   doppio_inventory_batches: ["pos-tab", "inventory-tab"],
   doppio_inventory_thresholds: ["pos-tab", "inventory-tab"],
   doppio_bills: ["pos-tab", "bills-tab", "reports-tab", "tax-tab"],
-  doppio_pending_orders: ["pos-tab", "qr-orders-tab", "kds-tab", "tokens-tab", "online-tab"],
+  doppio_pending_orders: ["pos-tab", "qr-orders-tab", "kds-tab", "tokens-tab", "online-tab", "aggregator-tab"],
   doppio_shifts: ["pos-tab", "employees-tab"],
   doppio_shift_events: ["pos-tab", "employees-tab"],
   doppio_employees: ["employees-tab"],
   doppio_leave_requests: ["employees-tab"],
   doppio_attendance: ["employees-tab"],
-  doppio_crm: ["pos-tab", "crm-tab"],
+  doppio_crm: ["pos-tab", "crm-tab", "customers-tab"],
   doppio_notifications: ["pos-tab", "qr-orders-tab", "inventory-tab", "employees-tab"],
   doppio_custom_recipes: ["pos-tab", "editor-tab"],
   doppio_pos_popularity: ["pos-tab", "reports-tab"],
@@ -108,25 +111,34 @@ const TABLE_TAB_ACCESS: Record<string, string[]> = {
 
 const ROLE_DEFAULT_TABS: Record<string, string[]> = {
   admin: Array.from(new Set(Object.values(TABLE_TAB_ACCESS).flat())),
-  cashier: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab"],
+  manager: [
+    "pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab",
+    "inventory-tab", "editor-tab", "customers-tab", "reports-tab",
+    "analytics-tab", "employees-tab", "growth-hub-tab",
+  ],
+  cashier: ["pos-tab", "floor-tab", "bills-tab", "customers-tab"],
+  waiter: ["pos-tab", "floor-tab", "kds-tab"],
+  captain: ["pos-tab", "floor-tab", "kds-tab", "qr-orders-tab"],
   kitchen: ["kds-tab"],
-  waiter: ["qr-orders-tab"],
+  inventory: ["inventory-tab", "editor-tab", "reports-tab"],
   customer_display: ["tokens-tab"],
 };
 
 const TABLE_WRITE_ROLES: Record<string, string[]> = {
-  doppio_inventory: ["cashier"],
-  doppio_inventory_batches: ["cashier"],
+  doppio_menu: ["inventory"],
+  doppio_inventory: ["cashier", "inventory"],
+  doppio_inventory_batches: ["cashier", "inventory"],
+  doppio_inventory_thresholds: ["inventory"],
   doppio_bills: ["cashier"],
-  doppio_pending_orders: ["cashier", "kitchen", "waiter"],
+  doppio_pending_orders: ["cashier", "kitchen", "waiter", "captain"],
   doppio_shifts: ["cashier"],
   doppio_shift_events: ["cashier"],
   doppio_crm: ["cashier"],
   doppio_notifications: ["cashier", "kitchen", "waiter"],
   doppio_pos_popularity: ["cashier"],
   doppio_draft_orders: ["cashier", "waiter"],
-  doppio_support_tickets: ["cashier", "kitchen", "waiter"],
-  doppio_reservations: ["cashier", "waiter"],
+  doppio_support_tickets: ["cashier", "kitchen", "waiter", "captain"],
+  doppio_reservations: ["cashier", "waiter", "captain"],
 };
 
 const ZERO_COST_DEFAULT_LIMIT = 250;
@@ -134,7 +146,7 @@ const ZERO_COST_MAX_LIMIT = 500;
 
 const PLAN_ENTITLEMENTS: Record<string, { allowedTabs: string[] }> = {
   starter: {
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "customers-tab"],
   },
   growth: {
     allowedTabs: ROLE_DEFAULT_TABS.admin,
@@ -174,6 +186,30 @@ function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request
   });
 }
 
+async function broadcastTenantDataChange(tenantId: string, table: string, operation: string) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
+  const topic = `rs-tenant-${tenantId}`;
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL.replace(/\/+$/, "")}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/tenant-data-changed`,
+      {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ table, operation, at: new Date().toISOString() }),
+      },
+    );
+    if (!response.ok) {
+      console.error("tenant-data realtime broadcast failed:", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("tenant-data realtime broadcast error:", error);
+  }
+}
+
 function encodeBase64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((byte) => {
@@ -211,6 +247,43 @@ function timingSafeEqualString(a: string, b: string): boolean {
   let diff = 0;
   for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
   return diff === 0;
+}
+
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function getTenantPinResetHash(tenantId: string) {
+  if (PIN_RESET_CODE_HASH) return PIN_RESET_CODE_HASH;
+
+  const { data, error } = await supabaseAdmin
+    .from("doppio_business_profile")
+    .select("feature_flags")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("tenant-data PIN reset hash lookup failed:", error);
+    return "";
+  }
+
+  try {
+    const flags = typeof data?.feature_flags === "string"
+      ? JSON.parse(data.feature_flags)
+      : (data?.feature_flags || {});
+    return String(
+      flags.pin_reset_code_hash
+      || flags.master_pin_reset_hash
+      || flags.master_pin_hash
+      || "",
+    );
+  } catch {
+    return "";
+  }
 }
 
 function getGatewayUrlAndToken() {
@@ -434,6 +507,35 @@ serve(async (req) => {
       return await proxyGatewayRequest("/send", "POST", req, { phone, message, orderId, pdfData, filename }, verified.tenantId);
     }
 
+    if (operation === "verify_pin_reset_code") {
+      const code = String(payload.code || "").trim();
+      if (!/^[A-Za-z0-9_-]{6,64}$/.test(code)) {
+        return jsonResponse({ valid: false, error: "Invalid reset code." }, 400, req);
+      }
+
+      const expectedHash = await getTenantPinResetHash(verified.tenantId as string);
+      if (!expectedHash) {
+        return jsonResponse({ valid: false, error: "PIN reset code is not configured for this outlet." }, 503, req);
+      }
+
+      const providedHash = await sha256Hex(code);
+      if (!timingSafeEqualString(providedHash, expectedHash)) {
+        return jsonResponse({ valid: false, error: "Invalid reset code." }, 403, req);
+      }
+
+      const { error: auditError } = await supabaseAdmin.from("tenant_audit_logs").insert({
+        tenant_id: verified.tenantId,
+        actor_user_id: verified.actorUserId,
+        actor_username: verified.actorUsername,
+        actor_role: verified.actorRole,
+        action: "security.pin_reset_verified",
+        target_type: "doppio_business_profile",
+      });
+      if (auditError) console.error("tenant-data PIN reset audit log failed:", auditError);
+
+      return jsonResponse({ valid: true }, 200, req);
+    }
+
     if (!TENANT_TABLES.has(table)) return jsonResponse({ error: "Table is not available through tenant data API." }, 400, req);
 
     const filters = Array.isArray(payload.filters) ? payload.filters : [];
@@ -447,6 +549,7 @@ serve(async (req) => {
     if (
       operation !== "select"
       && verified.actorRole !== "admin"
+      && verified.actorRole !== "manager"
       && !(TABLE_WRITE_ROLES[table] || []).includes(verified.actorRole as string)
     ) {
       return jsonResponse({ error: "Your role has read-only access to this module." }, 403, req);
@@ -513,6 +616,7 @@ serve(async (req) => {
         },
       });
       if (auditError) console.error("tenant-data audit log failed:", auditError);
+      await broadcastTenantDataChange(verified.tenantId as string, table, operation);
     }
 
     return jsonResponse({ data }, 200, req);
