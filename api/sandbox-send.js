@@ -16,18 +16,36 @@ export default async function handler(req, res) {
     'x-gateway-token': gatewayToken
   };
 
+  async function readGatewayResponse(response) {
+    const text = await response.text();
+    try { return JSON.parse(text); } catch { return { error: text || `Gateway error ${response.status}` }; }
+  }
+
   if (req.method === 'GET') {
     try {
       const statusResp = await fetch(`${gatewayUrl}/status`, { method: 'GET', headers, cache: 'no-store' });
-      const text = await statusResp.text();
-      let statusData;
-      try { statusData = JSON.parse(text); } catch { statusData = { error: text || `Gateway status ${statusResp.status}` }; }
-      return res.status(statusResp.ok ? 200 : statusResp.status).json({
-        ok: statusResp.ok,
-        gatewayAuthorized: statusResp.ok,
+      const statusData = await readGatewayResponse(statusResp);
+
+      // /status intentionally exposes connection state even without auth.
+      // /send checks the real gateway token before validating body fields, so
+      // an empty body should return 400 when authorized and 401 when rejected.
+      const authResp = await fetch(`${gatewayUrl}/send`, {
+        method: 'POST',
+        headers,
+        body: '{}'
+      });
+      const authData = await readGatewayResponse(authResp);
+      const sendAuthorized = authResp.status !== 401;
+
+      return res.status(sendAuthorized ? 200 : 401).json({
+        ok: sendAuthorized && statusResp.ok,
+        gatewayAuthorized: sendAuthorized,
         gatewayStatus: statusData.status || null,
         gatewayAuthenticated: Boolean(statusData.authenticated),
-        tokenFingerprint
+        sendAuthStatus: authResp.status,
+        tokenFingerprint,
+        error: sendAuthorized ? undefined : 'Gateway /send rejected the token. Set GATEWAY_TOKEN in Hugging Face Space secrets and restart the Space.',
+        gatewayError: sendAuthorized ? undefined : (authData.error || authData.status || null)
       });
     } catch (err) {
       return res.status(502).json({
@@ -93,11 +111,6 @@ export default async function handler(req, res) {
   }
   message += `\n*TOTAL    ${rs(total)}*\n\nThank you for dining with us.\nPowered by RestroSuite`;
 
-  async function readGatewayResponse(response) {
-    const text = await response.text();
-    try { return JSON.parse(text); } catch { return { error: text || `Gateway error ${response.status}` }; }
-  }
-
   const textResp = await fetch(`${gatewayUrl}/send`, {
     method: 'POST',
     headers,
@@ -107,7 +120,7 @@ export default async function handler(req, res) {
   if (!textResp.ok) {
     if (textResp.status === 401) {
       return res.status(401).json({
-        error: 'Gateway rejected the token saved in Vercel. Update WHATSAPP_GATEWAY_TOKEN in Vercel, then redeploy.',
+        error: 'Gateway /send rejected the token. Set GATEWAY_TOKEN in Hugging Face Space secrets, restart the Space, then redeploy Vercel if you changed Vercel too.',
         tokenFingerprint
       });
     }
