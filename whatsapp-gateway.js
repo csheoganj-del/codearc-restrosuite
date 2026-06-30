@@ -3026,13 +3026,59 @@ app.get('/test-relay-call', async (req, res) => {
 
 // HEALTH ENDPOINT -- for UptimeRobot / external monitors
 // ============================================================
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
     const systemData = tenantClients.get('system') || { status: 'disconnected' };
+    
+    // Diagnostic checks
+    const dnsDiag = {};
+    const tcpDiag = {};
+    
+    const dns = require('dns');
+    const net = require('net');
+    
+    try {
+        dnsDiag.ips = await new Promise((resolve) => {
+            dns.resolve4('long.whatsapp.net', (err, addresses) => {
+                if (err) resolve(`Error: ${err.message}`);
+                else resolve(addresses);
+            });
+        });
+    } catch (e) {
+        dnsDiag.ips = `Crash: ${e.message}`;
+    }
+
+    const testPort = (host, port) => {
+        return new Promise((resolve) => {
+            const socket = new net.Socket();
+            socket.setTimeout(3000);
+            socket.on('connect', () => {
+                socket.destroy();
+                resolve('CONNECTED');
+            });
+            socket.on('timeout', () => {
+                socket.destroy();
+                resolve('TIMEOUT');
+            });
+            socket.on('error', (err) => {
+                resolve(`ERROR: ${err.message}`);
+            });
+            socket.connect(port, host);
+        });
+    };
+
+    tcpDiag['long.whatsapp.net:443'] = await testPort('long.whatsapp.net', 443);
+    tcpDiag['long.whatsapp.net:5222'] = await testPort('long.whatsapp.net', 5222);
+    tcpDiag['web.whatsapp.com:443'] = await testPort('web.whatsapp.com', 443);
+
     res.json({
         ok: true,
         status: systemData.status,
         uptime: Math.floor(process.uptime()),
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
+        diagnostics: {
+            dns: dnsDiag,
+            tcp: tcpDiag
+        }
     });
 });
 
