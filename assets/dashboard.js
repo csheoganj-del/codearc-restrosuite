@@ -1681,7 +1681,19 @@
       const text = window.RSReceipt && typeof RSReceipt.text === 'function'
         ? RSReceipt.text(bill)
         : `${bill.no}\nTotal: ${rs(bill.grand)}`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      
+      // Clean phone number (remove non-digits)
+      let phone = bill.customerPhone ? bill.customerPhone.replace(/\D/g, '') : '';
+      // Ensure country code is present (default to 91 if it is a 10-digit Indian number)
+      if (phone.length === 10) {
+        phone = '91' + phone;
+      }
+      
+      const url = phone 
+        ? `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`
+        : `https://wa.me/?text=${encodeURIComponent(text)}`;
+        
+      window.open(url, '_blank', 'noopener,noreferrer');
       toast('WhatsApp receipt ready','fa-whatsapp');
     }
   }
