@@ -1,0 +1,12 @@
+node_modules
+.wwebjs_auth
+.wwebjs_cache
+.restrosuite
+.git
+.gemini
+.vercel
+backups
+uploads
+.env*
+*.log
+*.zip
