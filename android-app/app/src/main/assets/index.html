@@ -1591,12 +1591,11 @@
 
       if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…'; }
 
-      // 1. Generate PDF + download locally
+      // 1. Generate PDF for WhatsApp delivery
       var pdfBase64 = null;
       try {
         const pdfDoc = await buildPdfReceipt(num, items, tax, total, billNo);
         if (pdfDoc) {
-          pdfDoc.save('RestroSuite_Receipt_' + billNo + '.pdf');
           pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
         }
       } catch(_) {}
@@ -1620,29 +1619,27 @@
       }
       msg += '\n*TOTAL    ' + rs(total) + '*\n\nCash    ' + rs(total) + '\n\nThank you for dining with us!\n*Powered by RestroSuite*';
 
-      // 3. Send — direct to gateway (same origin after CSP fix + gateway CORS)
-      // Send to gateway — single clean attempt
-      const GW = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+      // 3. Send through our server route so the private gateway token stays server-side.
       try {
-        const r = await fetch(GW + '/send', {
+        const r = await fetch('/api/sandbox-send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: fullPhone, message: msg })
+          body: JSON.stringify({
+            phone: fullPhone,
+            items: items,
+            country: SIM_COUNTRY,
+            pdfData: pdfBase64,
+            filename: 'Receipt_' + billNo + '.pdf'
+          })
         });
-        const d = r.headers.get('content-type')||'' ;
-        const json = d.includes('application/json') ? await r.json() : null;
-        if (r.ok && json) {
-          showSandboxToast('\u2713 Receipt sent to +' + fullPhone, false);
-          if (pdfBase64) fetch(GW + '/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: fullPhone, pdfData: pdfBase64, filename: 'Receipt_' + billNo + '.pdf' })
-          }).catch(function(){});
+        const json = await r.json().catch(function() { return {}; });
+        if (r.ok && json && json.ok) {
+          showSandboxToast('\u2713 ' + (json.pdfSent ? 'PDF receipt' : 'Receipt text') + ' sent to +' + fullPhone, false);
         } else {
-          showSandboxToast('\u2713 PDF downloaded \u2014 check WhatsApp shortly', false);
+          showSandboxToast(json.error || 'WhatsApp gateway failed. PDF not sent.', true);
         }
-      } catch(_) {
-        showSandboxToast('\u2713 PDF downloaded \u2014 check WhatsApp shortly', false);
+      } catch(err) {
+        showSandboxToast('WhatsApp gateway unreachable. PDF not sent.', true);
       }
 
       // 4. Reset

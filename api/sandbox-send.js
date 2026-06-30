@@ -111,6 +111,27 @@ export default async function handler(req, res) {
   }
   message += `\n*TOTAL    ${rs(total)}*\n\nThank you for dining with us.\nPowered by RestroSuite`;
 
+  if (pdfData) {
+    const cleanPdfData = String(pdfData).includes(',') ? String(pdfData).split(',').pop() : String(pdfData);
+    const pdfResp = await fetch(`${gatewayUrl}/send`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        phone: cleanPhone,
+        pdfData: cleanPdfData,
+        filename: filename || `Receipt_${billNo}.pdf`
+      })
+    });
+    const pdfRespData = await readGatewayResponse(pdfResp);
+    if (!pdfResp.ok) {
+      return res.status(pdfResp.status).json({
+        error: pdfRespData.error || `PDF send failed with gateway status ${pdfResp.status}`,
+        tokenFingerprint
+      });
+    }
+    return res.status(200).json({ ok: true, phone: cleanPhone, billNo, textSent: false, pdfSent: true });
+  }
+
   const textResp = await fetch(`${gatewayUrl}/send`, {
     method: 'POST',
     headers,
@@ -127,19 +148,5 @@ export default async function handler(req, res) {
     return res.status(textResp.status).json({ error: textData.error || `Gateway error ${textResp.status}` });
   }
 
-  let pdfSent = false;
-  if (pdfData) {
-    const pdfResp = await fetch(`${gatewayUrl}/send`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        phone: cleanPhone,
-        pdfData,
-        filename: filename || `Receipt_${billNo}.pdf`
-      })
-    });
-    pdfSent = pdfResp.ok;
-  }
-
-  return res.status(200).json({ ok: true, phone: cleanPhone, billNo, textSent: true, pdfSent });
+  return res.status(200).json({ ok: true, phone: cleanPhone, billNo, textSent: true, pdfSent: false });
 }
