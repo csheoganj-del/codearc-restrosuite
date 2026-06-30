@@ -381,7 +381,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
     const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
     let subject = '';
     let bodyHtml = '';
-    const dashboardUrl = 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+    const dashboardUrl = 'https://kalpeshdeora1006-restrosuite-gateway.hf.space';
 
     if (type === 'disconnected') {
         subject = '[Alert] RestroSuite WhatsApp Gateway Offline';

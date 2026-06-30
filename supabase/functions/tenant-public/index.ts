@@ -130,7 +130,7 @@ serve(async (req) => {
       if (rlErr || !rlData) {
         return jsonResponse({ error: "Too many OTP requests. Please wait before trying again." }, 429, req);
       }
-      const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || "https://kalpeshdeora1006-whatsapp-gateway.hf.space").replace(/\/+$/, "");
+      const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || "https://kalpeshdeora1006-restrosuite-gateway.hf.space").replace(/\/+$/, "");
       const gatewayToken = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || "";
       try {
         const gwRes = await fetch(`${gatewayUrl}/send`, {

@@ -2811,7 +2811,7 @@
      ============================================================ */
   async function pollSuperAdminGateway() {
     const isZeroCost = RS_API.zeroCostLaunchMode;
-    const gatewayUrl = isZeroCost ? '' : 'https://kalpeshdeora1006-whatsapp-gateway.hf.space';
+    const gatewayUrl = isZeroCost ? '' : 'https://kalpeshdeora1006-restrosuite-gateway.hf.space';
 
     const statusBadge = document.getElementById('saas-gateway-status');
     const phoneEl = document.getElementById('saas-gateway-phone');

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export default async function handler(req, res) {
-  const gatewayUrl = (process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-whatsapp-gateway.hf.space').replace(/\/$/, '');
+  const gatewayUrl = (process.env.WHATSAPP_GATEWAY_URL || process.env.GATEWAY_URL || 'https://kalpeshdeora1006-restrosuite-gateway.hf.space').replace(/\/$/, '');
   const configuredToken = (process.env.WHATSAPP_GATEWAY_TOKEN || process.env.GATEWAY_TOKEN || process.env.GATEWAY_AUTH_TOKEN || '').trim();
   const gatewayToken = configuredToken.toLowerCase().startsWith('bearer ') ? configuredToken.slice(7).trim() : configuredToken;
   const tokenFingerprint = gatewayToken ? createHash('sha256').update(gatewayToken).digest('hex').slice(0, 12) : null;
