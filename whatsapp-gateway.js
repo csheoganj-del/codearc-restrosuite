@@ -823,7 +823,10 @@ async function initializeBaileysClient(tid, tenantData) {
             auth: state,
             printQRInTerminal: false,
             logger: pino({ level: 'silent' }),
-            browser: ['RestroSuite Gateway', 'Chrome', '1.0.0']
+            browser: ['Ubuntu', 'Chrome', '20.0.04'],
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 30000
         });
 
         // Set the client reference on tenantData
