@@ -1568,7 +1568,7 @@
       t.textContent = msg;
       t.className = 'sandbox-toast' + (isError ? ' error' : '');
       requestAnimationFrame(function() { t.classList.add('show'); });
-      _toastTimer = setTimeout(function() { t.classList.remove('show'); }, 3800);
+      _toastTimer = setTimeout(function() { t.classList.remove('show'); }, isError ? 9000 : 3800);
     }
 
     async function sendRealWhatsAppReceipt() {
