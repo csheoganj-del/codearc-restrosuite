@@ -1315,8 +1315,11 @@ body.product-guide-open {
 
 @media (max-width: 1180px) {
   .app { grid-template-columns: 1fr !important; }
-  .sidebar-hamburger { display: flex; }
-  .sidebar-overlay.active { display: block; }
+  
+  @media (min-width: 761px) {
+    .sidebar-hamburger { display: flex; }
+    .sidebar-overlay.active { display: block; }
+  }
   
   /* Hide sidebar collapse button on mobile/tablet drawer */
   .sb-collapse {
