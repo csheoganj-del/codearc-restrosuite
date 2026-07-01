@@ -7529,6 +7529,10 @@ body.product-guide-open {
     margin-left: 14px !important;
     width: calc(100vw - 14px) !important;
   }
+  /* Hide sidebar collapse button on mobile/tablet drawer */
+  .sb-collapse {
+    display: none !important;
+  }
 }
 
 /* Fix 7 — Phone: stack multi-column views */
