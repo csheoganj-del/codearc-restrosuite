@@ -1323,6 +1323,45 @@ body.product-guide-open {
     display: none !important;
   }
   
+  /* Prevent collapsed state from hiding text/labels on mobile/tablet drawer */
+  .app.collapsed .sb-brand .brand-name,
+  .app.collapsed .hide-collapsed {
+    display: block !important;
+  }
+  .app.collapsed .sidebar-link span {
+    display: inline !important;
+  }
+  .app.collapsed .sidebar-link .badge-count {
+    display: inline-block !important;
+  }
+  .app.collapsed .sb-foot-btn span {
+    display: inline !important;
+  }
+  .app.collapsed .sidebar-link {
+    justify-content: flex-start !important;
+    padding: 10px 12px !important;
+  }
+  .app.collapsed .sb-nav {
+    align-items: stretch !important;
+  }
+  .app.collapsed .sb-foot-btn {
+    justify-content: flex-start !important;
+  }
+  .app.collapsed .user-pill {
+    justify-content: flex-start !important;
+    padding: 10px !important;
+  }
+  .app.collapsed .sb-top {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  .app.collapsed .brand-logo {
+    width: 38px !important;
+    height: 38px !important;
+    margin: 0 !important;
+  }
+  
   /* Sidebar drawer behavior for mobile/tablet */
   .sidebar {
     position: fixed !important;
