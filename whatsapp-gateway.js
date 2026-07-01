@@ -30,7 +30,7 @@ const path = require('path');
         });
     }
 });
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const QRCodeLib = require('qrcode');
@@ -824,8 +824,18 @@ async function initializeBaileysClient(tid, tenantData) {
         
         const { state, saveCreds } = await useMultiFileAuthState(tenantFolder);
         
+        let waVersion = [2, 3000, 1015949770];
+        try {
+            const { version } = await fetchLatestBaileysVersion();
+            waVersion = version;
+            console.log(`[Version Fetch] Dynamically fetched latest WA version for tenant ${tid}:`, waVersion.join('.'));
+        } catch (err) {
+            console.warn(`[Version Fetch] Failed to fetch latest WA version for tenant ${tid}, using fallback [${waVersion.join('.')}]:`, err.message);
+        }
+
         const sock = makeWASocket({
             auth: state,
+            version: waVersion,
             printQRInTerminal: false,
             logger: pino({ level: 'silent' }),
             browser: ['Ubuntu', 'Chrome', '20.0.04'],
@@ -881,7 +891,7 @@ async function initializeBaileysClient(tid, tenantData) {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 
-                console.log(`[Disconnected] Tenant ${tid} connection closed:`, lastDisconnect?.error?.message, `, reconnecting:`, shouldReconnect);
+                console.log(`[Disconnected] Tenant ${tid} connection closed:`, lastDisconnect?.error);
                 tenantData.status = shouldReconnect ? 'connecting' : 'disconnected';
                 tenantData.qr = null;
                 tenantData.number = null;
