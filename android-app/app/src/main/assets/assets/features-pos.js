@@ -896,8 +896,8 @@
       const qrDataUri = await generateReceiptQrDataUri(bill);
       const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
       const autoSendSettings = window.RS_SETTINGS || {};
-      const autoSendOn = autoSendSettings.set_auto_send_receipts !== false
-                      && autoSendSettings.set_auto_send_receipts !== 'false';
+      const autoSendOn = autoSendSettings.set_auto_send_receipts === true
+                      || autoSendSettings.set_auto_send_receipts === 'true';
       const hasPhone = bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null';
       // Always show the WhatsApp button — sending is background so cashier can resend if needed.
       const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>`;
@@ -1694,7 +1694,7 @@
         // Auto-send WhatsApp receipt if enabled in settings
         try {
           const autoSendSettings = window.RS_SETTINGS || {};
-          const autoSendEnabled = autoSendSettings.set_auto_send_receipts !== false && autoSendSettings.set_auto_send_receipts !== 'false';
+          const autoSendEnabled = autoSendSettings.set_auto_send_receipts === true || autoSendSettings.set_auto_send_receipts === 'true';
           if (autoSendEnabled && bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null') {
             setTimeout(() => { shareReceiptViaWhatsApp(bill); }, 800);
           }
@@ -2931,7 +2931,7 @@
             const tableName = `Table ${t.n}`;
             const activeOrder = pendingRows.find(r => 
               (r.tableNumber === tableName || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}`) &&
-              (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'Billed')
+              (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'served' || r.status === 'Ready' || r.status === 'Billed')
             );
             const activeDraft = drafts.find(d => d.draftName === tableName);
             
@@ -3020,7 +3020,7 @@
           
           const activeOrder = pendingRows.find(r => 
             (r.tableNumber === tableName || r.tableNumber === tableName.replace('Table ', '') || r.tableNumber === `0${parseInt(tableName.replace('Table ', ''))}`) &&
-            (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'Billed')
+            (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'served' || r.status === 'Ready' || r.status === 'Billed')
           );
           const activeDraft = drafts.find(d => d.draftName === tableName);
           

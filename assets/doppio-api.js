@@ -103,14 +103,14 @@
     });
   }
 
-  // Helper: read from localStorage first (persistent), then sessionStorage (tab-only)
-  function ssGet(k){ return LS_SESS.getItem(k) || SS.getItem(k); }
+  // Helper: the active session is tab-local. localStorage is only the
+  // remembered-session fallback for a newly opened tab.
+  function ssGet(k){ return SS.getItem(k) || LS_SESS.getItem(k); }
   function ssSet(k, v, persist){
+    SS.setItem(k, v);
     if(persist){
       LS_SESS.setItem(k, v);
-      SS.removeItem(k); // clear session copy if upgrading to persistent
     } else {
-      SS.setItem(k, v);
       LS_SESS.removeItem(k);
     }
   }
@@ -126,8 +126,8 @@
   function readSessionSnapshot(){
     const snapshot = {};
     SESSION_KEYS.forEach(k => {
-      if (LS_SESS.getItem(k) !== null) snapshot[k] = { storage:'local', value:LS_SESS.getItem(k) };
-      else if (SS.getItem(k) !== null) snapshot[k] = { storage:'session', value:SS.getItem(k) };
+      if (SS.getItem(k) !== null) snapshot[k] = { storage:'session', value:SS.getItem(k) };
+      else if (LS_SESS.getItem(k) !== null) snapshot[k] = { storage:'local', value:LS_SESS.getItem(k) };
     });
     return snapshot;
   }

@@ -166,6 +166,7 @@ body::before {
 .sidebar:hover, .sidebar.reveal {
   transform: translateX(0) !important;
   overflow-y: auto;
+  opacity: 1 !important;
 }
 
 @media (min-width: 1025px) {

@@ -1257,6 +1257,7 @@
   let _pendingRegOTP = null;   // registration OTP (in-memory only)
   let _pendingRecOTP = null;   // recovery OTP
   let _pendingRegPayload = null; // buffered registration payload
+  let _pendingRegOtpChallenge = null;
   let _regResendTimer = null;
 
   function genOTP(){ return String(Math.floor(100000 + Math.random() * 900000)); }
@@ -1269,7 +1270,6 @@
   }
 
   async function sendWhatsAppOTP(phone, code, purpose){
-    const msg = `Your RestroSuite ${purpose === 'recovery' ? 'password reset' : 'verification'} code is: *${code}*\n\nValid for 10 minutes. Never share this code.`;
     // Wait for runtime config to load (async fetch in config.js)
     try { await (window.__configReady || Promise.resolve()); } catch(e){}
     const endpoint = (window.CONFIG && window.CONFIG.functions && window.CONFIG.functions.tenantPublic) ||
@@ -1281,11 +1281,12 @@
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ action: 'send_otp', phone, message: msg })
+          body: JSON.stringify({ action: 'send_otp', phone, purpose })
         });
         const data = await res.json().catch(() => ({}));
-        if(res.ok && data.sent) return { sent:true, demo:false };
-        failure = data.error || ('HTTP ' + res.status);
+        if(res.ok && data.sent && data.challenge_id) return { sent:true, demo:false, challengeId:data.challenge_id };
+        if(res.ok && data.sent) failure = 'OTP challenge was not created. Please try again.';
+        else failure = data.error || ('HTTP ' + res.status);
       } catch(e){ failure = e && e.message ? e.message : String(e); }
     }
     if(canUseDemoOtpFallback()) return { sent:false, demo:true, code };
@@ -1305,7 +1306,7 @@
   }
 
   async function showRegOTPStep(phone, displayPhone){
-    const code = genOTP(); _pendingRegOTP = code;
+    const code = genOTP(); _pendingRegOTP = null; _pendingRegOtpChallenge = null;
     let result;
     try {
       result = await sendWhatsAppOTP(phone, code, 'register');
@@ -1320,9 +1321,11 @@
     document.getElementById('reg-otp-phone-echo').textContent = displayPhone;
     const demoNotice = document.getElementById('reg-otp-demo-notice');
     if(result.demo){
+      _pendingRegOTP = code;
       document.getElementById('reg-otp-demo-code').textContent = code;
       demoNotice.style.display='flex';
     } else {
+      _pendingRegOtpChallenge = result.challengeId;
       demoNotice.style.display='none';
     }
     // Wire OTP inputs
@@ -1363,14 +1366,15 @@
   };
 
   // ── Registration OTP verify button ───────────────────────────────────
-  async function finalizeRegistration(){
+  async function finalizeRegistration(otpCode){
     const payload = _pendingRegPayload;
     if(!payload) return;
     const btn=document.getElementById('reg-otp-verify'); const orig=btn.innerHTML;
     btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Creating…'; btn.disabled=true;
     try{
       if(window.RS_API && RS_API.configured){
-        const r = await RS_API.register(payload);
+        const registrationPayload = { ...payload, otp_challenge_id:_pendingRegOtpChallenge, otp_code:otpCode };
+        const r = await RS_API.register(registrationPayload);
         showOk(r.message || 'Registration submitted! Once CodeArc approves your outlet you can sign in.');
         setTimeout(()=>{ tabLogin.click(); const t=document.getElementById('tenant-id'); if(t)t.value=payload.slug; const un=document.getElementById('username'); if(un)un.value=payload.email; }, 2200);
       } else {
@@ -1411,9 +1415,13 @@
       inputs[0].focus();
       return;
     }
+    if(!_pendingRegOTP && !_pendingRegOtpChallenge && window.RS_API && RS_API.configured){
+      showErr('OTP session expired. Please request a new code.');
+      return;
+    }
     _pendingRegOTP = null; // consume
     hideAlerts();
-    finalizeRegistration();
+    finalizeRegistration(code);
   };
 
   document.getElementById('reg-otp-back').onclick=()=>{
@@ -1421,6 +1429,7 @@
     document.getElementById('reg-step-2').classList.add('on');
     clearInterval(_regResendTimer);
     _pendingRegOTP=null;
+    _pendingRegOtpChallenge=null;
   };
 
   document.getElementById('reg-resend-otp').onclick=async ()=>{
@@ -1428,7 +1437,7 @@
     const ccVal=document.getElementById('reg-country-code').value.replace(/\D/g,'');
     const phoneDigits=document.getElementById('reg-whatsapp').value.replace(/\D/g,'');
     const phone=ccVal+phoneDigits;
-    const code=genOTP(); _pendingRegOTP=code;
+    const code=genOTP(); _pendingRegOTP=null; _pendingRegOtpChallenge=null;
     let result;
     try {
       result=await sendWhatsAppOTP(phone,code,'register');
@@ -1438,8 +1447,8 @@
       return;
     }
     const demoNotice=document.getElementById('reg-otp-demo-notice');
-    if(result.demo){ document.getElementById('reg-otp-demo-code').textContent=code; demoNotice.style.display='flex'; }
-    else { demoNotice.style.display='none'; }
+    if(result.demo){ _pendingRegOTP=code; document.getElementById('reg-otp-demo-code').textContent=code; demoNotice.style.display='flex'; }
+    else { _pendingRegOtpChallenge=result.challengeId; demoNotice.style.display='none'; }
     document.querySelectorAll('#reg-otp-row input').forEach(i=>i.value='');
     document.querySelector('#reg-otp-row input').focus();
     startRegResendCooldown();
@@ -1515,8 +1524,16 @@
 
   // ── Recovery channel switching ────────────────────────────────────────
   let _recChannel = 'email'; // 'email' | 'whatsapp'
+  const recoveryWhatsappBtn = document.querySelector('.rec-ch-btn[data-channel="whatsapp"]');
+  if(recoveryWhatsappBtn){
+    recoveryWhatsappBtn.disabled = true;
+    recoveryWhatsappBtn.title = 'Use owner email recovery. WhatsApp recovery is disabled until server-side reset verification is enabled.';
+    recoveryWhatsappBtn.style.opacity = '0.45';
+    recoveryWhatsappBtn.style.cursor = 'not-allowed';
+  }
   document.querySelectorAll('.rec-ch-btn').forEach(btn=>{
     btn.onclick=()=>{
+      if(btn.disabled) return;
       _recChannel=btn.dataset.channel;
       document.querySelectorAll('.rec-ch-btn').forEach(b=>b.classList.toggle('active',b===btn));
       const emailGrp=document.getElementById('rec-email-group');
@@ -1550,6 +1567,12 @@
     btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; btn.disabled=true;
 
     if(_recChannel==='whatsapp'){
+      btn.innerHTML=orig; btn.disabled=false;
+      showErr('WhatsApp recovery is disabled. Use owner email recovery for a server-verified reset link.');
+      return;
+    }
+
+    if(false){
       const phoneDigits=document.getElementById('recovery-phone').value.replace(/\D/g,'');
       if(phoneDigits.length<7){
         btn.innerHTML=orig; btn.disabled=false;

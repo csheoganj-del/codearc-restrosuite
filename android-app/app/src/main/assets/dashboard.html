@@ -161,6 +161,23 @@
     color: var(--hold-color);
     background: color-mix(in srgb, var(--hold-color) 10%, var(--glass-2));
   }
+  body:not(.rs-role-superadmin) .superadmin-only {
+    display: none !important;
+  }
+  body:not(.rs-role-brandadmin) .brandadmin-only {
+    display: none !important;
+  }
+  body.rs-role-superadmin .superadmin-only.sidebar-link,
+  body.rs-role-superadmin .superadmin-only.mnav-link {
+    display: flex !important;
+  }
+  body.rs-role-superadmin .sb-section.superadmin-only {
+    display: block !important;
+  }
+  body.rs-role-brandadmin .brandadmin-only.sidebar-link,
+  body.rs-role-brandadmin .brandadmin-only.mnav-link {
+    display: flex !important;
+  }
   @keyframes holdBtnBlink {
     0%, 100% {
       box-shadow: 0 0 0 0 color-mix(in srgb, var(--hold-color) 50%, transparent);

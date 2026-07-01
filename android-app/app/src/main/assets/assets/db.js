@@ -286,8 +286,26 @@
     recipeCosting: { table: 'doppio_custom_recipes', onConflict: 'tenant_id,item_name' },
     billSql: 'ON CONFLICT (tenant_id, "orderId") DO UPDATE SET'
   });
+  const optionalCloudColumns = Object.freeze({
+    menu: ['tax_category']
+  });
   const known = {}; // collection -> Set of ids seen from server
   function newClientId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
+
+  function omitUnsupportedOptionalColumns(collection, body, err) {
+    const cols = optionalCloudColumns[collection] || [];
+    if (!cols.length || !body) return false;
+    const msg = String((err && err.message) || err || '');
+    if (!/schema cache|Could not find|column|42703/i.test(msg)) return false;
+    let changed = false;
+    cols.forEach(col => {
+      if (Object.prototype.hasOwnProperty.call(body, col) && msg.includes(col)) {
+        delete body[col];
+        changed = true;
+      }
+    });
+    return changed;
+  }
 
   /* ---------------- LOCAL (localStorage) ---------------- */
   const LS = {
@@ -401,12 +419,26 @@
       const cleanObj = { ...obj, id: cleanId };
       const body = m.to(cleanObj);
       const isKnown = known[c] && known[c].has(String(cleanId));
-      if(isKnown){ await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]); return cleanObj; }
+      if(isKnown){
+        try {
+          await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
+        } catch (err) {
+          if (!omitUnsupportedOptionalColumns(c, body, err)) throw err;
+          await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
+        }
+        return cleanObj;
+      }
       // Only auto-generate a new ID if clientId mode AND the body doesn't already have one
       if(m.clientId && !body[m.pk]) { body[m.pk] = cleanId || newClientId(); }
       else if(!body[m.pk]) { body[m.pk] = cleanId; }
       try {
-        const res = await API.insert(m.table, body);
+        let res;
+        try {
+          res = await API.insert(m.table, body);
+        } catch (err) {
+          if (!omitUnsupportedOptionalColumns(c, body, err)) throw err;
+          res = await API.insert(m.table, body);
+        }
         const newId = (Array.isArray(res)&&res[0]&&res[0][m.pk]!=null) ? res[0][m.pk] : (body[m.pk]!=null?body[m.pk]:cleanId);
         const cleanNewId = cleanIdForCollection(c, newId);
         if(!known[c]) known[c]=new Set(); known[c].add(String(cleanNewId));
@@ -414,7 +446,12 @@
       } catch (err) {
         console.warn(`[RS_DB] Cloud insert failed for ${c}/${cleanId}, attempting update fallback:`, err.message);
         try {
-          await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
+          try {
+            await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
+          } catch (updateErr) {
+            if (!omitUnsupportedOptionalColumns(c, body, updateErr)) throw updateErr;
+            await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
+          }
           if(!known[c]) known[c]=new Set(); known[c].add(String(cleanId));
           return cleanObj;
         } catch (updateErr) {
@@ -549,11 +586,17 @@
           try {
             const res = await CLOUD.list(c, ...args);
             if (res) {
-              // SAFE MERGE: preserve locally-created records not yet in cloud
-              // (bills/orders written while offline must not be overwritten)
+              // Preserve only records that are still queued for upload. Rows
+              // that once came from cloud but were deleted elsewhere must not
+              // be resurrected from this device's local cache.
               const existing = LS.read(c);
               const cloudIds = new Set(res.map(r => String(r.id)));
-              const localOnly = existing.filter(r => r.id && !cloudIds.has(String(r.id)));
+              const queuedPutIds = queuedWriteIdsForCollection(c);
+              const localOnly = existing.filter(r => {
+                if (!r || r.id == null) return false;
+                const id = String(cleanIdForCollection(c, r.id));
+                return !cloudIds.has(id) && queuedPutIds.has(id);
+              });
               const merged = [...res, ...localOnly];
               LS.write(c, merged);
               lastListFetchTime[c] = Date.now();
@@ -632,6 +675,20 @@
     // Cap queue at 200 entries to prevent localStorage bloat
     if (q.length > 200) q.splice(0, q.length - 200);
     saveSyncQueue(q);
+  }
+  function queuedWriteIdsForCollection(collection) {
+    try {
+      const ids = new Set();
+      getSyncQueue()
+        .filter(entry => entry && entry.collection === collection && entry.method === 'put')
+        .forEach(entry => {
+          const rawId = entry.args && entry.args[0];
+          if (rawId != null) ids.add(String(cleanIdForCollection(collection, rawId)));
+        });
+      return ids;
+    } catch(e) {
+      return new Set();
+    }
   }
   async function drainSyncQueue() {
     if (!signedIn()) return;

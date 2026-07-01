@@ -17,6 +17,7 @@ function getCorsHeaders(req: Request) {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const OTP_SECRET = Deno.env.get("OTP_SECRET") || SUPABASE_SERVICE_ROLE_KEY;
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -33,6 +34,31 @@ const ZERO_COST_MENU_LIMIT = 300;
 
 function activeSubscription(status: unknown) {
   return ["active", "trialing"].includes(String(status || "active"));
+}
+
+// Mirrors the VAT/GST/Sales-Tax fallback used by the internal dashboard's
+// RS_getTenantTaxProfile() (assets/dashboard.js) so the public QR ordering page shows the
+// same tax label as the tenant's own POS instead of always defaulting to "GST". Previously
+// this edge function only checked uiSettings.set_tax_label, which most tenants (including
+// non-Indian ones onboarded via the reset/reseed flow) never have explicitly set -- so a
+// tenant in e.g. Ireland fell straight through to the "GST" default even though their
+// dashboard correctly shows VAT based on set_country.
+const VAT_COUNTRIES = new Set([
+  "ireland", "uk", "united kingdom", "great britain", "germany", "austria", "belgium",
+  "france", "italy", "spain", "netherlands", "portugal", "finland", "greece", "denmark",
+  "sweden", "norway", "saudi arabia", "united arab emirates", "uae", "south africa",
+  "kenya", "nigeria", "ghana", "philippines", "thailand", "indonesia",
+]);
+const SALES_TAX_COUNTRIES = new Set(["united states", "us", "usa"]);
+const GST_COUNTRIES = new Set(["india", "australia", "new zealand", "singapore", "canada"]);
+
+function deriveTaxLabel(uiSettings: Record<string, any>): string {
+  if (uiSettings?.set_tax_label) return String(uiSettings.set_tax_label);
+  const country = String(uiSettings?.set_country || "India").trim().toLowerCase();
+  if (VAT_COUNTRIES.has(country)) return "VAT";
+  if (SALES_TAX_COUNTRIES.has(country)) return "Sales Tax";
+  if (GST_COUNTRIES.has(country)) return "GST";
+  return "GST";
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {
@@ -56,6 +82,19 @@ async function sha256Hex(value: string) {
   return Array.from(new Uint8Array(hashBuffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function randomOtp() {
+  const bytes = crypto.getRandomValues(new Uint32Array(1));
+  return String(100000 + (bytes[0] % 900000));
+}
+
+async function otpCodeHash(challengeId: string, phone: string, code: string, purpose: string) {
+  return sha256Hex(`otp:${purpose}:${challengeId}:${phone}:${code}:${OTP_SECRET}`);
+}
+
+async function phoneHash(phone: string) {
+  return sha256Hex(`phone:${phone}`);
 }
 
 async function checkRateLimit(req: Request, action: string, tenantSlug: string) {
@@ -116,9 +155,9 @@ serve(async (req) => {
     // ── Public OTP send (no tenant/session required) ──────────────────────────
     if (action === "send_otp") {
       const phone = String(payload.phone || "").replace(/\D/g, "");
-      const message = String(payload.message || "").trim();
-      if (!phone || phone.length < 10 || !message) {
-        return jsonResponse({ error: "Invalid phone or message." }, 400, req);
+      const purpose = String(payload.purpose || "register").trim().toLowerCase();
+      if (!phone || phone.length < 10 || !["register", "recovery"].includes(purpose)) {
+        return jsonResponse({ error: "Invalid OTP request." }, 400, req);
       }
       // Rate limit: 5 OTPs per phone per 10 minutes
       const otpBucket = await sha256Hex(`otp:${phone}`);
@@ -132,6 +171,24 @@ serve(async (req) => {
       }
       const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || "https://kalpeshdeora1006-restrosuite-gateway.hf.space").replace(/\/+$/, "");
       const gatewayToken = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || "";
+      if (!gatewayToken) {
+        return jsonResponse({ error: "WhatsApp gateway is not configured." }, 503, req);
+      }
+      const code = randomOtp();
+      const challengeId = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const message = `Your RestroSuite ${purpose === "recovery" ? "password reset" : "verification"} code is: *${code}*\n\nValid for 10 minutes. Never share this code.`;
+      const { error: challengeError } = await supabaseAdmin.from("public_otp_challenges").insert({
+        id: challengeId,
+        phone_hash: await phoneHash(phone),
+        purpose,
+        code_hash: await otpCodeHash(challengeId, phone, code, purpose),
+        expires_at: expiresAt,
+      });
+      if (challengeError) {
+        console.error("send_otp challenge insert failed:", challengeError);
+        return jsonResponse({ error: "Failed to create OTP challenge." }, 500, req);
+      }
       try {
         const gwRes = await fetch(`${gatewayUrl}/send`, {
           method: "POST",
@@ -141,11 +198,13 @@ serve(async (req) => {
         if (!gwRes.ok) {
           const gwErr = await gwRes.text();
           console.error("send_otp gateway error:", gwErr);
+          await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
           return jsonResponse({ error: "Failed to send OTP via WhatsApp." }, 502, req);
         }
-        return jsonResponse({ sent: true }, 200, req);
+        return jsonResponse({ sent: true, challenge_id: challengeId, expires_at: expiresAt }, 200, req);
       } catch (e) {
         console.error("send_otp fetch error:", e);
+        await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
         return jsonResponse({ error: "Failed to reach WhatsApp gateway." }, 502, req);
       }
     }
@@ -183,6 +242,8 @@ serve(async (req) => {
         .maybeSingle();
 
       let currencySymbol = "₹";
+      let taxLabel = "GST";
+      let countryName = "India";
       let featureFlags = {};
       if (profileData?.feature_flags) {
         try {
@@ -193,6 +254,8 @@ serve(async (req) => {
           const currencyVal = uiSettings.set_currency || "INR (₹)";
           const match = currencyVal.match(/\(([^)]+)\)/);
           if (match) currencySymbol = match[1];
+          countryName = uiSettings.set_country || "India";
+          taxLabel = deriveTaxLabel(uiSettings);
         } catch (e) {
           console.warn("Failed to parse feature flags for currency:", e);
         }
@@ -205,6 +268,8 @@ serve(async (req) => {
         tenantPhone: profileData?.phone || "",
         upiVpa: profileData?.upi_vpa || "",
         currencySymbol,
+        taxLabel,
+        country: countryName,
         feature_flags: featureFlags,
         stripeEnabled: (tenant as any).stripe_enabled || false,
         stripeAccountId: (tenant as any).stripe_account_id || null
@@ -465,7 +530,7 @@ serve(async (req) => {
             ? JSON.parse(profileData.feature_flags)
             : profileData.feature_flags;
           const uiSettings = featureFlags.ui_settings || {};
-          taxLabel = uiSettings.set_tax_label || "GST";
+          taxLabel = deriveTaxLabel(uiSettings);
           currencyVal = uiSettings.set_currency || "INR (₹)";
           const match = currencyVal.match(/\(([^)]+)\)/);
           if (match) currencySymbol = match[1];

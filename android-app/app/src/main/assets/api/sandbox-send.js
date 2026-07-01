@@ -119,7 +119,8 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         phone: cleanPhone,
         pdfData: cleanPdfData,
-        filename: filename || `Receipt_${billNo}.pdf`
+        filename: filename || `Receipt_${billNo}.pdf`,
+        message: message
       })
     });
     const pdfRespData = await readGatewayResponse(pdfResp);
