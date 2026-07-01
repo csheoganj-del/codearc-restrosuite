@@ -28,6 +28,7 @@ function getCorsHeaders(req: Request) {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const SUPERADMIN_SESSION_SECRET = Deno.env.get("SUPERADMIN_SESSION_SECRET") || "";
+const OTP_SECRET = Deno.env.get("OTP_SECRET") || SUPABASE_SERVICE_ROLE_KEY;
 const EMAIL_RELAY_URL = Deno.env.get("EMAIL_RELAY_URL") || "";
 const EMAIL_RELAY_TOKEN = Deno.env.get("EMAIL_RELAY_TOKEN") || "";
 const PUBLIC_APP_URL = (Deno.env.get("PUBLIC_APP_URL") || ALLOWED_ORIGIN).replace(/\/+$/, "");
@@ -143,6 +144,14 @@ async function sha256Hex(value: string) {
   return Array.from(new Uint8Array(hashBuffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+async function otpCodeHash(challengeId: string, phone: string, code: string, purpose: string) {
+  return sha256Hex(`otp:${purpose}:${challengeId}:${phone}:${code}:${OTP_SECRET}`);
+}
+
+async function phoneHash(phone: string) {
+  return sha256Hex(`phone:${phone}`);
 }
 
 async function checkRateLimit(req: Request, action: string) {
@@ -797,6 +806,70 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
   }, 200, req);
 }
 
+async function consumeRegistrationOtp(payload: Record<string, unknown>, phone: string, req: Request) {
+  const challengeId = String(payload.otp_challenge_id || "").trim();
+  const code = String(payload.otp_code || "").replace(/\D/g, "");
+  const cleanPhone = String(phone || "").replace(/\D/g, "");
+
+  if (!challengeId || code.length !== 6 || cleanPhone.length < 10) {
+    return { ok: false, response: jsonResponse({ error: "Please verify your WhatsApp OTP before registering." }, 400, req) };
+  }
+
+  const { data: challenge, error } = await supabaseAdmin
+    .from("public_otp_challenges")
+    .select("id, phone_hash, purpose, code_hash, expires_at, attempts, used_at")
+    .eq("id", challengeId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("registration OTP lookup failed:", error);
+    return { ok: false, response: jsonResponse({ error: "OTP verification is unavailable. Please try again." }, 500, req) };
+  }
+
+  if (
+    !challenge
+    || challenge.purpose !== "register"
+    || challenge.used_at
+    || Date.now() > new Date(challenge.expires_at).getTime()
+  ) {
+    return { ok: false, response: jsonResponse({ error: "OTP expired or invalid. Please request a new code." }, 400, req) };
+  }
+
+  const attempts = Number(challenge.attempts || 0);
+  if (attempts >= 5) {
+    return { ok: false, response: jsonResponse({ error: "Too many incorrect OTP attempts. Please request a new code." }, 429, req) };
+  }
+
+  const expectedPhoneHash = await phoneHash(cleanPhone);
+  const expectedCodeHash = await otpCodeHash(challengeId, cleanPhone, code, "register");
+  if (
+    !timingSafeEqualString(String(challenge.phone_hash || ""), expectedPhoneHash)
+    || !timingSafeEqualString(String(challenge.code_hash || ""), expectedCodeHash)
+  ) {
+    await supabaseAdmin
+      .from("public_otp_challenges")
+      .update({ attempts: attempts + 1 })
+      .eq("id", challengeId)
+      .is("used_at", null);
+    return { ok: false, response: jsonResponse({ error: "Incorrect OTP. Check the code sent to WhatsApp." }, 400, req) };
+  }
+
+  const { data: claimed, error: claimError } = await supabaseAdmin
+    .from("public_otp_challenges")
+    .update({ used_at: new Date().toISOString(), attempts: attempts + 1 })
+    .eq("id", challengeId)
+    .is("used_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (claimError || !claimed) {
+    console.error("registration OTP consume failed:", claimError);
+    return { ok: false, response: jsonResponse({ error: "OTP was already used. Please request a new code." }, 409, req) };
+  }
+
+  return { ok: true };
+}
+
 async function handleRegister(payload: Record<string, unknown>, req: Request) {
   const name = String(payload.name || "").trim();
   const slug = normalizeSlug(String(payload.slug || ""));
@@ -832,6 +905,11 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   if (!/^[a-z0-9-]+$/.test(slug)) {
     return jsonResponse({ error: "Slug can only contain lowercase letters, numbers, and hyphens." }, 400, req);
   }
+
+  const cleanPhone = phone.replace(/\D/g, "");
+  if (cleanPhone.length < 10) {
+    return jsonResponse({ error: "A verified WhatsApp phone number is required." }, 400, req);
+  }
  
   const { data: existingSlug, error: slugErr } = await supabaseAdmin
     .from("saas_tenants")
@@ -862,6 +940,9 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   if (existingUsername) {
     return jsonResponse({ error: `The username "${username}" is already in use. Choose another username.` }, 409, req);
   }
+
+  const otpCheck = await consumeRegistrationOtp(payload, cleanPhone, req);
+  if (!otpCheck.ok) return otpCheck.response;
  
   const passwordHash = await hashPassword(password);
   const { error: insertErr } = await supabaseAdmin.from("saas_tenants").insert({
@@ -869,7 +950,7 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
     slug,
     outlet_type: outletType,
     email,
-    phone,
+    phone: cleanPhone,
     username,
     password_hash: passwordHash,
     status: "pending",

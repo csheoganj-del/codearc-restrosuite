@@ -10,6 +10,14 @@ node_modules_old
 .wwebjs_cache
 backups
 uploads
+scratch
+android-app
+supabase
+*.docx
+LIVE_SIMULATION_FINDINGS.md
+RestroSuite_Independent_Audit_2026-07-01.md
+ngrok-service.js
+src/dashboard/people_verify_tmp.cjs
 *.log
 test_sec.log
 test_sec_utf8.log

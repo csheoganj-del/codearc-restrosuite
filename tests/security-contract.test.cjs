@@ -528,3 +528,47 @@ test("credential recovery uses expiring one-time tokens and separates privileged
   assert.match(migration, /FORCE ROW LEVEL SECURITY/);
   assert.match(guide, /Superadmin recovery is intentionally not exposed/);
 });
+
+test("live simulation regressions keep sessions, menu saves, QR sync, and QR billing safe", () => {
+  const api = read("assets/doppio-api.js");
+  const db = read("assets/db.js");
+  const dashboard = read("assets/dashboard.js");
+  const pos = read("assets/features-pos.js");
+  const login = read("login.html");
+  const tenantPublic = read("supabase/functions/tenant-public/index.ts");
+  const tenantAccess = read("supabase/functions/tenant-access/index.ts");
+  const otpMigration = read("supabase/migrations/20260701163000_public_otp_challenges.sql");
+
+  assert.match(api, /function ssGet\(k\)\{\s*return SS\.getItem\(k\) \|\| LS_SESS\.getItem\(k\);\s*\}/);
+  assert.match(api, /function ssSet\(k, v, persist\)\{\s*SS\.setItem\(k, v\);/);
+  assert.match(api, /if \(SS\.getItem\(k\) !== null\) snapshot\[k\] = \{ storage:'session'/);
+
+  assert.match(db, /optionalCloudColumns = Object\.freeze\(\{\s*menu: \['tax_category'\]/);
+  assert.match(db, /function omitUnsupportedOptionalColumns\(collection, body, err\)/);
+  assert.match(db, /if \(!omitUnsupportedOptionalColumns\(c, body, err\)\) throw err;/);
+
+  assert.match(dashboard, /async function syncPendingOrders\(options\)/);
+  assert.match(dashboard, /const forceCloud = options === true \|\| !!\(options && options\.forceCloud\);/);
+  assert.match(dashboard, /RS_DB\.listCloud\('pending_orders'\)/);
+  assert.match(dashboard, /RS_DB\.writeLocal\('pending_orders', rows \|\| \[\]\)/);
+  assert.match(dashboard, /syncPendingOrders\(\{ forceCloud: true \}\)/);
+  assert.match(dashboard, /customerName: r\.customerName \|\| ''/);
+  assert.match(dashboard, /customerPhone: r\.customerPhone \|\| ''/);
+  assert.match(dashboard, /function openQrOrderInPos\(order\)/);
+  assert.match(dashboard, /RS\.setCart\(items\)/);
+  assert.match(dashboard, /new Set\(QR_ORDERS\.map\(o => o\.table\)\)\.size/);
+
+  assert.match(pos, /r\.status === 'served'/);
+  assert.match(pos, /r\.status === 'Ready'/);
+
+  assert.match(tenantPublic, /public_otp_challenges/);
+  assert.match(tenantPublic, /challenge_id: challengeId/);
+  assert.match(tenantPublic, /body: JSON\.stringify\(\{ phone, message \}\)/);
+  assert.doesNotMatch(login, /message: msg/);
+  assert.match(login, /otp_challenge_id:_pendingRegOtpChallenge/);
+  assert.match(tenantAccess, /function consumeRegistrationOtp/);
+  assert.match(tenantAccess, /otp_challenge_id/);
+  assert.match(tenantAccess, /phone: cleanPhone/);
+  assert.match(otpMigration, /CREATE TABLE IF NOT EXISTS public\.public_otp_challenges/);
+  assert.match(otpMigration, /FORCE ROW LEVEL SECURITY/);
+});

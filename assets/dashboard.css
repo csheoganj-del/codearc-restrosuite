@@ -1333,6 +1333,7 @@ body.product-guide-open {
   }
   .sidebar.reveal {
     transform: translateX(0) !important;
+    opacity: 1 !important;
   }
   
   /* Fix 7 — Tablet breakpoint: ensure full-width content area */

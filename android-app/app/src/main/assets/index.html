@@ -1620,6 +1620,7 @@
       msg += '\n*TOTAL    ' + rs(total) + '*\n\nCash    ' + rs(total) + '\n\nThank you for dining with us!\n*Powered by RestroSuite*';
 
       // 3. Send through our server route so the private gateway token stays server-side.
+      var sendSucceeded = false;
       try {
         const r = await fetch('/api/sandbox-send', {
           method: 'POST',
@@ -1634,6 +1635,7 @@
         });
         const json = await r.json().catch(function() { return {}; });
         if (r.ok && json && json.ok) {
+          sendSucceeded = true;
           showSandboxToast('\u2713 ' + (json.pdfSent ? 'PDF receipt' : 'Receipt text') + ' sent to +' + fullPhone, false);
         } else {
           showSandboxToast(json.error || 'WhatsApp gateway failed. PDF not sent.', true);
@@ -1642,8 +1644,11 @@
         showSandboxToast('WhatsApp gateway unreachable. PDF not sent.', true);
       }
 
-      // 4. Reset
-      simCart = {}; phoneEl.value = '';
+      // 4. Reset -- only clear the cart/phone once the send actually succeeded.
+      // Clearing on failure used to hide real errors (e.g. gateway 503s) from the user.
+      if (sendSucceeded) {
+        simCart = {}; phoneEl.value = '';
+      }
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp"></i> Send WhatsApp Invoice'; }
       renderSimCart(); validateSandboxPhone();
     }
