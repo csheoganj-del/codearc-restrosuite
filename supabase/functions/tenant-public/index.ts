@@ -35,31 +35,6 @@ function activeSubscription(status: unknown) {
   return ["active", "trialing"].includes(String(status || "active"));
 }
 
-// Mirrors the VAT/GST/Sales-Tax fallback used by the internal dashboard's
-// RS_getTenantTaxProfile() (assets/dashboard.js) so the public QR ordering page shows the
-// same tax label as the tenant's own POS instead of always defaulting to "GST". Previously
-// this edge function only checked uiSettings.set_tax_label, which most tenants (including
-// non-Indian ones onboarded via the reset/reseed flow) never have explicitly set -- so a
-// tenant in e.g. Ireland fell straight through to the "GST" default even though their
-// dashboard correctly shows VAT based on set_country.
-const VAT_COUNTRIES = new Set([
-  "ireland", "uk", "united kingdom", "great britain", "germany", "austria", "belgium",
-  "france", "italy", "spain", "netherlands", "portugal", "finland", "greece", "denmark",
-  "sweden", "norway", "saudi arabia", "united arab emirates", "uae", "south africa",
-  "kenya", "nigeria", "ghana", "philippines", "thailand", "indonesia",
-]);
-const SALES_TAX_COUNTRIES = new Set(["united states", "us", "usa"]);
-const GST_COUNTRIES = new Set(["india", "australia", "new zealand", "singapore", "canada"]);
-
-function deriveTaxLabel(uiSettings: Record<string, any>): string {
-  if (uiSettings?.set_tax_label) return String(uiSettings.set_tax_label);
-  const country = String(uiSettings?.set_country || "India").trim().toLowerCase();
-  if (VAT_COUNTRIES.has(country)) return "VAT";
-  if (SALES_TAX_COUNTRIES.has(country)) return "Sales Tax";
-  if (GST_COUNTRIES.has(country)) return "GST";
-  return "GST";
-}
-
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {
   return new Response(JSON.stringify(body), {
     status,
@@ -208,8 +183,6 @@ serve(async (req) => {
         .maybeSingle();
 
       let currencySymbol = "₹";
-      let taxLabel = "GST";
-      let countryName = "India";
       let featureFlags = {};
       if (profileData?.feature_flags) {
         try {
@@ -220,8 +193,6 @@ serve(async (req) => {
           const currencyVal = uiSettings.set_currency || "INR (₹)";
           const match = currencyVal.match(/\(([^)]+)\)/);
           if (match) currencySymbol = match[1];
-          countryName = uiSettings.set_country || "India";
-          taxLabel = deriveTaxLabel(uiSettings);
         } catch (e) {
           console.warn("Failed to parse feature flags for currency:", e);
         }
@@ -234,8 +205,6 @@ serve(async (req) => {
         tenantPhone: profileData?.phone || "",
         upiVpa: profileData?.upi_vpa || "",
         currencySymbol,
-        taxLabel,
-        country: countryName,
         feature_flags: featureFlags,
         stripeEnabled: (tenant as any).stripe_enabled || false,
         stripeAccountId: (tenant as any).stripe_account_id || null
@@ -496,7 +465,7 @@ serve(async (req) => {
             ? JSON.parse(profileData.feature_flags)
             : profileData.feature_flags;
           const uiSettings = featureFlags.ui_settings || {};
-          taxLabel = deriveTaxLabel(uiSettings);
+          taxLabel = uiSettings.set_tax_label || "GST";
           currencyVal = uiSettings.set_currency || "INR (₹)";
           const match = currencyVal.match(/\(([^)]+)\)/);
           if (match) currencySymbol = match[1];

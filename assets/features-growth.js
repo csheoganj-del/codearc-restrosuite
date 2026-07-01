@@ -607,69 +607,7 @@
         addCustomerBtn.insertAdjacentHTML('beforebegin', '<button class="btn btn-ghost btn-sm" id="btn-import-customers"><i class="fa-solid fa-file-import"></i> Import CSV</button><button class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-file-csv"></i> Export CSV</button>');
       }
       const broadcastBtn = $$('.toolbar-row .btn-ghost', sec).find(b => b.textContent.trim() === 'Broadcast');
-      if(broadcastBtn) broadcastBtn.onclick = () => {
-        if (!window.RSModal) { RS.toast('Modal module is unavailable', 'fa-circle-exclamation'); return; }
-        RSModal.open({ title:'Broadcast to customers', sub:'Compose a WhatsApp message for your customer list', icon:'fa-bullhorn', size:'md',
-          body:`<div style="display:flex;flex-direction:column;gap:12px">
-            <div><label class="fl">Audience</label>
-              <select class="form-input" id="bc-audience">
-                <option value="all">All customers with a phone number</option>
-                <option value="platinum">Platinum tier</option>
-                <option value="gold">Gold tier</option>
-                <option value="silver">Silver tier</option>
-                <option value="bronze">Bronze tier</option>
-              </select>
-            </div>
-            <div><label class="fl">Message</label><textarea class="form-input" id="bc-message" rows="3" placeholder="e.g. This weekend only: 15% off all mains!"></textarea></div>
-            <div id="bc-count" style="font-size:12px;color:var(--text-soft)"></div>
-          </div>`,
-          foot:`<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-primary" style="flex:1" data-review><i class="fa-solid fa-list-check"></i> Review recipients</button>`,
-          onMount(modal, close){
-            const audienceSel = modal.querySelector('#bc-audience');
-            const countEl = modal.querySelector('#bc-count');
-            const matching = () => {
-              const aud = audienceSel.value;
-              return CUSTOMERS.filter(c => c.phone && (aud==='all' || (c.tier||'silver')===aud));
-            };
-            const refreshCount = () => { countEl.textContent = matching().length + ' customer(s) match this audience.'; };
-            refreshCount();
-            audienceSel.addEventListener('change', refreshCount);
-            modal.querySelector('[data-cancel]').onclick = close;
-            modal.querySelector('[data-review]').onclick = async () => {
-              const message = modal.querySelector('#bc-message').value.trim();
-              if (!message) { RS.toast('Enter a message first', 'fa-circle-exclamation'); return; }
-              const recipients = matching();
-              if (!recipients.length) { RS.toast('No customers match this audience', 'fa-circle-exclamation'); return; }
-              close();
-              const campaignRow = { id: 'bcast_'+Date.now(), message, audience: audienceSel.value, recipientCount: recipients.length, createdAt: new Date().toISOString() };
-              try { if (window.RS_DB) await RS_DB.put('broadcasts', campaignRow.id, campaignRow); } catch(e) { console.warn('Failed to save broadcast record', e); }
-              // Browsers block bulk window.open() popups, so recipients are sent one at a time by the user
-              // clicking each row below -- this genuinely opens a pre-filled WhatsApp chat per customer
-              // rather than silently pretending a mass-send happened.
-              RSModal.open({ title:'Send to '+recipients.length+' customer(s)', sub:'Click each customer to open their WhatsApp chat', icon:'fa-bullhorn', size:'sm',
-                body:`<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto">${recipients.map((c,i)=>`
-                  <div class="row-actions" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--stroke);border-radius:10px">
-                    <div><b>${esc(c.name)}</b><div style="font-size:11px;color:var(--text-mute)">${esc(c.phone)}</div></div>
-                    <button class="btn btn-ghost btn-sm" data-send-i="${i}"><i class="fa-brands fa-whatsapp"></i> Send</button>
-                  </div>`).join('')}</div>`,
-                foot:`<button class="btn btn-primary" style="flex:1" data-done>Done</button>`,
-                onMount(sendModal, closeSend){
-                  sendModal.querySelector('[data-done]').onclick = closeSend;
-                  sendModal.querySelectorAll('[data-send-i]').forEach(btn=>{
-                    btn.onclick = () => {
-                      const cst = recipients[+btn.dataset.sendI];
-                      window.open(`https://wa.me/${String(cst.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
-                      btn.innerHTML = '<i class="fa-solid fa-check"></i> Sent';
-                      btn.disabled = true;
-                    };
-                  });
-                }
-              });
-              RS.toast('Broadcast ready for '+recipients.length+' customer(s)', 'fa-bullhorn');
-            };
-          }
-        });
-      };
+      if(broadcastBtn) broadcastBtn.onclick = () => RS.toast('Broadcast campaigns are not connected yet', 'fa-bullhorn');
 
       const exportCustomers = $('#btn-export-customers');
       if(exportCustomers) exportCustomers.onclick = () => {
@@ -973,36 +911,7 @@
             close();
             RS.toast('WhatsApp message ready for '+c.name,'fa-whatsapp');
           };
-          modal.querySelector('[data-offer]').onclick=()=>{
-            if (!window.RSModal) { RS.toast('Modal module is unavailable', 'fa-circle-exclamation'); return; }
-            RSModal.open({ title:'Send offer to '+c.name, sub:c.phone, icon:'fa-tags', size:'sm',
-              body:`<div style="display:flex;flex-direction:column;gap:12px">
-                <div><label class="fl">Offer</label><input class="form-input" id="offer-title" placeholder="e.g. 20% off your next visit"></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                  <div><label class="fl">Discount %</label><input class="form-input" id="offer-pct" type="number" min="0" max="100" value="10"></div>
-                  <div><label class="fl">Valid for (days)</label><input class="form-input" id="offer-days" type="number" min="1" value="14"></div>
-                </div>
-              </div>`,
-              foot:`<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-primary" style="flex:1" data-send><i class="fa-brands fa-whatsapp"></i> Send via WhatsApp</button>`,
-              onMount(offerModal, closeOffer){
-                offerModal.querySelector('[data-cancel]').onclick = closeOffer;
-                offerModal.querySelector('[data-send]').onclick = async () => {
-                  const title = offerModal.querySelector('#offer-title').value.trim() || 'A special offer for you';
-                  const pct = Math.max(0, Math.min(100, +offerModal.querySelector('#offer-pct').value || 0));
-                  const days = Math.max(1, +offerModal.querySelector('#offer-days').value || 14);
-                  const code = 'OFR' + Math.random().toString(36).slice(2,7).toUpperCase();
-                  const expiry = new Date(Date.now() + days*24*60*60*1000).toLocaleDateString();
-                  const msg = `Hi ${c.name}! ${title} -- use code ${code} for ${pct}% off, valid until ${expiry}.`;
-                  const offerRow = { id: 'offer_'+Date.now(), code, title, pct, customerPhone: c.phone, customerName: c.name, createdAt: new Date().toISOString(), expiresAt: expiry, status: 'sent' };
-                  try { if (window.RS_DB) await RS_DB.put('offers', offerRow.id, offerRow); } catch(e) { console.warn('Failed to save offer record', e); }
-                  window.open(`https://wa.me/${String(c.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
-                  closeOffer();
-                  close();
-                  RS.toast('Offer '+code+' sent to '+c.name, 'fa-tags');
-                };
-              }
-            });
-          };
+          modal.querySelector('[data-offer]').onclick=()=>{close();RS.toast('Offer campaigns are not connected yet','fa-tags');};
           const settleBtn = modal.querySelector('#modal-settle-dues-btn');
           if (settleBtn) {
             settleBtn.onclick = () => {

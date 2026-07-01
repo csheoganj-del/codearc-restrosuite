@@ -16,16 +16,13 @@
     return "Bronze";
   }
 
-  function calculatePayroll(baseSalary, lossOfPayDays, daysInMonth) {
+  function calculatePayroll(baseSalary, lossOfPayDays) {
     const base = Math.max(0, Number(baseSalary) || 0);
-    // Per-day rate uses a fixed 30-day month by default (standard payroll convention),
-    // NOT the current wall-clock month -- basing this on "today" made payroll for a
-    // fixed salary silently drift by calendar month (28/29/30/31 days) depending on
-    // which day the calculation happened to run. Callers who want to compute against
-    // a specific month/period can pass its actual day-count explicitly.
-    const resolvedDaysInMonth = Math.max(1, Number(daysInMonth) || 30);
-    const lop = Math.min(resolvedDaysInMonth, Math.max(0, Number(lossOfPayDays) || 0));
-    const effectiveBase = base * (resolvedDaysInMonth - lop) / resolvedDaysInMonth;
+    // Use actual days in the current calendar month for accurate per-day rate
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const lop = Math.min(daysInMonth, Math.max(0, Number(lossOfPayDays) || 0));
+    const effectiveBase = base * (daysInMonth - lop) / daysInMonth;
     const basic = effectiveBase * 0.5;
     const hra = basic * 0.4;
     const allowance = effectiveBase - basic - hra;
@@ -56,7 +53,7 @@
       annualTax = 300000 + (taxableIncome - 2400000) * 0.30;
     }
 
-    // Section 87A rebate: zero tax if taxable income <= 7L
+    // Section 87A rebate: zero tax if taxable income ≤ ₹7L
     if (taxableIncome <= 700000) annualTax = 0;
 
     // Add 4% health & education cess
