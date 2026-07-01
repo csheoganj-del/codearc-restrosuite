@@ -1318,6 +1318,11 @@ body.product-guide-open {
   .sidebar-hamburger { display: flex; }
   .sidebar-overlay.active { display: block; }
   
+  /* Hide sidebar collapse button on mobile/tablet drawer */
+  .sb-collapse {
+    display: none !important;
+  }
+  
   /* Sidebar drawer behavior for mobile/tablet */
   .sidebar {
     position: fixed !important;
