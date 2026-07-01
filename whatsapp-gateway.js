@@ -614,12 +614,12 @@ async function saveSessionToSupabaseScoped(tenantId) {
         if (error) throw error;
 
         console.log(`[Session Save] ✅ Tenant ${tenantId} WhatsApp session backed up to Supabase Storage.`);
-        await logHealthEvent('session_saved', 'ok', { path: fileName, size: zipBuffer.length });
+        await logHealthEvent('session_saved', 'ok', { path: fileName, size: zipBuffer.length, message: `Session backup saved for tenant ${tenantId} (${(zipBuffer.length / 1024).toFixed(1)} KB)` });
     } catch (err) {
         console.error(`[Session Save Error] Tenant ${tenantId}:`, err.message);
         const size = fs.existsSync(zipPath) ? fs.statSync(zipPath).size : 0;
         const sizeMb = (size / (1024 * 1024)).toFixed(2) + ' MB';
-        await logHealthEvent('session_save_failed', 'error', { error: err.message, zipSize: sizeMb });
+        await logHealthEvent('session_save_failed', 'error', { error: err.message, zipSize: sizeMb, message: `Failed to save session for tenant ${tenantId}: ${err.message} (size: ${sizeMb})` });
     } finally {
         try { fs.unlinkSync(zipPath); } catch (_) {}
     }
@@ -721,9 +721,31 @@ async function restoreSessionsFromSupabase() {
 // or when an API call is made for that tenant. This prevents HuggingFace from
 // flagging outgoing WebSocket connections during container startup.
 function autoInitializeLocalSessions() {
-    // Intentionally disabled: lazy initialization prevents HF from pausing the Space.
-    // Tenants reconnect automatically when their first API request arrives.
-    console.log('[Lazy Init] Session auto-restore is disabled. Clients connect on first request.');
+    console.log('[Startup Auto-Connect] Restoring all WhatsApp sessions on server boot...');
+    const authDir = path.join(os.homedir(), '.restrosuite', 'whatsapp-auth');
+    if (!fs.existsSync(authDir)) {
+        console.log('[Startup Auto-Connect] No local session directory found.');
+        return;
+    }
+    
+    try {
+        const folders = fs.readdirSync(authDir);
+        let count = 0;
+        for (const folder of folders) {
+            if (folder.startsWith('session-')) {
+                const tenantId = folder.substring(8);
+                console.log(`[Startup Auto-Connect] Auto-connecting WhatsApp for tenant: ${tenantId}`);
+                const tenantData = getOrCreateClient(tenantId);
+                initializeBaileysClient(tenantId, tenantData).catch(err => {
+                    console.error(`[Startup Auto-Connect Error] Tenant ${tenantId}:`, err.message);
+                });
+                count++;
+            }
+        }
+        console.log(`[Startup Auto-Connect] Triggered connection for ${count} WhatsApp session(s).`);
+    } catch (err) {
+        console.error('[Startup Auto-Connect Error] Failed to read auth directory:', err.message);
+    }
 }
 
 // SECURITY: GATEWAY_TOKEN must be explicitly set in production. There is NO
@@ -883,7 +905,7 @@ async function initializeBaileysClient(tid, tenantData) {
                 } catch (err) {
                     console.error(`[QR Error] Failed to generate QR URL for tenant ${tid}:`, err);
                 }
-                await logHealthEvent('qr_generated', 'warning', { tenantId: tid });
+                await logHealthEvent('qr_generated', 'warning', { tenantId: tid, message: `QR code generated for tenant: ${tid}` });
             }
 
             if (connection === 'close') {
@@ -898,7 +920,8 @@ async function initializeBaileysClient(tid, tenantData) {
                 
                 await logHealthEvent('disconnected', shouldReconnect ? 'warning' : 'error', { 
                     tenantId: tid, 
-                    reason: lastDisconnect?.error?.message 
+                    reason: lastDisconnect?.error?.message,
+                    message: `Connection closed for tenant ${tid}: ${lastDisconnect?.error?.message || 'Connection Failure'}`
                 });
 
                 // Send email alert for central system disconnect
@@ -913,7 +936,7 @@ async function initializeBaileysClient(tid, tenantData) {
                     // Reconnect logic
                     if (tenantData.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
                         console.error(`[Reconnect] Tenant ${tid}: All attempts exhausted.`);
-                        await logHealthEvent('reconnect_failed', 'error', { tenantId: tid, attempts: tenantData.reconnectAttempts });
+                        await logHealthEvent('reconnect_failed', 'error', { tenantId: tid, attempts: tenantData.reconnectAttempts, message: `Reconnect failed for tenant ${tid} after ${tenantData.reconnectAttempts} attempts` });
                         
                         if (tid === 'system') {
                             sendAdminAlert('qr_needed', {
@@ -951,7 +974,7 @@ async function initializeBaileysClient(tid, tenantData) {
                 if (supabaseService) {
                     await saveSessionToSupabaseScoped(tid);
                 }
-                await logHealthEvent('connected', 'ok', { tenantId: tid, number: tenantData.number });
+                await logHealthEvent('connected', 'ok', { tenantId: tid, number: tenantData.number, message: `WhatsApp connected for tenant ${tid} as +${tenantData.number}` });
             }
         });
 
@@ -1822,80 +1845,86 @@ app.post('/send', async (req, res) => {
 
     try {
         const chatId = `${phone}@c.us`;
-        
-        if (pdfData) {
-            const media = {
-                document: Buffer.from(pdfData, 'base64'),
-                mimetype: 'application/pdf',
-                fileName: filename || 'receipt.pdf'
-            };
-            await humanSend(tenantData.client, chatId, media, {}, tenantId);
-            // Do NOT send a separate text after the PDF -- the PDF IS the receipt.
-        } else {
-            // Send monospaced text receipt
-            await humanSend(tenantData.client, chatId, message, {}, tenantId);
-        }
 
-        console.log(`[Manual Sent] WhatsApp receipt successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
+        // 1. Respond to the client immediately (within 10ms!)
+        res.json({ status: 'success', message: 'Message sending initiated' });
 
-        // Mark this order as handled so the realtime listener doesn't double-send
+        // 2. Mark this order as handled so the realtime listener doesn't double-send
         if (orderId) {
             const skipKey = `${tenantId}:${orderId}`;
             realtimeSkipOrders.add(skipKey);
-            setTimeout(() => realtimeSkipOrders.delete(skipKey), 60_000); // clean up after 60s
+            setTimeout(() => realtimeSkipOrders.delete(skipKey), 60000);
         }
 
-        // Tag sending activity securely for this tenant
-        await logHealthEvent('send_receipt', 'ok', {
-            tenant_id: tenantId,
-            phone: maskPhone(phone),
-            orderId: orderId,
-            message: `Receipt for ${orderId || 'order'} successfully sent to +${maskPhone(phone)}`
-        });
+        // 3. Process the delivery in the background (asynchronously)
+        (async () => {
+            // A. Send text message first
+            if (message) {
+                await humanSend(tenantData.client, chatId, message, {}, tenantId);
+                console.log(`[Background Sent] WhatsApp text message successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
+            }
 
-        // Broadcast success back to Supabase Realtime
-        if (orderId && supabase) {
-            const channel = supabase.channel('whatsapp-billing-status');
-            channel.subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await channel.send({
-                           type: 'broadcast',
-                           event: 'status',
-                           payload: { orderId, status: 'success' }
-                    });
-                    supabase.removeChannel(channel);
-                }
+            // B. Send PDF message second
+            if (pdfData) {
+                const media = {
+                    document: Buffer.from(pdfData, 'base64'),
+                    mimetype: 'application/pdf',
+                    fileName: filename || 'receipt.pdf'
+                };
+                await humanSend(tenantData.client, chatId, media, {}, tenantId);
+                console.log(`[Background Sent] WhatsApp PDF receipt successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
+            }
+
+            // C. Broadcast success back to Supabase Realtime & Health Log
+            await logHealthEvent('send_receipt', 'ok', {
+                tenant_id: tenantId,
+                phone: maskPhone(phone),
+                orderId: orderId,
+                message: `Receipt for tenant ${tenantId} successfully sent to +${maskPhone(phone)}`
             });
-        }
 
-        res.json({ status: 'success', message: 'Message sent successfully' });
+            if (orderId && supabase) {
+                const channel = supabase.channel('whatsapp-billing-status');
+                channel.subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        await channel.send({
+                               type: 'broadcast',
+                               event: 'status',
+                               payload: { orderId, status: 'success' }
+                        });
+                        supabase.removeChannel(channel);
+                    }
+                });
+            }
+        })().catch(async (err) => {
+            console.error(`[Background Error] Failed to send receipt for tenant ${tenantId} to +${maskPhone(phone)}:`, err.message);
+            await logHealthEvent('send_receipt', 'error', {
+                tenant_id: tenantId,
+                phone: maskPhone(phone),
+                orderId: orderId,
+                error: err.message,
+                message: `Failed to send receipt for tenant ${tenantId} to +${maskPhone(phone)}: ${err.message}`
+            });
+
+            if (orderId && supabase) {
+                const channel = supabase.channel('whatsapp-billing-status');
+                channel.subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        await channel.send({
+                            type: 'broadcast',
+                            event: 'status',
+                            payload: { orderId, status: 'failed', error: err.message }
+                        });
+                        supabase.removeChannel(channel);
+                    }
+                });
+            }
+        });
     } catch (err) {
-        console.error(`[Manual Error] Failed to send receipt for tenant ${tenantId} to +${maskPhone(phone)}:`, err.message);
-
-        // Tag sending failure activity securely for this tenant
-        await logHealthEvent('send_receipt', 'error', {
-            tenant_id: tenantId,
-            phone: maskPhone(phone),
-            orderId: orderId,
-            error: err.message,
-            message: `Failed to send receipt for ${orderId || 'order'} to +${maskPhone(phone)}: ${err.message}`
-        });
-        
-        // Broadcast failure back to Supabase Realtime
-        if (orderId && supabase) {
-            const channel = supabase.channel('whatsapp-billing-status');
-            channel.subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await channel.send({
-                        type: 'broadcast',
-                        event: 'status',
-                        payload: { orderId, status: 'failed', error: err.message }
-                    });
-                    supabase.removeChannel(channel);
-                }
-            });
+        console.error(`[Manual Error] Failed to initiate receipt send for tenant ${tenantId} to +${maskPhone(phone)}:`, err.message);
+        if (!res.headersSent) {
+            res.status(500).json({ status: 'error', error: err.message });
         }
-        res.status(500).json({ status: 'error', error: err.message });
     }
 });
 
@@ -3149,12 +3178,10 @@ app.listen(PORT, async () => {
         console.warn('[Startup Alert Warning] Skipped:', err.message);
     }
 
-    // LAZY INIT: Do NOT auto-connect WhatsApp on startup.
-    // HuggingFace flags spaces that open outgoing WebSocket connections during boot.
-    // Connections are established on-demand when a tenant first makes an API request.
-    console.log('[Startup] Lazy init mode: WhatsApp connections will be established on first request.');
-    console.log('[Startup] Server is ready. Waiting for tenant requests to initialize WhatsApp...');
-    autoInitializeLocalSessions(); // No-op in lazy mode — just logs
+    // Startup Auto-Connect: Automatically connect all saved sessions on boot
+    console.log('[Startup] Restoring saved WhatsApp connections...');
+    autoInitializeLocalSessions();
+    console.log('[Startup] Server is ready. Active connections are syncing in the background...');
 
     // Start database notification polling fallback (every 60 seconds)
     if (supabaseService) {
