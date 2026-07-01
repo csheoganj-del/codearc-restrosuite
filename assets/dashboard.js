@@ -1631,79 +1631,7 @@
       }
       toast('Table '+(o.table.split('-')[1]||o.table)+' -> '+statusTxt[nextStatus]);
     }));
-    $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>{
-      const srcIdx = +b.dataset.merge;
-      const src = QR_ORDERS[srcIdx];
-      if (!src) return;
-      const candidates = QR_ORDERS
-        .map((o,idx)=>({o,idx}))
-        .filter(({o,idx})=> idx!==srcIdx && o.status!=='served' && o.table!==src.table);
-      if (!candidates.length) {
-        toast('No other open tables to merge into', 'fa-code-merge');
-        return;
-      }
-      if (!window.RSModal) {
-        toast('Modal module is unavailable', 'fa-circle-exclamation');
-        return;
-      }
-      const options = candidates.map(({o,idx})=>`<option value="${idx}">Table ${_e(o.table.split('-')[1]||o.table)} -- ${rs(o.total)}</option>`).join('');
-      RSModal.open({
-        title: 'Merge table',
-        sub: 'Combine Table ' + (src.table.split('-')[1]||src.table) + ' into another open table',
-        icon: 'fa-code-merge',
-        size: 'sm',
-        body: `
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <div style="font-size:13px;color:var(--text-soft)">
-              This will move all items from Table ${_e(src.table.split('-')[1]||src.table)} onto the table you pick below, then close out Table ${_e(src.table.split('-')[1]||src.table)}. This cannot be undone.
-            </div>
-            <div>
-              <label class="fl">Merge into</label>
-              <select class="form-input" id="merge-target">${options}</select>
-            </div>
-          </div>`,
-        foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-code-merge"></i> Merge tables</button>`,
-        onMount(modal, close) {
-          modal.querySelector('[data-cancel]').onclick = close;
-          modal.querySelector('[data-confirm]').onclick = async () => {
-            const targetIdx = +modal.querySelector('#merge-target').value;
-            const target = QR_ORDERS[targetIdx];
-            if (!target) { close(); return; }
-            close();
-            setOperationStatus('Merging tables...');
-            const mergedItems = target.items.concat(src.items);
-            const mergedTotal = (Number(target.total)||0) + (Number(src.total)||0);
-            target.items = mergedItems;
-            target.total = mergedTotal;
-            try {
-              if (window.RS_DB) {
-                const rows = await RS_DB.list('pending_orders');
-                const targetRow = rows.find(r => r.id === target.id);
-                const srcRow = rows.find(r => r.id === src.id);
-                if (targetRow) {
-                  targetRow.items = mergedItems;
-                  targetRow.total = mergedTotal;
-                  await RS_DB.put('pending_orders', target.id, targetRow);
-                }
-                if (srcRow) {
-                  await RS_DB.del('pending_orders', src.id);
-                }
-                await syncPendingOrders();
-              } else {
-                QR_ORDERS.splice(srcIdx, 1);
-                renderQR();
-              }
-              finishOperationStatus('Tables merged');
-              toast('Merged into Table ' + (target.table.split('-')[1]||target.table), 'fa-code-merge');
-            } catch (e) {
-              console.warn('Failed to merge tables', e);
-              finishOperationStatus('Merge failed', 'error');
-              toast('Could not merge tables -- try again', 'fa-circle-exclamation');
-            }
-          };
-        }
-      });
-    }));
+    $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>toast('Table merge is not connected yet','fa-code-merge')));
     $$('#qr-grid [data-bill]').forEach(b=>b.addEventListener('click',()=>{
       activateTab('pos-tab');
       toast('Open the table in POS to settle this bill','fa-receipt');
@@ -2157,86 +2085,6 @@
           });
         });
       });
-
-      // Edit ingredient (previously unwired -- clicking the pencil icon did nothing at all)
-      $$('#inv-table-body .icon-act:not(.go)').forEach(b => {
-        b.addEventListener('click', () => {
-          const row = b.closest('tr');
-          const name = row.querySelector('b').textContent;
-          const inv = INVENTORY.find(x => x.name === name);
-          if (!inv) return;
-
-          if (!window.RSModal) {
-            toast('Modal module is unavailable', 'fa-circle-exclamation');
-            return;
-          }
-
-          const body = `
-            <div style="display:flex;flex-direction:column;gap:14px">
-              <div><label class="fl">Ingredient name</label><input class="form-input" id="edit-ing-name" value="${_e(inv.name)}"></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Category</label><input class="form-input" id="edit-ing-cat" value="${_e(inv.cat || '')}"></div>
-                <div><label class="fl">Unit</label><input class="form-input" id="edit-ing-unit" value="${_e(inv.unit || '')}"></div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Current stock</label><input class="form-input" id="edit-ing-stock" type="number" min="0" value="${inv.stock}"></div>
-                <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="edit-ing-min" type="number" min="0" value="${inv.min}"></div>
-              </div>
-              <div><label class="fl">Unit cost (${rs(1).replace(/[\d.,]/g,'').trim() || '₹'})</label><input class="form-input" id="edit-ing-cost" type="number" min="0" value="${inv.cost}"></div>
-            </div>`;
-
-          RSModal.open({
-            title: 'Edit ingredient',
-            sub: 'Update ' + inv.name,
-            icon: 'fa-pen',
-            size: 'sm',
-            body,
-            foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-danger" style="flex:0" data-delete title="Remove ingredient"><i class="fa-solid fa-trash"></i></button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-circle-check"></i> Save changes</button>`,
-            onMount(modal, close) {
-              modal.querySelector('[data-cancel]').onclick = close;
-              modal.querySelector('[data-delete]').onclick = async () => {
-                close();
-                setOperationStatus('Removing ingredient...');
-                try {
-                  const idx = INVENTORY.findIndex(x => x.id === inv.id);
-                  if (idx > -1) INVENTORY.splice(idx, 1);
-                  if (window.RS_DB) await RS_DB.del('inventory', inv.id);
-                  finishOperationStatus('Ingredient removed');
-                  toast(`${inv.name} removed from inventory`, 'fa-circle-check');
-                  renderInventory();
-                } catch (e) {
-                  console.warn('Failed to remove ingredient', e);
-                  finishOperationStatus('Failed to remove ingredient', 'error');
-                  toast('Could not remove ingredient -- try again', 'fa-circle-exclamation');
-                }
-              };
-              modal.querySelector('[data-confirm]').onclick = async () => {
-                const name = modal.querySelector('#edit-ing-name').value.trim();
-                if (!name) return toast('Enter ingredient name', 'fa-circle-exclamation');
-                inv.name = name;
-                inv.cat = modal.querySelector('#edit-ing-cat').value.trim() || 'General';
-                inv.unit = modal.querySelector('#edit-ing-unit').value.trim() || 'unit';
-                inv.stock = +modal.querySelector('#edit-ing-stock').value || 0;
-                inv.min = +modal.querySelector('#edit-ing-min').value || 0;
-                inv.cost = +modal.querySelector('#edit-ing-cost').value || 0;
-                close();
-                setOperationStatus('Saving changes...');
-                try {
-                  if (window.RS_DB) await RS_DB.put('inventory', inv.id, inv);
-                  finishOperationStatus('Ingredient updated');
-                  toast(`${inv.name} updated`, 'fa-circle-check');
-                  renderInventory();
-                } catch (e) {
-                  console.warn('Failed to save ingredient edit', e);
-                  finishOperationStatus('Saved locally -- cloud sync pending', 'error');
-                  toast('Saved locally. Cloud sync pending.', 'fa-circle-exclamation');
-                  renderInventory();
-                }
-              };
-            }
-          });
-        });
-      });
     }
 
     // render recipe table
@@ -2351,18 +2199,8 @@
         <td><label class="switch-mini"><input type="checkbox" ${m.stock!=='out'?'checked':''}><span></span></label></td>
         <td><div class="row-actions"><button class="icon-act go" title="Edit" aria-label="Edit ${_e(m.name)}"><i class="fa-solid fa-pen"></i></button><button class="icon-act" title="Recipe" aria-label="Recipe for ${_e(m.name)}"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" title="Delete" aria-label="Delete ${_e(m.name)}"><i class="fa-solid fa-trash"></i></button></div></td>
       </tr>`).join('');
-    // NOTE: this is a fallback renderer. In normal operation `features-editor.js` overrides
-    // 'editor-tab' in `renderers` with a real save/delete implementation (RS.addRenderer).
-    // These handlers only run if that override failed to load -- they must NOT claim success
-    // for an edit/delete that never actually happened.
-    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>{
-      console.warn('Menu editor fallback renderer active -- features-editor.js did not load/override editor-tab.');
-      toast('Menu editor failed to load. Please refresh the page and try again.', 'fa-triangle-exclamation');
-    }));
-    $$('#editor-list .icon-act.danger').forEach(b=>b.addEventListener('click',()=>{
-      console.warn('Menu editor fallback renderer active -- features-editor.js did not load/override editor-tab.');
-      toast('Menu editor failed to load -- nothing was deleted. Please refresh the page.', 'fa-triangle-exclamation');
-    }));
+    $$('#editor-list .icon-act.go').forEach(b=>b.addEventListener('click',()=>toast('Opening item editor...','fa-pen')));
+    $$('#editor-list .icon-act.danger').forEach(b=>b.addEventListener('click',()=>toast('Item removed','fa-trash')));
   };
 
   /* ============================================================

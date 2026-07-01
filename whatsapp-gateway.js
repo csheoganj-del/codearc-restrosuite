@@ -1,5 +1,4 @@
 // Force IPv4 resolution order to avoid cloud IPv6 connectivity issues
-require('dns').setDefaultResultOrder('ipv4first');
 process.on('uncaughtException', (err) => {
     console.error('[CRITICAL] Uncaught Exception:', err);
 });
