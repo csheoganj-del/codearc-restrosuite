@@ -120,7 +120,13 @@
       if (Number.isFinite(Number(id))) {
         return Number(id);
       }
-      return stableNumericId(id);
+      // Salt string ids (e.g. bill numbers like "RS-20260702-001") with the
+      // tenant id. These tables are shared across all tenants with a plain
+      // numeric primary key, and every tenant's daily bill numbering starts
+      // at -001, so unsalted hashes collide across tenants: only the first
+      // restaurant to bill each day could save its bill, everyone else's
+      // insert failed on doppio_bills_pkey and was silently dropped.
+      return stableNumericId(getActiveTenantId() + ':' + id);
     }
     return id;
   }
