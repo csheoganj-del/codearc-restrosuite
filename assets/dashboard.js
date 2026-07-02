@@ -1434,10 +1434,14 @@
 
   function parseOrderTimestamp(dateStr) {
     if (!dateStr) return null;
-    const nativeTime = new Date(dateStr).getTime();
-    if (!Number.isNaN(nativeTime)) return nativeTime;
+    // Locale d/m/y strings like "02/07/2026, 10:26 am" must be parsed as
+    // d/m/y; the native Date parser reads them m/d/y (Feb 7 instead of
+    // 2 July), which made order ages show as thousands of hours.
     const m = String(dateStr).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]m)?$/i);
-    if (!m) return null;
+    if (!m) {
+      const nativeTime = new Date(dateStr).getTime();
+      return Number.isNaN(nativeTime) ? null : nativeTime;
+    }
     let [, d, mo, y, h, mi, s, meridiem] = m;
     let hour = Number(h);
     if (meridiem) {
@@ -1591,6 +1595,19 @@
             syncPendingOrders({ forceCloud: true });
           }).subscribe();
       }
+    }
+    // Fallback: postgres_changes events are silently dropped for anon
+    // subscribers when RLS denies SELECT on the table (production locks
+    // all tables behind Edge Functions). Poll while the app is visible so
+    // new QR orders surface within ~12s even without realtime events.
+    if (!window.__rsPendingOrdersPollTimer) {
+      window.__rsPendingOrdersPollTimer = setInterval(() => {
+        if (document.hidden) return;
+        syncPendingOrders({ forceCloud: true });
+      }, 12000);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) syncPendingOrders({ forceCloud: true });
+      });
     }
   }
 
