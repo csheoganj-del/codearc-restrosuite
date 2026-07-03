@@ -296,6 +296,19 @@
     .invalid i { font-size: 56px; color: var(--brand); opacity: 0.45; }
     .invalid h2 { font-family: 'Playfair Display', serif; font-size: 21px; }
     .invalid p { color: var(--muted); max-width: 280px; }
+    .mode-banner {
+      margin: 12px 12px 0;
+      padding: 10px 12px;
+      border-radius: var(--r-sm);
+      background: #111827;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .mode-banner i { color: var(--brand); }
 
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -306,9 +319,12 @@
 <canvas id="cc"></canvas>
 
 <!-- HEADER -->
-<header class="hdr">
-  <div class="hdr-brand">
-    <div id="rest-name">Loading...</div>
+<header class="hdr" style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <a href="#" class="back-to-portal-btn" id="back-to-portal" style="display: none; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; color: var(--text); background: var(--surface-alt); text-decoration: none; font-size: 16px;"><i class="fa-solid fa-arrow-left"></i></a>
+    <div class="hdr-brand">
+      <div id="rest-name">Loading...</div>
+    </div>
   </div>
   <div class="table-pill" id="table-pill" style="display:none">
     <i class="fa-solid fa-chair"></i>
@@ -401,6 +417,17 @@
   const slug  = params.get('tenant') || params.get('outlet') || '';
   function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
   const tNum  = params.get('table') || '';
+  // Waiter mode: same table QR, staff flow. Orders punch to KOT/KDS as
+  // waiter-taken (POS-linked) instead of QR self-orders.
+  const waiterMode = params.get('mode') === 'waiter';
+  document.body.classList.toggle('waiter-mode', waiterMode);
+
+  // Configure back to dining portal link
+  const backBtn = document.getElementById('back-to-portal');
+  if (backBtn && slug) {
+    backBtn.href = 'qr-order.html?tenant=' + slug + '&table=' + tNum + (waiterMode ? '&mode=waiter' : '');
+    backBtn.style.display = 'inline-flex';
+  }
 
   function slugToName(s){ return s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
   const restName = slug ? slugToName(slug) : '';
@@ -417,7 +444,9 @@
       '<span class="logo-doppio">' + escHtml(first) + '</span>' + 
       (rest ? '<span class="logo-cafe">' + escHtml(rest) + '</span>' : '');
       
-    document.getElementById('hero-sub').textContent = 'Order directly from your table at ' + nameVal + '. Fresh and fast!';
+    document.getElementById('hero-sub').textContent = waiterMode
+      ? 'Punch items for this table directly to the kitchen.'
+      : 'Order directly from your table at ' + nameVal + '. Fresh and fast!';
   }
 
   if(restName){
@@ -433,6 +462,18 @@
     document.getElementById('drawer-tag').textContent = 'Table '+pad;
   } else {
     document.getElementById('drawer-tag').textContent = 'Takeaway';
+  }
+
+  if(waiterMode){
+    const heroTitle = document.querySelector('.hero-title');
+    if(heroTitle) heroTitle.innerHTML = 'Waiter <span>KOT</span>';
+    document.getElementById('hero-sub').textContent = 'Punch items for this table directly to the kitchen.';
+    const drawerTitle = document.querySelector('.drawer-title');
+    if(drawerTitle) drawerTitle.textContent = 'KOT Order';
+    const formTitle = document.querySelector('.cust-form h4');
+    if(formTitle) formTitle.textContent = 'Guest Details (Optional)';
+    const orderBtn = document.querySelector('.order-btn');
+    if(orderBtn) orderBtn.innerHTML = '<i class="fa-solid fa-fire-burner"></i> Send KOT';
   }
 
   // ── VALIDATE ──
@@ -495,6 +536,55 @@
   var cat   = 'ALL';
   var q     = '';
 
+  function normalizePublicMenuItem(i){
+    return {
+      name: String(i.name || '').trim(),
+      price: parseInt(i.price, 10) || 0,
+      category: i.category || i.cat || 'Other',
+      description: i.description || i.desc || '',
+      image: i.image || '',
+      bestseller: !!i.bestseller
+    };
+  }
+
+  function readPublicMenuCache(){
+    var keys = ['doppio_menu_cache_' + slug, 'doppio_menu_cache_demo-tenant', 'doppio_menu_cache_local-demo'];
+    try {
+      var seen = {};
+      for(var i=0; i<localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(!k || seen[k]) continue;
+        seen[k] = true;
+        if(k.indexOf('doppio_menu_cache_') === 0 || k.slice(-10) === 'rs_v2:menu') keys.push(k);
+      }
+    } catch(e) {}
+    for(var n=0; n<keys.length; n++){
+      try {
+        var raw = localStorage.getItem(keys[n]);
+        if(!raw) continue;
+        var parsed = JSON.parse(raw);
+        var menu = Array.isArray(parsed) ? parsed : parsed.menu;
+        if(!Array.isArray(menu) || !menu.length) continue;
+        return {
+          menu: menu.map(normalizePublicMenuItem).filter(function(i){ return i.name && i.price > 0; }),
+          tenantName: parsed.tenantName || parsed.businessName || restName,
+          currencySymbol: parsed.currencySymbol || '\u20b9',
+          taxLabel: parsed.taxLabel || 'GST'
+        };
+      } catch(e) {}
+    }
+    return null;
+  }
+
+  function applyMenuPayload(data){
+    items = (data.menu || []).map(normalizePublicMenuItem).filter(function(i){ return i.name && i.price > 0; });
+    if (data.tenantName) applyLogoBranding(data.tenantName);
+    window.currencySymbol = data.currencySymbol || '\u20b9';
+    window.taxLabel = data.taxLabel || 'GST';
+    applyTaxLabel();
+    buildUI();
+  }
+
   // ── LOAD ──
   function loadMenu(){
     var cacheKey = 'doppio_menu_cache_' + slug;
@@ -504,17 +594,16 @@
     } catch(e) {}
 
     if (cachedData && Array.isArray(cachedData.menu) && cachedData.menu.length > 0) {
-      items = cachedData.menu;
-      if (cachedData.tenantName) {
-        applyLogoBranding(cachedData.tenantName);
-      }
-      window.currencySymbol = cachedData.currencySymbol || '₹';
-      window.taxLabel = cachedData.taxLabel || 'GST';
-      applyTaxLabel();
-      buildUI();
+      applyMenuPayload(cachedData);
     } else {
-      window.currencySymbol = '₹';
-      window.taxLabel = 'GST';
+      var localPublicData = readPublicMenuCache();
+      if (localPublicData && localPublicData.menu.length > 0) {
+        cachedData = localPublicData;
+        applyMenuPayload(localPublicData);
+        try { localStorage.setItem(cacheKey, JSON.stringify(localPublicData)); } catch(e) {}
+      }
+      window.currencySymbol = window.currencySymbol || '\u20b9';
+      window.taxLabel = window.taxLabel || 'GST';
     }
 
     if(sc){
@@ -531,7 +620,7 @@
 
         var menuChanged = JSON.stringify(items) !== JSON.stringify(newItems);
         var nameChanged = res.tenantName && res.tenantName !== 'Doppio Cafe' && (!cachedData || cachedData.tenantName !== res.tenantName);
-        var currencySymbol = res.currencySymbol || '₹';
+        var currencySymbol = res.currencySymbol || '\u20b9';
         var taxLabel = res.taxLabel || 'GST';
         var currencyChanged = window.currencySymbol !== currencySymbol || window.taxLabel !== taxLabel;
 
@@ -590,6 +679,7 @@
         (c==='ALL'?'All':c.charAt(0).toUpperCase()+c.slice(1).toLowerCase())+'</button>';
     }).join('');
     document.getElementById('main').innerHTML =
+      (waiterMode ? '<div class="mode-banner"><i class="fa-solid fa-user-tie"></i><span>Waiter mode: orders go to KOT/KDS. Payment stays in POS.</span></div>' : '') +
       '<div class="controls">'+
         '<div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i>'+
           '<input class="search-input" id="si" placeholder="Search menu..." oninput="setQ(this.value)"></div>'+
@@ -635,7 +725,7 @@
           '<div class="card-name">'+escHtml(item.name)+'</div>'+
           (item.description ? '<div class="card-desc">'+escHtml(item.description)+'</div>' : '')+
           '<div class="card-footer">'+
-            '<span class="card-price">'+(window.currencySymbol || '₹')+item.price+'</span>'+
+            '<span class="card-price">'+(window.currencySymbol || '\u20b9')+item.price+'</span>'+
             (qty>0
               ? '<div class="qty-row" onclick="event.stopPropagation()">'+
                   '<button class="q-btn" onclick="chQty(\''+sn+'\',-1)">&#8722;</button>'+
@@ -673,7 +763,7 @@
     if(tq>0){
       btn.classList.add('show');
       document.getElementById('float-lbl').textContent = tq+' item'+(tq>1?'s':'');
-      document.getElementById('float-tot').textContent = (window.currencySymbol || '₹')+tt;
+      document.getElementById('float-tot').textContent = (window.currencySymbol || '\u20b9')+tt;
     } else {
       btn.classList.remove('show');
     }
@@ -689,10 +779,18 @@
     document.getElementById('overlay').classList.add('on');
     document.getElementById('drawer').classList.add('on');
     document.body.style.overflow='hidden';
-    var sn=localStorage.getItem('rs_name')||'';
-    var sp=localStorage.getItem('rs_phone')||'';
-    if(sn) document.getElementById('cust-name').value=sn;
-    if(sp) document.getElementById('cust-phone').value=sp;
+    if(waiterMode){
+      // Staff flow: guest details are optional -- KOT is linked to the table.
+      var nameInp = document.getElementById('cust-name');
+      var phoneInp = document.getElementById('cust-phone');
+      if(nameInp){ nameInp.placeholder = 'Guest name (optional in waiter mode)'; }
+      if(phoneInp){ phoneInp.placeholder = 'Guest phone (optional)'; }
+    } else {
+      var sn=localStorage.getItem('rs_name')||'';
+      var sp=localStorage.getItem('rs_phone')||'';
+      if(sn) document.getElementById('cust-name').value=sn;
+      if(sp) document.getElementById('cust-phone').value=sp;
+    }
   };
   window.closeCart = function(){
     document.getElementById('overlay').classList.remove('on');
@@ -708,28 +806,29 @@
       return '<div class="cart-row">'+
         '<div class="cart-info">'+
           '<div class="cart-name">'+escHtml(item.name)+'</div>'+
-          '<div class="cart-unit">'+(window.currencySymbol || '₹')+item.price+' each</div>'+
+          '<div class="cart-unit">'+(window.currencySymbol || '\u20b9')+item.price+' each</div>'+
         '</div>'+
         '<div class="cart-ctrl">'+
           '<button class="cc-btn" onclick="chQty(\''+sn+'\',-1)">&#8722;</button>'+
           '<span class="cc-qty">'+item.qty+'</span>'+
           '<button class="cc-btn p" onclick="chQty(\''+sn+'\',1)">+</button>'+
         '</div>'+
-        '<div class="cart-total">'+(window.currencySymbol || '₹')+(item.price*item.qty)+'</div>'+
+        '<div class="cart-total">'+(window.currencySymbol || '\u20b9')+(item.price*item.qty)+'</div>'+
       '</div>';
     }).join('');
   }
   function calcSummary(){
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);
-    document.getElementById('s-sub').textContent = (window.currencySymbol || '₹')+(sub-gst);
-    document.getElementById('s-gst').textContent = (window.currencySymbol || '₹')+gst;
-    document.getElementById('s-tot').textContent = (window.currencySymbol || '₹')+sub;
+    document.getElementById('s-sub').textContent = (window.currencySymbol || '\u20b9')+(sub-gst);
+    document.getElementById('s-gst').textContent = (window.currencySymbol || '\u20b9')+gst;
+    document.getElementById('s-tot').textContent = (window.currencySymbol || '\u20b9')+sub;
   }
 
   window.placeOrder = function(){
     var name  = (document.getElementById('cust-name').value||'').trim();
     var phone = (document.getElementById('cust-phone').value||'').trim();
+    if(waiterMode && !name){ name = 'Waiter' + (tNum ? ' - T' + tNum : ''); }
     if(!name){
       var ni=document.getElementById('cust-name');
       ni.style.outline='2px solid #ff4444';
@@ -738,9 +837,13 @@
       return;
     }
     if(!cart.length) return;
-    localStorage.setItem('rs_name',name);
-    if(phone) localStorage.setItem('rs_phone',phone);
-    var rid = 'DO-QR-' + Date.now().toString(36).toUpperCase() + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
+    if(!waiterMode){
+      localStorage.setItem('rs_name',name);
+      if(phone) localStorage.setItem('rs_phone',phone);
+    }
+    // Order-ID prefix decides the source: DO-QR- = customer self-order,
+    // DO-WTR- = waiter KOT (backend classifies non-QR prefixes as staff-taken).
+    var rid = (waiterMode ? 'DO-WTR-' : 'DO-QR-') + Date.now().toString(36).toUpperCase() + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
     var tv  = tNum||'Takeaway';
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);
@@ -748,12 +851,49 @@
     var order = {orderId:rid,customerName:name,customerPhone:phone||'Dine-in',dateTime:ts,
       items:JSON.parse(JSON.stringify(cart)),subtotal:sub,discount:0,gst:gst,total:sub,
       paymentMethod:'Pending',orderType:tv==='Takeaway'?'Takeaway':'Dine-in',
-      tableNumber:tv,tenant_slug:slug,status:'Pending Review'};
-    if(sc){ apiCall('create_order',{order:Object.assign({},order,{items:JSON.stringify(cart)})}).catch(function(){}); }
-    try{ var ch=new BroadcastChannel(slug+'_qr_orders'); ch.postMessage({type:'NEW_QR_ORDER',order:order}); ch.close(); }catch(e){}
-    try{ var pq=JSON.parse(localStorage.getItem('doppio_pending_qr_orders')||'[]'); pq.push(order); localStorage.setItem('doppio_pending_qr_orders',JSON.stringify(pq)); }catch(e){}
-    closeCart();
-    showSuccess(order);
+      tableNumber:tv,tenant_slug:slug,status:'Pending Review',
+      source: waiterMode ? 'waiter_kot' : 'customer_qr',
+      waiterMode: !!waiterMode};
+    var orderBtn = document.querySelector('.order-btn');
+    var originalText = orderBtn ? orderBtn.innerHTML : 'Place Order';
+    if (orderBtn) {
+      orderBtn.disabled = true;
+      orderBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+    }
+
+    apiCall('create_order', { order: Object.assign({}, order, { items: JSON.stringify(cart) }) })
+      .then(function(res) {
+        if (res.error) {
+          alert("Order failed: " + res.error);
+          if (orderBtn) {
+            orderBtn.disabled = false;
+            orderBtn.innerHTML = originalText;
+          }
+          return;
+        }
+
+        try {
+          var pq = JSON.parse(localStorage.getItem('doppio_pending_qr_orders') || '[]');
+          pq.push(order);
+          localStorage.setItem('doppio_pending_qr_orders', JSON.stringify(pq));
+        } catch(e) {}
+
+        try {
+          var ch = new BroadcastChannel(slug + '_qr_orders');
+          ch.postMessage({ type: 'NEW_QR_ORDER', order: order });
+          ch.close();
+        } catch(e) {}
+
+        closeCart();
+        showSuccess(order);
+      })
+      .catch(function(err) {
+        alert("Failed to submit order. Please check your connection.");
+        if (orderBtn) {
+          orderBtn.disabled = false;
+          orderBtn.innerHTML = originalText;
+        }
+      });
   };
 
   function showSuccess(order){
@@ -762,9 +902,15 @@
     var pd = tNum && parseInt(tNum)<10 ? '0'+tNum : tNum;
     document.getElementById('r-table').textContent = tNum ? 'Table '+pd : 'Takeaway';
     document.getElementById('r-id').textContent = 'Order ID: '+order.orderId;
-    document.getElementById('r-total').textContent = (window.currencySymbol || '₹')+order.total;
+    if(waiterMode){
+      document.querySelector('.s-title').textContent = 'KOT Sent!';
+      document.getElementById('s-msg').textContent = 'The kitchen has received this waiter order.';
+      var totalLabel = document.querySelector('.r-total span:first-child');
+      if(totalLabel) totalLabel.textContent = 'KOT Total';
+    }
+    document.getElementById('r-total').textContent = (window.currencySymbol || '\u20b9')+order.total;
     document.getElementById('r-items').innerHTML = order.items.map(function(i){
-      return '<div class="r-item"><span>'+escHtml(i.name)+' x'+i.qty+'</span><span>'+(window.currencySymbol || '₹')+(i.price*i.qty)+'</span></div>';
+      return '<div class="r-item"><span>'+escHtml(i.name)+' x'+i.qty+'</span><span>'+(window.currencySymbol || '\u20b9')+(i.price*i.qty)+'</span></div>';
     }).join('');
     document.getElementById('success').classList.add('on');
     confetti();
@@ -787,6 +933,9 @@
     cart=[];
     document.getElementById('success').classList.remove('on');
     updateFloat(); renderGrid();
+    if (!waiterMode) {
+      window.location.href = 'qr-order.html?tenant=' + slug + '&table=' + tNum;
+    }
   };
 
   function confetti(){
