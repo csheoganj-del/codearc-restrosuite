@@ -247,6 +247,14 @@
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
     $$('.sidebar-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
+    // Mobile POS checkout bar only belongs to the POS tab
+    try {
+      const mBar = document.getElementById('pos-m-cart-bar');
+      if (mBar) {
+        if (id !== 'pos-tab') mBar.classList.add('hidden');
+        else if (cart.length > 0 && window.innerWidth <= 1024 && !$('.pos-cart')?.classList.contains('active')) mBar.classList.remove('hidden');
+      }
+    } catch(e){}
     document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     try { updateTabAttentionBlinking(); } catch(e){}
     const meta = titles[id]; if(meta){ $('#page-title').textContent = meta[0]; $('#page-sub').textContent = meta[1]; }
@@ -755,13 +763,16 @@
   const renderPOS = () => {
     const grid = $('#pos-grid');
     const q = ($('#pos-search-input')?.value||'').toLowerCase();
-    const items = MENU.filter(m=>(activeCat==='All'||m.cat.toLowerCase()===activeCat.toLowerCase()) && m.name.toLowerCase().includes(q));
+    const items = MENU.filter(m=>{
+      const mc = ((m.cat || '').trim() || 'Uncategorized').toLowerCase();
+      return (activeCat==='All'||mc===String(activeCat).toLowerCase()) && (m.name||'').toLowerCase().includes(q);
+    });
     grid.innerHTML = items.map(m=>{
       const inCart = cart.find(c=>String(c.id)===String(m.id));
       return `
       <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
         ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
-        <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat)}</span></div>
+        <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat || 'Uncategorized')}</span></div>
         <div class="pname">${_e(m.name)}</div>
         <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></div>
       </div>`;
@@ -812,7 +823,9 @@
     if (barCount && barTotal && cartBar) {
       barCount.textContent = count + (count === 1 ? ' item' : ' items');
       barTotal.textContent = rs(totals.grand);
-      if (count > 0 && window.innerWidth <= 1024) {
+      const posActive = !!document.querySelector('#pos-tab.active');
+      const cartViewOpen = !!document.querySelector('.pos-cart.active');
+      if (count > 0 && window.innerWidth <= 1024 && posActive && !cartViewOpen) {
         cartBar.classList.remove('hidden');
       } else {
         cartBar.classList.add('hidden');
@@ -1219,7 +1232,14 @@
       }
     })();
 
-    $('#pos-cats').innerHTML = CATS.map((c,i)=>`<button class="pos-cat-btn ${i===0?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
+    // Category chips are derived from the LIVE menu, so every item is always
+    // reachable via its own category (custom categories included) -- not just
+    // the hardcoded defaults.
+    const liveCats = ['All'].concat(Array.from(new Set(
+      MENU.map(m => (m.cat || '').trim() || 'Uncategorized')
+    )).sort((a, b) => a.localeCompare(b)));
+    if (!liveCats.some(c => c.toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
+    $('#pos-cats').innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${c.toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
     $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
       activeCat=b.dataset.cat;
       $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
@@ -4192,21 +4212,37 @@
       const items = billRow._items || [];
       if (!items.length) return;
       let changed = false;
+      let deductedCount = 0;   // ingredient lines deducted
+      let noRecipeCount = 0;   // sold items with no recipe linked
+      const lowStock = [];     // ingredients that fell below their min level
       items.forEach(it => {
         const menuItem = MENU.find(m => m.name === it.name);
-        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) { noRecipeCount++; return; }
         const orderedQty = Number(it.qty) || 1;
         menuItem.ingredients.forEach(ing => {
           const invItem = INVENTORY.find(x => x.name === ing.name);
           if (!invItem) return;
           invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(ing.qty) || 0) * orderedQty);
           changed = true;
+          deductedCount++;
+          const minLevel = Number(invItem.min != null ? invItem.min : (invItem.minStock || 0));
+          if (minLevel && invItem.stock <= minLevel && lowStock.indexOf(invItem.name) === -1) lowStock.push(invItem.name);
         });
       });
       if (changed) {
+        // Persist locally AND push to cloud so stock levels survive/sync.
         if (window.RS_DB && RS_DB.writeLocal) RS_DB.writeLocal('inventory', INVENTORY).catch(() => {});
+        try { if (RS.save) RS.save('inventory'); } catch (e) {}
         const rendered = document.querySelector('#inventory-tab.active');
         if (rendered && window.RS && RS.render) RS.render('inventory-tab');
+        // Make the deduction visible instead of silent
+        toast(`Stock updated: ${deductedCount} ingredient${deductedCount === 1 ? '' : 's'} deducted from inventory`, 'fa-boxes-stacked');
+        if (lowStock.length) {
+          setTimeout(() => toast(`Low stock: ${lowStock.slice(0, 3).join(', ')}${lowStock.length > 3 ? '…' : ''}`, 'fa-triangle-exclamation'), 2600);
+        }
+      } else if (noRecipeCount === items.length) {
+        // Nothing deducted because no sold item has a recipe -- tell the user why
+        console.info('[Inventory] No stock deducted: none of the billed items have linked recipes. Link recipes under Inventory → Recipes.');
       }
     },
 

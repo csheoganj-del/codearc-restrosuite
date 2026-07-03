@@ -92,6 +92,21 @@ function _humanDelay(messageText) {
  */
 function _betweenMessageDelay() { return _randInt(3000, 9000); }
 
+/**
+ * Message uniqueness -- makes every outbound text byte-unique so no two
+ * messages are byte-identical (identical bulk payloads are a spam signal).
+ *   1. Appends 0-3 zero-width spaces (invisible to the recipient).
+ *   2. Occasionally varies trailing whitespace style.
+ * Visual content is unchanged.
+ */
+function _uniquifyText(text) {
+    if (typeof text !== 'string' || !text.length) return text;
+    let out = text;
+    if (Math.random() < 0.3 && !/\s$/.test(out)) out += ' ';
+    out += '\u200B'.repeat(_randInt(0, 3));
+    return out;
+}
+
 /** Check and increment daily counter. Returns false if limit reached. */
 function _checkDailyLimit(tenantId) {
     const today = new Date().toISOString().slice(0, 10);
@@ -156,7 +171,11 @@ async function humanSend(client, chatId, msg, opts, tenantId) {
             // 4. Send the actual message
             let result;
             if (typeof msg === 'string') {
-                result = await client.sendMessage(cleanJid, { text: msg }, opts || {});
+                result = await client.sendMessage(cleanJid, { text: _uniquifyText(msg) }, opts || {});
+            } else if (msg && typeof msg === 'object' && typeof msg.text === 'string') {
+                result = await client.sendMessage(cleanJid, { ...msg, text: _uniquifyText(msg.text) }, opts || {});
+            } else if (msg && typeof msg === 'object' && typeof msg.caption === 'string') {
+                result = await client.sendMessage(cleanJid, { ...msg, caption: _uniquifyText(msg.caption) }, opts || {});
             } else {
                 result = await client.sendMessage(cleanJid, msg, opts || {});
             }
@@ -892,6 +911,7 @@ async function initializeBaileysClient(tid, tenantData) {
                 clearWatchdog();
                 tenantData.status = 'qr';
                 tenantData.number = null;
+                tenantData.awaitingLink = true; // fresh QR shown -> next 'open' is a new link
                 try {
                     tenantData.qr = await QRCodeLib.toDataURL(qr);
                     console.log(`[QR] New QR code generated for tenant: ${tid}`);
@@ -913,10 +933,17 @@ async function initializeBaileysClient(tid, tenantData) {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 
+                const lostNumber = tenantData.number; // capture before it is cleared
                 console.log(`[Disconnected] Tenant ${tid} connection closed:`, lastDisconnect?.error);
                 tenantData.status = shouldReconnect ? 'connecting' : 'disconnected';
                 tenantData.qr = null;
                 tenantData.number = null;
+
+                // Terminal disconnect (logged out) -> alert the tenant on their
+                // WhatsApp via the central gateway (their own session is dead).
+                if (!shouldReconnect && tid !== 'system' && lostNumber) {
+                    notifyTenantDisconnected(tid, lostNumber, 'logged out').catch(() => {});
+                }
                 
                 await logHealthEvent('disconnected', shouldReconnect ? 'warning' : 'error', { 
                     tenantId: tid, 
@@ -945,6 +972,10 @@ async function initializeBaileysClient(tid, tenantData) {
                         }
                         return;
                     }
+                    if (tenantData.reconnectAttempts + 1 >= MAX_RECONNECT_ATTEMPTS && tid !== 'system' && lostNumber) {
+                        // Last attempt about to run -- warn the tenant proactively
+                        notifyTenantDisconnected(tid, lostNumber, 'connection lost').catch(() => {});
+                    }
                     tenantData.reconnectAttempts++;
                     const delayMs = 10000 * tenantData.reconnectAttempts;
                     console.log(`[Reconnect] Tenant ${tid}: Attempt ${tenantData.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000}s...`);
@@ -971,6 +1002,15 @@ async function initializeBaileysClient(tid, tenantData) {
                     });
                 }
 
+                // Fresh QR link (not a routine reconnect) -> confirm to the tenant
+                // on their own WhatsApp number.
+                if (tenantData.awaitingLink && tid !== 'system') {
+                    tenantData.awaitingLink = false;
+                    notifyTenantConnected(tid, tenantData).catch(() => {});
+                } else {
+                    tenantData.awaitingLink = false;
+                }
+
                 if (supabaseService) {
                     await saveSessionToSupabaseScoped(tid);
                 }
@@ -982,6 +1022,53 @@ async function initializeBaileysClient(tid, tenantData) {
         clearWatchdog();
         console.error(`[Initialization Error] Tenant ${tid} failed:`, err.message);
         tenantData.status = 'error';
+    }
+}
+
+// ============================================================
+// TENANT CONNECT / DISCONNECT WHATSAPP NOTIFICATIONS
+// ============================================================
+// - On successful link: the tenant gets a confirmation on their own
+//   WhatsApp (sent from their own freshly-linked session, to themselves).
+// - On terminal disconnect (logged out / attempts exhausted): the tenant is
+//   notified from the CENTRAL system WhatsApp, since their own session is dead.
+const _disconnectNotifyAt = {}; // tid -> timestamp (anti-spam)
+
+async function notifyTenantConnected(tid, tenantData) {
+    if (tid === 'system' || !tenantData || !tenantData.client || !tenantData.number) return;
+    try {
+        const selfJid = `${tenantData.number}@s.whatsapp.net`;
+        const msg = `\u2705 *WhatsApp Connected to RestroSuite*\n\n` +
+            `Your number +${tenantData.number} is now linked to your RestroSuite outlet and will be used to send bills and order updates to your customers.\n\n` +
+            `If you did not perform this connection, open Dashboard \u2192 Settings \u2192 WhatsApp and disconnect immediately.`;
+        await humanSend(tenantData.client, selfJid, msg, {}, tid);
+        console.log(`[Notify] Sent connection confirmation to tenant ${tid} (+${tenantData.number})`);
+    } catch (err) {
+        console.warn(`[Notify] Failed to send connect confirmation for tenant ${tid}:`, err.message);
+    }
+}
+
+async function notifyTenantDisconnected(tid, lostNumber, reason) {
+    if (tid === 'system' || !lostNumber) return;
+    // Anti-spam: at most one disconnect notification per tenant per 15 minutes
+    const now = Date.now();
+    if (_disconnectNotifyAt[tid] && now - _disconnectNotifyAt[tid] < 15 * 60 * 1000) return;
+    try {
+        const systemData = tenantClients.get('system');
+        if (!systemData || systemData.status !== 'ready' || !systemData.client) {
+            console.warn(`[Notify] Cannot notify tenant ${tid} of disconnect -- central gateway not ready.`);
+            return;
+        }
+        _disconnectNotifyAt[tid] = now;
+        const msg = `\u26A0\uFE0F *RestroSuite: WhatsApp Disconnected*\n\n` +
+            `Your outlet's WhatsApp (+${lostNumber}) has been disconnected from RestroSuite` +
+            (reason ? ` (${reason})` : '') + `.\n\n` +
+            `Customer bills and order updates are paused. To reconnect, open Dashboard \u2192 Settings \u2192 WhatsApp and scan the QR code again.\n\n` +
+            `\u2014 RestroSuite Central Notification Service`;
+        await humanSend(systemData.client, `${lostNumber}@s.whatsapp.net`, msg, {}, 'system');
+        console.log(`[Notify] Sent disconnect alert to tenant ${tid} (+${lostNumber}) via central gateway.`);
+    } catch (err) {
+        console.warn(`[Notify] Failed to send disconnect alert for tenant ${tid}:`, err.message);
     }
 }
 
