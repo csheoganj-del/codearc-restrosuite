@@ -401,6 +401,9 @@
   const slug  = params.get('tenant') || params.get('outlet') || '';
   function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
   const tNum  = params.get('table') || '';
+  // Waiter mode: same table QR, staff flow. Orders punch to KOT/KDS as
+  // waiter-taken (POS-linked) instead of QR self-orders.
+  const waiterMode = params.get('mode') === 'waiter';
 
   function slugToName(s){ return s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
   const restName = slug ? slugToName(slug) : '';
@@ -689,10 +692,18 @@
     document.getElementById('overlay').classList.add('on');
     document.getElementById('drawer').classList.add('on');
     document.body.style.overflow='hidden';
-    var sn=localStorage.getItem('rs_name')||'';
-    var sp=localStorage.getItem('rs_phone')||'';
-    if(sn) document.getElementById('cust-name').value=sn;
-    if(sp) document.getElementById('cust-phone').value=sp;
+    if(waiterMode){
+      // Staff flow: guest details are optional -- KOT is linked to the table.
+      var nameInp = document.getElementById('cust-name');
+      var phoneInp = document.getElementById('cust-phone');
+      if(nameInp){ nameInp.placeholder = 'Guest name (optional in waiter mode)'; }
+      if(phoneInp){ phoneInp.placeholder = 'Guest phone (optional)'; }
+    } else {
+      var sn=localStorage.getItem('rs_name')||'';
+      var sp=localStorage.getItem('rs_phone')||'';
+      if(sn) document.getElementById('cust-name').value=sn;
+      if(sp) document.getElementById('cust-phone').value=sp;
+    }
   };
   window.closeCart = function(){
     document.getElementById('overlay').classList.remove('on');
@@ -730,6 +741,7 @@
   window.placeOrder = function(){
     var name  = (document.getElementById('cust-name').value||'').trim();
     var phone = (document.getElementById('cust-phone').value||'').trim();
+    if(waiterMode && !name){ name = 'Waiter' + (tNum ? ' · T' + tNum : ''); }
     if(!name){
       var ni=document.getElementById('cust-name');
       ni.style.outline='2px solid #ff4444';
@@ -738,9 +750,13 @@
       return;
     }
     if(!cart.length) return;
-    localStorage.setItem('rs_name',name);
-    if(phone) localStorage.setItem('rs_phone',phone);
-    var rid = 'DO-QR-' + Date.now().toString(36).toUpperCase() + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
+    if(!waiterMode){
+      localStorage.setItem('rs_name',name);
+      if(phone) localStorage.setItem('rs_phone',phone);
+    }
+    // Order-ID prefix decides the source: DO-QR- = customer self-order,
+    // DO-WTR- = waiter KOT (backend classifies non-QR prefixes as staff-taken).
+    var rid = (waiterMode ? 'DO-WTR-' : 'DO-QR-') + Date.now().toString(36).toUpperCase() + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
     var tv  = tNum||'Takeaway';
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);

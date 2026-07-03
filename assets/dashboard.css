@@ -576,6 +576,21 @@
   justify-content: center; padding: 0 4px; border: 2px solid var(--panel);
 }
 .mobile-only-inline { display: none; }
+
+/* Mobile POS checkout bar (visible on phones only, see media query below) */
+.pos-m-cart-bar {
+  display: none; position: fixed; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 0 16px; cursor: pointer; user-select: none; -webkit-user-select: none;
+  background: linear-gradient(135deg, var(--orange-soft, #ff8a3d), var(--orange-deep, #ff4f00));
+  color: #fff; border: none; border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(255, 79, 0, 0.45);
+  transition: transform 0.28s cubic-bezier(0.22, 0.9, 0.35, 1);
+}
+.pos-m-cart-bar .pmcb-left { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; min-width: 0; }
+.pos-m-cart-bar .pmcb-left i { font-size: 15px; }
+.pos-m-cart-bar .pmcb-right { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 800; white-space: nowrap; }
+.pos-m-cart-bar .pmcb-cta { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; background: rgba(255,255,255,0.18); padding: 6px 10px; border-radius: 99px; }
+.pos-m-cart-bar .pmcb-cta i { font-size: 11px; }
 @keyframes bounceScale {
   0% { transform: scale(1); }
   50% { transform: scale(1.3); }
@@ -590,8 +605,14 @@
   .content { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 10px calc(92px + env(safe-area-inset-bottom)); }
   .mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 4px; justify-content: space-around;
     background: var(--panel); border-top: 1px solid var(--stroke); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
-  .mnav-link { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border-radius: var(--r-sm); color: var(--text-mute); font-size: 10px; font-weight: 600; cursor: pointer; transition: var(--t); }
-  .mnav-link i { font-size: 17px; }
+  /* Tab bar: equal-width links, one clean row, no zigzag (labels never wrap) */
+  .mnav-link {
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; height: 52px; padding: 4px 2px; border-radius: var(--r-sm); color: var(--text-mute);
+    font-size: 10px; font-weight: 600; line-height: 1; cursor: pointer; transition: var(--t);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+  }
+  .mnav-link i { font-size: 20px; width: 24px; height: 22px; display: flex; align-items: center; justify-content: center; }
   .mnav-link.active { color: var(--orange); }
 
   .stat-row { grid-template-columns: 1fr 1fr; }
@@ -627,8 +648,18 @@
   #pos-tab .cart-payment { padding: 10px; margin-bottom: 10px; }
   #pos-tab .cpay-methods { margin-bottom: 0; }
   #pos-tab .cart-actions .btn { padding: 11px 9px; font-size: 12.5px; }
-  .pos-m-cart-bar { bottom: calc(68px + env(safe-area-inset-bottom)); left: 10px; right: 10px; height: 50px; z-index: 120; }
-  .pos-m-cart-bar.hidden { transform: translateY(110px); }
+  .pos-m-cart-bar { display: flex; bottom: calc(68px + env(safe-area-inset-bottom)); left: 10px; right: 10px; height: 50px; z-index: 120; }
+  .pos-m-cart-bar.hidden { transform: translateY(130px); box-shadow: none; }
+
+  /* Compact POS item cards on small phones: 3 columns, ~2x more items visible */
+  @media (max-width: 480px) {
+    #pos-tab .pos-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+    #pos-tab .pos-item { min-height: 78px; padding: 8px 9px; gap: 5px; border-radius: 10px; }
+    #pos-tab .pos-item .picat { display: none; }
+    #pos-tab .pos-item .pname { font-size: 11.5px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    #pos-tab .pos-item .pprice { font-size: 13px; }
+    #pos-tab .stock-dot { font-size: 8.5px; padding: 2px 5px; }
+  }
   .toast { bottom: calc(82px + env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); }
   .rs-impersonation-banner { top: 8px; align-items: flex-start; flex-direction: column; gap: 8px; }
   .rs-impersonation-banner button { width: 100%; justify-content: center; }
