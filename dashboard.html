@@ -668,7 +668,7 @@
         </table></div></div>
         <!-- Recipes panel -->
         <div id="inv-panel-recipes" class="inv-panel-section panel panel-pad" style="display:none;">
-          <div class="panel-head"><h3>Menu Recipes</h3><span class="ph-sub">Ingredients linked to each menu item — used for automatic inventory deduction</span></div>
+          <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div><h3>Menu Recipes</h3><span class="ph-sub">Ingredients linked to each menu item — used for automatic inventory deduction</span></div><button class="btn btn-primary btn-sm" id="btn-bulk-recipe-import" style="white-space:nowrap;"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import Recipes</button></div>
           <div class="table-scroll"><table class="data-table">
             <thead><tr><th>Menu Item</th><th>Category</th><th>Ingredients</th><th>Plate Cost</th><th>Selling Price</th><th>Margin</th><th>Actions</th></tr></thead>
             <tbody id="recipe-table-body"></tbody>
@@ -1031,17 +1031,17 @@
 
 <!-- ===================== MOBILE BOTTOM NAV ===================== -->
 <nav class="mobile-nav">
-  <a class="mnav-link superadmin-hide" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i> POS</a>
-  <a class="mnav-link superadmin-hide" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i> Orders</a>
-  <a class="mnav-link superadmin-hide" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</a>
-  <a class="mnav-link superadmin-hide" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i> Bills</a>
-  <a class="mnav-link superadmin-hide" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i> Reports</a>
-  <a class="mnav-link superadmin-hide" id="mnav-more"><i class="fa-solid fa-ellipsis"></i> More</a>
+  <a class="mnav-link superadmin-hide" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i><span>POS</span></a>
+  <a class="mnav-link superadmin-hide" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i><span>Orders</span></a>
+  <a class="mnav-link superadmin-hide" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i><span>Kitchen</span></a>
+  <a class="mnav-link superadmin-hide" data-tab="bills-tab"><i class="fa-solid fa-file-invoice"></i><span>Bills</span></a>
+  <a class="mnav-link superadmin-hide" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
+  <a class="mnav-link superadmin-hide" id="mnav-more"><i class="fa-solid fa-ellipsis"></i><span>More</span></a>
 
   <!-- Super-admin specific mobile nav links -->
-  <a class="mnav-link superadmin-only" data-tab="super-admin-tab" style="display:none;"><i class="fa-solid fa-user-shield"></i> Admin</a>
-  <a class="mnav-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none;"><i class="fa-solid fa-server"></i> Gateway</a>
-  <a class="mnav-link logout superadmin-only" style="display:none;"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+  <a class="mnav-link superadmin-only" data-tab="super-admin-tab" style="display:none;"><i class="fa-solid fa-user-shield"></i><span>Admin</span></a>
+  <a class="mnav-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none;"><i class="fa-solid fa-server"></i><span>Gateway</span></a>
+  <a class="mnav-link logout superadmin-only" style="display:none;"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></a>
 </nav>
 
 <div class="toast" id="toast"></div>

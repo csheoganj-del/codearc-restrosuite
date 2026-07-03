@@ -249,11 +249,7 @@
     $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     // Mobile POS checkout bar only belongs to the POS tab
     try {
-      const mBar = document.getElementById('pos-m-cart-bar');
-      if (mBar) {
-        if (id !== 'pos-tab') mBar.classList.add('hidden');
-        else if (cart.length > 0 && window.innerWidth <= 1024 && !$('.pos-cart')?.classList.contains('active')) mBar.classList.remove('hidden');
-      }
+      updateMobileCartBar();
     } catch(e){}
     document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     try { updateTabAttentionBlinking(); } catch(e){}
@@ -762,6 +758,7 @@
   let activeCat='All', cart=[], discountPct=0;
   const renderPOS = () => {
     const grid = $('#pos-grid');
+    if (!grid) return;
     const q = ($('#pos-search-input')?.value||'').toLowerCase();
     const items = MENU.filter(m=>{
       const mc = ((m.cat || '').trim() || 'Uncategorized').toLowerCase();
@@ -779,6 +776,82 @@
     }).join('');
     $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
   };
+  function refreshPosCats(){
+    const catsEl = $('#pos-cats');
+    if (!catsEl) return;
+    const liveCats = ['All'].concat(Array.from(new Set(
+      MENU.map(m => (m.cat || '').trim() || 'Uncategorized')
+    )).sort((a, b) => a.localeCompare(b)));
+    if (!liveCats.some(c => c.toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
+    catsEl.innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${c.toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
+    $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
+      activeCat=b.dataset.cat;
+      $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
+      renderPOS();
+      const container = document.getElementById('pos-cats');
+      if (container) {
+        container.scrollTo({
+          left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
+          behavior: 'smooth'
+        });
+      }
+    }));
+  }
+  window.refreshPosCats = refreshPosCats;
+  let lastMobileCartOpenAt = 0;
+  function updateMobileCartBar(countArg, totalsArg){
+    const barCount = $('#pos-m-cart-bar-count');
+    const barTotal = $('#pos-m-cart-bar-total');
+    const cartBar = $('#pos-m-cart-bar');
+    if (!barCount || !barTotal || !cartBar) return;
+    const count = countArg != null ? countArg : cart.reduce((a,c)=>a+c.qty,0);
+    const totals = totalsArg || getTotals();
+    barCount.textContent = count + (count === 1 ? ' item' : ' items');
+    barTotal.textContent = rs(totals.grand);
+    const posActive = !!document.querySelector('#pos-tab.active');
+    const cartViewOpen = !!document.querySelector('.pos-cart.active');
+    const shouldShow = count > 0 && window.innerWidth <= 1024 && posActive && !cartViewOpen;
+    cartBar.classList.toggle('hidden', !shouldShow);
+  }
+  function openMobilePOSCart(e){
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const now = Date.now();
+    if (now - lastMobileCartOpenAt < 250) return;
+    lastMobileCartOpenAt = now;
+    if (window.innerWidth > 1024 || !cart.length) return;
+    const posLeft = $('.pos-left');
+    const posCart = $('.pos-cart');
+    const cartBar = $('#pos-m-cart-bar');
+    if (!posLeft || !posCart || !cartBar) return;
+    posLeft.classList.add('hidden');
+    posCart.classList.add('active');
+    cartBar.classList.add('hidden');
+    const content = document.querySelector('.content');
+    if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function closeMobilePOSCart(showBar = true){
+    const posLeft = $('.pos-left');
+    const posCart = $('.pos-cart');
+    const cartBar = $('#pos-m-cart-bar');
+    if (!posLeft || !posCart || !cartBar) return;
+    posLeft.classList.remove('hidden');
+    posCart.classList.remove('active');
+    if (showBar) updateMobileCartBar();
+    else cartBar.classList.add('hidden');
+  }
+  function bindMobileCartBar(){
+    const cartBar = $('#pos-m-cart-bar');
+    if (!cartBar || cartBar.dataset.rsBound) return;
+    cartBar.dataset.rsBound = '1';
+    cartBar.addEventListener('click', openMobilePOSCart);
+    cartBar.addEventListener('pointerup', openMobilePOSCart);
+    cartBar.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') openMobilePOSCart(e);
+    });
+  }
   function addToCart(id){ const m=MENU.find(x=>String(x.id)===String(id)); const line=cart.find(c=>String(c.id)===String(id)); if(line) line.qty++; else cart.push({...m,qty:1}); renderCart(); toast(`${m.name} added`,'fa-plus'); }
   function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
   function renderCart(){
@@ -816,21 +889,7 @@
     
     $('#t-grand').textContent=rs(totals.grand);
 
-    // Update Mobile Cart Bar
-    const barCount = $('#pos-m-cart-bar-count');
-    const barTotal = $('#pos-m-cart-bar-total');
-    const cartBar = $('#pos-m-cart-bar');
-    if (barCount && barTotal && cartBar) {
-      barCount.textContent = count + (count === 1 ? ' item' : ' items');
-      barTotal.textContent = rs(totals.grand);
-      const posActive = !!document.querySelector('#pos-tab.active');
-      const cartViewOpen = !!document.querySelector('.pos-cart.active');
-      if (count > 0 && window.innerWidth <= 1024 && posActive && !cartViewOpen) {
-        cartBar.classList.remove('hidden');
-      } else {
-        cartBar.classList.add('hidden');
-      }
-    }
+    updateMobileCartBar(count, totals);
 
     if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
     else { wrap.innerHTML = cart.map(c=>`
@@ -1057,16 +1116,7 @@
   }
   function clearCart(){
     cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart();
-    if (window.innerWidth <= 1024) {
-      const posLeft = $('.pos-left');
-      const posCart = $('.pos-cart');
-      const cartBar = $('#pos-m-cart-bar');
-      if (posLeft && posCart && cartBar) {
-        posLeft.classList.remove('hidden');
-        posCart.classList.remove('active');
-        cartBar.classList.add('hidden');
-      }
-    }
+    if (window.innerWidth <= 1024) closeMobilePOSCart(false);
   }
   function getCustomer(){
     const nameEl = $('#cust-input-name') || $('#cust-name');
@@ -1232,26 +1282,8 @@
       }
     })();
 
-    // Category chips are derived from the LIVE menu, so every item is always
-    // reachable via its own category (custom categories included) -- not just
-    // the hardcoded defaults.
-    const liveCats = ['All'].concat(Array.from(new Set(
-      MENU.map(m => (m.cat || '').trim() || 'Uncategorized')
-    )).sort((a, b) => a.localeCompare(b)));
-    if (!liveCats.some(c => c.toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
-    $('#pos-cats').innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${c.toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
-    $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
-      activeCat=b.dataset.cat;
-      $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
-      renderPOS();
-      const container = document.getElementById('pos-cats');
-      if (container) {
-        container.scrollTo({
-          left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
-          behavior: 'smooth'
-        });
-      }
-    }));
+    // Category chips are derived from the live menu, including custom categories.
+    refreshPosCats();
     $('#pos-search-input').addEventListener('input', renderPOS);
     $('#pos-sort-select').addEventListener('change', renderPOS);
     $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
@@ -1404,28 +1436,8 @@
     // Mobile view toggles
     const cartBar = $('#pos-m-cart-bar');
     const backBtn = $('#btn-pos-back-menu');
-    const posLeft = $('.pos-left');
-    const posCart = $('.pos-cart');
-    if (cartBar && posLeft && posCart) {
-      cartBar.onclick = () => {
-        if (window.innerWidth <= 1024) {
-          posLeft.classList.add('hidden');
-          posCart.classList.add('active');
-          cartBar.classList.add('hidden');
-        }
-      };
-    }
-    if (backBtn && posLeft && posCart && cartBar) {
-      backBtn.onclick = () => {
-        if (window.innerWidth <= 1024) {
-          posLeft.classList.remove('hidden');
-          posCart.classList.remove('active');
-          if (cart.length > 0) {
-            cartBar.classList.remove('hidden');
-          }
-        }
-      };
-    }
+    bindMobileCartBar();
+    if (backBtn && cartBar) backBtn.onclick = () => { if (window.innerWidth <= 1024) closeMobilePOSCart(true); };
 
     renderPOS(); renderCart();
 
@@ -2394,6 +2406,56 @@
           }, 200);
         };
       });
+    }
+
+    // Bulk Import Recipes -- paste CSV (Item, Ingredient, Qty, Unit) to link many
+    // recipes at once. Lives on the live Recipes panel (not the dormant module).
+    const bulkRecBtn = $('#btn-bulk-recipe-import');
+    if (bulkRecBtn && !bulkRecBtn._wired) {
+      bulkRecBtn._wired = true;
+      bulkRecBtn.onclick = () => {
+        const root = getModalRoot();
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-modal active';
+        wrap.innerHTML =
+          '<div class="dm-card" style="max-width:520px">' +
+          '<h3 style="margin:0 0 4px;font-size:17px">Bulk Import Recipes</h3>' +
+          '<p style="margin:0 0 12px;color:var(--text-mute);font-size:12.5px">One ingredient per line: <b>Menu Item, Ingredient, Qty, Unit</b>. Items &amp; ingredients must already exist. Repeated item rows accumulate; existing recipes for listed items are replaced.</p>' +
+          '<textarea id="bulk-rec-ta" rows="8" placeholder="Masala Dosa, Dosa Batter, 0.15, kg\nMasala Dosa, Potato, 0.1, kg" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12.5px;padding:10px;border:1px solid var(--stroke-2);border-radius:8px;background:var(--panel);color:var(--text);resize:vertical"></textarea>' +
+          '<div id="bulk-rec-out" style="font-size:12px;margin-top:8px;line-height:1.5"></div>' +
+          '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn btn-ghost" id="bulk-rec-cancel" style="flex:1">Cancel</button><button class="btn btn-primary" id="bulk-rec-go" style="flex:1"><i class="fa-solid fa-circle-check"></i> Import</button></div>' +
+          '</div>';
+        root.appendChild(wrap);
+        const close = () => { try { root.removeChild(wrap); } catch(e){} };
+        wrap.querySelector('#bulk-rec-cancel').onclick = close;
+        wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+        wrap.querySelector('#bulk-rec-go').onclick = async () => {
+          const raw = (wrap.querySelector('#bulk-rec-ta').value || '').trim();
+          const out = wrap.querySelector('#bulk-rec-out');
+          if (!raw) { out.innerHTML = '<span style="color:var(--red)">Nothing to import.</span>'; return; }
+          const byItem = {}; const errors = [];
+          raw.split(/\r?\n/).forEach((line, idx) => {
+            const t = line.trim(); if (!t) return;
+            const parts = t.split(',').map(s => s.trim());
+            if (parts.length < 3) { errors.push('Line ' + (idx+1) + ': need Item, Ingredient, Qty, Unit'); return; }
+            const menuItem = MENU.find(m => m.name.toLowerCase() === parts[0].toLowerCase());
+            if (!menuItem) { errors.push('Line ' + (idx+1) + ': item "' + _e(parts[0]) + '" not found'); return; }
+            const invItem = (INVENTORY || []).find(i => i.name.toLowerCase() === parts[1].toLowerCase());
+            if (!invItem) { errors.push('Line ' + (idx+1) + ': ingredient "' + _e(parts[1]) + '" not in inventory'); return; }
+            const qty = parseFloat(parts[2]);
+            if (!(qty > 0)) { errors.push('Line ' + (idx+1) + ': bad qty "' + _e(parts[2]) + '"'); return; }
+            (byItem[menuItem.id] = byItem[menuItem.id] || { m: menuItem, ings: [] }).ings.push({ name: invItem.name, qty: qty, unit: parts[3] || invItem.unit || '' });
+          });
+          const ids = Object.keys(byItem);
+          if (!ids.length) { out.innerHTML = '<span style="color:var(--red)">No valid rows.</span>' + (errors.length ? '<br>' + errors.slice(0,6).join('<br>') : ''); return; }
+          let links = 0;
+          ids.forEach(id => { byItem[id].m.ingredients = byItem[id].ings; links += byItem[id].ings.length; });
+          try { if (RS.save) await RS.save('menu'); } catch(e){}
+          toast('Recipes imported: ' + ids.length + ' item(s), ' + links + ' ingredient links', 'fa-circle-check');
+          if (errors.length) { out.innerHTML = '<span style="color:var(--green)">Imported ' + ids.length + '.</span> <span style="color:var(--red)">' + errors.length + ' skipped:</span><br>' + errors.slice(0,6).join('<br>'); }
+          else { close(); renderInventory(); }
+        };
+      };
     }
 
     // wire sub-tab seg buttons (only once)
@@ -4215,13 +4277,17 @@
       let deductedCount = 0;   // ingredient lines deducted
       let noRecipeCount = 0;   // sold items with no recipe linked
       const lowStock = [];     // ingredients that fell below their min level
+      const missingIngredients = [];
       items.forEach(it => {
         const menuItem = MENU.find(m => m.name === it.name);
         if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) { noRecipeCount++; return; }
         const orderedQty = Number(it.qty) || 1;
         menuItem.ingredients.forEach(ing => {
           const invItem = INVENTORY.find(x => x.name === ing.name);
-          if (!invItem) return;
+          if (!invItem) {
+            if (ing.name && missingIngredients.indexOf(ing.name) === -1) missingIngredients.push(ing.name);
+            return;
+          }
           invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(ing.qty) || 0) * orderedQty);
           changed = true;
           deductedCount++;
@@ -4231,18 +4297,25 @@
       });
       if (changed) {
         // Persist locally AND push to cloud so stock levels survive/sync.
-        if (window.RS_DB && RS_DB.writeLocal) RS_DB.writeLocal('inventory', INVENTORY).catch(() => {});
+        if (window.RS_DB && RS_DB.writeLocal) { try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {} }
         try { if (RS.save) RS.save('inventory'); } catch (e) {}
         const rendered = document.querySelector('#inventory-tab.active');
         if (rendered && window.RS && RS.render) RS.render('inventory-tab');
         // Make the deduction visible instead of silent
         toast(`Stock updated: ${deductedCount} ingredient${deductedCount === 1 ? '' : 's'} deducted from inventory`, 'fa-boxes-stacked');
+        if (noRecipeCount) {
+          setTimeout(() => toast(`${noRecipeCount} sold item${noRecipeCount === 1 ? '' : 's'} skipped: no recipe linked`, 'fa-triangle-exclamation'), 1400);
+        }
+        if (missingIngredients.length) {
+          setTimeout(() => toast(`Recipe ingredient not in stock: ${missingIngredients.slice(0, 3).join(', ')}${missingIngredients.length > 3 ? '...' : ''}`, 'fa-triangle-exclamation'), noRecipeCount ? 2600 : 1400);
+        }
         if (lowStock.length) {
-          setTimeout(() => toast(`Low stock: ${lowStock.slice(0, 3).join(', ')}${lowStock.length > 3 ? '…' : ''}`, 'fa-triangle-exclamation'), 2600);
+          setTimeout(() => toast(`Low stock: ${lowStock.slice(0, 3).join(', ')}${lowStock.length > 3 ? '...' : ''}`, 'fa-triangle-exclamation'), missingIngredients.length || noRecipeCount ? 3800 : 2600);
         }
       } else if (noRecipeCount === items.length) {
-        // Nothing deducted because no sold item has a recipe -- tell the user why
-        console.info('[Inventory] No stock deducted: none of the billed items have linked recipes. Link recipes under Inventory → Recipes.');
+        toast('No stock deducted: link recipes under Inventory > Recipes', 'fa-triangle-exclamation');
+      } else if (missingIngredients.length) {
+        toast(`No stock deducted: missing inventory item ${missingIngredients.slice(0, 2).join(', ')}`, 'fa-triangle-exclamation');
       }
     },
 
@@ -4263,7 +4336,7 @@
         });
       });
       if (changed) {
-        if (window.RS_DB && RS_DB.writeLocal) RS_DB.writeLocal('inventory', INVENTORY).catch(() => {});
+        if (window.RS_DB && RS_DB.writeLocal) { try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {} }
         const rendered = document.querySelector('#inventory-tab.active');
         if (rendered && window.RS && RS.render) RS.render('inventory-tab');
       }
@@ -4312,7 +4385,7 @@
     const fresh = await RS_DB.listCloud(coll);
     await RS_DB.writeLocal(coll, fresh || []);
     if (cfg.arr) replaceArr(cfg.arr, fresh || []);
-    if (coll === 'menu') { try { renderPOS(); } catch(e){} }
+    if (coll === 'menu') { try { refreshPosCats(); renderPOS(); publishMenuForPublicOrdering(); } catch(e){} }
     const active = document.querySelector('.tab-content.active')?.id;
     if (active && cfg.tabs.includes(active) && renderers[active]) {
       try { renderers[active](); rendered[active] = true; } catch(e){}
@@ -4423,7 +4496,54 @@
     if (!document.hidden && navigator.onLine) syncWithSupabase();
   }, 800);
 
+  function slugifyPublicMenuKey(value) {
+    const slug = String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return slug || '';
+  }
+
+  function publishMenuForPublicOrdering() {
+    try {
+      const settings = window.RS_SETTINGS || {};
+      const session = window.RS_API && RS_API.session ? RS_API.session() : null;
+      const tenantName = settings.set_restaurant_name || settings.set_outlet_name || session?.tenant_name || session?.business_name || 'Demo Restaurant';
+      const slugs = new Set(['demo-tenant', 'local-demo']);
+      [
+        session?.tenant_slug,
+        session?.outlet_id,
+        sessionStorage.getItem('tenant_slug'),
+        localStorage.getItem('tenant_slug'),
+        settings.set_outlet_code,
+        settings.set_outlet_name,
+        settings.set_restaurant_name,
+        tenantName
+      ].forEach(v => {
+        const s = slugifyPublicMenuKey(v);
+        if (s) slugs.add(s);
+      });
+      const taxProfile = window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : {};
+      const payload = {
+        menu: MENU.filter(m => m.stock !== 'out').map(m => ({
+          name: m.name,
+          price: Number(m.price) || 0,
+          category: (m.cat || '').trim() || 'Uncategorized',
+          description: m.description || '',
+          image: m.image || '',
+          bestseller: !!m.bestseller
+        })),
+        tenantName,
+        currencySymbol: getCurrencySymbol ? getCurrencySymbol() : '\u20b9',
+        taxLabel: taxProfile.tax_system || 'GST',
+        updatedAt: new Date().toISOString()
+      };
+      slugs.forEach(slug => localStorage.setItem('doppio_menu_cache_' + slug, JSON.stringify(payload)));
+    } catch(e) {
+      console.warn('Public menu cache publish failed', e);
+    }
+  }
+
   function broadcastMenuUpdate() {
+    publishMenuForPublicOrdering();
+    try { refreshPosCats(); renderPOS(); } catch(e) {}
     const api = window.RS_API;
     const activeTenantId = api?.session()?.tenant_id || sessionStorage.getItem('tenant_id');
     if (!api || !api.supabaseClient || !activeTenantId) return;
@@ -4449,7 +4569,7 @@
         if(cached && cached.length){ replaceArr(map[coll], cached); }
       } catch(e){}
     }
-    try{ renderPOS(); }catch(e){}
+    try{ refreshPosCats(); renderPOS(); publishMenuForPublicOrdering(); }catch(e){}
 
     // Restore persistent cart state / pre-update snapshot
     try {
@@ -4552,7 +4672,7 @@
         }
       });
       Promise.all(fetchPromises).then(() => {
-        try{ renderPOS(); }catch(e){}
+        try{ refreshPosCats(); renderPOS(); publishMenuForPublicOrdering(); }catch(e){}
         const cur=document.querySelector('.tab-content.active'); if(cur && renderers[cur.id]) { try{ renderers[cur.id](); }catch(e){} }
       });
     }
@@ -4968,7 +5088,9 @@
                   MENU.length = 0;
                   items.forEach(i => MENU.push(i));
                   renderEditor();
+                  refreshPosCats();
                   renderPOS();
+                  publishMenuForPublicOrdering();
                 }
               }
             } catch(err) {
