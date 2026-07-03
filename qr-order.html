@@ -718,9 +718,9 @@
       window.openModal = function(id) {
         document.getElementById(id).classList.add('active');
         if (id === 'tracker-modal') {
-          pollOrderTrackers();
+          pollOrderTrackers(false); // First load: show loading spinner
           if (trackerInterval) clearInterval(trackerInterval);
-          trackerInterval = setInterval(pollOrderTrackers, 5000); // Poll status every 5 seconds
+          trackerInterval = setInterval(function() { pollOrderTrackers(true); }, 5000); // Background: silent polling
         } else if (id === 'checkout-modal') {
           renderCheckoutSummary();
         }
@@ -777,7 +777,7 @@
         }
       }
 
-      function pollOrderTrackers() {
+      function pollOrderTrackers(isBackground) {
         const orderList = getPendingOrderList();
         const box = document.getElementById('tracker-box');
 
@@ -788,12 +788,16 @@
 
         // Fetch the status of the most recent order in list
         const latestOrder = orderList[orderList.length - 1];
-        box.innerHTML = `<div style="display:flex; justify-content:center; padding:30px;"><div class="spin" style="width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--brand); border-radius:50%; animation:spin 0.8s linear infinite;"></div></div>`;
+        if (!isBackground) {
+          box.innerHTML = `<div style="display:flex; justify-content:center; padding:30px;"><div class="spin" style="width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--brand); border-radius:50%; animation:spin 0.8s linear infinite;"></div></div>`;
+        }
 
         apiCall('get_order_status', { orderId: latestOrder.orderId })
           .then(res => {
             if (res.error) {
-              box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Could not verify order status. (${escHtml(String(res.error||'Unknown error'))})</p>`;
+              if (!isBackground) {
+                box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Could not verify order status. (${escHtml(String(res.error||'Unknown error'))})</p>`;
+              }
               return;
             }
 
@@ -831,7 +835,9 @@
             `;
           })
           .catch(() => {
-            box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Offline. Check connection.</p>`;
+            if (!isBackground) {
+              box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Offline. Check connection.</p>`;
+            }
           });
       }
 
