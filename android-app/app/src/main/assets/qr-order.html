@@ -506,26 +506,31 @@
         <div class="card-desc">Browse dishes, customize and send orders to kitchen</div>
       </a>
 
-      <!-- Call Waiter -->
-      <div class="portal-card" onclick="openModal('service-modal')">
+      <!-- Call Waiter (customer mode only -- ringing the bell is for guests) -->
+      <div class="portal-card" id="service-card" onclick="openModal('service-modal')">
         <div class="card-icon"><i class="fa-solid fa-bell"></i></div>
         <div class="card-title">Service Requests</div>
         <div class="card-desc">Call captain, request water, cutlery or clear table</div>
       </div>
 
       <!-- Live Order Tracker -->
-      <div class="portal-card" onclick="openModal('tracker-modal')">
+      <div class="portal-card" id="tracker-card" onclick="openModal('tracker-modal')">
         <div class="card-icon"><i class="fa-solid fa-hourglass-half"></i></div>
         <div class="card-title">Track Live Order</div>
         <div class="card-desc">Check kitchen status of your table orders</div>
       </div>
 
-      <!-- Checkout / Pay -->
-      <div class="portal-card" onclick="openModal('checkout-modal')">
+      <!-- Checkout / Pay (customer mode only -- waiter settles via POS) -->
+      <div class="portal-card" id="checkout-card" onclick="openModal('checkout-modal')">
         <div class="card-icon"><i class="fa-solid fa-credit-card"></i></div>
         <div class="card-title">Pay Bill / Pay Later</div>
         <div class="card-desc">Check running total and pay using UPI QR</div>
       </div>
+    </div>
+
+    <!-- Waiter mode switch (visible only on staff devices) -->
+    <div id="waiter-mode-switch" style="display:none; text-align:center; margin-top:14px;">
+      <a id="waiter-mode-link" href="#" style="font-size:12px; color:var(--text-muted); text-decoration:underline;"></a>
     </div>
   </div>
 
@@ -605,9 +610,52 @@
         return;
       }
 
+      // ── Dual-mode table QR ────────────────────────────────────────────
+      // The SAME table QR serves two roles:
+      //  · CUSTOMER (default): order + track + ring bell + self-checkout.
+      //  · WAITER  (?mode=waiter, offered on staff devices): KOT ordering
+      //    linked to the POS -- no ring-the-bell, no self-checkout.
+      // A device that has logged into the dashboard (tenant_id in storage)
+      // is treated as a staff device and gets a mode toggle link.
+      const isStaffDevice = (() => { try { return !!localStorage.getItem('tenant_id'); } catch(e){ return false; } })();
+      const waiterMode = params.get('mode') === 'waiter';
+      window.__RS_WAITER_MODE__ = waiterMode;
+
       // Configure Menu Button Redirect
-      document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}`;
+      document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}${waiterMode ? '&mode=waiter' : ''}`;
       document.getElementById('table-label').textContent = table ? `Table ${table.padStart(2, '0')}` : 'Takeaway';
+
+      if (waiterMode) {
+        // Hide guest-only actions; waiter punches KOTs and settles at the POS.
+        const svcCard = document.getElementById('service-card');
+        const payCard = document.getElementById('checkout-card');
+        if (svcCard) svcCard.style.display = 'none';
+        if (payCard) payCard.style.display = 'none';
+        const outletEl = document.getElementById('outlet-name');
+        if (outletEl) outletEl.innerHTML = '<i class="fa-solid fa-user-tie" style="margin-right:5px;"></i>Waiter Mode · KOT Ordering';
+        const menuCard = document.getElementById('menu-btn');
+        const menuDesc = menuCard ? menuCard.querySelector('.card-desc') : null;
+        if (menuDesc) menuDesc.textContent = 'Punch items straight to the kitchen (KOT/KDS)';
+        const trackDesc = document.querySelector('#tracker-card .card-desc');
+        if (trackDesc) trackDesc.textContent = 'Monitor kitchen status for this table';
+      }
+
+      // Staff devices see a discreet link to flip between the two modes
+      if (isStaffDevice || waiterMode) {
+        const sw = document.getElementById('waiter-mode-switch');
+        const link = document.getElementById('waiter-mode-link');
+        if (sw && link) {
+          sw.style.display = 'block';
+          const base = `qr-order.html?tenant=${encodeURIComponent(slug)}&table=${encodeURIComponent(table)}`;
+          if (waiterMode) {
+            link.textContent = 'Switch to customer view';
+            link.href = base;
+          } else {
+            link.innerHTML = '<i class="fa-solid fa-user-tie" style="margin-right:4px;"></i>Staff? Switch to waiter mode';
+            link.href = base + '&mode=waiter';
+          }
+        }
+      }
 
       // Load Config variables
       let SU = '';
@@ -624,6 +672,7 @@
 
       let upiVpaAddress = "";
       window.currencySymbol = '₹';
+      let trackerInterval = null;
 
       // API Caller helper
       function apiCall(action, extra) {
@@ -670,6 +719,8 @@
         document.getElementById(id).classList.add('active');
         if (id === 'tracker-modal') {
           pollOrderTrackers();
+          if (trackerInterval) clearInterval(trackerInterval);
+          trackerInterval = setInterval(pollOrderTrackers, 5000); // Poll status every 5 seconds
         } else if (id === 'checkout-modal') {
           renderCheckoutSummary();
         }
@@ -677,6 +728,12 @@
 
       window.closeModal = function(id) {
         document.getElementById(id).classList.remove('active');
+        if (id === 'tracker-modal') {
+          if (trackerInterval) {
+            clearInterval(trackerInterval);
+            trackerInterval = null;
+          }
+        }
       };
 
       window.closeModalOnBg = function(e, id) {
@@ -751,9 +808,10 @@
             ];
 
             let activeIndex = 0;
-            if (status === 'Preparing') activeIndex = 1;
-            else if (status === 'Served') activeIndex = 2;
-            else if (status === 'Paid') activeIndex = 3;
+            const normStatus = String(status || '').trim().toLowerCase();
+            if (normStatus === 'preparing' || normStatus === 'accepted') activeIndex = 1;
+            else if (normStatus === 'served') activeIndex = 2;
+            else if (normStatus === 'paid') activeIndex = 3;
 
             let timelineHtml = steps.map((st, idx) => {
               let cls = '';
