@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260626";
+const CACHE_NAME = "restrosuite-shell-v20260704-3";
 const APP_SHELL = [
   "/",
   "/index.html",
