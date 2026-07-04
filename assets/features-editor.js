@@ -191,26 +191,31 @@
           ingredients: draftIngs.slice() 
         };
         
-        if(editingId){
-          const m=RS.MENU.find(x=>String(x.id)===String(editingId));
-          Object.assign(m,data);
-          if (RS.saveOne) {
-            const saved = await RS.saveOne('menu', m);
-            if (saved) Object.assign(m, saved);
+        try {
+          if(editingId){
+            const m=RS.MENU.find(x=>String(x.id)===String(editingId));
+            Object.assign(m,data);
+            if (RS.saveOne) {
+              const saved = await RS.saveOne('menu', m);
+              if (saved) Object.assign(m, saved);
+            }
+            RS.toast('"'+name+'" updated','fa-circle-check');
           }
-          RS.toast('"'+name+'" updated','fa-circle-check');
-        }
-        else {
-          const id=Math.max(0,...RS.MENU.map(x=>Number.isFinite(Number(x.id))?Number(x.id):0))+1;
-          const rec={id, stock:'ok', ...data};
-          RS.MENU.push(rec);
-          if (RS.saveOne) {
-            const saved = await RS.saveOne('menu', rec);
-            if (saved) Object.assign(rec, saved);
+          else {
+            const id=Math.max(0,...RS.MENU.map(x=>Number.isFinite(Number(x.id))?Number(x.id):0))+1;
+            const rec={id, stock:'ok', ...data};
+            RS.MENU.push(rec);
+            if (RS.saveOne) {
+              const saved = await RS.saveOne('menu', rec);
+              if (saved) Object.assign(rec, saved);
+            }
+            RS.toast('"'+name+'" added to menu','fa-circle-plus');
           }
-          RS.toast('"'+name+'" added to menu','fa-circle-plus');
+          resetForm(); renderList(); try{ RS.renderPOS(); if(window.refreshPosCats) window.refreshPosCats(); }catch(e){}
+        } catch(err) {
+          console.error(err);
+          RS.toast('Failed to save item: ' + err.message, 'fa-circle-exclamation');
         }
-        resetForm(); renderList(); try{ RS.renderPOS(); if(window.refreshPosCats) window.refreshPosCats(); }catch(e){}
       };
       // expose for edit
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
@@ -294,7 +299,23 @@
       body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>{ buildForm(); buildForm._load(RS.MENU.find(x=>String(x.id)===String(b.dataset.edit))); $('#editor-tab').scrollIntoView({block:'start'}); });
       body.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=> confirmDelete(b.dataset.del));
       body.querySelectorAll('[data-recipe]').forEach(b=> b.onclick=()=> recipeModal(b.dataset.recipe));
-      body.querySelectorAll('[data-av]').forEach(c=> c.onchange=()=>{ const m=RS.MENU.find(x=>String(x.id)===String(c.dataset.av)); m.stock = c.checked?'ok':'out'; RS.saveOne&&RS.saveOne('menu',m); renderList(); try{RS.renderPOS();}catch(e){} RS.toast(m.name+(c.checked?' available':' marked sold out'), c.checked?'fa-circle-check':'fa-ban'); });
+      body.querySelectorAll('[data-av]').forEach(c=> c.onchange=async ()=>{ 
+        try {
+          const m=RS.MENU.find(x=>String(x.id)===String(c.dataset.av)); 
+          m.stock = c.checked?'ok':'out'; 
+          if(RS.saveOne) {
+            await RS.saveOne('menu',m); 
+          }
+          renderList(); 
+          try{RS.renderPOS();}catch(e){} 
+          RS.toast(m.name+(c.checked?' available':' marked sold out'), c.checked?'fa-circle-check':'fa-ban'); 
+        } catch(err) {
+          console.error(err);
+          RS.toast('Failed to update stock: ' + err.message, 'fa-circle-exclamation');
+          // Revert the UI
+          c.checked = !c.checked;
+        }
+      });
       
       const btnAll = $('#btn-enable-all-menu');
       if (btnAll) {

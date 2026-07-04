@@ -136,10 +136,11 @@
       });
     };
 
-    async function loadReceiptProfile(){
+    async function loadReceiptProfile(settings){
       try {
-        const settings = window.RS && RS.getSettings ? await RS.getSettings() : null;
-        receiptProfile = normalizeReceiptProfile(settings);
+        // If settings are provided, use them; otherwise load from getSettings
+        const finalSettings = settings || (window.RS && RS.getSettings ? await RS.getSettings() : null);
+        receiptProfile = normalizeReceiptProfile(finalSettings);
       } catch(e) {
         receiptProfile.name = receiptProfile.name || sessionOutletName();
       }

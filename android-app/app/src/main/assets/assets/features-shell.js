@@ -757,7 +757,7 @@
             if (res.qr) {
               // Speed up polling while waiting for scan
               if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
-              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings -> Linked Devices -> Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically...</div></div></div>`;
+              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings -> Linked Devices -> Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically...</div></div><div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid rgba(234,179,8,0.35);border-radius:var(--r-md);background:rgba(234,179,8,0.06);text-align:left"><div style="font-size:16px;color:#eab308;margin-top:1px"><i class="fa-solid fa-triangle-exclamation"></i></div><div style="flex:1;font-size:12px;color:var(--text-soft);line-height:1.55"><strong style="color:var(--text)">Avoid linking your personal number.</strong> Automated sending carries a small risk (~2&ndash;4%) of the number being banned by WhatsApp if customers report it as spam. We use human-like sending and daily limits to keep this low, but we recommend a separate business/SIM number. You <em>can</em> use your personal number &mdash; just know the risk before you scan.</div></div></div>`;
             } else {
               container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Generating QR code... please wait.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Generating...</span></div>`;
             }
@@ -1105,19 +1105,29 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{
-        const isCloud = RS.dbMode && RS.dbMode()==='cloud' && navigator.onLine && !window.__OFFLINE_CONFIG__ && !window.RS_LAST_CLOUD_ERROR;
-        if(isCloud){
-          RS.toast('Settings saved to cloud','fa-circle-check');
-        } else {
-          RS.toast('Settings saved locally only — not synced to cloud. Log in to sync across devices.','fa-triangle-exclamation');
+      $('#set-save').onclick=async ()=>{ 
+        collect(); 
+        try {
+          await (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve());
+          // Update RS_SETTINGS immediately with new settings
+          window.RS_SETTINGS = SET_STORE;
+          const isCloud = RS.dbMode && RS.dbMode()==='cloud' && navigator.onLine && !window.__OFFLINE_CONFIG__ && !window.RS_LAST_CLOUD_ERROR;
+          if(isCloud){
+            RS.toast('Settings saved to cloud','fa-circle-check');
+          } else {
+            RS.toast('Settings saved locally only — not synced to cloud. Log in to sync across devices.','fa-triangle-exclamation');
+          }
+          if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); }
+          // First load receipt profile (which calls normalizeReceiptProfile)
+          if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(SET_STORE);
+          if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
+          if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
+          try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
+        } catch(err) {
+          console.error(err);
+          RS.toast('Failed to save settings: ' + err.message, 'fa-circle-exclamation');
         }
-        if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); }
-        if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
-        if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
-        if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile();
-        try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
-      }); };
+      };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }
@@ -1264,7 +1274,7 @@
           const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
           if(!confirm(msg)) return;
           try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
-          location.href='login.html';
+          location.href='login';
         });
       }
     })();
@@ -1296,17 +1306,17 @@
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
                 if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
-            if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
-            else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
-            return;
-          }
-          const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
-          if(!confirm(msg)) return;
+                  if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+                  else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
+                  return;
+                }
+                const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
+                if(!confirm(msg)) return;
                 close();
                 if(window.RS_DB) {
-                  RS_DB.signOut().then(()=>{ location.href='login.html'; });
+                  RS_DB.signOut().then(()=>{ location.href='login'; });
                 } else {
-                  location.href='login.html';
+                  location.href='login';
                 }
               } else {
                 RS.activateTab(b.dataset.go);
