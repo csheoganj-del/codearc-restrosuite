@@ -1243,7 +1243,9 @@
       if(logout){
         logout.removeAttribute('onclick');
         logout.addEventListener('click', async ()=>{
-          if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
+          const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?" + 
+            (!navigator.onLine ? "\n\nAdditionally, you are currently offline. If you log out, you will not be able to log back in to this device until you have internet connection." : "");
+          if(!confirm(msg)) return;
           try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
           location.href='login';
         });
@@ -1276,7 +1278,9 @@
           onMount(modal, close){
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
-                if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
+                const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?" + 
+                  (!navigator.onLine ? "\n\nAdditionally, you are currently offline. If you log out, you will not be able to log back in to this device until you have internet connection." : "");
+                if(!confirm(msg)) return;
                 close();
                 if(window.RS_DB) {
                   RS_DB.signOut().then(()=>{ location.href='login'; });

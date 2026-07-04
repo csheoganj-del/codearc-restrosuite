@@ -5497,6 +5497,9 @@
   $$('.logout').forEach(b => {
     b.addEventListener('click', e => {
       e.preventDefault();
+      const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?" + 
+        (!navigator.onLine ? "\n\nAdditionally, you are currently offline. If you log out, you will not be able to log back in to this device until you have internet connection." : "");
+      if(!confirm(msg)) return;
       if(window.RS_API) RS_API.logout();
       location.href = 'login';
     });
