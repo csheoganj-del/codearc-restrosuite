@@ -670,6 +670,126 @@
           : (SU ? SU + '/functions/v1/tenant-public' : '');
       });
 
+      function showSessionStatusOverlay(status) {
+        const existing = document.getElementById('session-status-overlay');
+        if (existing) existing.remove();
+
+        if (status === 'active') return;
+
+        let title = 'Table Session Closed';
+        let desc = 'This table does not have an active session. Please contact staff or scan the QR code again once seated.';
+        let icon = 'fa-power-off';
+        let color = '#ef4444';
+
+        if (status === 'paused') {
+          title = 'QR Ordering Paused';
+          desc = 'Ordering is temporarily paused for this table. Please ask staff for assistance.';
+          icon = 'fa-pause';
+          color = 'var(--orange)';
+        }
+
+        const overlayHtml = `
+          <div id="session-status-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; font-family:sans-serif; color:#fff;">
+            <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:40px 30px; border-radius:24px; max-width:400px; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
+              <i class="fa-solid ${icon}" style="font-size:64px; color:${color}; margin-bottom:20px;"></i>
+              <h2 style="font-size:24px; font-weight:800; margin:0 0 12px 0;">${title}</h2>
+              <p style="font-size:14px; line-height:1.6; color:#a1a1aa; margin:0 0 24px 0;">${desc}</p>
+              <button onclick="window.location.reload();" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:12px; font-size:14px;">
+                <i class="fa-solid fa-rotate-right" style="margin-right:6px;"></i> Refresh Page
+              </button>
+            </div>
+          </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', overlayHtml);
+      }
+
+      function showStaffLoginOverlay() {
+        const existing = document.getElementById('staff-login-overlay');
+        if (existing) return;
+
+        const overlayHtml = `
+          <div id="staff-login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; font-family:sans-serif; color:#fff;">
+            <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:40px 30px; border-radius:24px; max-width:360px; width:100%; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
+              <i class="fa-solid fa-user-shield" style="font-size:48px; color:var(--orange); margin-bottom:16px; display:block; text-align:center;"></i>
+              <h2 style="font-size:20px; font-weight:800; margin:0 0 6px 0; text-align:center;">Staff Authentication</h2>
+              <p style="font-size:12px; color:#a1a1aa; margin:0 0 24px 0; text-align:center;">Enter staff username & password to enable Waiter Mode</p>
+              
+              <div style="display:flex; flex-direction:column; gap:12px; text-align:left; margin-bottom:20px;">
+                <div>
+                  <label style="font-size:11px; font-weight:700; color:#a1a1aa; display:block; margin-bottom:4px;">Username</label>
+                  <input type="text" id="staff-login-username" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.2); color:#fff; font-size:14px; outline:none;" placeholder="E.g., waiter1">
+                </div>
+                <div>
+                  <label style="font-size:11px; font-weight:700; color:#a1a1aa; display:block; margin-bottom:4px;">Password</label>
+                  <input type="password" id="staff-login-password" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.2); color:#fff; font-size:14px; outline:none;" placeholder="••••••••">
+                </div>
+              </div>
+              <div id="staff-login-error" style="color:#ef4444; font-size:12px; margin-bottom:16px; display:none; text-align:center;"></div>
+              <button id="btn-staff-login-submit" class="btn btn-primary" style="width:100%; padding:12px; font-weight:700; border-radius:12px; font-size:14px;">
+                <i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In
+              </button>
+            </div>
+          </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', overlayHtml);
+
+        const btn = document.getElementById('btn-staff-login-submit');
+        btn.onclick = async () => {
+          const username = document.getElementById('staff-login-username').value.trim();
+          const password = document.getElementById('staff-login-password').value;
+          const errEl = document.getElementById('staff-login-error');
+          if (!username || !password) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Please enter both username and password.';
+            return;
+          }
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
+
+          try {
+            const accessFn = (window.__SUPABASE_URL__ || '') + '/functions/v1/tenant-access';
+            const res = await fetch(accessFn, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': window.__SUPABASE_ANON_KEY__,
+                'Authorization': 'Bearer ' + window.__SUPABASE_ANON_KEY__
+              },
+              body: JSON.stringify({ action: 'login', slug: slug, username, password })
+            }).then(r => r.json());
+
+            if (res.error) {
+              errEl.style.display = 'block';
+              errEl.textContent = res.error;
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In';
+              return;
+            }
+
+            if (res.session && res.session.session_token) {
+              localStorage.setItem('tenant_session_token', res.session.session_token);
+              localStorage.setItem('tenant_id', res.session.tenant_id);
+              localStorage.setItem('tenant_slug', res.session.tenant_slug);
+              localStorage.setItem('tenant_name', res.session.tenant_name);
+              
+              document.getElementById('staff-login-overlay').remove();
+              window.location.reload();
+            } else {
+              errEl.style.display = 'block';
+              errEl.textContent = 'Authentication failed.';
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In';
+            }
+          } catch (e) {
+            console.error("Staff login failed:", e);
+            errEl.style.display = 'block';
+            errEl.textContent = 'Failed to connect to authentication server.';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In';
+          }
+        };
+      }
+
       let upiVpaAddress = "";
       window.currencySymbol = '₹';
       let trackerInterval = null;
@@ -678,6 +798,7 @@
       function apiCall(action, extra) {
         return configPromise.then(() => {
           if (!FN) return Promise.reject(new Error('Backend endpoint config missing'));
+          const token = sessionStorage.getItem('qr_session_token') || '';
           return fetch(FN, {
             method: 'POST',
             headers: {
@@ -685,7 +806,7 @@
               'apikey': SK,
               'Authorization': 'Bearer ' + SK
             },
-            body: JSON.stringify(Object.assign({ action, tenant_slug: slug }, extra || {}))
+            body: JSON.stringify(Object.assign({ action, tenant_slug: slug, session_token: token }, extra || {}))
           }).then(res => res.json().catch(() => ({})));
         });
       }
@@ -712,6 +833,43 @@
       
       configPromise.then(() => {
         initBranding();
+        
+        if (waiterMode) {
+          const staffToken = localStorage.getItem('tenant_session_token');
+          if (!staffToken) {
+            showStaffLoginOverlay();
+          } else {
+            document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}&mode=waiter`;
+          }
+        } else {
+          // Verify active table session
+          apiCall('get_active_session', { table: table })
+            .then(res => {
+              if (res.active) {
+                if (res.status === 'paused') {
+                  showSessionStatusOverlay('paused');
+                } else {
+                  sessionStorage.setItem('qr_session_token', res.session_token);
+                  const currentToken = params.get('token');
+                  if (currentToken !== res.session_token) {
+                    params.set('token', res.session_token);
+                    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+                  }
+                  document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}&token=${res.session_token}`;
+                  showSessionStatusOverlay('active');
+                }
+              } else {
+                showSessionStatusOverlay('closed');
+              }
+            })
+            .catch(err => {
+              console.error("Session verification failed:", err);
+              // In local dev/fallback, let it go if Supabase URL is not present, otherwise block
+              if (SU) {
+                showSessionStatusOverlay('closed');
+              }
+            });
+        }
       });
 
       // Modal management
@@ -980,5 +1138,6 @@
 
     })();
   </script>
+  <script src="pwa.js"></script>
 </body>
 </html>
