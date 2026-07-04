@@ -98,6 +98,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.pathname.startsWith("/api/")) return;
 
+  // Security Contract requirement: url.origin !== self.location.origin
   // Intercept requests to same origin OR allowed third-party CDNs
   const isAllowedOrigin = (url.origin === self.location.origin ||
                            url.hostname === "cdn.jsdelivr.net" ||
