@@ -3310,7 +3310,7 @@
         if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
         // If we got an auth error, show a helpful message with retry
         if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login.html\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
           return;
         }
       }
@@ -3555,7 +3555,7 @@
         const slug = (tenant.slug || tenant.username || '').toLowerCase().replace(/\s+/g, '-');
         copyLoginBtn.onclick = () => {
           const origin = location.origin + location.pathname.replace(/\/[^\/]*$/, '');
-          const url = `${origin}/login.html?tenant=${encodeURIComponent(slug)}`;
+          const url = `${origin}/login?tenant=${encodeURIComponent(slug)}`;
           navigator.clipboard.writeText(url)
             .then(() => toast('Login URL copied!', 'fa-link'))
             .catch(() => prompt('Copy tenant login URL:', url));
@@ -3654,7 +3654,7 @@
       if (logoutBtn) logoutBtn.onclick = () => {
         m.remove();
         if (window.RS_API) RS_API.logout();
-        location.href = 'login.html';
+        location.href = 'login';
       };
     } else {
       m.remove();
@@ -4691,9 +4691,9 @@
   // Run synchronously first (catches the common case where config is already cached),
   // then re-run after __configReady resolves to catch the new-browser race where
   // RS_API.configured is still false when this line first executes.
-  if(window.RS_API && RS_API.configured && !RS_API.session()){ location.href='login.html'; return; }
+  if(window.RS_API && RS_API.configured && !RS_API.session()){ location.href='login'; return; }
   (window.__configReady || Promise.resolve()).then(() => {
-    if(window.RS_API && RS_API.configured && !RS_API.session()){ location.href='login.html'; }
+    if(window.RS_API && RS_API.configured && !RS_API.session()){ location.href='login'; }
   }).catch(()=>{});
 
   const sess = window.RS_API ? RS_API.session() : null;
@@ -5486,7 +5486,7 @@
   (window.__configReady || Promise.resolve()).then(() => {
     if(window.RS_API && RS_API.configured){
       RS_API.validateSession().then(sess => {
-        if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login.html'; }
+        if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login'; }
       }).catch(() => {
         console.warn('[RS] validateSession network error -- keeping local session alive.');
       });
@@ -5498,7 +5498,7 @@
     b.addEventListener('click', e => {
       e.preventDefault();
       if(window.RS_API) RS_API.logout();
-      location.href = 'login.html';
+      location.href = 'login';
     });
   });
 
