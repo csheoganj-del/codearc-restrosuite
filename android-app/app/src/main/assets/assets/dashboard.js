@@ -5493,10 +5493,45 @@
     }
   }).catch(()=>{});
 
+  function showOfflineLogoutLock(){
+    toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
+  }
+
+  function hasRecentCloudFailure(){
+    const last = window.RS_LAST_CLOUD_ERROR;
+    return !!(last && last.time && (Date.now() - last.time < 120000));
+  }
+
+  async function logoutWouldLockOut(){
+    if (navigator.onLine === false || window.__OFFLINE_CONFIG__ || hasRecentCloudFailure()) return true;
+    if (!(window.RS_API && RS_API.configured)) return false;
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 1800) : null;
+    try {
+      const response = await fetch('/api/config?logout_probe=' + Date.now(), {
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined
+      });
+      return !response.ok;
+    } catch(e) {
+      return true;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   // Wire up logout button cleanly
   $$('.logout').forEach(b => {
-    b.addEventListener('click', e => {
+    b.addEventListener('click', async e => {
       e.preventDefault();
+      e.stopPropagation();
+      if(await logoutWouldLockOut()){
+        showOfflineLogoutLock();
+        return;
+      }
+      const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
+      if(!confirm(msg)) return;
       if(window.RS_API) RS_API.logout();
       location.href = 'login.html';
     });
