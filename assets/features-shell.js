@@ -1106,7 +1106,7 @@
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
       $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{
-        const isCloud = RS.dbMode && RS.dbMode()==='cloud';
+        const isCloud = RS.dbMode && RS.dbMode()==='cloud' && navigator.onLine && !window.__OFFLINE_CONFIG__ && !window.RS_LAST_CLOUD_ERROR;
         if(isCloud){
           RS.toast('Settings saved to cloud','fa-circle-check');
         } else {
@@ -1150,6 +1150,18 @@
         const isOnline = navigator.onLine;
         const session = window.RS_API && RS_API.session ? RS_API.session() : null;
         const isSuperAdmin = session && session.role === 'superadmin';
+        const cloudFallbackActive = window.__OFFLINE_CONFIG__ || !!window.RS_LAST_CLOUD_ERROR;
+
+        if (!isSuperAdmin && (!isOnline || cloudFallbackActive)) {
+          const title = !isOnline
+            ? 'Offline mode - bills and changes are saved locally and will sync to the cloud automatically when you reconnect.'
+            : 'Cloud is currently unavailable. Data is saved locally on this device and will retry sync automatically.';
+          setState('local-only',
+            title,
+            `<i class="fa-solid fa-triangle-exclamation" style="font-size:10px"></i>&nbsp;Local only`
+          );
+          return;
+        }
 
         if (!isOnline) {
           setState('offline',
