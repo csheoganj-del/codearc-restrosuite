@@ -1140,6 +1140,7 @@
         pill.style.cssText = '';              // wipe any legacy inline styles
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
+        document.body.classList.toggle('rs-offline-lock', ['local-only', 'offline', 'sync-error'].includes(state));
         pill.title   = title;
         pill.innerHTML = html;
       }
@@ -1255,8 +1256,9 @@
       if(logout){
         logout.removeAttribute('onclick');
         logout.addEventListener('click', async ()=>{
-          if(!navigator.onLine){
-            RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
+          if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
+            if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+            else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
             return;
           }
           const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
@@ -1293,8 +1295,9 @@
           onMount(modal, close){
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
-                if(!navigator.onLine){
-                  RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
+                if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
+                  if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+                  else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
                   return;
                 }
                 const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
