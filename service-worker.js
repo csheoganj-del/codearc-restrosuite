@@ -2,38 +2,72 @@
 // Format: restrosuite-shell-vYYYYMMDD
 const CACHE_NAME = "restrosuite-shell-v20260704";
 const APP_SHELL = [
+  // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
-  "/index.html",
+  "/login",
   "/login.html",
-  "/home.html",
+  "/dashboard",
   "/dashboard.html",
+  "/home",
+  "/home.html",
+  "/order",
   "/order.html",
+  "/qr-order",
   "/qr-order.html",
+  "/tokens",
   "/tokens.html",
-  "/bill.html",
-  "/kds.html",
-  "/privacy.html",
-  "/terms.html",
-  "/refund-policy.html",
+  "/404",
   "/404.html",
+  
+  // Core Styles
   "/styles.css",
   "/dashboard-styles.css",
+  "/assets/restrosuite.css",
+  "/assets/dashboard.css",
+  "/assets/features.css",
+  
+  // Local Scripts
   "/script.js",
   "/pwa.js",
   "/config.js",
-  "/assets/restrosuite.css",
   "/assets/supabase-config.js",
   "/assets/saas-core.js",
   "/assets/db.js",
-  "/assets/dashboard.js",
-  "/assets/doppio-api.js"
+  "/assets/doppio-api.js",
+  "/assets/country-currency-data.js",
+  "/assets/qrcode.min.js",
+  "/src/dashboard/observability.js",
+  "/src/dashboard/imports.js",
+  "/src/dashboard/bills.js",
+  "/src/dashboard/chain.js",
+  
+  // Images/Assets
+  "/assets/restrosuite-mark.png",
+  "/assets/restrosuite_logo.png",
+  
+  // External CDN Dependencies (Pre-cached)
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Robust caching: Fetch each URL individually to handle redirects/errors gracefully
+      // without failing the entire installation if one resource is unavailable.
+      for (const url of APP_SHELL) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            await cache.put(url, response);
+          } else {
+            console.warn(`[SW] Failed to cache ${url}: status ${response.status}`);
+          }
+        } catch (e) {
+          console.error(`[SW] Error caching ${url}:`, e);
+        }
+      }
+    }).then(() => self.skipWaiting())
   );
 });
 
@@ -52,21 +86,36 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (url.pathname.startsWith("/api/")) return;
+
+  // Intercept requests to same origin OR allowed third-party CDNs
+  const isAllowedOrigin = (url.origin === self.location.origin ||
+                           url.hostname === "cdn.jsdelivr.net" ||
+                           url.hostname === "cdnjs.cloudflare.com" ||
+                           url.hostname === "fonts.googleapis.com" ||
+                           url.hostname === "fonts.gstatic.com");
+  if (!isAllowedOrigin) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (!response || response.status !== 200 || response.type !== "basic") return response;
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        // Cache successful requests dynamically
+        if (!response || response.status !== 200) return response;
+        
+        // Cache basic or CORS/CDN resources
+        const isCacheable = response.type === "basic" || response.type === "cors";
+        if (isCacheable) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
         return response;
       })
       .catch(() => caches.match(request).then((cached) => {
         if (cached) return cached;
-        // Only fall back to the login shell for page navigations.
-        // Returning HTML for failed image/script/style requests corrupts the page.
-        if (request.mode === "navigate") return caches.match("/login.html");
+        // Fall back to clean URL /login or /login.html for page navigations.
+        if (request.mode === "navigate") {
+          return caches.match("/login").then((fallback) => fallback || caches.match("/login.html"));
+        }
         return new Response("", { status: 504, statusText: "Offline" });
       }))
   );

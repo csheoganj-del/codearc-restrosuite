@@ -1092,7 +1092,7 @@
         return;
       }
       showOk(navigator.onLine ? 'Opening your dashboard...' : 'Opening offline dashboard...');
-      setTimeout(()=>location.href='dashboard.html',250);
+      setTimeout(()=>location.href='dashboard',250);
     };
   }
   window.addEventListener('online', updateOfflineResume);
@@ -1117,7 +1117,7 @@
       const saved = savedClientSession();
       if(saved){
         showOk('Offline mode - opening your saved dashboard...');
-        setTimeout(()=>location.href='dashboard.html',350);
+        setTimeout(()=>location.href='dashboard',350);
       } else {
         showErr('No saved workspace session found on this device. Sign in online once before using offline access.');
         loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
@@ -1131,7 +1131,7 @@
       if(window.RS_API && RS_API.configured){
         await RS_API.login({ slug, username:u, password:p, remember });
         showOk('Verified — opening your console…');
-        setTimeout(()=>location.href='dashboard.html',700);
+        setTimeout(()=>location.href='dashboard',700);
       } else {
         if(slug === 'superadmin'){
           throw new Error('Super-Admin is cloud-only. Please wait a moment and try again.');
@@ -1144,7 +1144,7 @@
         if(found){
           showOk('Demo mode — opening your console…');
           try{ localStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_id', slug); }catch(e){}
-          setTimeout(()=>location.href='dashboard.html',700);
+          setTimeout(()=>location.href='dashboard',700);
         } else {
           showErr('Outlet "'+slug+'" not found. Register it first or configure Supabase to sign in to a live outlet.');
           loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
@@ -1392,7 +1392,7 @@
           sessionStorage.setItem('tenant_id', tenantId);
         } catch(e){}
         showOk('Outlet created! Redirecting to your new console…');
-        setTimeout(()=>location.href='dashboard.html',900);
+        setTimeout(()=>location.href='dashboard',900);
       }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;

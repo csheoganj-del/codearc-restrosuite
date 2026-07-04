@@ -1245,7 +1245,7 @@
         logout.addEventListener('click', async ()=>{
           if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
           try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
-          location.href='login.html';
+          location.href='login';
         });
       }
     })();
@@ -1279,9 +1279,9 @@
                 if(!confirm("Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?")) return;
                 close();
                 if(window.RS_DB) {
-                  RS_DB.signOut().then(()=>{ location.href='login.html'; });
+                  RS_DB.signOut().then(()=>{ location.href='login'; });
                 } else {
-                  location.href='login.html';
+                  location.href='login';
                 }
               } else {
                 RS.activateTab(b.dataset.go);
