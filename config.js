@@ -47,6 +47,34 @@
     return;
   }
 
+  // -- Offline fallback ----------------------------------------------------------
+  // /api/config is a serverless function, not a static file, so the service
+  // worker never intercepts or caches it (see service-worker.js -- it explicitly
+  // skips /api/*). Without this, going offline would always wipe the Supabase
+  // URL/anon key and silently disable every feature that checks RS_API.configured,
+  // even after a successful sign-in. We stash the last good response ourselves
+  // and reuse it whenever the live fetch fails (offline, DNS hiccup, etc).
+  var RUNTIME_CONFIG_CACHE_KEY = 'restrosuite_runtime_config_v1';
+
+  function readCachedRuntimeConfig() {
+    try {
+      var raw = window.localStorage && window.localStorage.getItem(RUNTIME_CONFIG_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeCachedRuntimeConfig(cfg) {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(RUNTIME_CONFIG_CACHE_KEY, JSON.stringify(cfg));
+      }
+    } catch (e) {
+      // Storage full or disabled -- non-fatal, just skip the offline cache.
+    }
+  }
+
   // -- Vercel / web path --------------------------------------------------------
   // Async fetch -- does NOT block the main thread. dashboard.js awaits
   // window.__configReady before using window.__SUPABASE_URL__ or window.CONFIG.
@@ -64,9 +92,27 @@
         enableDemoTools:    cfg.enableDemoTools    || false,
         zeroCostLaunchMode: cfg.zeroCostLaunchMode || false,
       });
+      // Remember this good config so we can survive the next offline load.
+      writeCachedRuntimeConfig({
+        supabaseUrl: url,
+        supabaseAnonKey: key,
+        enableDemoTools: cfg.enableDemoTools || false,
+        zeroCostLaunchMode: cfg.zeroCostLaunchMode || false,
+      });
     })
     .catch(function (err) {
-      console.error('[config.js] Failed to load runtime config:', err.message);
+      console.warn('[config.js] Live /api/config fetch failed, checking offline cache:', err.message);
+      var cached = readCachedRuntimeConfig();
+      if (cached && cached.supabaseUrl && cached.supabaseAnonKey) {
+        console.info('[config.js] Using last known-good config (offline mode).');
+        applyConfig(cached.supabaseUrl, cached.supabaseAnonKey, {
+          enableDemoTools:    cached.enableDemoTools    || false,
+          zeroCostLaunchMode: cached.zeroCostLaunchMode || false,
+        });
+        window.__OFFLINE_CONFIG__ = true;
+        return;
+      }
+      console.error('[config.js] Failed to load runtime config and no offline cache exists:', err.message);
       window.__CONFIG_ERROR__ = err.message;
       // Apply empty config so the app can still render an error state
       // rather than hanging indefinitely.

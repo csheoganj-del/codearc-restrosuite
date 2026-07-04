@@ -1,14 +1,20 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260626";
+const CACHE_NAME = "restrosuite-shell-v20260704";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/login.html",
   "/home.html",
+  "/dashboard.html",
   "/order.html",
   "/qr-order.html",
   "/tokens.html",
+  "/bill.html",
+  "/kds.html",
+  "/privacy.html",
+  "/terms.html",
+  "/refund-policy.html",
   "/404.html",
   "/styles.css",
   "/dashboard-styles.css",
@@ -18,7 +24,9 @@ const APP_SHELL = [
   "/assets/restrosuite.css",
   "/assets/supabase-config.js",
   "/assets/saas-core.js",
-  "/assets/db.js"
+  "/assets/db.js",
+  "/assets/dashboard.js",
+  "/assets/doppio-api.js"
 ];
 
 self.addEventListener("install", (event) => {
