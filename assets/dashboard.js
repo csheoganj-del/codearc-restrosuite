@@ -5494,6 +5494,10 @@
   }).catch(()=>{});
 
   function showOfflineLogoutLock(){
+    if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) {
+      window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+      return;
+    }
     toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
   }
 
@@ -5503,6 +5507,7 @@
   }
 
   async function logoutWouldLockOut(){
+    if (window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return true;
     if (navigator.onLine === false || window.__OFFLINE_CONFIG__ || hasRecentCloudFailure()) return true;
     if (!(window.RS_API && RS_API.configured)) return false;
 

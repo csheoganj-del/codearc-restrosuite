@@ -63,7 +63,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v34-20260628';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v35-20260704-offline-logout';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   (function() {
@@ -1388,6 +1388,65 @@
 <script src="src/dashboard/bills.js?v=20260618-importsync3"></script>
 <script src="src/dashboard/chain.js"></script>
 <script>
+  (function() {
+    var lockMessage = 'Logout is disabled while offline to prevent lock-out.';
+
+    function hasRecentCloudFailure() {
+      var last = window.RS_LAST_CLOUD_ERROR;
+      return !!(last && last.time && (Date.now() - last.time < 120000));
+    }
+
+    function pillShowsOfflineMode() {
+      var pill = document.getElementById('db-mode-pill');
+      var text = ((pill && pill.textContent) || '').toLowerCase();
+      return text.indexOf('local only') !== -1 ||
+        text.indexOf('app offline') !== -1 ||
+        text.indexOf('offline') !== -1 ||
+        text.indexOf('sync error') !== -1;
+    }
+
+    window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE = function() {
+      try {
+        return navigator.onLine === false ||
+          window.__OFFLINE_CONFIG__ === true ||
+          hasRecentCloudFailure() ||
+          pillShowsOfflineMode() ||
+          document.body.classList.contains('rs-offline-lock');
+      } catch (e) {
+        return navigator.onLine === false;
+      }
+    };
+
+    window.RS_SHOW_OFFLINE_LOGOUT_LOCK = function() {
+      if (window.RS && typeof window.RS.toast === 'function') {
+        window.RS.toast(lockMessage, 'fa-circle-xmark');
+        return;
+      }
+      if (typeof window.toast === 'function') {
+        window.toast(lockMessage, 'fa-circle-xmark');
+        return;
+      }
+      var toast = document.getElementById('toast');
+      if (toast) {
+        toast.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + lockMessage;
+        toast.classList.add('show');
+        clearTimeout(window.__rsOfflineLogoutToastTimer);
+        window.__rsOfflineLogoutToastTimer = setTimeout(function() {
+          toast.classList.remove('show');
+        }, 2400);
+      }
+    };
+
+    document.addEventListener('click', function(e) {
+      var target = e.target && e.target.closest && e.target.closest('.logout, [data-go="logout"], #sa-settings-logout');
+      if (!target || !window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+    }, true);
+  })();
+</script><script>
   // Load versioned feature scripts in order without document.write.
   // document.write blocks the HTML parser; this approach does not.
   (function() {
