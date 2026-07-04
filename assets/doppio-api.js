@@ -106,6 +106,13 @@
   // Helper: the active session is tab-local. localStorage is only the
   // remembered-session fallback for a newly opened tab.
   function ssGet(k){ return SS.getItem(k) || LS_SESS.getItem(k); }
+  function restorePersistentSessionToTab(){
+    if (SS.getItem(K.token) || !LS_SESS.getItem(K.token)) return;
+    SESSION_KEYS.forEach(k => {
+      const value = LS_SESS.getItem(k);
+      if (value !== null && SS.getItem(k) === null) SS.setItem(k, value);
+    });
+  }
   function ssSet(k, v, persist){
     SS.setItem(k, v);
     if(persist){
@@ -292,7 +299,9 @@
       }
     },
 
-    session(){ const t = ssGet(K.token); if(!t) return null;
+    session(){
+      restorePersistentSessionToTab();
+      const t = ssGet(K.token); if(!t) return null;
       const role = ssGet(K.role);
       if (role === 'superadmin' && !CONFIGURED) {
         absorbRuntimeConfig();
