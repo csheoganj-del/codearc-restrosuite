@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260704";
+const CACHE_NAME = "restrosuite-shell-v20260704-2";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -40,6 +40,16 @@ const APP_SHELL = [
   "/src/dashboard/imports.js",
   "/src/dashboard/bills.js",
   "/src/dashboard/chain.js",
+  
+  // Missing Feature Scripts Loaded Dynamically by dashboard.html
+  "/assets/dashboard.js",
+  "/assets/features-pos.js",
+  "/assets/features-editor.js",
+  "/assets/features-manage.js",
+  "/assets/features-growth.js",
+  "/assets/features-extra.js",
+  "/src/dashboard/onboarding.js",
+  "/assets/features-shell.js",
   
   // Images/Assets
   "/assets/restrosuite-mark.png",
@@ -110,11 +120,11 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => {
+      .catch(() => caches.match(request, { ignoreSearch: true }).then((cached) => {
         if (cached) return cached;
         // Fall back to clean URL /login or /login.html for page navigations.
         if (request.mode === "navigate") {
-          return caches.match("/login").then((fallback) => fallback || caches.match("/login.html"));
+          return caches.match("/login", { ignoreSearch: true }).then((fallback) => fallback || caches.match("/login.html", { ignoreSearch: true }));
         }
         return new Response("", { status: 504, statusText: "Offline" });
       }))
