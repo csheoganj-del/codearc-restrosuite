@@ -1105,19 +1105,29 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
-      $('#set-save').onclick=()=>{ collect(); (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve()).then(()=>{
-        const isCloud = RS.dbMode && RS.dbMode()==='cloud' && navigator.onLine && !window.__OFFLINE_CONFIG__ && !window.RS_LAST_CLOUD_ERROR;
-        if(isCloud){
-          RS.toast('Settings saved to cloud','fa-circle-check');
-        } else {
-          RS.toast('Settings saved locally only — not synced to cloud. Log in to sync across devices.','fa-triangle-exclamation');
+      $('#set-save').onclick=async ()=>{ 
+        collect(); 
+        try {
+          await (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve());
+          // Update RS_SETTINGS immediately with new settings
+          window.RS_SETTINGS = SET_STORE;
+          const isCloud = RS.dbMode && RS.dbMode()==='cloud' && navigator.onLine && !window.__OFFLINE_CONFIG__ && !window.RS_LAST_CLOUD_ERROR;
+          if(isCloud){
+            RS.toast('Settings saved to cloud','fa-circle-check');
+          } else {
+            RS.toast('Settings saved locally only — not synced to cloud. Log in to sync across devices.','fa-triangle-exclamation');
+          }
+          if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); }
+          // First load receipt profile (which calls normalizeReceiptProfile)
+          if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(SET_STORE);
+          if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
+          if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
+          try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
+        } catch(err) {
+          console.error(err);
+          RS.toast('Failed to save settings: ' + err.message, 'fa-circle-exclamation');
         }
-        if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); }
-        if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
-        if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
-        if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile();
-        try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
-      }); };
+      };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }
