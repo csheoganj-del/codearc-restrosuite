@@ -232,14 +232,30 @@
     }
 
     function tableModal(t){
-      const body = t.state==='free'
+      let bodyHtml = t.state==='free'
         ? `<p style="color:var(--text-soft);font-size:14.5px">Table ${t.n} is available (${t.cap} seats). Seat guests and start a new order on the POS.</p>`
         : `<div class="crm-stats" style="margin-bottom:6px"><div class="cs"><div class="csv">${rs(t.amt)}</div><div class="csl">Running bill</div></div><div class="cs"><div class="csv">${t.since}</div><div class="csl">Seated for</div></div><div class="cs"><div class="csv">${t.cap}</div><div class="csl">Seats</div></div></div>`;
+      
+      bodyHtml += `
+        <div class="qr-session-controls" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke-2); font-family: var(--font-body), sans-serif;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; margin-bottom: 8px;">QR Ordering Session</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <span style="font-size: 13.5px; color: var(--text);">Status: <b id="qr-session-status-text">🔴 Closed</b></span>
+            <span id="qr-session-token-text" style="font-size: 10px; font-family: monospace; color: var(--text-soft); display: none;"></span>
+          </div>
+          <div style="display: flex; gap: 8px;" id="qr-session-buttons-container">
+            <div style="color: var(--text-soft); font-size: 12px;"><i class="fa-solid fa-spinner fa-spin"></i> Checking QR status...</div>
+          </div>
+        </div>
+      `;
+
       const foot = t.state==='free'
         ? `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px;margin-right:8px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button><button class="btn btn-ghost" style="flex:1" data-x>Close</button><button class="btn btn-primary" style="flex:1" data-pos><i class="fa-solid fa-cash-register"></i> Seat & order</button>`
         : `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px;margin-right:8px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button><button class="btn btn-ghost" style="flex:1" data-pos><i class="fa-solid fa-plus"></i> Add items</button><button class="btn btn-primary" style="flex:1" data-bill><i class="fa-solid fa-print"></i> ${t.state==='billed'?'Settle payment':'Print bill'}</button>`;
-      RSModal.open({ title:'Table '+t.n, sub:stateTxt[t.state], icon:'fa-chair', size:'sm', body, foot,
-        onMount(modal,close){ modal.querySelector('[data-x]')&&(modal.querySelector('[data-x]').onclick=close);
+      
+      RSModal.open({ title:'Table '+t.n, sub:stateTxt[t.state], icon:'fa-chair', size:'sm', body: bodyHtml, foot,
+        onMount(modal,close){
+          modal.querySelector('[data-x]')&&(modal.querySelector('[data-x]').onclick=close);
           modal.querySelector('[data-pos]').onclick=()=>{ close(); RS.activateTab('pos-tab'); RS.toast('Table '+t.n+' selected on POS','fa-cash-register'); };
           const qrBtn = modal.querySelector('#tbl-view-qr');
           if (qrBtn) {
@@ -248,12 +264,153 @@
               showSingleTableQR(t);
             };
           }
+
+          let session = null;
+          // Mirror of normalizeTableKey() in the tenant-public edge function:
+          // sessions must be stored/matched on the SAME normalized key
+          // ("Table 05" -> "5") or the customer QR page never finds them.
+          const normTableKey = raw => {
+            let key = String(raw == null ? '' : raw).trim().toLowerCase();
+            if (!key) return '';
+            key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
+            if (/^t\d+$/.test(key)) key = key.slice(1);
+            if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+            return key;
+          };
+          const checkStatus = async () => {
+            if (!window.RS_DB) return;
+            try {
+              const sessions = await RS_DB.list('table_sessions').catch(() => []);
+              const wantKey = normTableKey(t.n);
+              session = sessions.find(s => normTableKey(s.tableNumber) === wantKey);
+              updateQRControls(session);
+            } catch (err) {
+              console.warn("Failed checking session status", err);
+            }
+          };
+
+          const updateQRControls = (sess) => {
+            const statusTextEl = modal.querySelector('#qr-session-status-text');
+            const tokenTextEl = modal.querySelector('#qr-session-token-text');
+            const btnContainer = modal.querySelector('#qr-session-buttons-container');
+            if (!statusTextEl || !btnContainer) return;
+
+            let statusHtml = '🔴 Closed';
+            let buttonsHtml = '';
+            
+            if (sess && sess.status === 'active') {
+              statusHtml = '🟢 Active';
+              if (sess.token) {
+                tokenTextEl.style.display = 'inline';
+                tokenTextEl.textContent = `Token: ${sess.token.substring(0, 8)}...`;
+              } else {
+                tokenTextEl.style.display = 'none';
+              }
+              buttonsHtml = `
+                <button class="btn btn-ghost btn-sm btn-qr-action" data-action="pause" style="flex:1; border: 1px solid var(--stroke-2); font-size:11px; padding:6px 4px;"><i class="fa-solid fa-pause"></i> Pause</button>
+                <button class="btn btn-ghost btn-sm btn-qr-action" data-action="regenerate" style="flex:1; border: 1px solid var(--stroke-2); font-size:11px; padding:6px 4px;" title="Regenerate Token"><i class="fa-solid fa-rotate"></i> Regen</button>
+                <button class="btn btn-ghost btn-sm btn-qr-action" data-action="close" style="flex:1; border: 1px solid rgba(239,68,68,0.25); color:var(--red); font-size:11px; padding:6px 4px;"><i class="fa-solid fa-power-off"></i> Close</button>
+              `;
+            } else if (sess && sess.status === 'paused') {
+              statusHtml = '🟡 Paused';
+              tokenTextEl.style.display = 'none';
+              buttonsHtml = `
+                <button class="btn btn-ghost btn-sm btn-qr-action" data-action="resume" style="flex:1; border: 1px solid var(--stroke-2); font-size:11px; padding:6px 4px;"><i class="fa-solid fa-play"></i> Resume</button>
+                <button class="btn btn-ghost btn-sm btn-qr-action" data-action="close" style="flex:1; border: 1px solid rgba(239,68,68,0.25); color:var(--red); font-size:11px; padding:6px 4px;"><i class="fa-solid fa-power-off"></i> Close</button>
+              `;
+            } else {
+              statusHtml = '🔴 Closed';
+              tokenTextEl.style.display = 'none';
+              buttonsHtml = `
+                <button class="btn btn-primary btn-sm btn-qr-action" data-action="open" style="flex:1; font-size:11px; padding:6px 4px;"><i class="fa-solid fa-play"></i> Open Session</button>
+              `;
+            }
+
+            statusTextEl.innerHTML = statusHtml;
+            btnContainer.innerHTML = buttonsHtml;
+          };
+
+          modal.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.btn-qr-action');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            try {
+              let updatedSess = null;
+              // Store the normalized key (e.g. "5"), matching both the DB
+              // trigger and the tenant-public get_active_session lookup.
+              const tableNumKey = normTableKey(t.n);
+
+              if (action === 'open') {
+                const randomToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                updatedSess = {
+                  tableNumber: tableNumKey,
+                  token: randomToken,
+                  status: 'active',
+                  createdAt: new Date().toISOString()
+                };
+                if (session && session.id) updatedSess.id = session.id;
+                // No made-up id for new sessions: the cloud table's primary
+                // key is a uuid the DB generates on insert.
+                const savedOpen = await RS_DB.put('table_sessions', session?.id, updatedSess);
+                if (savedOpen && savedOpen.id != null) updatedSess.id = savedOpen.id;
+                RS.toast('QR Session opened', 'fa-circle-check');
+              } else if (action === 'pause') {
+                updatedSess = { ...session, status: 'paused' };
+                await RS_DB.put('table_sessions', session.id, updatedSess);
+                RS.toast('QR Session paused', 'fa-circle-check');
+              } else if (action === 'resume') {
+                updatedSess = { ...session, status: 'active' };
+                await RS_DB.put('table_sessions', session.id, updatedSess);
+                RS.toast('QR Session resumed', 'fa-circle-check');
+              } else if (action === 'regenerate') {
+                const randomToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                updatedSess = { ...session, token: randomToken, status: 'active' };
+                await RS_DB.put('table_sessions', session.id, updatedSess);
+                RS.toast('QR Session regenerated', 'fa-circle-check');
+              } else if (action === 'close') {
+                updatedSess = { ...session, status: 'closed', closedAt: new Date().toISOString() };
+                await RS_DB.put('table_sessions', session.id, updatedSess);
+                RS.toast('QR Session closed', 'fa-circle-check');
+              }
+
+              session = updatedSess;
+              updateQRControls(session);
+              document.dispatchEvent(new Event('rs:tables-updated'));
+            } catch(err) {
+              console.error("Failed to update QR session:", err);
+              RS.toast('Failed to update session', 'fa-circle-exclamation');
+              updateQRControls(session);
+            }
+          });
+
+          checkStatus();
+
           const bb=modal.querySelector('[data-bill]'); if(bb) bb.onclick=async ()=>{
             close();
             if (t.state === 'billed' || t.state === 'occupied') {
               if (t.dbId && window.RS_DB) {
                 try {
                   await RS_DB.del('pending_orders', t.dbId);
+                  
+                  // Clear session locally/cloud on checkout
+                  const normKey = raw => {
+                    let key = String(raw == null ? '' : raw).trim().toLowerCase();
+                    if (!key) return '';
+                    key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
+                    if (/^t\d+$/.test(key)) key = key.slice(1);
+                    if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+                    return key;
+                  };
+                  const sessions = await RS_DB.list('table_sessions').catch(() => []);
+                  const curSess = sessions.find(s => normKey(s.tableNumber) === normKey(t.n));
+                  if (curSess) {
+                    await RS_DB.put('table_sessions', curSess.id, { ...curSess, status: 'closed', closedAt: new Date().toISOString() });
+                  }
+
                   RS.toast('Table '+t.n+' settled / bill cleared','fa-check');
                   renderFloor();
                 } catch(e) {

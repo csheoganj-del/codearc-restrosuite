@@ -70,12 +70,14 @@ const TENANT_TABLES = new Set([
   "doppio_table_layout",
   "doppio_waitlist",
   "doppio_tax_rates",
+  "doppio_table_sessions",
 ]);
 
 const TABLE_TAB_ACCESS: Record<string, string[]> = {
   doppio_aggregator_config: ["pos-tab", "editor-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
   doppio_online_orders: ["pos-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
   doppio_table_layout: ["pos-tab", "growth-hub-tab"],
+  doppio_table_sessions: ["pos-tab", "growth-hub-tab"],
   doppio_waitlist: ["pos-tab", "crm-tab", "growth-hub-tab"],
   doppio_menu: ["pos-tab", "editor-tab", "online-tab"],
   doppio_inventory: ["pos-tab", "inventory-tab", "editor-tab"],
@@ -139,6 +141,7 @@ const TABLE_WRITE_ROLES: Record<string, string[]> = {
   doppio_draft_orders: ["cashier", "waiter"],
   doppio_support_tickets: ["cashier", "kitchen", "waiter", "captain"],
   doppio_reservations: ["cashier", "waiter", "captain"],
+  doppio_table_sessions: ["cashier", "waiter", "captain"],
 };
 
 const ZERO_COST_DEFAULT_LIMIT = 250;

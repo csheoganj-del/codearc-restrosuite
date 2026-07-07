@@ -1,0 +1,57 @@
+name: Nightly database backup
+
+# Disaster-recovery automation: previously `npm run backup` only ran when
+# someone remembered to run it by hand. This runs it every night regardless,
+# and keeps the archive somewhere other than the single machine the manual
+# backup used to land on.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#
+# Artifacts are kept for 90 days. For true off-site, long-term retention,
+# pair this with the Google Drive export feature (per-tenant, client-owned
+# copies) once that's connected -- this workflow covers the "automatic,
+# won't be forgotten" part of disaster recovery in the meantime.
+
+on:
+  schedule:
+    - cron: '30 20 * * *' # 20:30 UTC = 02:00 IST
+  workflow_dispatch: {} # allow manual "Run workflow" too
+
+jobs:
+  backup:
+    name: Run nightly backup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run backup
+        run: npm run backup
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: restrosuite-backup-${{ github.run_id }}
+          path: backups/*.zip
+          retention-days: 90
+
+      - name: Fail loudly if no backup was produced
+        run: |
+          if [ -z "$(ls -A backups/*.zip 2>/dev/null)" ]; then
+            echo "::error::No backup archive was produced -- treat this as a disaster-recovery incident, not a skipped job."
+            exit 1
+          fi

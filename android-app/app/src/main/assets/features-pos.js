@@ -180,11 +180,14 @@
 
     /* ---------------- print helper ---------------- */
     window.RSPrint = function(innerHTML, title){
+      const paperSize = (window.RS_SETTINGS && window.RS_SETTINGS.set_paper_size) || '80 mm';
+      const maxW = paperSize === '58 mm' ? '200px' : '300px';
       const style = `
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@800&display=swap');
           *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',monospace;}
           body{padding:10px;color:#111;}
+          body > div { max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important; }
           .rcp-center{text-align:center}.rcp-logo{font-family:'Plus Jakarta Sans';font-weight:800;font-size:20px}
           .rcp-sub{font-size:11px;color:#666;margin-top:2px}.rcp-hr{border:0;border-top:1px dashed #aaa;margin:10px 0}
           .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}

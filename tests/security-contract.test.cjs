@@ -572,3 +572,50 @@ test("live simulation regressions keep sessions, menu saves, QR sync, and QR bil
   assert.match(otpMigration, /CREATE TABLE IF NOT EXISTS public\.public_otp_challenges/);
   assert.match(otpMigration, /FORCE ROW LEVEL SECURITY/);
 });
+
+test("harden QR ordering system uses signed table sessions and authenticates waiter mode", () => {
+  const publicApi = read("supabase/functions/tenant-public/index.ts");
+  const dataApi = read("supabase/functions/tenant-data/index.ts");
+  const db = read("assets/db.js");
+  const growth = read("assets/features-growth.js");
+  const qrOrder = read("qr-order.html");
+  const order = read("order.html");
+  const migration = read("supabase/migrations/20260703180000_qr_ordering_hardening.sql");
+
+  // 1. Database Migration checks
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.doppio_table_sessions/);
+  assert.match(migration, /FORCE ROW LEVEL SECURITY/);
+  assert.match(migration, /trg_on_order_inserted_or_deleted/);
+
+  // 2. tenant-public checks
+  assert.match(publicApi, /function verifyTableSessionToken/);
+  assert.match(publicApi, /async function validateActiveSession/);
+  assert.match(publicApi, /action === "get_active_session"/);
+  assert.match(publicApi, /update\(\{ last_order_at: new Date\(\)\.toISOString\(\) \}\)/);
+  assert.match(publicApi, /validateActiveSession\(tenant\.id, tenantSlug, tableNumber, sessionToken, true\)/);
+  assert.match(publicApi, /validateActiveSession\(tenant\.id, tenantSlug, tableRaw, sessionToken, false\)/);
+
+  // 3. tenant-data and db.js mapping checks
+  assert.match(dataApi, /"doppio_table_sessions"/);
+  assert.match(dataApi, /doppio_table_sessions: \["cashier", "waiter", "captain"\]/);
+  assert.match(db, /table_sessions: \{/);
+  assert.match(db, /table:'doppio_table_sessions'/);
+
+  // 4. growth features checks
+  assert.match(growth, /QR Ordering Session/);
+  assert.match(growth, /btn-qr-action/);
+  assert.match(growth, /updateQRControls/);
+  assert.match(growth, /status === 'active'/);
+
+  // 5. qr-order.html checks
+  assert.match(qrOrder, /showSessionStatusOverlay/);
+  assert.match(qrOrder, /showStaffLoginOverlay/);
+  assert.match(qrOrder, /get_active_session/);
+  assert.match(qrOrder, /sessionStorage\.setItem\('qr_session_token'/);
+
+  // 6. order.html checks
+  assert.match(order, /showSessionStatusOverlay/);
+  assert.match(order, /showStaffLoginOverlay/);
+  assert.match(order, /waiterMode && action === 'create_order'/);
+  assert.match(order, /FN\.replace\('tenant-public', 'tenant-data'\)/);
+});

@@ -14,6 +14,7 @@ if (-not (Test-Path $DestDir)) {
 $FilesToCopy = @(
     "index.html",
     "dashboard.html",
+    "dashboard-styles.css",
     "login.html",
     "home.html",
     "kds.html",

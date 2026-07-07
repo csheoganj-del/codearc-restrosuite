@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'idea'
 }
 
 android {
@@ -10,6 +11,12 @@ android {
         applicationId "com.doppiocafe.pos"
         minSdk 24
         targetSdk 34
+        // IMPORTANT: bump versionCode by at least 1 (and versionName to match)
+        // on every Play Store release. It has been frozen at 1 / "1.0.0"
+        // since launch, so the Play Store has never seen a new version to
+        // offer as an update -- this is the native-app half of the
+        // "update never lands" issue (the other half was the WebView
+        // caching the entry page; see the cache-bust fix in loadUrl()).
         versionCode 1
         versionName "1.0.0"
 
@@ -55,6 +62,40 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+// Tell Android Studio's file indexer to exclude the build output directory.
+// This prevents it from holding Windows file handles on intermediate dex files.
+idea {
+    module {
+        excludeDirs += [file("build")]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Force-remove Windows-locked dex intermediate directories before each build.
+// Android Studio's "Apply Changes" / file indexer holds exclusive handles on
+// these folders. Java NIO cannot delete locked files on Windows, but the
+// native cmd.exe rmdir command can bypass the lock.
+// ---------------------------------------------------------------------------
+task forceCleanDexIntermediates {
+    doFirst {
+        def targets = [
+            "${buildDir}/intermediates/project_dex_archive",
+            "${buildDir}/intermediates/desugar_graph",
+        ]
+        targets.each { path ->
+            if (file(path).exists()) {
+                logger.lifecycle("Force-removing locked directory: $path")
+                new ProcessBuilder('cmd', '/c', 'rmdir', '/s', '/q', path)
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor()
+            }
+        }
+    }
+}
+
+preBuild.dependsOn forceCleanDexIntermediates
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'

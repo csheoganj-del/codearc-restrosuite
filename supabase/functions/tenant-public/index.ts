@@ -23,6 +23,103 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+function encodeBase64Url(bytes: Uint8Array) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function signValue(value: string, secret: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return encodeBase64Url(new Uint8Array(signature));
+}
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  return diff === 0;
+}
+
+async function generateTableSessionToken(tenantSlug: string, tableNumber: string, dbToken: string) {
+  const valueToSign = `${tenantSlug}:${normalizeTableKey(tableNumber)}:${dbToken}`;
+  const signature = await signValue(valueToSign, OTP_SECRET);
+  return `${valueToSign}:${signature}`;
+}
+
+async function verifyTableSessionToken(token: string, tenantSlug: string, tableNumber: string) {
+  if (!token) return { ok: false, error: "Missing session token." };
+  const parts = token.split(":");
+  if (parts.length !== 4) return { ok: false, error: "Invalid session token format." };
+  const [slug, table, dbToken, signature] = parts;
+  if (slug !== tenantSlug || normalizeTableKey(table) !== normalizeTableKey(tableNumber)) {
+    return { ok: false, error: "Token table or tenant mismatch." };
+  }
+  const valueToSign = `${slug}:${normalizeTableKey(table)}:${dbToken}`;
+  const expectedSignature = await signValue(valueToSign, OTP_SECRET);
+  if (!timingSafeEqualString(expectedSignature, signature)) {
+    return { ok: false, error: "Invalid session token signature." };
+  }
+  return { ok: true, dbToken };
+}
+
+async function validateActiveSession(tenantId: string, tenantSlug: string, tableRaw: string, token: string, isOrder = false) {
+  const tableKey = normalizeTableKey(tableRaw);
+  if (!tableKey) return { allowed: false, error: "Invalid table." };
+
+  if (["takeaway", "walk-in"].includes(tableKey.toLowerCase())) {
+    return { allowed: true, tableKey };
+  }
+
+  const verification = await verifyTableSessionToken(token, tenantSlug, tableKey);
+  if (!verification.ok) {
+    return { allowed: false, error: "This table session is closed or invalid. Please scan the table QR again." };
+  }
+
+  const { data: sessionData, error: sessionError } = await supabaseAdmin
+    .from("doppio_table_sessions")
+    .select("session_token, status, last_order_at")
+    .eq("tenant_id", tenantId)
+    .eq("table_number", tableKey)
+    .maybeSingle();
+
+  if (sessionError || !sessionData) {
+    return { allowed: false, error: "Table session not found or closed." };
+  }
+
+  if (sessionData.status === "closed") {
+    return { allowed: false, error: "This table session has been closed. Please call staff to re-open." };
+  }
+
+  if (sessionData.status === "paused") {
+    return { allowed: false, error: "QR ordering is temporarily paused for this table. Please call staff." };
+  }
+
+  if (sessionData.session_token !== verification.dbToken) {
+    return { allowed: false, error: "This table session has expired. Please scan the new table QR code." };
+  }
+
+  if (isOrder && sessionData.last_order_at) {
+    const elapsedSeconds = (Date.now() - new Date(sessionData.last_order_at).getTime()) / 1000;
+    if (elapsedSeconds < 15) {
+      return { allowed: false, error: `Please wait ${Math.ceil(15 - elapsedSeconds)}s before placing another order.` };
+    }
+  }
+
+  return { allowed: true, tableKey };
+}
+
 const PLAN_LIMITS: Record<string, { monthlyOrderLimit: number }> = {
   free: { monthlyOrderLimit: 50 },
   starter: { monthlyOrderLimit: 300 },
@@ -101,6 +198,8 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
   const rules: Record<string, { limit: number; windowSeconds: number }> = {
     list_menu: { limit: 120, windowSeconds: 60 },
     create_order: { limit: 20, windowSeconds: 5 * 60 },
+    get_table_orders: { limit: 90, windowSeconds: 60 },
+    create_notification: { limit: 12, windowSeconds: 60 },
   };
   const rule = rules[action];
   if (!rule) return { allowed: true };
@@ -121,6 +220,20 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
     return { allowed: false, unavailable: true };
   }
   return { allowed: data === true };
+}
+
+// Normalizes table identifiers so "Table 05", "T5", "table-5" and "5" all
+// match. QR links carry the raw ?table= value while the POS stores labels
+// like "Table 5", so both sides must be compared through this key.
+function normalizeTableKey(raw: unknown): string {
+  let key = String(raw == null ? "" : raw).trim().toLowerCase();
+  if (!key) return "";
+  key = key.replace(/\btable\b|\btbl\b/g, "").replace(/[^a-z0-9]/g, "");
+  // "t5" -> "5" (single leading t used as table shorthand)
+  if (/^t\d+$/.test(key)) key = key.slice(1);
+  // strip leading zeros on pure numbers: "05" -> "5"
+  if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+  return key;
 }
 
 async function getApprovedTenant(slug: string) {
@@ -278,6 +391,19 @@ serve(async (req) => {
 
     if (action === "create_order") {
       const order = payload.order && typeof payload.order === "object" ? payload.order as Record<string, unknown> : {};
+      
+      const orderId = String(order.orderId || "").trim();
+      if (!/^DO-QR-[A-Z0-9-]{8,64}$/i.test(orderId)) {
+        return jsonResponse({ error: "Invalid order identifier." }, 400, req);
+      }
+
+      const tableNumber = String(order.tableNumber || "Takeaway").trim();
+      const sessionToken = String(payload.session_token || payload.token || "").trim();
+      const sessionCheck = await validateActiveSession(tenant.id, tenantSlug, tableNumber, sessionToken, true);
+      if (!sessionCheck.allowed) {
+        return jsonResponse({ error: sessionCheck.error }, 403, req);
+      }
+
       let parsedItems: unknown;
       try {
         parsedItems = typeof order.items === "string"
@@ -360,11 +486,6 @@ serve(async (req) => {
         ? "UPI - Pending Verification"
         : requestedPaymentMethod.slice(0, 80);
 
-      const orderId = String(order.orderId || "").trim();
-      if (!/^DO-QR-[A-Z0-9-]{8,64}$/i.test(orderId)) {
-        return jsonResponse({ error: "Invalid order identifier." }, 400, req);
-      }
-
       const { data: existingOrder, error: existingOrderError } = await supabaseAdmin
         .from("doppio_pending_orders")
         .select("orderId")
@@ -424,6 +545,13 @@ serve(async (req) => {
         return jsonResponse({ error: "Failed to submit order." }, 500, req);
       }
 
+      // Update last_order_at timestamp for table cooldown
+      await supabaseAdmin
+        .from("doppio_table_sessions")
+        .update({ last_order_at: new Date().toISOString() })
+        .eq("tenant_id", tenant.id)
+        .eq("table_number", sessionCheck.tableKey);
+
       return jsonResponse({ success: true }, 200, req);
     }
 
@@ -463,11 +591,133 @@ serve(async (req) => {
       return jsonResponse({ order: data }, 200, req);
     }
 
+    // ── Table-based live order tracking ─────────────────────────────────────
+    // Returns every active order for a table (QR self-orders AND waiter-taken
+    // KOTs both land in doppio_pending_orders with a tableNumber), plus bills
+    // settled in the last 2 hours so guests see "Paid" after checkout.
+    if (action === "get_table_orders") {
+      const tableRaw = String(payload.table || "").trim().slice(0, 40);
+      const sessionToken = String(payload.session_token || payload.token || "").trim();
+      const sessionCheck = await validateActiveSession(tenant.id, tenantSlug, tableRaw, sessionToken, false);
+      if (!sessionCheck.allowed) {
+        return jsonResponse({ error: sessionCheck.error }, 403, req);
+      }
+      const tableKey = sessionCheck.tableKey;
+
+      const sessionWindowStart = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+      const { data: pendingRows, error: pendingError } = await supabaseAdmin
+        .from("doppio_pending_orders")
+        .select('"orderId", status, items, total, subtotal, "tableNumber", "orderType", "paymentMethod", "dateTime", created_at')
+        .eq("tenant_id", tenant.id)
+        .gte("created_at", sessionWindowStart)
+        .order("created_at", { ascending: false })
+        .limit(120);
+
+      if (pendingError) {
+        console.error("tenant-public get_table_orders failed:", pendingError);
+        return jsonResponse({ error: "Failed to fetch table orders." }, 500, req);
+      }
+
+      const parseItems = (raw: unknown): Array<Record<string, unknown>> => {
+        try {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          if (!Array.isArray(parsed)) return [];
+          return parsed.slice(0, 100).map((it: Record<string, unknown>) => ({
+            name: String(it?.name || "").slice(0, 120),
+            qty: Number(it?.qty || 1) || 1,
+            price: Number(it?.price || 0) || 0,
+          }));
+        } catch {
+          return [];
+        }
+      };
+
+      const orders = (pendingRows || [])
+        .filter((row: Record<string, unknown>) => normalizeTableKey(row.tableNumber) === tableKey)
+        .map((row: Record<string, unknown>) => ({
+          orderId: String(row.orderId || ""),
+          status: String(row.status || "Pending Review"),
+          items: parseItems(row.items),
+          total: Number(row.total || 0),
+          orderType: String(row.orderType || ""),
+          paymentMethod: String(row.paymentMethod || ""),
+          dateTime: String(row.dateTime || row.created_at || ""),
+          source: /^DO-QR-/i.test(String(row.orderId || "")) ? "qr" : "staff",
+        }));
+
+      // Recently settled bills for this table -> show as Paid
+      const billWindowStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const { data: billRows, error: billError } = await supabaseAdmin
+        .from("doppio_bills")
+        .select('"orderId", "table", items, total, "paymentMethod", "dateTime"')
+        .eq("tenant_id", tenant.id)
+        .gte("dateTime", billWindowStart)
+        .order("dateTime", { ascending: false })
+        .limit(60);
+
+      if (billError) {
+        console.error("tenant-public get_table_orders bill fetch failed:", billError);
+      }
+
+      const pendingIds = new Set(orders.map((o) => o.orderId));
+      const paidOrders = (billRows || [])
+        .filter((row: Record<string, unknown>) =>
+          normalizeTableKey(row.table) === tableKey && !pendingIds.has(String(row.orderId || "")))
+        .map((row: Record<string, unknown>) => ({
+          orderId: String(row.orderId || ""),
+          status: "Paid",
+          items: parseItems(row.items),
+          total: Number(row.total || 0),
+          orderType: "Dine-in",
+          paymentMethod: String(row.paymentMethod || ""),
+          dateTime: String(row.dateTime || ""),
+          source: /^DO-QR-/i.test(String(row.orderId || "")) ? "qr" : "staff",
+        }));
+
+      return jsonResponse({
+        table: tableRaw,
+        orders: [...orders, ...paidOrders].slice(0, 40),
+        serverTime: new Date().toISOString(),
+      }, 200, req);
+    }
+
     if (action === "create_notification") {
       const title = String(payload.title || "Service Alert").trim().slice(0, 120);
       const message = String(payload.message || "").trim().slice(0, 240);
       const type = String(payload.type || "info").trim().slice(0, 40);
-      const notifId = "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+      const tableRaw = String(payload.table || "").trim().slice(0, 40);
+
+      const sessionToken = String(payload.session_token || payload.token || "").trim();
+      const sessionCheck = await validateActiveSession(tenant.id, tenantSlug, tableRaw, sessionToken, false);
+      if (!sessionCheck.allowed) {
+        return jsonResponse({ error: sessionCheck.error }, 403, req);
+      }
+
+      // Anti-spam: ignore duplicate unread waiter calls from the same table
+      // within 45 seconds (guest tapping the button repeatedly).
+      if (type === "waiter_call") {
+        const dedupeWindowStart = new Date(Date.now() - 45 * 1000).toISOString();
+        const { data: recentCalls, error: dedupeError } = await supabaseAdmin
+          .from("doppio_notifications")
+          .select("id, title, message")
+          .eq("tenant_id", tenant.id)
+          .eq("type", "waiter_call")
+          .eq("isRead", false)
+          .gte("created_at", dedupeWindowStart)
+          .limit(20);
+        if (!dedupeError && Array.isArray(recentCalls)) {
+          // A guest double-tapping the same button produces an identical
+          // title + message pair -- exact match is the safest dedupe key.
+          const duplicate = recentCalls.some((n: Record<string, unknown>) =>
+            String(n.title || "") === title && String(n.message || "") === message);
+          if (duplicate) {
+            return jsonResponse({ success: true, deduped: true }, 200, req);
+          }
+        }
+      }
+
+      const notifId = (type === "waiter_call" ? "wcall_" : "notif_")
+        + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
 
       const { error } = await supabaseAdmin
         .from("doppio_notifications")
@@ -487,7 +737,7 @@ serve(async (req) => {
         return jsonResponse({ error: "Failed to send notification." }, 500, req);
       }
 
-      return jsonResponse({ success: true }, 200, req);
+      return jsonResponse({ success: true, id: notifId }, 200, req);
     }
 
     if (action === "get_public_bill") {
@@ -583,6 +833,37 @@ serve(async (req) => {
         locale,
         currency: currencyVal
       }, 200, req);
+    }
+
+    if (action === "get_active_session") {
+      const tableRaw = String(payload.table || "").trim().slice(0, 40);
+      const tableKey = normalizeTableKey(tableRaw);
+      if (!tableKey) {
+        return jsonResponse({ error: "Invalid table." }, 400, req);
+      }
+
+      const { data: sessionData, error: sessionError } = await supabaseAdmin
+        .from("doppio_table_sessions")
+        .select("session_token, status")
+        .eq("tenant_id", tenant.id)
+        .eq("table_number", tableKey)
+        .maybeSingle();
+
+      if (sessionError) {
+        console.error("Failed to query table session:", sessionError);
+        return jsonResponse({ error: "Failed to verify table session." }, 500, req);
+      }
+
+      if (!sessionData || sessionData.status === "closed") {
+        return jsonResponse({ active: false, status: "closed" }, 200, req);
+      }
+
+      if (sessionData.status === "paused") {
+        return jsonResponse({ active: true, status: "paused" }, 200, req);
+      }
+
+      const signedToken = await generateTableSessionToken(tenantSlug, tableKey, sessionData.session_token);
+      return jsonResponse({ active: true, status: "active", session_token: signedToken }, 200, req);
     }
 
     return jsonResponse({ error: "Unsupported action." }, 400, req);

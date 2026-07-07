@@ -44,7 +44,8 @@
     "doppio_online_orders",
     "doppio_table_layout",
     "doppio_waitlist",
-    "doppio_tax_rates"
+    "doppio_tax_rates",
+    "doppio_table_sessions"
   ]);
 
   function createTenantApi(options) {

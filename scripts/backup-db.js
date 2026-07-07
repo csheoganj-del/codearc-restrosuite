@@ -30,8 +30,37 @@ function loadEnv() {
 
 loadEnv();
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://htkauiibuejetimfiavs.supabase.co";
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk"; // Fallback to dev key if env not configured
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// No hardcoded fallback -- a committed key (even a low-privilege one) is a
+// secret-hygiene risk, and a silently-wrong fallback previously masked
+// missing config instead of failing loudly. Backups must run with real
+// service-role credentials or not run at all.
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("[Backup] SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set (.env.local or environment). Refusing to run with no/placeholder credentials.");
+  process.exit(1);
+}
+
+// How many backup archives to keep locally. Older ones are pruned after a
+// successful run so backups/ doesn't grow unbounded on a long-running
+// server. Off-site copies (CI artifact / Google Drive) are unaffected.
+const BACKUP_RETENTION_COUNT = parseInt(process.env.BACKUP_RETENTION_COUNT || "14", 10);
+
+function pruneOldBackups(backupsDir) {
+  try {
+    const files = fs.readdirSync(backupsDir)
+      .filter(f => /^restrosuite-backup-.*\.zip$/.test(f))
+      .map(f => ({ name: f, time: fs.statSync(path.join(backupsDir, f)).mtimeMs }))
+      .sort((a, b) => b.time - a.time);
+    const toDelete = files.slice(BACKUP_RETENTION_COUNT);
+    for (const f of toDelete) {
+      fs.unlinkSync(path.join(backupsDir, f.name));
+      console.log(`[Backup] Pruned old backup: ${f.name}`);
+    }
+  } catch (err) {
+    console.warn("[Backup] Retention cleanup failed (non-fatal):", err.message);
+  }
+}
 
 const TABLES_TO_BACKUP = [
   "doppio_bills",
@@ -89,9 +118,10 @@ async function runBackup() {
   output.on("close", () => {
     console.log(`Backup completed successfully! Size: ${archive.pointer()} bytes`);
     console.log(`Archive file saved at: ${zipFilePath}`);
-    
+
     // Clean up temporary files
     fs.rmSync(tempDir, { recursive: true, force: true });
+    pruneOldBackups(backupsDir);
   });
 
   archive.on("error", (err) => {

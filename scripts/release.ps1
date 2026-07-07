@@ -5,6 +5,10 @@ Push-Location $Root
 try {
     npm run check:launch
     npm test
+    # Bump the service-worker cache version BEFORE syncing to Android and
+    # deploying, so both the web PWA and the Android WebView shell actually
+    # pick up this release's files instead of serving a stale cached copy.
+    npm run bump:sw-version
     npm run sync:android
     npm run check
 

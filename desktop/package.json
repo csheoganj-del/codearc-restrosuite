@@ -1,0 +1,68 @@
+{
+  "name": "restrosuite-desktop",
+  "productName": "RestroSuite",
+  "version": "2.0.0",
+  "private": true,
+  "description": "RestroSuite Windows desktop app -- offline-first restaurant POS wrapper around the RestroSuite web app. Shares the same Supabase backend as the web and Android apps.",
+  "author": "RestroSuite",
+  "main": "main.js",
+  "scripts": {
+    "sync": "node sync-app.mjs",
+    "start": "npm run sync && electron .",
+    "dev": "electron .",
+    "dist": "npm run sync && electron-builder --win",
+    "dist:portable": "npm run sync && electron-builder --win portable",
+    "dist:installer": "npm run sync && electron-builder --win nsis",
+    "pack": "npm run sync && electron-builder --dir"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.restrosuite.desktop",
+    "productName": "RestroSuite",
+    "copyright": "Copyright (c) 2026 RestroSuite",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "preload.js",
+      "splash.html",
+      "config.json",
+      "build/icon.ico"
+    ],
+    "extraResources": [
+      {
+        "from": "app",
+        "to": "app-web",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RestroSuite"
+    },
+    "portable": {
+      "artifactName": "RestroSuite-${version}-portable.exe"
+    }
+  }
+}

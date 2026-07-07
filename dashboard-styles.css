@@ -629,6 +629,46 @@ body::before {
   100% { opacity: 0.4; }
 }
 
+/* Anything that needs the operator's attention blinks continuously until it's
+   handled -- pending QR orders, unattended KDS tickets, low-stock inventory,
+   the WhatsApp-gateway-offline banner, etc. Toggled via .attention-blink. */
+@keyframes rs-attention-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.attention-blink {
+  animation: rs-attention-blink 1s ease-in-out infinite;
+  position: relative;
+}
+
+.attention-blink::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger-color, #e5484d);
+  box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.7);
+  animation: rs-attention-ping 1.4s ease-out infinite;
+}
+
+@keyframes rs-attention-ping {
+  0% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(229, 72, 77, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attention-blink,
+  .attention-blink::after {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 .bell-icon-wrapper {
   position: relative;
   cursor: pointer;
@@ -5837,17 +5877,20 @@ body.dark-theme #page-lock-overlay {
 .kds-item-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  font-size: 12.5px;
+  gap: 12px;
+  font-size: 13.5px;
   color: var(--primary-brand);
+  padding: 4px 0;
+  min-height: 32px;
 }
 
 .kds-item-row input[type="checkbox"] {
-  margin-top: 3px;
+  margin-top: 2px;
   cursor: pointer;
   accent-color: var(--accent-caramel);
-  width: 15px;
-  height: 15px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .kds-item-row.checked span {
@@ -5880,12 +5923,13 @@ body.dark-theme #page-lock-overlay {
 
 .kds-bump-btn {
   width: 100%;
+  min-height: 44px;
   border: none;
   background: var(--caramel-gradient);
   color: var(--white);
-  padding: 10px 14px;
+  padding: 13px 14px;
   border-radius: 12px;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   transition: var(--transition);
