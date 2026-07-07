@@ -66,17 +66,61 @@
   window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v35-20260704-offline-logout';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
+  //
+  // Dynamically-injected <link rel="stylesheet"> tags are NOT guaranteed to
+  // block first paint the way parser-inserted ones are -- so the browser can
+  // (and did) paint the unstyled #app skeleton for a beat before these two
+  // stylesheets finish loading. #app stays hidden (see inline style below)
+  // until both are confirmed loaded (or a safety timeout elapses), and a
+  // lightweight inline-styled loader is shown in the meantime so the screen
+  // is never blank/unstyled.
   (function() {
     var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__);
-    ['assets/dashboard.css', 'assets/features.css'].forEach(function(href) {
+    var hrefs = ['assets/dashboard.css', 'assets/features.css'];
+    var pending = hrefs.length;
+    var revealed = false;
+    function reveal() {
+      if (revealed) return; // already revealed
+      revealed = true;
+      pending = 0;
+      document.documentElement.classList.add('rs-styles-ready');
+    }
+    hrefs.forEach(function(href) {
       var link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = href + '?v=' + ver;
+      link.onload = function() { pending--; if (pending <= 0) reveal(); };
+      link.onerror = function() { pending--; if (pending <= 0) reveal(); };
       document.head.appendChild(link);
     });
+    // Safety net: never leave the app hidden longer than this even if a
+    // stylesheet request stalls (flaky network, ad-blocker, etc.).
+    setTimeout(reveal, 2500);
   })();
 </script>
 <style>
+  /* Skeleton/FOUC guard: #app (and the pre-app side drawers) stay invisible
+     until dashboard.css + features.css are confirmed loaded (see script
+     above), so the browser never paints an unstyled flash of raw HTML. */
+  #app { visibility: hidden; }
+  html.rs-styles-ready #app { visibility: visible; }
+  #rs-boot-loader {
+    position: fixed; inset: 0; z-index: 2147483000;
+    display: flex; align-items: center; justify-content: center;
+    background: #0a0a0f; color: #fff;
+    font: 600 14px/1.4 -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    flex-direction: column; gap: 14px;
+  }
+  html.rs-styles-ready #rs-boot-loader { display: none; }
+  #rs-boot-loader .rs-boot-spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.18); border-top-color: #FC8019;
+    animation: rs-boot-spin 0.8s linear infinite;
+  }
+  @keyframes rs-boot-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    #rs-boot-loader .rs-boot-spinner { animation: none; }
+  }
   /* mini switch for menu editor */
   .switch-mini { position: relative; display: inline-block; width: 38px; height: 22px; }
   .switch-mini input { opacity: 0; width: 0; height: 0; }
@@ -189,6 +233,8 @@
 </style>
 </head>
 <body>
+
+<div id="rs-boot-loader"><div class="rs-boot-spinner"></div><span>Loading RestroSuite&hellip;</span></div>
 
 <!-- ======= CASH CALCULATOR SIDE DRAWER (slides in from LEFT of cart) ======= -->
 <div id="cpay-drawer-backdrop" style="display:none; position:fixed; inset:0; z-index:299;"></div>
@@ -443,12 +489,12 @@
               </div>
             </div>
             <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative; align-items: start;">
-              <select class="form-input" id="cart-table" style="height: 34px; padding: 0 32px 0 12px; font-size: 12.5px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+              <select class="form-input" id="cart-table" style="height: 44px; padding: 0 32px 0 12px; font-size: 14px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
               <div class="custom-customer-widget" id="custom-customer-widget">
                 <!-- Direct inputs visible in cart -->
-                <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
-                  <input type="text" id="cust-input-name" placeholder="Guest Name" class="form-input" style="padding: 0 10px; font-size: 12.5px; height: 34px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
-                  <input type="text" id="cust-input-phone" placeholder="Guest Phone" class="form-input" style="padding: 0 10px; font-size: 12.5px; height: 34px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
+                <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                  <input type="text" id="cust-input-name" placeholder="Guest Name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
+                  <input type="text" id="cust-input-phone" placeholder="Guest Phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
                 </div>
                 
                 <!-- Hidden trigger for backwards compatibility -->

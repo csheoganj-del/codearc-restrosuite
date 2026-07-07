@@ -1710,7 +1710,7 @@
             receivedAmount: receivedVal, changeAmount: changeVal,
             customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
             subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, taxCategory: i.taxCategory || i.tax_category })),
+            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category })),
             taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge };
           RS.BILLS.unshift(billRow);
           if (RS.saveOne) await RS.saveOne('bills',billRow);
@@ -2294,7 +2294,17 @@
             if (cp) cp.value = selected.phone || '';
             if (cg) cg.value = selected.gst || '';
             if (ct && selected.table) {
-              ct.value = selected.table;
+              // Don't let a held Takeaway cart clobber an actively selected
+              // dine-in table: recalling a "Walk-in / Takeaway" hold while a
+              // table is selected used to silently overwrite the hidden
+              // #cart-table field, so the KOT/kitchen ticket/bill printed
+              // "Walk-in / Takeaway" even though the UI showed the table.
+              const heldIsTakeaway = selected.table === 'Walk-in / Takeaway';
+              const curTableActive = getCurrentOrderTypeKey() === 'dinein' &&
+                ct.value && ct.value !== 'Walk-in / Takeaway' && !String(ct.value).startsWith('Delivery');
+              if (!(heldIsTakeaway && curTableActive)) {
+                ct.value = selected.table;
+              }
             }
             if (csel) {
               csel.value = selected.phone || '';

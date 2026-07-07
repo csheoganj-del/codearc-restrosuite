@@ -242,6 +242,19 @@
       if (id === 'super-admin-tab' || id === 'gateway-monitor-tab' || id === 'chain-dashboard-tab') {
         id = 'pos-tab';
       }
+      // Route-level role enforcement: hiding sidebar links is cosmetic --
+      // saved tabs, URL hashes, global search and the mobile "More" sheet
+      // could all still open a restricted screen. Block them here so a
+      // Kitchen/Cashier/Waiter login can never land on a tab outside its
+      // role's allowed list (audit findings #1 and #2).
+      const roleInfo = window.RS_ROLE;
+      if (roleInfo && Array.isArray(roleInfo.allowedTabs) && roleInfo.allowedTabs.length) {
+        const permitted = roleInfo.allowedTabs.slice();
+        // Managers may open Settings (Plan & Billing / Danger Zone are
+        // additionally gated inside the Settings screen itself).
+        if (roleInfo.staffRole === 'manager') permitted.push('settings-tab');
+        if (!permitted.includes(id)) id = permitted[0];
+      }
     }
 
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
@@ -2801,7 +2814,11 @@
     paidBills.forEach(b => {
       (b._items||[]).forEach(it => {
         if (!it||!it.name) return;
-        const cat = it.category||it.cat||'Uncategorized';
+        // Older bills didn't store the category on each line item -- fall back
+        // to looking the item up in the current menu by name so it isn't
+        // lumped under "Uncategorized" in the category breakdown.
+        let cat = it.category||it.cat;
+        if (!cat) { const mm = MENU.find(x=>x.name===it.name); cat = (mm && mm.cat) || 'Uncategorized'; }
         catSales[cat] = (catSales[cat]||0) + (it.price||0)*(it.qty||1);
       });
       // fallback: parse old string-format items
@@ -4920,8 +4937,21 @@
   };
 
   // Resolve current staff role (session meta -> sessionStorage fallback)
-  const staffRole = (sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner';
-  const allowedTabs = ROLE_TAB_MAP[staffRole] || null; // null = unrestricted
+  const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
+    .toLowerCase().trim();
+  // Roles that get the full, unrestricted dashboard.
+  const UNRESTRICTED_ROLES = ['owner', 'admin', 'superadmin', 'brand_admin'];
+  // Prefer the backend-computed allowed_tabs from the session (it already
+  // intersects role defaults, per-user overrides and the tenant's plan),
+  // then fall back to the client-side role map. A non-admin role that
+  // resolves to nothing gets POS only -- never the full dashboard.
+  function resolveAllowedTabs(role, sessionTabs) {
+    if (UNRESTRICTED_ROLES.includes(role)) return null; // null = unrestricted
+    const fromSession = (Array.isArray(sessionTabs) && sessionTabs.length)
+      ? sessionTabs.map(String) : null;
+    return fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
+  }
+  const allowedTabs = resolveAllowedTabs(staffRole, sess && sess.allowed_tabs);
 
   // -- Apply role-specific UI lockdown before first render --
   if (isBrandAdmin) {
@@ -5100,13 +5130,24 @@
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
+    // Hide mobile "More" sheet entries not in allowed list (built later by
+    // features-shell, so this also re-runs on rs:hydrated below)
+    $$('.more-sheet-link[data-tab]').forEach(link => {
+      const tabId = link.dataset.tab || '';
+      if (!tabId) return;
+      link.style.display = tabs.includes(tabId) ? '' : 'none';
+    });
     // Update user pill role label
     const userRoleEl = document.querySelector('.user-pill .ur');
     if (userRoleEl) userRoleEl.textContent = ROLE_LABELS[role] || role;
-    // Hide settings gear from non-managers (only owner/manager can change settings)
+    // Hide settings entry points from non-managers (only owner/admin/manager
+    // may open Settings; this covers both the sidebar link and the gear
+    // button in the sidebar footer, which previously was never gated)
     if (role !== 'manager') {
       const settingsLink = document.querySelector('.sidebar-link[data-tab="settings-tab"]');
       if (settingsLink) settingsLink.style.display = 'none';
+      const settingsGear = document.getElementById('open-settings');
+      if (settingsGear) settingsGear.style.display = 'none';
     }
     // If the tab the user is currently sitting on just got revoked, move
     // them somewhere they can still see rather than leaving a dead screen up.
@@ -5116,6 +5157,13 @@
     }
   }
   applyStaffRoleTabFiltering(staffRole, allowedTabs);
+  // Re-apply after hydration: some nav elements (mobile "More" sheet links,
+  // late-rendered footer buttons) don't exist yet on the first pass, and the
+  // currently active tab may only be resolved after the saved-tab restore.
+  document.addEventListener('rs:hydrated', () => {
+    const cur = window.RS_ROLE || {};
+    applyStaffRoleTabFiltering(cur.staffRole || staffRole, cur.allowedTabs || allowedTabs);
+  });
 
   // Live role/permission update -- called from setupSupabaseRealtime()'s
   // tenant_users subscription when an admin changes this user's role or
@@ -5123,12 +5171,10 @@
   // fresh login.
   function applyLiveRoleUpdate(newRole, newAllowedTabsColumn) {
     if (isSuper || isBrandAdmin) return;
-    const resolvedRole = newRole || staffRole;
+    const resolvedRole = String(newRole || staffRole).toLowerCase().trim();
     // Prefer an explicit per-user allowed_tabs override (set in Team & Roles);
     // otherwise fall back to the role's default tab set.
-    const resolvedTabs = (Array.isArray(newAllowedTabsColumn) && newAllowedTabsColumn.length)
-      ? newAllowedTabsColumn
-      : (ROLE_TAB_MAP[resolvedRole] || null);
+    const resolvedTabs = resolveAllowedTabs(resolvedRole, newAllowedTabsColumn);
     sessionStorage.setItem('logged_in_role', resolvedRole);
     sessionStorage.setItem('allowed_tabs', JSON.stringify(resolvedTabs || []));
     applyStaffRoleTabFiltering(resolvedRole, resolvedTabs);

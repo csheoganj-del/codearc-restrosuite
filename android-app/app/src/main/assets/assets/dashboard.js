@@ -242,6 +242,19 @@
       if (id === 'super-admin-tab' || id === 'gateway-monitor-tab' || id === 'chain-dashboard-tab') {
         id = 'pos-tab';
       }
+      // Route-level role enforcement: hiding sidebar links is cosmetic --
+      // saved tabs, URL hashes, global search and the mobile "More" sheet
+      // could all still open a restricted screen. Block them here so a
+      // Kitchen/Cashier/Waiter login can never land on a tab outside its
+      // role's allowed list (audit findings #1 and #2).
+      const roleInfo = window.RS_ROLE;
+      if (roleInfo && Array.isArray(roleInfo.allowedTabs) && roleInfo.allowedTabs.length) {
+        const permitted = roleInfo.allowedTabs.slice();
+        // Managers may open Settings (Plan & Billing / Danger Zone are
+        // additionally gated inside the Settings screen itself).
+        if (roleInfo.staffRole === 'manager') permitted.push('settings-tab');
+        if (!permitted.includes(id)) id = permitted[0];
+      }
     }
 
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
@@ -317,6 +330,26 @@
     }, onClick ? 8000 : 2600);
   }
   window.__toast = toast;
+
+  // Guarantees a toast only ever fires AFTER the async action it describes has
+  // actually resolved: success toast on fulfillment, failure toast on rejection.
+  // Use this for any toast tied to a database/cloud write so the UI never claims
+  // something is "saved"/"sent"/"updated" before that's actually true.
+  //   await withToast(RS_DB.put('bills', id, row), {
+  //     success: 'Bill saved', error: 'Could not save bill -- try again'
+  //   });
+  async function withToast(promise, { success, error, successIcon = 'fa-circle-check', errorIcon = 'fa-circle-exclamation' } = {}) {
+    try {
+      const result = await promise;
+      if (success) toast(typeof success === 'function' ? success(result) : success, successIcon);
+      return result;
+    } catch (err) {
+      console.warn('[withToast] action failed', err);
+      if (error) toast(typeof error === 'function' ? error(err) : error, errorIcon);
+      throw err;
+    }
+  }
+  window.withToast = withToast;
 
   const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v33-20260624';
   // Show version in topbar
@@ -1530,17 +1563,25 @@
           rows = await RS_DB.list('pending_orders');
         }
         rows = rows || [];
-        
-        // 1. Update KDS
-        const activeKds = rows.filter(r => r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review');
-        const mappedKds = activeKds.map(r => ({
-          id: r.id,
-          tok: r.orderId,
-          type: `${r.orderType} · ${r.tableNumber}`,
-          start: parseOrderTimestamp(r.dateTime) || Date.now(),
-          items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
-        }));
-        replaceArr(KDS, mappedKds);
+
+        // 1. Update KDS -- skipped entirely in POS-only mode: billing still
+        // works and QR orders still land in the manager's own dashboard
+        // (QR_ORDERS below), but nothing is ever queued to the kitchen
+        // display or a waiter screen.
+        const posOnlyMode = !!(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
+        if (posOnlyMode) {
+          replaceArr(KDS, []);
+        } else {
+          const activeKds = rows.filter(r => r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review');
+          const mappedKds = activeKds.map(r => ({
+            id: r.id,
+            tok: r.orderId,
+            type: `${r.orderType} · ${r.tableNumber}`,
+            start: parseOrderTimestamp(r.dateTime) || Date.now(),
+            items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
+          }));
+          replaceArr(KDS, mappedKds);
+        }
 
         // 2. Update QR_ORDERS
         const activeQr = rows.filter(r => r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready');
@@ -1570,6 +1611,7 @@
         try { renderQR(); } catch(e){}
         document.dispatchEvent(new CustomEvent('rs:pending_orders_synced'));
         try { updateTabAttentionBlinking(); } catch(e){}
+        try { applyPosOnlyModeUI(); } catch(e){}
       } catch(e) {
         console.warn("syncPendingOrders failed", e);
         // Only show toast if user is likely watching the KDS/orders tab
@@ -1617,6 +1659,102 @@
     });
   }
 
+  // POS-only mode (Settings -> Printers & KOT -> "POS-only mode"): billing
+  // only, no order ever reaches the Kitchen Display or a waiter screen.
+  // Hides the now-pointless KDS nav entry and the "Send KOT" button so the
+  // UI doesn't offer actions that no longer do anything.
+  function applyPosOnlyModeUI() {
+    const posOnlyMode = !!(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
+    document.querySelectorAll('[data-tab="kds-tab"]').forEach(el => {
+      el.style.display = posOnlyMode ? 'none' : '';
+    });
+    const kotBtn = document.getElementById('btn-kot');
+    if (kotBtn) kotBtn.style.display = posOnlyMode ? 'none' : '';
+    document.documentElement.classList.toggle('rs-pos-only-mode', posOnlyMode);
+  }
+  window.RS_applyPosOnlyModeUI = applyPosOnlyModeUI;
+
+  // WhatsApp gateway down/up banner -- subscribes to gateway_health_log
+  // (already written by whatsapp-gateway.js on every disconnect/connect,
+  // realtime already enabled on this table) and shows a persistent,
+  // continuously-blinking banner until the gateway reports back online.
+  function showGatewayOfflineBanner(reason) {
+    let bar = document.getElementById('rs-gateway-offline-banner');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'rs-gateway-offline-banner';
+      bar.className = 'attention-blink';
+      bar.setAttribute('role', 'status');
+      bar.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99998;' +
+        'background:var(--danger-color,#EF4444);color:#fff;padding:10px 18px;border-radius:10px;' +
+        'font-size:13px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;max-width:92vw;';
+      bar.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span id="rs-gateway-offline-text"></span>';
+      document.body.appendChild(bar);
+    }
+    const textEl = document.getElementById('rs-gateway-offline-text');
+    if (textEl) textEl.textContent = 'WhatsApp gateway is offline -- bill/receipt sending is paused' + (reason ? ` (${reason})` : '');
+    bar.style.display = 'flex';
+  }
+  function hideGatewayOfflineBanner() {
+    const bar = document.getElementById('rs-gateway-offline-banner');
+    if (bar) bar.style.display = 'none';
+  }
+
+  // Offline / pending-cloud-sync indicator. assets/db.js already saves every
+  // write locally first and queues failed cloud writes in localStorage
+  // ('rs:sync_queue') for retry -- but there was no visible sign of any of
+  // this, so a save made while offline silently looked identical to a save
+  // that actually reached the cloud. This small pill makes that state visible
+  // and shows a live count while it's happening.
+  function getSyncQueueLength() {
+    try {
+      const raw = localStorage.getItem('rs:sync_queue');
+      if (!raw) return 0;
+      const q = JSON.parse(raw);
+      return Array.isArray(q) ? q.length : 0;
+    } catch(e) { return 0; }
+  }
+  function updateOfflineSyncIndicator() {
+    const count = getSyncQueueLength();
+    const isOffline = !navigator.onLine;
+    let pill = document.getElementById('rs-offline-sync-pill');
+    if (!isOffline && count === 0) {
+      if (pill) pill.style.display = 'none';
+      return;
+    }
+    if (!pill) {
+      pill = document.createElement('div');
+      pill.id = 'rs-offline-sync-pill';
+      pill.className = 'attention-blink';
+      pill.setAttribute('role', 'status');
+      pill.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:99997;' +
+        'background:var(--warning-color,#F59E0B);color:#1a1a1a;padding:8px 14px;border-radius:999px;' +
+        'font-size:12.5px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;gap:8px;max-width:88vw;';
+      pill.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i><span id="rs-offline-sync-text"></span>';
+      document.body.appendChild(pill);
+    }
+    const textEl = document.getElementById('rs-offline-sync-text');
+    if (textEl) {
+      if (isOffline) {
+        textEl.textContent = count > 0
+          ? `Offline -- ${count} change${count === 1 ? '' : 's'} waiting to sync`
+          : 'Offline -- changes are being saved on this device';
+      } else {
+        textEl.textContent = `Syncing ${count} change${count === 1 ? '' : 's'} to the cloud...`;
+      }
+    }
+    pill.style.display = 'flex';
+  }
+  window.addEventListener('online', updateOfflineSyncIndicator);
+  window.addEventListener('offline', updateOfflineSyncIndicator);
+  window.addEventListener('rs:cloud-fallback', updateOfflineSyncIndicator);
+  window.addEventListener('rs:sync-queue-drained', updateOfflineSyncIndicator);
+  window.addEventListener('rs:sync-done', updateOfflineSyncIndicator);
+  setInterval(updateOfflineSyncIndicator, 5000);
+  if (document.readyState !== 'loading') updateOfflineSyncIndicator();
+  else document.addEventListener('DOMContentLoaded', updateOfflineSyncIndicator);
+  window.RS_updateOfflineSyncIndicator = updateOfflineSyncIndicator;
+
   function setupSupabaseRealtime() {
     const api = window.RS_API;
     if (api && api.supabaseClient && window.RS_DB && RS_DB.isCloud) {
@@ -1625,6 +1763,40 @@
         api.supabaseClient.channel('doppio-pending-orders-realtime')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'doppio_pending_orders', filter: `tenant_id=eq.${activeTenantId}` }, () => {
             syncPendingOrders({ forceCloud: true });
+          }).subscribe();
+      }
+      // Only admin/manager roles need to see (and act on) this -- avoid
+      // alarming waiter/kitchen screens with something they can't fix.
+      const role = (sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+      if (role === 'admin' || role === 'manager' || role === 'owner' || role === 'superadmin') {
+        api.supabaseClient.channel('doppio-gateway-health-realtime')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gateway_health_log' }, (payload) => {
+            const row = payload && payload.new;
+            if (!row) return;
+            if (row.event === 'disconnected') {
+              showGatewayOfflineBanner(row.details && row.details.reason);
+            } else if (row.event === 'connected' || row.event === 'online') {
+              hideGatewayOfflineBanner();
+            }
+          }).subscribe();
+      }
+
+      // Live role/permission sync: when an admin changes this staff member's
+      // role or allowed tabs in Team & Roles, apply it to this open session
+      // immediately instead of requiring them to log out and back in.
+      // session_version-based forced revocation (a real security action,
+      // e.g. deactivating someone) is handled separately and still works --
+      // this only covers routine "give them one more tab" style edits.
+      const currentUserId = sessionStorage.getItem('tenant_user_id');
+      const currentRoleForSub = (api.session && api.session()?.role) || sessionStorage.getItem('logged_in_role') || '';
+      if (currentUserId && currentRoleForSub !== 'superadmin' && currentRoleForSub !== 'brand_admin') {
+        api.supabaseClient.channel('doppio-tenant-user-role-realtime')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tenant_users', filter: `id=eq.${currentUserId}` }, (payload) => {
+            const row = payload && payload.new;
+            if (!row) return;
+            if (window.RS_applyLiveRoleUpdate) {
+              window.RS_applyLiveRoleUpdate(row.role, row.allowed_tabs);
+            }
           }).subscribe();
       }
     }
@@ -1750,6 +1922,7 @@
       const o=QR_ORDERS[+b.dataset.adv];
       const nextStatus = o.status==='pending'?'preparing':'served';
       const dbStatus = nextStatus==='preparing'?'preparing':'served';
+      const tableLabel = o.table.split('-')[1]||o.table;
       if(o.id && window.RS_DB){
         try {
           const rows = await RS_DB.list('pending_orders');
@@ -1759,13 +1932,16 @@
             await RS_DB.put('pending_orders', o.id, row);
             syncPendingOrders();
           }
+          // Toast only after the write has actually completed successfully.
+          toast('Table '+tableLabel+' -> '+statusTxt[nextStatus]);
         } catch(e) {
           console.warn("Failed updating order status", e);
+          toast('Could not update Table '+tableLabel+' -- try again', 'fa-circle-exclamation');
         }
       } else {
         o.status=nextStatus; renderQR();
+        toast('Table '+tableLabel+' -> '+statusTxt[nextStatus]);
       }
-      toast('Table '+(o.table.split('-')[1]||o.table)+' -> '+statusTxt[nextStatus]);
     }));
     $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>{
       const srcIdx = +b.dataset.merge;
@@ -2450,10 +2626,17 @@
           if (!ids.length) { out.innerHTML = '<span style="color:var(--red)">No valid rows.</span>' + (errors.length ? '<br>' + errors.slice(0,6).join('<br>') : ''); return; }
           let links = 0;
           ids.forEach(id => { byItem[id].m.ingredients = byItem[id].ings; links += byItem[id].ings.length; });
-          try { if (RS.save) await RS.save('menu'); } catch(e){}
-          toast('Recipes imported: ' + ids.length + ' item(s), ' + links + ' ingredient links', 'fa-circle-check');
-          if (errors.length) { out.innerHTML = '<span style="color:var(--green)">Imported ' + ids.length + '.</span> <span style="color:var(--red)">' + errors.length + ' skipped:</span><br>' + errors.slice(0,6).join('<br>'); }
-          else { close(); renderInventory(); }
+          try {
+            if (RS.save) await RS.save('menu');
+            // Toast only after the save has actually completed successfully.
+            toast('Recipes imported: ' + ids.length + ' item(s), ' + links + ' ingredient links', 'fa-circle-check');
+            if (errors.length) { out.innerHTML = '<span style="color:var(--green)">Imported ' + ids.length + '.</span> <span style="color:var(--red)">' + errors.length + ' skipped:</span><br>' + errors.slice(0,6).join('<br>'); }
+            else { close(); renderInventory(); }
+          } catch(e) {
+            console.warn('Recipe import save failed', e);
+            out.innerHTML = '<span style="color:var(--red)">Save failed -- recipes were not saved. Try again.</span>';
+            toast('Recipe import failed to save -- try again', 'fa-circle-exclamation');
+          }
         };
       };
     }
@@ -2631,7 +2814,11 @@
     paidBills.forEach(b => {
       (b._items||[]).forEach(it => {
         if (!it||!it.name) return;
-        const cat = it.category||it.cat||'Uncategorized';
+        // Older bills didn't store the category on each line item -- fall back
+        // to looking the item up in the current menu by name so it isn't
+        // lumped under "Uncategorized" in the category breakdown.
+        let cat = it.category||it.cat;
+        if (!cat) { const mm = MENU.find(x=>x.name===it.name); cat = (mm && mm.cat) || 'Uncategorized'; }
         catSales[cat] = (catSales[cat]||0) + (it.price||0)*(it.qty||1);
       });
       // fallback: parse old string-format items
@@ -2804,6 +2991,7 @@
     $$('#kds-grid .kds-item').forEach(it=> it.addEventListener('click',()=>it.classList.toggle('done')));
     $$('#kds-grid [data-done]').forEach(b=> b.addEventListener('click',async ()=>{
       const item = KDS[+b.dataset.done];
+      let failed = false;
       if(item && item.id && window.RS_DB){
         try {
           const rows = await RS_DB.list('pending_orders');
@@ -2815,7 +3003,12 @@
           }
         } catch(e) {
           console.warn("Failed updating KDS status", e);
+          failed = true;
         }
+      }
+      if (failed) {
+        toast('Could not mark order ready -- try again', 'fa-circle-exclamation');
+        return;
       }
       const c=b.closest('.kds-card');
       c.style.transition='all .4s var(--ease)'; c.style.opacity='0'; c.style.transform='scale(.9)';
@@ -4297,8 +4490,21 @@
       });
       if (changed) {
         // Persist locally AND push to cloud so stock levels survive/sync.
+        // Local write is effectively instant, so the "stock updated" toast reflects that.
+        // Cloud sync is intentionally non-blocking here (keeps checkout fast) but its
+        // outcome is no longer swallowed silently -- a failure surfaces its own toast.
         if (window.RS_DB && RS_DB.writeLocal) { try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {} }
-        try { if (RS.save) RS.save('inventory'); } catch (e) {}
+        try {
+          if (RS.save) {
+            const saveResult = RS.save('inventory');
+            if (saveResult && typeof saveResult.catch === 'function') {
+              saveResult.catch(err => {
+                console.warn('Inventory cloud sync failed', err);
+                toast('Inventory saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
+              });
+            }
+          }
+        } catch (e) { console.warn('Inventory save failed', e); }
         const rendered = document.querySelector('#inventory-tab.active');
         if (rendered && window.RS && RS.render) RS.render('inventory-tab');
         // Make the deduction visible instead of silent
@@ -4731,8 +4937,21 @@
   };
 
   // Resolve current staff role (session meta -> sessionStorage fallback)
-  const staffRole = (sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner';
-  const allowedTabs = ROLE_TAB_MAP[staffRole] || null; // null = unrestricted
+  const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
+    .toLowerCase().trim();
+  // Roles that get the full, unrestricted dashboard.
+  const UNRESTRICTED_ROLES = ['owner', 'admin', 'superadmin', 'brand_admin'];
+  // Prefer the backend-computed allowed_tabs from the session (it already
+  // intersects role defaults, per-user overrides and the tenant's plan),
+  // then fall back to the client-side role map. A non-admin role that
+  // resolves to nothing gets POS only -- never the full dashboard.
+  function resolveAllowedTabs(role, sessionTabs) {
+    if (UNRESTRICTED_ROLES.includes(role)) return null; // null = unrestricted
+    const fromSession = (Array.isArray(sessionTabs) && sessionTabs.length)
+      ? sessionTabs.map(String) : null;
+    return fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
+  }
+  const allowedTabs = resolveAllowedTabs(staffRole, sess && sess.allowed_tabs);
 
   // -- Apply role-specific UI lockdown before first render --
   if (isBrandAdmin) {
@@ -4888,26 +5107,81 @@
   }
 
   // -- Apply staff role tab filtering (waiter / cashier / kitchen / etc.) --
-  if (!isSuper && !isBrandAdmin && allowedTabs) {
+  // Pulled into a function so a live role change (see setupSupabaseRealtime's
+  // tenant_users subscription) can re-run this instantly instead of only
+  // taking effect after the next login.
+  function applyStaffRoleTabFiltering(role, tabs) {
+    if (isSuper || isBrandAdmin) return;
+    if (!tabs) {
+      // Unrestricted (owner or unrecognised role) -- make sure nothing is
+      // left hidden from a previous, more restrictive role.
+      $$('.sidebar-link, .mnav-link').forEach(link => { link.style.display = ''; });
+      return;
+    }
     // Hide sidebar links not in allowed list
     $$('.sidebar-link').forEach(link => {
       const tabId = link.dataset.tab || '';
-      if (!allowedTabs.includes(tabId)) link.style.display = 'none';
+      if (!tabId) return;
+      link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Hide mobile bottom nav links not in allowed list
     $$('.mnav-link').forEach(link => {
       const tabId = link.dataset.tab || '';
-      if (!allowedTabs.includes(tabId)) link.style.display = 'none';
+      if (!tabId) return;
+      link.style.display = tabs.includes(tabId) ? '' : 'none';
+    });
+    // Hide mobile "More" sheet entries not in allowed list (built later by
+    // features-shell, so this also re-runs on rs:hydrated below)
+    $$('.more-sheet-link[data-tab]').forEach(link => {
+      const tabId = link.dataset.tab || '';
+      if (!tabId) return;
+      link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Update user pill role label
     const userRoleEl = document.querySelector('.user-pill .ur');
-    if (userRoleEl) userRoleEl.textContent = ROLE_LABELS[staffRole] || staffRole;
-    // Hide settings gear from non-managers (only owner/manager can change settings)
-    if (staffRole !== 'manager') {
+    if (userRoleEl) userRoleEl.textContent = ROLE_LABELS[role] || role;
+    // Hide settings entry points from non-managers (only owner/admin/manager
+    // may open Settings; this covers both the sidebar link and the gear
+    // button in the sidebar footer, which previously was never gated)
+    if (role !== 'manager') {
       const settingsLink = document.querySelector('.sidebar-link[data-tab="settings-tab"]');
       if (settingsLink) settingsLink.style.display = 'none';
+      const settingsGear = document.getElementById('open-settings');
+      if (settingsGear) settingsGear.style.display = 'none';
+    }
+    // If the tab the user is currently sitting on just got revoked, move
+    // them somewhere they can still see rather than leaving a dead screen up.
+    const activeTab = document.querySelector('.tab-content.active');
+    if (activeTab && !tabs.includes(activeTab.id) && tabs.length && typeof activateTab === 'function') {
+      activateTab(tabs[0]);
     }
   }
+  applyStaffRoleTabFiltering(staffRole, allowedTabs);
+  // Re-apply after hydration: some nav elements (mobile "More" sheet links,
+  // late-rendered footer buttons) don't exist yet on the first pass, and the
+  // currently active tab may only be resolved after the saved-tab restore.
+  document.addEventListener('rs:hydrated', () => {
+    const cur = window.RS_ROLE || {};
+    applyStaffRoleTabFiltering(cur.staffRole || staffRole, cur.allowedTabs || allowedTabs);
+  });
+
+  // Live role/permission update -- called from setupSupabaseRealtime()'s
+  // tenant_users subscription when an admin changes this user's role or
+  // allowed tabs, so it takes effect immediately instead of needing a
+  // fresh login.
+  function applyLiveRoleUpdate(newRole, newAllowedTabsColumn) {
+    if (isSuper || isBrandAdmin) return;
+    const resolvedRole = String(newRole || staffRole).toLowerCase().trim();
+    // Prefer an explicit per-user allowed_tabs override (set in Team & Roles);
+    // otherwise fall back to the role's default tab set.
+    const resolvedTabs = resolveAllowedTabs(resolvedRole, newAllowedTabsColumn);
+    sessionStorage.setItem('logged_in_role', resolvedRole);
+    sessionStorage.setItem('allowed_tabs', JSON.stringify(resolvedTabs || []));
+    applyStaffRoleTabFiltering(resolvedRole, resolvedTabs);
+    window.RS_ROLE = { staffRole: resolvedRole, allowedTabs: resolvedTabs, ROLE_TAB_MAP, ROLE_LABELS };
+    toast('Your access permissions were just updated', 'fa-user-shield');
+  }
+  window.RS_applyLiveRoleUpdate = applyLiveRoleUpdate;
 
   // Expose role helpers globally for other modules
   window.RS_ROLE = { staffRole, allowedTabs, ROLE_TAB_MAP, ROLE_LABELS };
