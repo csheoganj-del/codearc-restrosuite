@@ -78,8 +78,10 @@
     var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__);
     var hrefs = ['assets/dashboard.css', 'assets/features.css'];
     var pending = hrefs.length;
+    var revealed = false;
     function reveal() {
-      if (pending <= 0) return; // already revealed
+      if (revealed) return; // already revealed
+      revealed = true;
       pending = 0;
       document.documentElement.classList.add('rs-styles-ready');
     }
