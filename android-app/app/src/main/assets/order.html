@@ -147,22 +147,22 @@
     }
 
     .add-btn {
-      width: 28px; height: 28px; border-radius: 50%;
+      width: 40px; height: 40px; border-radius: 50%;
       background: var(--brand);
-      border: none; color: #fff; font-size: 14px; cursor: pointer;
+      border: none; color: #fff; font-size: 16px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: transform 0.15s; box-shadow: 0 4px 10px rgba(255,107,0,0.2);
       flex-shrink: 0;
     }
-    .add-btn:active { transform: scale(0.84); }
-    .qty-row { display: flex; align-items: center; gap: 5px; }
+    .add-btn:active { transform: scale(0.88); }
+    .qty-row { display: flex; align-items: center; gap: 8px; }
     .q-btn {
-      width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border);
-      background: var(--surface-alt); color: var(--text); font-size: 15px; cursor: pointer;
+      width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
+      background: var(--surface-alt); color: var(--text); font-size: 16px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; transition: var(--tr); flex-shrink: 0;
     }
     .q-btn.plus { background: var(--brand); border-color: var(--brand); color: #fff; }
-    .q-num { font-weight: 700; font-size: 13px; min-width: 18px; text-align: center; }
+    .q-num { font-weight: 700; font-size: 14px; min-width: 22px; text-align: center; }
 
     .empty { grid-column: 1/-1; text-align: center; padding: 60px 20px; color: var(--muted); }
     .empty i { font-size: 44px; margin-bottom: 14px; display: block; opacity: 0.35; }
@@ -205,25 +205,25 @@
     }
     .drawer-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; }
     .drawer-tag { background: rgba(255,107,0,0.08); color: var(--brand); font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 50px; }
-    .close-btn { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-alt); border: none; color: var(--text2); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: var(--tr); }
+    .close-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--surface-alt); border: none; color: var(--text2); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: var(--tr); }
     .close-btn:hover { background: rgba(17,24,39,0.08); }
     .cart-list { padding: 10px 20px; }
     .cart-empty { text-align: center; padding: 36px; color: var(--muted); }
     .cart-empty i { font-size: 36px; margin-bottom: 10px; display: block; opacity: 0.35; }
-    .cart-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .cart-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
     .cart-info { flex: 1; }
     .cart-name { font-weight: 600; font-size: 14px; font-family: 'Outfit', sans-serif; }
     .cart-unit { font-size: 12px; color: var(--muted); }
-    .cart-ctrl { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-    .cc-btn { width: 27px; height: 27px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-alt); color: var(--text); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .cart-ctrl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .cc-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-alt); color: var(--text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .cc-btn.p { background: var(--brand); border-color: var(--brand); color: #fff; }
-    .cc-qty { font-weight: 700; min-width: 18px; text-align: center; font-size: 13px; }
+    .cc-qty { font-weight: 700; min-width: 22px; text-align: center; font-size: 14px; }
     .cart-total { font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--brand); min-width: 52px; text-align: right; font-size: 14px; }
 
     /* CUSTOMER FORM */
     .cust-form { padding: 14px 20px; border-top: 1px solid var(--border); }
     .cust-form h4 { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; font-family: 'Outfit', sans-serif; }
-    .field { display: flex; align-items: center; gap: 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 13px; margin-bottom: 9px; transition: var(--tr); }
+    .field { display: flex; align-items: center; gap: 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 13px; margin-bottom: 9px; transition: var(--tr); min-height: 44px; box-sizing: border-box; }
     .field:focus-within { border-color: var(--brand); background: #ffffff; box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15); }
     .field i { color: var(--muted); font-size: 13px; flex-shrink: 0; }
     .field input { background: none; border: none; color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; flex: 1; outline: none; }

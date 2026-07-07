@@ -872,6 +872,40 @@
 
       const text = receiptText(bill);
       const cleanPhone = phone.replace(/\D/g, '');
+
+      // Real PDF attachment via the self-hosted gateway, when it's linked and
+      // reachable. This actually sends the bill as a PDF document inside
+      // WhatsApp (server-side, no cashier action needed) instead of just a
+      // pre-filled text message. Only attempted when the topbar's periodic
+      // gateway_status poll last reported "ready" (checked every 15s), so an
+      // unlinked/offline gateway never makes checkout wait on a network call.
+      if (window.__rsGatewayReady === true && window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
+        try {
+          const pdfDataUri = await compileThermalPDF(bill);
+          const base64 = String(pdfDataUri || '').split(',')[1] || '';
+          if (base64) {
+            const timeoutMs = 12000;
+            await Promise.race([
+              RS_API.data({
+                operation: 'gateway_send',
+                phone: cleanPhone,
+                message: text,
+                pdfData: base64,
+                filename: `receipt-${bill.no || 'bill'}.pdf`,
+                orderId: String(bill.no || '')
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Gateway send timed out')), timeoutMs))
+            ]);
+            RS.toast('WhatsApp PDF receipt sent!', 'fa-whatsapp');
+            return;
+          }
+        } catch (gwErr) {
+          console.warn('Gateway PDF send failed, falling back to text link:', gwErr && gwErr.message);
+          // Fall through to the plain-text link below so the cashier still has
+          // a way to reach the customer even if the gateway just dropped.
+        }
+      }
+
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
       RS.toast('WhatsApp receipt ready!', 'fa-whatsapp');
@@ -921,6 +955,12 @@
         }
       });
     }
+
+    // Expose the thermal-receipt PDF compiler so it can actually be used by
+    // the WhatsApp send flow below (previously built and fully working, but
+    // never called from anywhere -- every bill went out as a plain text
+    // wa.me link, never a real PDF attachment).
+    RS.compileThermalPDF = compileThermalPDF;
 
     window.RSReceipt = {
       html: receiptHTML,
@@ -1670,7 +1710,7 @@
             receivedAmount: receivedVal, changeAmount: changeVal,
             customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
             subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, taxCategory: i.taxCategory || i.tax_category })),
+            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category })),
             taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge };
           RS.BILLS.unshift(billRow);
           if (RS.saveOne) await RS.saveOne('bills',billRow);
@@ -2254,7 +2294,17 @@
             if (cp) cp.value = selected.phone || '';
             if (cg) cg.value = selected.gst || '';
             if (ct && selected.table) {
-              ct.value = selected.table;
+              // Don't let a held Takeaway cart clobber an actively selected
+              // dine-in table: recalling a "Walk-in / Takeaway" hold while a
+              // table is selected used to silently overwrite the hidden
+              // #cart-table field, so the KOT/kitchen ticket/bill printed
+              // "Walk-in / Takeaway" even though the UI showed the table.
+              const heldIsTakeaway = selected.table === 'Walk-in / Takeaway';
+              const curTableActive = getCurrentOrderTypeKey() === 'dinein' &&
+                ct.value && ct.value !== 'Walk-in / Takeaway' && !String(ct.value).startsWith('Delivery');
+              if (!(heldIsTakeaway && curTableActive)) {
+                ct.value = selected.table;
+              }
             }
             if (csel) {
               csel.value = selected.phone || '';

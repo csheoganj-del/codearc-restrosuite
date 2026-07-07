@@ -6,6 +6,9 @@
   // HTML escaping -- prevents XSS when inserting DB-sourced strings into innerHTML
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  // Alias: some render paths (Employee Ledger "Logins" tab) call safe() --
+  // it was never defined in this module, crashing with "safe is not defined".
+  const safe = esc;
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];

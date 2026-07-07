@@ -388,6 +388,7 @@
     select(...a) { return window.RS_API.select(...a); },
     insert(...a) { return window.RS_API.insert(...a); },
     update(...a) { return window.RS_API.update(...a); },
+    upsert(...a) { return window.RS_API.upsert(...a); },
     remove(...a) { return window.RS_API.remove(...a); },
   };
 
@@ -768,7 +769,6 @@
       if(isCloudConfigured() && signedIn()){ try{ await window.RS_API.logout(); }catch(e){} }
       for (const k in lastListFetchTime) delete lastListFetchTime[k];
       cachedSettingsMap = {};
-      cachedSettings = null;
 
       try {
         const tenant = getActiveTenantId();

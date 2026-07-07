@@ -388,6 +388,7 @@
     select(...a) { return window.RS_API.select(...a); },
     insert(...a) { return window.RS_API.insert(...a); },
     update(...a) { return window.RS_API.update(...a); },
+    upsert(...a) { return window.RS_API.upsert(...a); },
     remove(...a) { return window.RS_API.remove(...a); },
   };
 
@@ -658,8 +659,10 @@
       if (!isSchemaCacheError) {
         window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
         window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
-        // Queue for retry when back online
-        if (method === 'put' || method === 'del') {
+        // Queue for retry when back online. bulkPut used to be silently
+        // dropped here (only put/del were queued) -- bulk menu/recipe
+        // imports done while offline would never actually reach the cloud.
+        if (method === 'put' || method === 'del' || method === 'bulkPut') {
           addToSyncQueue(method, c, args);
         }
       } else {
@@ -676,7 +679,9 @@
   function getSyncQueue() { try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e){ return []; } }
   function saveSyncQueue(q) { try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); } catch(e){} }
   function addToSyncQueue(method, collection, args) {
-    if (!MAP[collection]) return; // only queue known collections
+    // 'settings' is a whole-object save (not a per-row collection in MAP),
+    // so allow it through explicitly; everything else must be a known collection.
+    if (!MAP[collection] && collection !== 'settings') return;
     const q = getSyncQueue();
     // Deduplicate: if same collection+id already queued for put, replace it
     const id = args[0];
@@ -691,10 +696,20 @@
     try {
       const ids = new Set();
       getSyncQueue()
-        .filter(entry => entry && entry.collection === collection && entry.method === 'put')
+        .filter(entry => entry && entry.collection === collection && (entry.method === 'put' || entry.method === 'bulkPut'))
         .forEach(entry => {
-          const rawId = entry.args && entry.args[0];
-          if (rawId != null) ids.add(String(cleanIdForCollection(collection, rawId)));
+          if (entry.method === 'put') {
+            const rawId = entry.args && entry.args[0];
+            if (rawId != null) ids.add(String(cleanIdForCollection(collection, rawId)));
+          } else {
+            // bulkPut queues an array of records as args[0] -- pull each
+            // record's own id so none of them look "already deleted" to a
+            // background list refresh while still pending upload.
+            const rows = (entry.args && Array.isArray(entry.args[0])) ? entry.args[0] : [];
+            rows.forEach(row => {
+              if (row && row.id != null) ids.add(String(cleanIdForCollection(collection, row.id)));
+            });
+          }
         });
       return ids;
     } catch(e) {
@@ -709,7 +724,13 @@
     let failed = 0;
     for (const entry of q) {
       try {
-        await CLOUD[entry.method](entry.collection, ...entry.args);
+        if (entry.method === 'setSettings') {
+          // Whole-object save -- CLOUD.setSettings(o) takes only the settings
+          // object, not a leading collection name like put/del/bulkPut do.
+          await CLOUD.setSettings(entry.args[0]);
+        } else {
+          await CLOUD[entry.method](entry.collection, ...entry.args);
+        }
       } catch(e) {
         console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
         addToSyncQueue(entry.method, entry.collection, entry.args);
@@ -729,6 +750,14 @@
   });
   // Also expose for manual call
   window.RS_DB_DRAIN = drainSyncQueue;
+  // Drain at boot too, not just on the 'online' event. Without this, anything
+  // queued from a previous tab/session (e.g. the browser was closed while
+  // offline, or was left signed out) would just sit in localStorage forever
+  // -- the 'online' listener only fires on a live offline->online transition,
+  // which never happens if the page is loaded fresh while already online.
+  if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+    setTimeout(() => { drainSyncQueue().catch(()=>{}); }, 2000);
+  }
 
   /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */
 
@@ -740,7 +769,6 @@
       if(isCloudConfigured() && signedIn()){ try{ await window.RS_API.logout(); }catch(e){} }
       for (const k in lastListFetchTime) delete lastListFetchTime[k];
       cachedSettingsMap = {};
-      cachedSettings = null;
 
       try {
         const tenant = getActiveTenantId();
@@ -790,6 +818,13 @@
           return res;
         } catch(e) {
           console.warn('[RS_DB] setSettings cloud failed:', e.message);
+          // Queue for retry when back online -- previously a settings save
+          // made while offline (or during a flaky connection) was silently
+          // dropped: the local copy looked saved, but the cloud never got it
+          // and nothing retried later.
+          window.RS_LAST_CLOUD_ERROR = { method: 'setSettings', collection: 'settings', message: e.message, time: Date.now() };
+          window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail: window.RS_LAST_CLOUD_ERROR }));
+          addToSyncQueue('setSettings', 'settings', [o]);
           return o;
         }
       }

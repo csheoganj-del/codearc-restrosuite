@@ -866,7 +866,7 @@
     modal.style.cssText = 'position:fixed;inset:0;z-index:2147482000;display:flex;align-items:center;' +
       'justify-content:center;background:rgba(10,10,15,0.6);padding:16px;';
     modal.innerHTML = `
-      <div style="background:var(--panel,#fff);color:var(--text,#1e293b);width:100%;max-width:460px;border-radius:14px;
+      <div style="background:var(--panel-solid,#fff);color:var(--text,#1e293b);width:100%;max-width:460px;border-radius:14px;
         box-shadow:0 20px 60px rgba(0,0,0,.35);padding:26px;max-height:90vh;overflow:auto;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
           <div style="width:40px;height:40px;border-radius:10px;background:var(--orange-tint,rgba(255,79,0,.12));

@@ -6,6 +6,9 @@
   // HTML escaping -- prevents XSS when inserting DB-sourced strings into innerHTML
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  // Alias: some render paths (Employee Ledger "Logins" tab) call safe() --
+  // it was never defined in this module, crashing with "safe is not defined".
+  const safe = esc;
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -235,13 +238,20 @@
                   if (!itemIds.length) { resBox.innerHTML = `<span style="color:var(--red)">No valid rows.</span>${errors.length ? '<br>' + errors.slice(0, 6).join('<br>') : ''}`; return; }
                   let ingTotal = 0;
                   itemIds.forEach(id => { byItem[id].m.ingredients = byItem[id].ings; ingTotal += byItem[id].ings.length; });
-                  try { if (RS.save) await RS.save('menu'); } catch (e) {}
-                  RS.toast(`Recipes imported: ${itemIds.length} item${itemIds.length === 1 ? '' : 's'}, ${ingTotal} ingredient links`, 'fa-circle-check');
-                  if (errors.length) {
-                    resBox.innerHTML = `<span style="color:var(--green)">Imported ${itemIds.length} recipe(s).</span> <span style="color:var(--red)">${errors.length} line(s) skipped:</span><br>` + errors.slice(0, 6).join('<br>') + (errors.length > 6 ? '<br>…' : '');
-                  } else {
-                    close();
-                    drawPanes();
+                  try {
+                    if (RS.save) await RS.save('menu');
+                    // Toast only after the save has actually completed successfully.
+                    RS.toast(`Recipes imported: ${itemIds.length} item${itemIds.length === 1 ? '' : 's'}, ${ingTotal} ingredient links`, 'fa-circle-check');
+                    if (errors.length) {
+                      resBox.innerHTML = `<span style="color:var(--green)">Imported ${itemIds.length} recipe(s).</span> <span style="color:var(--red)">${errors.length} line(s) skipped:</span><br>` + errors.slice(0, 6).join('<br>') + (errors.length > 6 ? '<br>…' : '');
+                    } else {
+                      close();
+                      drawPanes();
+                    }
+                  } catch (e) {
+                    console.warn('Recipe import save failed', e);
+                    resBox.innerHTML = '<span style="color:var(--red)">Save failed -- recipes were not saved. Try again.</span>';
+                    RS.toast('Recipe import failed to save -- try again', 'fa-circle-exclamation');
                   }
                 };
               }

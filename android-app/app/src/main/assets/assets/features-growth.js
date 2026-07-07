@@ -266,17 +266,23 @@
           }
 
           let session = null;
+          // Mirror of normalizeTableKey() in the tenant-public edge function:
+          // sessions must be stored/matched on the SAME normalized key
+          // ("Table 05" -> "5") or the customer QR page never finds them.
+          const normTableKey = raw => {
+            let key = String(raw == null ? '' : raw).trim().toLowerCase();
+            if (!key) return '';
+            key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
+            if (/^t\d+$/.test(key)) key = key.slice(1);
+            if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+            return key;
+          };
           const checkStatus = async () => {
             if (!window.RS_DB) return;
             try {
               const sessions = await RS_DB.list('table_sessions').catch(() => []);
-              const currentTableNumStr = `Table ${t.n}`;
-              const currentTableNum = t.n;
-              session = sessions.find(s => 
-                s.tableNumber === currentTableNumStr || 
-                s.tableNumber === currentTableNum || 
-                s.tableNumber === `0${parseInt(currentTableNum)}`
-              );
+              const wantKey = normTableKey(t.n);
+              session = sessions.find(s => normTableKey(s.tableNumber) === wantKey);
               updateQRControls(session);
             } catch (err) {
               console.warn("Failed checking session status", err);
@@ -334,8 +340,10 @@
 
             try {
               let updatedSess = null;
-              const tableNumKey = `Table ${t.n}`;
-              
+              // Store the normalized key (e.g. "5"), matching both the DB
+              // trigger and the tenant-public get_active_session lookup.
+              const tableNumKey = normTableKey(t.n);
+
               if (action === 'open') {
                 const randomToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
                 updatedSess = {
@@ -345,7 +353,10 @@
                   createdAt: new Date().toISOString()
                 };
                 if (session && session.id) updatedSess.id = session.id;
-                await RS_DB.put('table_sessions', session?.id || Math.random().toString(36).substring(2, 9), updatedSess);
+                // No made-up id for new sessions: the cloud table's primary
+                // key is a uuid the DB generates on insert.
+                const savedOpen = await RS_DB.put('table_sessions', session?.id, updatedSess);
+                if (savedOpen && savedOpen.id != null) updatedSess.id = savedOpen.id;
                 RS.toast('QR Session opened', 'fa-circle-check');
               } else if (action === 'pause') {
                 updatedSess = { ...session, status: 'paused' };
@@ -386,8 +397,16 @@
                   await RS_DB.del('pending_orders', t.dbId);
                   
                   // Clear session locally/cloud on checkout
+                  const normKey = raw => {
+                    let key = String(raw == null ? '' : raw).trim().toLowerCase();
+                    if (!key) return '';
+                    key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
+                    if (/^t\d+$/.test(key)) key = key.slice(1);
+                    if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+                    return key;
+                  };
                   const sessions = await RS_DB.list('table_sessions').catch(() => []);
-                  const curSess = sessions.find(s => s.tableNumber === `Table ${t.n}` || s.tableNumber === t.n);
+                  const curSess = sessions.find(s => normKey(s.tableNumber) === normKey(t.n));
                   if (curSess) {
                     await RS_DB.put('table_sessions', curSess.id, { ...curSess, status: 'closed', closedAt: new Date().toISOString() });
                   }

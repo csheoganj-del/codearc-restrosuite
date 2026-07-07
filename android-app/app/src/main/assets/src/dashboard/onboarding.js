@@ -257,6 +257,17 @@
     }
   }
 
+  // Shared with the mandatory first-login profile widget below so both
+  // "is the profile complete" checks can never drift out of sync.
+  function detectHasBusinessProfile() {
+    const profile = readJson('doppio_business_profile', {}) || {};
+    const localSettings = readJson('rs_v2:settings', {}) || {};
+    return Boolean(
+      profile.name || profile.businessName || profile.restaurantName ||
+      localSettings.set_restaurant_name || localSettings.set_outlet_name
+    );
+  }
+
   function setupTasks() {
     const enabled = new Set(enabledFeatures().map(feature => feature.tabId));
     const profile = readJson('doppio_business_profile', {}) || {};
@@ -267,10 +278,7 @@
     const bills = readJson('doppio_bills', []);
     const pendingOrders = readJson('doppio_pending_qr_orders', []);
 
-    const hasProfile = Boolean(
-      profile.name || profile.businessName || profile.restaurantName ||
-      localSettings.set_restaurant_name || localSettings.set_outlet_name
-    );
+    const hasProfile = detectHasBusinessProfile();
     const hasTax = Boolean(
       profile.gstin || profile.gstNumber || profile.gst_number ||
       localSettings.set_gstin || localSettings.set_invoice_prefix
@@ -812,6 +820,150 @@
     positionCard(target);
   });
 
+  // ==========================================================
+  // MANDATORY FIRST-LOGIN PROFILE-COMPLETION WIDGET
+  // ==========================================================
+  // New client onboarding, step one: collect the business info the rest of
+  // the system needs (name, address, phone, GST) before the tour opens.
+  // Saves straight into the same settings store Settings -> Outlet profile
+  // uses (RS.saveSettings), so it's the exact same data, not a parallel copy.
+  function profilePromptStorageKey() {
+    const tenant = sessionStorage.getItem('tenant_id') || 'default';
+    return `restrosuite_profile_prompt_dismissed:${tenant}`;
+  }
+
+  function shouldPromptForProfile() {
+    const role = (sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+    // Only the person who can actually fix it should be blocked by it.
+    if (role && role !== 'admin' && role !== 'manager' && role !== 'owner' && role !== 'superadmin') return false;
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') return false;
+    if (detectHasBusinessProfile()) return false;
+    // "Skip for now" only defers for this browser session -- it comes back
+    // next login until it's actually filled in, per "first step ... for
+    // smooth working" -- this is necessary setup, not a one-time nag.
+    if (sessionStorage.getItem(profilePromptStorageKey())) return false;
+    return true;
+  }
+
+  function showRemindLaterBadge() {
+    const openSettings = document.getElementById('open-settings');
+    if (openSettings && !openSettings.classList.contains('attention-blink')) {
+      openSettings.classList.add('attention-blink');
+    }
+  }
+
+  function closeProfilePromptModal() {
+    const modal = document.getElementById('rs-profile-prompt-modal');
+    if (modal) modal.remove();
+  }
+
+  function showProfileCompletionModal() {
+    if (document.getElementById('rs-profile-prompt-modal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'rs-profile-prompt-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.style.cssText = 'position:fixed;inset:0;z-index:2147482000;display:flex;align-items:center;' +
+      'justify-content:center;background:rgba(10,10,15,0.6);padding:16px;';
+    modal.innerHTML = `
+      <div style="background:var(--panel-solid,#fff);color:var(--text,#1e293b);width:100%;max-width:460px;border-radius:14px;
+        box-shadow:0 20px 60px rgba(0,0,0,.35);padding:26px;max-height:90vh;overflow:auto;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+          <div style="width:40px;height:40px;border-radius:10px;background:var(--orange-tint,rgba(255,79,0,.12));
+            color:var(--orange,#FF4F00);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
+            <i class="fa-solid fa-store"></i>
+          </div>
+          <div>
+            <h3 style="margin:0;font-size:17px;">Welcome -- let's set up your outlet</h3>
+            <p style="margin:2px 0 0;font-size:12.5px;color:var(--text-soft,#64748b);">Takes under a minute. This is saved to your account so billing, receipts, and tax work correctly from day one.</p>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px;">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:var(--text-soft,#64748b);">Business / outlet name *</label>
+            <input id="rs-profile-name" class="form-input" style="width:100%;box-sizing:border-box;margin-top:4px;" placeholder="e.g. Spice Route Kitchen" autocomplete="off">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:var(--text-soft,#64748b);">Phone number *</label>
+            <input id="rs-profile-phone" class="form-input" style="width:100%;box-sizing:border-box;margin-top:4px;" placeholder="10-digit mobile number" autocomplete="off">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:var(--text-soft,#64748b);">Address</label>
+            <input id="rs-profile-address" class="form-input" style="width:100%;box-sizing:border-box;margin-top:4px;" placeholder="Street, city (shown on printed bills)" autocomplete="off">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:var(--text-soft,#64748b);">GSTIN (optional)</label>
+            <input id="rs-profile-gstin" class="form-input" style="width:100%;box-sizing:border-box;margin-top:4px;" placeholder="Leave blank if not GST-registered" autocomplete="off">
+          </div>
+        </div>
+        <div id="rs-profile-prompt-error" style="display:none;color:var(--red,#EF4444);font-size:12px;margin-top:10px;"></div>
+        <div style="display:flex;gap:10px;margin-top:22px;">
+          <button type="button" id="rs-profile-skip" style="flex:1;padding:11px;border-radius:9px;border:1px solid var(--stroke-2,#e2e8f0);background:transparent;color:var(--text-soft,#64748b);font-weight:600;cursor:pointer;">Fill this in later</button>
+          <button type="button" id="rs-profile-save" style="flex:1.4;padding:11px;border-radius:9px;border:none;background:var(--orange,#FF4F00);color:#fff;font-weight:700;cursor:pointer;">Save and continue</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    setTimeout(() => document.getElementById('rs-profile-name')?.focus(), 60);
+
+    document.getElementById('rs-profile-skip').addEventListener('click', () => {
+      sessionStorage.setItem(profilePromptStorageKey(), '1');
+      showRemindLaterBadge();
+      closeProfilePromptModal();
+    });
+
+    document.getElementById('rs-profile-save').addEventListener('click', async () => {
+      const name = document.getElementById('rs-profile-name').value.trim();
+      const phone = document.getElementById('rs-profile-phone').value.trim();
+      const address = document.getElementById('rs-profile-address').value.trim();
+      const gstin = document.getElementById('rs-profile-gstin').value.trim();
+      const errorEl = document.getElementById('rs-profile-prompt-error');
+      if (!name || !phone) {
+        errorEl.textContent = 'Business name and phone number are required.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      const saveBtn = document.getElementById('rs-profile-save');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      try {
+        const current = (window.RS && typeof RS.getSettings === 'function')
+          ? (await RS.getSettings()) || {}
+          : readJson('rs_v2:settings', {}) || {};
+        const updated = Object.assign({}, current, {
+          set_restaurant_name: name,
+          set_phone: phone,
+          set_address: address,
+          set_gstin: gstin
+        });
+        if (window.RS && typeof RS.saveSettings === 'function') {
+          await RS.saveSettings(updated);
+          window.RS_SETTINGS = updated;
+        } else {
+          localStorage.setItem('rs_v2:settings', JSON.stringify(updated));
+        }
+        sessionStorage.removeItem(profilePromptStorageKey());
+        if (window.RS && typeof RS.toast === 'function') RS.toast('Outlet profile saved', 'fa-circle-check');
+        closeProfilePromptModal();
+      } catch (err) {
+        errorEl.textContent = 'Could not save -- ' + (err && err.message ? err.message : 'please try again.');
+        errorEl.style.display = 'block';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save and continue';
+      }
+    });
+  }
+
+  function checkAndPromptProfileCompletion() {
+    if (shouldPromptForProfile()) {
+      showProfileCompletionModal();
+    } else if (!detectHasBusinessProfile() && sessionStorage.getItem(profilePromptStorageKey())) {
+      // Previously skipped this session -- keep a quiet, blinking reminder
+      // on the Settings entry point instead of re-interrupting the user.
+      showRemindLaterBadge();
+    }
+  }
+  window.RS_checkAndPromptProfileCompletion = checkAndPromptProfileCompletion;
+
   async function init() {
     injectGuide();
     const backdrop = document.getElementById('onboarding-backdrop');
@@ -847,6 +999,18 @@
 
     setTimeout(() => {
       if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
+
+      // Step one of onboarding a new client: a complete business profile.
+      // Takes priority over the tour/update modal -- no point touring a
+      // dashboard that can't bill or print correctly yet.
+      try {
+        if (shouldPromptForProfile()) {
+          showProfileCompletionModal();
+          return;
+        }
+        checkAndPromptProfileCompletion();
+      } catch (error) { /* profile prompt is best-effort, never block the tour */ }
+
       try {
         // If we just finished applying an update, automatically trigger the update tour
         if (sessionStorage.getItem('rs_update_applied_at')) {

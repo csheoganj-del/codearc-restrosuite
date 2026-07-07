@@ -711,10 +711,30 @@
       };
     }
 
+    function settingsRole(){
+      const meta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      return String(meta.role || sessionStorage.getItem('logged_in_role') || 'owner').toLowerCase().trim();
+    }
     function renderSettings(){
       const sec = $('#settings-tab');
+      // -- Role gate (audit finding #2): Settings was reachable by every role,
+      // including the Danger Zone data-wipe and Plan & Billing. Only the
+      // outlet owner/admin gets the full screen; managers get an operational
+      // subset; every other staff role is blocked entirely.
+      const role = settingsRole();
+      const isOwnerAdmin = ['owner','admin','superadmin'].includes(role);
+      const isManager = role === 'manager';
+      if (!isOwnerAdmin && !isManager) {
+        sec.innerHTML = `<div class="panel panel-pad" style="text-align:center;padding:48px 24px">
+          <i class="fa-solid fa-lock" style="font-size:40px;color:var(--text-mute);margin-bottom:14px;display:block"></i>
+          <h3 style="margin:0 0 6px">Settings is restricted</h3>
+          <div style="font-size:13.5px;color:var(--text-soft)">Your role does not have access to outlet settings. Ask the outlet owner or a manager if something needs changing.</div>
+        </div>`;
+        return;
+      }
+      const NAV = SET_NAV.filter(s => isOwnerAdmin || !['plan','danger'].includes(s[0]));
       sec.innerHTML = `<div class="set-layout">
-        <div class="set-nav">${SET_NAV.map((s,i)=>`<button class="${i===0?'active':''}" data-s="${s[0]}"><i class="fa-solid ${s[2]}"></i> ${s[1]}</button>`).join('')}</div>
+        <div class="set-nav">${NAV.map((s,i)=>`<button class="${i===0?'active':''}" data-s="${s[0]}"><i class="fa-solid ${s[2]}"></i> ${s[1]}</button>`).join('')}</div>
         <div class="panel panel-pad">
           <div id="set-body"></div>
           <div style="display:flex;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid var(--stroke)"><div class="grow"></div><button class="btn btn-ghost" id="set-cancel">Cancel</button><button class="btn btn-primary" id="set-save"><i class="fa-solid fa-circle-check"></i> Save changes</button></div>
@@ -947,6 +967,9 @@
       function applyStore(){ $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; }); }
       function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
       function show(key){
+        // Never render a section this role's nav doesn't include (e.g. a
+        // manager deep-linking to Danger Zone via the WhatsApp pill handler)
+        if (!NAV.some(s => s[0] === key)) key = 'profile';
         if(body.querySelector('[data-skey]')) collect();
         body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`;
         if (key === 'gateway') {
@@ -1080,6 +1103,12 @@
         const btnReset = $('#btn-client-reset-data');
         if(btnReset) {
           btnReset.onclick = async () => {
+            // Defense in depth: even if this pane is somehow rendered for a
+            // non-admin role, refuse to run the destructive reset.
+            if (!['owner','admin','superadmin'].includes(settingsRole())) {
+              RS.toast('Only the outlet owner can reset outlet data.', 'fa-lock');
+              return;
+            }
             if(!confirm("⚠️ RESET OUTLET DATA?\n\nThis will PERMANENTLY DELETE all of your operational data (bills, menu, inventory, employees, customers, drafts, etc.).\n\nThis action cannot be undone! Proceed?")) return;
             btnReset.disabled = true;
             btnReset.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
@@ -1277,6 +1306,9 @@
           }
           const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
           if(!confirm(msg)) return;
+          // Stop background gateway polling so the reconnect loop can't
+          // delay or wedge the navigation to the login page.
+          try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(e){}
           try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
           location.href='login';
         });
@@ -1301,8 +1333,15 @@
         ['logout','Sign Out','right-from-bracket']
       ];
       moreBtn.addEventListener('click', ()=>{
+        // Filter the sheet by the signed-in staff role's allowed tabs so
+        // restricted roles can't even see (let alone open) forbidden screens.
+        const roleInfo = window.RS_ROLE || {};
+        const allowed = Array.isArray(roleInfo.allowedTabs) && roleInfo.allowedTabs.length
+          ? roleInfo.allowedTabs.concat(roleInfo.staffRole === 'manager' ? ['settings-tab'] : [], ['logout'])
+          : null;
+        const VISIBLE = allowed ? MORE.filter(m => allowed.includes(m[0])) : MORE;
         RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
-          body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${MORE.map(m=>{
+          body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${VISIBLE.map(m=>{
             const bgClass = m[0] === 'logout' ? 'bg-r' : 'bg-o';
             return `<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic ${bgClass}" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`;
           }).join('')}</div>`,
@@ -1317,6 +1356,7 @@
                 const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
                 if(!confirm(msg)) return;
                 close();
+                try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(err){}
                 if(window.RS_DB) {
                   RS_DB.signOut().then(()=>{ location.href='login'; });
                 } else {
@@ -1345,6 +1385,7 @@
         const res = isSuperAdmin
           ? await RS_API.admin({ action: 'gateway_status' })
           : await RS_API.data({ operation: 'gateway_status' });
+        window.__rsGatewayLastStatus = (res && res.status) || 'offline';
         window.__rsGatewayReady = false; // default -- only the 'ready' branch below flips this on
         if (res && res.status === 'ready') {
           // Cached signal (refreshed every 15s) used by the checkout/receipt
@@ -1383,19 +1424,50 @@
           pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
         }
       } catch(err) {
+        window.__rsGatewayLastStatus = 'error';
         textEl.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px"></i>WhatsApp Offline';
         pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
         pillEl.style.color = '#ef4444';
         pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
       }
     };
-    
-    let topbarWhatsAppInterval = null;
+
+    // Adaptive polling with backoff: a fixed 15s interval hammered the
+    // gateway forever on outlets that never configured WhatsApp ("Scan to
+    // Connect" / "WhatsApp Starting..." loops), wasting battery/data and
+    // keeping the tab busy even around sign-out. Healthy or transitioning
+    // states poll fast; unconfigured/offline/error states back off up to
+    // 5 minutes; nothing polls while the tab is hidden.
+    let topbarWhatsAppTimer = null;
+    let topbarWhatsAppDelay = 15000;
+    window.stopTopbarWhatsAppPolling = function() {
+      if (topbarWhatsAppTimer) { clearTimeout(topbarWhatsAppTimer); topbarWhatsAppTimer = null; }
+    };
+    async function pollTopbarWhatsApp() {
+      if (!document.hidden) {
+        await window.updateTopbarWhatsAppStatus();
+        const st = window.__rsGatewayLastStatus || 'offline';
+        if (st === 'ready' || st === 'syncing' || st === 'authenticated' || st === 'qr') {
+          topbarWhatsAppDelay = 15000; // actively used / mid-handshake: stay responsive
+        } else {
+          topbarWhatsAppDelay = Math.min(Math.max(topbarWhatsAppDelay, 15000) * 2, 300000);
+        }
+      }
+      topbarWhatsAppTimer = setTimeout(pollTopbarWhatsApp, topbarWhatsAppDelay);
+    }
+    document.addEventListener('visibilitychange', () => {
+      // Coming back to a visible tab: poll immediately and reset the backoff
+      if (!document.hidden && topbarWhatsAppTimer) {
+        window.stopTopbarWhatsAppPolling();
+        topbarWhatsAppDelay = 15000;
+        pollTopbarWhatsApp();
+      }
+    });
     window.startTopbarWhatsAppPolling = function() {
-      if (topbarWhatsAppInterval) clearInterval(topbarWhatsAppInterval);
-      window.updateTopbarWhatsAppStatus();
-      topbarWhatsAppInterval = setInterval(window.updateTopbarWhatsAppStatus, 15000);
-      
+      window.stopTopbarWhatsAppPolling();
+      topbarWhatsAppDelay = 15000;
+      pollTopbarWhatsApp();
+
       const pill = document.getElementById('topbar-whatsapp-status-pill');
       if (pill) {
         pill.onclick = () => {
