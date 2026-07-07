@@ -120,7 +120,13 @@
       if (Number.isFinite(Number(id))) {
         return Number(id);
       }
-      return stableNumericId(id);
+      // Salt string ids (e.g. bill numbers like "RS-20260702-001") with the
+      // tenant id. These tables are shared across all tenants with a plain
+      // numeric primary key, and every tenant's daily bill numbering starts
+      // at -001, so unsalted hashes collide across tenants: only the first
+      // restaurant to bill each day could save its bill, everyone else's
+      // insert failed on doppio_bills_pkey and was silently dropped.
+      return stableNumericId(getActiveTenantId() + ':' + id);
     }
     return id;
   }
@@ -225,6 +231,11 @@
                   gst:num(o.gst), total:num(o.total), paymentMethod:o.paymentMethod||'UPI',
                   orderType:o.orderType||'Dine-in', tableNumber:o.tableNumber||'Walk-in',
                   status:o.status||'Pending Review', dateTime:o.dateTime||new Date().toISOString(), priority:o.priority||'normal' })
+    },
+    table_sessions: {
+      table:'doppio_table_sessions', pk:'id', clientId:false,
+      from: r => ({ id:r.id, tableNumber:r.table_number, token:r.session_token, status:r.status, createdAt:r.created_at, closedAt:r.closed_at, lastOrderAt:r.last_order_at }),
+      to: o => ({ id:o.id, table_number:o.tableNumber, session_token:o.token, status:o.status, created_at:o.createdAt, closed_at:o.closedAt, last_order_at:o.lastOrderAt })
     },
     shifts: {
       table:'doppio_shifts', pk:'shiftId', clientId:true,
@@ -604,8 +615,8 @@
               // Dispatch database sync event
               window.dispatchEvent(new CustomEvent('rs:db-sync', { detail: { collection: c, data: res } }));
 
-              // Refresh seating grid if drafts, pending_orders or settings changed
-              if (c === 'drafts' || c === 'pending_orders' || c === 'settings') {
+              // Refresh seating grid if drafts, pending_orders, table_sessions or settings changed
+              if (c === 'drafts' || c === 'pending_orders' || c === 'table_sessions' || c === 'settings') {
                 document.dispatchEvent(new Event('rs:tables-updated'));
               }
             }

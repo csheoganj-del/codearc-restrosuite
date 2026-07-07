@@ -234,6 +234,14 @@ const SESSION_FILE_NAME = 'session.zip';
 const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'csheoganj@gmail.com';
 const ADMIN_ALERT_WHATSAPP = process.env.ADMIN_ALERT_WHATSAPP || '919983721179'; // +91 99837 21179
 
+// Extra "gateway is down" alert channels, on top of email, so the owner
+// finds out immediately by whichever route they actually notice first.
+// Every one of these is optional and independently configured -- missing
+// config just means that channel is silently skipped for this deploy.
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+const DESKTOP_ALERTS_ENABLED = String(process.env.DESKTOP_ALERTS_ENABLED || 'true').toLowerCase() === 'true';
+
 const nodemailer = require('nodemailer');
 
 let emailConfig = {
@@ -402,11 +410,88 @@ async function logHealthEvent(event, status, details = {}) {
 }
 
 // ============================================================
+// ADMIN ALERT -- EXTRA CHANNELS (Telegram + desktop notification)
+// ============================================================
+// These run alongside the existing email alert so a gateway outage reaches
+// the owner through more than one path. Each is best-effort: a missing
+// token/config, or the channel itself failing, never blocks the others.
+
+async function sendTelegramAlert(text) {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return { skipped: true, reason: 'not configured' };
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' })
+    });
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Telegram API ${res.status}: ${body.slice(0, 200)}`);
+    }
+    return { skipped: false };
+}
+
+// Lazily require node-notifier -- it's an optional dependency. If it isn't
+// installed yet (npm install hasn't been re-run since this feature shipped)
+// desktop alerts are skipped instead of crashing the gateway process.
+let _notifier = null;
+let _notifierLoadFailed = false;
+function getNotifier() {
+    if (_notifier || _notifierLoadFailed) return _notifier;
+    try {
+        _notifier = require('node-notifier');
+    } catch (err) {
+        _notifierLoadFailed = true;
+        console.warn('[Desktop Alert] node-notifier is not installed -- run `npm install` to enable desktop popups. Skipping.');
+    }
+    return _notifier;
+}
+
+async function sendDesktopAlert(title, message) {
+    if (!DESKTOP_ALERTS_ENABLED) return { skipped: true, reason: 'disabled' };
+    const notifier = getNotifier();
+    if (!notifier) return { skipped: true, reason: 'node-notifier not installed' };
+    return new Promise((resolve, reject) => {
+        notifier.notify({
+            title,
+            message,
+            sound: true,       // plays the OS default notification sound
+            wait: false,
+            timeout: 20
+        }, (err) => {
+            if (err) reject(err); else resolve({ skipped: false });
+        });
+    });
+}
+
+// Fans an alert out to every extra channel in parallel and logs each
+// outcome individually -- one channel failing (e.g. bad Telegram token)
+// never prevents the others (e.g. desktop popup) from firing.
+async function fanOutExtraAlerts(type, subject, plainText) {
+    const jobs = [
+        { name: 'telegram', run: () => sendTelegramAlert(`<b>${subject}</b>\n${plainText}`) },
+        { name: 'desktop', run: () => sendDesktopAlert(subject, plainText) }
+    ];
+    const results = await Promise.allSettled(jobs.map(j => j.run()));
+    results.forEach((result, i) => {
+        const name = jobs[i].name;
+        if (result.status === 'fulfilled') {
+            if (!result.value || !result.value.skipped) {
+                console.log(`[Admin Alert] ${name} alert sent: ${subject}`);
+            }
+        } else {
+            console.error(`[Admin Alert Error] ${name} alert failed:`, result.reason && result.reason.message);
+        }
+    });
+}
+
+// ============================================================
 // ADMIN ALERT -- sends email to admin when gateway is in trouble
 // ============================================================
 async function sendAdminAlert(type, extraDetails = {}) {
-    if (!transporter && !emailConfig.relayUrl) {
-        console.warn('[Admin Alert] Email transporter and relay URL are not configured. Alert not sent.');
+    const emailConfigured = !!(transporter || emailConfig.relayUrl);
+    if (!emailConfigured && !TELEGRAM_BOT_TOKEN && !DESKTOP_ALERTS_ENABLED) {
+        console.warn('[Admin Alert] No alert channel is configured (email, Telegram, desktop). Alert not sent.');
         return;
     }
 
@@ -532,13 +617,28 @@ async function sendAdminAlert(type, extraDetails = {}) {
 
     if (!subject) return;
 
-    try {
-        await sendMailHelper(ADMIN_ALERT_EMAIL, subject, bodyHtml);
-        console.log(`[Admin Alert] Email sent: ${subject}`);
-        await logHealthEvent('alert_sent', 'ok', { type, to: ADMIN_ALERT_EMAIL });
-    } catch (err) {
-        console.error(`[Admin Alert Error] Failed to send alert email:`, err.message);
-    }
+    // Short plain-text version for Telegram/desktop -- the HTML email above
+    // stays the detailed version; these channels are for "notice it NOW".
+    const plainTextByType = {
+        disconnected: `WhatsApp gateway went OFFLINE at ${timeStr}. Reason: ${extraDetails.reason || 'Unknown'}. Reconnect attempts: ${extraDetails.attempts || 0}/${MAX_RECONNECT_ATTEMPTS}.`,
+        online: `WhatsApp gateway is back ONLINE at ${timeStr} (+${extraDetails.number || 'unknown number'}).`,
+        qr_needed: `WhatsApp gateway needs a fresh QR scan to reconnect. ${extraDetails.reason || ''}`.trim(),
+        startup: `WhatsApp gateway server started at ${timeStr}.`
+    };
+    const plainText = plainTextByType[type] || subject;
+
+    const emailJob = emailConfigured
+        ? sendMailHelper(ADMIN_ALERT_EMAIL, subject, bodyHtml)
+            .then(() => console.log(`[Admin Alert] Email sent: ${subject}`))
+            .catch(err => console.error('[Admin Alert Error] Failed to send alert email:', err.message))
+        : Promise.resolve();
+
+    await Promise.allSettled([
+        emailJob,
+        fanOutExtraAlerts(type, subject, plainText)
+    ]);
+
+    await logHealthEvent('alert_sent', 'ok', { type, to: ADMIN_ALERT_EMAIL, channels: { email: emailConfigured, telegram: !!TELEGRAM_BOT_TOKEN, desktop: DESKTOP_ALERTS_ENABLED } });
 }
 
 // ============================================================

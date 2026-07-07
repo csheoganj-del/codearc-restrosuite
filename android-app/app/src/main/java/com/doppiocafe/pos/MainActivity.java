@@ -118,29 +118,26 @@ public class MainActivity extends AppCompatActivity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     String url = request.getUrl().toString();
-                    if (url.endsWith("index.html")) {
-                        view.loadUrl("file:///android_asset/login.html");
-                        return true;
+                    // Allow URLs from restrosuite.codearc.co.in
+                    if (url.startsWith("https://restrosuite.codearc.co.in/")) {
+                        return false; // Let WebView load it
                     }
-                    if (!url.startsWith("file:///android_asset/")) {
-                        openExternalUrl(url);
-                        return true;
-                    }
+                    // All other external URLs open in browser
+                    openExternalUrl(url);
+                    return true;
                 }
                 return false;
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (url.endsWith("index.html")) {
-                    view.loadUrl("file:///android_asset/login.html");
-                    return true;
+                // Allow URLs from restrosuite.codearc.co.in
+                if (url.startsWith("https://restrosuite.codearc.co.in/")) {
+                    return false; // Let WebView load it
                 }
-                if (!url.startsWith("file:///android_asset/")) {
-                    openExternalUrl(url);
-                    return true;
-                }
-                return false;
+                // All other external URLs open in browser
+                openExternalUrl(url);
+                return true;
             }
 
             @Override
@@ -184,8 +181,15 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Load the main entry page from assets (loading the dedicated cashier login page!)
-        myWebView.loadUrl("file:///android_asset/login.html");
+        // Load the live RestroSuite web app.
+        // Cache-bust the TOP-LEVEL document on every cold start: WebSettings
+        // is left on LOAD_DEFAULT (so versioned sub-resources like JS/CSS
+        // still benefit from normal HTTP caching), but the entry HTML itself
+        // must never be served from a stale cache -- that was the main
+        // cause of the app appearing "stuck" on an old version after a
+        // deploy. The query param is unique per launch, so an intermediate
+        // cache can never have a matching prior response for it.
+        myWebView.loadUrl("https://restrosuite.codearc.co.in/login?_cachebust=" + System.currentTimeMillis());
     }
 
     private void openExternalUrl(String url) {

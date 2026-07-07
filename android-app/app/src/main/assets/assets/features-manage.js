@@ -124,9 +124,16 @@
       function drawPanes() {
         panes.innerHTML = `
           <div class="panel panel-pad subtab-pane" data-pane="recipes">
-            <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
               <h3>Menu Recipes</h3>
-              <div style="font-size:12.5px;color:var(--text-soft)">Link raw ingredients to menu items for stock deduction</div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="font-size:12.5px;color:var(--text-soft)">Link raw ingredients to menu items for stock deduction</div>
+                <button class="btn btn-primary btn-sm" id="bulk-recipe-import"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
+              <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-top:2px"></i>
+              <div><strong style="color:var(--text)">How deduction works:</strong> when a bill is paid at the POS, every sold item's linked ingredients are automatically deducted from stock (recipe qty &times; items sold). Items without a linked recipe do not deduct anything.</div>
             </div>
             <div class="table-scroll"><table class="data-table">
               <thead><tr><th>Menu Item</th><th>Category</th><th>Plate Cost</th><th>Linked Ingredients</th><th>Actions</th></tr></thead>
@@ -183,6 +190,63 @@
               }
             };
           });
+        }
+
+        // ── Bulk recipe import: paste CSV lines, link many recipes at once ──
+        const bulkBtn = $('#bulk-recipe-import', panes);
+        if (bulkBtn) {
+          bulkBtn.onclick = () => {
+            if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
+            RSModal.open({
+              title: 'Bulk Recipe Import', sub: 'One ingredient per line: Menu Item, Ingredient, Qty, Unit', icon: 'fa-file-arrow-up', size: 'md',
+              body: `
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <div style="font-size:12px;color:var(--text-soft);line-height:1.55">
+                    Paste one row per ingredient in CSV format:<br>
+                    <code style="display:block;background:var(--glass-2);border:1px solid var(--stroke);border-radius:6px;padding:8px 10px;margin-top:6px;font-size:11.5px;line-height:1.7">Paneer Tikka, Paneer, 0.2, kg<br>Paneer Tikka, Curd, 0.05, kg<br>Masala Dosa, Dosa Batter, 0.15, kg</code>
+                    Menu items and ingredients must already exist (Menu Editor / Inventory Stock). Repeated menu-item rows accumulate into one recipe. Existing recipes for the listed items are replaced.
+                  </div>
+                  <textarea id="bulk-rec-input" class="form-input" rows="9" placeholder="Menu Item, Ingredient, Qty, Unit" style="width:100%;resize:vertical;font-family:monospace;font-size:12.5px;line-height:1.6"></textarea>
+                  <div id="bulk-rec-result" style="font-size:12px;line-height:1.5"></div>
+                </div>`,
+              foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-import><i class="fa-solid fa-circle-check"></i> Import Recipes</button>`,
+              onMount(modal, close) {
+                modal.querySelector('[data-x]').onclick = close;
+                modal.querySelector('[data-import]').onclick = async () => {
+                  const raw = (modal.querySelector('#bulk-rec-input').value || '').trim();
+                  const resBox = modal.querySelector('#bulk-rec-result');
+                  if (!raw) { resBox.innerHTML = '<span style="color:var(--red)">Nothing to import.</span>'; return; }
+                  const byItem = {}; const errors = [];
+                  raw.split(/\r?\n/).forEach((line, idx) => {
+                    const t = line.trim();
+                    if (!t) return;
+                    const parts = t.split(',').map(s => s.trim());
+                    if (parts.length < 3) { errors.push(`Line ${idx + 1}: expected "Item, Ingredient, Qty, Unit"`); return; }
+                    const itemName = parts[0], ingName = parts[1], qtyStr = parts[2], unitRaw = parts[3];
+                    const menuItem = (RS.MENU || []).find(m => m.name.toLowerCase() === itemName.toLowerCase());
+                    if (!menuItem) { errors.push(`Line ${idx + 1}: menu item "${esc(itemName)}" not found`); return; }
+                    const invItem = (RS.INVENTORY || []).find(i => i.name.toLowerCase() === ingName.toLowerCase());
+                    if (!invItem) { errors.push(`Line ${idx + 1}: ingredient "${esc(ingName)}" not in inventory`); return; }
+                    const qty = parseFloat(qtyStr);
+                    if (!(qty > 0)) { errors.push(`Line ${idx + 1}: invalid qty "${esc(qtyStr)}"`); return; }
+                    (byItem[menuItem.id] = byItem[menuItem.id] || { m: menuItem, ings: [] }).ings.push({ name: invItem.name, qty: qty, unit: unitRaw || invItem.unit || '' });
+                  });
+                  const itemIds = Object.keys(byItem);
+                  if (!itemIds.length) { resBox.innerHTML = `<span style="color:var(--red)">No valid rows.</span>${errors.length ? '<br>' + errors.slice(0, 6).join('<br>') : ''}`; return; }
+                  let ingTotal = 0;
+                  itemIds.forEach(id => { byItem[id].m.ingredients = byItem[id].ings; ingTotal += byItem[id].ings.length; });
+                  try { if (RS.save) await RS.save('menu'); } catch (e) {}
+                  RS.toast(`Recipes imported: ${itemIds.length} item${itemIds.length === 1 ? '' : 's'}, ${ingTotal} ingredient links`, 'fa-circle-check');
+                  if (errors.length) {
+                    resBox.innerHTML = `<span style="color:var(--green)">Imported ${itemIds.length} recipe(s).</span> <span style="color:var(--red)">${errors.length} line(s) skipped:</span><br>` + errors.slice(0, 6).join('<br>') + (errors.length > 6 ? '<br>…' : '');
+                  } else {
+                    close();
+                    drawPanes();
+                  }
+                };
+              }
+            });
+          };
         }
 
         const btnAddSup = $('#add-sup');

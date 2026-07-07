@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="none" role="img" aria-label="RestroSuite logo mark">
+  <!-- Fork (left) -->
+  <g fill="#1a1a1a">
+    <rect x="28" y="28" width="5" height="38" rx="2.5"/>
+    <rect x="38" y="28" width="5" height="38" rx="2.5"/>
+    <rect x="48" y="28" width="5" height="38" rx="2.5"/>
+    <path d="M28 62 C28 62 29 80 40.5 80 C52 80 53 62 53 62 L53 162 L28 162 Z" rx="2"/>
+  </g>
+  <!-- Knife (right) -->
+  <g fill="#1a1a1a">
+    <path d="M152 28 C152 28 168 44 168 72 L152 72 Z" opacity="0.9"/>
+    <rect x="152" y="72" width="6" height="90" rx="3"/>
+  </g>
+  <!-- Plate outer ring -->
+  <circle cx="96" cy="96" r="66" fill="#1a1a1a"/>
+  <!-- Plate white ring -->
+  <circle cx="96" cy="96" r="58" fill="white"/>
+  <!-- Plate inner dark -->
+  <circle cx="96" cy="96" r="50" fill="#1a1a1a"/>
+  <!-- Code bracket </> -->
+  <!-- < bracket -->
+  <path d="M66 82 L80 96 L66 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- > bracket -->
+  <path d="M126 82 L112 96 L126 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- / slash -->
+  <line x1="106" y1="78" x2="86" y2="114" stroke="#FF6A2A" stroke-width="6" stroke-linecap="round"/>
+</svg>

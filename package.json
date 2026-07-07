@@ -7,11 +7,13 @@
     "start": "node whatsapp-gateway.js",
     "start:gateway": "node whatsapp-gateway.js",
     "check:free-tier": "node scripts/check-free-tier.cjs",
-    "test": "node --test --test-isolation=none tests/*.test.cjs",
+    "test": "node --test --experimental-test-isolation=none tests/*.test.cjs",
     "check": "node scripts/check-project.cjs && node scripts/check-free-tier.cjs",
     "check:launch": "node scripts/check-launch.cjs",
     "hash:superadmin": "node scripts/hash-superadmin-password.cjs",
     "backup": "node scripts/backup-db.js",
+    "restore": "node scripts/restore-db.js",
+    "bump:sw-version": "node scripts/bump-sw-version.cjs",
     "sync:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./sync-assets.ps1",
     "build:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-android.ps1",
     "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/release.ps1"
@@ -21,12 +23,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
+    "@whiskeysockets/baileys": "^6.7.8",
     "archiver": "^7.0.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "lines-and-columns": "^2.0.4",
+    "node-notifier": "^10.0.1",
     "nodemailer": "^9.0.1",
-    "@whiskeysockets/baileys": "^6.7.8",
     "pino": "^9.1.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
@@ -34,6 +37,8 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "eslint": "^10.6.0"
+    "esbuild": "^0.28.1",
+    "eslint": "^10.6.0",
+    "jsdom": "^29.1.1"
   }
 }

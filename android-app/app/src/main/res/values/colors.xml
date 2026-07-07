@@ -7,4 +7,6 @@
     <color name="bg_cream">#F6F7F9</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
+    <!-- Adaptive launcher icon background (brand orange) -->
+    <color name="ic_launcher_background">#FF6B00</color>
 </resources>

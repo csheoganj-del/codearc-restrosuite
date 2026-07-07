@@ -1,0 +1,2042 @@
+{
+  "startedAt": "2026-07-02T09:17:25.752Z",
+  "target": "https://restrosuite.codearc.co.in",
+  "supabaseUrl": "https://htkauiibuejetimfiavs.supabase.co",
+  "tenantsRequested": 10,
+  "ordersPerTenant": 2,
+  "phases": {
+    "registration": {
+      "ok": true,
+      "viaApi": 0,
+      "fallbackProvisioned": 10,
+      "fallbackReason": "tenant-access registration failed: Incorrect OTP. Check the code sent to WhatsApp.",
+      "apiRegisteredSlugs": [],
+      "fallbackSlugs": [
+        "api-sim-01",
+        "api-sim-02",
+        "api-sim-03",
+        "api-sim-04",
+        "api-sim-05",
+        "api-sim-06",
+        "api-sim-07",
+        "api-sim-08",
+        "api-sim-09",
+        "api-sim-10"
+      ]
+    },
+    "pendingLoginBlocked": {
+      "ok": true,
+      "skipped": true,
+      "reason": "Skipped in 10-tenant run to stay inside tenant-access login rate limit from one test source."
+    },
+    "approval": {
+      "ok": true,
+      "mode": "service-role-fallback",
+      "reason": "Invalid session token.",
+      "status": 401,
+      "count": 10
+    },
+    "ownerLogin": {
+      "ok": true,
+      "count": 10
+    },
+    "staff": {
+      "ok": true,
+      "created": 30,
+      "loggedIn": 0,
+      "loginSkippedReason": "Skipped to keep the 10-tenant run within tenant-access login rate limits."
+    },
+    "seed": {
+      "ok": true
+    },
+    "qrOrders": {
+      "ok": true,
+      "count": 20
+    },
+    "workflow": {
+      "ok": true
+    },
+    "verify": {
+      "ok": true
+    }
+  },
+  "verification": [
+    {
+      "slug": "api-sim-01",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-02",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-03",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-04",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-05",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-06",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-07",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-08",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-09",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    },
+    {
+      "slug": "api-sim-10",
+      "pendingOrders": 0,
+      "bills": 2,
+      "billTotal": 700,
+      "paneerCubes": 11640,
+      "staffUsers": 3,
+      "publicMenuItems": 4,
+      "workflowActorMode": "owner-session",
+      "schemaDriftCount": 0
+    }
+  ],
+  "gateway": {
+    "ok": true,
+    "mode": "direct-gateway-status",
+    "status": 200,
+    "body": {
+      "status": "connecting",
+      "authenticated": false,
+      "number": null,
+      "qr": null,
+      "sessionSavedAt": null,
+      "reconnectAttempts": 5,
+      "totalMessagesSent": 0,
+      "recentHealthEvents": [
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant bd00caf9-9a68-4b8b-bada-07b53ab1cd8d after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:33.345Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant d617313d-a0a8-4006-98b0-f1a9e6e6dd2e after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:33.303Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant 65b4747e-868d-4f22-a52c-fadf7571597f after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:33.297Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6 after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:32.902Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant 070ab703-c882-4b93-98a6-44a38c33f8ef after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:32.880Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant 41fa7809-0a50-4102-9ec1-20e279dbbd81 after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:32.815Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant 5f93da05-a5ed-4684-b2be-084acb924ac1 after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:32.796Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant d3cddace-1155-4891-a86c-3bb872b7e57b after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:32.666Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant f95b27f9-bdee-49c3-9a6f-0a18562d7d20 after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:32.665Z"
+        },
+        {
+          "event": "reconnect_failed",
+          "status": "error",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "attempts": 5,
+            "message": "Reconnect failed for tenant b3c09277-d079-4ab3-ad3b-0251e0c83b32 after 5 attempts"
+          },
+          "created_at": "2026-07-02T08:51:32.663Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant bd00caf9-9a68-4b8b-bada-07b53ab1cd8d: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:32.127Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant d617313d-a0a8-4006-98b0-f1a9e6e6dd2e: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:32.058Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 65b4747e-868d-4f22-a52c-fadf7571597f: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.995Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 070ab703-c882-4b93-98a6-44a38c33f8ef: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.946Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.899Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 41fa7809-0a50-4102-9ec1-20e279dbbd81: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.804Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 5f93da05-a5ed-4684-b2be-084acb924ac1: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.788Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant b3c09277-d079-4ab3-ad3b-0251e0c83b32: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.725Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant d3cddace-1155-4891-a86c-3bb872b7e57b: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.663Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant f95b27f9-bdee-49c3-9a6f-0a18562d7d20: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:51:31.647Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:51:12.132Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:51:12.065Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:51:11.992Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:51:11.947Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:51:11.896Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:51:11.806Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:51:11.804Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:51:11.727Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:51:11.664Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:51:11.647Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:50:52.121Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:50:52.047Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:50:51.989Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:50:51.940Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:50:51.891Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:50:51.799Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:50:51.775Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:50:51.715Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:50:51.657Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:50:51.655Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:50:32.122Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:50:32.037Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:50:31.964Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:50:31.932Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:50:31.876Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:50:31.792Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:50:31.758Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:50:31.705Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:50:31.648Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:50:31.625Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:50:12.123Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:50:12.036Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:50:11.963Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:50:11.958Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:50:11.886Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:50:11.787Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:50:11.785Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:50:11.709Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:50:11.647Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:50:11.614Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:49:52.089Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:49:52.011Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:49:51.920Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:49:51.919Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:49:51.853Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:49:51.750Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:49:51.748Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:49:51.679Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:49:51.624Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:49:51.586Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:48:52.090Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:48:52.023Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:48:51.936Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:48:51.934Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:48:51.848Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:48:51.753Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:48:51.751Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:48:51.674Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:48:51.620Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:48:51.569Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 65b4747e-868d-4f22-a52c-fadf7571597f: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:58.565Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:58.149Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant d3cddace-1155-4891-a86c-3bb872b7e57b: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:58.101Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant b3c09277-d079-4ab3-ad3b-0251e0c83b32: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:58.086Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant d617313d-a0a8-4006-98b0-f1a9e6e6dd2e: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:58.043Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant bd00caf9-9a68-4b8b-bada-07b53ab1cd8d: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:58.039Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 5f93da05-a5ed-4684-b2be-084acb924ac1: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:57.976Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant f95b27f9-bdee-49c3-9a6f-0a18562d7d20: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:57.867Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 070ab703-c882-4b93-98a6-44a38c33f8ef: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:57.851Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 41fa7809-0a50-4102-9ec1-20e279dbbd81: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:47:57.835Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:47:38.556Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:47:38.147Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:47:38.111Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:47:38.110Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:47:38.047Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:47:38.046Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:47:37.972Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:47:37.878Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:47:37.876Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:47:37.873Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:47:18.548Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:47:18.137Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:47:18.105Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:47:18.073Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:47:18.039Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:47:18.037Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:47:17.965Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:47:17.854Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:47:17.852Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:47:17.849Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:46:58.543Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:46:58.134Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:46:58.101Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:46:58.071Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:46:58.030Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:46:58.029Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:46:57.965Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:46:57.837Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:46:57.819Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:46:57.815Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:46:38.532Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:46:38.135Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:46:38.131Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:46:38.127Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:46:38.091Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:46:37.993Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:46:37.968Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:46:37.840Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:46:37.837Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:46:37.834Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:46:18.522Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:46:18.097Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:46:18.080Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:46:18.055Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:46:18.052Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:46:18.050Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:46:17.929Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:46:17.802Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:46:17.800Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:46:17.797Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:45:18.512Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:45:18.081Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:45:18.075Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:45:18.073Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:45:18.038Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:45:17.962Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:45:17.907Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:45:17.785Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:45:17.784Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:45:17.731Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 5f93da05-a5ed-4684-b2be-084acb924ac1: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.632Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 41fa7809-0a50-4102-9ec1-20e279dbbd81: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.618Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant d617313d-a0a8-4006-98b0-f1a9e6e6dd2e: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.586Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant bd00caf9-9a68-4b8b-bada-07b53ab1cd8d: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.571Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant d3cddace-1155-4891-a86c-3bb872b7e57b: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.540Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 65b4747e-868d-4f22-a52c-fadf7571597f: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.510Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant f95b27f9-bdee-49c3-9a6f-0a18562d7d20: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.336Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.148Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant b3c09277-d079-4ab3-ad3b-0251e0c83b32: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.120Z"
+        },
+        {
+          "event": "disconnected",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "reason": "QR refs attempts ended",
+            "message": "Connection closed for tenant 070ab703-c882-4b93-98a6-44a38c33f8ef: QR refs attempts ended"
+          },
+          "created_at": "2026-07-02T08:44:35.101Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:44:15.650Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:44:15.648Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:44:15.642Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:44:15.618Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:44:15.543Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:44:15.513Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:44:15.333Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:44:15.154Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:44:15.153Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:44:15.150Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:43:55.624Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:43:55.621Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:43:55.619Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:43:55.603Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:43:55.527Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:43:55.486Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:43:55.323Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:43:55.161Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:43:55.159Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:43:55.145Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:43:35.604Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:43:35.602Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:43:35.600Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:43:35.583Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:43:35.520Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:43:35.487Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:43:35.310Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:43:35.109Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:43:35.106Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:43:35.086Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "5f93da05-a5ed-4684-b2be-084acb924ac1",
+            "message": "QR code generated for tenant: 5f93da05-a5ed-4684-b2be-084acb924ac1"
+          },
+          "created_at": "2026-07-02T08:43:15.602Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "41fa7809-0a50-4102-9ec1-20e279dbbd81",
+            "message": "QR code generated for tenant: 41fa7809-0a50-4102-9ec1-20e279dbbd81"
+          },
+          "created_at": "2026-07-02T08:43:15.601Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d617313d-a0a8-4006-98b0-f1a9e6e6dd2e",
+            "message": "QR code generated for tenant: d617313d-a0a8-4006-98b0-f1a9e6e6dd2e"
+          },
+          "created_at": "2026-07-02T08:43:15.584Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "bd00caf9-9a68-4b8b-bada-07b53ab1cd8d",
+            "message": "QR code generated for tenant: bd00caf9-9a68-4b8b-bada-07b53ab1cd8d"
+          },
+          "created_at": "2026-07-02T08:43:15.554Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "d3cddace-1155-4891-a86c-3bb872b7e57b",
+            "message": "QR code generated for tenant: d3cddace-1155-4891-a86c-3bb872b7e57b"
+          },
+          "created_at": "2026-07-02T08:43:15.533Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "65b4747e-868d-4f22-a52c-fadf7571597f",
+            "message": "QR code generated for tenant: 65b4747e-868d-4f22-a52c-fadf7571597f"
+          },
+          "created_at": "2026-07-02T08:43:15.467Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "f95b27f9-bdee-49c3-9a6f-0a18562d7d20",
+            "message": "QR code generated for tenant: f95b27f9-bdee-49c3-9a6f-0a18562d7d20"
+          },
+          "created_at": "2026-07-02T08:43:15.303Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6",
+            "message": "QR code generated for tenant: fb9eb080-d3b7-4299-b838-3c8fcbf8e3b6"
+          },
+          "created_at": "2026-07-02T08:43:15.100Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "b3c09277-d079-4ab3-ad3b-0251e0c83b32",
+            "message": "QR code generated for tenant: b3c09277-d079-4ab3-ad3b-0251e0c83b32"
+          },
+          "created_at": "2026-07-02T08:43:15.098Z"
+        },
+        {
+          "event": "qr_generated",
+          "status": "warning",
+          "details": {
+            "tenantId": "070ab703-c882-4b93-98a6-44a38c33f8ef",
+            "message": "QR code generated for tenant: 070ab703-c882-4b93-98a6-44a38c33f8ef"
+          },
+          "created_at": "2026-07-02T08:43:15.052Z"
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "before": {
+      "tenants": 0
+    },
+    "after": {
+      "tenants": 10
+    },
+    "leftoverTenants": []
+  },
+  "schemaDrift": [],
+  "finishedAt": "2026-07-02T09:18:04.403Z"
+}
