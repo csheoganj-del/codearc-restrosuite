@@ -12,7 +12,7 @@
 .rs-overlay.show { opacity: 1; pointer-events: auto; }
 .rs-modal {
   width: 100%; background: var(--panel-solid); border: 1px solid var(--stroke-2); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg); max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: var(--shadow-lg); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; overflow: hidden;
   opacity: 0; transition: opacity .2s ease; position: relative;
 }
 .rs-overlay.show .rs-modal { opacity: 1; }
@@ -23,7 +23,7 @@
 .rs-mhead .mh-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; font-size: 16px; background: var(--orange-tint); color: var(--orange); flex: none; }
 .rs-mclose { margin-left: auto; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--stroke-2); background: var(--glass-2); color: var(--text-soft); display: grid; place-items: center; transition: var(--t); flex: none; }
 .rs-mclose:hover { color: var(--text); background: var(--glass-3); }
-.rs-mbody { padding: 22px 24px; overflow-y: auto; }
+.rs-mbody { padding: 22px 24px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
 .rs-mfoot { padding: 16px 24px; border-top: 1px solid var(--stroke); display: flex; gap: 12px; align-items: center; flex: none; }
 
 /* ---------------- PAYMENT MODAL ---------------- */

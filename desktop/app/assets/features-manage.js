@@ -17,7 +17,7 @@
     function wireSeg(sectionSel, names){
       const sec = $(sectionSel); if(!sec || sec.dataset.segWired) return; sec.dataset.segWired='1';
       const segBtns = $$('.seg button', sec);
-      segBtns.forEach((b,i)=> b.onclick=()=>{ segBtns.forEach(x=>x.classList.toggle('active',x===b)); $$('.subtab-pane', sec).forEach(p=>p.classList.toggle('active', p.dataset.pane===names[i])); });
+      segBtns.forEach((b,i)=> b.onclick=()=>{ segBtns.forEach(x=>x.classList.toggle('active',x===b)); $$('.subtab-pane', sec).forEach(p=>p.classList.toggle('active', p.dataset.pane===names[i])); sec.dispatchEvent(new CustomEvent('rs:subtab-change', { detail:{ pane:names[i], index:i } })); });
     }
 
     /* ============== INVENTORY ============== */
@@ -565,7 +565,7 @@
         const activeBtn = sec.querySelector('.seg button.active');
         if (activeBtn) {
           const tabName = activeBtn.textContent.trim().toLowerCase();
-          const paneMap = { directory: 'directory', roster: 'roster', attendance: 'attendance', payroll: 'payroll' };
+          const paneMap = { directory: 'directory', roster: 'roster', attendance: 'attendance', payroll: 'payroll', logins: 'logins' };
           const activePane = paneMap[tabName] || 'directory';
           $$('.subtab-pane', sec).forEach(p => p.classList.toggle('active', p.dataset.pane === activePane));
         }
@@ -887,11 +887,12 @@
       }
 
       // Load staff logins when that subtab becomes active
+      sec.addEventListener('rs:subtab-change', e => {
+        if (e.detail && e.detail.pane === 'logins') setTimeout(() => loadStaffUsers(), 50);
+      });
       sec.addEventListener('click', e => {
         const btn = e.target.closest('.seg button');
-        if (btn && btn.textContent.trim().toLowerCase() === 'logins') {
-          setTimeout(() => loadStaffUsers(), 50);
-        }
+        if (btn && btn.textContent.trim().toLowerCase() === 'logins') setTimeout(() => loadStaffUsers(), 50);
       });
     }
 

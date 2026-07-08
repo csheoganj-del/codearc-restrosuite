@@ -1534,6 +1534,10 @@
       moreSheet.querySelectorAll('.mnav-more-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           moreSheet.style.display = 'none';
+          if (window.RS_ROLE && Array.isArray(RS_ROLE.allowedTabs) && RS_ROLE.allowedTabs.length && !RS_ROLE.allowedTabs.includes(btn.dataset.tab)) {
+            activateTab(RS_ROLE.allowedTabs[0]);
+            return;
+          }
           activateTab(btn.dataset.tab);
         });
       });
@@ -5199,9 +5203,25 @@
     if (!tabs) {
       // Unrestricted (owner or unrecognised role) -- make sure nothing is
       // left hidden from a previous, more restrictive role.
-      $$('.sidebar-link, .mnav-link').forEach(link => { link.style.display = ''; });
+      const roleStyle = document.getElementById('rs-role-filter-style');
+      if (roleStyle) roleStyle.remove();
+      $$('.sidebar-link, .mnav-link, .mnav-more-btn, .more-sheet-link[data-tab]').forEach(link => { link.style.display = ''; });
       return;
     }
+    const roleStyleId = 'rs-role-filter-style';
+    let roleStyle = document.getElementById(roleStyleId);
+    if (!roleStyle) {
+      roleStyle = document.createElement('style');
+      roleStyle.id = roleStyleId;
+      document.head.appendChild(roleStyle);
+    }
+    const allowedSelectors = tabs
+      .concat(role === 'manager' ? ['settings-tab'] : [])
+      .map(tab => `[data-tab="${String(tab).replace(/"/g, '\\"')}"]`)
+      .join(', ');
+    roleStyle.textContent = allowedSelectors
+      ? `.sidebar-link[data-tab]:not(${allowedSelectors}), .mnav-link[data-tab]:not(${allowedSelectors}), .mnav-more-btn[data-tab]:not(${allowedSelectors}), .more-sheet-link[data-tab]:not(${allowedSelectors}) { display: none !important; }`
+      : `.sidebar-link[data-tab], .mnav-link[data-tab], .mnav-more-btn[data-tab], .more-sheet-link[data-tab] { display: none !important; }`;
     // Hide sidebar links not in allowed list
     $$('.sidebar-link').forEach(link => {
       const tabId = link.dataset.tab || '';
@@ -5216,7 +5236,7 @@
     });
     // Hide mobile "More" sheet entries not in allowed list (built later by
     // features-shell, so this also re-runs on rs:hydrated below)
-    $$('.more-sheet-link[data-tab]').forEach(link => {
+    $$('.mnav-more-btn[data-tab], .more-sheet-link[data-tab]').forEach(link => {
       const tabId = link.dataset.tab || '';
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';

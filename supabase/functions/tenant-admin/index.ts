@@ -760,8 +760,8 @@ async function seedTenantData(payload: Record<string, unknown>, req: Request) {
     tenant_id: tenantId,
     ingredient_key: item.key,
     qty: item.current,
-    expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    receivedDate: new Date().toISOString().split('T')[0]
+    expiry_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    received_date: new Date().toISOString().split('T')[0]
   }));
   const { data: batchData, error: batchErr } = await supabaseAdmin.from("doppio_inventory_batches").insert(batchInserts).select();
   if (batchErr) {

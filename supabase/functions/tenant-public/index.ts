@@ -488,9 +488,9 @@ serve(async (req) => {
 
       const { data: existingOrder, error: existingOrderError } = await supabaseAdmin
         .from("doppio_pending_orders")
-        .select("orderId")
+        .select("order_id")
         .eq("tenant_id", tenant.id)
-        .eq("orderId", orderId)
+        .eq("order_id", orderId)
         .maybeSingle();
 
       if (existingOrderError) {
@@ -509,7 +509,7 @@ serve(async (req) => {
         .from("doppio_pending_orders")
         .select("id", { count: "exact", head: true })
         .eq("tenant_id", tenant.id)
-        .gte("dateTime", monthStart.toISOString());
+        .gte("date_time", monthStart.toISOString());
       if (orderLimitError) {
         console.error("tenant-public monthly order limit check failed:", orderLimitError);
         return jsonResponse({ error: "Failed to validate order capacity." }, 500, req);
@@ -520,18 +520,18 @@ serve(async (req) => {
 
       const safeOrder = {
         tenant_id: tenant.id,
-        orderId,
-        customerName: String(order.customerName || "").slice(0, 120),
-        customerPhone: String(order.customerPhone || "Dine-in Customer").slice(0, 40),
-        dateTime: String(order.dateTime || new Date().toISOString()),
+        order_id: orderId,
+        customer_name: String(order.customerName || "").slice(0, 120),
+        customer_phone: String(order.customerPhone || "Dine-in Customer").slice(0, 40),
+        date_time: String(order.dateTime || new Date().toISOString()),
         items: JSON.stringify(safeItems),
         subtotal: expectedSubtotal,
         discount: 0,
         gst: 0,
         total: expectedSubtotal,
-        paymentMethod,
-        orderType: String(order.orderType || "Takeaway").slice(0, 40),
-        tableNumber: String(order.tableNumber || "Takeaway").slice(0, 40),
+        payment_method: paymentMethod,
+        order_type: String(order.orderType || "Takeaway").slice(0, 40),
+        table_number: String(order.tableNumber || "Takeaway").slice(0, 40),
         status: "Pending Review",
       };
 
@@ -562,9 +562,9 @@ serve(async (req) => {
       }
       const { data, error } = await supabaseAdmin
         .from("doppio_pending_orders")
-        .select("status, items, total, tableNumber, paymentMethod")
+        .select("status, items, total, tableNumber:table_number, paymentMethod:payment_method, prepMinutes:prep_minutes, prepStartedAt:prep_started_at")
         .eq("tenant_id", tenant.id)
-        .eq("orderId", orderId)
+        .eq("order_id", orderId)
         .maybeSingle();
 
       if (error) {
@@ -575,9 +575,9 @@ serve(async (req) => {
         // Check if it has moved to bills (completed/paid)
         const { data: billData, error: billError } = await supabaseAdmin
           .from("doppio_bills")
-          .select("total, tableNumber, paymentMethod")
+          .select("total, tableNumber:table_number, paymentMethod:payment_method")
           .eq("tenant_id", tenant.id)
-          .eq("orderId", orderId)
+          .eq("order_id", orderId)
           .maybeSingle();
         if (billError) {
           console.error("tenant-public get_order_status bill search failed:", billError);
@@ -607,7 +607,7 @@ serve(async (req) => {
       const sessionWindowStart = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
       const { data: pendingRows, error: pendingError } = await supabaseAdmin
         .from("doppio_pending_orders")
-        .select('"orderId", status, items, total, subtotal, "tableNumber", "orderType", "paymentMethod", "dateTime", created_at')
+        .select('orderId:order_id, status, items, total, subtotal, tableNumber:table_number, orderType:order_type, paymentMethod:payment_method, dateTime:date_time, created_at, prep_minutes, prep_started_at')
         .eq("tenant_id", tenant.id)
         .gte("created_at", sessionWindowStart)
         .order("created_at", { ascending: false })
@@ -642,6 +642,8 @@ serve(async (req) => {
           orderType: String(row.orderType || ""),
           paymentMethod: String(row.paymentMethod || ""),
           dateTime: String(row.dateTime || row.created_at || ""),
+          prepMinutes: row.prep_minutes != null ? Number(row.prep_minutes) : null,
+          prepStartedAt: row.prep_started_at || null,
           source: /^DO-QR-/i.test(String(row.orderId || "")) ? "qr" : "staff",
         }));
 
@@ -649,10 +651,10 @@ serve(async (req) => {
       const billWindowStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       const { data: billRows, error: billError } = await supabaseAdmin
         .from("doppio_bills")
-        .select('"orderId", "table", items, total, "paymentMethod", "dateTime"')
+        .select('orderId:order_id, table:table_number, items, total, paymentMethod:payment_method, dateTime:date_time')
         .eq("tenant_id", tenant.id)
-        .gte("dateTime", billWindowStart)
-        .order("dateTime", { ascending: false })
+        .gte("date_time", billWindowStart)
+        .order("date_time", { ascending: false })
         .limit(60);
 
       if (billError) {
@@ -702,7 +704,7 @@ serve(async (req) => {
           .select("id, title, message")
           .eq("tenant_id", tenant.id)
           .eq("type", "waiter_call")
-          .eq("isRead", false)
+          .eq("is_read", false)
           .gte("created_at", dedupeWindowStart)
           .limit(20);
         if (!dedupeError && Array.isArray(recentCalls)) {
@@ -728,7 +730,7 @@ serve(async (req) => {
           message,
           type,
           role: "staff",
-          isRead: false,
+          is_read: false,
           timestamp: new Date().toISOString()
         });
 
@@ -749,9 +751,9 @@ serve(async (req) => {
       // Fetch the bill from the tenant's outlet bills
       const { data: billData, error: billError } = await supabaseAdmin
         .from("doppio_bills")
-        .select("id, orderId, dateTime, table, items, subtotal, discount, serviceChargeAmount, gst, cgst, sgst, total, paymentMethod, tenders, change, customerName, customerPhone")
+        .select("id, orderId:order_id, dateTime:date_time, table:table_number, items, subtotal, discount, serviceChargeAmount:service_charge_amount, gst, cgst, sgst, total, paymentMethod:payment_method, tenders, change, customerName:customer_name, customerPhone:customer_phone")
         .eq("tenant_id", tenant.id)
-        .or(`orderId.eq."${billNo}",id.eq."${billNo}"`)
+        .or(`order_id.eq."${billNo}",id.eq."${billNo}"`)
         .maybeSingle();
 
       if (billError) {
