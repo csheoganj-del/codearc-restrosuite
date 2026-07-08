@@ -63,7 +63,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v37-20260708-2000';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v37-20260708-2020';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -1530,7 +1530,7 @@
   // Load versioned feature scripts in order without document.write.
   // document.write blocks the HTML parser; this approach does not.
   (function() {
-    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v37-20260708-2000');
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v37-20260708-2020');
     var srcs = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
