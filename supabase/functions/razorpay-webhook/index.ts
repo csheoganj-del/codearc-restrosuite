@@ -281,11 +281,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { error: updateErr } = await supabase
         .from("doppio_pending_orders")
         .update({
-          status:        "Paid",
-          paymentMethod: "Razorpay",
+          status:         "Paid",
+          payment_method: "Razorpay",
         })
         .eq("tenant_id", routeTenant.id)
-        .eq("orderId", orderId);
+        .eq("order_id", orderId);
 
       if (updateErr) {
         console.error("payment.captured: failed to update order status", updateErr);

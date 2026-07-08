@@ -158,7 +158,7 @@
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
-      from: r => ({ id:r.id, no:r.order_id, time:r.date_time, table:'--',
+      from: r => ({ id:r.id, no:r.order_id, time:r.date_time, table:(r.table_number||'--'), dateTime:r.created_at,
                     _items:parseItems(r.items),
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
                     subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),

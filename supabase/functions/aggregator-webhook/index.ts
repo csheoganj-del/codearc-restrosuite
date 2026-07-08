@@ -113,20 +113,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Build the pending order row
     const pendingOrderRow = {
       tenant_id: tenantId,
-      orderId,
-      customerName,
-      customerPhone,
+      order_id: orderId,
+      customer_name: customerName,
+      customer_phone: customerPhone,
       items: JSON.stringify(items),
       subtotal,
       discount: Number(payload.discount || 0),
       gst,
       total,
-      paymentMethod: String(payload.payment_method || "UPI"),
-      orderType: "Delivery",
-      tableNumber: `Online (${platform.toUpperCase()})`,
+      payment_method: String(payload.payment_method || "UPI"),
+      order_type: "Delivery",
+      table_number: `Online (${platform.toUpperCase()})`,
       status: "Pending Review", // Stays in Pending Review until staff accepts
       priority: "normal",
-      dateTime: new Date().toISOString()
+      date_time: new Date().toISOString()
     };
 
     // 5. Insert order into doppio_pending_orders table

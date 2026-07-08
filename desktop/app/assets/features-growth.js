@@ -19,8 +19,8 @@
       if (!digits || digits.length < 10) return; // no valid number -> skip silently
       let outlet = 'our restaurant';
       try {
-        const s = window.RS_SETTINGS || (window.RS_DB ? await window.RS_DB.getSettings().catch(()=>null) : null);
-        outlet = (s && (s.set_restaurant_name || s.set_outlet_name)) || outlet;
+        const s = (window.RS_DB ? await window.RS_DB.getSettings().catch(()=>null) : null) || window.RS_SETTINGS || {};
+        outlet = s.set_restaurant_name || s.set_outlet_name || s.business_name || (s._raw && s._raw.business_name) || outlet;
       } catch(e) {}
       let niceDate = date;
       try { niceDate = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' }); } catch(e) {}

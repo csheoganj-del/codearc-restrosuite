@@ -266,7 +266,7 @@
     // Build wrapper
     const wrap = document.createElement('div');
     wrap.className = 'phone-combo';
-    wrap.style.cssText = 'display:flex;align-items:center;position:relative;border:1px solid var(--stroke-2);border-radius:8px;background:var(--glass);overflow:visible;height:34px;box-sizing:border-box;transition:var(--t);';
+    wrap.style.cssText = 'display:flex;align-items:center;position:relative;border:1px solid var(--stroke-2);border-radius:8px;background:var(--glass);overflow:visible;height:44px;box-sizing:border-box;transition:var(--t);';
 
     // Flag button
     const flagBtn = document.createElement('button');

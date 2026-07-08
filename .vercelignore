@@ -12,6 +12,7 @@ backups
 uploads
 scratch
 android-app
+desktop
 supabase
 *.docx
 LIVE_SIMULATION_FINDINGS.md
@@ -29,3 +30,5 @@ test_sec_utf8.log
 *.aar
 *.jks
 *.keystore
+*.exe
+desktop/
