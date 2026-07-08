@@ -2682,37 +2682,39 @@ textarea:focus-visible,
   height: 34px !important;
   width: 34px !important;
   padding: 0 !important;
-  border-radius: 50% !important;
+  border-radius: 17px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
   box-sizing: border-box !important;
   position: relative !important;
-  background: transparent !important;
-  border: none !important;
   flex-shrink: 0 !important;
+  border: 1px solid var(--stroke-2) !important;
+  background: var(--glass) !important;
+  color: var(--text-soft) !important;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s, border-color 0.2s, color 0.2s !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
 }
 
 /* Make support trigger fill the container */
 .topbar .support-dropdown .dropdown-trigger {
-  height: 34px !important;
-  width: 34px !important;
+  height: 100% !important;
+  width: 100% !important;
   padding: 0 !important;
-  border-radius: 50% !important;
+  border-radius: inherit !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
   box-sizing: border-box !important;
-  position: relative !important;
   background: transparent !important;
   border: none !important;
-  color: var(--text-soft) !important;
-  z-index: 5;
+  color: inherit !important;
 }
 
-/* Ensure inner icons are positioned on top of background and centered */
+/* Ensure inner elements align properly */
 .topbar .tb-pill:not(.clock-pill) i,
 .topbar .tb-pill:not(.clock-pill) span i,
 .topbar .support-dropdown .dropdown-trigger i {
@@ -2720,63 +2722,47 @@ textarea:focus-visible,
   margin: 0 !important;
   padding: 0 !important;
   display: inline-block !important;
-  position: relative;
-  z-index: 5;
-  color: inherit !important;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  flex-shrink: 0;
 }
 
-/* Visual Background Card (Expands to the left!) */
-.topbar .tb-pill:not(.clock-pill)::before,
-.topbar .support-dropdown::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 34px;
-  width: 34px;
-  border-radius: 17px;
-  border: 1px solid var(--stroke-2);
-  background: var(--glass);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1;
-  pointer-events: none;
-  box-sizing: border-box;
-}
-
-.topbar .tb-pill:not(.clock-pill):hover::before,
-.topbar .support-dropdown:hover::before {
-  width: 140px; /* Expand visual container to the left */
-  border-color: var(--stroke-hi);
-  background: var(--glass-3);
-  box-shadow: var(--shadow-sm);
-}
-
-/* Visual Text Label (Slides out to the left!) */
-.topbar .tb-pill:not(.clock-pill)::after,
-.topbar .support-dropdown::after {
-  content: attr(data-status);
-  position: absolute;
-  right: 36px; /* Anchor text just to the left of the 34px icon circle */
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 11px;
-  font-weight: 700;
-  font-family: var(--font-body);
-  color: inherit;
-  white-space: nowrap;
+/* Hide span text tag inside badge by default */
+.topbar .tb-pill:not(.clock-pill) span,
+.topbar .support-dropdown .dropdown-trigger span {
   opacity: 0;
   max-width: 0;
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 3;
-  pointer-events: none;
+  display: inline-block !important;
+  transition: opacity 0.2s ease, max-width 0.2s ease, margin-left 0.2s ease !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  color: inherit !important;
+  vertical-align: middle;
 }
 
-.topbar .tb-pill:not(.clock-pill):hover::after,
-.topbar .support-dropdown:hover::after {
+/* On hover: expand width to the left (negative margin-left offsets layout shift completely!) */
+.topbar .tb-pill:not(.clock-pill):hover,
+.topbar .support-dropdown:hover {
+  width: 120px !important;
+  margin-left: -86px !important;
+  padding: 0 10px !important;
+  justify-content: flex-start !important;
+  color: var(--text) !important;
+  border-color: var(--stroke-hi) !important;
+  background: var(--glass-3) !important;
+}
+
+.topbar .support-dropdown:hover .dropdown-trigger {
+  justify-content: flex-start !important;
+  padding: 0 10px !important;
+}
+
+/* Show span text on hover */
+.topbar .tb-pill:not(.clock-pill):hover span,
+.topbar .support-dropdown:hover .dropdown-trigger span {
   opacity: 1;
-  max-width: 100px;
+  max-width: 80px;
+  margin-left: 6px;
 }
 
 /* Scale up icons slightly on hover */
@@ -2825,12 +2811,10 @@ textarea:focus-visible,
 /* 1. Cloud status color variations (applied to ::before and text) */
 #db-mode-pill.cloud {
   color: #22c55e !important; /* Green */
-}
-#db-mode-pill.cloud::before {
   background: rgba(34, 197, 94, 0.1) !important;
   border-color: rgba(34, 197, 94, 0.2) !important;
 }
-#db-mode-pill.cloud:hover::before {
+#db-mode-pill.cloud:hover {
   background: rgba(34, 197, 94, 0.15) !important;
   border-color: rgba(34, 197, 94, 0.35) !important;
 }
@@ -2838,14 +2822,11 @@ textarea:focus-visible,
 #db-mode-pill.syncing,
 #db-mode-pill.local-only {
   color: #eab308 !important; /* Yellow/Amber */
-}
-#db-mode-pill.syncing::before,
-#db-mode-pill.local-only::before {
   background: rgba(234, 179, 8, 0.1) !important;
   border-color: rgba(234, 179, 8, 0.2) !important;
 }
-#db-mode-pill.syncing:hover::before,
-#db-mode-pill.local-only:hover::before {
+#db-mode-pill.syncing:hover,
+#db-mode-pill.local-only:hover {
   background: rgba(234, 179, 8, 0.15) !important;
   border-color: rgba(234, 179, 8, 0.35) !important;
 }
@@ -2853,26 +2834,21 @@ textarea:focus-visible,
 #db-mode-pill.offline,
 #db-mode-pill.sync-error {
   color: #ef4444 !important; /* Red */
-}
-#db-mode-pill.offline::before,
-#db-mode-pill.sync-error::before {
   background: rgba(239, 68, 68, 0.1) !important;
   border-color: rgba(239, 68, 68, 0.2) !important;
 }
-#db-mode-pill.offline:hover::before,
-#db-mode-pill.sync-error:hover::before {
+#db-mode-pill.offline:hover,
+#db-mode-pill.sync-error:hover {
   background: rgba(239, 68, 68, 0.15) !important;
   border-color: rgba(239, 68, 68, 0.35) !important;
 }
 
 #db-mode-pill.superadmin-cloud {
   color: var(--violet-soft) !important; /* Violet */
-}
-#db-mode-pill.superadmin-cloud::before {
   background: var(--violet-tint) !important;
   border-color: rgba(139, 92, 246, 0.2) !important;
 }
-#db-mode-pill.superadmin-cloud:hover::before {
+#db-mode-pill.superadmin-cloud:hover {
   background: rgba(139, 92, 246, 0.15) !important;
   border-color: rgba(139, 92, 246, 0.35) !important;
 }

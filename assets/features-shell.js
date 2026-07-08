@@ -1185,14 +1185,13 @@
       let syncDoneTimer   = null;
       let errorClearTimer = null;
 
-      function setState(state, title, html, statusText) {
+      function setState(state, title, html) {
         if (!pill) return;
         pill.style.cssText = '';              // wipe any legacy inline styles
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
         document.body.classList.toggle('rs-offline-lock', ['local-only', 'offline', 'sync-error'].includes(state));
         pill.setAttribute('data-tooltip', title);
-        pill.setAttribute('data-status', statusText || '');
         pill.title = '';
         pill.innerHTML = html;
       }
@@ -1211,8 +1210,7 @@
             : 'Cloud is currently unavailable. Data is saved locally on this device and will retry sync automatically.';
           setState('local-only',
             title,
-            `<i class="fa-solid fa-cloud"></i>`,
-            'Local only'
+            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
           );
           return;
         }
@@ -1220,24 +1218,21 @@
         if (!isOnline) {
           setState('offline',
             'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
-            `<i class="fa-solid fa-cloud"></i>`,
-            'Offline'
+            `<i class="fa-solid fa-cloud"></i><span>Offline</span>`
           );
           return;
         }
         if (isSuperAdmin) {
           setState('superadmin-cloud',
             'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
-            `<i class="fa-solid fa-cloud-bolt"></i>`,
-            'Cloud admin'
+            `<i class="fa-solid fa-cloud-bolt"></i><span>Cloud admin</span>`
           );
           return;
         }
         if (!isCloud) {
           setState('local-only',
             'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
-            `<i class="fa-solid fa-cloud"></i>`,
-            'Local only'
+            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
           );
           return;
         }
@@ -1246,8 +1241,7 @@
         if (err && (Date.now() - err.time < 30000)) {
           setState('sync-error',
             `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
-            `<i class="fa-solid fa-cloud"></i>`,
-            'Sync error'
+            `<i class="fa-solid fa-cloud"></i><span>Sync error</span>`
           );
           clearTimeout(errorClearTimer);
           errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
@@ -1255,8 +1249,7 @@
         }
         setState('cloud',
           'Connected to Supabase — all data syncs to the cloud instantly.',
-          `<i class="fa-solid fa-cloud"></i>`,
-          'Cloud'
+          `<i class="fa-solid fa-cloud"></i><span>Cloud</span>`
         );
       }
 
@@ -1266,9 +1259,8 @@
         pill.classList.add('syncing');
         pill.style.cssText = '';
         pill.setAttribute('data-tooltip', 'Syncing to cloud…');
-        pill.setAttribute('data-status', 'Syncing…');
         pill.title = '';
-        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i>`;
+        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i><span>Syncing</span>`;
       }
 
       // ── Sync-event listeners (fired by db.js guard()) ─────────────────
@@ -1410,42 +1402,42 @@
           // worth attempting a real PDF-attachment WhatsApp send via the
           // gateway vs. going straight to the plain-text wa.me link.
           window.__rsGatewayReady = true;
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i>';
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Linked</span>';
           pillEl.setAttribute('data-tooltip', 'WhatsApp Linked');
           pillEl.title = '';
           pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
           pillEl.style.color = '#22c55e';
           pillEl.style.border = '1px solid rgba(34, 197, 94, 0.2)';
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i>';
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i><span>Syncing</span>';
           pillEl.setAttribute('data-tooltip', 'WhatsApp Syncing');
           pillEl.title = '';
           pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
           pillEl.style.color = '#eab308';
           pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
         } else if (res && res.status === 'qr') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i>';
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Connect</span>';
           pillEl.setAttribute('data-tooltip', 'Scan to Connect');
           pillEl.title = '';
           pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
           pillEl.style.color = '#eab308';
           pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
         } else if (res && res.status === 'auth_failure') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i>';
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Auth Failed</span>';
           pillEl.setAttribute('data-tooltip', 'Auth Failed');
           pillEl.title = '';
           pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
           pillEl.style.color = '#ef4444';
           pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
         } else if (res && res.status === 'connecting') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i>';
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i><span>Starting</span>';
           pillEl.setAttribute('data-tooltip', 'WhatsApp Starting...');
           pillEl.title = '';
           pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
           pillEl.style.color = '#6b7280';
           pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
         } else {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i>';
+          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
           pillEl.setAttribute('data-tooltip', 'WhatsApp Offline');
           pillEl.title = '';
           pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
@@ -1454,7 +1446,7 @@
         }
       } catch(err) {
         window.__rsGatewayLastStatus = 'error';
-        textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i>';
+        textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
         pillEl.setAttribute('data-tooltip', 'WhatsApp Offline');
         pillEl.title = '';
         pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
