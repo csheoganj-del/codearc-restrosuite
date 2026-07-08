@@ -1178,7 +1178,7 @@
         // manager deep-linking to Danger Zone via the WhatsApp pill handler)
         if (!NAV.some(s => s[0] === key)) key = 'profile';
         if(body.querySelector('[data-skey]')) collect();
-        body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`;
+        body.innerHTML = `<div class="set-pane active set-pane-${key}">${PANES[key]}</div>`;
         if (key === 'gateway') {
           startOutletGatewayPolling();
         } else {

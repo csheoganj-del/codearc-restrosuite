@@ -589,3 +589,186 @@
   margin-bottom: 0;
 }
 
+/* Color Segregation - Themes per Category */
+
+/* 1. Profile - Blue Theme */
+.set-nav button.active[data-s="profile"] {
+  background: linear-gradient(100deg, rgba(37,99,235,0.08), transparent);
+  color: #2563eb;
+  border-color: rgba(37,99,235,0.2);
+}
+.set-nav button.active[data-s="profile"]::before {
+  background: #2563eb;
+  box-shadow: 0 0 8px rgba(37,99,235,0.6);
+}
+.set-nav button.active[data-s="profile"] i {
+  color: #2563eb;
+}
+.set-pane-profile .set-pane-title {
+  color: #2563eb;
+}
+.set-pane-profile .set-card-title i {
+  color: #2563eb;
+}
+
+/* 2. Tax - Purple Theme */
+.set-nav button.active[data-s="tax"] {
+  background: linear-gradient(100deg, rgba(139,92,246,0.08), transparent);
+  color: #8b5cf6;
+  border-color: rgba(139,92,246,0.2);
+}
+.set-nav button.active[data-s="tax"]::before {
+  background: #8b5cf6;
+  box-shadow: 0 0 8px rgba(139,92,246,0.6);
+}
+.set-nav button.active[data-s="tax"] i {
+  color: #8b5cf6;
+}
+.set-pane-tax .set-pane-title {
+  color: #8b5cf6;
+}
+.set-pane-tax .set-card-title i {
+  color: #8b5cf6;
+}
+
+/* 3. Printer - Slate Theme */
+.set-nav button.active[data-s="printer"] {
+  background: linear-gradient(100deg, rgba(71,85,105,0.08), transparent);
+  color: #475569;
+  border-color: rgba(71,85,105,0.2);
+}
+.set-nav button.active[data-s="printer"]::before {
+  background: #475569;
+  box-shadow: 0 0 8px rgba(71,85,105,0.6);
+}
+.set-nav button.active[data-s="printer"] i {
+  color: #475569;
+}
+.set-pane-printer .set-pane-title {
+  color: #475569;
+}
+.set-pane-printer .set-card-title i {
+  color: #475569;
+}
+
+/* 4. WhatsApp Gateway - Green Theme */
+.set-nav button.active[data-s="gateway"] {
+  background: linear-gradient(100deg, rgba(34,197,94,0.08), transparent);
+  color: #22c55e;
+  border-color: rgba(34,197,94,0.25);
+}
+.set-nav button.active[data-s="gateway"]::before {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34,197,94,0.6);
+}
+.set-nav button.active[data-s="gateway"] i {
+  color: #22c55e;
+}
+.set-pane-gateway .set-pane-title {
+  color: #22c55e;
+}
+.set-pane-gateway .set-card-title i {
+  color: #22c55e;
+}
+
+/* 5. Payments - Indigo Theme */
+.set-nav button.active[data-s="payments"] {
+  background: linear-gradient(100deg, rgba(99,102,241,0.08), transparent);
+  color: #6366f1;
+  border-color: rgba(99,102,241,0.2);
+}
+.set-nav button.active[data-s="payments"]::before {
+  background: #6366f1;
+  box-shadow: 0 0 8px rgba(99,102,241,0.6);
+}
+.set-nav button.active[data-s="payments"] i {
+  color: #6366f1;
+}
+.set-pane-payments .set-pane-title {
+  color: #6366f1;
+}
+.set-pane-payments .set-card-title i {
+  color: #6366f1;
+}
+
+/* 6. Security - Amber Theme */
+.set-nav button.active[data-s="security"] {
+  background: linear-gradient(100deg, rgba(217,119,6,0.08), transparent);
+  color: #d97706;
+  border-color: rgba(217,119,6,0.2);
+}
+.set-nav button.active[data-s="security"]::before {
+  background: #d97706;
+  box-shadow: 0 0 8px rgba(217,119,6,0.6);
+}
+.set-nav button.active[data-s="security"] i {
+  color: #d97706;
+}
+.set-pane-security .set-pane-title {
+  color: #d97706;
+}
+.set-pane-security .set-card-title i {
+  color: #d97706;
+}
+
+/* 7. Team - Teal Theme */
+.set-nav button.active[data-s="team"] {
+  background: linear-gradient(100deg, rgba(13,148,136,0.08), transparent);
+  color: #0d9488;
+  border-color: rgba(13,148,136,0.2);
+}
+.set-nav button.active[data-s="team"]::before {
+  background: #0d9488;
+  box-shadow: 0 0 8px rgba(13,148,136,0.6);
+}
+.set-nav button.active[data-s="team"] i {
+  color: #0d9488;
+}
+.set-pane-team .set-pane-title {
+  color: #0d9488;
+}
+.set-pane-team .set-card-title i {
+  color: #0d9488;
+}
+
+/* 8. Plan - Gold Theme */
+.set-nav button.active[data-s="plan"] {
+  background: linear-gradient(100deg, rgba(234,179,8,0.08), transparent);
+  color: #ca8a04;
+  border-color: rgba(234,179,8,0.2);
+}
+.set-nav button.active[data-s="plan"]::before {
+  background: #ca8a04;
+  box-shadow: 0 0 8px rgba(234,179,8,0.6);
+}
+.set-nav button.active[data-s="plan"] i {
+  color: #ca8a04;
+}
+.set-pane-plan .set-pane-title {
+  color: #ca8a04;
+}
+.set-pane-plan .set-card-title i {
+  color: #ca8a04;
+}
+
+/* 9. Danger - Red Theme */
+.set-nav button.active[data-s="danger"] {
+  background: linear-gradient(100deg, rgba(239,68,68,0.08), transparent);
+  color: #ef4444;
+  border-color: rgba(239,68,68,0.2);
+}
+.set-nav button.active[data-s="danger"]::before {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239,68,68,0.6);
+}
+.set-nav button.active[data-s="danger"] i {
+  color: #ef4444;
+}
+.set-pane-danger .set-pane-title {
+  color: #ef4444;
+}
+.set-pane-danger .set-card-title i {
+  color: #ef4444;
+}
+
+
