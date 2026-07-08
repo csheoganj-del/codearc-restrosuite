@@ -214,11 +214,36 @@ We have successfully resolved the issues related to applying country, currency, 
    - Added dynamic payment method swapping in [assets/features-pos.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-pos.js) based on the active currency:
      - For Indian Rupee (`₹`), the digital payment button and split input field show `UPI` with the QR code icon.
      - For other currencies (`€`, `$`, `£`), the payment button and split input dynamically swap to `Stripe` with the Stripe icon/branding and deep purple theme color.
-   - Generalised the checkout tenders builder to push the correct digital payment name (`UPI` or `Stripe`) into the database ledger depending on the active currency.
-   - Added element identifiers (`id="split-upi-icon"` and `id="split-upi-label"`) in [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html) to enable the DOM updates.
+     - Generalised the checkout tenders builder to push the correct digital payment name (`UPI` or `Stripe`) into the database ledger depending on the active currency.
+     - Added element identifiers (`id="split-upi-icon"` and `id="split-upi-label"`) in [dashboard.html](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/dashboard.html) to enable the DOM updates.
 
 4. **Full Directory Sync**:
    - Synchronized all files across the root repository, submodule, and Android app assets.
+
+### Dynamic Analog Clock
+- The hour, minute, and second hands rotate dynamically to reflect the current local system time.
+- The orange second hand sweeps smoothly every second without layout shifts.
+- Theme switching updates the clock face borders and hands to adapt to light/dark themes correctly.
+
+---
+
+## Settings Panel Refactoring
+
+We refactored the settings dashboard tabs to replace the flat, unorganized structure with premium, grouped cards.
+
+### Changes Made
+
+1. **Dashboard Styles Update**:
+   - Added custom CSS classes in [features.css](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features.css) for `.set-pane-title`, `.set-pane-desc`, `.set-card`, `.set-card-header`, `.set-card-title`, and card padding rules.
+   - Set up automatic row border cleanup so that the last `.set-row` inside a card doesn't have a trailing bottom border.
+
+2. **Pane Template Refactoring**:
+   - In [features-shell.js](file:///c:/Users/MASTER%20PC/Downloads/restrosuite/assets/features-shell.js), restructured all keys inside `PANES` (profile, tax, printer, gateway, team, plan, payments, security, danger) to group elements into distinct `.set-card` cards.
+   - Added dynamic panel headers and descriptions at the top of the content pane.
+   - Kept all HTML element IDs, class indicators, and bindings intact so that database updates, polling services, and event handlers continue to work perfectly.
+
+3. **Production Deployment**:
+   - Pushed the updates to GitHub and triggered a production deployment via the Vercel CLI (`vercel --prod --yes`) to sync the live environment (**https://restrosuite.codearc.co.in**).
 
 ---
 

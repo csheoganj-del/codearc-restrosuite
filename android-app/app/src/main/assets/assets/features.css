@@ -156,7 +156,18 @@
 
 /* ---------------- SETTINGS ---------------- */
 .set-layout { display: grid; grid-template-columns: 220px 1fr; gap: 22px; align-items: start; }
-.set-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; }
+.set-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  padding: 16px;
+  position: sticky;
+  top: 0;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.02);
+}
 .set-nav button { text-align: left; padding: 11px 14px; border-radius: 10px; border: 0; background: transparent; color: var(--text-soft); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 11px; transition: var(--t); }
 .set-nav button i { width: 18px; text-align: center; }
 .set-nav button:hover { background: var(--glass-2); color: var(--text); }
@@ -212,7 +223,7 @@
 
 @media (max-width: 860px) {
   .pay-grid { grid-template-columns: 1fr; } .pay-left { border-right: 0; border-bottom: 1px solid var(--stroke); }
-  .set-layout { grid-template-columns: 1fr; } .set-nav { flex-direction: row; overflow-x: auto; position: static; }
+  .set-layout { grid-template-columns: 1fr; } .set-nav { flex-direction: row; overflow-x: auto; position: static; padding: 10px; gap: 8px; white-space: nowrap; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .token-board { grid-template-columns: 1fr; }
 }
