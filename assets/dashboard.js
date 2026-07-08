@@ -361,6 +361,36 @@
       el.title = '';
     }
   })();
+
+  (function(){
+    const pill = document.getElementById('topbar-whatsapp-status-pill');
+    if (!pill || pill.dataset.gatewaySettingsWired) return;
+    pill.dataset.gatewaySettingsWired = '1';
+    pill.setAttribute('role', 'button');
+    pill.setAttribute('tabindex', '0');
+    const openGatewaySettings = () => {
+      window.RS_PENDING_SETTINGS_SECTION = 'gateway';
+      if (window.RS && typeof window.RS.activateTab === 'function') {
+        window.RS.activateTab('settings-tab');
+      }
+      const clickGatewayTab = () => {
+        const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+        if (!gatewayBtn) return false;
+        gatewayBtn.click();
+        return true;
+      };
+      if (!clickGatewayTab()) {
+        [80, 220, 500, 900].forEach(delay => setTimeout(clickGatewayTab, delay));
+      }
+    };
+    pill.addEventListener('click', openGatewaySettings);
+    pill.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openGatewaySettings();
+      }
+    });
+  })();
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 

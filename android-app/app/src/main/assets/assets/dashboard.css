@@ -2962,21 +2962,62 @@ textarea:focus-visible,
 .topbar > #app-version-pill:hover,
 .topbar > #app-version-pill:focus-visible {
   width: auto !important;
-  min-width: 62px !important;
+  min-width: 74px !important;
   padding: 0 10px !important;
   justify-content: center !important;
+  overflow: visible !important;
 }
 
 #app-version-pill .tb-badge-label {
   opacity: 1 !important;
-  max-width: 54px !important;
+  display: inline-block !important;
+  width: auto !important;
+  max-width: none !important;
   margin-left: 6px !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
 }
 
-#topbar-whatsapp-status-pill .tb-badge-label {
-  opacity: 0;
-  max-width: 0;
-  margin-left: 0;
+.topbar > #topbar-whatsapp-status-pill {
+  width: 34px !important;
+  min-width: 34px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.topbar > #topbar-whatsapp-status-pill #topbar-whatsapp-status-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+.topbar > #topbar-whatsapp-status-pill .tb-badge-label {
+  display: inline-block !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  max-width: 0 !important;
+  margin-left: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.topbar > #topbar-whatsapp-status-pill:hover,
+.topbar > #topbar-whatsapp-status-pill:focus-visible {
+  width: 120px !important;
+  min-width: 120px !important;
+  padding: 0 10px !important;
+  justify-content: flex-start !important;
+}
+
+.topbar > #topbar-whatsapp-status-pill:hover .tb-badge-label,
+.topbar > #topbar-whatsapp-status-pill:focus-visible .tb-badge-label {
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  max-width: 80px !important;
+  margin-left: 6px !important;
 }
 
 /* Clock styling: always compact, but clean */

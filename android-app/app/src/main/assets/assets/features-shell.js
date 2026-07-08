@@ -1163,6 +1163,9 @@
         }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
+      const initialSettingsSection = window.RS_PENDING_SETTINGS_SECTION || 'profile';
+      window.RS_PENDING_SETTINGS_SECTION = null;
+      show(initialSettingsSection);
       $('#set-save').onclick=async ()=>{ 
         collect(); 
         try {
@@ -1188,7 +1191,7 @@
         }
       };
       $('#set-cancel').onclick=()=>show('profile');
-      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
+      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show(initialSettingsSection); });
     }
     RS.titles['settings-tab']=['Settings','Outlet, taxes, printer & gateway configuration'];
     RS.addRenderer('settings-tab', renderSettings);
@@ -1497,6 +1500,7 @@
         pill.setAttribute('role', 'button');
         pill.setAttribute('tabindex', '0');
         const openGatewaySettings = () => {
+          window.RS_PENDING_SETTINGS_SECTION = 'gateway';
           if (window.RS && typeof RS.activateTab === 'function') {
             RS.activateTab('settings-tab');
           }
