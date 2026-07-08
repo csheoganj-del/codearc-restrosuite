@@ -624,6 +624,7 @@
         const raw = String(id || '');
         const m = raw.match(/^DO-(QR|WTR)-(\d{6})-(\d{3,})(?:-[A-Z0-9]+)?$/i);
         if (m) return `${m[1].toUpperCase()}-${m[2]}-${m[3]}`;
+        if (/^DO-(QR|WTR)-/i.test(raw)) return raw;
         const hash = Math.abs(raw.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0));
         if (/^DO-QR-/i.test(raw)) return `QR-${String(hash % 1000).padStart(3, '0')}`;
         if (/^DO-WTR-/i.test(raw)) return `WTR-${String(hash % 1000).padStart(3, '0')}`;

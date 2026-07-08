@@ -74,6 +74,12 @@ const server = http.createServer(async (req, res) => {
       res.end(Buffer.from(await response.arrayBuffer()));
       return;
     }
+    if (u.pathname === '/__shutdown' && req.method === 'POST') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      setTimeout(() => server.close(() => process.exit(0)), 25);
+      return;
+    }
     // test-admin: manipulate DB state (simulates POS/KDS actions)
     if (u.pathname === '/__admin' && req.method === 'POST') {
       const chunks = []; for await (const c of req) chunks.push(c);
@@ -81,11 +87,26 @@ const server = http.createServer(async (req, res) => {
       let out = { ok: true };
       if (body.op === 'seed') seed();
       else if (body.op === 'insert') fake.db[body.table].push(...body.rows.map(r => ({ tenant_id: TENANT_ID, created_at: new Date().toISOString(), ...r })));
-      else if (body.op === 'set_status') { fake.db.doppio_pending_orders.filter(r => r.orderId === body.orderId).forEach(r => r.status = body.status); }
+      else if (body.op === 'set_status') { fake.db.doppio_pending_orders.filter(r => (r.orderId || r.order_id) === body.orderId).forEach(r => r.status = body.status); }
       else if (body.op === 'settle') {
         // move pending order to bills (POS checkout behaviour)
-        const idx = fake.db.doppio_pending_orders.findIndex(r => r.orderId === body.orderId);
-        if (idx >= 0) { const [o] = fake.db.doppio_pending_orders.splice(idx, 1); fake.db.doppio_bills.push({ tenant_id: TENANT_ID, orderId: o.orderId, table: o.tableNumber, items: o.items, total: o.total, paymentMethod: body.paymentMethod || 'Cash', dateTime: new Date().toISOString() }); }
+        const idx = fake.db.doppio_pending_orders.findIndex(r => (r.orderId || r.order_id) === body.orderId);
+        if (idx >= 0) {
+          const [o] = fake.db.doppio_pending_orders.splice(idx, 1);
+          const now = new Date().toISOString();
+          const orderId = o.orderId || o.order_id;
+          const table = o.tableNumber || o.table_number;
+          const paymentMethod = body.paymentMethod || 'Cash';
+          fake.db.doppio_bills.push({
+            tenant_id: TENANT_ID,
+            orderId, order_id: orderId,
+            table, table_number: table,
+            items: o.items,
+            total: o.total,
+            paymentMethod, payment_method: paymentMethod,
+            dateTime: now, date_time: now
+          });
+        }
       }
       else if (body.op === 'dump') out = { ok: true, db: fake.db };
       else if (body.op === 'rate_limits') require('./fake-supabase').setRateLimits(!!body.enabled);
