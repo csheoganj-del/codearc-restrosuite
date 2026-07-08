@@ -11,6 +11,37 @@
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
+    // Send a WhatsApp reservation confirmation to the guest. Uses the connected
+    // gateway when it's ready (server-side, no staff action), otherwise falls
+    // back to opening a pre-filled wa.me message the staff taps to send.
+    async function sendReservationWhatsApp({ guestName, guestPhone, tableNumber, date, time, pax }) {
+      const digits = String(guestPhone || '').replace(/\D/g, '');
+      if (!digits || digits.length < 10) return; // no valid number -> skip silently
+      let outlet = 'our restaurant';
+      try {
+        const s = window.RS_SETTINGS || (window.RS_DB ? await window.RS_DB.getSettings().catch(()=>null) : null);
+        outlet = (s && (s.set_restaurant_name || s.set_outlet_name)) || outlet;
+      } catch(e) {}
+      let niceDate = date;
+      try { niceDate = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' }); } catch(e) {}
+      const msg = `Hi ${guestName}, your table is reserved at ${outlet}. \n\n`
+        + `Table: ${tableNumber}\n`
+        + `Date: ${niceDate}\n`
+        + `Time: ${time}\n`
+        + `Guests: ${pax}\n\n`
+        + `We look forward to serving you! Reply here if you need to change anything.`;
+      if (window.__rsGatewayReady === true && window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof window.RS_API.data === 'function') {
+        try {
+          await window.RS_API.data({ operation:'gateway_send', phone: digits, message: msg });
+          RS.toast('WhatsApp confirmation sent to guest', 'fa-whatsapp');
+          return;
+        } catch(e) { /* fall through to link */ }
+      }
+      const waPhone = digits.length === 10 ? '91' + digits : digits;
+      try { window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer'); } catch(e) {}
+      RS.toast('WhatsApp message ready — tap send', 'fa-whatsapp');
+    }
+
     /* ===================== FLOOR & TABLES ===================== */
     const DEFAULT_TABLES = [
       {n:'01',cap:2}, {n:'02',cap:4}, {n:'03',cap:4}, {n:'04',cap:2},
@@ -68,7 +99,9 @@
       
       if (window.RS_DB) {
         sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
-        RS_DB.list('pending_orders').then(rows => {
+        Promise.all([RS_DB.list('pending_orders'), RS_DB.list('reservations').catch(()=>[])]).then(([rows, reservations]) => {
+          const _resToday = new Date().toISOString().slice(0,10);
+          const _resDigits = v => parseInt(String(v==null?'':v).replace(/\D/g,''),10);
           TABLES.forEach(t => {
             const activeOrder = rows.find(r => 
               (r.tableNumber === `Table ${t.n}` || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}` || r.tableNumber === t.name) &&
@@ -87,6 +120,9 @@
               t.orderId = null;
               t.dbId = null;
             }
+            t.reservedInfo = (t.state === 'free')
+              ? (reservations.find(rv => rv && (rv.status==='confirmed'||rv.status==='booked'||rv.status==='pending') && (!rv.date || rv.date===_resToday) && _resDigits(rv.tableNumber)===_resDigits(t.n)) || null)
+              : null;
           });
           drawFloorUI(sec);
         }).catch(e => {
@@ -116,7 +152,7 @@
           <div class="table-card ${t.state}" data-n="${t.n}">
             <span class="tdot" style="background:${stateDot[t.state]}"></span>
             <div class="tnum2">Table ${t.n}</div><div class="tcap"><i class="fa-solid fa-user-group" style="font-size:10px"></i> ${t.cap} seats</div>
-            <div class="tstate">${stateTxt[t.state]}</div>
+            <div class="tstate">${stateTxt[t.state]}${(t.state==='free'&&t.reservedInfo)?` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time||'')}${t.reservedInfo.guestName?(' · '+esc(t.reservedInfo.guestName)):''}</span>`:''}</div>
             ${t.amt?`<div class="tamt">${rs(t.amt)}</div><div class="tcap">${t.since}</div>`:'<div class="tcap" style="margin-top:auto">Tap to seat</div>'}
           </div>`).join('')}</div>`;
       $$('.table-card', sec).forEach(c=> c.onclick=()=> tableModal(TABLES.find(t=>t.n===c.dataset.n)));
@@ -631,7 +667,7 @@
           id: row.id,
           row,
           plat: detectPlatform(row),
-          oid: row.orderId || row.id,
+          oid: RS.formatDisplayOrderId ? RS.formatDisplayOrderId(row) : (row.orderId || row.id),
           cust: row.customerName || 'Online customer',
           area: row.tableNumber || row.orderType || 'Delivery',
           items: (row.items || []).map(it => `${it.qty || 1}x ${it.name || 'Item'}`),
@@ -1278,6 +1314,7 @@
             newBtn.onclick = () => {
               close();
               if (name === 'Reservations') {
+                const _todayISO = new Date().toISOString().slice(0,10);
                 const formBody = `
                   <div style="display:flex;flex-direction:column;gap:12px">
                     <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -1286,8 +1323,18 @@
                         <input type="text" id="res-guest" class="form-control" placeholder="e.g. John Doe" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                       </div>
                       <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Phone (WhatsApp)</label>
+                        <input type="tel" id="res-phone" class="form-control" placeholder="e.g. 9876543210" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                    </div>
+                    <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Date</label>
+                        <input type="date" id="res-date" class="form-control" value="${_todayISO}" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                      <div>
                         <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Time</label>
-                        <input type="text" id="res-time" class="form-control" value="07:30 PM" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                        <input type="time" id="res-time" class="form-control" value="19:30" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                       </div>
                     </div>
                     <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -1314,16 +1361,20 @@
                     resModal.querySelector('[data-confirm]').onclick = async () => {
                       const guestName = resModal.querySelector('#res-guest').value || '';
                       if (!guestName) return RS.toast('Guest name is required', 'fa-circle-exclamation');
-                      const time = resModal.querySelector('#res-time').value || '07:30 PM';
+                      const guestPhone = (resModal.querySelector('#res-phone').value || '').trim();
+                      const date = resModal.querySelector('#res-date').value || _todayISO;
+                      const time = resModal.querySelector('#res-time').value || '19:30';
                       const pax = Number(resModal.querySelector('#res-pax').value) || 2;
                       const tableNumber = resModal.querySelector('#res-table').value || '';
 
-                      const id = 'res_' + Date.now().toString().slice(-6);
-                      const resRow = { id, time, guestName, pax, tableNumber, status: 'confirmed' };
+                      const id = RS.nextLogicalNo('RES');
+                      const resRow = { id, time, date, guestName, guestPhone, pax, tableNumber, status: 'confirmed' };
                       resClose();
                       if (RS.saveOne) {
                         await RS.saveOne('reservations', resRow);
-                        RS.toast('Reservation booked successfully', 'fa-circle-check');
+                        RS.toast('Reservation booked — table marked reserved', 'fa-circle-check');
+                        try { document.dispatchEvent(new Event('rs:tables-updated')); } catch(e){}
+                        try { if (typeof sendReservationWhatsApp === 'function') await sendReservationWhatsApp({ guestName, guestPhone, tableNumber, date, time, pax }); } catch(e){ console.warn('Reservation WhatsApp failed', e); }
                         hubScreen('Reservations');
                       }
                     };
@@ -1367,7 +1418,7 @@
                       if (!subject) return RS.toast('Subject is required', 'fa-circle-exclamation');
                       const priority = tktModal.querySelector('#tkt-priority').value || 'medium';
 
-                      const tktNum = 'TKT-' + Date.now().toString().slice(-6);
+                      const tktNum = RS.nextLogicalNo('TKT');
                       const tktRow = { id: tktNum, ticketNumber: tktNum, subject, customerName, priority, status: 'open' };
                       tktClose();
                       if (RS.saveOne) {
@@ -1407,7 +1458,7 @@
                       if (!code) return RS.toast('Coupon code is required', 'fa-circle-exclamation');
                       const description = offModal.querySelector('#off-desc').value || 'Discount Coupon';
 
-                      const id = 'off_' + Date.now().toString().slice(-6);
+                      const id = RS.nextLogicalNo('OFF');
                       const offRow = { id, code, description, usageCount: 0, status: 'active' };
                       offClose();
                       if (RS.saveOne) {

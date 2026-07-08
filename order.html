@@ -440,6 +440,26 @@
 
   function slugToName(s){ return s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
   const restName = slug ? slugToName(slug) : '';
+  function pad2(v){ return String(v).padStart(2,'0'); }
+  function shortDateKey(d){
+    d = d || new Date();
+    return String(d.getFullYear()).slice(-2) + pad2(d.getMonth()+1) + pad2(d.getDate());
+  }
+  function nextOrderNumber(kind){
+    var day = shortDateKey();
+    var key = 'rs_seq:' + (slug || 'local') + ':' + kind + ':' + day;
+    var next = 1;
+    try { next = (Number(localStorage.getItem(key) || 0) || 0) + 1; localStorage.setItem(key, String(next)); } catch(e) {}
+    return kind + '-' + day + '-' + String(next).padStart(3, '0');
+  }
+  function randomSuffix(){
+    try { return crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase().slice(0, 3); }
+    catch(e) { return Math.random().toString(36).slice(2,5).toUpperCase(); }
+  }
+  function displayOrderId(id){
+    var m = String(id || '').match(/^DO-(QR|WTR)-(\d{6})-(\d{3,})(?:-[A-Z0-9]+)?$/i);
+    return m ? (m[1].toUpperCase() + '-' + m[2] + '-' + m[3]) : String(id || '');
+  }
 
   // ── BRANDING ──
   function applyLogoBranding(nameVal) {
@@ -1049,12 +1069,13 @@
     }
     // Order-ID prefix decides the source: DO-QR- = customer self-order,
     // DO-WTR- = waiter KOT (backend classifies non-QR prefixes as staff-taken).
-    var rid = (waiterMode ? 'DO-WTR-' : 'DO-QR-') + Date.now().toString(36).toUpperCase() + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
+    var displayId = nextOrderNumber(waiterMode ? 'WTR' : 'QR');
+    var rid = 'DO-' + displayId + '-' + randomSuffix();
     var tv  = tNum||'Takeaway';
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);
     var ts  = new Date().toLocaleString('en-IN');
-    var order = {orderId:rid,customerName:name,customerPhone:phone||'Dine-in',dateTime:ts,
+    var order = {orderId:rid,displayOrderId:displayId,customerName:name,customerPhone:phone||'Dine-in',dateTime:ts,
       items:JSON.parse(JSON.stringify(cart)),subtotal:sub,discount:0,gst:gst,total:sub,
       paymentMethod:'Pending',orderType:tv==='Takeaway'?'Takeaway':'Dine-in',
       tableNumber:tv,tenant_slug:slug,status:'Pending Review',
@@ -1107,7 +1128,7 @@
     document.getElementById('r-rest').textContent = rn;
     var pd = tNum && parseInt(tNum)<10 ? '0'+tNum : tNum;
     document.getElementById('r-table').textContent = tNum ? 'Table '+pd : 'Takeaway';
-    document.getElementById('r-id').textContent = 'Order ID: '+order.orderId;
+    document.getElementById('r-id').textContent = 'Order ID: '+(order.displayOrderId || displayOrderId(order.orderId));
     if(waiterMode){
       document.querySelector('.s-title').textContent = 'KOT Sent!';
       document.getElementById('s-msg').textContent = 'The kitchen has received this waiter order.';
