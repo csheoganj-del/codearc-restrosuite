@@ -356,7 +356,7 @@
   (function(){
     const el = document.getElementById('app-version-pill');
     if(el) {
-      el.textContent = '';
+      el.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>' + appVersion.split('-')[0] + '</span>';
       el.setAttribute('data-tooltip', 'App Version: ' + appVersion);
       el.title = '';
     }
@@ -1748,9 +1748,8 @@
     const textEl = document.getElementById('topbar-whatsapp-status-text');
     const pillEl = document.getElementById('topbar-whatsapp-status-pill');
     if (textEl && pillEl) {
-      textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i>';
+      textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
       pillEl.setAttribute('data-tooltip', 'WhatsApp gateway is offline' + (reason ? `: ${reason}` : ''));
-      pillEl.setAttribute('data-status', 'Offline');
       pillEl.title = '';
       pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
       pillEl.style.color = '#ef4444';

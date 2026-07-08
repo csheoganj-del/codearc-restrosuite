@@ -1140,13 +1140,12 @@
       let syncDoneTimer   = null;
       let errorClearTimer = null;
 
-      function setState(state, title, html, statusText) {
+      function setState(state, title, html) {
         if (!pill) return;
         pill.style.cssText = '';              // wipe any legacy inline styles
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
         pill.setAttribute('data-tooltip', title);
-        pill.setAttribute('data-status', statusText || '');
         pill.title = '';
         pill.innerHTML = html;
       }
@@ -1161,24 +1160,21 @@
         if (!isOnline) {
           setState('offline',
             'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
-            `<i class="fa-solid fa-cloud"></i>`,
-            'Offline'
+            `<i class="fa-solid fa-cloud"></i><span>Offline</span>`
           );
           return;
         }
         if (isSuperAdmin) {
           setState('superadmin-cloud',
             'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
-            `<i class="fa-solid fa-cloud-bolt"></i>`,
-            'Cloud admin'
+            `<i class="fa-solid fa-cloud-bolt"></i><span>Cloud admin</span>`
           );
           return;
         }
         if (!isCloud) {
           setState('local-only',
             'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
-            `<i class="fa-solid fa-cloud"></i>`,
-            'Local only'
+            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
           );
           return;
         }
@@ -1187,8 +1183,7 @@
         if (err && (Date.now() - err.time < 30000)) {
           setState('sync-error',
             `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
-            `<i class="fa-solid fa-cloud"></i>`,
-            'Sync error'
+            `<i class="fa-solid fa-cloud"></i><span>Sync error</span>`
           );
           clearTimeout(errorClearTimer);
           errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
@@ -1196,8 +1191,7 @@
         }
         setState('cloud',
           'Connected to Supabase — all data syncs to the cloud instantly.',
-          `<i class="fa-solid fa-cloud"></i>`,
-          'Cloud'
+          `<i class="fa-solid fa-cloud"></i><span>Cloud</span>`
         );
       }
 
@@ -1207,9 +1201,8 @@
         pill.classList.add('syncing');
         pill.style.cssText = '';
         pill.setAttribute('data-tooltip', 'Syncing to cloud…');
-        pill.setAttribute('data-status', 'Syncing…');
         pill.title = '';
-        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i>`;
+        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i><span>Syncing</span>`;
       }
 
       // ── Sync-event listeners (fired by db.js guard()) ─────────────────
