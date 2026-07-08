@@ -206,6 +206,17 @@
 .set-nav button.active i {
   color: var(--orange);
 }
+.set-nav button[data-s="gateway"].active {
+  background: linear-gradient(100deg, var(--green-tint), transparent);
+  border-color: oklch(0.74 0.15 158 / 0.25);
+}
+.set-nav button[data-s="gateway"].active::before {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+.set-nav button[data-s="gateway"].active i {
+  color: var(--green);
+}
 .set-pane { display: none; } .set-pane.active { display: block; animation: rsFade .3s var(--ease); }
 .set-section { margin-bottom: 20px; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--stroke); }
