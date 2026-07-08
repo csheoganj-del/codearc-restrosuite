@@ -2640,6 +2640,17 @@ textarea:focus-visible,
   gap: 10px !important;
   height: 54px !important;
   box-sizing: border-box;
+  min-width: 0;
+  overflow: visible;
+}
+
+.tb-spacer {
+  min-width: 0;
+}
+
+.tb-title {
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Make title area more compact */
@@ -2647,6 +2658,8 @@ textarea:focus-visible,
   font-size: 17px !important;
   font-weight: 700 !important;
   line-height: 1.2 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tb-title p {
   font-size: 11px !important;
@@ -2664,12 +2677,16 @@ textarea:focus-visible,
 /* Highly compact search bar */
 .tb-search {
   width: 150px !important;
+  min-width: 150px !important;
   padding: 6px 12px !important;
   border-radius: var(--r-md) !important;
   gap: 8px !important;
+  box-sizing: border-box !important;
+  flex: 0 0 auto !important;
 }
 .tb-search:focus-within {
   width: 200px !important;
+  min-width: 200px !important;
   border-color: var(--orange) !important;
 }
 .tb-search input {
@@ -2677,10 +2694,11 @@ textarea:focus-visible,
 }
 
 /* General design for circular icon status badges (except Clock) */
-.topbar .tb-pill:not(.clock-pill),
+.topbar > .tb-pill:not(.clock-pill),
 .topbar .support-dropdown {
   height: 34px !important;
   width: 34px !important;
+  min-width: 34px !important;
   padding: 0 !important;
   border-radius: 17px !important;
   display: inline-flex !important;
@@ -2697,7 +2715,7 @@ textarea:focus-visible,
   white-space: nowrap !important;
 }
 
-.topbar .tb-pill:not(.clock-pill) {
+.topbar > .tb-pill:not(.clock-pill) {
   overflow: hidden !important;
 }
 
@@ -2723,8 +2741,8 @@ textarea:focus-visible,
 }
 
 /* Ensure inner elements align properly */
-.topbar .tb-pill:not(.clock-pill) i,
-.topbar .tb-pill:not(.clock-pill) span i,
+.topbar > .tb-pill:not(.clock-pill) > i,
+.topbar > .tb-pill:not(.clock-pill) > span > i,
 .topbar .support-dropdown .dropdown-trigger i {
   font-size: 14px !important;
   margin: 0 !important;
@@ -2734,9 +2752,9 @@ textarea:focus-visible,
   flex-shrink: 0;
 }
 
-/* Hide span text tag inside badge by default */
-.topbar .tb-pill:not(.clock-pill) span,
-.topbar .support-dropdown .dropdown-trigger span {
+/* Hide badge text by default; keep icon wrapper spans intact. */
+.topbar .tb-badge-label,
+.topbar .support-dropdown .dropdown-trigger .tb-badge-label {
   opacity: 0;
   max-width: 0;
   overflow: hidden;
@@ -2749,9 +2767,10 @@ textarea:focus-visible,
 }
 
 /* On hover: expand width to the left (pushes items on the left side) */
-.topbar .tb-pill:not(.clock-pill):hover,
+.topbar > .tb-pill:not(.clock-pill):hover,
 .topbar .support-dropdown:hover {
   width: 120px !important;
+  min-width: 120px !important;
   padding: 0 10px !important;
   justify-content: flex-start !important;
   color: var(--text) !important;
@@ -2765,18 +2784,29 @@ textarea:focus-visible,
 }
 
 /* Show span text on hover */
-.topbar .tb-pill:not(.clock-pill):hover span,
-.topbar .support-dropdown:hover .dropdown-trigger span {
+.topbar > .tb-pill:not(.clock-pill):hover .tb-badge-label,
+.topbar .support-dropdown:hover .dropdown-trigger .tb-badge-label {
   opacity: 1;
   max-width: 80px;
   margin-left: 6px;
 }
 
 /* Scale up icons slightly on hover */
-.topbar .tb-pill:not(.clock-pill):hover i,
-.topbar .tb-pill:not(.clock-pill):hover span i,
+.topbar > .tb-pill:not(.clock-pill):hover > i,
+.topbar > .tb-pill:not(.clock-pill):hover > span > i,
 .topbar .support-dropdown:hover .dropdown-trigger i {
   transform: scale(1.12);
+}
+
+.topbar .tb-icon-btn {
+  width: 34px !important;
+  height: 34px !important;
+  flex: 0 0 34px !important;
+}
+
+.topbar .tb-icon-btn .dot-notif {
+  top: 6px !important;
+  right: 7px !important;
 }
 
 /* Premium Detailed Tooltips using data-tooltip (Floating below, animated) */
@@ -2860,6 +2890,52 @@ textarea:focus-visible,
   border-color: rgba(139, 92, 246, 0.35) !important;
 }
 
+/* WhatsApp gateway status colors */
+#topbar-whatsapp-status-pill.wa-linked {
+  color: #22c55e !important;
+  background: rgba(34, 197, 94, 0.1) !important;
+  border-color: rgba(34, 197, 94, 0.2) !important;
+}
+#topbar-whatsapp-status-pill.wa-linked:hover {
+  background: rgba(34, 197, 94, 0.15) !important;
+  border-color: rgba(34, 197, 94, 0.35) !important;
+}
+#topbar-whatsapp-status-pill.wa-syncing,
+#topbar-whatsapp-status-pill.wa-qr {
+  color: #eab308 !important;
+  background: rgba(234, 179, 8, 0.1) !important;
+  border-color: rgba(234, 179, 8, 0.2) !important;
+}
+#topbar-whatsapp-status-pill.wa-syncing:hover,
+#topbar-whatsapp-status-pill.wa-qr:hover {
+  background: rgba(234, 179, 8, 0.15) !important;
+  border-color: rgba(234, 179, 8, 0.35) !important;
+}
+#topbar-whatsapp-status-pill.wa-offline,
+#topbar-whatsapp-status-pill.wa-auth-failure {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+#topbar-whatsapp-status-pill.wa-offline:hover,
+#topbar-whatsapp-status-pill.wa-auth-failure:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+#topbar-whatsapp-status-pill.wa-starting {
+  color: #6b7280 !important;
+  background: rgba(107, 114, 128, 0.1) !important;
+  border-color: rgba(107, 114, 128, 0.2) !important;
+}
+#topbar-whatsapp-status-pill.wa-starting:hover {
+  background: rgba(107, 114, 128, 0.15) !important;
+  border-color: rgba(107, 114, 128, 0.35) !important;
+}
+
+#rs-gateway-offline-banner {
+  display: none !important;
+}
+
 /* 2. Support dropdown colors */
 .support-dropdown::after {
   color: var(--text-soft) !important;
@@ -2873,7 +2949,7 @@ textarea:focus-visible,
 
 /* 3. Version Pill: info icon using pseudo-element */
 #app-version-pill::before {
-  content: "\f05a"; /* fa-circle-info */
+  content: none !important;
   font-family: "Font Awesome 6 Free";
   font-weight: 900;
   font-size: 13.5px;
@@ -2909,6 +2985,26 @@ textarea:focus-visible,
     .clock-pill {
       display: none !important;
     }
+  }
+}
+
+@media (max-width: 1100px) {
+  .topbar .tb-search {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    gap: 6px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  .tb-search {
+    display: none !important;
+  }
+  .tb-title h1 {
+    font-size: 15px !important;
   }
 }
 

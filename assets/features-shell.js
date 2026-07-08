@@ -42,9 +42,16 @@
       let notifLoading = false;
       let notifReloadQueued = false;
       let notifCloudUnavailable = false;
+      let notifClearAfterLoad = false;
       const panel = document.createElement('div'); panel.className='notif-panel';
       function readSet(){ try { return new Set(JSON.parse(localStorage.getItem(readKey) || '[]')); } catch(e){ return new Set(); } }
       function saveRead(set){ try { localStorage.setItem(readKey, JSON.stringify([...set])); } catch(e){} }
+      function mergeReadIds(ids){
+        const read = readSet();
+        ids.filter(Boolean).forEach(id => read.add(String(id)));
+        saveRead(read);
+        return read;
+      }
       function relTime(v){
         const t = v ? new Date(v).getTime() : 0;
         if(!t || Number.isNaN(t)) return '';
@@ -112,8 +119,15 @@
           }
           // Re-read localStorage AFTER all awaits so any mark-as-read
           // that happened during the cloud fetch is not missed.
-          const read = readSet();
-          NOTIFS = [...saved, ...live].map(n=>{
+          const combined = [...saved, ...live];
+          let read = readSet();
+          if (notifClearAfterLoad) {
+            read = mergeReadIds(combined.map(n => n && n.id));
+            notifClearAfterLoad = false;
+          } else {
+            saveRead(read);
+          }
+          NOTIFS = combined.map(n=>{
             const [ic,bg,c] = iconFor(n.type);
             return { ...n, ic, bg, c, unread: !n.isRead && !read.has(String(n.id)), time:relTime(n.timestamp || n.createdAt) };
           }).filter(n=>n.unread);
@@ -131,7 +145,7 @@
         const markRead = n => {
           if(!n || !n.id) return;
           n.unread = false; n.isRead = true;
-          const read = readSet(); read.add(String(n.id)); saveRead(read);
+          mergeReadIds([n.id]);
           if(window.RS_DB && !String(n.id).startsWith('low-stock-') && !String(n.id).startsWith('pending-order-') && !String(n.id).startsWith('refund-') && n.id !== 'cloud-sync-warning' && !String(n.id).startsWith('system-update')) {
             RS_DB.put('notifications', n.id, n).catch(()=>{});
           }
@@ -139,7 +153,12 @@
             window.RS_SHOW_UPDATE_DIALOG();
           }
         };
-        panel.querySelector('#notif-read').onclick = ()=>{ NOTIFS.forEach(markRead); draw(); updateDot(); };
+        panel.querySelector('#notif-read').onclick = ()=>{
+          notifClearAfterLoad = notifLoading || notifReloadQueued;
+          mergeReadIds(NOTIFS.map(n => n && n.id));
+          NOTIFS.forEach(markRead);
+          draw(); updateDot();
+        };
         $$('.notif-item',panel).forEach(el=> el.onclick=()=>{
           const id = el.dataset.id;
           const target = NOTIFS.find(x => String(x.id) === String(id));
@@ -1210,7 +1229,7 @@
             : 'Cloud is currently unavailable. Data is saved locally on this device and will retry sync automatically.';
           setState('local-only',
             title,
-            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
+            `<i class="fa-solid fa-cloud"></i><span class="tb-badge-label">Local only</span>`
           );
           return;
         }
@@ -1218,21 +1237,21 @@
         if (!isOnline) {
           setState('offline',
             'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
-            `<i class="fa-solid fa-cloud"></i><span>Offline</span>`
+            `<i class="fa-solid fa-cloud"></i><span class="tb-badge-label">Offline</span>`
           );
           return;
         }
         if (isSuperAdmin) {
           setState('superadmin-cloud',
             'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
-            `<i class="fa-solid fa-cloud-bolt"></i><span>Cloud admin</span>`
+            `<i class="fa-solid fa-cloud-bolt"></i><span class="tb-badge-label">Cloud</span>`
           );
           return;
         }
         if (!isCloud) {
           setState('local-only',
             'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
-            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
+            `<i class="fa-solid fa-cloud"></i><span class="tb-badge-label">Local only</span>`
           );
           return;
         }
@@ -1241,7 +1260,7 @@
         if (err && (Date.now() - err.time < 30000)) {
           setState('sync-error',
             `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
-            `<i class="fa-solid fa-cloud"></i><span>Sync error</span>`
+            `<i class="fa-solid fa-cloud"></i><span class="tb-badge-label">Sync error</span>`
           );
           clearTimeout(errorClearTimer);
           errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
@@ -1249,7 +1268,7 @@
         }
         setState('cloud',
           'Connected to Supabase — all data syncs to the cloud instantly.',
-          `<i class="fa-solid fa-cloud"></i><span>Cloud</span>`
+          `<i class="fa-solid fa-cloud"></i><span class="tb-badge-label">Cloud</span>`
         );
       }
 
@@ -1260,7 +1279,7 @@
         pill.style.cssText = '';
         pill.setAttribute('data-tooltip', 'Syncing to cloud…');
         pill.title = '';
-        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i><span>Syncing</span>`;
+        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i><span class="tb-badge-label">Syncing</span>`;
       }
 
       // ── Sync-event listeners (fired by db.js guard()) ─────────────────
@@ -1381,11 +1400,28 @@
       });
     }
     
-    // Add topbar status badge polling & click handler
-    window.updateTopbarWhatsAppStatus = async function() {
+    const WA_BADGE_STATES = ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
+    function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
       const textEl = document.getElementById('topbar-whatsapp-status-text');
       const pillEl = document.getElementById('topbar-whatsapp-status-pill');
       if (!textEl || !pillEl) return;
+      if (window.RS_SET_TOPBAR_WHATSAPP_BADGE) {
+        window.RS_SET_TOPBAR_WHATSAPP_BADGE(state, label, tooltip, pulse);
+        return;
+      }
+      WA_BADGE_STATES.forEach(cls => pillEl.classList.remove(cls));
+      pillEl.classList.add(state);
+      pillEl.style.cssText = '';
+      textEl.innerHTML = `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i><span class="tb-badge-label">${safe(label)}</span>`;
+      pillEl.setAttribute('data-tooltip', tooltip);
+      pillEl.title = '';
+    }
+    function gatewayReason(res, fallback) {
+      return (res && (res.error || res.reason || res.message || (res.details && res.details.reason))) || fallback;
+    }
+
+    // Add topbar status badge polling & click handler
+    window.updateTopbarWhatsAppStatus = async function() {
       const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
       const isSuperAdmin = sessionMeta.role === 'superadmin' || sessionMeta.role === 'super_admin';
       try {
@@ -1402,56 +1438,21 @@
           // worth attempting a real PDF-attachment WhatsApp send via the
           // gateway vs. going straight to the plain-text wa.me link.
           window.__rsGatewayReady = true;
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Linked</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Linked');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
-          pillEl.style.color = '#22c55e';
-          pillEl.style.border = '1px solid rgba(34, 197, 94, 0.2)';
+          setTopbarWhatsAppBadge('wa-linked', 'Linked', 'WhatsApp gateway linked', false);
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i><span>Syncing</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Syncing');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
-          pillEl.style.color = '#eab308';
-          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+          setTopbarWhatsAppBadge('wa-syncing', 'Syncing', 'WhatsApp gateway syncing', true);
         } else if (res && res.status === 'qr') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Connect</span>';
-          pillEl.setAttribute('data-tooltip', 'Scan to Connect');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
-          pillEl.style.color = '#eab308';
-          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+          setTopbarWhatsAppBadge('wa-qr', 'QR', 'Scan the WhatsApp QR code to connect', false);
         } else if (res && res.status === 'auth_failure') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Auth Failed</span>';
-          pillEl.setAttribute('data-tooltip', 'Auth Failed');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-          pillEl.style.color = '#ef4444';
-          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-        } else if (res && res.status === 'connecting') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i><span>Starting</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Starting...');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
-          pillEl.style.color = '#6b7280';
-          pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
+          setTopbarWhatsAppBadge('wa-auth-failure', 'Auth', 'WhatsApp auth failed: ' + gatewayReason(res, 'session needs reconnect'), false);
+        } else if (res && (res.status === 'connecting' || res.status === 'starting')) {
+          setTopbarWhatsAppBadge('wa-starting', 'Starting', 'WhatsApp gateway starting', true);
         } else {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Offline');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-          pillEl.style.color = '#ef4444';
-          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+          setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + gatewayReason(res, 'not connected'), false);
         }
       } catch(err) {
         window.__rsGatewayLastStatus = 'error';
-        textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-        pillEl.setAttribute('data-tooltip', 'WhatsApp Offline');
-        pillEl.title = '';
-        pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-        pillEl.style.color = '#ef4444';
-        pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + (err && err.message ? err.message : 'status check failed'), false);
       }
     };
 

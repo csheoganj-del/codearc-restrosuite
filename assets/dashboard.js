@@ -356,7 +356,7 @@
   (function(){
     const el = document.getElementById('app-version-pill');
     if(el) {
-      el.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>' + appVersion.split('-')[0] + '</span>';
+      el.innerHTML = '<i class="fa-solid fa-circle-info"></i><span class="tb-badge-label">' + appVersion.split('-')[0] + '</span>';
       el.setAttribute('data-tooltip', 'App Version: ' + appVersion);
       el.title = '';
     }
@@ -1737,24 +1737,32 @@
   }
   window.RS_applyPosOnlyModeUI = applyPosOnlyModeUI;
 
-  // WhatsApp gateway down/up banner -- subscribes to gateway_health_log
-  // (already written by whatsapp-gateway.js on every disconnect/connect,
-  // realtime already enabled on this table) and shows a persistent,
-  // continuously-blinking banner until the gateway reports back online.
+  function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
+    const textEl = document.getElementById('topbar-whatsapp-status-text');
+    const pillEl = document.getElementById('topbar-whatsapp-status-pill');
+    if (!textEl || !pillEl) return;
+    ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting']
+      .forEach(cls => pillEl.classList.remove(cls));
+    pillEl.classList.add(state);
+    pillEl.style.cssText = '';
+    textEl.innerHTML = `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i><span class="tb-badge-label">${_e(label)}</span>`;
+    pillEl.setAttribute('data-tooltip', tooltip);
+    pillEl.title = '';
+  }
+  window.RS_SET_TOPBAR_WHATSAPP_BADGE = setTopbarWhatsAppBadge;
+
+  // WhatsApp gateway down/up signal -- keep the intrusive center-top banner
+  // hidden and surface the problem through the topbar badge tooltip instead.
   function showGatewayOfflineBanner(reason) {
     const bar = document.getElementById('rs-gateway-offline-banner');
     if (bar) bar.style.display = 'none';
 
-    const textEl = document.getElementById('topbar-whatsapp-status-text');
-    const pillEl = document.getElementById('topbar-whatsapp-status-pill');
-    if (textEl && pillEl) {
-      textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-      pillEl.setAttribute('data-tooltip', 'WhatsApp gateway is offline' + (reason ? `: ${reason}` : ''));
-      pillEl.title = '';
-      pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-      pillEl.style.color = '#ef4444';
-      pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-    }
+    setTopbarWhatsAppBadge(
+      'wa-offline',
+      'Offline',
+      'WhatsApp gateway is offline' + (reason ? `: ${reason}` : ''),
+      false
+    );
   }
   function hideGatewayOfflineBanner() {
     const bar = document.getElementById('rs-gateway-offline-banner');
