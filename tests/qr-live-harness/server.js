@@ -77,7 +77,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/__shutdown' && req.method === 'POST') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));
-      setTimeout(() => server.close(() => process.exit(0)), 25);
+      setTimeout(() => server.close(), 25);
       return;
     }
     // test-admin: manipulate DB state (simulates POS/KDS actions)
