@@ -114,7 +114,7 @@
           NOTIFS = [...saved, ...live].map(n=>{
             const [ic,bg,c] = iconFor(n.type);
             return { ...n, ic, bg, c, unread: !n.isRead && !read.has(String(n.id)), time:relTime(n.timestamp || n.createdAt) };
-          });
+          }).filter(n=>n.unread);
           draw(); updateDot();
         } finally {
           notifLoading = false;
@@ -122,9 +122,10 @@
         }
       }
       function draw(){
-        const unread = NOTIFS.filter(n=>n.unread).length;
+        const list = NOTIFS.filter(n=>n.unread);
+        const unread = list.length;
         panel.innerHTML = `<div class="notif-h"><h4>Notifications ${unread?`<span class="pill pill-orange" style="padding:2px 8px;font-size:11px">${unread} new</span>`:''}</h4><button class="btn btn-ghost btn-sm" id="notif-read">Mark all read</button></div>
-          <div class="notif-list">${NOTIFS.length ? NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" data-i="${i}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${n.ic}"></i></div><div style="flex:1"><div class="nt">${safe(n.title)}</div><div class="nd">${safe(n.message)}</div><div class="ntime">${safe(n.time)}</div></div></div>`).join('') : '<div class="sr-empty">No live notifications right now.</div>'}</div>`;
+          <div class="notif-list">${list.length ? list.map(n=>`<div class="notif-item unread" data-id="${n.id}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${n.ic}"></i></div><div style="flex:1"><div class="nt">${safe(n.title)}</div><div class="nd">${safe(n.message)}</div><div class="ntime">${safe(n.time)}</div></div></div>`).join('') : '<div class="sr-empty">No live notifications right now.</div>'}</div>`;
         const markRead = n => {
           if(!n || !n.id) return;
           n.unread = false; n.isRead = true;
@@ -137,7 +138,11 @@
           }
         };
         panel.querySelector('#notif-read').onclick = ()=>{ NOTIFS.forEach(markRead); draw(); updateDot(); };
-        $$('.notif-item',panel).forEach(el=> el.onclick=()=>{ markRead(NOTIFS[+el.dataset.i]); draw(); updateDot(); });
+        $$('.notif-item',panel).forEach(el=> el.onclick=()=>{
+          const id = el.dataset.id;
+          const target = NOTIFS.find(x => String(x.id) === String(id));
+          if(target) { markRead(target); draw(); updateDot(); }
+        });
       }
       function updateDot(){ const d=bell.querySelector('.dot-notif'); if(d) d.style.display = NOTIFS.some(n=>n.unread)?'':'none'; }
       document.body.appendChild(panel); loadNotifications();
