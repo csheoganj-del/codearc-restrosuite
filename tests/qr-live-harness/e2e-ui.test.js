@@ -118,5 +118,5 @@ function makeDom(html, url) {
   staffDom.window.close();
 
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
-  process.exit(fail ? 1 : 0);
-})().catch(e => { console.error('SUITE ERROR', e); process.exit(2); });
+  process.exitCode = fail ? 1 : 0;
+})().catch(e => { console.error('SUITE ERROR', e); process.exitCode = 2; });

@@ -113,5 +113,5 @@ async function admin(body) {
   ok(r.status === 404, 'unknown tenant rejected');
 
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
-  process.exit(fail ? 1 : 0);
-})().catch(e => { console.error('SUITE ERROR', e); process.exit(2); });
+  process.exitCode = fail ? 1 : 0;
+})().catch(e => { console.error('SUITE ERROR', e); process.exitCode = 2; });
