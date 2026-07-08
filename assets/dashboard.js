@@ -351,7 +351,7 @@
   }
   window.withToast = withToast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v33-20260624';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708';
   // Show version in topbar
   (function(){ const el = document.getElementById('app-version-pill'); if(el) el.textContent = appVersion; })();
   const updateSignatureKey = 'rs_update_signature';
@@ -359,9 +359,58 @@
 
   function pad2(value) { return String(value).padStart(2, '0'); }
   function dateKey(date = new Date()) { return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`; }
+  function shortDateKey(date = new Date()) { return `${String(date.getFullYear()).slice(-2)}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`; }
   function fileDate(date = new Date()) { return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`; }
+  function sequenceScope() {
+    return sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || localStorage.getItem('tenant_id') || 'local';
+  }
+  function hashCode(value) {
+    let hash = 0;
+    const text = String(value || '');
+    for (let i = 0; i < text.length; i += 1) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+    return hash;
+  }
+  function nextLogicalNo(prefix, existingValues = [], opts = {}) {
+    const day = opts.day || shortDateKey();
+    const width = opts.width || 3;
+    const cleanPrefix = String(prefix || 'NO').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'NO';
+    const start = `${cleanPrefix}-${day}-`;
+    const re = new RegExp('^' + cleanPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-' + day + '-(\\d+)', 'i');
+    const maxExisting = (existingValues || []).reduce((max, value) => {
+      const raw = typeof value === 'string' ? value : String((value && (value.no || value.orderId || value.draftId || value.poNumber || value.ticketNumber || value.id)) || '');
+      const match = raw.match(re);
+      return match ? Math.max(max, Number(match[1]) || 0) : max;
+    }, 0);
+    const key = `rs_seq:${sequenceScope()}:${cleanPrefix}:${day}`;
+    let stored = 0;
+    try { stored = Number(localStorage.getItem(key) || 0) || 0; } catch (_) {}
+    const next = Math.max(stored, maxExisting) + 1;
+    try { localStorage.setItem(key, String(next)); } catch (_) {}
+    return `${start}${String(next).padStart(width, '0')}`;
+  }
+  function formatDisplayOrderId(order) {
+    const raw = String((order && (order.displayOrderId || order.displayNo || order.orderId || order.id)) || order || '').trim();
+    if (!raw) return '-';
+    let match = raw.match(/^DO-(QR|WTR)-(\d{6})-(\d{3,})(?:-[A-Z0-9]+)?$/i);
+    if (match) return `${match[1].toUpperCase()}-${match[2]}-${match[3]}`;
+    match = raw.match(/^(QR|WTR|KOT|ORD)-(\d{6})-(\d{3,})/i);
+    if (match) return `${match[1].toUpperCase()}-${match[2]}-${match[3]}`;
+    if (/^DO-QR-/i.test(raw)) {
+      const id = order && order.id != null ? String(order.id) : raw;
+      const n = Number(id);
+      if (Number.isFinite(n)) return `QR-${String(Math.abs(n) % 1000).padStart(3, '0')}`;
+      return `QR-${String(Math.abs(hashCode(id)) % 1000).padStart(3, '0')}`;
+    }
+    if (/^DO-WTR-/i.test(raw)) {
+      const id = order && order.id != null ? String(order.id) : raw;
+      const n = Number(id);
+      if (Number.isFinite(n)) return `WTR-${String(Math.abs(n) % 1000).padStart(3, '0')}`;
+      return `WTR-${String(Math.abs(hashCode(id)) % 1000).padStart(3, '0')}`;
+    }
+    return raw;
+  }
   function nextBillNo(existingBills = []) {
-    const key = dateKey();
+    const key = shortDateKey();
     const prefix = `RS-${key}-`;
     const max = existingBills.reduce((highest, bill) => {
       const no = String((bill && (bill.no || bill.orderId || bill.id)) || '');
@@ -653,18 +702,19 @@
       const prevJsonHash = getFileHashFromSignature(previous, 'app-update.json');
       const currJsonHash = getFileHashFromSignature(signature, 'app-update.json');
       const isJsonUpdated = prevJsonHash && currJsonHash && prevJsonHash !== currJsonHash;
+      const dialogReleaseInfo = isJsonUpdated ? releaseInfo : null;
 
       window.RS_APP_UPDATE = { 
-        releaseInfo, 
+        releaseInfo: dialogReleaseInfo,
         signature, 
         detectedAt: Date.now(),
         isPatchOnly: !isJsonUpdated
       };
       document.dispatchEvent(new CustomEvent('rs:app_update_available'));
       if (!silent) {
-        showUpdateDialog(releaseInfo, signature);
+        showUpdateDialog(dialogReleaseInfo, signature);
       } else {
-        toast('New update is ready. Click to apply.', 'fa-cloud-arrow-down', () => showUpdateDialog(releaseInfo, signature));
+        toast('New update is ready. Click to apply.', 'fa-cloud-arrow-down', () => showUpdateDialog(dialogReleaseInfo, signature));
       }
     } else if (!silent) {
       toast('RestroSuite is already up to date', 'fa-circle-check');
@@ -1575,9 +1625,11 @@
           const activeKds = rows.filter(r => r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review');
           const mappedKds = activeKds.map(r => ({
             id: r.id,
-            tok: r.orderId,
+            tok: formatDisplayOrderId(r),
             type: `${r.orderType} · ${r.tableNumber}`,
             start: parseOrderTimestamp(r.dateTime) || Date.now(),
+            prepMinutes: r.prepMinutes,
+            prepStartedAt: r.prepStartedAt,
             items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
           }));
           replaceArr(KDS, mappedKds);
@@ -2113,7 +2165,7 @@
         });
         const billFilters = Number.isFinite(Number(b.id))
           ? [{ operator:'eq', column:'id', value:Number(b.id) }]
-          : [{ operator:'eq', column:'orderId', value:String(b.no || b.orderId || '') }];
+          : [{ operator:'eq', column:'order_id', value:String(b.no || b.orderId || '') }];
         await RS_API.update('doppio_bills', {
           status:'refunded',
           refund_reason:b.refundReason,
@@ -2325,7 +2377,7 @@
 
           let draftedCount = 0;
           for (const [cat, items] of Object.entries(byCat)) {
-            const poNum = 'PO-' + Date.now().toString().slice(-6) + '-' + cat.substring(0, 3).toUpperCase();
+            const poNum = nextLogicalNo('PO') + '-' + cat.substring(0, 3).toUpperCase();
             const value = items.reduce((sum, i) => sum + ((i.min * 2 - i.stock) * i.cost), 0);
             const poRow = {
               id: poNum,
@@ -2440,7 +2492,7 @@
               modal.querySelector('[data-confirm]').onclick = async () => {
                 const qty = Math.max(1, Number(qtyInput.value) || 1);
                 const supplier = modal.querySelector('#po-supplier').value || 'Default Supplier';
-                const poNum = 'PO-' + Date.now().toString().slice(-6);
+                const poNum = nextLogicalNo('PO');
                 const poRow = {
                   id: poNum,
                   poNumber: poNum,
@@ -2982,12 +3034,23 @@
       }
     }
 
-    $('#kds-grid').innerHTML = KDS.map((o,i)=>`
+    const _ksEl = document.getElementById('kds-search');
+    if (_ksEl && !_ksEl.dataset.bound) { _ksEl.dataset.bound='1'; _ksEl.addEventListener('input', ()=>{ try{ renderKDS(); }catch(e){} }); }
+    const _kq = ((_ksEl && _ksEl.value) || '').trim().toLowerCase();
+    const _kmatch = (o) => !_kq || String(o.tok||'').toLowerCase().includes(_kq) || String(o.type||'').toLowerCase().includes(_kq) || (o.items||[]).some(it => String(it[1]||'').toLowerCase().includes(_kq));
+    $('#kds-grid').innerHTML = (KDS.length && !KDS.some(_kmatch))
+      ? `<div class="sr-empty" style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-soft)">No orders match your search.</div>`
+      : KDS.map((o,i)=> _kmatch(o) ? `
       <div class="kds-card" data-k="${i}">
         <div class="kds-h"><div><div class="ktok">${_e(o.tok)}</div><div class="ktype">${_e(o.type)}</div></div><span class="kds-timer" data-start="${_e(o.start)}">0:00</span></div>
         <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${_e(it[0])}×</span><div><span class="kn">${_e(it[1])}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${_e(it[2])}</div>`:''}</div></div>`).join('')}</div>
+        <div class="kds-eta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 0 2px;border-top:1px dashed var(--stroke);margin-top:6px">
+          <span style="font-size:11px;color:var(--text-soft);font-weight:600;margin-right:2px">${o.prepMinutes?('ETA '+o.prepMinutes+'m'):'Prep:'}</span>
+          ${[10,15,20,30].map(mn=>`<button class="kds-eta-btn" data-eta="${i}" data-mins="${mn}" style="font-size:11px;padding:3px 8px;border:1px solid var(--stroke);border-radius:5px;background:${o.prepMinutes===mn?'var(--orange)':'var(--panel)'};color:${o.prepMinutes===mn?'#fff':'var(--text)'};cursor:pointer">${mn}m</button>`).join('')}
+          <button class="kds-eta-btn" data-eta="${i}" data-mins="custom" style="font-size:11px;padding:3px 8px;border:1px solid var(--stroke);border-radius:5px;background:var(--panel);color:var(--text);cursor:pointer">…</button>
+        </div>
         <div class="kds-foot"><button class="btn btn-primary btn-block" data-done="${i}"><i class="fa-solid fa-check"></i> Mark ready</button></div>
-      </div>`).join('');
+      </div>` : '').join('');
     $$('#kds-grid .kds-item').forEach(it=> it.addEventListener('click',()=>it.classList.toggle('done')));
     $$('#kds-grid [data-done]').forEach(b=> b.addEventListener('click',async ()=>{
       const item = KDS[+b.dataset.done];
@@ -3014,6 +3077,27 @@
       c.style.transition='all .4s var(--ease)'; c.style.opacity='0'; c.style.transform='scale(.9)';
       toast('Order '+(item ? item.tok : '')+' ready','fa-bell');
       setTimeout(()=>c.remove(),400);
+    }));
+    $$('#kds-grid [data-eta]').forEach(b=> b.addEventListener('click', async ()=>{
+      const item = KDS[+b.dataset.eta];
+      if(!item || !item.id || !window.RS_DB) return;
+      let mins = b.dataset.mins;
+      if(mins==='custom'){ const v = prompt('Prep time in minutes?', item.prepMinutes||'15'); if(v==null) return; mins = parseInt(v,10); } else { mins = parseInt(mins,10); }
+      if(!Number.isFinite(mins) || mins<=0) return;
+      try {
+        const rows = await RS_DB.list('pending_orders');
+        const row = rows.find(r => r.id === item.id);
+        if(row){
+          row.prepMinutes = mins;
+          row.prepStartedAt = new Date().toISOString();
+          if(row.status==='Pending Review' || row.status==='Accepted') row.status='preparing';
+          await RS_DB.put('pending_orders', item.id, row);
+          item.prepMinutes = mins; item.prepStartedAt = row.prepStartedAt;
+          if(typeof syncPendingOrders==='function') syncPendingOrders();
+          toast('ETA set: '+mins+' min','fa-clock');
+          renderKDS();
+        }
+      } catch(e){ console.warn('set ETA failed', e); toast('Could not set prep time','fa-circle-exclamation'); }
     }));
     tickKDS();
   };
@@ -4444,7 +4528,7 @@
   function getModalRoot(){ if(!modalRoot){ modalRoot = document.getElementById('rs-modal-root') || (()=>{ const d=document.createElement('div'); d.id='rs-modal-root'; document.body.appendChild(d); return d; })(); } return modalRoot; }
   window.RS = {
     toast, activateTab, rs, initials, avatarColors, catColor,
-    nextBillNo, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
+    nextBillNo, nextLogicalNo, formatDisplayOrderId, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
     MENU, CATS, stockLabel, stockCls,
     getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
     setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
@@ -4458,7 +4542,7 @@
       }
     }, render:(id)=>{ if(renderers[id]){ renderers[id](); rendered[id]=true; } },
     getModalRoot,
-    seedToken:()=>{ window.__tok = (window.__tok||122)+1; return 'A-'+window.__tok; },
+    seedToken:()=> nextLogicalNo('KOT'),
     BILLS, INVENTORY, EMPLOYEES, QR_ORDERS,
 
     // -- Inventory deduction/restoration helpers -------------------------------

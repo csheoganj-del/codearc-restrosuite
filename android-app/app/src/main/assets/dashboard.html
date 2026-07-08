@@ -63,7 +63,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v35-20260704-offline-logout';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v36-20260708';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -488,13 +488,13 @@
                 <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative; align-items: start;">
+            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr; gap: 8px; position: relative; align-items: start;">
               <select class="form-input" id="cart-table" style="height: 44px; padding: 0 32px 0 12px; font-size: 14px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
               <div class="custom-customer-widget" id="custom-customer-widget">
                 <!-- Direct inputs visible in cart -->
                 <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                  <input type="text" id="cust-input-name" placeholder="Guest Name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
-                  <input type="text" id="cust-input-phone" placeholder="Guest Phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
+                  <input type="text" id="cust-input-name" placeholder="Guest name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
+                  <input type="tel" id="cust-input-phone" placeholder="Guest phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
                 </div>
                 
                 <!-- Hidden trigger for backwards compatibility -->
@@ -608,6 +608,7 @@
       <section class="tab-content" id="kds-tab" data-screen-label="KDS">
         <div class="toolbar-row">
           <div class="grow"><span class="pill pill-green"><span class="dot dot-live"></span> Live kitchen queue</span> <span class="pill" style="margin-left:6px" id="kds-avg-prep">Avg prep --:--</span></div>
+          <input id="kds-search" type="search" placeholder="Search order #, table or item…" autocomplete="off" aria-label="Search kitchen orders" style="flex:0 1 260px;min-width:150px;padding:8px 12px;border:1px solid var(--stroke);border-radius:8px;background:var(--panel);color:var(--text);font-size:13px;margin:0 10px 0 0" />
           <div class="seg"><button class="active">All stations</button><button>Tandoor</button><button>Curry</button><button>Beverages</button></div>
         </div>
         <div class="kds-grid" id="kds-grid"></div>
@@ -1497,7 +1498,7 @@
   // Load versioned feature scripts in order without document.write.
   // document.write blocks the HTML parser; this approach does not.
   (function() {
-    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v33-20260624');
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708');
     var srcs = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',

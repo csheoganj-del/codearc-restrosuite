@@ -1697,7 +1697,7 @@
         }
 
         const bill = {
-          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : 'RS-'+Date.now()), time:new Date().toLocaleString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true,timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
+          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001')), time:new Date().toLocaleString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true,timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
           table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
           tenders: customTenders || [{ method: payMethod, amount: receivedVal }], change: changeVal || 0,
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
@@ -1983,16 +1983,16 @@
       const cust = RS.getCustomer();
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
       const tok = RS.seedToken();
-      const kotInner = `<div class="kot-h"><span class="kt">KOT ${tok}</span><span style="font-weight:700">${cust.table}</span></div>
+      const kotInner = `<div class="kot-h"><span class="kt">${esc(tok)}</span><span style="font-weight:700">${cust.table}</span></div>
         <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'})} · ${totals.count} items</div>
         ${totals.items.map(i=>`<div class="kot-item"><span class="kq">${i.qty}×</span><span>${i.name}</span></div>`).join('')}`;
       RSModal.open({
-        title:'Kitchen ticket', sub:'Token '+tok, icon:'fa-fire', size:'sm',
+        title:'Kitchen ticket', sub:tok, icon:'fa-fire', size:'sm',
         body:`<div class="kot-paper">${kotInner}</div>`,
         foot:`<button class="btn btn-ghost" id="kot-print" style="flex:1"><i class="fa-solid fa-print"></i> Print ticket</button>
               <button class="btn btn-primary" id="kot-send" style="flex:1"><i class="fa-solid fa-fire"></i> Send to kitchen</button>`,
         onMount(modal, close){
-          modal.querySelector('#kot-print').onclick = ()=> RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`,'KOT '+tok);
+          modal.querySelector('#kot-print').onclick = ()=> RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
           modal.querySelector('#kot-send').onclick = async ()=>{
             close();
             if(window.RS_DB){
@@ -2022,14 +2022,14 @@
               }
             }
             markKotSent();
-            RS.toast('KOT '+tok+' fired to kitchen','fa-fire');
+            RS.toast(tok+' fired to kitchen','fa-fire');
 
             // Auto-print KOT if enabled in settings
             if (window.RS && typeof window.RS.getSettings === 'function') {
               try {
                 const settings = await window.RS.getSettings();
                 if (settings && settings.set_auto_print_kot) {
-                  RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`,'KOT '+tok);
+                  RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
                 }
               } catch(e) {
                 console.error("Failed to read settings for auto-print KOT", e);
@@ -2184,7 +2184,7 @@
       
       const cust = RS.getCustomer();
       const id = Date.now();
-      const draftId = 'D' + id;
+      const draftId = RS.nextLogicalNo ? RS.nextLogicalNo('D') : ('D-' + String(id).slice(-6));
       const orderTypeKey = getCurrentOrderTypeKey();
       
       const newHeld = { 
@@ -2893,7 +2893,7 @@
           
           const dbRow = {
             id: id,
-            draftId: existingDraft ? existingDraft.draftId : 'D' + Date.now(),
+            draftId: existingDraft ? existingDraft.draftId : (window.RS && RS.nextLogicalNo ? RS.nextLogicalNo('D') : ('D-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001')),
             draftName: draftName,
             customerName: nameInput ? nameInput.value.trim() : '',
             customerPhone: phoneInput ? phoneInput.value.trim() : '',
@@ -2980,9 +2980,13 @@
         try {
           const pendingRows = window.RS_DB ? await window.RS_DB.list('pending_orders').catch(() => []) : [];
           const drafts = window.RS_DB ? await window.RS_DB.list('drafts').catch(() => []) : [];
+          const reservations = window.RS_DB ? await window.RS_DB.list('reservations').catch(() => []) : [];
+          const _resToday = new Date().toISOString().slice(0,10);
+          const _resDigits = v => parseInt(String(v==null?'':v).replace(/\D/g,''),10);
           
           container.innerHTML = TABLES.map(t => {
             const tableName = `Table ${t.n}`;
+            const reservedFor = reservations.find(rv => rv && (rv.status==='confirmed'||rv.status==='booked'||rv.status==='pending') && (!rv.date || rv.date===_resToday) && _resDigits(rv.tableNumber)===_resDigits(t.n));
             const activeOrder = pendingRows.find(r => 
               (r.tableNumber === tableName || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}`) &&
               (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'served' || r.status === 'Ready' || r.status === 'Billed')
@@ -3008,6 +3012,7 @@
                 <span style="position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: ${stateDot[state]};"></span>
                 <div style="font-weight: 700; font-size: 13.5px; color: var(--text);">Table ${t.n}</div>
                 <div style="font-size: 11px; color: var(--text-soft);"><i class="fa-solid fa-user-group" style="font-size: 9px;"></i> ${t.cap} seats</div>
+                ${(state==='free' && reservedFor) ? `<div style="font-size:10.5px; font-weight:700; color:#b45309; background:rgba(234,179,8,0.14); border:1px solid rgba(234,179,8,0.3); padding:2px 6px; border-radius:5px; margin-top:4px; align-self:flex-start;"><i class="fa-solid fa-calendar-check" style="font-size:9px;"></i> Reserved ${reservedFor.time||''}${reservedFor.guestName?(' · '+reservedFor.guestName):''}</div>` : ''}
                 <div style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-top: 4px;">${label}</div>
                 ${amt > 0 ? `<div style="font-size: 13px; font-weight: 800; color: var(--text); margin-top: auto; padding-top: 6px;">₹${amt}</div>` : `<div style="font-size: 11px; color: var(--text-faint); margin-top: auto; padding-top: 6px;">Tap to select</div>`}
               </div>

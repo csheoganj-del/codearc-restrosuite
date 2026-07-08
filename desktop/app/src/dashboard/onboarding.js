@@ -119,6 +119,17 @@
 
   const UPDATES_HISTORY = [
     {
+      version: "v36-20260708",
+      date: "2026-07-08",
+      title: "Logical Numbering & Update Reliability Fix",
+      summary: "This update replaces timestamp-style visible numbers with short daily sequences, keeps update notes current, and widens the POS guest name and phone fields.",
+      highlights: [
+        "Visible bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable daily numbers.",
+        "The update dialog no longer reuses old release notes for patch-only code updates.",
+        "The POS cart guest name and phone fields now have full-width room and mobile-safe wrapping."
+      ]
+    },
+    {
       version: "v22-20260621",
       date: "2026-06-21",
       title: "POS Active Cart Persistence & Stability",
@@ -160,7 +171,7 @@
       title: "RestroSuite dashboard reliability update",
       summary: "This update improves billing clarity, import/export feedback, logo consistency, update safety, and background sync smoothness.",
       highlights: [
-        "Bills now use date-wise numbers like RS-20260619-001.",
+        "Bills now use date-wise numbers like RS-260619-001.",
         "Bill, tax, menu, inventory, and tenant exports use date-wise filenames.",
         "Import and export work now shows a clear progress/status bar.",
         "The dashboard checks for updates in the background and prompts with release notes."
@@ -663,7 +674,7 @@
 
   function endTour() {
     try {
-      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v22-20260621';
+      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
       if (steps === DUES_TOUR_STEPS) {
         localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, '1');
       } else {
@@ -684,7 +695,7 @@
   function openUpdateHistoryModal() {
     if (typeof window.RSModal === 'undefined') return;
     const justUpdated = sessionStorage.getItem('rs_update_applied_at');
-    const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v22-20260621';
+    const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
 
     window.RSModal.open({
       title: justUpdated ? 'RestroSuite Updated Successfully!' : 'Update History & Releases',
@@ -1018,7 +1029,7 @@
           return;
         }
 
-        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || 'v22-20260621';
+        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
         const updateTourSeen = localStorage.getItem('restrosuite_update_tour_seen:' + currentVer);
         if (!updateTourSeen) {
           openUpdateHistoryModal();

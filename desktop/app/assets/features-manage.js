@@ -314,7 +314,7 @@
                   const terms = modal.querySelector('#sup-terms').value || 'Net 30';
                   const rating = Number(modal.querySelector('#sup-rating').value) || 4;
 
-                  const supId = 'sup_' + Date.now().toString().slice(-6);
+                  const supId = RS.nextLogicalNo('SUP');
                   const newSup = { id: supId, name, category, contact, terms, rating, itemsCount: 0 };
                   close();
                   if (RS.saveOne) {
@@ -367,7 +367,7 @@
                   const items = modal.querySelector('#po-add-items').value || 'Supply items';
                   const value = Number(modal.querySelector('#po-add-value').value) || 0;
 
-                  const poNum = 'PO-' + Date.now().toString().slice(-6);
+                  const poNum = RS.nextLogicalNo('PO');
                   const newPo = {
                     id: poNum,
                     poNumber: poNum,

@@ -130,6 +130,18 @@
     }
     return id;
   }
+  function fallbackLogicalCode(prefix) {
+    const now = new Date();
+    const day = String(now.getFullYear()).slice(-2) + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    const cleanPrefix = String(prefix || 'NO').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'NO';
+    const key = `rs_seq:${getActiveTenantId()}:${cleanPrefix}:${day}`;
+    let next = 1;
+    try {
+      next = (Number(localStorage.getItem(key) || 0) || 0) + 1;
+      localStorage.setItem(key, String(next));
+    } catch(e) {}
+    return `${cleanPrefix}-${day}-${String(next).padStart(3, '0')}`;
+  }
 
   const MAP = {
     menu: {
@@ -146,24 +158,24 @@
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
-      from: r => ({ id:r.id, no:r.orderId, time:r.dateTime, table:'--',
+      from: r => ({ id:r.id, no:r.order_id, time:r.date_time, table:'--',
                     _items:parseItems(r.items),
                     items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
                     subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
-                    amount:num(r.total), pay:r.paymentMethod, status:r.status || 'paid',
+                    amount:num(r.total), pay:r.payment_method, status:r.status || 'paid',
                     refundReason:r.refund_reason || '',
                     refundedAt:r.refunded_at || '',
-                    customerName:r.customerName, customerPhone:r.customerPhone,
+                    customerName:r.customer_name, customerPhone:r.customer_phone,
                     tenders:parseTenders(r.tenders), change:num(r.change),
                     taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
                     channel: r.channel || 'dine_in',
                     taxProfile: typeof r.tax_profile === 'string' ? JSON.parse(r.tax_profile) : (r.tax_profile || {}),
                     liquorTaxAmount: num(r.liquor_tax_amount),
                     serviceChargeAmount: num(r.service_charge_amount) }),
-      to: o => ({ id:o.id, orderId:o.no, customerName:o.customerName||'Walk-in Guest', customerPhone:o.customerPhone||null,
+      to: o => ({ id:o.id, order_id:o.no, customer_name:o.customerName||'Walk-in Guest', customer_phone:o.customerPhone||null,
                   items: JSON.stringify(o._items||[]), subtotal:num(o.subtotal), gst:num(o.gst),
                   cgst:num(o.cgst), sgst:num(o.sgst), igst:0, total:num(o.amount),
-                  paymentMethod:o.pay||'UPI', dateTime:o.time||new Date().toISOString(), transaction_type:'intra',
+                  payment_method:o.pay||'UPI', date_time:o.time||new Date().toISOString(), transaction_type:'intra',
                   tenders: Array.isArray(o.tenders) ? JSON.stringify(o.tenders) : o.tenders || '[]',
                   change: num(o.change || 0),
                   tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
@@ -202,35 +214,37 @@
     notifications: {
       table:'doppio_notifications', pk:'id', clientId:true, order:{column:'created_at',ascending:false},
       from: r => ({ id:r.id, title:r.title, message:r.message, type:r.type||'info', role:r.role||'all',
-                    timestamp:r.timestamp||r.created_at||'', isRead:!!r.isRead, createdAt:r.created_at }),
+                    timestamp:r.timestamp||r.created_at||'', isRead:!!r.is_read, createdAt:r.created_at }),
       to: o => ({ id:o.id, title:o.title||'', message:o.message||'', type:o.type||'info',
-                  role:o.role||'all', timestamp:o.timestamp||new Date().toISOString(), isRead:!!o.isRead })
+                  role:o.role||'all', timestamp:o.timestamp||new Date().toISOString(), is_read:!!o.isRead })
     },
     employees: {
       table:'doppio_employees', pk:'id', clientId:true,
       from: r => ({ id:r.id, name:r.name, role:r.role, rc:'r-'+String(r.role||'').toLowerCase(),
-                    email:r.contact, baseSalary:num(r.baseSalary), shift:r.shift }),
-      to: o => ({ id:o.id, name:o.name, role:o.role, contact:o.email||'', baseSalary:num(o.baseSalary), shift:o.shift||'Morning', daily_rate:0 })
+                    email:r.contact, baseSalary:num(r.base_salary), shift:r.shift }),
+      to: o => ({ id:o.id, name:o.name, role:o.role, contact:o.email||'', base_salary:num(o.baseSalary), shift:o.shift||'Morning', daily_rate:0 })
     },
     drafts: {
       table:'doppio_draft_orders', pk:'id', clientId:true,
-      from: r => ({ id:r.id, draftId:r.draftId, name:r.draftName, draftName:r.draftName, customerName:r.customerName, customerPhone:r.customerPhone, total:num(r.total),
+      from: r => ({ id:r.id, draftId:r.draft_id, name:r.draft_name, draftName:r.draft_name, customerName:r.customer_name, customerPhone:r.customer_phone, total:num(r.total),
                     items: parseItems(r.items) }),
-      to: o => ({ id:o.id, draftId:o.draftId||('D'+Date.now()), draftName:o.draftName||o.name||o.table||'Held order',
-                  customerName:o.customerName||'', customerPhone:o.customerPhone||'', paymentMethod:'UPI',
+      to: o => ({ id:o.id, draft_id:o.draftId||fallbackLogicalCode('D'), draft_name:o.draftName||o.name||o.table||'Held order',
+                  customer_name:o.customerName||'', customer_phone:o.customerPhone||'', payment_method:'UPI',
                   items: JSON.stringify(o.items||[]), subtotal:num(o.subtotal), gst:num(o.gst), total:num(o.total) })
     },
     pending_orders: {
       table:'doppio_pending_orders', pk:'id', clientId:false,
-      from: r => ({ id:r.id, orderId:r.orderId, customerName:r.customerName, customerPhone:r.customerPhone,
+      from: r => ({ id:r.id, orderId:r.order_id, customerName:r.customer_name, customerPhone:r.customer_phone,
                     items: parseItems(r.items), subtotal:num(r.subtotal), discount:num(r.discount),
-                    gst:num(r.gst), total:num(r.total), paymentMethod:r.paymentMethod,
-                    orderType:r.orderType, tableNumber:r.tableNumber, status:r.status, dateTime:r.dateTime, priority:r.priority||'normal' }),
-      to: o => ({ id:o.id, orderId:o.orderId, customerName:o.customerName||'Guest', customerPhone:o.customerPhone||null,
+                    gst:num(r.gst), total:num(r.total), paymentMethod:r.payment_method,
+                    orderType:r.order_type, tableNumber:r.table_number, status:r.status, dateTime:r.date_time, priority:r.priority||'normal',
+                    prepMinutes:(r.prep_minutes!=null?num(r.prep_minutes):null), prepStartedAt:r.prep_started_at||null }),
+      to: o => ({ id:o.id, order_id:o.orderId, customer_name:o.customerName||'Guest', customer_phone:o.customerPhone||null,
                   items: JSON.stringify(o.items||[]), subtotal:num(o.subtotal), discount:num(o.discount),
-                  gst:num(o.gst), total:num(o.total), paymentMethod:o.paymentMethod||'UPI',
-                  orderType:o.orderType||'Dine-in', tableNumber:o.tableNumber||'Walk-in',
-                  status:o.status||'Pending Review', dateTime:o.dateTime||new Date().toISOString(), priority:o.priority||'normal' })
+                  gst:num(o.gst), total:num(o.total), payment_method:o.paymentMethod||'UPI',
+                  order_type:o.orderType||'Dine-in', table_number:o.tableNumber||'Walk-in',
+                  status:o.status||'Pending Review', date_time:o.dateTime||new Date().toISOString(), priority:o.priority||'normal',
+                  prep_minutes:(o.prepMinutes!=null?num(o.prepMinutes):null), prep_started_at:o.prepStartedAt||null })
     },
     table_sessions: {
       table:'doppio_table_sessions', pk:'id', clientId:false,
@@ -238,57 +252,57 @@
       to: o => ({ id:o.id, table_number:o.tableNumber, session_token:o.token, status:o.status, created_at:o.createdAt, closed_at:o.closedAt, last_order_at:o.lastOrderAt })
     },
     shifts: {
-      table:'doppio_shifts', pk:'shiftId', clientId:true,
-      from: r => ({ shiftId:r.shiftId, cashierName:r.cashierName, openedAt:r.openedAt, closedAt:r.closedAt,
-                    openingFloat:num(r.openingFloat), expectedCash:num(r.expectedCash), actualCash:num(r.actualCash),
-                    variance:num(r.variance), totalSalesCash:num(r.totalSalesCash), totalSalesUpi:num(r.totalSalesUpi),
-                    totalSalesCard:num(r.totalSalesCard), totalPayouts:num(r.totalPayouts), totalSafeDrops:num(r.totalSafeDrops),
+      table:'doppio_shifts', pk:'shift_id', clientId:true,
+      from: r => ({ shiftId:r.shift_id, cashierName:r.cashier_name, openedAt:r.opened_at, closedAt:r.closed_at,
+                    openingFloat:num(r.opening_float), expectedCash:num(r.expected_cash), actualCash:num(r.actual_cash),
+                    variance:num(r.variance), totalSalesCash:num(r.total_sales_cash), totalSalesUpi:num(r.total_sales_upi),
+                    totalSalesCard:num(r.total_sales_card), totalPayouts:num(r.total_payouts), totalSafeDrops:num(r.total_safe_drops),
                     status:r.status, notes:r.notes }),
-      to: o => ({ shiftId:o.shiftId, cashierName:o.cashierName||'', openedAt:o.openedAt, closedAt:o.closedAt||null,
-                  openingFloat:num(o.openingFloat), expectedCash:num(o.expectedCash), actualCash:num(o.actualCash),
-                  variance:num(o.variance), totalSalesCash:num(o.totalSalesCash), totalSalesUpi:num(o.totalSalesUpi),
-                  totalSalesCard:num(o.totalSalesCard), totalPayouts:num(o.totalPayouts), totalSafeDrops:num(o.totalSafeDrops),
+      to: o => ({ shift_id:o.shiftId, cashier_name:o.cashierName||'', opened_at:o.openedAt, closed_at:o.closedAt||null,
+                  opening_float:num(o.openingFloat), expected_cash:num(o.expectedCash), actual_cash:num(o.actualCash),
+                  variance:num(o.variance), total_sales_cash:num(o.totalSalesCash), total_sales_upi:num(o.totalSalesUpi),
+                  total_sales_card:num(o.totalSalesCard), total_payouts:num(o.totalPayouts), total_safe_drops:num(o.totalSafeDrops),
                   status:o.status||'OPEN', notes:o.notes||'' })
     },
     shift_events: {
-      table:'doppio_shift_events', pk:'eventId', clientId:true,
-      from: r => ({ eventId:r.eventId, shiftId:r.shiftId, eventType:r.eventType, amount:num(r.amount), reason:r.reason, createdAt:r.createdAt }),
-      to: o => ({ eventId:o.eventId, shiftId:o.shiftId, eventType:o.eventType, amount:num(o.amount), reason:o.reason||'', createdAt:o.createdAt||new Date().toISOString() })
+      table:'doppio_shift_events', pk:'event_id', clientId:true,
+      from: r => ({ eventId:r.event_id, shiftId:r.shift_id, eventType:r.event_type, amount:num(r.amount), reason:r.reason, createdAt:r.created_at }),
+      to: o => ({ event_id:o.eventId, shift_id:o.shiftId, event_type:o.eventType, amount:num(o.amount), reason:o.reason||'', created_at:o.createdAt||new Date().toISOString() })
     },
     attendance: {
       table:'doppio_attendance', pk:'id', clientId:true,
-      from: r => ({ id:r.id, employeeId:r.employeeId, employeeName:r.employeeName, date:r.date, clockInTime:r.clockInTime, clockOutTime:r.clockOutTime, hoursWorked:num(r.hoursWorked), status:r.status, wages:num(r.wages) }),
-      to: o => ({ id:o.id, employeeId:o.employeeId, employeeName:o.employeeName, date:o.date, clockInTime:o.clockInTime, clockOutTime:o.clockOutTime||null, hoursWorked:num(o.hoursWorked), status:o.status||'Completed', wages:num(o.wages) })
+      from: r => ({ id:r.id, employeeId:r.employee_id, employeeName:r.employee_name, date:r.date, clockInTime:r.clock_in_time, clockOutTime:r.clock_out_time, hoursWorked:num(r.hours_worked), status:r.status, wages:num(r.wages) }),
+      to: o => ({ id:o.id, employee_id:o.employeeId, employee_name:o.employeeName, date:o.date, clock_in_time:o.clockInTime, clock_out_time:o.clockOutTime||null, hours_worked:num(o.hoursWorked), status:o.status||'Completed', wages:num(o.wages) })
     },
     leave_requests: {
       table:'doppio_leave_requests', pk:'id', clientId:true,
-      from: r => ({ id:r.id, employeeId:r.employeeId, employeeName:r.employeeName, type:r.type, startDate:r.startDate, endDate:r.endDate, reason:r.reason, status:r.status, days:num(r.days) }),
-      to: o => ({ id:o.id, employeeId:o.employeeId, employeeName:o.employeeName, type:o.type, startDate:o.startDate, endDate:o.endDate, reason:o.reason||'', status:o.status||'Pending', days:num(o.days) })
+      from: r => ({ id:r.id, employeeId:r.employee_id, employeeName:r.employee_name, type:r.type, startDate:r.start_date, endDate:r.end_date, reason:r.reason, status:r.status, days:num(r.days) }),
+      to: o => ({ id:o.id, employee_id:o.employeeId, employee_name:o.employeeName, type:o.type, start_date:o.startDate, end_date:o.endDate, reason:o.reason||'', status:o.status||'Pending', days:num(o.days) })
     },
     reservations: {
-      table:'doppio_reservations', pk:'id', clientId:true,
-      from: r => ({ id:r.id, guestName:r.guestName, guestPhone:r.guestPhone, pax:num(r.pax), tableNumber:r.tableNumber, time:r.time, date:r.date, status:r.status }),
-      to: o => ({ id:o.id, guestName:o.guestName, guestPhone:o.guestPhone, pax:num(o.pax), tableNumber:o.tableNumber, time:o.time, date:o.date, status:o.status||'confirmed' })
+      table:'doppio_reservations', pk:'id', clientId:false, uuidPK:true,
+      from: r => ({ id:r.id, guestName:r.guest_name, guestPhone:r.phone, pax:num(r.party_size), tableNumber:r.table_number, time:r.notes||'', date:(r.reserved_for||'').slice(0,10), status:r.status }),
+      to: o => ({ guest_name:o.guestName||'Guest', phone:o.guestPhone||null, party_size:num(o.pax)||2, table_number:o.tableNumber||'', reserved_for:(function(){ try { if(o.date&&o.time){ var d=new Date(o.date+'T'+o.time); if(!isNaN(d)) return d.toISOString(); } } catch(e){} return o.reserved_for||new Date().toISOString(); })(), notes:o.time||'', status:o.status||'confirmed' })
     },
     offers: {
-      table:'doppio_offers', pk:'id', clientId:true,
-      from: r => ({ id:r.id, code:r.code, description:r.description, usageCount:num(r.usageCount), status:r.status }),
-      to: o => ({ id:o.id, code:o.code, description:o.description||'', usageCount:num(o.usageCount), status:o.status||'active' })
+      table:'doppio_offers', pk:'id', clientId:false, uuidPK:true,
+      from: r => ({ id:r.id, code:r.code, description:r.title, usageCount:num(r.usage_count), status:r.status }),
+      to: o => ({ code:o.code||'', title:o.description||o.code||'Offer', usage_count:num(o.usageCount), status:o.status||'active' })
     },
     vendors: {
-      table:'doppio_vendors', pk:'id', clientId:true,
-      from: r => ({ id:r.id, name:r.name, category:r.category, contact:r.contact, terms:r.terms, rating:num(r.rating), itemsCount:num(r.itemsCount) }),
-      to: o => ({ id:o.id, name:o.name, category:o.category||'', contact:o.contact, terms:o.terms||'', rating:num(o.rating), itemsCount:num(o.itemsCount) })
+      table:'doppio_vendors', pk:'id', clientId:false, uuidPK:true,
+      from: r => ({ id:r.id, name:r.name, category:r.category, contact:r.phone, terms:r.terms, rating:num(r.rating), itemsCount:num(r.items_count) }),
+      to: o => ({ name:o.name, category:o.category||'', phone:o.contact||'', terms:o.terms||'', rating:num(o.rating), items_count:num(o.itemsCount) })
     },
     purchase_orders: {
-      table:'doppio_purchase_orders', pk:'id', clientId:true,
-      from: r => ({ id:r.id, poNumber:r.poNumber, supplier:r.supplier, items:r.items, value:num(r.value), date:r.date, status:r.status }),
-      to: o => ({ id:o.id, poNumber:o.poNumber, supplier:o.supplier, items:o.items||'', value:num(o.value), date:o.date||new Date().toISOString(), status:o.status||'pending' })
+      table:'doppio_purchase_orders', pk:'id', clientId:false, uuidPK:true,
+      from: r => ({ id:r.id, poNumber:r.po_number, supplier:r.vendor_name, items:r.item_name, value:num(r.expected_cost), date:r.due_date, status:r.status }),
+      to: o => ({ po_number:o.poNumber||'', vendor_name:o.supplier||'Supplier', item_name:o.items||'Supply items', expected_cost:num(o.value), due_date:(o.date||new Date().toISOString()).slice(0,10), status:o.status||'pending' })
     },
     support_tickets: {
-      table:'doppio_support_tickets', pk:'id', clientId:true,
-      from: r => ({ id:r.id, ticketNumber:r.ticketNumber, subject:r.subject, customerName:r.customerName, priority:r.priority, status:r.status }),
-      to: o => ({ id:o.id, ticketNumber:o.ticketNumber, subject:o.subject, customerName:o.customerName, priority:o.priority||'medium', status:o.status||'open' })
+      table:'doppio_support_tickets', pk:'id', clientId:false, uuidPK:true,
+      from: r => ({ id:r.id, ticketNumber:r.ticket_number, subject:r.subject, customerName:r.customer_name, priority:r.priority, status:r.status }),
+      to: o => ({ ticket_number:o.ticketNumber||'', subject:o.subject||'', customer_name:o.customerName||'', priority:o.priority||'medium', status:o.status||'open' })
     }
   };
   const conflictTargets = Object.freeze({
@@ -442,7 +456,11 @@
       }
       // Only auto-generate a new ID if clientId mode AND the body doesn't already have one
       if(m.clientId && !body[m.pk]) { body[m.pk] = cleanId || newClientId(); }
-      else if(!body[m.pk]) { body[m.pk] = cleanId; }
+      // uuidPK tables have a DB-side gen_random_uuid() default and a client-side
+      // text id (e.g. "PO-123456") that can't live in a uuid column. Leave the id
+      // off the insert so the database generates it; the human-readable code is
+      // preserved in a dedicated column (po_number / ticket_number / etc.).
+      else if(!body[m.pk] && !m.uuidPK) { body[m.pk] = cleanId; }
       try {
         let res;
         try {

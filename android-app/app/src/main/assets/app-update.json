@@ -1,12 +1,12 @@
 {
-  "version": "v33-20260624",
-  "date": "2026-06-24",
-  "title": "Thermal PDF & WhatsApp Session Persistence Update",
-  "summary": "This update implements high-fidelity 88mm thermal PDF receipt layouts to match the visual preview, introduces auto-created Supabase Storage backups for WhatsApp persistence on Hugging Face, and resolves country code selection issues in the cart.",
+  "version": "v36-20260708",
+  "date": "2026-07-08",
+  "title": "Logical Numbering & Update Reliability Fix",
+  "summary": "This update replaces timestamp-style visible numbers with short daily sequence numbers, refreshes update-release text so old notes are not reused, and widens the POS guest name and phone fields.",
   "highlights": [
-    "High-Fidelity Thermal PDFs: Perfect 88mm paper width layout with font, color, and divider parity to on-screen previews.",
-    "WhatsApp Connection Persistence: Auto-creates a storage bucket and backs up active sessions on Supabase for zero-disconnect restarts on Hugging Face.",
-    "Cart Country Code Fix: Country prefix picker combines dial code (e.g. Ireland +353) with national phone inputs automatically on checkout.",
-    "Performance Optimization: Zero-cost database sync rate-limiting, CRM customer details auto-linking, and PWA reliability updates."
+    "Short daily numbers: Bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable sequences such as RS-260708-001 or KOT-260708-001.",
+    "Update dialog fix: Patch-only updates no longer show stale release notes from an older release.",
+    "Current release history: Update history now starts with the latest release instead of falling back to June release text.",
+    "POS cart cleanup: Guest name and phone inputs now use the full cart width and remain readable on desktop, tablet, and mobile."
   ]
 }
