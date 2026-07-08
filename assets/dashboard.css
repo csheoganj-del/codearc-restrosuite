@@ -2693,7 +2693,7 @@ textarea:focus-visible,
   border: 1px solid var(--stroke-2) !important;
   background: var(--glass) !important;
   color: var(--text-soft) !important;
-  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s, border-color 0.2s, color 0.2s !important;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s, border-color 0.2s, color 0.2s !important;
   overflow: hidden !important;
   white-space: nowrap !important;
 }
@@ -2740,11 +2740,10 @@ textarea:focus-visible,
   vertical-align: middle;
 }
 
-/* On hover: expand width to the left (negative margin-left offsets layout shift completely!) */
+/* On hover: expand width to the left (pushes items on the left side) */
 .topbar .tb-pill:not(.clock-pill):hover,
 .topbar .support-dropdown:hover {
   width: 120px !important;
-  margin-left: -86px !important;
   padding: 0 10px !important;
   justify-content: flex-start !important;
   color: var(--text) !important;
