@@ -2689,61 +2689,118 @@ textarea:focus-visible,
   overflow: hidden !important;
   white-space: nowrap !important;
   cursor: pointer !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.2s ease !important;
   box-sizing: border-box !important;
-  font-size: 0 !important; /* Hide text nodes by default */
   border: 1px solid var(--stroke-2) !important;
   background: var(--glass) !important;
   color: var(--text-soft) !important;
+  position: relative;
 }
 
 /* Keep icons/dots visible & centered */
 .topbar .tb-pill i,
 .topbar .tb-pill span i,
 .topbar .support-dropdown .dropdown-trigger i {
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   margin: 0 !important;
   padding: 0 !important;
   display: inline-block !important;
   color: inherit !important;
+  transition: transform 0.2s ease !important;
 }
 
-.topbar .tb-pill .dot {
-  margin: 0 !important;
-  flex-shrink: 0;
-}
-
-/* Hover expansion effect: expanding pill to show full text */
+/* Hover effects for badges without changing width (Resolves Jitter!) */
 .topbar .tb-pill:hover,
 .topbar .support-dropdown:hover .dropdown-trigger {
-  width: auto !important;
-  max-width: 200px !important;
-  padding: 0 10px !important;
-  border-radius: 17px !important;
-  font-size: 11.5px !important; /* Show text nodes on hover */
-  gap: 6px !important;
   color: var(--text) !important;
   border-color: var(--stroke-hi) !important;
-  background: var(--glass-2) !important;
-  box-shadow: var(--shadow-sm) !important;
+  background: var(--glass-3) !important;
 }
 
-/* Ensure inner spans and text inside pills behave when expanded */
-.topbar .tb-pill:hover span,
-.topbar .support-dropdown:hover .dropdown-trigger span {
-  display: inline !important;
-  font-size: 11.5px !important;
-  font-weight: 600 !important;
-}
-
-/* Make sure text elements that contain icons preserve spacing when hovered/expanded */
 .topbar .tb-pill:hover i,
-.topbar .tb-pill:hover span i,
 .topbar .support-dropdown:hover .dropdown-trigger i {
-  margin-right: 2px !important;
+  transform: scale(1.12);
 }
 
-/* Version Pill customization using FontAwesome pseudo-element */
+/* Premium Custom CSS Tooltips using data-tooltip */
+.topbar [data-tooltip] {
+  position: relative;
+}
+
+.topbar [data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: #111827; /* Dark slate */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f3f4f6;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 99999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.topbar [data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ==========================================
+   STATUS-BASED ICON COLOR RULES
+   ========================================== */
+
+/* 1. Cloud status color variations */
+#db-mode-pill.cloud {
+  color: #22c55e !important; /* Green */
+  background: rgba(34, 197, 94, 0.1) !important;
+  border-color: rgba(34, 197, 94, 0.2) !important;
+}
+#db-mode-pill.syncing {
+  color: #eab308 !important; /* Yellow */
+  background: rgba(234, 179, 8, 0.1) !important;
+  border-color: rgba(234, 179, 8, 0.2) !important;
+}
+#db-mode-pill.local-only {
+  color: #eab308 !important; /* Yellow */
+  background: rgba(234, 179, 8, 0.1) !important;
+  border-color: rgba(234, 179, 8, 0.2) !important;
+}
+#db-mode-pill.offline,
+#db-mode-pill.sync-error {
+  color: #ef4444 !important; /* Red */
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+#db-mode-pill.superadmin-cloud {
+  color: var(--violet-soft) !important; /* Violet */
+  background: var(--violet-tint) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+}
+
+/* 2. WhatsApp status color variations are handled dynamically in JS styles,
+   but we style the default brand icons to be clean */
+#topbar-whatsapp-status-pill i {
+  color: inherit !important;
+}
+
+/* 3. Support dropdown brand colors on hover */
+.support-dropdown .dropdown-trigger i {
+  color: var(--text-soft) !important;
+}
+.support-dropdown:hover .dropdown-trigger i {
+  color: var(--orange) !important; /* Contact headset icon turns brand orange on hover */
+}
+
+/* Version Pill: info icon using pseudo-element */
 #app-version-pill::before {
   content: "\f05a"; /* fa-circle-info */
   font-family: "Font Awesome 6 Free";
@@ -2751,10 +2808,6 @@ textarea:focus-visible,
   font-size: 13.5px;
   display: inline-block;
   color: inherit;
-  transition: opacity 0.15s;
-}
-#app-version-pill:hover::before {
-  display: none !important; /* Hide info icon when version text is shown */
 }
 
 /* Clock styling: always compact, but clean */

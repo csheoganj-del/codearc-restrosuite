@@ -353,7 +353,14 @@
 
   const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708';
   // Show version in topbar
-  (function(){ const el = document.getElementById('app-version-pill'); if(el) el.textContent = appVersion; })();
+  (function(){
+    const el = document.getElementById('app-version-pill');
+    if(el) {
+      el.textContent = '';
+      el.setAttribute('data-tooltip', 'App Version: ' + appVersion);
+      el.title = '';
+    }
+  })();
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
 

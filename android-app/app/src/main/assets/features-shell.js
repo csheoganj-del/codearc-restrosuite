@@ -1145,7 +1145,8 @@
         pill.style.cssText = '';              // wipe any legacy inline styles
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
-        pill.title   = title;
+        pill.setAttribute('data-tooltip', title);
+        pill.title = '';
         pill.innerHTML = html;
       }
 
@@ -1159,21 +1160,21 @@
         if (!isOnline) {
           setState('offline',
             'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
-            `<i class="fa-solid fa-wifi-slash" style="font-size:10px"></i>&nbsp;Offline`
+            `<i class="fa-solid fa-cloud"></i>`
           );
           return;
         }
         if (isSuperAdmin) {
           setState('superadmin-cloud',
             'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
-            `<span class="dot dot-live"></span>&nbsp;Cloud admin`
+            `<i class="fa-solid fa-cloud-bolt"></i>`
           );
           return;
         }
         if (!isCloud) {
           setState('local-only',
             'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
-            `<i class="fa-solid fa-triangle-exclamation" style="font-size:10px"></i>&nbsp;Local only`
+            `<i class="fa-solid fa-cloud"></i>`
           );
           return;
         }
@@ -1182,7 +1183,7 @@
         if (err && (Date.now() - err.time < 30000)) {
           setState('sync-error',
             `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
-            `<i class="fa-solid fa-circle-exclamation" style="font-size:10px"></i>&nbsp;Sync error`
+            `<i class="fa-solid fa-cloud"></i>`
           );
           clearTimeout(errorClearTimer);
           errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
@@ -1190,7 +1191,7 @@
         }
         setState('cloud',
           'Connected to Supabase — all data syncs to the cloud instantly.',
-          `<span class="dot dot-live"></span>&nbsp;Cloud`
+          `<i class="fa-solid fa-cloud"></i>`
         );
       }
 
@@ -1199,8 +1200,9 @@
         ALL_STATES.forEach(s => pill.classList.remove(s));
         pill.classList.add('syncing');
         pill.style.cssText = '';
-        pill.title     = 'Syncing to cloud…';
-        pill.innerHTML = `<span class="dot dot-live" style="background:currentColor;animation:pulse 0.7s ease infinite alternate"></span>&nbsp;Syncing…`;
+        pill.setAttribute('data-tooltip', 'Syncing to cloud…');
+        pill.title = '';
+        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i>`;
       }
 
       // ── Sync-event listeners (fired by db.js guard()) ─────────────────
