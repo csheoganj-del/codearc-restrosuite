@@ -1001,7 +1001,7 @@
       const sec = $('#analytics-tab');
       sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px"></i><div style="margin-top:12px;font-size:13px">Loading analytics...</div></div>';
 
-      RS_DB.list('doppio_bills').then(function(allBills){
+      RS_DB.list('bills').then(function(allBills){
         const d = buildAnalytics(allBills||[], days);
         const trendColor = d.trend>=0?'var(--green)':'var(--red)';
         const trendIcon = d.trend>=0?'fa-arrow-trend-up':'fa-arrow-trend-down';
