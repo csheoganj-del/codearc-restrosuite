@@ -1494,13 +1494,29 @@
 
       const pill = document.getElementById('topbar-whatsapp-status-pill');
       if (pill) {
-        pill.onclick = () => {
+        pill.setAttribute('role', 'button');
+        pill.setAttribute('tabindex', '0');
+        const openGatewaySettings = () => {
           if (window.RS && typeof RS.activateTab === 'function') {
             RS.activateTab('settings-tab');
           }
-          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
-          if (gatewayBtn) {
+          const clickGatewayTab = () => {
+            const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+            if (!gatewayBtn) return false;
             gatewayBtn.click();
+            return true;
+          };
+          if (!clickGatewayTab()) {
+            [80, 220, 500].forEach(delay => setTimeout(clickGatewayTab, delay));
+          }
+        };
+        pill.onclick = () => {
+          openGatewaySettings();
+        };
+        pill.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openGatewaySettings();
           }
         };
       }

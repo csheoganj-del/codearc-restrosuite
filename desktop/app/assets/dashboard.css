@@ -2785,6 +2785,7 @@ textarea:focus-visible,
 
 /* Show span text on hover */
 .topbar > .tb-pill:not(.clock-pill):hover .tb-badge-label,
+.topbar > .tb-pill:not(.clock-pill):focus-visible .tb-badge-label,
 .topbar .support-dropdown:hover .dropdown-trigger .tb-badge-label {
   opacity: 1;
   max-width: 80px;
@@ -2957,6 +2958,27 @@ textarea:focus-visible,
   color: inherit;
 }
 
+.topbar > #app-version-pill,
+.topbar > #app-version-pill:hover,
+.topbar > #app-version-pill:focus-visible {
+  width: auto !important;
+  min-width: 62px !important;
+  padding: 0 10px !important;
+  justify-content: center !important;
+}
+
+#app-version-pill .tb-badge-label {
+  opacity: 1 !important;
+  max-width: 54px !important;
+  margin-left: 6px !important;
+}
+
+#topbar-whatsapp-status-pill .tb-badge-label {
+  opacity: 0;
+  max-width: 0;
+  margin-left: 0;
+}
+
 /* Clock styling: always compact, but clean */
 .topbar .tb-pill.clock-pill {
   width: auto !important;
@@ -2979,11 +3001,13 @@ textarea:focus-visible,
   .topbar .tb-pill.txt {
     display: inline-flex !important; /* keep them visible as compact icons! */
   }
-  /* Hide clock and version on very small devices to prioritize sync/whatsapp status */
+  /* Hide clock on very small devices; keep app version visible for support checks. */
   @media (max-width: 480px) {
-    #app-version-pill,
     .clock-pill {
       display: none !important;
+    }
+    #app-version-pill {
+      display: inline-flex !important;
     }
   }
 }
