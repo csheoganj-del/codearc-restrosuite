@@ -2670,7 +2670,6 @@ textarea:focus-visible,
   text-overflow: ellipsis;
 }
 .tb-title p {
-.tb-title p {
   font-size: 11px !important;
   margin-top: 0px !important;
   line-height: 1.2 !important;
