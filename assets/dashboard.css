@@ -2629,3 +2629,160 @@ textarea:focus-visible,
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   REIMAGINED COMPACT HEADER & STATUS BADGES WITH DYNAMIC MICRO-INTERACTIONS
+   ========================================================================== */
+
+/* Shorter header height & refined layout */
+.topbar {
+  padding: 8px clamp(12px, 2vw, 20px) !important;
+  gap: 10px !important;
+  height: 54px !important;
+  box-sizing: border-box;
+}
+
+/* Make title area more compact */
+.tb-title h1 {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+.tb-title p {
+  font-size: 11px !important;
+  margin-top: 0px !important;
+  line-height: 1.2 !important;
+}
+
+/* Hide header subtitle on medium/small viewports to save space */
+@media (max-width: 1200px) {
+  .tb-title p {
+    display: none !important;
+  }
+}
+
+/* Highly compact search bar */
+.tb-search {
+  width: 150px !important;
+  padding: 6px 12px !important;
+  border-radius: var(--r-md) !important;
+  gap: 8px !important;
+}
+.tb-search:focus-within {
+  width: 200px !important;
+  border-color: var(--orange) !important;
+}
+.tb-search input {
+  font-size: 13px !important;
+}
+
+/* General design for circular icon status badges */
+.topbar .tb-pill,
+.topbar .support-dropdown .dropdown-trigger {
+  height: 34px !important;
+  width: 34px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-sizing: border-box !important;
+  font-size: 0 !important; /* Hide text nodes by default */
+  border: 1px solid var(--stroke-2) !important;
+  background: var(--glass) !important;
+  color: var(--text-soft) !important;
+}
+
+/* Keep icons/dots visible & centered */
+.topbar .tb-pill i,
+.topbar .tb-pill span i,
+.topbar .support-dropdown .dropdown-trigger i {
+  font-size: 13.5px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-block !important;
+  color: inherit !important;
+}
+
+.topbar .tb-pill .dot {
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+
+/* Hover expansion effect: expanding pill to show full text */
+.topbar .tb-pill:hover,
+.topbar .support-dropdown:hover .dropdown-trigger {
+  width: auto !important;
+  max-width: 200px !important;
+  padding: 0 10px !important;
+  border-radius: 17px !important;
+  font-size: 11.5px !important; /* Show text nodes on hover */
+  gap: 6px !important;
+  color: var(--text) !important;
+  border-color: var(--stroke-hi) !important;
+  background: var(--glass-2) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* Ensure inner spans and text inside pills behave when expanded */
+.topbar .tb-pill:hover span,
+.topbar .support-dropdown:hover .dropdown-trigger span {
+  display: inline !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+}
+
+/* Make sure text elements that contain icons preserve spacing when hovered/expanded */
+.topbar .tb-pill:hover i,
+.topbar .tb-pill:hover span i,
+.topbar .support-dropdown:hover .dropdown-trigger i {
+  margin-right: 2px !important;
+}
+
+/* Version Pill customization using FontAwesome pseudo-element */
+#app-version-pill::before {
+  content: "\f05a"; /* fa-circle-info */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 13.5px;
+  display: inline-block;
+  color: inherit;
+  transition: opacity 0.15s;
+}
+#app-version-pill:hover::before {
+  display: none !important; /* Hide info icon when version text is shown */
+}
+
+/* Clock styling: always compact, but clean */
+.topbar .tb-pill.clock-pill {
+  width: auto !important;
+  padding: 0 10px !important;
+  border-radius: 17px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+}
+.topbar .tb-pill.clock-pill i {
+  font-size: 12px !important;
+  margin-right: 4px !important;
+  color: var(--text-soft) !important;
+}
+
+/* Override responsive hiders to keep these vital indicators visible as icons on mobile */
+@media (max-width: 860px) {
+  .topbar .tb-pill.txt {
+    display: inline-flex !important; /* keep them visible as compact icons! */
+  }
+  /* Hide clock and version on very small devices to prioritize sync/whatsapp status */
+  @media (max-width: 480px) {
+    #app-version-pill,
+    .clock-pill {
+      display: none !important;
+    }
+  }
+}
+
