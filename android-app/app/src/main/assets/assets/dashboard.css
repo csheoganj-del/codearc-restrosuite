@@ -2690,12 +2690,19 @@ textarea:focus-visible,
   box-sizing: border-box !important;
   position: relative !important;
   flex-shrink: 0 !important;
-  border: 1px solid var(--stroke-2) !important;
-  background: var(--glass) !important;
-  color: var(--text-soft) !important;
+  border: 1px solid var(--stroke-2);
+  background: var(--glass);
+  color: var(--text-soft);
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s, border-color 0.2s, color 0.2s !important;
-  overflow: hidden !important;
   white-space: nowrap !important;
+}
+
+.topbar .tb-pill:not(.clock-pill) {
+  overflow: hidden !important;
+}
+
+.topbar .support-dropdown {
+  overflow: visible !important;
 }
 
 /* Make support trigger fill the container */
@@ -2712,6 +2719,7 @@ textarea:focus-visible,
   background: transparent !important;
   border: none !important;
   color: inherit !important;
+  overflow: hidden !important;
 }
 
 /* Ensure inner elements align properly */
