@@ -1052,20 +1052,20 @@
             // Speed up polling while gateway is starting
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
             container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up -- this usually takes 15-45 seconds.</div></div><span class="pill pill-green" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
-              <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 18px;border:1.5px solid oklch(0.74 0.15 158 / 0.25);border-radius:var(--r-md);background:var(--green-tint);text-align:center">
+              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up -- this usually takes 15-45 seconds.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 18px;border:1.5px solid rgba(217, 119, 6, 0.2);border-radius:var(--r-md);background:rgba(217, 119, 6, 0.03);text-align:center">
                 <div style="position:relative;width:56px;height:56px">
                   <svg viewBox="0 0 56 56" style="width:56px;height:56px;transform:rotate(-90deg)">
-                    <circle cx="28" cy="28" r="22" fill="none" stroke="oklch(0.74 0.15 158 / 0.15)" stroke-width="4"/>
-                    <circle cx="28" cy="28" r="22" fill="none" stroke="var(--green)" stroke-width="4" stroke-dasharray="138" stroke-dashoffset="138" stroke-linecap="round" style="animation:gw-conn-spin 1.5s linear infinite"/>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(217, 119, 6, 0.15)" stroke-width="4"/>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="#d97706" stroke-width="4" stroke-dasharray="138" stroke-dashoffset="138" stroke-linecap="round" style="animation:gw-conn-spin 1.5s linear infinite"/>
                   </svg>
-                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--green)"><i class="fa-brands fa-whatsapp"></i></div>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#d97706"><i class="fa-brands fa-whatsapp"></i></div>
                 </div>
                 <div>
                   <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Initialising gateway...</div>
                   <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp gateway is booting up.<br>A QR code will appear shortly.</div>
                 </div>
-                <div style="border-top:1px solid oklch(0.74 0.15 158 / 0.2);padding-top:14px;width:100%;text-align:center">
+                <div style="border-top:1px solid rgba(217, 119, 6, 0.15);padding-top:14px;width:100%;text-align:center">
                   <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Stuck on this screen? Try forcing a reset:</div>
                   <button type="button" id="btn-gateway-conn-reset" style="display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,0.08);color:#ef4444;border:1px solid rgba(239,68,68,0.25);font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;cursor:pointer;transition:all 0.2s">
                     <i class="fa-solid fa-rotate-right"></i> Force Reset

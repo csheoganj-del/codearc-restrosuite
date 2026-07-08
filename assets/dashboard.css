@@ -2900,20 +2900,27 @@ textarea:focus-visible,
   border-color: rgba(139, 92, 246, 0.35) !important;
 }
 
-#topbar-whatsapp-status-pill.wa-linked,
-#topbar-whatsapp-status-pill.wa-starting,
-#topbar-whatsapp-status-pill.wa-syncing,
-#topbar-whatsapp-status-pill.wa-qr {
+#topbar-whatsapp-status-pill.wa-linked {
   color: var(--green) !important;
   background: var(--green-tint) !important;
   border-color: oklch(0.74 0.15 158 / 0.3) !important;
 }
-#topbar-whatsapp-status-pill.wa-linked:hover,
+#topbar-whatsapp-status-pill.wa-linked:hover {
+  background: oklch(0.74 0.15 158 / 0.20) !important;
+  border-color: oklch(0.74 0.15 158 / 0.45) !important;
+}
+#topbar-whatsapp-status-pill.wa-starting,
+#topbar-whatsapp-status-pill.wa-syncing,
+#topbar-whatsapp-status-pill.wa-qr {
+  color: #d97706 !important;
+  background: rgba(217, 119, 6, 0.1) !important;
+  border-color: rgba(217, 119, 6, 0.2) !important;
+}
 #topbar-whatsapp-status-pill.wa-starting:hover,
 #topbar-whatsapp-status-pill.wa-syncing:hover,
 #topbar-whatsapp-status-pill.wa-qr:hover {
-  background: oklch(0.74 0.15 158 / 0.20) !important;
-  border-color: oklch(0.74 0.15 158 / 0.45) !important;
+  background: rgba(217, 119, 6, 0.15) !important;
+  border-color: rgba(217, 119, 6, 0.35) !important;
 }
 #topbar-whatsapp-status-pill.wa-offline,
 #topbar-whatsapp-status-pill.wa-auth-failure {
