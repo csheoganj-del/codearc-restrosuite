@@ -74,6 +74,10 @@
       const isIreland = (country === 'IE');
       
       const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      const currentPeriod = Math.floor(currentMonth / 2) + 1; // bi-monthly VAT period
+      const psel = p => currentPeriod === p ? ' selected' : '';
+      const msel = m => currentMonth === m ? ' selected' : '';
       
       // Dynamic period select container
       let periodSelectorHTML = '';
@@ -82,12 +86,12 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
             <label class="fl" style="margin:0;font-weight:600;">Filing Period:</label>
             <select class="form-input" id="tax-period-select" style="max-width:180px;height:34px;padding:4px 8px;">
-              <option value="1">Jan - Feb ${currentYear}</option>
-              <option value="2">Mar - Apr ${currentYear}</option>
-              <option value="3" selected>May - Jun ${currentYear}</option>
-              <option value="4">Jul - Aug ${currentYear}</option>
-              <option value="5">Sep - Oct ${currentYear}</option>
-              <option value="6">Nov - Dec ${currentYear}</option>
+              <option value="1"${psel(1)}>Jan - Feb ${currentYear}</option>
+              <option value="2"${psel(2)}>Mar - Apr ${currentYear}</option>
+              <option value="3"${psel(3)}>May - Jun ${currentYear}</option>
+              <option value="4"${psel(4)}>Jul - Aug ${currentYear}</option>
+              <option value="5"${psel(5)}>Sep - Oct ${currentYear}</option>
+              <option value="6"${psel(6)}>Nov - Dec ${currentYear}</option>
             </select>
             <select class="form-input" id="tax-year-select" style="max-width:100px;height:34px;padding:4px 8px;">
               <option value="${currentYear}" selected>${currentYear}</option>
@@ -100,18 +104,18 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
             <label class="fl" style="margin:0;font-weight:600;">GST Return Month:</label>
             <select class="form-input" id="tax-period-select" style="max-width:180px;height:34px;padding:4px 8px;">
-              <option value="0">January</option>
-              <option value="1">February</option>
-              <option value="2">March</option>
-              <option value="3">April</option>
-              <option value="4">May</option>
-              <option value="5" selected>June</option>
-              <option value="6">July</option>
-              <option value="7">August</option>
-              <option value="8">September</option>
-              <option value="9">October</option>
-              <option value="10">November</option>
-              <option value="11">December</option>
+              <option value="0"${msel(0)}>January</option>
+              <option value="1"${msel(1)}>February</option>
+              <option value="2"${msel(2)}>March</option>
+              <option value="3"${msel(3)}>April</option>
+              <option value="4"${msel(4)}>May</option>
+              <option value="5"${msel(5)}>June</option>
+              <option value="6"${msel(6)}>July</option>
+              <option value="7"${msel(7)}>August</option>
+              <option value="8"${msel(8)}>September</option>
+              <option value="9"${msel(9)}>October</option>
+              <option value="10"${msel(10)}>November</option>
+              <option value="11"${msel(11)}>December</option>
             </select>
             <select class="form-input" id="tax-year-select" style="max-width:100px;height:34px;padding:4px 8px;">
               <option value="${currentYear}" selected>${currentYear}</option>

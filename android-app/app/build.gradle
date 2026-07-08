@@ -72,16 +72,19 @@ idea {
 }
 
 // ---------------------------------------------------------------------------
-// Force-remove Windows-locked dex intermediate directories before each build.
-// Android Studio's "Apply Changes" / file indexer holds exclusive handles on
-// these folders. Java NIO cannot delete locked files on Windows, but the
-// native cmd.exe rmdir command can bypass the lock.
+// Force-remove Windows-locked intermediate directories before each build.
+// Android Studio's "Apply Changes" / file indexer often holds exclusive handles
+// on these folders, causing AccessDeniedException on Windows.
+// Java NIO cannot delete locked files, but the native cmd.exe rmdir can.
 // ---------------------------------------------------------------------------
-task forceCleanDexIntermediates {
+task forceCleanLockedIntermediates {
     doFirst {
         def targets = [
             "${buildDir}/intermediates/project_dex_archive",
             "${buildDir}/intermediates/desugar_graph",
+            "${buildDir}/intermediates/incremental",
+            "${buildDir}/intermediates/merged_res_blame_folder",
+            "${buildDir}/intermediates/packaged_res",
         ]
         targets.each { path ->
             if (file(path).exists()) {
@@ -95,7 +98,7 @@ task forceCleanDexIntermediates {
     }
 }
 
-preBuild.dependsOn forceCleanDexIntermediates
+preBuild.dependsOn forceCleanLockedIntermediates
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'

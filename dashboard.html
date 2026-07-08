@@ -399,7 +399,18 @@
       </span>
       <span class="tb-pill txt" id="db-mode-pill"><i class="fa-solid fa-cloud"></i><span class="tb-badge-label">Loading</span></span>
       <span class="tb-pill txt" id="app-version-pill"></span>
-      <span class="tb-pill txt clock-pill"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
+      <span class="tb-pill txt clock-pill" id="clock-pill" data-tooltip="Local Time">
+        <span class="clock-icon-wrapper">
+          <svg class="analog-clock" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" class="clock-face" />
+            <line x1="12" y1="12" x2="12" y2="7" class="clock-hand hour-hand" id="analog-hour" />
+            <line x1="12" y1="12" x2="12" y2="5" class="clock-hand minute-hand" id="analog-minute" />
+            <line x1="12" y1="12" x2="12" y2="4.2" class="clock-hand second-hand" id="analog-second" />
+            <circle cx="12" cy="12" r="1.5" class="clock-center" />
+          </svg>
+        </span>
+        <span class="tb-badge-label" id="clock">—</span>
+      </span>
       <button class="tb-icon-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
       <button class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
     </header>
@@ -1418,8 +1429,30 @@
   <div id="rs-modal-root"></div>
 
 <script>
-  // clock
-  (function(){ const c=document.getElementById('clock'); function tick(){ const d=new Date(); c.textContent=d.toLocaleString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}); } tick(); setInterval(tick,30000); })();
+  // clock (reimagined dynamic analog + digital sync)
+  (function(){
+    const c = document.getElementById('clock');
+    const hourHand = document.getElementById('analog-hour');
+    const minHand = document.getElementById('analog-minute');
+    const secHand = document.getElementById('analog-second');
+    function tick(){
+      const d = new Date();
+      if (c) {
+        c.textContent = d.toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+      }
+      const s = d.getSeconds();
+      const m = d.getMinutes();
+      const h = d.getHours();
+      const sDeg = s * 6;
+      const mDeg = m * 6 + s * 0.1;
+      const hDeg = (h % 12) * 30 + m * 0.5;
+      if (secHand) secHand.setAttribute('transform', 'rotate(' + sDeg + ' 12 12)');
+      if (minHand) minHand.setAttribute('transform', 'rotate(' + mDeg + ' 12 12)');
+      if (hourHand) hourHand.setAttribute('transform', 'rotate(' + hDeg + ' 12 12)');
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 <script src="assets/qrcode.min.js"></script>
