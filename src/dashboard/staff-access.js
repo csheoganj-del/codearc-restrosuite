@@ -10,17 +10,23 @@
 
   const ROLE_LABELS = {
     admin: "Administrator",
+    manager: "Manager",
     cashier: "Cashier",
-    kitchen: "Kitchen",
     waiter: "Waiter",
+    captain: "Captain",
+    kitchen: "Kitchen Staff",
+    inventory: "Inventory Manager",
     customer_display: "Customer display"
   };
 
   const ROLE_TABS = {
-    admin: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab", "editor-tab", "crm-tab", "tax-tab", "online-tab", "kds-tab", "tokens-tab", "employees-tab"],
-    cashier: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab"],
+    admin: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab", "editor-tab", "customers-tab", "tax-tab", "aggregator-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "analytics-tab"],
+    manager: ["pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab", "inventory-tab", "editor-tab", "customers-tab", "reports-tab", "analytics-tab", "employees-tab", "growth-hub-tab"],
+    cashier: ["pos-tab", "floor-tab", "bills-tab", "customers-tab"],
+    waiter: ["pos-tab", "floor-tab", "kds-tab"],
+    captain: ["pos-tab", "floor-tab", "kds-tab", "qr-orders-tab"],
     kitchen: ["kds-tab"],
-    waiter: ["qr-orders-tab"],
+    inventory: ["inventory-tab", "editor-tab", "reports-tab"],
     customer_display: ["tokens-tab"]
   };
 
@@ -31,12 +37,15 @@
     "inventory-tab": "Inventory",
     "reports-tab": "Reports",
     "editor-tab": "Menu",
-    "crm-tab": "CRM",
+    "customers-tab": "Customers",
     "tax-tab": "Tax",
-    "online-tab": "Online",
+    "aggregator-tab": "Online",
     "kds-tab": "KDS",
     "tokens-tab": "Tokens",
-    "employees-tab": "Employees"
+    "employees-tab": "Employees",
+    "floor-tab": "Floor",
+    "growth-hub-tab": "Growth Hub",
+    "analytics-tab": "Analytics"
   };
 
   function formatDate(value) {
