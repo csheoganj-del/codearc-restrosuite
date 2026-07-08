@@ -178,7 +178,7 @@
     }
 
     /* ===================== SETTINGS ===================== */
-    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-comment-dots'],['payments','Payments','fa-credit-card'],['security','Security & PIN','fa-shield-halved'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
+    const SET_NAV = [['profile','Outlet profile','fa-solid fa-store'],['tax','Taxes & billing','fa-solid fa-percent'],['printer','Printers & KOT','fa-solid fa-print'],['gateway','WhatsApp gateway','fa-brands fa-whatsapp'],['payments','Payments','fa-solid fa-credit-card'],['security','Security & PIN','fa-solid fa-shield-halved'],['team','Team & roles','fa-solid fa-user-shield'],['plan','Plan & billing','fa-solid fa-crown'],['danger','Danger Zone','fa-solid fa-triangle-exclamation']];
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
@@ -941,7 +941,7 @@
       }
       const NAV = SET_NAV.filter(s => isOwnerAdmin || !['plan','danger'].includes(s[0]));
       sec.innerHTML = `<div class="set-layout">
-        <div class="set-nav">${NAV.map((s,i)=>`<button class="${i===0?'active':''}" data-s="${s[0]}"><i class="fa-solid ${s[2]}"></i> ${s[1]}</button>`).join('')}</div>
+        <div class="set-nav">${NAV.map((s,i)=>`<button class="${i===0?'active':''}" data-s="${s[0]}"><i class="${s[2]}"></i> ${s[1]}</button>`).join('')}</div>
         <div class="panel panel-pad">
           <div id="set-body"></div>
           <div style="display:flex;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid var(--stroke)"><div class="grow"></div><button class="btn btn-ghost" id="set-cancel">Cancel</button><button class="btn btn-primary" id="set-save"><i class="fa-solid fa-circle-check"></i> Save changes</button></div>
