@@ -1381,11 +1381,24 @@
       });
     }
     
-    // Add topbar status badge polling & click handler
-    window.updateTopbarWhatsAppStatus = async function() {
+    const WA_BADGE_STATES = ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
+    function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
       const textEl = document.getElementById('topbar-whatsapp-status-text');
       const pillEl = document.getElementById('topbar-whatsapp-status-pill');
       if (!textEl || !pillEl) return;
+      WA_BADGE_STATES.forEach(cls => pillEl.classList.remove(cls));
+      pillEl.classList.add(state);
+      pillEl.style.cssText = '';
+      textEl.innerHTML = `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i><span class="tb-badge-label">${safe(label)}</span>`;
+      pillEl.setAttribute('data-tooltip', tooltip);
+      pillEl.title = '';
+    }
+    function gatewayReason(res, fallback) {
+      return (res && (res.error || res.reason || res.message || (res.details && res.details.reason))) || fallback;
+    }
+
+    // Add topbar status badge polling & click handler
+    window.updateTopbarWhatsAppStatus = async function() {
       const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
       const isSuperAdmin = sessionMeta.role === 'superadmin' || sessionMeta.role === 'super_admin';
       try {
@@ -1402,56 +1415,21 @@
           // worth attempting a real PDF-attachment WhatsApp send via the
           // gateway vs. going straight to the plain-text wa.me link.
           window.__rsGatewayReady = true;
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Linked</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Linked');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(34, 197, 94, 0.1)';
-          pillEl.style.color = '#22c55e';
-          pillEl.style.border = '1px solid rgba(34, 197, 94, 0.2)';
+          setTopbarWhatsAppBadge('wa-linked', 'Linked', 'WhatsApp gateway linked', false);
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i><span>Syncing</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Syncing');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
-          pillEl.style.color = '#eab308';
-          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+          setTopbarWhatsAppBadge('wa-syncing', 'Syncing', 'WhatsApp gateway syncing', true);
         } else if (res && res.status === 'qr') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Connect</span>';
-          pillEl.setAttribute('data-tooltip', 'Scan to Connect');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(234, 179, 8, 0.1)';
-          pillEl.style.color = '#eab308';
-          pillEl.style.border = '1px solid rgba(234, 179, 8, 0.2)';
+          setTopbarWhatsAppBadge('wa-qr', 'QR', 'Scan the WhatsApp QR code to connect', false);
         } else if (res && res.status === 'auth_failure') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Auth Failed</span>';
-          pillEl.setAttribute('data-tooltip', 'Auth Failed');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-          pillEl.style.color = '#ef4444';
-          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-        } else if (res && res.status === 'connecting') {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp fa-pulse"></i><span>Starting</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Starting...');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(107, 114, 128, 0.1)';
-          pillEl.style.color = '#6b7280';
-          pillEl.style.border = '1px solid rgba(107, 114, 128, 0.2)';
+          setTopbarWhatsAppBadge('wa-auth-failure', 'Auth', 'WhatsApp auth failed: ' + gatewayReason(res, 'session needs reconnect'), false);
+        } else if (res && (res.status === 'connecting' || res.status === 'starting')) {
+          setTopbarWhatsAppBadge('wa-starting', 'Starting', 'WhatsApp gateway starting', true);
         } else {
-          textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-          pillEl.setAttribute('data-tooltip', 'WhatsApp Offline');
-          pillEl.title = '';
-          pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-          pillEl.style.color = '#ef4444';
-          pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+          setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + gatewayReason(res, 'not connected'), false);
         }
       } catch(err) {
         window.__rsGatewayLastStatus = 'error';
-        textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-        pillEl.setAttribute('data-tooltip', 'WhatsApp Offline');
-        pillEl.title = '';
-        pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-        pillEl.style.color = '#ef4444';
-        pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+        setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + (err && err.message ? err.message : 'status check failed'), false);
       }
     };
 
