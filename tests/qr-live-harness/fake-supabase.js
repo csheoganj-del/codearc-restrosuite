@@ -38,7 +38,27 @@ class Query {
     }
     if (this._order) rows = rows.slice().sort((a, b) => this._order.asc ? cmp(String(a[this._order.k]||''), String(b[this._order.k]||'')) : cmp(String(b[this._order.k]||''), String(a[this._order.k]||'')));
     if (this._limit != null) rows = rows.slice(0, this._limit);
-    return rows.map(r => ({ ...r }));
+    return rows.map(r => this._projectRow(r));
+  }
+  _projectRow(row) {
+    const out = { ...row };
+    const pairs = [
+      ['order_id', 'orderId'],
+      ['table_number', 'tableNumber'],
+      ['order_type', 'orderType'],
+      ['payment_method', 'paymentMethod'],
+      ['date_time', 'dateTime'],
+      ['prep_minutes', 'prepMinutes'],
+      ['prep_started_at', 'prepStartedAt'],
+      ['is_read', 'isRead'],
+      ['created_at', 'createdAt'],
+    ];
+    for (const [snake, camel] of pairs) {
+      if (out[camel] == null && out[snake] != null) out[camel] = out[snake];
+      if (out[snake] == null && out[camel] != null) out[snake] = out[camel];
+    }
+    if (out.table == null && out.table_number != null) out.table = out.table_number;
+    return out;
   }
   _run() {
     try {
@@ -48,7 +68,7 @@ class Query {
           if (this.table === 'doppio_pending_orders' || this.table === 'doppio_notifications') {
             if (row.created_at == null) row.created_at = new Date().toISOString();
           }
-          db[this.table].push({ ...row });
+          db[this.table].push(this._projectRow(row));
         }
         return Promise.resolve({ data: null, error: null });
       }
