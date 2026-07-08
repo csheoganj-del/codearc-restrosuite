@@ -1742,25 +1742,28 @@
   // realtime already enabled on this table) and shows a persistent,
   // continuously-blinking banner until the gateway reports back online.
   function showGatewayOfflineBanner(reason) {
-    let bar = document.getElementById('rs-gateway-offline-banner');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'rs-gateway-offline-banner';
-      bar.className = 'attention-blink';
-      bar.setAttribute('role', 'status');
-      bar.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99998;' +
-        'background:var(--danger-color,#EF4444);color:#fff;padding:10px 18px;border-radius:10px;' +
-        'font-size:13px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;max-width:92vw;';
-      bar.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span id="rs-gateway-offline-text"></span>';
-      document.body.appendChild(bar);
+    const bar = document.getElementById('rs-gateway-offline-banner');
+    if (bar) bar.style.display = 'none';
+
+    const textEl = document.getElementById('topbar-whatsapp-status-text');
+    const pillEl = document.getElementById('topbar-whatsapp-status-pill');
+    if (textEl && pillEl) {
+      textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i>';
+      pillEl.setAttribute('data-tooltip', 'WhatsApp gateway is offline' + (reason ? `: ${reason}` : ''));
+      pillEl.setAttribute('data-status', 'Offline');
+      pillEl.title = '';
+      pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+      pillEl.style.color = '#ef4444';
+      pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
     }
-    const textEl = document.getElementById('rs-gateway-offline-text');
-    if (textEl) textEl.textContent = 'WhatsApp gateway is offline -- bill/receipt sending is paused' + (reason ? ` (${reason})` : '');
-    bar.style.display = 'flex';
   }
   function hideGatewayOfflineBanner() {
     const bar = document.getElementById('rs-gateway-offline-banner');
     if (bar) bar.style.display = 'none';
+
+    if (window.updateTopbarWhatsAppStatus) {
+      window.updateTopbarWhatsAppStatus();
+    }
   }
 
   // Offline / pending-cloud-sync indicator. assets/db.js already saves every
