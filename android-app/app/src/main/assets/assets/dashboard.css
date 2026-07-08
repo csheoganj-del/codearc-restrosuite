@@ -2676,8 +2676,25 @@ textarea:focus-visible,
   font-size: 13px !important;
 }
 
-/* General design for circular icon status badges */
-.topbar .tb-pill,
+/* General design for circular icon status badges (except Clock) */
+.topbar .tb-pill:not(.clock-pill),
+.topbar .support-dropdown {
+  height: 34px !important;
+  width: 34px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  background: transparent !important;
+  border: none !important;
+  flex-shrink: 0 !important;
+}
+
+/* Make support trigger fill the container */
 .topbar .support-dropdown .dropdown-trigger {
   height: 34px !important;
   width: 34px !important;
@@ -2686,48 +2703,95 @@ textarea:focus-visible,
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  overflow: hidden !important;
-  white-space: nowrap !important;
   cursor: pointer !important;
-  transition: all 0.2s ease !important;
   box-sizing: border-box !important;
-  border: 1px solid var(--stroke-2) !important;
-  background: var(--glass) !important;
+  position: relative !important;
+  background: transparent !important;
+  border: none !important;
   color: var(--text-soft) !important;
-  position: relative;
+  z-index: 5;
 }
 
-/* Keep icons/dots visible & centered */
-.topbar .tb-pill i,
-.topbar .tb-pill span i,
+/* Ensure inner icons are positioned on top of background and centered */
+.topbar .tb-pill:not(.clock-pill) i,
+.topbar .tb-pill:not(.clock-pill) span i,
 .topbar .support-dropdown .dropdown-trigger i {
   font-size: 14px !important;
   margin: 0 !important;
   padding: 0 !important;
   display: inline-block !important;
+  position: relative;
+  z-index: 5;
   color: inherit !important;
-  transition: transform 0.2s ease !important;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Hover effects for badges without changing width (Resolves Jitter!) */
-.topbar .tb-pill:hover,
-.topbar .support-dropdown:hover .dropdown-trigger {
-  color: var(--text) !important;
-  border-color: var(--stroke-hi) !important;
-  background: var(--glass-3) !important;
+/* Visual Background Card (Expands to the left!) */
+.topbar .tb-pill:not(.clock-pill)::before,
+.topbar .support-dropdown::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 34px;
+  width: 34px;
+  border-radius: 17px;
+  border: 1px solid var(--stroke-2);
+  background: var(--glass);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+  pointer-events: none;
+  box-sizing: border-box;
 }
 
-.topbar .tb-pill:hover i,
+.topbar .tb-pill:not(.clock-pill):hover::before,
+.topbar .support-dropdown:hover::before {
+  width: 140px; /* Expand visual container to the left */
+  border-color: var(--stroke-hi);
+  background: var(--glass-3);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Visual Text Label (Slides out to the left!) */
+.topbar .tb-pill:not(.clock-pill)::after,
+.topbar .support-dropdown::after {
+  content: attr(data-status);
+  position: absolute;
+  right: 36px; /* Anchor text just to the left of the 34px icon circle */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-body);
+  color: inherit;
+  white-space: nowrap;
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.topbar .tb-pill:not(.clock-pill):hover::after,
+.topbar .support-dropdown:hover::after {
+  opacity: 1;
+  max-width: 100px;
+}
+
+/* Scale up icons slightly on hover */
+.topbar .tb-pill:not(.clock-pill):hover i,
+.topbar .tb-pill:not(.clock-pill):hover span i,
 .topbar .support-dropdown:hover .dropdown-trigger i {
   transform: scale(1.12);
 }
 
-/* Premium Custom CSS Tooltips using data-tooltip */
+/* Premium Detailed Tooltips using data-tooltip (Floating below, animated) */
 .topbar [data-tooltip] {
   position: relative;
 }
 
-.topbar [data-tooltip]::after {
+.topbar [data-tooltip]::before {
   content: attr(data-tooltip);
   position: absolute;
   top: calc(100% + 8px);
@@ -2749,58 +2813,82 @@ textarea:focus-visible,
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.topbar [data-tooltip]:hover::after {
+.topbar [data-tooltip]:hover::before {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
 /* ==========================================
-   STATUS-BASED ICON COLOR RULES
+   STATUS-BASED BACKGROUND/COLOR RULES
    ========================================== */
 
-/* 1. Cloud status color variations */
+/* 1. Cloud status color variations (applied to ::before and text) */
 #db-mode-pill.cloud {
   color: #22c55e !important; /* Green */
+}
+#db-mode-pill.cloud::before {
   background: rgba(34, 197, 94, 0.1) !important;
   border-color: rgba(34, 197, 94, 0.2) !important;
 }
-#db-mode-pill.syncing {
-  color: #eab308 !important; /* Yellow */
-  background: rgba(234, 179, 8, 0.1) !important;
-  border-color: rgba(234, 179, 8, 0.2) !important;
+#db-mode-pill.cloud:hover::before {
+  background: rgba(34, 197, 94, 0.15) !important;
+  border-color: rgba(34, 197, 94, 0.35) !important;
 }
+
+#db-mode-pill.syncing,
 #db-mode-pill.local-only {
-  color: #eab308 !important; /* Yellow */
+  color: #eab308 !important; /* Yellow/Amber */
+}
+#db-mode-pill.syncing::before,
+#db-mode-pill.local-only::before {
   background: rgba(234, 179, 8, 0.1) !important;
   border-color: rgba(234, 179, 8, 0.2) !important;
 }
+#db-mode-pill.syncing:hover::before,
+#db-mode-pill.local-only:hover::before {
+  background: rgba(234, 179, 8, 0.15) !important;
+  border-color: rgba(234, 179, 8, 0.35) !important;
+}
+
 #db-mode-pill.offline,
 #db-mode-pill.sync-error {
   color: #ef4444 !important; /* Red */
+}
+#db-mode-pill.offline::before,
+#db-mode-pill.sync-error::before {
   background: rgba(239, 68, 68, 0.1) !important;
   border-color: rgba(239, 68, 68, 0.2) !important;
 }
+#db-mode-pill.offline:hover::before,
+#db-mode-pill.sync-error:hover::before {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
 #db-mode-pill.superadmin-cloud {
   color: var(--violet-soft) !important; /* Violet */
+}
+#db-mode-pill.superadmin-cloud::before {
   background: var(--violet-tint) !important;
   border-color: rgba(139, 92, 246, 0.2) !important;
 }
-
-/* 2. WhatsApp status color variations are handled dynamically in JS styles,
-   but we style the default brand icons to be clean */
-#topbar-whatsapp-status-pill i {
-  color: inherit !important;
+#db-mode-pill.superadmin-cloud:hover::before {
+  background: rgba(139, 92, 246, 0.15) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
 }
 
-/* 3. Support dropdown brand colors on hover */
-.support-dropdown .dropdown-trigger i {
+/* 2. Support dropdown colors */
+.support-dropdown::after {
   color: var(--text-soft) !important;
 }
 .support-dropdown:hover .dropdown-trigger i {
   color: var(--orange) !important; /* Contact headset icon turns brand orange on hover */
 }
+.support-dropdown:hover::after {
+  color: var(--text) !important;
+}
 
-/* Version Pill: info icon using pseudo-element */
+/* 3. Version Pill: info icon using pseudo-element */
 #app-version-pill::before {
   content: "\f05a"; /* fa-circle-info */
   font-family: "Font Awesome 6 Free";
@@ -2818,6 +2906,8 @@ textarea:focus-visible,
   font-size: 12px !important;
   font-weight: 600 !important;
   color: var(--text) !important;
+  border: 1px solid var(--stroke-2) !important;
+  background: var(--glass) !important;
 }
 .topbar .tb-pill.clock-pill i {
   font-size: 12px !important;
