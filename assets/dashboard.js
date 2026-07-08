@@ -351,7 +351,7 @@
   }
   window.withToast = withToast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708';
+  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v37-20260708-2000';
   // Show version in topbar
   (function(){
     const el = document.getElementById('app-version-pill');
