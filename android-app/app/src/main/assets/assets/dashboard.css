@@ -2860,6 +2860,63 @@ textarea:focus-visible,
   border-color: rgba(139, 92, 246, 0.35) !important;
 }
 
+#topbar-whatsapp-status-pill.wa-linked,
+#topbar-whatsapp-status-pill.wa-linked i,
+#topbar-whatsapp-status-pill.wa-linked span {
+  color: var(--green) !important;
+}
+#topbar-whatsapp-status-pill.wa-linked {
+  background: var(--green-tint) !important;
+  border-color: oklch(0.74 0.15 158 / 0.3) !important;
+}
+#topbar-whatsapp-status-pill.wa-linked:hover {
+  background: oklch(0.74 0.15 158 / 0.20) !important;
+  border-color: oklch(0.74 0.15 158 / 0.45) !important;
+}
+
+#topbar-whatsapp-status-pill.wa-starting,
+#topbar-whatsapp-status-pill.wa-starting i,
+#topbar-whatsapp-status-pill.wa-starting span,
+#topbar-whatsapp-status-pill.wa-syncing,
+#topbar-whatsapp-status-pill.wa-syncing i,
+#topbar-whatsapp-status-pill.wa-syncing span,
+#topbar-whatsapp-status-pill.wa-qr,
+#topbar-whatsapp-status-pill.wa-qr i,
+#topbar-whatsapp-status-pill.wa-qr span {
+  color: #d97706 !important;
+}
+#topbar-whatsapp-status-pill.wa-starting,
+#topbar-whatsapp-status-pill.wa-syncing,
+#topbar-whatsapp-status-pill.wa-qr {
+  background: rgba(217, 119, 6, 0.1) !important;
+  border-color: rgba(217, 119, 6, 0.2) !important;
+}
+#topbar-whatsapp-status-pill.wa-starting:hover,
+#topbar-whatsapp-status-pill.wa-syncing:hover,
+#topbar-whatsapp-status-pill.wa-qr:hover {
+  background: rgba(217, 119, 6, 0.15) !important;
+  border-color: rgba(217, 119, 6, 0.35) !important;
+}
+
+#topbar-whatsapp-status-pill.wa-offline,
+#topbar-whatsapp-status-pill.wa-offline i,
+#topbar-whatsapp-status-pill.wa-offline span,
+#topbar-whatsapp-status-pill.wa-auth-failure,
+#topbar-whatsapp-status-pill.wa-auth-failure i,
+#topbar-whatsapp-status-pill.wa-auth-failure span {
+  color: #ef4444 !important;
+}
+#topbar-whatsapp-status-pill.wa-offline,
+#topbar-whatsapp-status-pill.wa-auth-failure {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+#topbar-whatsapp-status-pill.wa-offline:hover,
+#topbar-whatsapp-status-pill.wa-auth-failure:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
 /* 2. Support dropdown colors */
 .support-dropdown::after {
   color: var(--text-soft) !important;
