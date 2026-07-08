@@ -203,83 +203,264 @@
     const defaultOutletName = sessionMeta.tenant_name || sessionMeta.business_name || String(sessionMeta.tenant_slug || sessionStorage.getItem('tenant_slug') || 'Outlet').replace(/[-_]+/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
     const defaultOutletCode = sessionMeta.tenant_slug || sessionMeta.outlet_id || sessionStorage.getItem('tenant_slug') || '';
     const PANES = {
-      profile:`<div class="set-section form-grid-2">${field('Business name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
-<div class="set-section" style="margin-top:12px">
-  <label class="fl">Business type <span style="font-size:11px;color:var(--orange);font-weight:600;margin-left:6px">SaaS vertical</span></label>
-  <select class="form-input" data-skey="set_business_type" style="max-width:320px">
-    <option value="restaurant">Restaurant / Café / Food</option>
-    <option value="retail">Retail Store</option>
-    <option value="salon">Salon / Spa</option>
-    <option value="clinic">Clinic / Hospital</option>
-  </select>
-  <p style="font-size:11.5px;color:var(--text-soft);margin-top:6px">Changing this adapts the dashboard tabs, labels, and features for your business. Save and refresh to apply.</p>
-</div>
-        <div class="set-section">${field('Address','','Outlet address')}</div>
-        <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
-        <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
-        <div class="set-section form-grid-2" id="set-country-currency-row"></div>`,
-      tax:`<div class="set-section form-grid-2">
-          ${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
-          ${field('Invoice prefix','INV-')}
+      profile:`<div class="set-pane-title">Outlet Profile</div>
+        <div class="set-pane-desc">Manage your business brand, contact information, and local vertical settings.</div>
+        
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-store"></i> Business Identity</h4>
+          </div>
+          <div class="set-section form-grid-2">
+            ${field('Business name',defaultOutletName)}
+            ${field('Outlet code',defaultOutletCode)}
+          </div>
+          <div class="set-section" style="margin-top:12px">
+            <label class="fl">Business type <span style="font-size:11px;color:var(--orange);font-weight:600;margin-left:6px">SaaS vertical</span></label>
+            <select class="form-input" data-skey="set_business_type" style="max-width:320px">
+              <option value="restaurant">Restaurant / Café / Food</option>
+              <option value="retail">Retail Store</option>
+              <option value="salon">Salon / Spa</option>
+              <option value="clinic">Clinic / Hospital</option>
+            </select>
+            <p style="font-size:11.5px;color:var(--text-soft);margin-top:6px">Changing this adapts the dashboard tabs, labels, and features for your business. Save and refresh to apply.</p>
+          </div>
         </div>
-        <div class="set-section form-grid-2">
-          ${field('Tax label','GST','e.g. GST, VAT, Sales Tax')}
-          ${field('Tax rate (%)','5','Tax rate percentage')}
+
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-location-dot"></i> Contact Details</h4>
+          </div>
+          <div class="set-section">${field('Address','','Outlet address')}</div>
+          <div class="set-section form-grid-2">
+            ${field('Phone','','Outlet phone')}
+            ${field('Email','','Outlet email')}
+          </div>
         </div>
-        ${toggle('Service charge','Add 5% service charge on dine-in',false)}
-        ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
-        ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
-        ${toggle('Inclusive pricing','Menu prices include GST',false)}`,
-      printer:`<div class="set-section form-grid-2">${field('Receipt printer','EPSON TM-T82 (USB)')}${sel('Paper size',['58 mm','80 mm'],'80 mm')}</div>
-        ${toggle('Auto-print receipt','Print automatically after payment',true)}
-        ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
-        <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}</div>
-        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or the waiter app. QR ordering still works, but every order lands only in your own POS/order dashboard, never the KDS or waiter screens. Manager/admin only.',false)}
+
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-globe"></i> Localization &amp; Tax Identification</h4>
+          </div>
+          <div class="set-section form-grid-2">
+            ${field('GSTIN','','GSTIN if enabled')}
+            ${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}
+          </div>
+          <div class="set-section form-grid-2" id="set-country-currency-row" style="margin-top: 14px;"></div>
         </div>`,
-      gateway:`<div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Configure your WhatsApp gateway for this outlet</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</span></div></div>
-        ${toggle('Auto-send receipts','WhatsApp the bill to customer after payment',true)}
-        ${sel('WhatsApp bill format',['Text receipt','Thermal PDF receipt'],'Text receipt')}
-        ${toggle('Order updates','Notify customer when order is ready',true)}
-        ${toggle('Marketing broadcasts','Allow promotional campaigns',true)}
-        <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining with us. Your bill is attached.</textarea></div>
-        <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
-          <label class="fl" style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:8px;">
-            <span>Recent WhatsApp Activity Logs</span>
+
+      tax:`<div class="set-pane-title">Taxes &amp; Billing</div>
+        <div class="set-pane-desc">Configure rules for GST/VAT taxes, service charges, inclusive pricing, and rounding formats.</div>
+        
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-percent"></i> Tax Calculations</h4>
+          </div>
+          <div style="margin-bottom: 16px;">
+            ${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
+          </div>
+          <div class="set-section form-grid-2">
+            ${field('Tax label','GST','e.g. GST, VAT, Sales Tax')}
+            ${field('Tax rate (%)','5','Tax rate percentage')}
+          </div>
+          <div style="margin-top: 12px;">
+            ${toggle('Inclusive pricing','Menu prices include tax label rate',false)}
+          </div>
+        </div>
+
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-file-invoice"></i> Invoicing Rules &amp; Surcharges</h4>
+          </div>
+          <div class="set-section form-grid-2">
+            ${field('Invoice prefix','INV-')}
+          </div>
+          <div style="margin-top: 12px; display:flex; flex-direction:column; gap:8px;">
+            ${toggle('Service charge','Add 5% service charge on dine-in',false)}
+            ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
+            ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
+          </div>
+        </div>`,
+
+      printer:`<div class="set-pane-title">Printers &amp; KOT</div>
+        <div class="set-pane-desc">Manage physical receipt printers and Kitchen Order Ticket (KOT) routing.</div>
+        
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-receipt"></i> Customer Receipt Printer</h4>
+          </div>
+          <div class="set-section form-grid-2">
+            ${field('Receipt printer','EPSON TM-T82 (USB)')}
+            ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
+          </div>
+          <div style="margin-top: 12px;">
+            ${toggle('Auto-print receipt','Print automatically after payment is completed',true)}
+          </div>
+        </div>
+
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-utensils"></i> Kitchen Tickets (KOT)</h4>
+          </div>
+          <div class="set-section form-grid-2">
+            ${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}
+            ${sel('KOT copies',['1','2','3'],'2')}
+          </div>
+          <div style="margin-top: 12px;">
+            ${toggle('Auto-print KOT','Send KOT to kitchen printer immediately on order placement',true)}
+          </div>
+        </div>
+
+        <div class="set-card" style="border-color: rgba(255,107,0,0.15); background: rgba(255,107,0,0.01);">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-route"></i> Routing Overrides</h4>
+          </div>
+          <div>
+            ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or waiter app. Every order lands only in your POS/order dashboard, never on KDS or waiter screens.',false)}
+          </div>
+        </div>`,
+
+      gateway:`<div class="set-pane-title">WhatsApp Gateway</div>
+        <div class="set-pane-desc">Connect and configure your automated WhatsApp messaging channel for instant receipts and updates.</div>
+        
+        <div class="set-card" style="margin-bottom: 20px;">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-link"></i> Connection Status</h4>
+          </div>
+          <div id="outlet-gateway-status-container">
+            <div class="set-row">
+              <div class="si">
+                <div class="st">Gateway status</div>
+                <div class="sd">Configure your WhatsApp gateway for this outlet</div>
+              </div>
+              <span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;">
+                <i class="fa-solid fa-spinner fa-spin"></i> Checking...
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-brands fa-whatsapp"></i> Notification Automation</h4>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${toggle('Auto-send receipts','WhatsApp the bill to customer automatically after payment',true)}
+            <div class="set-section" style="margin-top: 8px;">
+              ${sel('WhatsApp bill format',['Text receipt','Thermal PDF receipt'],'Text receipt')}
+            </div>
+            ${toggle('Order updates','Notify customer via WhatsApp when their order is ready',true)}
+            ${toggle('Marketing broadcasts','Allow promotional messaging campaigns to customer list',true)}
+          </div>
+        </div>
+
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-comment-dots"></i> Message Content</h4>
+          </div>
+          <div class="set-section">
+            <label class="fl">Receipt message template</label>
+            <textarea class="form-input" rows="3" style="resize:vertical; min-height:80px;">Thanks for dining with us. Your bill is attached.</textarea>
+          </div>
+        </div>
+
+        <div class="set-card">
+          <div class="set-card-header" style="justify-content: space-between;">
+            <h4 class="set-card-title"><i class="fa-solid fa-terminal"></i> Recent WhatsApp Activity Logs</h4>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-refresh-client-logs" style="font-size:10px; padding:2px 8px; height:22px; cursor:pointer;"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
-          </label>
+          </div>
           <div id="client-gateway-logs" style="max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.15); border:1px solid var(--stroke-2); border-radius:var(--r-sm); padding:10px; font-family:monospace; font-size:11px; line-height:1.5; color:var(--text-soft)">
             <div style="text-align:center; padding:12px; color:var(--text-mute)">Loading activity logs...</div>
           </div>
         </div>
-        <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-            <div>
-              <div style="font-weight:700; font-size:13px; color:var(--text)">Troubleshoot Gateway</div>
-              <div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">If WhatsApp is stuck or not showing a new QR, you can force a fresh reset.</div>
+
+        <div class="set-card" style="border-color:rgba(239,68,68,0.2); background:rgba(239,68,68,0.01)">
+          <div class="set-card-header">
+            <h4 class="set-card-title" style="color:#ef4444"><i class="fa-solid fa-triangle-exclamation" style="color:#ef4444"></i> Troubleshoot Gateway</h4>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap: 16px;">
+            <div style="flex:1;">
+              <div style="font-size:12px; color:var(--text-soft); line-height:1.5;">If WhatsApp is stuck, disconnected, or failing to load a new QR code, force a connection reset.</div>
             </div>
-            <button type="button" class="btn btn-sm btn-danger" id="btn-gateway-troubleshoot-reset" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); font-size:11px; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; white-space:nowrap; transition:all 0.2s">
-              <i class="fa-solid fa-triangle-exclamation"></i> Force Reset
+            <button type="button" class="btn btn-sm btn-danger" id="btn-gateway-troubleshoot-reset" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); font-size:11px; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600; white-space:nowrap; transition:all 0.2s">
+              <i class="fa-solid fa-power-off"></i> Force Reset
             </button>
           </div>
         </div>`,
-      team:`<div class="set-row"><div class="si"><div class="st">Team members</div><div class="sd">Manage staff roles and permissions for this outlet</div></div><button class="btn btn-ghost btn-sm" id="set-team-go">Manage team</button></div>
-        ${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
-        ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
-        ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`,
-      plan:`<div class="panel-head" style="margin-bottom:14px"><h3>Current plan</h3></div>
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px">
-          <div style="flex:1;min-width:200px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)"><div style="font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Current subscription</div><div style="font-family:var(--font-display);font-weight:800;font-size:30px;margin:6px 0">Active</div><div style="font-size:12.5px;color:var(--text-soft)">Plan details sync from account billing</div></div>
-          <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">-</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">-</div><div class="csl">Outlets</div></div><div class="cs"><div class="csv">-</div><div class="csl">Bills/mo</div></div></div>
+
+      team:`<div class="set-pane-title">Team &amp; Roles</div>
+        <div class="set-pane-desc">Manage employee profiles, assign staff permissions, and enforce administrative overrides.</div>
+        
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-users"></i> Staff Directory &amp; Roles</h4>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;">
+            <div style="flex:1; font-size:12.5px; color:var(--text-soft)">Add new employees, configure credentials, and set dashboard tab accessibility.</div>
+            <button class="btn btn-primary btn-sm" id="set-team-go" style="padding: 8px 16px; font-size:12.5px; font-weight:600;"><i class="fa-solid fa-user-plus"></i> Manage Team</button>
+          </div>
         </div>
-        <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Manage plan</button>`,
-      payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status...</span></div></div>`,
-      security:`<div class="panel-head" style="margin-bottom:20px"><h3>Security &amp; PIN</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Protect sensitive actions with a 4-digit admin PIN. Staff must enter it for refunds, deletions, and other restricted operations.</p></div><div id="rs-security-panel"></div>`,
-      danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
-        <div style="border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);border-radius:var(--r-md);padding:20px;margin-bottom:18px">
-          <h4 style="color:#ef4444;margin-bottom:8px;font-family:var(--font-display);font-weight:800;font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> Reset Operational Data</h4>
-          <p style="font-size:12.5px;color:var(--text-soft);margin-bottom:16px;line-height:1.5">This will permanently delete all operational data for this outlet including all bills, transactions, customer profiles, custom menu items, staff, and inventory records. Account credentials and settings will be preserved.</p>
-          <button class="btn" id="btn-client-reset-data" style="background:#EF4444;color:#fff;border:none;padding:10px 16px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;"><i class="fa-solid fa-trash-can"></i> Reset Outlet Data</button>
+
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-shield-halved"></i> Privilege Restrictions</h4>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${toggle('Require PIN for refunds','Manager or Owner 4-digit PIN is required to approve billing refunds',true)}
+            ${toggle('Cashier can edit prices','Allow price overrides/adjustments on cart items at POS',false)}
+            ${toggle('Lock reports for staff','Restrict access to sales summaries and analytics reports for standard operators',true)}
+          </div>
+        </div>`,
+
+      plan:`<div class="set-pane-title">Plan &amp; Billing</div>
+        <div class="set-pane-desc">Monitor your active subscription details, workspace limits, and billing metrics.</div>
+        
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-crown"></i> Active Subscription</h4>
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+            <div style="flex:1;min-width:200px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)">
+              <div style="font-family:var(--font-display);font-weight:800;font-size:12px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Current subscription</div>
+              <div style="font-family:var(--font-display);font-weight:800;font-size:30px;margin:6px 0;color:var(--text)">Active</div>
+              <div style="font-size:12px;color:var(--text-soft)">Details sync from your central SaaS account</div>
+            </div>
+            <div class="crm-stats" style="flex:2;min-width:240px">
+              <div class="cs"><div class="csv">-</div><div class="csl">Devices</div></div>
+              <div class="cs"><div class="csv">-</div><div class="csl">Outlets</div></div>
+              <div class="cs"><div class="csv">-</div><div class="csl">Bills/mo</div></div>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="padding: 10px 18px; font-weight:600;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Manage Billing Plan</button>
+        </div>`,
+
+      payments:`<div class="set-pane-title">Payments</div>
+        <div class="set-pane-desc">Set up Razorpay Route destination settings to receive customer payouts directly into your merchant bank account.</div>
+        
+        <div class="set-card">
+          <div class="set-card-header">
+            <h4 class="set-card-title"><i class="fa-solid fa-indian-rupee-sign"></i> Razorpay Route Settings</h4>
+          </div>
+          <div id="rzp-route-container">
+            <div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)">
+              <i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i>
+              <span style="font-size:13px;color:var(--text-soft)">Checking payment status...</span>
+            </div>
+          </div>
+        </div>`,
+
+      security:`<div class="set-pane-title">Security &amp; PIN</div>
+        <div class="set-pane-desc">Restrict sensitive actions (refunds, bill deletions, data reset) with a 4-digit master PIN.</div>
+        <div id="rs-security-panel"></div>`,
+
+      danger:`<div class="set-pane-title" style="color:#ef4444">Danger Zone</div>
+        <div class="set-pane-desc">Irreversible operational actions. Admin privilege required.</div>
+        
+        <div class="set-card" style="border:1.5px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.02)">
+          <div class="set-card-header">
+            <h4 class="set-card-title" style="color:#ef4444"><i class="fa-solid fa-trash-can" style="color:#ef4444"></i> Reset Operational Data</h4>
+          </div>
+          <p style="font-size:12.5px;color:var(--text-soft);margin-bottom:16px;line-height:1.6">This will permanently delete all operational data for this outlet including all bills, transactions, customer profiles, custom menu items, staff, and inventory records. Account credentials and settings will be preserved.</p>
+          <button class="btn" id="btn-client-reset-data" style="background:#EF4444;color:#fff;border:none;padding:10px 20px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;"><i class="fa-solid fa-trash-can"></i> Reset Outlet Data</button>
         </div>`
     };
     // -- Security & PIN panel --------------------------------------------------
