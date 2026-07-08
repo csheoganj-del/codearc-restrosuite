@@ -66,28 +66,27 @@
       async function loadNotifications(){
         if(notifLoading){ notifReloadQueued = true; return; }
         notifLoading = true;
-        const read = readSet();
         try {
           const live = [];
           if(Array.isArray(RS.INVENTORY)){
             RS.INVENTORY.filter(i=>Number(i.stock) < Number(i.min)).slice(0,4).forEach(i=>{
-              live.push({ id:'low-stock-'+(i.id||i.name), type:'warning', title:`${i.name} is low on stock`, message:`${i.stock || 0} ${i.unit || 'unit'} left, minimum ${i.min || 0}`, timestamp:'', isRead:read.has('low-stock-'+(i.id||i.name)) });
+              live.push({ id:'low-stock-'+(i.id||i.name), type:'warning', title:`${i.name} is low on stock`, message:`${i.stock || 0} ${i.unit || 'unit'} left, minimum ${i.min || 0}`, timestamp:'' });
             });
           }
           if(Array.isArray(RS.QR_ORDERS)){
             RS.QR_ORDERS.filter(o=>String(o.status||'').toLowerCase()==='pending').slice(0,4).forEach(o=>{
               const id = 'pending-order-'+(o.id||o.orderId||o.table);
-              live.push({ id, type:'order', title:`New order${o.table ? (' · ' + (String(o.table).match(/^\d+$/) ? ('Table ' + o.table) : o.table)) : ''}`.trim(), message:`${o.table || 'Table'} - ${rs(o.total || 0)}`, timestamp:o.time || o.dateTime || '', isRead:read.has(id) });
+              live.push({ id, type:'order', title:`New order${o.table ? (' · ' + (String(o.table).match(/^\d+$/) ? ('Table ' + o.table) : o.table)) : ''}`.trim(), message:`${o.table || 'Table'} - ${rs(o.total || 0)}`, timestamp:o.time || o.dateTime || '' });
             });
           }
           if(Array.isArray(RS.BILLS)){
             RS.BILLS.filter(b=>String(b.status||'').toLowerCase()==='refunded').slice(0,2).forEach(b=>{
               const id = 'refund-'+(b.id||b.no);
-              live.push({ id, type:'billing', title:`Refund completed ${b.no || ''}`.trim(), message:`${rs(b.amount || 0)} refunded`, timestamp:b.time || '', isRead:read.has(id) });
+              live.push({ id, type:'billing', title:`Refund completed ${b.no || ''}`.trim(), message:`${rs(b.amount || 0)} refunded`, timestamp:b.time || '' });
             });
           }
           if(window.RS_LAST_CLOUD_ERROR){
-            live.push({ id:'cloud-sync-warning', type:'warning', title:'Cloud sync needs attention', message:window.RS_LAST_CLOUD_ERROR.message || 'Latest change is saved locally until sync recovers.', timestamp:window.RS_LAST_CLOUD_ERROR.time, isRead:read.has('cloud-sync-warning') });
+            live.push({ id:'cloud-sync-warning', type:'warning', title:'Cloud sync needs attention', message:window.RS_LAST_CLOUD_ERROR.message || 'Latest change is saved locally until sync recovers.', timestamp:window.RS_LAST_CLOUD_ERROR.time });
           }
           if(window.RS_APP_UPDATE){
             const notifId = 'system-update-' + (window.RS_APP_UPDATE.signature ? window.RS_APP_UPDATE.signature.substring(0, 8) : 'latest');
@@ -95,7 +94,7 @@
             const msg = window.RS_APP_UPDATE.isPatchOnly 
               ? 'System stability hotfix - Click to apply.'
               : `Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} - Click to apply.`;
-            live.push({ id:notifId, type:'system', title:'System update is ready', message:msg, timestamp, isRead:read.has(notifId) });
+            live.push({ id:notifId, type:'system', title:'System update is ready', message:msg, timestamp });
           }
           let saved = [];
           if(window.RS_DB){
@@ -111,6 +110,9 @@
               saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
             }
           }
+          // Re-read localStorage AFTER all awaits so any mark-as-read
+          // that happened during the cloud fetch is not missed.
+          const read = readSet();
           NOTIFS = [...saved, ...live].map(n=>{
             const [ic,bg,c] = iconFor(n.type);
             return { ...n, ic, bg, c, unread: !n.isRead && !read.has(String(n.id)), time:relTime(n.timestamp || n.createdAt) };
