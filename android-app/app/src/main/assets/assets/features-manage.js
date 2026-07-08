@@ -632,7 +632,7 @@
       }
 
       function renderStaffLogins(loginPane) {
-        const used = staffUsage.active_staff || staffUsers.length;
+        const used = Number.isFinite(Number(staffUsage.active_staff)) ? Number(staffUsage.active_staff) : staffUsers.length;
         const max  = staffUsage.max_staff || '--';
         loginPane.innerHTML = `
           <div class="panel-head" style="margin-bottom:16px">
