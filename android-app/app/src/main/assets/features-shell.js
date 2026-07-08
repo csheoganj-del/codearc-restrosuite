@@ -1140,12 +1140,13 @@
       let syncDoneTimer   = null;
       let errorClearTimer = null;
 
-      function setState(state, title, html) {
+      function setState(state, title, html, statusText) {
         if (!pill) return;
         pill.style.cssText = '';              // wipe any legacy inline styles
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
         pill.setAttribute('data-tooltip', title);
+        pill.setAttribute('data-status', statusText || '');
         pill.title = '';
         pill.innerHTML = html;
       }
@@ -1160,21 +1161,24 @@
         if (!isOnline) {
           setState('offline',
             'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
-            `<i class="fa-solid fa-cloud"></i>`
+            `<i class="fa-solid fa-cloud"></i>`,
+            'Offline'
           );
           return;
         }
         if (isSuperAdmin) {
           setState('superadmin-cloud',
             'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
-            `<i class="fa-solid fa-cloud-bolt"></i>`
+            `<i class="fa-solid fa-cloud-bolt"></i>`,
+            'Cloud admin'
           );
           return;
         }
         if (!isCloud) {
           setState('local-only',
             'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
-            `<i class="fa-solid fa-cloud"></i>`
+            `<i class="fa-solid fa-cloud"></i>`,
+            'Local only'
           );
           return;
         }
@@ -1183,7 +1187,8 @@
         if (err && (Date.now() - err.time < 30000)) {
           setState('sync-error',
             `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
-            `<i class="fa-solid fa-cloud"></i>`
+            `<i class="fa-solid fa-cloud"></i>`,
+            'Sync error'
           );
           clearTimeout(errorClearTimer);
           errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
@@ -1191,7 +1196,8 @@
         }
         setState('cloud',
           'Connected to Supabase — all data syncs to the cloud instantly.',
-          `<i class="fa-solid fa-cloud"></i>`
+          `<i class="fa-solid fa-cloud"></i>`,
+          'Cloud'
         );
       }
 
@@ -1201,6 +1207,7 @@
         pill.classList.add('syncing');
         pill.style.cssText = '';
         pill.setAttribute('data-tooltip', 'Syncing to cloud…');
+        pill.setAttribute('data-status', 'Syncing…');
         pill.title = '';
         pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i>`;
       }
