@@ -63,7 +63,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v38-20260708-pill';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v39-20260709-pill-icon';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -1497,7 +1497,7 @@
   // Load versioned feature scripts in order without document.write.
   // document.write blocks the HTML parser; this approach does not.
   (function() {
-    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v38-20260708-pill');
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v39-20260709-pill-icon');
     var srcs = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
