@@ -3627,6 +3627,26 @@
     });
   }
 
+  let _superPollTimer = null;
+  async function pollSuperTenants() {
+    try {
+      if (!window.RS_API || !RS_API.configured) return;
+      const body = document.getElementById('tenant-table-body');
+      if (!body || body.offsetParent === null) return;
+      if (document.visibilityState !== 'visible') return;
+      const out = await RS_API.admin({ action: 'list_tenants' }).catch(() => null);
+      if (out && Array.isArray(out.tenants)) {
+        _cachedTenants = out.tenants;
+        renderPlatformSummary(_cachedTenants);
+        renderTenantTable();
+      }
+    } catch (e) { /* quiet */ }
+  }
+  function startSuperPolling() {
+    if (_superPollTimer) return;
+    _superPollTimer = setInterval(pollSuperTenants, 30000);
+  }
+
   const renderSuper = async () => {
     const tbody = $('#tenant-table-body');
     if (!tbody) return;
@@ -3666,6 +3686,7 @@
       renderTenantTable();
       bindTenantBulkControls();
       updateBulkBar();
+      startSuperPolling();
 
       // Wire sort headers (only once)
       document.querySelectorAll('th[data-sort-col]').forEach(th => {
@@ -4079,6 +4100,12 @@
         catch (e) { periodEndEl.value = ''; }
       }
       loadTenantDevices(tenant.id);
+      if (window.__rsDeviceTimer) clearInterval(window.__rsDeviceTimer);
+      window.__rsDeviceTimer = setInterval(function () {
+        const box = document.getElementById('manage-devices-box');
+        if (!box || box.offsetParent === null) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; return; }
+        loadTenantDevices(tenant.id);
+      }, 15000);
       // Notes field — stored in localStorage keyed by tenant ID (no backend needed)
       const notesEl = document.getElementById('manage-notes');
       if (notesEl) {
@@ -4142,6 +4169,7 @@
   function closeTenantModal() {
     const modal = document.getElementById('tenant-manage-modal');
     if (modal) modal.classList.remove('active');
+    if (window.__rsDeviceTimer) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; }
   }
 
   // ── Super-Admin Settings Modal ──────────────────────────────────────────
