@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260709-pill-icon";
+const CACHE_NAME = "restrosuite-shell-v20260709-license-guard";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -43,6 +43,9 @@ const APP_SHELL = [
   
   // Missing Feature Scripts Loaded Dynamically by dashboard.html
   "/assets/dashboard.js",
+  // Offline-lease guard — MUST be cached so enforcement survives offline.
+  "/assets/license-config.js",
+  "/assets/license-guard.js",
   "/assets/features-pos.js",
   "/assets/features-editor.js",
   "/assets/features-manage.js",

@@ -9,7 +9,7 @@
    ============================================================ */
 'use strict';
 
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('RS_DESKTOP', {
   isDesktop: true,
@@ -21,4 +21,12 @@ contextBridge.exposeInMainWorld('RS_DESKTOP', {
   },
   // Convenience mirror of navigator.onLine for any UI that wants it.
   isOnline: () => (typeof navigator !== 'undefined' ? navigator.onLine : true),
+});
+
+// License bridge: the renderer's license-guard.js calls window.rsDesktop.storeLease
+// whenever it obtains a fresh lease, so the main process can persist it
+// (DPAPI-encrypted) and verify it natively on the next cold start.
+contextBridge.exposeInMainWorld('rsDesktop', {
+  storeLease: (leaseToken, serverTimeMs) => ipcRenderer.invoke('rs-license-store', leaseToken, serverTimeMs),
+  recheckLicense: () => ipcRenderer.invoke('rs-license-recheck'),
 });

@@ -71,3 +71,8 @@ nul
 # Agent files
 .gemini/
 .env*
+
+# License signing (never commit private keys)
+scripts/.license-signing-key.dev.b64
+*.license-key
+LICENSE_PRIVATE_KEY_KEEP_SECRET.txt

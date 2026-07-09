@@ -1,0 +1,294 @@
+{
+  "owner": {
+    "success": true,
+    "visibleTabs": [
+      "pos-tab",
+      "qr-orders-tab",
+      "kds-tab",
+      "floor-tab",
+      "aggregator-tab",
+      "bills-tab",
+      "inventory-tab",
+      "editor-tab",
+      "employees-tab",
+      "customers-tab",
+      "tax-tab",
+      "reports-tab",
+      "analytics-tab",
+      "growth-hub-tab"
+    ],
+    "settingsVisible": true,
+    "restrictedVisible": [],
+    "missingAllowed": [],
+    "consoleErrors": [],
+    "screenshots": [
+      {
+        "tab": "pos-tab",
+        "label": "Point of Sale",
+        "file": "owner_pos-tab.png"
+      },
+      {
+        "tab": "qr-orders-tab",
+        "label": "QR Orders",
+        "file": "owner_qr-orders-tab.png"
+      },
+      {
+        "tab": "kds-tab",
+        "label": "Kitchen Display",
+        "file": "owner_kds-tab.png"
+      },
+      {
+        "tab": "floor-tab",
+        "label": "Floor & Tables",
+        "file": "owner_floor-tab.png"
+      },
+      {
+        "tab": "aggregator-tab",
+        "label": "Online Orders",
+        "file": "owner_aggregator-tab.png"
+      },
+      {
+        "tab": "bills-tab",
+        "label": "Bills",
+        "file": "owner_bills-tab.png"
+      },
+      {
+        "tab": "inventory-tab",
+        "label": "Inventory",
+        "file": "owner_inventory-tab.png"
+      },
+      {
+        "tab": "editor-tab",
+        "label": "Menu Editor",
+        "file": "owner_editor-tab.png"
+      },
+      {
+        "tab": "employees-tab",
+        "label": "Employees",
+        "file": "owner_employees-tab.png"
+      },
+      {
+        "tab": "customers-tab",
+        "label": "Customers",
+        "file": "owner_customers-tab.png"
+      },
+      {
+        "tab": "tax-tab",
+        "label": "Tax & GST",
+        "file": "owner_tax-tab.png"
+      },
+      {
+        "tab": "reports-tab",
+        "label": "Reports",
+        "file": "owner_reports-tab.png"
+      },
+      {
+        "tab": "analytics-tab",
+        "label": "Advanced Analytics",
+        "file": "owner_analytics-tab.png"
+      },
+      {
+        "tab": "growth-hub-tab",
+        "label": "Growth Hub",
+        "file": "owner_growth-hub-tab.png"
+      },
+      {
+        "tab": "settings",
+        "label": "Settings",
+        "file": "owner_settings.png"
+      }
+    ]
+  },
+  "manager": {
+    "success": true,
+    "visibleTabs": [
+      "pos-tab",
+      "qr-orders-tab",
+      "kds-tab",
+      "bills-tab",
+      "inventory-tab",
+      "editor-tab",
+      "employees-tab",
+      "reports-tab"
+    ],
+    "settingsVisible": true,
+    "restrictedVisible": [],
+    "missingAllowed": [],
+    "consoleErrors": [],
+    "screenshots": [
+      {
+        "tab": "pos-tab",
+        "label": "Point of Sale",
+        "file": "manager_pos-tab.png"
+      },
+      {
+        "tab": "qr-orders-tab",
+        "label": "QR Orders",
+        "file": "manager_qr-orders-tab.png"
+      },
+      {
+        "tab": "kds-tab",
+        "label": "Kitchen Display",
+        "file": "manager_kds-tab.png"
+      },
+      {
+        "tab": "bills-tab",
+        "label": "Bills",
+        "file": "manager_bills-tab.png"
+      },
+      {
+        "tab": "inventory-tab",
+        "label": "Inventory",
+        "file": "manager_inventory-tab.png"
+      },
+      {
+        "tab": "editor-tab",
+        "label": "Menu Editor",
+        "file": "manager_editor-tab.png"
+      },
+      {
+        "tab": "employees-tab",
+        "label": "Employees",
+        "file": "manager_employees-tab.png"
+      },
+      {
+        "tab": "reports-tab",
+        "label": "Reports",
+        "file": "manager_reports-tab.png"
+      },
+      {
+        "tab": "settings",
+        "label": "Settings",
+        "file": "manager_settings.png"
+      }
+    ]
+  },
+  "cashier": {
+    "success": true,
+    "visibleTabs": [
+      "pos-tab",
+      "bills-tab"
+    ],
+    "settingsVisible": false,
+    "restrictedVisible": [],
+    "missingAllowed": [],
+    "consoleErrors": [],
+    "screenshots": [
+      {
+        "tab": "pos-tab",
+        "label": "Point of Sale",
+        "file": "cashier_pos-tab.png"
+      },
+      {
+        "tab": "bills-tab",
+        "label": "Bills",
+        "file": "cashier_bills-tab.png"
+      }
+    ]
+  },
+  "waiter": {
+    "success": true,
+    "visibleTabs": [
+      "pos-tab",
+      "kds-tab"
+    ],
+    "settingsVisible": false,
+    "restrictedVisible": [],
+    "missingAllowed": [],
+    "consoleErrors": [],
+    "screenshots": [
+      {
+        "tab": "pos-tab",
+        "label": "Point of Sale",
+        "file": "waiter_pos-tab.png"
+      },
+      {
+        "tab": "kds-tab",
+        "label": "Kitchen Display",
+        "file": "waiter_kds-tab.png"
+      }
+    ]
+  },
+  "kitchen": {
+    "success": true,
+    "visibleTabs": [
+      "kds-tab"
+    ],
+    "settingsVisible": false,
+    "restrictedVisible": [],
+    "missingAllowed": [],
+    "consoleErrors": [],
+    "screenshots": [
+      {
+        "tab": "kds-tab",
+        "label": "Kitchen Display",
+        "file": "kitchen_kds-tab.png"
+      }
+    ]
+  },
+  "captain": {
+    "success": true,
+    "visibleTabs": [
+      "pos-tab",
+      "qr-orders-tab",
+      "kds-tab"
+    ],
+    "settingsVisible": false,
+    "restrictedVisible": [],
+    "missingAllowed": [],
+    "consoleErrors": [],
+    "screenshots": [
+      {
+        "tab": "pos-tab",
+        "label": "Point of Sale",
+        "file": "captain_pos-tab.png"
+      },
+      {
+        "tab": "qr-orders-tab",
+        "label": "QR Orders",
+        "file": "captain_qr-orders-tab.png"
+      },
+      {
+        "tab": "kds-tab",
+        "label": "Kitchen Display",
+        "file": "captain_kds-tab.png"
+      }
+    ]
+  },
+  "inventory": {
+    "success": true,
+    "visibleTabs": [
+      "inventory-tab",
+      "editor-tab",
+      "reports-tab"
+    ],
+    "settingsVisible": false,
+    "restrictedVisible": [],
+    "missingAllowed": [],
+    "consoleErrors": [],
+    "screenshots": [
+      {
+        "tab": "inventory-tab",
+        "label": "Inventory",
+        "file": "inventory_inventory-tab.png"
+      },
+      {
+        "tab": "editor-tab",
+        "label": "Menu Editor",
+        "file": "inventory_editor-tab.png"
+      },
+      {
+        "tab": "reports-tab",
+        "label": "Reports",
+        "file": "inventory_reports-tab.png"
+      }
+    ]
+  },
+  "realtimeSync": {
+    "success": true,
+    "dbOrderPersisted": true,
+    "kitchenRealtimeDisplayed": true,
+    "statusUpdatedToServed": true,
+    "ownerRealtimeReflected": true
+  }
+}

@@ -1267,7 +1267,17 @@
               <option value="canceled">Canceled</option>
             </select>
           </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Renews on (paid until)</label>
+            <input type="date" id="manage-period-end" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box">
+          </div>
         </div>
+      </div>
+
+      <!-- Licensing & devices -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-key" style="font-size:9px"></i> Licensing &amp; Devices</div>
+        <div id="manage-devices-box" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;background:var(--panel);font-size:12.5px;color:var(--text-soft);min-height:44px">Loading devices…</div>
       </div>
 
       <!-- Notes -->
@@ -1437,6 +1447,22 @@
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js?v=20260618-realdata"></script>
 <script src="assets/saas-core.js"></script>
+<script src="assets/license-config.js"></script>
+<script src="assets/license-guard.js"></script>
+<script>
+  (function () {
+    function boot() {
+      try {
+        var sess = window.RS_API && RS_API.session ? RS_API.session() : null;
+        if (sess && sess.role === 'superadmin') return;
+      } catch (e) {}
+      if (window.RSLicense && typeof RSLicense.enforce === 'function') {
+        RSLicense.enforce().catch(function (e) { console.warn('[RSLicense] enforce failed', e); });
+      }
+    }
+    (window.__configReady || Promise.resolve()).then(boot, boot);
+  })();
+</script>
 <script src="src/dashboard/staff-access.js"></script>
 <script src="src/dashboard/observability.js"></script>
 <script src="src/dashboard/imports.js?v=20260618-importsync3"></script>

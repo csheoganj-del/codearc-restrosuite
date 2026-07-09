@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RestroSuite — Reconnect to continue</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: radial-gradient(1200px 600px at 50% -10%, #1b2233, #0b0e16);
+      color: #fff; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      max-width: 460px; text-align: center; background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08); border-radius: 22px;
+      padding: 40px 32px; box-shadow: 0 24px 80px rgba(0,0,0,.5);
+    }
+    .badge {
+      width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 20px;
+      background: rgba(252,128,25,.15); display: flex; align-items: center;
+      justify-content: center; font-size: 32px;
+    }
+    h1 { font-size: 21px; margin: 0 0 12px; }
+    p { font-size: 14.5px; line-height: 1.65; color: #c7cede; margin: 0 0 24px; }
+    button {
+      background: #FC8019; color: #fff; border: none; border-radius: 11px;
+      padding: 13px 26px; font-weight: 700; font-size: 14.5px; cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: default; }
+    .support { margin-top: 18px; font-size: 12.5px; color: #8b93a7; }
+    .status { margin-top: 14px; font-size: 12.5px; color: #ffd9b8; min-height: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">🔒</div>
+    <h1>Reconnect to continue</h1>
+    <p>
+      RestroSuite needs to verify your subscription. Please connect this device
+      to the internet — it will reactivate automatically once your plan is
+      confirmed. Your data is safe and nothing has been deleted.
+    </p>
+    <button id="retry">Retry now</button>
+    <div class="status" id="status"></div>
+    <div class="support">Need help? Contact RestroSuite support.</div>
+  </div>
+  <script>
+    // Restarting the app re-runs the main-process gate; once the plan is
+    // renewed and the device is online, the next launch loads the dashboard.
+    var btn = document.getElementById('retry');
+    var status = document.getElementById('status');
+    btn.addEventListener('click', async function () {
+      btn.disabled = true;
+      status.textContent = navigator.onLine
+        ? 'Checking your subscription…'
+        : 'Still offline — connect to the internet, then retry.';
+      try {
+        // Only the main process can unlock: it re-runs the gate and, if the
+        // subscription is valid again, loads the dashboard itself. Retry can
+        // never bypass the lock from inside the page.
+        var res = (window.rsDesktop && window.rsDesktop.recheckLicense)
+          ? await window.rsDesktop.recheckLicense()
+          : { locked: true };
+        if (res && res.locked) {
+          status.textContent = navigator.onLine
+            ? 'Subscription still inactive. Please renew, then retry.'
+            : 'Still offline. Connect to the internet, then retry.';
+        }
+      } catch (e) {
+        status.textContent = 'Could not verify right now. Please try again.';
+      }
+      setTimeout(function () { btn.disabled = false; }, 1500);
+    });
+  </script>
+</body>
+</html>

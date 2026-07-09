@@ -3366,7 +3366,7 @@
     target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
       item.addEventListener('click', async () => {
         const f = item.getAttribute('data-filter');
-        if (f === 'mrr') return; // MRR card is display-only, not a filter
+        if (f === 'mrr') { openPlanPricingEditor(); return; } // MRR card opens plan pricing
         superAdminFilter = f;
         await renderSuper();
       });
@@ -3907,6 +3907,105 @@
     modal.classList.add('active');
   }
 
+  async function openPlanPricingEditor() {
+    document.getElementById('rs-pricing-modal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'rs-pricing-modal';
+    m.className = 'modal-backdrop';
+    m.style.cssText = 'z-index:200010;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto';
+    m.innerHTML = `
+      <div style="background:var(--panel,#fff);border:1px solid var(--stroke);border-radius:16px;max-width:640px;width:100%;padding:22px 22px 18px;box-shadow:0 24px 80px rgba(0,0,0,.35)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <h3 style="margin:0;font-size:16px;font-weight:800">Plan pricing</h3>
+          <button id="rs-pricing-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-mute);line-height:1">×</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-soft);margin:0 0 14px">Edit monthly price, currency, and the Razorpay plan id used for self-serve checkout. Changes apply immediately.</p>
+        <div id="rs-pricing-body" style="font-size:13px;color:var(--text-soft)"><i class="fa-solid fa-spinner fa-spin"></i> Loading plans…</div>
+      </div>`;
+    document.body.appendChild(m);
+    m.querySelector('#rs-pricing-close').onclick = () => m.remove();
+    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+    const body = m.querySelector('#rs-pricing-body');
+    let plans = [];
+    try { const out = await RS_API.admin({ action: 'list_plans' }); plans = (out && out.plans) || []; }
+    catch (e) { body.innerHTML = '<span style="color:#dc2626">Could not load plans (' + _e(e.message || 'error') + ').</span>'; return; }
+    body.innerHTML = plans.map(p => `
+      <div data-plan="${_e(p.plan_code)}" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px">${_e(p.name)} <span style="color:var(--text-mute);font-weight:600">(${_e(p.plan_code)})</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label style="font-size:11px;color:var(--text-mute)">Price / month
+            <input class="rs-pp-price" type="number" min="0" value="${Number(p.price_monthly)||0}" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px">
+          </label>
+          <label style="font-size:11px;color:var(--text-mute)">Currency
+            <input class="rs-pp-cur" type="text" value="${_e(p.currency||'INR')}" maxlength="8" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px">
+          </label>
+          <label style="font-size:11px;color:var(--text-mute);grid-column:1/3">Razorpay plan id (for self-serve checkout)
+            <input class="rs-pp-rzp" type="text" value="${_e(p.razorpay_plan_id||'')}" placeholder="plan_XXXXXXXX" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px;font-family:monospace">
+          </label>
+          <label style="font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;grid-column:1/3">
+            <input class="rs-pp-pub" type="checkbox" ${p.is_public===false?'':'checked'}> Show to tenants in the in-app billing panel
+          </label>
+        </div>
+        <div style="text-align:right;margin-top:8px">
+          <button class="rs-pp-save btn btn-sm" style="background:var(--orange);color:#fff;border:none;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">Save</button>
+        </div>
+      </div>`).join('');
+    body.querySelectorAll('.rs-pp-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('[data-plan]');
+        const payload = {
+          action: 'update_plan',
+          plan_code: row.getAttribute('data-plan'),
+          price_monthly: Number(row.querySelector('.rs-pp-price').value) || 0,
+          currency: (row.querySelector('.rs-pp-cur').value || 'INR').trim().toUpperCase(),
+          razorpay_plan_id: row.querySelector('.rs-pp-rzp').value.trim(),
+          is_public: row.querySelector('.rs-pp-pub').checked,
+        };
+        btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Saving…';
+        try { await RS_API.admin(payload); toast('Plan pricing updated.', 'fa-circle-check'); }
+        catch (e) { toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
+        finally { btn.disabled = false; btn.textContent = orig; }
+      });
+    });
+  }
+
+  async function loadTenantDevices(tenantId) {
+    const box = document.getElementById('manage-devices-box');
+    if (!box) return;
+    if (!tenantId) { box.textContent = 'Save the workspace first to see licensed devices.'; return; }
+    box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading devices…';
+    let devices = [];
+    try { const out = await RS_API.admin({ action: 'list_devices', tenant_id: tenantId }); devices = (out && out.devices) || []; }
+    catch (e) { box.innerHTML = '<span style="color:#dc2626">Could not load devices (' + _e(e.message || 'error') + ').</span>'; return; }
+    if (!devices.length) { box.innerHTML = '<span style="color:var(--text-mute)">No devices have activated a licence yet.</span>'; return; }
+    const rel = (iso) => { if (!iso) return '—'; const ms = Date.now() - new Date(iso).getTime(); const d = Math.floor(ms/86400000); if (d>0) return d+'d ago'; const h=Math.floor(ms/3600000); if(h>0) return h+'h ago'; const mi=Math.floor(ms/60000); return mi>0?mi+'m ago':'just now'; };
+    box.innerHTML = devices.map(d => {
+      const shortId = _e(String(d.device_id || '').replace(/^dev_/, '').slice(0, 12));
+      const revoked = !!d.revoked;
+      const statusChip = revoked ? '<span style="color:#dc2626;font-weight:700">Revoked</span>' : '<span style="color:#16A34A;font-weight:700">Active</span>';
+      const btn = revoked
+        ? `<button class="rs-dev-btn" data-act="restore_device" data-dev="${_e(d.device_id)}" style="background:none;border:1px solid var(--stroke);border-radius:7px;padding:5px 10px;font-size:11px;color:var(--text);cursor:pointer">Restore</button>`
+        : `<button class="rs-dev-btn" data-act="revoke_device" data-dev="${_e(d.device_id)}" style="background:none;border:1px solid rgba(239,68,68,.35);border-radius:7px;padding:5px 10px;font-size:11px;color:#dc2626;cursor:pointer">Revoke</button>`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--stroke)">
+        <div style="min-width:0">
+          <div style="font-weight:700;color:var(--text);font-family:monospace;font-size:12px">${shortId} · ${statusChip}</div>
+          <div style="font-size:11px;color:var(--text-mute)">${_e(d.last_plan || '—')} · last seen ${rel(d.last_lease_at)} · ${_e(String(d.lease_count || 0))} renewals</div>
+        </div>${btn}
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.rs-dev-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const act = btn.getAttribute('data-act'); const dev = btn.getAttribute('data-dev');
+        btn.disabled = true;
+        try {
+          await RS_API.admin({ action: act, tenant_id: tenantId, device_id: dev, reason: 'Toggled from admin console' });
+          toast(act === 'revoke_device' ? 'Device revoked — it will lock within the offline window.' : 'Device restored.', 'fa-circle-check');
+          loadTenantDevices(tenantId);
+        } catch (e) { btn.disabled = false; toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
+      });
+    });
+  }
+
   function openTenantManageModal(tenant) {
     try {
       const modal = document.getElementById('tenant-manage-modal');
@@ -3959,6 +4058,12 @@
       if (emailEl) emailEl.value = tenant.email || '';
       if (planCodeEl) planCodeEl.value = tenant.plan_code || 'starter';
       if (subscriptionStatusEl) subscriptionStatusEl.value = tenant.subscription_status || 'active';
+      const periodEndEl = document.getElementById('manage-period-end');
+      if (periodEndEl) {
+        try { periodEndEl.value = tenant.subscription_current_period_end ? new Date(tenant.subscription_current_period_end).toISOString().slice(0,10) : ''; }
+        catch (e) { periodEndEl.value = ''; }
+      }
+      loadTenantDevices(tenant.id);
       // Notes field — stored in localStorage keyed by tenant ID (no backend needed)
       const notesEl = document.getElementById('manage-notes');
       if (notesEl) {
@@ -4165,6 +4270,7 @@
           const email = document.getElementById('manage-email').value.trim();
           const plan_code = document.getElementById('manage-plan-code').value;
           const subscription_status = document.getElementById('manage-subscription-status').value;
+          const periodEndRaw = (document.getElementById('manage-period-end') || {}).value || '';
 
           const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
 
@@ -4178,6 +4284,7 @@
             phone,
             email
           };
+          updates.subscription_current_period_end = periodEndRaw ? new Date(periodEndRaw + 'T23:59:59Z').toISOString() : '';
 
           if (password !== '') updates.password = password;
 

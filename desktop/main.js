@@ -10,11 +10,12 @@
    ============================================================ */
 'use strict';
 
-const { app, BrowserWindow, Menu, shell, session, dialog } = require('electron');
+const { app, BrowserWindow, Menu, shell, session, dialog, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { createServer } = require('./server');
+const licenseGate = require('./license-main');
 
 // --- Load config -----------------------------------------------------------
 function loadConfig() {
@@ -44,6 +45,7 @@ function resolveWebRoot() {
 
 let mainWindow = null;
 let serverInstance = null;
+let appEntryUrl = null; // set in createWindow; used by the license re-check IPC
 
 // --- Single-instance lock: second launch focuses the existing window -------
 const gotLock = app.requestSingleInstanceLock();
@@ -111,13 +113,32 @@ function createWindow() {
 
   const entry = (config.entry || '/login');
   const url = `http://localhost:${PORT}${entry.startsWith('/') ? entry : '/' + entry}`;
+  appEntryUrl = url;
 
   win.webContents.once('did-finish-load', () => {
     if (!win.isVisible()) win.show();
   });
 
-  // Load the real app after a short splash beat.
+  // Offline-lease gate: re-verify the lease in the main process before loading
+  // the dashboard. Fail OPEN on any gate error so a bug can never brick a
+  // paying outlet.
+  let locked = false;
+  try {
+    const decision = licenseGate.gate();
+    locked = !!decision.locked;
+    if (locked) console.warn('[main] license gate locked:', decision.reason);
+  } catch (e) {
+    console.warn('[main] license gate error (failing open):', e && e.message);
+  }
+
   setTimeout(() => {
+    if (locked) {
+      win.loadFile(path.join(__dirname, 'lock.html')).catch((err) => {
+        dialog.showErrorBox('RestroSuite is locked', String(err));
+      });
+      if (!win.isVisible()) win.show();
+      return;
+    }
     win.loadURL(url).catch((err) => {
       dialog.showErrorBox('RestroSuite failed to start', String(err));
     });
@@ -194,6 +215,25 @@ function buildMenu() {
 app.whenReady().then(async () => {
   try {
     installOriginRewrite();
+
+    try {
+      licenseGate.init({ userDataDir: app.getPath('userData'), webRoot: resolveWebRoot(), safeStorage });
+    } catch (e) {
+      console.warn('[main] license gate init failed (failing open):', e && e.message);
+    }
+
+    ipcMain.handle('rs-license-store', (_evt, leaseToken, serverTimeMs) => {
+      try { return licenseGate.persistLease(leaseToken, serverTimeMs); }
+      catch (e) { return { error: String(e && e.message) }; }
+    });
+    ipcMain.handle('rs-license-recheck', () => {
+      let decision;
+      try { decision = licenseGate.gate(); }
+      catch (e) { decision = { locked: false, reason: 'gate_error' }; }
+      if (!decision.locked && appEntryUrl && mainWindow) mainWindow.loadURL(appEntryUrl).catch(() => {});
+      return { locked: !!decision.locked, reason: decision.reason };
+    });
+
     serverInstance = await startLocalServer();
     buildMenu();
     createWindow();

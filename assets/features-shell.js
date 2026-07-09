@@ -248,12 +248,8 @@
         ${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
         ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
         ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`,
-      plan:`<div class="panel-head" style="margin-bottom:14px"><h3>Current plan</h3></div>
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px">
-          <div style="flex:1;min-width:200px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)"><div style="font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Current subscription</div><div style="font-family:var(--font-display);font-weight:800;font-size:30px;margin:6px 0">Active</div><div style="font-size:12.5px;color:var(--text-soft)">Plan details sync from account billing</div></div>
-          <div class="crm-stats" style="flex:2;min-width:240px"><div class="cs"><div class="csv">-</div><div class="csl">Devices</div></div><div class="cs"><div class="csv">-</div><div class="csl">Outlets</div></div><div class="cs"><div class="csv">-</div><div class="csl">Bills/mo</div></div></div>
-        </div>
-        <button class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Manage plan</button>`,
+      plan:`<div class="panel-head" style="margin-bottom:14px"><h3>Plan &amp; billing</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Your subscription, renewal date, and plan options.</p></div>
+        <div id="rs-plan-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Loading your plan…</span></div></div>`,
       payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status...</span></div></div>`,
       security:`<div class="panel-head" style="margin-bottom:20px"><h3>Security &amp; PIN</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Protect sensitive actions with a 4-digit admin PIN. Staff must enter it for refunds, deletions, and other restricted operations.</p></div><div id="rs-security-panel"></div>`,
       danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
@@ -354,6 +350,76 @@
         }
         RS.toast('Admin PIN removed','fa-lock-open');
         initSecurityPanel(body);
+      });
+    }
+
+    // -- Plan & billing panel (tenant self-serve) -----------------------------
+    async function initPlanPanel(body) {
+      const container = body.querySelector('#rs-plan-container');
+      if (!container) return;
+      const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+      const fmtDate = (iso) => { if (!iso) return '—'; try { return new Date(iso).toLocaleDateString(undefined, { day:'2-digit', month:'short', year:'numeric' }); } catch(e){ return '—'; } };
+      const money = (amt, cur) => { const sym = cur === 'INR' ? '₹' : (cur === 'EUR' ? '€' : (cur === 'USD' ? '$' : (cur ? cur + ' ' : ''))); return amt > 0 ? `${sym}${Number(amt).toLocaleString()}` : 'Free'; };
+      const STATUS_STYLE = { active:['#22c55e','Active'], trialing:['#3b82f6','Trial'], past_due:['#f59e0b','Payment due'], canceled:['#ef4444','Cancelled'] };
+      let data;
+      try { data = await RS_API.getPlans(); }
+      catch (e) { container.innerHTML = `<div style="padding:14px;border:1px solid rgba(239,68,68,0.25);border-radius:var(--r-sm);background:rgba(239,68,68,0.04);color:#ef4444;font-size:13px;">Could not load your plan. Please check your connection and try again.</div>`; return; }
+      const current = (data && data.current) || {};
+      const plans = (data && data.plans) || [];
+      const curCode = current.plan_code || 'starter';
+      const st = STATUS_STYLE[current.subscription_status] || STATUS_STYLE.active;
+      const sColor = st[0], sLabel = st[1];
+      const curPlan = plans.find(p => p.plan_code === curCode) || { name: curCode, price_monthly: 0, currency: 'INR' };
+      const renews = current.subscription_current_period_end;
+      const header = `
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">
+          <div style="flex:1;min-width:220px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)">
+            <div style="font-weight:800;font-size:12px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Current plan</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin:6px 0">${esc(curPlan.name)}</div>
+            <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:${sColor}"><span style="width:7px;height:7px;border-radius:50%;background:${sColor};display:inline-block"></span>${esc(sLabel)}</div>
+          </div>
+          <div style="flex:1;min-width:220px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:18px;background:var(--glass)">
+            <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em">Renews on</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin:6px 0">${fmtDate(renews)}</div>
+            <div style="font-size:12px;color:var(--text-soft)">${money(curPlan.price_monthly, curPlan.currency)}${curPlan.price_monthly>0?' / month':''}</div>
+          </div>
+        </div>`;
+      const cards = plans.map(p => {
+        const isCurrent = p.plan_code === curCode;
+        const canCheckout = p.checkout_available && p.price_monthly > 0 && !isCurrent;
+        const noCheckout = !p.checkout_available && p.price_monthly > 0 && !isCurrent;
+        let cta;
+        if (isCurrent) cta = `<button class="btn btn-ghost btn-sm" disabled style="width:100%;opacity:.7">Current plan</button>`;
+        else if (canCheckout) cta = `<button class="btn btn-primary btn-sm rs-upgrade-btn" data-plan="${esc(p.plan_code)}" style="width:100%"><i class="fa-solid fa-arrow-up"></i> Choose ${esc(p.name)}</button>`;
+        else if (noCheckout) cta = `<button class="btn btn-ghost btn-sm rs-contact-btn" data-plan="${esc(p.plan_code)}" style="width:100%">Contact to upgrade</button>`;
+        else cta = `<button class="btn btn-ghost btn-sm" disabled style="width:100%">—</button>`;
+        return `
+          <div style="flex:1;min-width:190px;border:1.5px solid ${isCurrent?'var(--orange)':'var(--stroke-2)'};border-radius:var(--r-md);padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:8px">
+            <div style="font-weight:800;font-size:15px">${esc(p.name)}</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:22px">${money(p.price_monthly, p.currency)}<span style="font-size:12px;color:var(--text-soft);font-weight:600">${p.price_monthly>0?' /mo':''}</span></div>
+            <div style="font-size:11.5px;color:var(--text-soft);line-height:1.6">Up to ${esc(p.max_staff)} staff · ${esc((p.monthly_order_limit||0).toLocaleString())} orders/mo · ${esc(p.support_level||'standard')} support</div>
+            <div style="margin-top:auto;padding-top:6px">${cta}</div>
+          </div>`;
+      }).join('');
+      container.innerHTML = header +
+        `<div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Available plans</div>
+         <div style="display:flex;gap:12px;flex-wrap:wrap">${cards}</div>
+         <p style="font-size:11.5px;color:var(--text-soft);margin-top:14px;line-height:1.6">Secure checkout by Razorpay. Your subscription renews automatically each month and your workspace stays active as long as billing is current. Cancel anytime from the checkout page.</p>`;
+      container.querySelectorAll('.rs-upgrade-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const plan = btn.getAttribute('data-plan');
+          btn.disabled = true; const orig = btn.innerHTML;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting checkout…';
+          try {
+            const res = await RS_API.subscribe(plan);
+            if (res && res.short_url) { window.open(res.short_url, '_blank', 'noopener'); RS.toast('Complete payment in the new tab to activate your plan.', 'fa-arrow-up-right-from-square'); }
+            else { throw new Error('No checkout URL'); }
+          } catch (e) { RS.toast((e && e.message) || 'Could not start checkout.', 'fa-circle-exclamation'); }
+          finally { btn.disabled = false; btn.innerHTML = orig; }
+        });
+      });
+      container.querySelectorAll('.rs-contact-btn').forEach(btn => {
+        btn.addEventListener('click', () => { RS.toast('Contact RestroSuite support to move to this plan.', 'fa-headset'); });
       });
     }
 
@@ -984,6 +1050,7 @@
         } else {
           stopOutletGatewayPolling();
         }
+        if (key === 'plan') { try { initPlanPanel(body); } catch (e) { console.warn('plan panel', e); } }
         // If profile pane: inject country/currency selects dynamically using stored values
         if (key === 'profile') {
           const row = body.querySelector('#set-country-currency-row');
