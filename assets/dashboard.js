@@ -3471,7 +3471,7 @@
       const statusKey = (t.status || 'active').toLowerCase();
       const statusCls = tStatus[statusKey] || 't-active';
       const statusText = t.status ? (t.status.charAt(0).toUpperCase() + t.status.slice(1).replace(/_/g,' ')) : 'Active';
-      const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { month:'short', year:'numeric' }) : '-';
+      const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '-';
       const mrr = t.mrr || 0;
       const name = t.name || t.tenant_name || t.slug || 'Unknown';
       const slug = t.slug || t.tenant_slug || '';
