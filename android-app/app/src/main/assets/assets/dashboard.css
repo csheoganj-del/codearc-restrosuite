@@ -2734,8 +2734,9 @@ textarea:focus-visible,
   flex-shrink: 0;
 }
 
-/* Hide span text tag inside badge by default */
-.topbar .tb-pill:not(.clock-pill) span,
+/* Hide badge labels by default, but keep wrapper spans visible so icons render. */
+.topbar .tb-pill:not(.clock-pill) > span:not(#topbar-whatsapp-status-text),
+#topbar-whatsapp-status-text > span,
 .topbar .support-dropdown .dropdown-trigger span {
   opacity: 0;
   max-width: 0;
@@ -2746,6 +2747,13 @@ textarea:focus-visible,
   font-weight: 600 !important;
   color: inherit !important;
   vertical-align: middle;
+}
+
+#topbar-whatsapp-status-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 0 !important;
 }
 
 /* On hover: expand width to the left (pushes items on the left side) */
@@ -2765,7 +2773,8 @@ textarea:focus-visible,
 }
 
 /* Show span text on hover */
-.topbar .tb-pill:not(.clock-pill):hover span,
+.topbar .tb-pill:not(.clock-pill):hover > span:not(#topbar-whatsapp-status-text),
+.topbar .tb-pill:not(.clock-pill):hover #topbar-whatsapp-status-text > span,
 .topbar .support-dropdown:hover .dropdown-trigger span {
   opacity: 1;
   max-width: 80px;
