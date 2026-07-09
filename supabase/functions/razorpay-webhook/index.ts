@@ -159,19 +159,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+  // Razorpay subscription entities carry Unix-second timestamps. current_end is
+  // the end of the currently-paid billing cycle — exactly the "paid until" date
+  // that drives lease issuance (subscription_current_period_end). Fall back to
+  // +1 month if a webhook variant omits it, so the period always advances.
+  const currentEndIso = (() => {
+    const raw = Number((entity as Record<string, unknown>).current_end || 0);
+    if (raw > 0) return new Date(raw * 1000).toISOString();
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString();
+  })();
+
   switch (event) {
     // ── Subscription activated (first payment succeeded) ──────────────────
     case "subscription.activated": {
       const { error } = await supabase
         .from("saas_tenants")
         .update({
-          status: "active",
-          // plan_code is the column read by tenant-access/tenant-data/tenant-admin.
-          // Writing `plan` (the old field) silently left the entitlement gate stale.
+          status: "approved", // keep tenant approved so QR ordering / all gates stay open
           plan_code: planSlug,
           subscription_id: subscriptionId,
           subscription_activated_at: new Date().toISOString(),
           subscription_status: "active",
+          subscription_current_period_end: currentEndIso,
         })
         .eq("username", tenantUsername);
 
@@ -179,16 +190,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
         console.error("DB update failed (activated):", error);
         return new Response("DB error", { status: 500 });
       }
-      console.log(`Tenant ${tenantUsername} activated on plan ${planSlug}`);
+      console.log(`Tenant ${tenantUsername} activated on plan ${planSlug} (paid until ${currentEndIso})`);
       break;
     }
 
-    // ── Recurring charge succeeded ─────────────────────────────────────────
+    // ── Recurring charge succeeded (auto-renew) ────────────────────────────
     case "subscription.charged": {
       const { error } = await supabase
         .from("saas_tenants")
         .update({
-          status: "active",
+          status: "approved",
+          subscription_status: "active",
+          subscription_current_period_end: currentEndIso,
           subscription_renewed_at: new Date().toISOString(),
         })
         .eq("username", tenantUsername);
@@ -197,7 +210,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         console.error("DB update failed (charged):", error);
         return new Response("DB error", { status: 500 });
       }
-      console.log(`Tenant ${tenantUsername} subscription renewed`);
+      console.log(`Tenant ${tenantUsername} renewed (paid until ${currentEndIso})`);
       break;
     }
 
@@ -208,6 +221,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .from("saas_tenants")
         .update({
           status: "suspended",
+          subscription_status: "canceled",
           subscription_cancelled_at: new Date().toISOString(),
         })
         .eq("username", tenantUsername);

@@ -242,6 +242,23 @@ function planMonthlyRupees(planCode: unknown) {
   return 0;
 }
 
+async function fetchPlanPriceMap(): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabaseAdmin.from("saas_plans").select("plan_code, price_monthly");
+    if (error || !data) throw error || new Error("no plans");
+    const map: Record<string, number> = {};
+    for (const p of data as Array<{ plan_code: string; price_monthly: number }>) map[String(p.plan_code)] = Number(p.price_monthly) || 0;
+    return map;
+  } catch (e) {
+    console.warn("fetchPlanPriceMap fell back to constants:", (e as Error)?.message);
+    return { free: 0, starter: 0, growth: 1499, enterprise: 4999 };
+  }
+}
+function priceFrom(map: Record<string, number>, planCode: unknown) {
+  const code = String(planCode || "starter").toLowerCase();
+  return map[code] != null ? map[code] : planMonthlyRupees(code);
+}
+
 async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Request) {
   const { url, token } = getGatewayUrlAndToken();
   const targetUrl = `${url}${path}`;
@@ -307,13 +324,14 @@ async function getPlatformStats(req: Request) {
     .select("id", { count: "exact", head: true });
 
   const rows = tenants || [];
+  const priceMap = await fetchPlanPriceMap();
   const stats = {
     tenants_total: rows.length,
     tenants_active: rows.filter((t: any) => ["approved", "active"].includes(String(t.status))).length,
     tenants_pending: rows.filter((t: any) => String(t.status) === "pending").length,
     tenants_at_risk: rows.filter((t: any) => ["past_due", "canceled"].includes(String(t.subscription_status))).length,
     paid_tenants: rows.filter((t: any) => ["growth", "enterprise"].includes(String(t.plan_code))).length,
-    platform_mrr: rows.reduce((sum: number, t: any) => sum + planMonthlyRupees(t.plan_code), 0),
+    platform_mrr: rows.reduce((sum: number, t: any) => sum + (["active", "trialing"].includes(String(t.subscription_status)) ? priceFrom(priceMap, t.plan_code) : 0), 0),
     users_total: userCount || 0,
   };
   return jsonResponse({ stats }, 200, req);
@@ -358,6 +376,7 @@ async function getBilling(req: Request) {
     .limit(500);
   if (invoiceError) console.warn("get_billing invoices unavailable:", invoiceError.message);
 
+  const priceMap = await fetchPlanPriceMap();
   const billing = (tenants || []).map((tenant: any) => ({
     tenant_id: tenant.id,
     tenant_name: tenant.name,
@@ -365,9 +384,93 @@ async function getBilling(req: Request) {
     plan_code: tenant.plan_code || "starter",
     subscription_status: tenant.subscription_status || "active",
     subscription_current_period_end: tenant.subscription_current_period_end || null,
-    mrr: planMonthlyRupees(tenant.plan_code),
+    mrr: priceFrom(priceMap, tenant.plan_code),
   }));
   return jsonResponse({ billing, invoices: invoiceError ? [] : (invoices || []) }, 200, req);
+}
+// ── Plan pricing management (superadmin) ───────────────────────────────────
+async function listPlans(req: Request) {
+  const { data, error } = await supabaseAdmin
+    .from("saas_plans")
+    .select("plan_code, name, price_monthly, currency, billing_interval, razorpay_plan_id, is_public, max_staff, monthly_order_limit, allowed_tabs, support_level")
+    .order("price_monthly", { ascending: true });
+  if (error) {
+    console.error("list_plans failed:", error);
+    return jsonResponse({ error: "Failed to load plans." }, 500, req);
+  }
+  return jsonResponse({ plans: data || [] }, 200, req);
+}
+
+async function updatePlan(payload: Record<string, unknown>, req: Request) {
+  const planCode = String(payload.plan_code || "").trim().toLowerCase();
+  if (!["free", "starter", "growth", "enterprise"].includes(planCode)) {
+    return jsonResponse({ error: "Unknown plan." }, 400, req);
+  }
+  const updates: Record<string, unknown> = {};
+  if (payload.price_monthly !== undefined) {
+    const price = Number(payload.price_monthly);
+    if (!Number.isFinite(price) || price < 0 || price > 10_000_000) {
+      return jsonResponse({ error: "Invalid price." }, 400, req);
+    }
+    updates.price_monthly = price;
+  }
+  if (typeof payload.currency === "string" && payload.currency.trim()) {
+    updates.currency = payload.currency.trim().toUpperCase().slice(0, 8);
+  }
+  if (typeof payload.billing_interval === "string" && ["monthly", "yearly", "weekly"].includes(payload.billing_interval)) {
+    updates.billing_interval = payload.billing_interval;
+  }
+  if (payload.razorpay_plan_id !== undefined) {
+    const rid = String(payload.razorpay_plan_id || "").trim();
+    updates.razorpay_plan_id = rid ? rid.slice(0, 64) : null;
+  }
+  if (typeof payload.is_public === "boolean") updates.is_public = payload.is_public;
+  if (Object.keys(updates).length === 0) {
+    return jsonResponse({ error: "No changes provided." }, 400, req);
+  }
+  const { data, error } = await supabaseAdmin
+    .from("saas_plans").update(updates).eq("plan_code", planCode)
+    .select("plan_code, name, price_monthly, currency, billing_interval, razorpay_plan_id, is_public").maybeSingle();
+  if (error) {
+    console.error("update_plan failed:", error);
+    return jsonResponse({ error: "Failed to update plan." }, 500, req);
+  }
+  return jsonResponse({ plan: data }, 200, req);
+}
+
+// ── Licensing / device registry management (superadmin) ────────────────────
+async function listDevices(payload: Record<string, unknown>, req: Request) {
+  const tenantId = String(payload.tenant_id || "").trim();
+  let query = supabaseAdmin
+    .from("saas_license_devices")
+    .select("tenant_id, device_id, first_seen_at, last_lease_at, lease_count, last_plan, revoked, revoked_at, revoked_reason")
+    .order("last_lease_at", { ascending: false }).limit(500);
+  if (tenantId) query = query.eq("tenant_id", tenantId);
+  const { data, error } = await query;
+  if (error) {
+    console.error("list_devices failed:", error);
+    return jsonResponse({ error: "Failed to load devices." }, 500, req);
+  }
+  return jsonResponse({ devices: data || [] }, 200, req);
+}
+
+async function setDeviceRevoked(payload: Record<string, unknown>, req: Request, revoked: boolean) {
+  const tenantId = String(payload.tenant_id || "").trim();
+  const deviceId = String(payload.device_id || "").trim();
+  if (!tenantId || !deviceId) return jsonResponse({ error: "tenant_id and device_id required." }, 400, req);
+  const updates: Record<string, unknown> = {
+    revoked,
+    revoked_at: revoked ? new Date().toISOString() : null,
+    revoked_reason: revoked ? String(payload.reason || "Revoked by admin").slice(0, 240) : null,
+  };
+  const { error } = await supabaseAdmin
+    .from("saas_license_devices").update(updates)
+    .eq("tenant_id", tenantId).eq("device_id", deviceId);
+  if (error) {
+    console.error("set_device_revoked failed:", error);
+    return jsonResponse({ error: "Failed to update device." }, 500, req);
+  }
+  return jsonResponse({ success: true, revoked }, 200, req);
 }
 
 async function listErrorReports(payload: Record<string, unknown>, req: Request) {
@@ -996,6 +1099,11 @@ serve(async (req) => {
     if (action === "get_platform_stats") return await getPlatformStats(req);
     if (action === "list_users") return await listUsers(req);
     if (action === "get_billing") return await getBilling(req);
+    if (action === "list_plans") return await listPlans(req);
+    if (action === "update_plan") return await updatePlan(payload, req);
+    if (action === "list_devices") return await listDevices(payload, req);
+    if (action === "revoke_device") return await setDeviceRevoked(payload, req, true);
+    if (action === "restore_device") return await setDeviceRevoked(payload, req, false);
     if (action === "list_error_reports") return await listErrorReports(payload, req);
     if (action === "resolve_error_report") return await resolveErrorReport(payload, req);
     if (action === "bulk_delete") return await bulkDelete(payload, req);

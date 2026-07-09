@@ -36,8 +36,10 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private View splashView;
     private WebAppInterface jsInterface;
+    private LicenseManager licenseManager;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
+    private static final String APP_URL = "https://restrosuite.codearc.co.in/login";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,6 +114,11 @@ public class MainActivity extends AppCompatActivity {
         jsInterface = new WebAppInterface(this);
         myWebView.addJavascriptInterface(jsInterface, "AndroidInterface");
 
+        // Offline-lease: expose the license bridge so the web guard can persist
+        // each renewed lease natively (EncryptedSharedPreferences).
+        licenseManager = new LicenseManager(this);
+        myWebView.addJavascriptInterface(new LicenseBridge(licenseManager, this), "AndroidLicense");
+
         // Set WebView clients
         myWebView.setWebViewClient(new WebViewClient() {
             @Override
@@ -181,16 +188,56 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Load the live RestroSuite web app.
-        // Cache-bust the TOP-LEVEL document on every cold start: WebSettings
-        // is left on LOAD_DEFAULT (so versioned sub-resources like JS/CSS
-        // still benefit from normal HTTP caching), but the entry HTML itself
-        // must never be served from a stale cache -- that was the main
-        // cause of the app appearing "stuck" on an old version after a
-        // deploy. The query param is unique per launch, so an intermediate
-        // cache can never have a matching prior response for it.
-        myWebView.loadUrl("https://restrosuite.codearc.co.in/login?_cachebust=" + System.currentTimeMillis());
+        // Load the app — or the native offline lock screen if the lease is
+        // missing/expired/tampered and we have no connectivity to renew it.
+        loadAppOrLock();
     }
+
+    /**
+     * Offline-lease gate. When online we always load the app and let the web
+     * guard enforce + renew (it hands leases back through the AndroidLicense
+     * bridge). When OFFLINE we first check the natively-stored lease: a valid,
+     * unexpired one loads the cached app; otherwise we show a native lock
+     * screen instead of the cached dashboard.
+     */
+    public void loadAppOrLock() {
+        boolean online = isNetworkConnected();
+        boolean lockedOffline = false;
+        try {
+            lockedOffline = !online && licenseManager != null && licenseManager.isOfflineLocked();
+        } catch (Throwable t) {
+            // Fail OPEN — a bug in the gate must never brick a paying outlet.
+            Log.e(TAG, "license gate error (failing open): " + t.getMessage());
+            lockedOffline = false;
+        }
+
+        if (lockedOffline) {
+            Log.w(TAG, "Offline with no valid lease -> native lock screen");
+            myWebView.loadDataWithBaseURL(null, LOCK_SCREEN_HTML, "text/html", "utf-8", null);
+            return;
+        }
+
+        // Cache-bust the TOP-LEVEL document on every cold start (see history:
+        // stale entry HTML caused "stuck on old version"). Sub-resources still
+        // use normal HTTP caching via LOAD_DEFAULT.
+        myWebView.loadUrl(APP_URL + "?_cachebust=" + System.currentTimeMillis());
+    }
+
+    private static final String LOCK_SCREEN_HTML =
+        "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        + "<style>html,body{height:100%;margin:0}body{background:radial-gradient(1200px 600px at 50% -10%,#1b2233,#0b0e16);"
+        + "color:#fff;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;align-items:center;"
+        + "justify-content:center;padding:24px}.c{max-width:440px;text-align:center;background:rgba(255,255,255,.04);"
+        + "border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:38px 30px}.b{width:70px;height:70px;"
+        + "border-radius:50%;margin:0 auto 20px;background:rgba(252,128,25,.15);display:flex;align-items:center;"
+        + "justify-content:center;font-size:30px}h1{font-size:20px;margin:0 0 12px}p{font-size:14.5px;line-height:1.65;"
+        + "color:#c7cede;margin:0 0 24px}button{background:#FC8019;color:#fff;border:none;border-radius:11px;"
+        + "padding:13px 26px;font-weight:700;font-size:14.5px}.s{margin-top:16px;font-size:12.5px;color:#8b93a7}</style></head>"
+        + "<body><div class='c'><div class='b'>&#128274;</div><h1>Reconnect to continue</h1>"
+        + "<p>RestroSuite needs to verify your subscription. Please connect this device to the internet — "
+        + "it will reactivate automatically once your plan is confirmed. Your data is safe.</p>"
+        + "<button onclick=\"if(window.AndroidLicense&&AndroidLicense.retry){AndroidLicense.retry();}\">Retry now</button>"
+        + "<div class='s'>Need help? Contact RestroSuite support.</div></div></body></html>";
 
     private void openExternalUrl(String url) {
         if (

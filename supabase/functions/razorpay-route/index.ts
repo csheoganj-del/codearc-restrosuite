@@ -32,6 +32,8 @@ const SUPABASE_URL            = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RZP_KEY_ID              = Deno.env.get("RAZORPAY_KEY_ID")!;
 const RZP_KEY_SECRET          = Deno.env.get("RAZORPAY_KEY_SECRET")!;
+// Same secret used to sign the app's custom HMAC session tokens (tenant-access).
+const SUPERADMIN_SESSION_SECRET = Deno.env.get("SUPERADMIN_SESSION_SECRET") || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -72,6 +74,39 @@ function corsHeaders(req: Request) {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
+}
+// ── App session (custom HMAC token) verification — mirrors tenant-access ─────
+function decodeB64Url(value: string): Uint8Array {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  return new Uint8Array(binary.split("").map((c) => c.charCodeAt(0)));
+}
+function encB64Url(bytes: Uint8Array): string {
+  let binary = "";
+  bytes.forEach((b) => { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+async function hmacB64Url(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return encB64Url(new Uint8Array(sig));
+}
+async function verifyAppSession(req: Request): Promise<{ tenant_id: string } | null> {
+  if (!SUPERADMIN_SESSION_SECRET) return null;
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const [payloadEncoded, signature] = token.split(".");
+  if (!payloadEncoded || !signature) return null;
+  const expected = await hmacB64Url(payloadEncoded, SUPERADMIN_SESSION_SECRET);
+  if (expected !== signature) return null;
+  try {
+    const p = JSON.parse(new TextDecoder().decode(decodeB64Url(payloadEncoded)));
+    if (!p.exp || Date.now() > Number(p.exp)) return null;
+    const tid = String(p.tenant_id || "");
+    if (!tid || tid === "superadmin") return null;
+    return { tenant_id: tid };
+  } catch { return null; }
 }
 
 function json(body: unknown, status = 200, req?: Request) {
@@ -193,6 +228,72 @@ Deno.serve(async (req: Request): Promise<Response> => {
       currency:      "INR",
       name:          tenant.name,
     }, 200, req);
+  }
+
+  // ── get_plans: tenant-facing plan catalogue + current subscription ────────
+  if (action === "get_plans") {
+    const session = await verifyAppSession(req);
+    if (!session) return json({ error: "Unauthorized" }, 401, req);
+    const [{ data: plans }, { data: tenantRow }] = await Promise.all([
+      supabase.from("saas_plans")
+        .select("plan_code, name, price_monthly, currency, billing_interval, is_public, razorpay_plan_id, max_staff, monthly_order_limit, support_level")
+        .order("price_monthly", { ascending: true }),
+      supabase.from("saas_tenants")
+        .select("plan_code, subscription_status, subscription_current_period_end")
+        .eq("id", session.tenant_id).maybeSingle(),
+    ]);
+    const publicPlans = (plans || []).filter((p: any) => p.is_public !== false).map((p: any) => ({
+      plan_code: p.plan_code, name: p.name, price_monthly: Number(p.price_monthly) || 0,
+      currency: p.currency || "INR", billing_interval: p.billing_interval || "monthly",
+      max_staff: p.max_staff, monthly_order_limit: p.monthly_order_limit, support_level: p.support_level,
+      checkout_available: !!p.razorpay_plan_id,
+    }));
+    return json({
+      plans: publicPlans,
+      current: {
+        plan_code: tenantRow?.plan_code || "starter",
+        subscription_status: tenantRow?.subscription_status || "active",
+        subscription_current_period_end: tenantRow?.subscription_current_period_end || null,
+      },
+    }, 200, req);
+  }
+
+  // ── create_subscription: tenant self-serve plan upgrade ───────────────────
+  if (action === "create_subscription") {
+    const session = await verifyAppSession(req);
+    if (!session) return json({ error: "Unauthorized" }, 401, req);
+    const planCode = String(payload.plan_code || "").trim().toLowerCase();
+    if (!["starter", "growth", "enterprise"].includes(planCode)) {
+      return json({ error: "Invalid plan." }, 400, req);
+    }
+    const { data: plan } = await supabase
+      .from("saas_plans")
+      .select("plan_code, name, price_monthly, currency, razorpay_plan_id, is_public")
+      .eq("plan_code", planCode).maybeSingle();
+    if (!plan || plan.is_public === false) {
+      return json({ error: "This plan is not available for self-serve checkout." }, 400, req);
+    }
+    if (!plan.razorpay_plan_id) {
+      return json({ error: "Online checkout for this plan isn't configured yet. Please contact RestroSuite support to upgrade.", code: "no_razorpay_plan" }, 400, req);
+    }
+    const { data: tenantRow } = await supabase
+      .from("saas_tenants")
+      .select("id, name, slug, username, email, phone, subscription_id")
+      .eq("id", session.tenant_id).maybeSingle();
+    if (!tenantRow) return json({ error: "Workspace not found." }, 404, req);
+    try {
+      const sub = await rzpPost("/v1/subscriptions", {
+        plan_id: plan.razorpay_plan_id, total_count: 120, quantity: 1, customer_notify: 1,
+        notes: { tenant_username: tenantRow.username, tenant_id: tenantRow.id, tenant_slug: tenantRow.slug, plan_code: planCode },
+      });
+      return json({
+        success: true, subscription_id: sub.id, short_url: sub.short_url, rzp_key: RZP_KEY_ID,
+        plan: { code: plan.plan_code, name: plan.name, price_monthly: plan.price_monthly, currency: plan.currency },
+      }, 200, req);
+    } catch (e) {
+      console.error("create_subscription failed:", e);
+      return json({ error: "Could not start checkout. Please try again." }, 502, req);
+    }
   }
 
   // ── All actions below require staff auth ──────────────────────────────────

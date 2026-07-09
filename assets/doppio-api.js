@@ -341,6 +341,28 @@
     upsert(table, data, onConflict, { returning=true, columns='*' }={}){ return api.data({ table, operation:'upsert', data, options:{ onConflict }, returning, columns }); },
     remove(table, filters){ return api.data({ table, operation:'delete', filters }); },
 
+    /* ---------------- LICENSE (license-lease) ---------------- */
+    async lease(deviceId){
+      const token = ssGet(K.token);
+      if (!token) { const e = new Error('Not signed in'); e.status = 401; throw e; }
+      if (!CONFIGURED) absorbRuntimeConfig();
+      return post('license-lease', { device_id: deviceId }, token, 'License refresh failed');
+    },
+
+    /* ---------------- BILLING / PLANS (razorpay-route, tenant session) ------ */
+    async getPlans(){
+      const token = ssGet(K.token);
+      if (!token) { const e = new Error('Not signed in'); e.status = 401; throw e; }
+      if (!CONFIGURED) absorbRuntimeConfig();
+      return post('razorpay-route', { action: 'get_plans' }, token, 'Could not load plans');
+    },
+    async subscribe(planCode){
+      const token = ssGet(K.token);
+      if (!token) { const e = new Error('Not signed in'); e.status = 401; throw e; }
+      if (!CONFIGURED) absorbRuntimeConfig();
+      return post('razorpay-route', { action: 'create_subscription', plan_code: planCode }, token, 'Could not start checkout');
+    },
+
     /* ---------------- SUPER-ADMIN (tenant-admin) ---------------- */
     async admin({ action, ...payload }){
       if(!CONFIGURED) {

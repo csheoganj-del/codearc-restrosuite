@@ -387,7 +387,7 @@ const realtimeSkipOrders = new Set(); // "tenantId:orderId"
 const MAX_RECONNECT_ATTEMPTS = 5;
 let totalMessagesSent = 0;
 let recentHealthEvents = []; // last 10 events for dashboard
-let lastAlertSent = null;
+const lastAlertSentByType = new Map();
 
 // ============================================================
 // HEALTH LOGGING -- writes to gateway_health_log in Supabase
@@ -497,11 +497,12 @@ async function sendAdminAlert(type, extraDetails = {}) {
 
     // Throttle alerts -- don't spam more than once per 10 minutes for same type
     const now = Date.now();
-    if (lastAlertSent && lastAlertSent.type === type && (now - lastAlertSent.time) < 10 * 60 * 1000) {
+    const lastAlertTime = lastAlertSentByType.get(type) || 0;
+    if ((now - lastAlertTime) < 10 * 60 * 1000) {
         console.log(`[Admin Alert] Throttled -- ${type} alert already sent recently.`);
         return;
     }
-    lastAlertSent = { type, time: now };
+    lastAlertSentByType.set(type, now);
 
     const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
     let subject = '';
@@ -835,12 +836,11 @@ async function restoreSessionsFromSupabase() {
     }
 }
 
-// LAZY INIT: Sessions are NOT auto-connected on startup.
-// Connections are established only when a restaurant owner requests a QR code
-// or when an API call is made for that tenant. This prevents HuggingFace from
-// flagging outgoing WebSocket connections during container startup.
 function autoInitializeLocalSessions() {
-    console.log('[Startup Auto-Connect] Restoring all WhatsApp sessions on server boot...');
+    const autoConnectAll = String(process.env.RESTROSUITE_AUTO_CONNECT_ALL_SESSIONS || '').toLowerCase() === 'true';
+    console.log(autoConnectAll
+        ? '[Startup Auto-Connect] Restoring all WhatsApp sessions on server boot...'
+        : '[Startup Auto-Connect] Restoring central system WhatsApp session only...');
     const authDir = path.join(os.homedir(), '.restrosuite', 'whatsapp-auth');
     if (!fs.existsSync(authDir)) {
         console.log('[Startup Auto-Connect] No local session directory found.');
@@ -853,11 +853,9 @@ function autoInitializeLocalSessions() {
         for (const folder of folders) {
             if (folder.startsWith('session-')) {
                 const tenantId = folder.substring(8);
+                if (!autoConnectAll && tenantId !== 'system') continue;
                 console.log(`[Startup Auto-Connect] Auto-connecting WhatsApp for tenant: ${tenantId}`);
-                const tenantData = getOrCreateClient(tenantId);
-                initializeBaileysClient(tenantId, tenantData).catch(err => {
-                    console.error(`[Startup Auto-Connect Error] Tenant ${tenantId}:`, err.message);
-                });
+                getOrCreateClient(tenantId);
                 count++;
             }
         }
@@ -3365,7 +3363,8 @@ app.listen(PORT, async () => {
         console.warn('[Startup Alert Warning] Skipped:', err.message);
     }
 
-    // Startup Auto-Connect: Automatically connect all saved sessions on boot
+    // Startup Auto-Connect: keep the central notification account warm, but
+    // do not open every tenant session unless explicitly requested.
     console.log('[Startup] Restoring saved WhatsApp connections...');
     autoInitializeLocalSessions();
     console.log('[Startup] Server is ready. Active connections are syncing in the background...');
