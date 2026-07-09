@@ -92,6 +92,30 @@ function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request
   });
 }
 
+// Live licence push: tell the tenant's app to re-check its licence immediately
+// (mirrors tenant-data's realtime broadcast). Fires on billing/plan/status/
+// period changes and on device revoke, so lock/unlock happens without a refresh.
+async function broadcastLicenseChange(tenantId: string) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !tenantId) return;
+  const topic = `rs-license-${tenantId}`;
+  try {
+    await fetch(
+      `${SUPABASE_URL.replace(/\/+$/, "")}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/license-changed`,
+      {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ at: new Date().toISOString() }),
+      },
+    );
+  } catch (e) {
+    console.error("license broadcast failed:", e);
+  }
+}
+
 function encodeBase64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((byte) => {
@@ -470,6 +494,7 @@ async function setDeviceRevoked(payload: Record<string, unknown>, req: Request, 
     console.error("set_device_revoked failed:", error);
     return jsonResponse({ error: "Failed to update device." }, 500, req);
   }
+  await broadcastLicenseChange(tenantId);
   return jsonResponse({ success: true, revoked }, 200, req);
 }
 
@@ -611,6 +636,12 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
       console.error("migrated owner credential update failed:", ownerError);
       return jsonResponse({ error: "Workspace updated, but migrated owner credentials could not be synchronized." }, 500, req);
     }
+  }
+  // Push a live licence re-check to the tenant's app if anything that affects
+  // access changed (status / plan / billing / renewal date).
+  if (("subscription_status" in updates) || ("plan_code" in updates) ||
+      ("status" in updates) || ("subscription_current_period_end" in updates)) {
+    await broadcastLicenseChange(tenantId);
   }
   return jsonResponse({ success: true }, 200, req);
 }

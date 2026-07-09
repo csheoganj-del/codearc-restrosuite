@@ -445,6 +445,36 @@
     // Frequent lightweight local re-evaluation (catches lease expiring while
     // the app sits open offline, and clock tampering mid-session).
     setInterval(reassess, 5 * 60 * 1000);
+
+    // Live push: react INSTANTLY when the server changes this tenant's licence
+    // (billing set to past_due/active, plan change, or a device revoke) — no
+    // page refresh needed. Retry a few times in case the realtime client isn't
+    // ready at first paint.
+    subscribeRealtime();
+    var rtTries = 0;
+    var rtTimer = setInterval(function () {
+      if (_rtChannel || ++rtTries > 60) { clearInterval(rtTimer); return; }
+      subscribeRealtime();
+    }, 4000);
+  }
+
+  var _rtChannel = null;
+  function subscribeRealtime() {
+    if (!IS_BROWSER || _rtChannel) return;
+    try {
+      var api = root.RS_API;
+      var client = api && api.supabaseClient;
+      var sess = api && api.session ? api.session() : null;
+      var tid = sess && sess.tenant_id;
+      if (!client || !tid || typeof client.channel !== 'function') return;
+      _rtChannel = client.channel('rs-license-' + tid)
+        .on('broadcast', { event: 'license-changed' }, function () {
+          // The server says this tenant's licence changed. Re-fetch the lease
+          // and re-evaluate right away, so lock/unlock happens live.
+          refresh().then(reassess).catch(function () { reassess(); });
+        })
+        .subscribe();
+    } catch (e) { /* not ready yet — the retry interval will try again */ }
   }
 
   async function reassess() {
