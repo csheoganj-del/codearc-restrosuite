@@ -291,7 +291,7 @@
         return r.session || null;
       } catch (err) {
         // If the server explicitly rejected it with 401 or 403, bounce to login (sess = null)
-        if (err.status === 401 || err.status === 403) {
+        if (err.status === 401 || err.status === 403 || err.status === 402) {
           return null;
         }
         // Network error or offline -- keep the local session alive

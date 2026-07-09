@@ -130,6 +130,9 @@
 
     // 2) No verified lease.
     if (!input.verified || !input.claims) {
+      // Server kill switch beats bootstrap grace: if the server explicitly
+      // refused this device/tenant, never allow via the new-device grace.
+      if (input.killed) return decision(false, 'killed', { monitor: monitor });
       // Bootstrap grace: a device that has never banked a valid lease (fresh
       // install offline, or an existing tenant the moment the feature ships) is
       // allowed to run for a bounded window while it tries to fetch one.
@@ -257,11 +260,13 @@
       var res = await api.lease(deviceId);
       if (res && res.status === 'active' && res.lease) {
         storeLease(res.lease, Number(res.server_time || Date.now()));
+        lsDel('rs_license_killed_v1');
         return { ok: true, status: 'active' };
       }
       // Any authoritative "not active" answer is the kill switch.
       if (res && (res.status === 'expired' || res.status === 'revoked')) {
         wipeLease();
+        lsSet('rs_license_killed_v1', '1');
         return { ok: false, status: res.status, kill: true };
       }
       return { ok: false, status: (res && res.status) || 'unknown' };
@@ -270,6 +275,7 @@
       if (s === 402 || s === 403) {
         // Server explicitly refused (expired / revoked) — kill switch.
         wipeLease();
+        lsSet('rs_license_killed_v1', '1');
         return { ok: false, status: 'expired', kill: true };
       }
       if (s === 401) {
@@ -301,6 +307,7 @@
       now: now,
       hwm: st2.hwm,
       firstSeen: st2.firstSeen,
+      killed: lsGet('rs_license_killed_v1') === '1',
       cfg: CFG
     });
 
