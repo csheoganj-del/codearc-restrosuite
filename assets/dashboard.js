@@ -3430,6 +3430,7 @@
       else if (col === 'outlets') { va = Number(a.outlet_count) || 1; vb = Number(b.outlet_count) || 1; }
       else if (col === 'joined') { va = a.created_at || ''; vb = b.created_at || ''; }
       else if (col === 'status') { va = (a.status || '').toLowerCase(); vb = (b.status || '').toLowerCase(); }
+      else if (col === 'renews') { va = a.subscription_current_period_end || ''; vb = b.subscription_current_period_end || ''; }
       else { va = a.created_at || ''; vb = b.created_at || ''; }
       if (va < vb) return dir === 'asc' ? -1 : 1;
       if (va > vb) return dir === 'asc' ? 1 : -1;
@@ -3457,7 +3458,7 @@
 
     if (filtered.length === 0) {
       syncTenantSelectAll([]);
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>${q ? `No tenants match "${_e(q)}"` : `No tenants found for filter "${_e(superAdminFilter)}".`}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>${q ? `No tenants match "${_e(q)}"` : `No tenants found for filter "${_e(superAdminFilter)}".`}</td></tr>`;
       updateBulkBar();
       return;
     }
@@ -3489,6 +3490,19 @@
       const dashboardBtn = !isPending && !isSuspended
         ? `<button class="icon-act open-tenant-dashboard-btn" title="Open workspace dashboard" data-tid="${_e(t.id||'')}" style="font-size:13px;color:var(--orange)"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>`
         : '';
+      // Renews-on (paid-until) cell with colour: red=expired, amber=<=7 days, green=fine.
+      const rawEnd = t.subscription_current_period_end;
+      let renewsCell;
+      if (!rawEnd) {
+        renewsCell = '<span style="color:var(--text-mute)">—</span>';
+      } else {
+        const end = new Date(rawEnd);
+        const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86400000);
+        const dateStr = isNaN(end.getTime()) ? '—' : end.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+        const color = daysLeft < 0 ? '#dc2626' : (daysLeft <= 7 ? '#d97706' : '#16a34a');
+        const label = daysLeft < 0 ? (dateStr + ' (expired)') : (daysLeft <= 7 ? (dateStr + ' (' + daysLeft + 'd)') : dateStr);
+        renewsCell = `<span style="color:${color};font-weight:600;white-space:nowrap">${_e(label)}</span>`;
+      }
       return `<tr class="${selected ? 'tenant-row-selected' : ''}">
         <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
         <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
@@ -3496,6 +3510,7 @@
         <td>${_e(t.outlet_count || 1)}</td>
         <td>${_e(joined)}</td>
         <td><span class="tenant-status ${_e(statusCls)}">${_e(statusText)}</span></td>
+        <td>${renewsCell}</td>
         <td>
           <div class="row-actions" style="gap:5px">
             ${approveBtn}
@@ -3615,7 +3630,7 @@
   const renderSuper = async () => {
     const tbody = $('#tenant-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
     renderPlatformSummary([]);
     try {
       if (window.RS_API) {
@@ -3632,7 +3647,7 @@
         }
         // If still not configured after waiting, session is genuinely missing
         if (!RS_API.configured) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Supabase not reachable — check your internet connection and reload the page.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Supabase not reachable — check your internet connection and reload the page.</td></tr>';
           return;
         }
         const out = await Promise.race([
@@ -3643,7 +3658,7 @@
         if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
         // If we got an auth error, show a helpful message with retry
         if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
           return;
         }
       }
@@ -3665,7 +3680,7 @@
         });
       });
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
     }
   };
 
