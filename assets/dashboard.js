@@ -3297,6 +3297,7 @@
   let superAdminSearch = '';
   let superAdminSort = { col: 'joined', dir: 'desc' };
   let _cachedTenants = [];
+  let selectedTenantIds = new Set();
   let saasGatewayPollingInterval = null;
 
   function escHtml(str) {
@@ -3374,10 +3375,34 @@
 
   const tStatus={active:'t-active',approved:'t-active',trial:'t-trial',pending:'t-trial',suspended:'t-suspended',past_due:'t-suspended',canceled:'t-suspended'};
 
+  function getTenantRowId(tenant) {
+    return tenant && tenant.id != null ? String(tenant.id) : '';
+  }
+
+  function getSelectedTenants() {
+    return _cachedTenants.filter(t => selectedTenantIds.has(getTenantRowId(t)));
+  }
+
+  function pruneTenantSelection() {
+    const validIds = new Set(_cachedTenants.map(getTenantRowId).filter(Boolean));
+    selectedTenantIds = new Set([...selectedTenantIds].filter(id => validIds.has(id)));
+  }
+
+  function syncTenantSelectAll(visibleTenants = []) {
+    const all = document.getElementById('tenant-select-all');
+    if (!all) return;
+    const visibleIds = visibleTenants.map(getTenantRowId).filter(Boolean);
+    const selectedVisible = visibleIds.filter(id => selectedTenantIds.has(id)).length;
+    all.checked = visibleIds.length > 0 && selectedVisible === visibleIds.length;
+    all.indeterminate = selectedVisible > 0 && selectedVisible < visibleIds.length;
+    all.disabled = visibleIds.length === 0;
+  }
+
   // Render tenant table from cached data (no network call)
   function renderTenantTable() {
     const tbody = $('#tenant-table-body');
     if (!tbody) return;
+    pruneTenantSelection();
 
     let filtered = _cachedTenants.slice();
 
@@ -3431,7 +3456,9 @@
     });
 
     if (filtered.length === 0) {
+      syncTenantSelectAll([]);
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>${q ? `No tenants match "${_e(q)}"` : `No tenants found for filter "${_e(superAdminFilter)}".`}</td></tr>`;
+      updateBulkBar();
       return;
     }
 
@@ -3447,6 +3474,8 @@
       const mrr = t.mrr || 0;
       const name = t.name || t.tenant_name || t.slug || 'Unknown';
       const slug = t.slug || t.tenant_slug || '';
+      const tenantId = getTenantRowId(t);
+      const selected = tenantId && selectedTenantIds.has(tenantId);
       const isPending = statusKey === 'pending';
       const isSuspended = statusKey === 'suspended';
       const approveBtn = isPending
@@ -3460,8 +3489,8 @@
       const dashboardBtn = !isPending && !isSuspended
         ? `<button class="icon-act open-tenant-dashboard-btn" title="Open workspace dashboard" data-tid="${_e(t.id||'')}" style="font-size:13px;color:var(--orange)"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>`
         : '';
-      return `<tr>
-        <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
+      return `<tr class="${selected ? 'tenant-row-selected' : ''}">
+        <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
         <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
         <td class="td-strong">${mrr ? rs(mrr) : '--'}</td>
         <td>${_e(t.outlet_count || 1)}</td>
@@ -3477,6 +3506,20 @@
         </td>
       </tr>`;
     }).join('');
+
+    syncTenantSelectAll(filtered);
+    updateBulkBar();
+
+    tbody.querySelectorAll('.tenant-row-checkbox').forEach(cb => {
+      cb.addEventListener('click', e => e.stopPropagation());
+      cb.addEventListener('change', () => {
+        const tid = cb.getAttribute('data-tid');
+        if (!tid) return;
+        if (cb.checked) selectedTenantIds.add(tid);
+        else selectedTenantIds.delete(tid);
+        renderTenantTable();
+      });
+    });
 
     // Bind quick-approve buttons
     tbody.querySelectorAll('.quick-approve-btn').forEach(btn => {
@@ -3606,6 +3649,7 @@
       }
       renderPlatformSummary(_cachedTenants);
       renderTenantTable();
+      bindTenantBulkControls();
       updateBulkBar();
 
       // Wire sort headers (only once)
@@ -3629,13 +3673,76 @@
   function updateBulkBar() {
     const bar = document.getElementById('sa-bulk-bar');
     const label = document.getElementById('sa-bulk-label');
+    const icon = document.getElementById('sa-bulk-icon');
+    const selectionActions = document.getElementById('sa-selection-actions');
+    const approveBtn = document.getElementById('sa-bulk-approve-btn');
     if (!bar || !label) return;
+    const selected = getSelectedTenants();
     const pending = _cachedTenants.filter(t => t.status === 'pending');
-    if (pending.length > 0) {
+    if (selected.length > 0) {
       bar.style.display = 'flex';
+      bar.style.background = 'rgba(239,68,68,0.07)';
+      bar.style.borderColor = 'rgba(239,68,68,0.22)';
+      label.style.color = '#dc2626';
+      label.textContent = `${selected.length} client${selected.length > 1 ? 's' : ''} selected`;
+      if (icon) {
+        icon.className = 'fa-solid fa-trash-can';
+        icon.style.color = '#dc2626';
+      }
+      if (selectionActions) selectionActions.style.display = 'flex';
+      if (approveBtn) approveBtn.style.display = 'none';
+    } else if (pending.length > 0) {
+      bar.style.display = 'flex';
+      bar.style.background = 'rgba(245,158,11,0.08)';
+      bar.style.borderColor = 'rgba(245,158,11,0.2)';
+      label.style.color = '#b45309';
       label.textContent = `${pending.length} workspace${pending.length > 1 ? 's' : ''} waiting for approval`;
+      if (icon) {
+        icon.className = 'fa-solid fa-user-clock';
+        icon.style.color = '#b45309';
+      }
+      if (selectionActions) selectionActions.style.display = 'none';
+      if (approveBtn) approveBtn.style.display = 'inline-flex';
     } else {
       bar.style.display = 'none';
+      if (selectionActions) selectionActions.style.display = 'none';
+      if (approveBtn) approveBtn.style.display = 'inline-flex';
+    }
+  }
+
+  function bindTenantBulkControls() {
+    const selectHead = document.querySelector('.tenant-select-head');
+    if (selectHead && !selectHead.dataset.wired) {
+      selectHead.dataset.wired = '1';
+      selectHead.addEventListener('click', e => e.stopPropagation());
+    }
+    const selectAll = document.getElementById('tenant-select-all');
+    if (selectAll && !selectAll.dataset.wired) {
+      selectAll.dataset.wired = '1';
+      selectAll.addEventListener('click', e => e.stopPropagation());
+      selectAll.addEventListener('change', () => {
+        const visibleIds = Array.from(document.querySelectorAll('#tenant-table-body .tenant-row-checkbox'))
+          .map(cb => cb.getAttribute('data-tid'))
+          .filter(Boolean);
+        visibleIds.forEach(id => {
+          if (selectAll.checked) selectedTenantIds.add(id);
+          else selectedTenantIds.delete(id);
+        });
+        renderTenantTable();
+      });
+    }
+    const clearBtn = document.getElementById('sa-clear-selection-btn');
+    if (clearBtn && !clearBtn.dataset.wired) {
+      clearBtn.dataset.wired = '1';
+      clearBtn.addEventListener('click', () => {
+        selectedTenantIds.clear();
+        renderTenantTable();
+      });
+    }
+    const deleteBtn = document.getElementById('sa-bulk-delete-btn');
+    if (deleteBtn && !deleteBtn.dataset.wired) {
+      deleteBtn.dataset.wired = '1';
+      deleteBtn.addEventListener('click', () => bulkDeleteSelectedTenants());
     }
   }
 
@@ -3660,6 +3767,51 @@
     updateBulkBar();
     toast(`${done} workspace${done !== 1 ? 's' : ''} approved${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Approve all pending'; }
+  }
+
+  async function bulkDeleteSelectedTenants() {
+    const selected = getSelectedTenants();
+    if (!selected.length) return toast('Select clients to delete first.', 'fa-circle-info');
+    const sampleNames = selected.slice(0, 4).map(t => t.name || t.tenant_name || t.slug || 'Unnamed client');
+    const more = selected.length > sampleNames.length ? ` and ${selected.length - sampleNames.length} more` : '';
+    confirmDangerAction(
+      `Delete ${selected.length} selected client${selected.length > 1 ? 's' : ''}?`,
+      `This will <strong>permanently erase</strong> the selected client workspace${selected.length > 1 ? 's' : ''} and all related data. This cannot be undone.<br><br><strong>${sampleNames.map(_e).join(', ')}${_e(more)}</strong>`,
+      async () => {
+        const btn = document.getElementById('sa-bulk-delete-btn');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
+        }
+        let done = 0, failed = 0;
+        const deletedIds = [];
+        for (const tenant of selected) {
+          const tenantId = getTenantRowId(tenant);
+          if (!tenantId) { failed++; continue; }
+          try {
+            await RS_API.admin({ action: 'delete_tenant', tenant_id: tenantId });
+            deletedIds.push(tenantId);
+            done++;
+          } catch (err) {
+            console.error('Bulk tenant delete failed', tenantId, err);
+            failed++;
+          }
+        }
+        if (deletedIds.length) {
+          const deleted = new Set(deletedIds);
+          _cachedTenants = _cachedTenants.filter(t => !deleted.has(getTenantRowId(t)));
+          selectedTenantIds = new Set([...selectedTenantIds].filter(id => !deleted.has(id)));
+        }
+        renderPlatformSummary(_cachedTenants);
+        renderTenantTable();
+        updateBulkBar();
+        toast(`${done} client${done !== 1 ? 's' : ''} deleted${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete selected';
+        }
+      }
+    );
   }
 
   // ── Create Tenant Modal ─────────────────────────────────────────────────

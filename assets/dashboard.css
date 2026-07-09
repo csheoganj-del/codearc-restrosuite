@@ -2335,6 +2335,27 @@ body.rs-drawer-dragging {
 .app-incidents-empty i { font-size: 20px; color: var(--green); }
 .app-incidents-empty strong { font-size: 13px; color: var(--text-soft); }
 
+.tenant-select-head,
+.tenant-outlet-cell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.tenant-select-head {
+  cursor: pointer;
+  user-select: none;
+}
+.tenant-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--orange);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+#super-admin-tab .data-table tr.tenant-row-selected td {
+  background: rgba(252,128,25,0.045);
+}
+
 /* ============================================================
    SUPER-ADMIN / GATEWAY MONITOR — MOBILE RESPONSIVE FIXES
    ============================================================ */
