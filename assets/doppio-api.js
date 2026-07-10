@@ -69,11 +69,15 @@
   const ALLOW_DEMO = IS_LOCALHOST && (window.RS_ALLOW_DEMO === true);
 
   const SS = window.sessionStorage;
-  const LS_SESS = window.localStorage; // persistent session storage
+  const LS_SESS = window.localStorage; // ONLY for "remember me" restore blob + non-auth prefs
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',
               tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display',
               persist:'rs_session_persistent' };
   const SESSION_KEYS = [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,'superadmin_admin_token'];
+  // Single-blob remember key. Live auth keys must NEVER be flat localStorage entries
+  // shared across tabs — that caused multi-outlet session swaps (tab A silently
+  // became tab B when a second login wrote the same keys).
+  const REMEMBER_BLOB_KEY = 'rs_remembered_session_v1';
   const IMP_ORIGIN_KEY = 'rs_superadmin_impersonation_origin';
   const IMP_TARGET_KEY = 'rs_superadmin_impersonation_target';
 
@@ -103,38 +107,80 @@
     });
   }
 
-  // Helper: the active session is tab-local. localStorage is only the
-  // remembered-session fallback for a newly opened tab.
-  function ssGet(k){ return SS.getItem(k) || LS_SESS.getItem(k); }
-  function restorePersistentSessionToTab(){
-    if (SS.getItem(K.token) || !LS_SESS.getItem(K.token)) return;
+  // Active session is ALWAYS tab-scoped (sessionStorage only).
+  // localStorage holds at most one opaque "remember me" blob used to hydrate a
+  // brand-new tab that has no session yet — never the live auth keys.
+  function purgeLegacyFlatSessionKeys(){
     SESSION_KEYS.forEach(k => {
-      const value = LS_SESS.getItem(k);
-      if (value !== null && SS.getItem(k) === null) SS.setItem(k, value);
+      try { LS_SESS.removeItem(k); } catch (_) {}
     });
+  }
+  function ssGet(k){ return SS.getItem(k); }
+  function writeRememberBlobFromSession(){
+    try {
+      const blob = {};
+      SESSION_KEYS.forEach(k => {
+        const value = SS.getItem(k);
+        if (value !== null) blob[k] = value;
+      });
+      if (!blob[K.token]) {
+        LS_SESS.removeItem(REMEMBER_BLOB_KEY);
+        return;
+      }
+      LS_SESS.setItem(REMEMBER_BLOB_KEY, JSON.stringify(blob));
+    } catch (_) {}
+  }
+  function hydrateRememberedSessionOnce(){
+    if (SS.getItem(K.token)) return;
+    try {
+      // Prefer the new blob; fall back once to legacy flat keys then migrate.
+      let blob = null;
+      const raw = LS_SESS.getItem(REMEMBER_BLOB_KEY);
+      if (raw) {
+        blob = JSON.parse(raw);
+      } else if (LS_SESS.getItem(K.token)) {
+        blob = {};
+        SESSION_KEYS.forEach(k => {
+          const value = LS_SESS.getItem(k);
+          if (value !== null) blob[k] = value;
+        });
+      }
+      if (!blob || typeof blob !== 'object' || !blob[K.token]) return;
+      SESSION_KEYS.forEach(k => {
+        if (blob[k] != null && SS.getItem(k) === null) SS.setItem(k, String(blob[k]));
+      });
+      // Re-save as blob and strip shared flat keys so other open tabs cannot
+      // accidentally read a swapped identity from localStorage.
+      writeRememberBlobFromSession();
+      purgeLegacyFlatSessionKeys();
+    } catch (_) {}
+  }
+  function restorePersistentSessionToTab(){
+    hydrateRememberedSessionOnce();
   }
   function ssSet(k, v, persist){
     SS.setItem(k, v);
-    if(persist){
-      LS_SESS.setItem(k, v);
-    } else {
-      LS_SESS.removeItem(k);
+    // Never mirror live keys into localStorage. Remember-me is handled as a
+    // single blob at the end of storeSession / logout.
+    if (!persist) {
+      try { LS_SESS.removeItem(k); } catch (_) {}
     }
   }
   function ssClear(){
-    SESSION_KEYS
-      .forEach(k=>{ SS.removeItem(k); LS_SESS.removeItem(k); });
+    SESSION_KEYS.forEach(k => { SS.removeItem(k); });
+    purgeLegacyFlatSessionKeys();
+    try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
     SS.removeItem(IMP_ORIGIN_KEY);
     SS.removeItem(IMP_TARGET_KEY);
   }
   function clearActiveSession(){
-    SESSION_KEYS.forEach(k=>{ SS.removeItem(k); LS_SESS.removeItem(k); });
+    SESSION_KEYS.forEach(k => { SS.removeItem(k); });
+    purgeLegacyFlatSessionKeys();
   }
   function readSessionSnapshot(){
     const snapshot = {};
     SESSION_KEYS.forEach(k => {
       if (SS.getItem(k) !== null) snapshot[k] = { storage:'session', value:SS.getItem(k) };
-      else if (LS_SESS.getItem(k) !== null) snapshot[k] = { storage:'local', value:LS_SESS.getItem(k) };
     });
     return snapshot;
   }
@@ -143,8 +189,8 @@
     Object.keys(snapshot || {}).forEach(k => {
       const entry = snapshot[k] || {};
       if (typeof entry.value !== 'string') return;
-      if (entry.storage === 'local') LS_SESS.setItem(k, entry.value);
-      else SS.setItem(k, entry.value);
+      // Snapshots are always restored into this tab's sessionStorage only.
+      SS.setItem(k, entry.value);
     });
   }
   function isSuperadminSlug(slug){
@@ -152,9 +198,11 @@
   }
 
   function storeSession(s, remember){
-    // If remember is not provided, check existing preference or default to true
+    // Active session is always sessionStorage. "remember" only controls whether
+    // a private restore blob is written for future empty tabs — never shared
+    // live keys that other open tabs would inherit mid-session.
     const persist = (remember !== false);
-    const store = (k, v) => ssSet(k, v, persist);
+    const store = (k, v) => ssSet(k, v, false);
     // For superadmin, admin_token is the primary token (no session_token)
     const primaryToken = s.session_token || s.admin_token || '';
     store(K.token, primaryToken);
@@ -166,8 +214,16 @@
     store(K.role, s.role || 'admin');
     store(K.display, s.display_name || s.username || '');
     store(K.persist, persist ? '1' : '0');
-    if(s.admin_token) ssSet('superadmin_admin_token', s.admin_token, persist);
-    else { SS.removeItem('superadmin_admin_token'); LS_SESS.removeItem('superadmin_admin_token'); }
+    if (s.admin_token) {
+      SS.setItem('superadmin_admin_token', s.admin_token);
+    } else {
+      SS.removeItem('superadmin_admin_token');
+    }
+    purgeLegacyFlatSessionKeys();
+    if (persist) writeRememberBlobFromSession();
+    else {
+      try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
+    }
   }
 
   async function post(fn, body, token, fallbackMsg){

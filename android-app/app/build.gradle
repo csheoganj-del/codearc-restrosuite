@@ -4,19 +4,18 @@ plugins {
 }
 
 android {
-    namespace 'com.doppiocafe.pos'
+    // RestroSuite product ID. Changing applicationId creates a NEW Play Store
+    // listing (com.doppiocafe.pos installs will not auto-update onto this ID).
+    namespace 'com.restrosuite.pos'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.doppiocafe.pos"
+        applicationId "com.restrosuite.pos"
         minSdk 24
         targetSdk 34
         // IMPORTANT: bump versionCode by at least 1 (and versionName to match)
-        // on every Play Store release. It has been frozen at 1 / "1.0.0"
-        // since launch, so the Play Store has never seen a new version to
-        // offer as an update -- this is the native-app half of the
-        // "update never lands" issue (the other half was the WebView
-        // caching the entry page; see the cache-bust fix in loadUrl()).
+        // on every Play Store release. versionCode is per applicationId, so
+        // this fresh package can start at 1 — keep bumping on each upload.
         versionCode 1
         versionName "1.0.0"
 

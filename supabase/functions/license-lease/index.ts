@@ -48,6 +48,10 @@ const LICENSE_SIGNING_KEY = Deno.env.get("LICENSE_SIGNING_KEY") || "";
 // How long a freshly issued lease is valid for offline. Product decision: 3 days.
 const OFFLINE_WINDOW_DAYS = Number(Deno.env.get("LICENSE_OFFLINE_WINDOW_DAYS") || "3");
 const LEASE_TTL_MS = OFFLINE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+// Small grace added after the paid-until date so a device that is briefly past
+// the date still has a moment to reconnect and renew before it locks.
+const OFFLINE_GRACE_DAYS = Number(Deno.env.get("LICENSE_OFFLINE_GRACE_DAYS") || "1");
+const OFFLINE_GRACE_MS = OFFLINE_GRACE_DAYS * 24 * 60 * 60 * 1000;
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -227,15 +231,26 @@ serve(async (req) => {
   }
 
   const now = Date.now();
+  // Offline-until-paid-date model: the device may run offline right up to the
+  // date the tenant has paid for (subscription_current_period_end) + a small
+  // grace. So a tenant who paid for a month can be fully offline for that whole
+  // month; a yearly tenant for the whole year. Only when the paid period ends
+  // (and they haven't renewed) does the device lock itself offline.
+  // Fallback: if no paid-until date is set, use the bounded rolling window so
+  // the device still needs to reconnect periodically.
+  const periodEndMs = planExpiresAt ? new Date(planExpiresAt).getTime() : 0;
+  const leaseExpiresAt = (periodEndMs && periodEndMs > now)
+    ? periodEndMs + OFFLINE_GRACE_MS
+    : now + LEASE_TTL_MS;
   const claims = {
     v: 1,
     tenant_id: tenant.id,
     device_id: deviceId,
     plan: tenant.plan_code || "starter",
     subscription_status: tenant.subscription_status || "active",
-    plan_expires_at: planExpiresAt ? new Date(planExpiresAt).getTime() : null,
+    plan_expires_at: periodEndMs || null,
     issued_at: now,
-    lease_expires_at: now + LEASE_TTL_MS,
+    lease_expires_at: leaseExpiresAt,
     server_time: now,
   };
 

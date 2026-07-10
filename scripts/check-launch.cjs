@@ -243,6 +243,48 @@ async function checkLiveBackend() {
   }
 }
 
+// ── 5b. PWA / install assets must ship with the web shell ───────────────────
+const pwaAssets = [
+  "assets/restrosuite-mark.png",
+  "assets/restrosuite-mark-512.png",
+  "assets/restrosuite-maskable-512.png",
+  "assets/screenshot-pos.png",
+  "assets/screenshot-cart.png",
+  "assets/license-config.js",
+  "assets/license-guard.js",
+];
+for (const file of pwaAssets) {
+  if (!fs.existsSync(path.join(root, file))) fail(`Missing PWA/launch asset: ${file}`);
+}
+if (fs.existsSync(path.join(root, "manifest.webmanifest"))) {
+  const manifest = read("manifest.webmanifest");
+  for (const needle of ["restrosuite-mark-512.png", "restrosuite-maskable-512.png", "screenshot-pos.png", '"purpose": "maskable"']) {
+    if (!manifest.includes(needle)) fail(`manifest.webmanifest missing required entry: ${needle}`);
+  }
+} else {
+  fail("Missing manifest.webmanifest");
+}
+
+// ── 5c. CRM columns migration must exist for cloud customer saves ────────────
+const crmMigration = path.join(root, "supabase", "migrations", "20260709160000_crm_customer_fields.sql");
+if (!fs.existsSync(crmMigration)) {
+  fail("Missing CRM migration 20260709160000_crm_customer_fields.sql");
+} else {
+  const crmSql = fs.readFileSync(crmMigration, "utf8");
+  for (const col of ["email", "dues", "marketing_opt_in"]) {
+    if (!crmSql.includes(col)) fail(`CRM migration missing column: ${col}`);
+  }
+}
+
+// ── 5d. Tab-scoped sessions (no shared localStorage live auth keys) ──────────
+const doppioApi = read("assets/doppio-api.js");
+if (!doppioApi.includes("rs_remembered_session_v1") || !doppioApi.includes("hydrateRememberedSessionOnce")) {
+  fail("assets/doppio-api.js must use tab-scoped sessions with a remember-me blob.");
+}
+if (/function ssGet\(k\)\{\s*return SS\.getItem\(k\) \|\| LS_SESS\.getItem\(k\);/.test(doppioApi)) {
+  fail("assets/doppio-api.js ssGet still falls back to localStorage (cross-tab session leak).");
+}
+
 async function main() {
   await checkLiveBackend();
   for (const message of warnings) console.warn(`Launch check warning: ${message}`);

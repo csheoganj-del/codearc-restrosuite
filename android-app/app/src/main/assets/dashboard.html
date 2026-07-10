@@ -965,20 +965,30 @@
               <button class="btn btn-sm" id="btn-create-tenant" style="background:var(--orange);color:#fff;border:none;gap:6px"><i class="fa-solid fa-plus"></i> New Workspace</button>
             </div>
           </div>
-          <!-- Bulk actions bar — shown when pending tenants exist -->
+          <!-- Bulk actions bar — shown for selected tenants or pending approvals -->
           <div id="sa-bulk-bar" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;margin-bottom:12px">
-            <i class="fa-solid fa-user-clock" style="color:#b45309"></i>
+            <i id="sa-bulk-icon" class="fa-solid fa-user-clock" style="color:#b45309"></i>
             <span id="sa-bulk-label" style="font-size:13px;font-weight:500;color:#b45309;flex:1"></span>
+            <div id="sa-selection-actions" style="display:none;align-items:center;gap:8px">
+              <button id="sa-clear-selection-btn" class="btn btn-ghost btn-sm" style="font-size:12px">Clear</button>
+              <button id="sa-bulk-delete-btn" class="btn btn-danger btn-sm" style="font-size:12px"><i class="fa-solid fa-trash-can"></i> Delete selected</button>
+            </div>
             <button id="sa-bulk-approve-btn" class="btn btn-sm" style="background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);font-size:12px"><i class="fa-solid fa-check-double"></i> Approve all pending</button>
           </div>
           <div class="table-scroll"><table class="data-table">
             <thead><tr>
-              <th data-sort-col="outlet" style="white-space:nowrap">Outlet <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="outlet" style="white-space:nowrap">
+                <label class="tenant-select-head">
+                  <input type="checkbox" id="tenant-select-all" class="tenant-checkbox" aria-label="Select all visible clients">
+                  <span>Outlet <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></span>
+                </label>
+              </th>
               <th data-sort-col="plan" style="white-space:nowrap">Plan <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
               <th data-sort-col="mrr" style="white-space:nowrap">MRR <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
               <th data-sort-col="outlets" style="white-space:nowrap">Outlets <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
               <th data-sort-col="joined" style="white-space:nowrap">Joined <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
               <th data-sort-col="status" style="white-space:nowrap">Status <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
+              <th data-sort-col="renews" style="white-space:nowrap">Renews <i class="sort-icon fa-solid fa-sort" style="font-size:10px;margin-left:4px;color:var(--text-mute);opacity:.4"></i></th>
               <th>Actions</th>
             </tr></thead>
             <tbody id="tenant-table-body"></tbody>
@@ -1258,7 +1268,17 @@
               <option value="canceled">Canceled</option>
             </select>
           </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Renews on (paid until)</label>
+            <input type="date" id="manage-period-end" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box">
+          </div>
         </div>
+      </div>
+
+      <!-- Licensing & devices -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-key" style="font-size:9px"></i> Licensing &amp; Devices</div>
+        <div id="manage-devices-box" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;background:var(--panel);font-size:12.5px;color:var(--text-soft);min-height:44px">Loading devices…</div>
       </div>
 
       <!-- Notes -->
@@ -1428,6 +1448,22 @@
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js?v=20260618-realdata"></script>
 <script src="assets/saas-core.js"></script>
+<script src="assets/license-config.js"></script>
+<script src="assets/license-guard.js"></script>
+<script>
+  (function () {
+    function boot() {
+      try {
+        var sess = window.RS_API && RS_API.session ? RS_API.session() : null;
+        if (sess && sess.role === 'superadmin') return;
+      } catch (e) {}
+      if (window.RSLicense && typeof RSLicense.enforce === 'function') {
+        RSLicense.enforce().catch(function (e) { console.warn('[RSLicense] enforce failed', e); });
+      }
+    }
+    (window.__configReady || Promise.resolve()).then(boot, boot);
+  })();
+</script>
 <script src="src/dashboard/staff-access.js"></script>
 <script src="src/dashboard/observability.js"></script>
 <script src="src/dashboard/imports.js?v=20260618-importsync3"></script>

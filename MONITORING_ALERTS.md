@@ -16,10 +16,15 @@ Start with free monitoring and upgrade only when revenue or scale requires it.
 
 Use any free uptime monitor for:
 
-- `https://YOUR_DOMAIN/index.html`
-- `https://YOUR_DOMAIN/login.html`
-- `https://YOUR_SUPABASE_PROJECT.functions.supabase.co/tenant-public`
-- Optional gateway health endpoint if WhatsApp automation is enabled.
+- `https://YOUR_DOMAIN/` (or `/index.html`)
+- `https://YOUR_DOMAIN/login`
+- `https://YOUR_DOMAIN/api/config` (must return HTTP 200 with `supabaseUrl`)
+- `https://YOUR_SUPABASE_PROJECT.supabase.co/functions/v1/tenant-public` (POST preflight / OPTIONS)
+- WhatsApp gateway (when enabled): `https://YOUR_GATEWAY_HOST/health`
+  - Expect JSON `{ "ok": true, "ready": true|false, "status": "...", "alerts": {...} }`
+  - Alert if the endpoint is unreachable for 5 minutes
+  - Optionally alert when `ready` is `false` for >15 minutes during business hours
+  - Confirm at least one of `alerts.email` / `alerts.telegram` / `alerts.desktop` is `true`
 
 ## Alert Conditions
 

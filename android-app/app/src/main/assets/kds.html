@@ -8,6 +8,20 @@
   <link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">
   <link rel="stylesheet" href="dashboard-styles.css?v=2.6">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="config.js"></script>
+  <script src="assets/doppio-api.js"></script>
+  <script src="assets/license-config.js"></script>
+  <script src="assets/license-guard.js"></script>
+  <script>
+    (function () {
+      function boot() {
+        try { var s = window.RS_API && RS_API.session ? RS_API.session() : null; if (s && s.role === 'superadmin') return; } catch (e) {}
+        if (window.RSLicense) RSLicense.enforce().catch(function (e) { console.warn('[RSLicense]', e); });
+      }
+      function ready() { (window.__configReady || Promise.resolve()).then(boot, boot); }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
+    })();
+  </script>
   <script>
     (function() {
       var user = sessionStorage.getItem('logged_in_user');
