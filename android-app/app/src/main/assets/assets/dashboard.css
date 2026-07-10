@@ -1483,12 +1483,19 @@ body.product-guide-open {
     opacity: 1 !important;
   }
   .cust-qty-btn {
-    width: 40px !important;
-    height: 40px !important;
+    width: 44px !important;
+    height: 44px !important;
   }
   .cart-qty-btn {
-    min-width: 36px !important;
-    min-height: 36px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  /* KDS prep-time / ETA chips: keep a >=44px tap area even though the
+     visible chip stays compact (padding drives the look, min-* the target). */
+  .kds-eta-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 6px 10px !important;
   }
   .sidebar-link {
     min-height: 44px !important;
@@ -2334,6 +2341,27 @@ body.rs-drawer-dragging {
 }
 .app-incidents-empty i { font-size: 20px; color: var(--green); }
 .app-incidents-empty strong { font-size: 13px; color: var(--text-soft); }
+
+.tenant-select-head,
+.tenant-outlet-cell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.tenant-select-head {
+  cursor: pointer;
+  user-select: none;
+}
+.tenant-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--orange);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+#super-admin-tab .data-table tr.tenant-row-selected td {
+  background: rgba(252,128,25,0.045);
+}
 
 /* ============================================================
    SUPER-ADMIN / GATEWAY MONITOR — MOBILE RESPONSIVE FIXES

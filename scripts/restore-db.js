@@ -74,8 +74,14 @@ async function extractZip(zipFilePath) {
   const dir = await unzipper.Open.file(zipFilePath);
   const tables = {};
   for (const entry of dir.files) {
-    if (!entry.path.endsWith(".json")) continue;
-    const tableName = entry.path.replace(/\.json$/, "");
+    // Skip directory placeholders and non-JSON files. Accept both flat
+    // "doppio_menu.json" and nested "backup/doppio_menu.json" layouts.
+    if (entry.type === "Directory") continue;
+    if (!entry.path || !entry.path.toLowerCase().endsWith(".json")) continue;
+    const base = entry.path.replace(/\\/g, "/").split("/").pop();
+    if (!base || base.startsWith(".")) continue;
+    const tableName = base.replace(/\.json$/i, "");
+    if (!tableName) continue;
     const buffer = await entry.buffer();
     try {
       tables[tableName] = JSON.parse(buffer.toString("utf8"));

@@ -63,6 +63,11 @@ function pruneOldBackups(backupsDir) {
 }
 
 const TABLES_TO_BACKUP = [
+  // Platform / tenant identity (needed for full DR, not just POS data)
+  "saas_tenants",
+  "saas_plans",
+  "tenant_users",
+  "doppio_business_profile",
   "doppio_bills",
   "doppio_pending_orders",
   "doppio_draft_orders",

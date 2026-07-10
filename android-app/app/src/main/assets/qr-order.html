@@ -617,7 +617,13 @@
       //    linked to the POS -- no ring-the-bell, no self-checkout.
       // A device that has logged into the dashboard (tenant_id in storage)
       // is treated as a staff device and gets a mode toggle link.
-      const isStaffDevice = (() => { try { return !!localStorage.getItem('tenant_id'); } catch(e){ return false; } })();
+      const isStaffDevice = (() => {
+        try {
+          // Prefer tab-scoped staff session; do not treat another tab's outlet
+          // identity in localStorage as "this device is staff".
+          return !!(sessionStorage.getItem('tenant_session_token') || sessionStorage.getItem('tenant_id'));
+        } catch(e){ return false; }
+      })();
       const waiterMode = params.get('mode') === 'waiter';
       window.__RS_WAITER_MODE__ = waiterMode;
       function displayOrderId(id) {
@@ -777,10 +783,11 @@
             }
 
             if (res.session && res.session.session_token) {
-              localStorage.setItem('tenant_session_token', res.session.session_token);
-              localStorage.setItem('tenant_id', res.session.tenant_id);
-              localStorage.setItem('tenant_slug', res.session.tenant_slug);
-              localStorage.setItem('tenant_name', res.session.tenant_name);
+              // Tab-scoped staff session only (matches dashboard multi-tab isolation).
+              sessionStorage.setItem('tenant_session_token', res.session.session_token);
+              sessionStorage.setItem('tenant_id', res.session.tenant_id);
+              sessionStorage.setItem('tenant_slug', res.session.tenant_slug);
+              sessionStorage.setItem('tenant_name', res.session.tenant_name);
               
               document.getElementById('staff-login-overlay').remove();
               window.location.reload();
@@ -845,7 +852,7 @@
         initBranding();
         
         if (waiterMode) {
-          const staffToken = localStorage.getItem('tenant_session_token');
+          const staffToken = sessionStorage.getItem('tenant_session_token') || localStorage.getItem('tenant_session_token');
           if (!staffToken) {
             showStaffLoginOverlay();
           } else {
@@ -1043,7 +1050,7 @@
         const symbol = window.currencySymbol || '₹';
         const isUpiSupported = (symbol === '₹');
         const upiVpa = upiVpaAddress || "merchant@upi"; // Fallback VPA
-        const upiName = document.getElementById('brand-logo').textContent || "Doppio Cafe";
+        const upiName = document.getElementById('brand-logo').textContent || "Restaurant";
         const latestOrder = orderList[orderList.length - 1];
 
         // Format UPI deep link

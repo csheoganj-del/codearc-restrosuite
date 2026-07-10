@@ -1143,7 +1143,8 @@
         try { found = !!localStorage.getItem(localKey); } catch(e) {}
         if(found){
           showOk('Demo mode — opening your console…');
-          try{ localStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_id', slug); }catch(e){}
+          // Tab-scoped only — never write live tenant identity into shared localStorage.
+          try{ sessionStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_slug', slug); }catch(e){}
           setTimeout(()=>location.href='dashboard',700);
         } else {
           showErr('Outlet "'+slug+'" not found. Register it first or configure Supabase to sign in to a live outlet.');
@@ -1388,8 +1389,10 @@
             set_address:payload.address, set_tax_label:taxInfo.label,
             set_tax_rate_percent:taxInfo.rate, set_calculate_taxes:true
           }));
-          localStorage.setItem('tenant_id', tenantId);
+          // Live identity is tab-scoped (sessionStorage). Settings blob above is
+          // keyed by tenant id so multi-tab demos cannot clobber each other.
           sessionStorage.setItem('tenant_id', tenantId);
+          sessionStorage.setItem('tenant_slug', tenantId);
         } catch(e){}
         showOk('Outlet created! Redirecting to your new console…');
         setTimeout(()=>location.href='dashboard',900);

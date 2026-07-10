@@ -27,14 +27,18 @@
 
     function getTenantId() {
       try {
+        // Prefer live tab session (RS_API / sessionStorage). Do NOT fall back to
+        // a shared localStorage tenant_id — that is how multi-tab logins used
+        // to cross-contaminate carts and offline caches.
+        if (window.RS_API && typeof window.RS_API.session === 'function') {
+          const s = window.RS_API.session();
+          if (s && s.tenant_id) return s.tenant_id;
+          if (s && s.tenant_slug) return s.tenant_slug;
+        }
         const tid = sessionStorage.getItem('tenant_id');
         if (tid) return tid;
-        const localTid = originalGet.call(localStorage, 'tenant_id');
-        if (localTid) return localTid;
-
-        const sLocal = JSON.parse(originalGet.call(localStorage, 'rs:session') || 'null');
-        if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
-        if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
+        const slug = sessionStorage.getItem('tenant_slug');
+        if (slug) return slug;
       } catch(e) {}
       return 'local-demo';
     }
@@ -81,16 +85,13 @@
     if (isCloudConfigured() && window.RS_API && window.RS_API.session) {
       const s = window.RS_API.session();
       if (s && s.role !== 'superadmin' && s.role !== 'brand_admin' && s.tenant_id) return s.tenant_id;
+      if (s && s.role !== 'superadmin' && s.role !== 'brand_admin' && s.tenant_slug) return s.tenant_slug;
     }
     try {
       const tid = sessionStorage.getItem('tenant_id');
       if (tid) return tid;
-      const localTid = localStorage.getItem('tenant_id');
-      if (localTid) return localTid;
-
-      const sLocal = JSON.parse(localStorage.getItem('rs:session') || 'null');
-      if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
-      if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
+      const slug = sessionStorage.getItem('tenant_slug');
+      if (slug) return slug;
     } catch(e) {}
     return 'local-demo';
   }
@@ -207,9 +208,12 @@
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
       from: r => ({ id:r.id, name:r.name, phone:r.phone, visits:num(r.visits), spend:num(r.total_spend),
-                    email:r.email, last:r.last_visit, dues:num(r.dues), tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
+                    email:r.email||'', last:r.last_visit, dues:num(r.dues),
+                    marketingOptIn: r.marketing_opt_in !== false,
+                    tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
       to: o => ({ id:o.id, name:o.name, phone:o.phone, visits:num(o.visits)||1, total_spend:num(o.spend),
-                  email:o.email||'', dues:num(o.dues), marketing_opt_in:true })
+                  email:o.email||'', dues:num(o.dues),
+                  marketing_opt_in: o.marketingOptIn !== false && o.marketing_opt_in !== false })
     },
     notifications: {
       table:'doppio_notifications', pk:'id', clientId:true, order:{column:'created_at',ascending:false},
@@ -312,7 +316,11 @@
     billSql: 'ON CONFLICT (tenant_id, "orderId") DO UPDATE SET'
   });
   const optionalCloudColumns = Object.freeze({
-    menu: ['tax_category']
+    menu: ['tax_category'],
+    // These persist once migration 20260709160000_crm_customer_fields is
+    // applied; until then a DB without the columns will drop them gracefully
+    // instead of rejecting the whole customer upsert.
+    customers: ['email', 'dues', 'marketing_opt_in']
   });
   const known = {}; // collection -> Set of ids seen from server
   function newClientId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }

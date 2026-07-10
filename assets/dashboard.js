@@ -369,7 +369,8 @@
   function shortDateKey(date = new Date()) { return `${String(date.getFullYear()).slice(-2)}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`; }
   function fileDate(date = new Date()) { return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`; }
   function sequenceScope() {
-    return sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || localStorage.getItem('tenant_id') || 'local';
+    // Tab-scoped only — never fall back to shared localStorage tenant_id.
+    return sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || 'local';
   }
   function hashCode(value) {
     let hash = 0;
@@ -1868,15 +1869,33 @@
     // Fallback: postgres_changes events are silently dropped for anon
     // subscribers when RLS denies SELECT on the table (production locks
     // all tables behind Edge Functions). Poll while the app is visible so
-    // new QR orders surface within ~12s even without realtime events.
+    // new QR orders surface quickly even without realtime events.
+    // Active QR / KDS tabs poll every 4s; background tabs every 12s.
     if (!window.__rsPendingOrdersPollTimer) {
-      window.__rsPendingOrdersPollTimer = setInterval(() => {
+      const pollPending = () => {
         if (document.hidden) return;
         syncPendingOrders({ forceCloud: true });
-      }, 12000);
+      };
+      const armPoll = () => {
+        if (window.__rsPendingOrdersPollTimer) clearInterval(window.__rsPendingOrdersPollTimer);
+        const activeId = document.querySelector('.tab-content.active')?.id || '';
+        const hot = activeId === 'qr-orders-tab' || activeId === 'kds-tab' || activeId === 'online-orders-tab';
+        window.__rsPendingOrdersPollTimer = setInterval(pollPending, hot ? 4000 : 12000);
+      };
+      armPoll();
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) syncPendingOrders({ forceCloud: true });
+        if (!document.hidden) {
+          pollPending();
+          armPoll();
+        }
       });
+      // Re-arm when staff switch tabs so the QR board stays snappy.
+      document.addEventListener('click', (ev) => {
+        if (ev.target && ev.target.closest && ev.target.closest('[data-tab], .nav-item, .sb-item, .tab-btn')) {
+          setTimeout(armPoll, 50);
+        }
+      }, true);
+      window.__rsArmPendingOrdersPoll = armPoll;
     }
   }
 
@@ -1926,27 +1945,57 @@
     }
     const tableName = qrTableName(order.table);
     activateTab('pos-tab');
-    await new Promise(resolve => setTimeout(resolve, 80));
+    // Wait for POS tab DOM + cart helpers (RS.setCart) to be ready after tab switch.
+    await new Promise(resolve => setTimeout(resolve, 120));
+    let attempts = 0;
+    while (attempts < 8 && !(window.RS && typeof RS.setCart === 'function')) {
+      await new Promise(resolve => setTimeout(resolve, 60));
+      attempts += 1;
+    }
 
-    const tableSelect = document.getElementById('cart-table');
+    const tableSelect = document.getElementById('cart-table')
+      || document.getElementById('pos-table-select')
+      || document.querySelector('#pos-tab select[name="table"], #pos-tab #table-select');
     if (tableSelect) {
-      let opt = [...tableSelect.options].find(o => o.value === tableName || o.text === tableName);
+      const matchValue = order.table || tableName;
+      let opt = [...tableSelect.options].find(o =>
+        o.value === tableName || o.text === tableName ||
+        o.value === matchValue || o.text === matchValue ||
+        o.value === String(order.table) || o.textContent.trim() === tableName
+      );
       if (!opt) {
         opt = document.createElement('option');
         opt.value = tableName;
         opt.textContent = tableName;
         tableSelect.appendChild(opt);
       }
-      tableSelect.value = tableName;
+      tableSelect.value = opt.value;
       tableSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      tableSelect.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    if (window.RS && typeof RS.setCart === 'function') RS.setCart(items);
+    // Prefer the public cart API; fall back to direct cart mutation used by POS.
+    if (window.RS && typeof RS.setCart === 'function') {
+      RS.setCart(items);
+    } else if (window.RS && Array.isArray(RS.cart)) {
+      RS.cart.length = 0;
+      items.forEach(it => RS.cart.push(it));
+    }
+    if (window.RS && typeof RS.setTable === 'function') {
+      try { RS.setTable(tableName); } catch(e) {}
+    }
     const nameEl = document.getElementById('cust-name') || document.getElementById('cust-input-name');
     const phoneEl = document.getElementById('cust-phone') || document.getElementById('cust-input-phone');
-    if (nameEl && order.customerName) nameEl.value = order.customerName;
-    if (phoneEl && order.customerPhone) phoneEl.value = order.customerPhone;
+    if (nameEl && order.customerName) {
+      nameEl.value = order.customerName;
+      nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (phoneEl && order.customerPhone) {
+      phoneEl.value = order.customerPhone;
+      phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     try { if (window.RS && typeof RS.renderCart === 'function') RS.renderCart(); } catch(e) {}
+    try { if (typeof window.saveActiveCart === 'function') window.saveActiveCart(); } catch(e) {}
     toast(`Loaded ${tableName} in POS`, 'fa-receipt');
   }
   const renderQR = () => {

@@ -615,10 +615,11 @@
         }
 
         if (res.session && res.session.session_token) {
-          localStorage.setItem('tenant_session_token', res.session.session_token);
-          localStorage.setItem('tenant_id', res.session.tenant_id);
-          localStorage.setItem('tenant_slug', res.session.tenant_slug);
-          localStorage.setItem('tenant_name', res.session.tenant_name);
+          // Tab-scoped staff session only (matches dashboard multi-tab isolation).
+          sessionStorage.setItem('tenant_session_token', res.session.session_token);
+          sessionStorage.setItem('tenant_id', res.session.tenant_id);
+          sessionStorage.setItem('tenant_slug', res.session.tenant_slug);
+          sessionStorage.setItem('tenant_name', res.session.tenant_name);
           
           document.getElementById('staff-login-overlay').remove();
           window.location.reload();
@@ -656,7 +657,7 @@
       var sessionToken = params.get('token') || sessionStorage.getItem('qr_session_token') || '';
 
       if (waiterMode && action === 'create_order') {
-        var staffToken = localStorage.getItem('tenant_session_token') || '';
+        var staffToken = sessionStorage.getItem('tenant_session_token') || localStorage.getItem('tenant_session_token') || '';
         var dataUrl = FN.replace('tenant-public', 'tenant-data');
         var orderData = extra.order;
         var dbOrder = {
@@ -703,7 +704,7 @@
 
   configPromise.then(function() {
     if (waiterMode) {
-      var staffToken = localStorage.getItem('tenant_session_token');
+      var staffToken = sessionStorage.getItem('tenant_session_token') || localStorage.getItem('tenant_session_token');
       if (!staffToken) {
         showStaffLoginOverlay();
       }
@@ -845,7 +846,7 @@
         }
 
         var menuChanged = JSON.stringify(items) !== JSON.stringify(newItems);
-        var nameChanged = res.tenantName && res.tenantName !== 'Doppio Cafe' && (!cachedData || cachedData.tenantName !== res.tenantName);
+        var nameChanged = res.tenantName && res.tenantName !== 'Restaurant' && (!cachedData || cachedData.tenantName !== res.tenantName);
         var currencySymbol = res.currencySymbol || '\u20b9';
         var taxLabel = res.taxLabel || 'GST';
         var currencyChanged = window.currencySymbol !== currencySymbol || window.taxLabel !== taxLabel;
@@ -855,7 +856,7 @@
           window.currencySymbol = currencySymbol;
           window.taxLabel = taxLabel;
           applyTaxLabel();
-          if(res.tenantName && res.tenantName !== 'Doppio Cafe'){
+          if(res.tenantName && res.tenantName !== 'Restaurant'){
             applyLogoBranding(res.tenantName);
           }
 

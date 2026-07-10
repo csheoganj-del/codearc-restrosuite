@@ -3293,15 +3293,32 @@ app.get('/test-relay-call', async (req, res) => {
 
 // HEALTH ENDPOINT -- for UptimeRobot / external monitors
 // ============================================================
+// Also aliased as /status?health=1 for callers that only know /status.
 app.get('/health', async (req, res) => {
     const systemData = tenantClients.get('system') || { status: 'disconnected' };
-    
-    res.json({
+    const status = String(systemData.status || 'disconnected');
+    const ready = status === 'connected' || status === 'online' || status === 'open';
+    const emailConfigured = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD && process.env.ADMIN_ALERT_EMAIL);
+    const telegramConfigured = !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
+    const desktopConfigured = String(process.env.DESKTOP_ALERTS_ENABLED || '').toLowerCase() === 'true';
+    const payload = {
         ok: true,
-        status: systemData.status,
+        ready,
+        status,
         uptime: Math.floor(process.uptime()),
-        time: new Date().toISOString()
-    });
+        time: new Date().toISOString(),
+        tenants: typeof tenantClients !== 'undefined' ? tenantClients.size : 0,
+        alerts: {
+            email: emailConfigured,
+            telegram: telegramConfigured,
+            desktop: desktopConfigured,
+            any: emailConfigured || telegramConfigured || desktopConfigured
+        },
+        supabase: !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY))
+    };
+    // Non-ready still returns 200 so free uptime monitors don't flap on a
+    // temporary WhatsApp disconnect; they can alert on ready===false via body.
+    res.status(200).json(payload);
 });
 
 const PORT = process.env.PORT || 3000;

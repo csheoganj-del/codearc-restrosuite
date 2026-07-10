@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260709-license-guard";
+const CACHE_NAME = "restrosuite-shell-v20260710-launchfix";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -56,7 +56,11 @@ const APP_SHELL = [
   
   // Images/Assets
   "/assets/restrosuite-mark.png",
+  "/assets/restrosuite-mark-512.png",
+  "/assets/restrosuite-maskable-512.png",
   "/assets/restrosuite_logo.png",
+  "/assets/screenshot-pos.png",
+  "/assets/screenshot-cart.png",
   
   // External CDN Dependencies (Pre-cached)
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js",

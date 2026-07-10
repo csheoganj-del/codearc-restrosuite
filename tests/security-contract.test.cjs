@@ -100,7 +100,7 @@ test("deployment and Android wrappers enforce baseline security controls", () =>
   const vercel = read("vercel.json");
   const gitignore = read(".gitignore");
   const manifest = read("android-app/app/src/main/AndroidManifest.xml");
-  const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
+  const activity = read("android-app/app/src/main/java/com/restrosuite/pos/MainActivity.java");
   assert.match(vercel, /Content-Security-Policy/);
   assert.match(vercel, /Strict-Transport-Security/);
   assert.match(gitignore, /\.tmp-gradle-build\//);
@@ -275,7 +275,7 @@ test("mobile and Android app shells share a professional native layout", () => {
   const dashboardCss = read("dashboard-styles.css");
   const dashboard = read("dashboard.html");
   const checks = read("scripts/check-project.cjs");
-  const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
+  const activity = read("android-app/app/src/main/java/com/restrosuite/pos/MainActivity.java");
   const androidColors = read("android-app/app/src/main/res/values/colors.xml");
   const androidTheme = read("android-app/app/src/main/res/values/themes.xml");
 
@@ -336,7 +336,7 @@ test("dashboard interactions are optimized for instant feedback", () => {
   const dashboard = read("dashboard.js");
   const browserApi = read("src/dashboard/api.js");
   const dashboardCss = read("dashboard-styles.css");
-  const activity = read("android-app/app/src/main/java/com/doppiocafe/pos/MainActivity.java");
+  const activity = read("android-app/app/src/main/java/com/restrosuite/pos/MainActivity.java");
 
   assert.match(dashboard, /const FAST_INTERACTION_MODE = true/);
   assert.match(dashboard, /const ENABLE_DEMO_TOOLS\s*=/);
@@ -539,9 +539,16 @@ test("live simulation regressions keep sessions, menu saves, QR sync, and QR bil
   const tenantAccess = read("supabase/functions/tenant-access/index.ts");
   const otpMigration = read("supabase/migrations/20260701163000_public_otp_challenges.sql");
 
-  assert.match(api, /function ssGet\(k\)\{\s*return SS\.getItem\(k\) \|\| LS_SESS\.getItem\(k\);\s*\}/);
+  // Tab-scoped sessions: live auth keys live only in sessionStorage. Remember-me
+  // is a single localStorage blob (rs_remembered_session_v1), never flat keys
+  // that other open tabs would inherit mid-session.
+  assert.match(api, /function ssGet\(k\)\{\s*return SS\.getItem\(k\);\s*\}/);
+  assert.match(api, /REMEMBER_BLOB_KEY\s*=\s*['"]rs_remembered_session_v1['"]/);
+  assert.match(api, /function hydrateRememberedSessionOnce/);
+  assert.match(api, /function purgeLegacyFlatSessionKeys/);
   assert.match(api, /function ssSet\(k, v, persist\)\{\s*SS\.setItem\(k, v\);/);
   assert.match(api, /if \(SS\.getItem\(k\) !== null\) snapshot\[k\] = \{ storage:'session'/);
+  assert.match(api, /writeRememberBlobFromSession/);
 
   assert.match(db, /optionalCloudColumns = Object\.freeze\(\{\s*menu: \['tax_category'\]/);
   assert.match(db, /function omitUnsupportedOptionalColumns\(collection, body, err\)/);
@@ -557,6 +564,7 @@ test("live simulation regressions keep sessions, menu saves, QR sync, and QR bil
   assert.match(dashboard, /function openQrOrderInPos\(order\)/);
   assert.match(dashboard, /RS\.setCart\(items\)/);
   assert.match(dashboard, /new Set\(QR_ORDERS\.map\(o => o\.table\)\)\.size/);
+  assert.match(dashboard, /hot \? 4000 : 12000/);
 
   assert.match(pos, /r\.status === 'served'/);
   assert.match(pos, /r\.status === 'Ready'/);

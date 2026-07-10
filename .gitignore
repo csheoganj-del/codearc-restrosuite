@@ -20,10 +20,17 @@ android-app/gradle.properties
 
 # Node
 node_modules/
+**/node_modules/
 node_modules_old/
 .npm-cache/
 node-portable/
 node.zip
+
+# Nested deploy mirror (optional; root tree is source of truth).
+# Populate with: powershell -File ./sync-codearc.ps1
+# Do not track as a git submodule — it causes permanent drift.
+codearc-restrosuite/
+codearc-restrosuite-1/
 
 # WhatsApp session files (never commit these)
 .wwebjs_auth/
