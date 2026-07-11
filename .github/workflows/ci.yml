@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build critical JS bundle
+        run: npm run build:critical
+
       - name: JS syntax check and asset parity
         run: npm run check
         env:
@@ -35,6 +38,9 @@ jobs:
 
       - name: Run test suite
         run: npm test
+
+      - name: E2E smoke
+        run: npm run test:e2e
 
       - name: Free-tier limits check
         run: npm run check:free-tier

@@ -814,12 +814,124 @@
     }
   }
 
-  /* ---------------- OFFLINE SYNC QUEUE (crash-safe, money-critical protected) ---------------- */
+  /* ---------------- OFFLINE SYNC QUEUE (IndexedDB primary, localStorage mirror) ---------------- */
   const SYNC_QUEUE_KEY = 'rs:sync_queue';
+  const SYNC_IDB_NAME = 'rs_sync_queue_v1';
+  const SYNC_IDB_STORE = 'queue';
   const MONEY_COLLECTIONS = new Set(['bills', 'inventory', 'customers', 'drafts', 'pending_orders']);
   let drainInFlight = false;
-  function getSyncQueue() { try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e){ return []; } }
-  function saveSyncQueue(q) { try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); } catch(e){} }
+  let _syncQueueMem = null; // in-memory cache (source of truth after boot)
+  let _idbReady = null;
+
+  function openSyncIdb() {
+    if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+    if (_idbReady) return _idbReady;
+    _idbReady = new Promise((resolve) => {
+      try {
+        const req = indexedDB.open(SYNC_IDB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(SYNC_IDB_STORE)) {
+            db.createObjectStore(SYNC_IDB_STORE, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    return _idbReady;
+  }
+
+  async function idbLoadAll() {
+    const db = await openSyncIdb();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(SYNC_IDB_STORE, 'readonly');
+        const store = tx.objectStore(SYNC_IDB_STORE);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
+  async function idbReplaceAll(entries) {
+    const db = await openSyncIdb();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(SYNC_IDB_STORE, 'readwrite');
+        const store = tx.objectStore(SYNC_IDB_STORE);
+        store.clear();
+        (entries || []).forEach((e) => {
+          if (e && e.id) store.put(e);
+        });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      } catch (_) {
+        resolve(false);
+      }
+    });
+  }
+
+  function loadSyncQueueSync() {
+    if (_syncQueueMem) return _syncQueueMem;
+    try {
+      _syncQueueMem = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+      if (!Array.isArray(_syncQueueMem)) _syncQueueMem = [];
+    } catch (e) {
+      _syncQueueMem = [];
+    }
+    return _syncQueueMem;
+  }
+
+  function getSyncQueue() {
+    return loadSyncQueueSync().slice();
+  }
+
+  function saveSyncQueue(q) {
+    _syncQueueMem = Array.isArray(q) ? q.slice() : [];
+    // Mirror to localStorage (small critical backup; may truncate non-critical if huge)
+    try {
+      const mirror = _syncQueueMem.length > 80
+        ? _syncQueueMem.filter((e) => e && e.critical).concat(_syncQueueMem.filter((e) => e && !e.critical).slice(-40))
+        : _syncQueueMem;
+      localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(mirror));
+    } catch (e) {
+      try {
+        // last resort: bills only
+        const billsOnly = _syncQueueMem.filter((e) => e && e.collection === 'bills');
+        localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(billsOnly.slice(-50)));
+      } catch (_) {}
+    }
+    // Durable primary store
+    idbReplaceAll(_syncQueueMem).catch(() => {});
+  }
+
+  // Boot: prefer IndexedDB contents if present, else migrate localStorage → IDB
+  (async function migrateSyncQueueToIdb() {
+    try {
+      const fromIdb = await idbLoadAll();
+      if (fromIdb && fromIdb.length) {
+        _syncQueueMem = fromIdb;
+        // refresh LS mirror
+        try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(fromIdb.slice(0, 80))); } catch (_) {}
+      } else {
+        const fromLs = loadSyncQueueSync();
+        if (fromLs.length) await idbReplaceAll(fromLs);
+      }
+      if (typeof window !== 'undefined' && window.RS_DB_NOTIFY_SYNC) {
+        try { window.RS_DB_NOTIFY_SYNC(); } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('[RS_DB] sync queue IDB migrate failed', e);
+    }
+  })();
   function entryKey(method, collection, args) {
     const id = args && args[0];
     if (method === 'bulkPut' && Array.isArray(id)) {
