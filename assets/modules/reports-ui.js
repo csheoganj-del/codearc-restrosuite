@@ -260,30 +260,55 @@
   setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
   setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
 
-  // GSTR CSV download
+  // GSTR CSV download — richer columns for accountant handoff
   const gstrBtn = document.getElementById('btn-download-gstr');
   if (gstrBtn) gstrBtn.onclick = () => {
-    const rows = [['Bill No','Date','Customer','Amount','GST 5%','GST 12%','GST 18%','GST 28%','Payment Method']];
-    paidBills.forEach(b => {
-      const ts = b.taxSummary||{};
+    const rows = [[
+      'Bill No', 'DateTime', 'Customer', 'Phone', 'Place of Supply',
+      'Taxable Value', 'GST 5%', 'GST 12%', 'GST 18%', 'GST 28%', 'Total Tax',
+      'Invoice Value', 'Payment Method', 'Station', 'Channel', 'Status',
+    ]];
+    paidBills.forEach((b) => {
+      const ts = b.taxSummary || {};
+      const g5 = ts['5'] ? ts['5'].tax || 0 : 0;
+      const g12 = ts['12'] ? ts['12'].tax || 0 : 0;
+      const g18 = ts['18'] ? ts['18'].tax || 0 : 0;
+      const g28 = ts['28'] ? ts['28'].tax || 0 : 0;
+      const taxSum = Number(g5) + Number(g12) + Number(g18) + Number(g28) || Number(b.gst) || 0;
+      const inv = Number(b.amount != null ? b.amount : b.total) || 0;
+      const taxable = b.subtotal != null ? Number(b.subtotal) : Math.max(0, inv - taxSum);
       rows.push([
-        b.no||b.id||'',
-        b.dateTime ? new Date(b.dateTime).toLocaleDateString('en-IN') : '',
-        b.customerName||'Walk-in Guest',
-        b.amount||b.total||0,
-        ts['5']?ts['5'].tax||0:0,
-        ts['12']?ts['12'].tax||0:0,
-        ts['18']?ts['18'].tax||0:0,
-        ts['28']?ts['28'].tax||0:0,
-        b.pay||b.paymentMethod||''
+        b.no || b.orderId || b.id || '',
+        b.dateTime || b.time || '',
+        b.customerName || 'Walk-in Guest',
+        b.customerPhone || '',
+        (window.RS_SETTINGS && RS_SETTINGS.set_gst_state) || '',
+        taxable,
+        g5,
+        g12,
+        g18,
+        g28,
+        taxSum,
+        inv,
+        b.pay || b.paymentMethod || '',
+        b.stationLabel || b.stationId || '',
+        b.channel || b.channelCode || '',
+        b.status || 'paid',
       ]);
     });
-    const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+    // Totals footer
+    const sumCol = (idx) => rows.slice(1).reduce((a, r) => a + (Number(r[idx]) || 0), 0);
+    rows.push([
+      'TOTALS', '', '', '', '',
+      sumCol(5), sumCol(6), sumCol(7), sumCol(8), sumCol(9), sumCol(10), sumCol(11),
+      '', '', '', '',
+    ]);
+    const csv = rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
     const a = document.createElement('a');
-    a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
-    a.download = 'GSTR_report_'+new Date().toISOString().slice(0,10)+'.csv';
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+    a.download = 'GSTR_report_' + new Date().toISOString().slice(0, 10) + '.csv';
     a.click();
-    toast('GSTR CSV downloaded','fa-file-arrow-down');
+    toast('GSTR CSV downloaded (' + paidBills.length + ' bills)', 'fa-file-arrow-down');
   };
   }
 

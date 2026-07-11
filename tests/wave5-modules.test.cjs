@@ -201,7 +201,7 @@ test('tax-helpers module extracted (wave 12)', () => {
   assert.match(dash, /tax-helpers|RS_TAX_RATES|RSTax/);
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /tax-helpers\.js/);
-  assert.match(html, /v60-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
 });
 
 test('growth-hub-shell module extracted (wave 12)', () => {
@@ -225,6 +225,27 @@ test('prod asset checker and deploy-health e2e exist (wave 13)', () => {
   assert.match(e2e, /Deploy health|pos-ui\.js/);
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts['check:prod-assets'], 'node scripts/check-prod-assets.cjs');
+});
+
+test('product pack: Z-report scope, WA retry, demo script (wave product)', () => {
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  assert.match(ops, /getZScope|setZScope/);
+  assert.match(ops, /zReportCsv|downloadZCsv/);
+  assert.match(ops, /byStation/);
+  const receipt = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
+  assert.match(receipt, /withRetry/);
+  assert.match(receipt, /skipCache/);
+  assert.match(receipt, /rs:bill-paid/);
+  const demo = fs.readFileSync(path.join(root, 'assets/modules/demo-script.js'), 'utf8');
+  assert.match(demo, /RSDemoScript|openDemoScript/);
+  assert.ok(fs.existsSync(path.join(root, 'docs/DEMO_SCRIPT.md')));
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /stationLabel|shiftId|Tenders/);
+  const reports = fs.readFileSync(path.join(root, 'assets/modules/reports-ui.js'), 'utf8');
+  assert.match(reports, /Taxable Value|TOTALS/);
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /demo-script\.js/);
+  assert.match(html, /v61-20260711/);
 });
 
 test('USB and split docs exist', () => {

@@ -430,6 +430,20 @@
     }
   }
 
+  async function withRetry(fn, attempts, label) {
+    let lastErr;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        return await fn(i);
+      } catch (e) {
+        lastErr = e;
+        console.warn('[Receipt]', label, 'attempt', i + 1, e && e.message);
+        if (i < attempts - 1) await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+      }
+    }
+    throw lastErr || new Error(label + ' failed');
+  }
+
   async function sendWhatsApp(bill, phone, options) {
     const opts = options || {};
     const cleanPhone = String(phone || '').replace(/\D/g, '');
@@ -437,6 +451,7 @@
 
     const text = toText(bill);
     const cap = caption(bill);
+    global.__rsLastWaError = null;
 
     // Refresh gateway status when possible
     try {
@@ -452,37 +467,57 @@
       || (global.RS_API && !global.RS_API.zeroCostLaunchMode);
 
     if (global.RS_API && typeof global.RS_API.data === 'function' && !global.RS_API.zeroCostLaunchMode) {
-      // Prefer PDF = exact preview
+      // Prefer PDF = exact preview (retry compile + send once)
       try {
-        const dataUri = await toPDF(bill);
+        const dataUri = await withRetry(
+          async (attempt) => toPDF(bill, attempt > 0 ? { skipCache: true } : {}),
+          2,
+          'toPDF'
+        );
         const base64 = String(dataUri).includes(',') ? String(dataUri).split(',')[1] : String(dataUri);
         if (!base64 || base64.length < 100) throw new Error('Empty PDF');
-        await Promise.race([
-          global.RS_API.data({
-            operation: 'gateway_send',
-            phone: cleanPhone,
-            message: cap,
-            caption: cap,
-            pdfData: base64,
-            filename: `receipt-${normalizeBill(bill).no || 'bill'}.pdf`,
-            orderId: String(normalizeBill(bill).no || ''),
-          }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('Gateway send timed out')), opts.timeoutMs || 30000)),
-        ]);
+        await withRetry(
+          async () =>
+            Promise.race([
+              global.RS_API.data({
+                operation: 'gateway_send',
+                phone: cleanPhone,
+                message: cap,
+                caption: cap,
+                pdfData: base64,
+                filename: `receipt-${normalizeBill(bill).no || 'bill'}.pdf`,
+                orderId: String(normalizeBill(bill).no || ''),
+              }),
+              new Promise((_, rej) =>
+                setTimeout(() => rej(new Error('Gateway send timed out')), opts.timeoutMs || 30000)
+              ),
+            ]),
+          2,
+          'gateway_send pdf'
+        );
         global.__rsGatewayReady = true;
+        global.__rsLastWaMode = 'pdf';
         return { mode: 'pdf', phone: cleanPhone };
       } catch (pdfErr) {
         console.warn('[Receipt] PDF WhatsApp failed:', pdfErr && pdfErr.message);
+        global.__rsLastWaError = (pdfErr && pdfErr.message) || 'PDF send failed';
         try {
-          await global.RS_API.data({
-            operation: 'gateway_send',
-            phone: cleanPhone,
-            message: text,
-            orderId: String(normalizeBill(bill).no || ''),
-          });
+          await withRetry(
+            async () =>
+              global.RS_API.data({
+                operation: 'gateway_send',
+                phone: cleanPhone,
+                message: text,
+                orderId: String(normalizeBill(bill).no || ''),
+              }),
+            2,
+            'gateway_send text'
+          );
+          global.__rsLastWaMode = 'text';
           return { mode: 'text', phone: cleanPhone, warning: pdfErr && pdfErr.message };
         } catch (textErr) {
           console.warn('[Receipt] Text WhatsApp failed:', textErr && textErr.message);
+          global.__rsLastWaError = (textErr && textErr.message) || global.__rsLastWaError;
         }
       }
     }
@@ -490,8 +525,20 @@
     // Last resort: WhatsApp Web with same text content
     const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
     global.open(waUrl, '_blank', 'noopener,noreferrer');
-    return { mode: 'wa.me', phone: cleanPhone, gatewayReady };
+    global.__rsLastWaMode = 'wa.me';
+    return { mode: 'wa.me', phone: cleanPhone, gatewayReady, warning: global.__rsLastWaError };
   }
+
+  // Warm PDF cache as soon as a bill is paid (faster WhatsApp tap)
+  document.addEventListener('rs:bill-paid', (ev) => {
+    try {
+      const bill = ev && ev.detail && (ev.detail.bill || ev.detail);
+      if (!bill || !global.RSReceiptEngine) return;
+      const warm = () => toPDF(bill).catch(() => {});
+      if (global.requestIdleCallback) global.requestIdleCallback(warm, { timeout: 3000 });
+      else setTimeout(warm, 500);
+    } catch (_) {}
+  });
 
   const api = {
     normalizeBill,

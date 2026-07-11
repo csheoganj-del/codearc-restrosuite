@@ -2478,20 +2478,38 @@
             
             const settings = window.RS_SETTINGS || {};
             const taxLabel = settings.set_tax_label || 'GST';
-            const headers = ['Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone', 'Subtotal', taxLabel, 'Total', 'Payment', 'Status'];
-            const rows = BILLS.map(b => [
-              b.no || b.orderId || b.id || '',
-              b.dateTime || b.time || '',
-              b.table || '',
-              b.items || '',
-              b.customerName || '',
-              b.customerPhone || '',
-              b.subtotal || '',
-              b.gst || '',
-              b.amount || b.total || '',
-              b.pay || b.paymentMethod || '',
-              b.status || ''
-            ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
+            const headers = [
+              'Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone',
+              'Subtotal', taxLabel, 'Discount', 'Total', 'Payment', 'Tenders',
+              'Status', 'Channel', 'Station', 'Shift', 'Cashier', 'Order Type',
+            ];
+            const rows = BILLS.map((b) => {
+              const tenders = Array.isArray(b.tenders)
+                ? b.tenders.map((t) => (t.method || '') + ':' + (t.amount || 0)).join('|')
+                : '';
+              return [
+                b.no || b.orderId || b.id || '',
+                b.dateTime || b.time || '',
+                b.table || '',
+                b.items || '',
+                b.customerName || '',
+                b.customerPhone || '',
+                b.subtotal != null ? b.subtotal : '',
+                b.gst != null ? b.gst : '',
+                b.discount != null ? b.discount : (b.disc != null ? b.disc : ''),
+                b.amount != null ? b.amount : b.total || '',
+                b.pay || b.paymentMethod || '',
+                tenders,
+                b.status || '',
+                b.channel || b.channelCode || '',
+                b.stationLabel || b.stationId || '',
+                b.shiftId || '',
+                b.cashier || b.refundedBy || '',
+                b.orderType || '',
+              ]
+                .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+                .join(',');
+            });
             const csv = [headers.join(','), ...rows].join('\n');
             RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
             
