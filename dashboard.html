@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v62-20260711-ops';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v63-20260711-cashier';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -507,6 +507,7 @@
                 <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
                   <input type="text" id="cust-input-name" placeholder="Guest name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
                   <input type="tel" id="cust-input-phone" placeholder="Guest phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
+                  <div id="cart-customer-dues-banner" style="display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.08);color:var(--text-soft);line-height:1.4"></div>
                 </div>
                 
                 <!-- Hidden trigger for backwards compatibility -->
@@ -531,6 +532,10 @@
                       <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
                         <span class="insight-label">Spent</span>
                         <span class="insight-val" id="insight-spend">₹0</span>
+                      </div>
+                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
+                        <span class="insight-label">Dues</span>
+                        <span class="insight-val" id="insight-dues" style="color:var(--orange)">₹0</span>
                       </div>
                       <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
                         <span class="insight-label">Favorite</span>
