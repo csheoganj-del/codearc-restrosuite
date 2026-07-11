@@ -161,6 +161,10 @@
 /* ---------------- ONLINE / AGGREGATOR ORDERS ---------------- */
 .agg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap: 16px; }
 .agg-card { border-radius: var(--r-md); border: 1px solid var(--stroke); background: var(--panel); overflow: hidden; }
+.agg-card.needs-attention {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 35%, transparent);
+  animation: floor-pending-pulse 1.8s ease-in-out infinite;
+}
 .agg-top { padding: 13px 16px; display: flex; align-items: center; gap: 10px; color: #fff; }
 .agg-top.zomato { background: linear-gradient(135deg,#e23744,#b91d2b); }
 .agg-top.swiggy { background: linear-gradient(135deg,#fc8019,#e06a0c); }

@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v68 (2026-07-11) — Online orders + split pay chips
+
+- **Online Orders**: Accept + KOT, open in POS, demo seed order, phone/elapsed, new-order chime + toast
+- **Sidebar**: urgent badge + attention blink for new aggregator tickets
+- **Split pay**: Rest→Cash/UPI/Card/Due, ½ Cash·½ UPI, Clear; currency-aware remaining label
+
 ## v67 (2026-07-11) — Waiter floor → POS + auto thermal
 
 - **Floor → POS**: Seat / Add items / Checkout load table + order lines into the cart (Dine-in)
@@ -65,7 +71,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v67-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v68-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

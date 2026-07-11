@@ -1108,9 +1108,10 @@
       const totalPaid = cash + upi + card + due;
       const remaining = totals.grand - totalPaid;
 
-      totalText.textContent = `Paid: ₹${totalPaid}`;
+      const money = (n) => (typeof RS.rs === 'function' ? RS.rs(n) : '₹' + Number(n || 0));
+      totalText.textContent = `Paid: ${money(totalPaid)}`;
 
-      if (remaining === 0) {
+      if (remaining === 0 || Math.abs(remaining) < 0.005) {
         statusText.textContent = 'Balanced!';
         statusText.style.color = '#25d366';
         if (checkoutBtn) {
@@ -1118,7 +1119,7 @@
         }
         [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
       } else if (remaining > 0) {
-        statusText.textContent = `Remaining: ₹${remaining}`;
+        statusText.textContent = `Remaining: ${money(remaining)}`;
         statusText.style.color = 'var(--orange)';
         if (checkoutBtn) {
           checkoutBtn.disabled = true;
@@ -1127,14 +1128,14 @@
       } else {
         const overpaid = totalPaid - totals.grand;
         if (cash >= overpaid) {
-          statusText.textContent = `Change Due: ₹${overpaid}`;
+          statusText.textContent = `Change Due: ${money(overpaid)}`;
           statusText.style.color = '#25d366';
           if (checkoutBtn) {
             checkoutBtn.disabled = totals.count < 1;
           }
           [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
         } else {
-          statusText.textContent = `Overpaid by ₹${overpaid}`;
+          statusText.textContent = `Overpaid by ${money(overpaid)}`;
           statusText.style.color = 'var(--red)';
           if (checkoutBtn) {
             checkoutBtn.disabled = true;
@@ -1142,6 +1143,46 @@
           [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = 'var(--red)');
         }
       }
+    }
+
+    function fillSplitRemaining(target) {
+      const totals = RS.getTotals();
+      const grand = Number(totals.grand) || 0;
+      const splitCash = document.getElementById('split-cash');
+      const splitUpi = document.getElementById('split-upi');
+      const splitCard = document.getElementById('split-card');
+      const splitDue = document.getElementById('split-due');
+      if (!splitCash || !splitUpi || !splitCard || !splitDue) return;
+
+      const round2 = (n) => Math.round(Number(n) * 100) / 100;
+
+      if (target === 'clear') {
+        splitCash.value = '';
+        splitUpi.value = '';
+        splitCard.value = '';
+        splitDue.value = '';
+        updateSplitChange();
+        return;
+      }
+      if (target === 'half') {
+        const half = round2(grand / 2);
+        const rest = round2(grand - half);
+        splitCash.value = half;
+        splitUpi.value = rest;
+        splitCard.value = '';
+        splitDue.value = '';
+        updateSplitChange();
+        return;
+      }
+
+      const map = { cash: splitCash, upi: splitUpi, card: splitCard, due: splitDue };
+      const field = map[target];
+      if (!field) return;
+      const others = [splitCash, splitUpi, splitCard, splitDue].filter((el) => el !== field);
+      const otherSum = others.reduce((a, el) => a + (Math.max(0, Number(el.value) || 0)), 0);
+      const rem = round2(Math.max(0, grand - otherSum));
+      field.value = rem > 0 ? rem : '';
+      updateSplitChange();
     }
 
     function openDrawer(drawerId) {
@@ -1631,6 +1672,17 @@
         const inp = document.getElementById(id);
         if (inp) inp.addEventListener('input', updateSplitChange);
       });
+
+      // Quick-fill remaining tender chips
+      const splitQuick = document.getElementById('split-quick-fill');
+      if (splitQuick && !splitQuick.dataset.bound) {
+        splitQuick.dataset.bound = '1';
+        splitQuick.addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-split-fill]');
+          if (!btn) return;
+          fillSplitRemaining(btn.dataset.splitFill);
+        });
+      }
 
       // Wire denomination buttons
       const inlineDenButtons = document.querySelectorAll('#cash-denominations-grid .btn-den');

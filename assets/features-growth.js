@@ -948,154 +948,438 @@
 
     /* ===================== ONLINE / AGGREGATOR ORDERS ===================== */
     const ONLINE = [];
-    const platName = {zomato:'Zomato',swiggy:'Swiggy',ondc:'ONDC'};
-    function detectPlatform(order){
+    const platName = { zomato: 'Zomato', swiggy: 'Swiggy', ondc: 'ONDC' };
+    let aggAlertBooted = false;
+    const seenOnlineIds = new Set();
+
+    function detectPlatform(order) {
       const raw = `${order.platform || ''} ${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''} ${order.channel || ''}`.toLowerCase();
-      if(raw.includes('swiggy') || raw.includes('swi-') || raw.includes('swig')) return 'swiggy';
-      if(raw.includes('ondc') || raw.includes('ond-')) return 'ondc';
-      if(raw.includes('zomato') || raw.includes('zom-') || raw.includes('zom')) return 'zomato';
+      if (raw.includes('swiggy') || raw.includes('swi-') || raw.includes('swig')) return 'swiggy';
+      if (raw.includes('ondc') || raw.includes('ond-')) return 'ondc';
+      if (raw.includes('zomato') || raw.includes('zom-') || raw.includes('zom')) return 'zomato';
       return 'zomato';
     }
-    function isOnlineOrder(order){
+    function isOnlineOrder(order) {
       const raw = `${order.platform || ''} ${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''} ${order.channel || ''} ${order.source || ''}`.toLowerCase();
-      return raw.includes('online') || raw.includes('delivery') || raw.includes('aggregator')
-        || raw.includes('swiggy') || raw.includes('zomato') || raw.includes('ondc')
-        || /(^|[^a-z])(zom|swi|ond)-/.test(raw);
+      return (
+        raw.includes('online') ||
+        raw.includes('delivery') ||
+        raw.includes('aggregator') ||
+        raw.includes('swiggy') ||
+        raw.includes('zomato') ||
+        raw.includes('ondc') ||
+        /(^|[^a-z])(zom|swi|ond)-/.test(raw)
+      );
     }
-    function aggStatus(status){
+    function aggStatus(status) {
       const s = String(status || '').toLowerCase();
-      if(s.includes('reject') || s.includes('cancel')) return 'rejected';
-      if(s.includes('ready') || s.includes('pickup')) return 'ready';
-      if(s.includes('accept') || s.includes('prepar')) return 'preparing';
+      if (s.includes('reject') || s.includes('cancel')) return 'rejected';
+      if (s.includes('ready') || s.includes('pickup') || s.includes('picked')) return 'ready';
+      if (s.includes('accept') || s.includes('prepar')) return 'preparing';
       return 'new';
     }
-    async function refreshOnlineOrders(){
-      if(!window.RS_DB) return;
-      const rows = await RS_DB.list('pending_orders').catch(e => {
-        console.warn("Failed loading online orders from DB", e);
+
+    function paintOnlineBadge() {
+      const newCount = ONLINE.filter((o) => o.status === 'new').length;
+      const newAndPrep = ONLINE.filter((o) => o.status === 'new' || o.status === 'preparing').length;
+      window.__rsOnlineNewCount = newCount;
+      window.__rsOnlineActiveCount = newAndPrep;
+      document.querySelectorAll('.sidebar-link[data-tab="aggregator-tab"] .badge-count, .mnav-link[data-tab="aggregator-tab"] .badge-count').forEach((onlineBadge) => {
+        onlineBadge.textContent = newCount > 0 ? newCount : newAndPrep;
+        onlineBadge.style.display = newAndPrep > 0 ? '' : 'none';
+        onlineBadge.classList.toggle('badge-urgent', newCount > 0);
+        onlineBadge.title = newCount ? newCount + ' new online orders' : newAndPrep ? newAndPrep + ' active online' : '';
+      });
+      try {
+        if (typeof window.RS !== 'undefined' && RS.updateTabAttentionBlinking) RS.updateTabAttentionBlinking();
+        else if (typeof updateTabAttentionBlinking === 'function') updateTabAttentionBlinking();
+      } catch (e) {}
+    }
+
+    function notifyNewOnlineOrders() {
+      const freshNew = ONLINE.filter((o) => o.status === 'new' && o.id && !seenOnlineIds.has(String(o.id)));
+      if (!aggAlertBooted) {
+        aggAlertBooted = true;
+        ONLINE.forEach((o) => {
+          if (o.id) seenOnlineIds.add(String(o.id));
+        });
+        return;
+      }
+      if (!freshNew.length) return;
+      freshNew.forEach((o) => seenOnlineIds.add(String(o.id)));
+      // Reuse floor chime path when available
+      try {
+        if (window.RSOps && typeof RSOps.checkNewPendingOrders === 'function') {
+          /* floor chime is QR-only; play a short tone here */
+        }
+        const mute = localStorage.getItem('rs_service_alert_mute') === '1';
+        if (!mute) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (Ctx) {
+            const ctx = window.__rsAggAudio || (window.__rsAggAudio = new Ctx());
+            if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+            else {
+              [[523.25, 0], [659.25, 0.14], [783.99, 0.28]].forEach(([freq, d]) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                const t0 = ctx.currentTime + d;
+                gain.gain.setValueAtTime(0.0001, t0);
+                gain.gain.exponentialRampToValueAtTime(0.16, t0 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(t0);
+                osc.stop(t0 + 0.35);
+              });
+            }
+          }
+          if (navigator.vibrate) navigator.vibrate([160, 70, 160, 70, 160]);
+        }
+      } catch (e) {}
+      const first = freshNew[0];
+      const label =
+        freshNew.length === 1
+          ? `New ${platName[first.plat] || 'online'} order · ${first.oid}`
+          : `${freshNew.length} new online orders`;
+      const openAgg = () => {
+        if (RS.activateTab) RS.activateTab('aggregator-tab');
+      };
+      if (typeof window.__toast === 'function') window.__toast(label + ' — tap to open', 'fa-motorcycle', openAgg);
+      else RS.toast(label, 'fa-motorcycle');
+    }
+
+    async function refreshOnlineOrders() {
+      if (!window.RS_DB) return;
+      const rows = await RS_DB.list('pending_orders').catch((e) => {
+        console.warn('Failed loading online orders from DB', e);
         return [];
       });
       ONLINE.length = 0;
       (rows || [])
-        .filter(row => isOnlineOrder(row) && !/reject|cancel|picked|delivered/.test(String(row.status || '').toLowerCase()))
-        .forEach(row => {
-        ONLINE.push({
-          id: row.id,
-          row,
-          plat: detectPlatform(row),
-          oid: RS.formatDisplayOrderId ? RS.formatDisplayOrderId(row) : (row.orderId || row.id),
-          cust: row.customerName || 'Online customer',
-          area: row.tableNumber || row.orderType || 'Delivery',
-          items: (row.items || []).map(it => `${it.qty || 1}x ${it.name || 'Item'}`),
-          total: Number(row.total || 0),
-          status: aggStatus(row.status),
-          prep: row.prep || 10
+        .filter((row) => isOnlineOrder(row) && !/reject|cancel|picked|delivered|completed/.test(String(row.status || '').toLowerCase()))
+        .forEach((row) => {
+          ONLINE.push({
+            id: row.id,
+            row,
+            plat: detectPlatform(row),
+            oid: RS.formatDisplayOrderId ? RS.formatDisplayOrderId(row) : row.orderId || row.id,
+            cust: row.customerName || 'Online customer',
+            phone: row.customerPhone || row.phone || '',
+            area: row.tableNumber || row.orderType || 'Delivery',
+            items: (row.items || []).map((it) => `${it.qty || 1}× ${it.name || 'Item'}`),
+            rawItems: row.items || [],
+            total: Number(row.total || 0),
+            status: aggStatus(row.status),
+            prep: row.prepMinutes || row.prep || 15,
+            since: row.dateTime ? getElapsedDesc(row.dateTime) : '',
+            dateTime: row.dateTime,
+          });
         });
+      // New first
+      ONLINE.sort((a, b) => {
+        const rank = (s) => (s === 'new' ? 0 : s === 'preparing' ? 1 : 2);
+        return rank(a.status) - rank(b.status);
       });
+      paintOnlineBadge();
+      notifyNewOnlineOrders();
     }
-    async function persistOnlineStatus(idx, persistedStatus, message, icon){
-      const order = ONLINE[idx];
-      if(!order) return;
-      order.row.status = persistedStatus;
+
+    async function openOnlineOrderInPos(order) {
+      if (!order || !order.row) return;
+      const items = orderItemsForPos(order.row);
+      if (!items.length) {
+        RS.toast('No billable items on this order', 'fa-circle-exclamation');
+        return;
+      }
+      if (RS.activateTab) await RS.activateTab('pos-tab');
+      await new Promise((r) => setTimeout(r, 120));
+      let attempts = 0;
+      while (attempts < 8 && typeof RS.setCart !== 'function') {
+        await new Promise((r) => setTimeout(r, 60));
+        attempts += 1;
+      }
+      // Delivery / takeaway style for aggregators
+      const btns = document.querySelectorAll('.order-type-btn');
+      let deliveryBtn = null;
+      btns.forEach((b) => {
+        const t = (b.textContent || '').trim().toLowerCase();
+        if (t.includes('deliver') || t.includes('online')) deliveryBtn = b;
+        else if (!deliveryBtn && t.includes('take')) deliveryBtn = b;
+      });
+      if (deliveryBtn) deliveryBtn.click();
+
+      const tableSelect = document.getElementById('cart-table');
+      const tableLabel = `${platName[order.plat] || 'Online'} · ${order.oid}`;
+      if (tableSelect) {
+        let opt = [...tableSelect.options].find((o) => o.value === tableLabel || o.text === tableLabel);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = tableLabel;
+          opt.textContent = tableLabel;
+          tableSelect.appendChild(opt);
+        }
+        tableSelect.value = opt.value;
+        tableSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (typeof RS.setCart === 'function') RS.setCart(items);
+      const nameEl = document.getElementById('cust-name') || document.getElementById('cust-input-name');
+      const phoneEl = document.getElementById('cust-phone') || document.getElementById('cust-input-phone');
+      if (nameEl && order.cust) {
+        nameEl.value = order.cust;
+        nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (phoneEl && order.phone) {
+        phoneEl.value = order.phone;
+        phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       try {
-        if(window.RS_DB) await RS_DB.put('pending_orders', order.id, order.row);
-        if(window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders();
+        if (typeof RS.renderCart === 'function') RS.renderCart();
+      } catch (e) {}
+      RS.toast(`${platName[order.plat]} ${order.oid} loaded in POS`, 'fa-receipt');
+    }
+
+    function printOnlineKot(order) {
+      if (!order) return;
+      const items = (order.rawItems || order.row?.items || []).map((it) => ({
+        qty: it.qty || 1,
+        name: it.name || 'Item',
+      }));
+      if (window.RSOps && typeof RSOps.printKotThermal === 'function') {
+        RSOps.printKotThermal(items, {
+          token: order.oid,
+          table: `${platName[order.plat]} · ${order.area}`,
+          orderType: 'Online',
+        });
+      } else if (typeof window.RSPrint === 'function') {
+        const lines = items
+          .map((i) => `<div class="kot-item"><span class="kq">${esc(i.qty)}×</span><span>${esc(i.name)}</span></div>`)
+          .join('');
+        RSPrint(
+          `<div style="max-width:280px;margin:0 auto"><div class="kot-h"><span class="kt">KOT</span><span>${esc(order.oid)}</span></div>${lines}</div>`,
+          'KOT ' + order.oid
+        );
+      }
+    }
+
+    async function persistOnlineStatus(idx, persistedStatus, message, icon, opts) {
+      const order = ONLINE[idx];
+      if (!order) return;
+      order.row.status = persistedStatus;
+      if (opts && opts.prepMinutes) {
+        order.row.prepMinutes = opts.prepMinutes;
+        order.row.prepStartedAt = new Date().toISOString();
+        order.prep = opts.prepMinutes;
+      }
+      try {
+        if (window.RS_DB) await RS_DB.put('pending_orders', order.id, order.row);
+        if (window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: true });
         RS.toast(message, icon);
-        renderAgg();
-      } catch(e) {
-        console.warn("Failed updating online order status", e);
+        if (opts && opts.printKot) printOnlineKot(order);
+        try {
+          document.dispatchEvent(new CustomEvent('rs:kot-new', { detail: order.row }));
+        } catch (_) {}
+        await renderAgg();
+      } catch (e) {
+        console.warn('Failed updating online order status', e);
         RS.toast('Online order update failed', 'fa-circle-exclamation');
       }
     }
-    async function renderAgg(){
+
+    async function seedDemoOnlineOrder(platform) {
+      if (!window.RS_DB) {
+        RS.toast('Database unavailable', 'fa-circle-exclamation');
+        return;
+      }
+      const plat = platform || 'swiggy';
+      const menu = (RS.MENU && RS.MENU.length ? RS.MENU : []).slice(0, 2);
+      const items = menu.length
+        ? menu.map((m) => ({
+            id: m.id,
+            name: m.name,
+            qty: 1,
+            price: Number(m.price || m.salePrice || 120),
+          }))
+        : [
+            { id: 'demo_paneer', name: 'Paneer Butter Masala', qty: 1, price: 280 },
+            { id: 'demo_naan', name: 'Butter Naan', qty: 2, price: 50 },
+          ];
+      const total = items.reduce((a, i) => a + Number(i.price) * Number(i.qty), 0);
+      const stamp = Date.now();
+      const row = {
+        orderId: `${plat.slice(0, 3).toUpperCase()}-${String(stamp).slice(-6)}`,
+        tableNumber: 'Delivery',
+        orderType: 'Online Delivery',
+        platform: plat,
+        channel: 'aggregator',
+        source: plat,
+        customerName: plat === 'zomato' ? 'Demo Zomato Guest' : plat === 'ondc' ? 'Demo ONDC Guest' : 'Demo Swiggy Guest',
+        customerPhone: '9876501234',
+        items,
+        total,
+        status: 'Pending Review',
+        dateTime: new Date().toISOString(),
+        priority: 'normal',
+      };
+      try {
+        const saved = await RS_DB.put('pending_orders', null, row);
+        if (saved && saved.id) row.id = saved.id;
+        if (window.RS_SYNC && RS_SYNC.syncPendingOrders) await RS_SYNC.syncPendingOrders({ forceCloud: true });
+        RS.toast(`Demo ${platName[plat] || plat} order seeded`, 'fa-seedling');
+        await renderAgg();
+      } catch (e) {
+        console.warn('seedDemoOnlineOrder failed', e);
+        RS.toast('Could not seed demo order', 'fa-circle-exclamation');
+      }
+    }
+
+    async function renderAgg() {
       const sec = $('#aggregator-tab');
-      if(!sec) return;
+      if (!sec) return;
       sec.innerHTML = '<div class="sr-empty">Loading online orders...</div>';
       await refreshOnlineOrders();
-      // Update Online Orders sidebar badge dynamically
-      const newAndPrep = ONLINE.filter(o => o.status === 'new' || o.status === 'preparing').length;
-      const onlineBadge = document.querySelector('.sidebar-link[data-tab="aggregator-tab"] .badge-count');
-      if (onlineBadge) {
-        onlineBadge.textContent = newAndPrep;
-        onlineBadge.style.display = newAndPrep > 0 ? '' : 'none';
-      }
+      const newN = ONLINE.filter((o) => o.status === 'new').length;
+      const prepN = ONLINE.filter((o) => o.status === 'preparing').length;
+      const readyN = ONLINE.filter((o) => o.status === 'ready').length;
       sec.innerHTML = `
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-bowl-rice"></i></div><div><div class="sv">${ONLINE.filter(o=>o.status==='new').length}</div><div class="sl">New orders</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-fire-burner"></i></div><div><div class="sv">${ONLINE.filter(o=>o.status==='preparing').length}</div><div class="sl">Preparing</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-bell-concierge"></i></div><div><div class="sv">${ONLINE.filter(o=>o.status==='ready').length}</div><div class="sl">Ready for pickup</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(ONLINE.reduce((a,o)=>a+o.total,0))}</div><div class="sl">Online sales (open)</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-bowl-rice"></i></div><div><div class="sv">${newN}</div><div class="sl">New orders</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-fire-burner"></i></div><div><div class="sv">${prepN}</div><div class="sl">Preparing</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-bell-concierge"></i></div><div><div class="sv">${readyN}</div><div class="sl">Ready for pickup</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(ONLINE.reduce((a, o) => a + o.total, 0))}</div><div class="sl">Online sales (open)</div></div></div>
         </div>
         <div class="toolbar-row" style="flex-wrap:wrap;gap:8px">
           <span class="eyebrow">Live aggregator feed</span>
           <div class="grow"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="agg-seed" title="Seed a demo online order"><i class="fa-solid fa-seedling"></i> Demo order</button>
           <button type="button" class="btn btn-ghost btn-sm" id="agg-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
           <button type="button" class="btn btn-ghost btn-sm" id="agg-webhook-info" title="Webhook setup"><i class="fa-solid fa-link"></i> Webhook</button>
           <span class="pill pill-green"><span class="dot dot-live"></span> Live</span>
         </div>
-        <div class="agg-grid">${ONLINE.map((o,i)=>`
-          <div class="agg-card" data-i="${i}">
-            <div class="agg-top ${o.plat}"><i class="fa-solid ${o.plat==='ondc'?'fa-network-wired':'fa-bowl-food'}"></i><span class="plat">${platName[o.plat]}</span><span class="oid">${o.oid}</span></div>
+        <div class="agg-grid">${ONLINE.map(
+          (o, i) => `
+          <div class="agg-card${o.status === 'new' ? ' needs-attention' : ''}" data-i="${i}">
+            <div class="agg-top ${o.plat}"><i class="fa-solid ${o.plat === 'ondc' ? 'fa-network-wired' : 'fa-bowl-food'}"></i><span class="plat">${platName[o.plat]}</span><span class="oid">${esc(o.oid)}</span></div>
             <div class="agg-body">
-              <div class="agg-cust"><div><div class="cn">${esc(o.cust)}</div><div class="ct">${esc(o.area)}</div></div><span class="pill ${o.status==='new'?'pill-amber':o.status==='preparing'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(o.status)}</span></div>
+              <div class="agg-cust"><div><div class="cn">${esc(o.cust)}</div><div class="ct">${esc(o.area)}${o.phone ? ' · ' + esc(o.phone) : ''}${o.since ? ' · ' + esc(o.since) : ''}</div></div><span class="pill ${o.status === 'new' ? 'pill-amber' : o.status === 'preparing' ? 'pill-orange' : 'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(o.status)}</span></div>
               <div class="agg-items">${o.items.map(esc).join('<br>')}</div>
               <div class="agg-foot"><span class="at">${rs(o.total)}</span>
-                ${o.status==='new'?`<button class="btn btn-ghost btn-sm" data-rej="${i}">Reject</button><button class="btn btn-primary btn-sm" data-acc="${i}"><i class="fa-solid fa-check"></i> Accept</button>`
-                : o.status==='preparing'?`<span class="agg-prep"><i class="fa-solid fa-clock"></i> ${o.prep}m left</span><button class="btn btn-primary btn-sm" data-ready="${i}">Mark ready</button>`
-                :`<button class="btn btn-ghost btn-sm" data-rider="${i}"><i class="fa-solid fa-motorcycle"></i> Rider assigned</button>`}
+                <button class="btn btn-ghost btn-sm" data-pos="${i}" title="Open in POS"><i class="fa-solid fa-cash-register"></i></button>
+                ${
+                  o.status === 'new'
+                    ? `<button class="btn btn-ghost btn-sm" data-rej="${i}">Reject</button><button class="btn btn-primary btn-sm" data-acc="${i}"><i class="fa-solid fa-check"></i> Accept + KOT</button>`
+                    : o.status === 'preparing'
+                      ? `<span class="agg-prep"><i class="fa-solid fa-clock"></i> ${esc(o.prep)}m</span><button class="btn btn-primary btn-sm" data-ready="${i}">Mark ready</button>`
+                      : `<button class="btn btn-ghost btn-sm" data-rider="${i}"><i class="fa-solid fa-motorcycle"></i> Rider out</button>`
+                }
               </div>
             </div>
-          </div>`).join('')}</div>`;
-      if(!ONLINE.length) {
+          </div>`
+        ).join('')}</div>`;
+      if (!ONLINE.length) {
         const grid = $('.agg-grid', sec);
-        if(grid) grid.innerHTML = `<div class="sr-empty" style="padding:28px 16px">
+        if (grid)
+          grid.innerHTML = `<div class="sr-empty" style="padding:28px 16px">
           <div style="font-weight:700;margin-bottom:6px">No online orders right now</div>
           <div style="font-size:12.5px;color:var(--text-soft);max-width:420px;margin:0 auto;line-height:1.5">
-            Connect Zomato / Swiggy / ONDC to the aggregator webhook (Settings → Online, or Webhook button). Orders land in Pending Review automatically.
+            Connect Zomato / Swiggy / ONDC via the Webhook button, or tap <b>Demo order</b> to practice accept → KOT → POS checkout.
           </div>
         </div>`;
       }
-      $$('[data-acc]',sec).forEach(b=>b.onclick=async()=>{
-        const i = +b.dataset.acc;
-        if (ONLINE[i]) ONLINE[i].prep = 10;
-        await persistOnlineStatus(i, 'Accepted', 'Order accepted · KOT fired', 'fa-check');
-        // Push to KDS attention if available
-        try { document.dispatchEvent(new CustomEvent('rs:kot-new', { detail: ONLINE[i] && ONLINE[i].row })); } catch(_){}
+      $$('[data-pos]', sec).forEach((b) => {
+        b.onclick = () => openOnlineOrderInPos(ONLINE[+b.dataset.pos]);
       });
-      $$('[data-ready]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.ready, 'Ready', 'Marked ready for pickup','fa-bell-concierge'));
-      $$('[data-rej]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.rej, 'Rejected', 'Order rejected','fa-xmark'));
-      $$('[data-rider]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.rider, 'Picked Up', 'Rider pickup recorded','fa-motorcycle'));
+      $$('[data-acc]', sec).forEach((b) => {
+        b.onclick = async () => {
+          const i = +b.dataset.acc;
+          if (ONLINE[i]) ONLINE[i].prep = 15;
+          await persistOnlineStatus(i, 'preparing', 'Accepted · KOT printed', 'fa-check', {
+            printKot: true,
+            prepMinutes: 15,
+          });
+        };
+      });
+      $$('[data-ready]', sec).forEach((b) =>
+        b.onclick = () => persistOnlineStatus(+b.dataset.ready, 'Ready', 'Marked ready for pickup', 'fa-bell-concierge')
+      );
+      $$('[data-rej]', sec).forEach((b) =>
+        b.onclick = () => persistOnlineStatus(+b.dataset.rej, 'Rejected', 'Order rejected', 'fa-xmark')
+      );
+      $$('[data-rider]', sec).forEach((b) =>
+        b.onclick = () => persistOnlineStatus(+b.dataset.rider, 'Picked Up', 'Rider pickup recorded', 'fa-motorcycle')
+      );
 
       const refreshBtn = sec.querySelector('#agg-refresh');
       if (refreshBtn) refreshBtn.onclick = () => renderAgg();
+      const seedBtn = sec.querySelector('#agg-seed');
+      if (seedBtn)
+        seedBtn.onclick = () => {
+          const plats = ['swiggy', 'zomato', 'ondc'];
+          const pick = plats[Math.floor(Math.random() * plats.length)];
+          seedDemoOnlineOrder(pick);
+        };
       const whBtn = sec.querySelector('#agg-webhook-info');
-      if (whBtn) whBtn.onclick = () => {
-        const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
-        const tid = sess.tenant_id || '';
-        const base = (window.RS_API && RS_API.functionsBase) || (window.__SUPABASE_URL__ ? (String(window.__SUPABASE_URL__).replace(/\/+$/,'') + '/functions/v1') : 'https://YOUR_PROJECT.supabase.co/functions/v1');
-        const url = `${base}/aggregator-webhook?tenant_id=${encodeURIComponent(tid)}`;
-        const body = `<div style="font-size:13px;line-height:1.55;color:var(--text-soft)">
+      if (whBtn)
+        whBtn.onclick = () => {
+          const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
+          const tid = sess.tenant_id || '';
+          const base =
+            (window.RS_API && RS_API.functionsBase) ||
+            (window.__SUPABASE_URL__
+              ? String(window.__SUPABASE_URL__).replace(/\/+$/, '') + '/functions/v1'
+              : 'https://YOUR_PROJECT.supabase.co/functions/v1');
+          const url = `${base}/aggregator-webhook?tenant_id=${encodeURIComponent(tid)}`;
+          const body = `<div style="font-size:13px;line-height:1.55;color:var(--text-soft)">
           <p style="margin:0 0 10px;color:var(--text)"><b>Webhook URL</b> (POST JSON, Authorization: Bearer AGGREGATOR_WEBHOOK_SECRET)</p>
           <code style="display:block;padding:10px;border-radius:8px;background:var(--glass);border:1px solid var(--stroke);word-break:break-all;font-size:11.5px">${esc(url)}</code>
           <p style="margin:12px 0 0">Body fields: <code>platform</code>, <code>order_id</code>, <code>customer_name</code>, <code>customer_phone</code>, <code>items[]</code>, <code>total_amount</code>.</p>
         </div>`;
-        if (window.RSModal) {
-          RSModal.open({ title: 'Aggregator webhook', icon: 'fa-link', size: 'sm', body, foot: '<button class="btn btn-primary" id="agg-wh-close">Close</button>',
-            onMount(m, close) { const c = m.querySelector('#agg-wh-close'); if (c) c.onclick = close; } });
-        } else {
-          window.prompt('Webhook URL', url);
-        }
-      };
+          if (window.RSModal) {
+            RSModal.open({
+              title: 'Aggregator webhook',
+              icon: 'fa-link',
+              size: 'sm',
+              body,
+              foot: '<button class="btn btn-primary" id="agg-wh-close">Close</button>',
+              onMount(m, close) {
+                const c = m.querySelector('#agg-wh-close');
+                if (c) c.onclick = close;
+              },
+            });
+          } else {
+            window.prompt('Webhook URL', url);
+          }
+        };
 
       // Auto-refresh while tab is active
       if (window.__rsAggPoll) clearInterval(window.__rsAggPoll);
       window.__rsAggPoll = setInterval(() => {
         const active = document.getElementById('aggregator-tab');
         if (active && active.classList.contains('active')) renderAgg();
-        else { clearInterval(window.__rsAggPoll); window.__rsAggPoll = null; }
+        else {
+          clearInterval(window.__rsAggPoll);
+          window.__rsAggPoll = null;
+        }
       }, 12000);
     }
-    RS.titles['aggregator-tab']=['Online Orders','Zomato, Swiggy & ONDC orders']; RS.addRenderer('aggregator-tab', renderAgg);
+
+    RS.titles['aggregator-tab'] = ['Online Orders', 'Zomato, Swiggy & ONDC orders'];
+    RS.addRenderer('aggregator-tab', renderAgg);
+    RS.openOnlineOrderInPos = openOnlineOrderInPos;
+    RS.seedDemoOnlineOrder = seedDemoOnlineOrder;
+    if (!window.__rsAggSyncBound) {
+      window.__rsAggSyncBound = true;
+      document.addEventListener('rs:pending_orders_synced', () => {
+        refreshOnlineOrders().then(() => {
+          const active = document.getElementById('aggregator-tab');
+          if (active && active.classList.contains('active')) {
+            try {
+              renderAgg();
+            } catch (e) {}
+          }
+        });
+      });
+    }
 
     /* ===================== CUSTOMERS / CRM ===================== */
     const CUSTOMERS = [];
