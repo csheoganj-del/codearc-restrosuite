@@ -108,6 +108,7 @@
       serviceChargePct: b.serviceChargePct != null ? Number(b.serviceChargePct) : null,
       tipAmount: Number(b.tipAmount || b.tip || b.tip_amount) || 0,
       deliveryCharge: Number(b.deliveryCharge || b.delivery_charge || b.deliveryFee) || 0,
+      loyaltyRedeemAmount: Number(b.loyaltyRedeemAmount || b.loyalty_redeem_amount) || 0,
       liquorTaxAmount: Number(b.liquorTaxAmount || b.liquor_tax_amount) || 0,
       taxProfile: b.taxProfile || b.tax_profile || null,
       channel: b.channel || b.orderType || 'dine_in',
@@ -205,6 +206,7 @@
       ${m.serviceChargeAmount ? `<div class="rcp-line"><span>Service Charge (${m.serviceChargePct != null ? m.serviceChargePct : 5}%)</span><span>${$(m.serviceChargeAmount)}</span></div>` : ''}
       ${m.tipAmount ? `<div class="rcp-line"><span>Tip</span><span>${$(m.tipAmount)}</span></div>` : ''}
       ${m.deliveryCharge ? `<div class="rcp-line"><span>Delivery</span><span>${$(m.deliveryCharge)}</span></div>` : ''}
+      ${m.loyaltyRedeemAmount ? `<div class="rcp-line"><span>Loyalty redeem</span><span>- ${$(m.loyaltyRedeemAmount)}</span></div>` : ''}
       ${m.liquorTaxAmount ? `<div class="rcp-line"><span>Liquor VAT</span><span>${$(m.liquorTaxAmount)}</span></div>` : ''}
       ${taxBreakdownHTML}
       <div class="rcp-tot"><span>TOTAL</span><span>${$(m.grand)}</span></div>
@@ -245,6 +247,7 @@
       m.serviceChargeAmount ? `Service Charge (${m.serviceChargePct != null ? m.serviceChargePct : 5}%): ${$(m.serviceChargeAmount)}` : '',
       m.tipAmount ? `Tip: ${$(m.tipAmount)}` : '',
       m.deliveryCharge ? `Delivery: ${$(m.deliveryCharge)}` : '',
+      m.loyaltyRedeemAmount ? `Loyalty redeem: - ${$(m.loyaltyRedeemAmount)}` : '',
       m.liquorTaxAmount ? `Liquor VAT: ${$(m.liquorTaxAmount)}` : '',
     ];
     if (tax.gst_scheme === 'composition' && country === 'IN') {

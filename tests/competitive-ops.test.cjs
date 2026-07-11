@@ -101,6 +101,17 @@ test('delivery in totals, Z tips, rebill void polish', () => {
   assert.match(receipt, /deliveryCharge/);
 });
 
+test('loyalty earn redeem APIs', () => {
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
+  const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  const shell = fs.readFileSync(path.join(root, 'assets/features-shell.js'), 'utf8');
+  assert.match(ops, /RSLoyalty|applyLoyaltyEarnToCustomer|paintBanner/);
+  assert.match(posUi, /loyaltyRedeem|setLoyaltyRedeem/);
+  assert.match(pos, /loyaltyRedeemAmount|loyaltyPointsUsed/);
+  assert.match(shell, /Loyalty program|Loyalty earn rate/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);

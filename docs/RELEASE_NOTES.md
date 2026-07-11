@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v71 (2026-07-11) — Loyalty earn & redeem
+
+- **Earn points** on CRM-matched checkouts (1 pt / ₹100 default; Gold 2×, VIP 3×)
+- **Redeem** from POS loyalty banner; discount line on cart, bill, and receipt
+- **Tiers** auto: Silver → Gold (5k spend) → VIP (10k)
+- **Settings → Taxes**: Loyalty program, earn rate, point value
+- Customer profile shows live points balance
+
 ## v70 (2026-07-11) — Delivery fee, Z tips, void/rebill
 
 - **Delivery charge** included in cart grand total, bill, and receipt (live update on fee field)
@@ -85,7 +93,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v70-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v71-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

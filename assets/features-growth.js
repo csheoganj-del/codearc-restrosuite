@@ -1806,10 +1806,18 @@
       const history = custBills.map(b => [b.time, (b._items || []).map(i => `${i.name} x${i.qty}`).join(', '), b.amount]);
 
       const avgVisit = c.visits > 0 ? Math.round(c.spend/c.visits) : 0;
-      const points = c.spend > 0 ? Math.round(c.spend/100) : 0;
+      const points =
+        window.RSLoyalty && typeof RSLoyalty.customerPoints === 'function'
+          ? RSLoyalty.customerPoints(c)
+          : c.points != null
+            ? Math.floor(Number(c.points) || 0)
+            : c.spend > 0
+              ? Math.round(c.spend / 100)
+              : 0;
+      const tierLabel = String(c.tier || 'silver').toUpperCase();
 
-      RSModal.open({ title:c.name, sub:c.phone+' · '+c.tier.toUpperCase()+' member', icon:'fa-user', size:'md',
-        body:`<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${c.visits}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend)}</div><div class="csl">Lifetime</div></div><div class="cs"><div class="csv">${rs(avgVisit)}</div><div class="csl">Avg ₹/visit</div></div><div class="cs"><div class="csv" style="color:var(--orange)">${points}</div><div class="csl">Points</div></div></div>
+      RSModal.open({ title:c.name, sub:c.phone+' · '+tierLabel+' member · '+points+' pts', icon:'fa-user', size:'md',
+        body:`<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${c.visits}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend)}</div><div class="csl">Lifetime</div></div><div class="cs"><div class="csv">${rs(avgVisit)}</div><div class="csl">Avg / visit</div></div><div class="cs"><div class="csv" style="color:var(--orange)">${points}</div><div class="csl">Points</div></div></div>
           ${c.dues > 0 ? `
           <div style="background:var(--orange-tint); border:1px solid rgba(255,107,0,0.3); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
             <div style="font-size:13px; color:var(--text); font-weight:700;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--orange); margin-right:6px;"></i> Outstanding dues: <span style="color:var(--orange); font-size:15px; font-weight:800;">${rs(c.dues)}</span></div>

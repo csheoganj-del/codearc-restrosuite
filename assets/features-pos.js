@@ -547,6 +547,7 @@
         }
         if (bill.tipAmount) totalsRows.push({ left: 'Tip', right: rs(bill.tipAmount) });
         if (bill.deliveryCharge) totalsRows.push({ left: 'Delivery', right: rs(bill.deliveryCharge) });
+        if (bill.loyaltyRedeemAmount) totalsRows.push({ left: 'Loyalty redeem', right: '- ' + rs(bill.loyaltyRedeemAmount) });
         if (bill.liquorTaxAmount) totalsRows.push({ left: 'Liquor VAT', right: rs(bill.liquorTaxAmount) });
 
         totalsRows.forEach(row => {
@@ -1804,6 +1805,8 @@
           serviceChargePct: totals.serviceChargePct,
           tipAmount: totals.tip || 0,
           deliveryCharge: totals.deliveryCharge || 0,
+          loyaltyRedeemAmount: totals.loyaltyRedeem || 0,
+          loyaltyPointsUsed: totals.loyaltyPointsUsed || 0,
           idempotencyKey: identity.idempotencyKey,
           syncStatus: 'saving',
         };
@@ -1838,6 +1841,8 @@
           serviceChargePct: totals.serviceChargePct,
           tipAmount: totals.tip || 0,
           deliveryCharge: totals.deliveryCharge || 0,
+          loyaltyRedeemAmount: totals.loyaltyRedeem || 0,
+          loyaltyPointsUsed: totals.loyaltyPointsUsed || 0,
         };
         if (window.RSOps && RSOps.decorateBillMeta) RSOps.decorateBillMeta(billRow, bill);
 
@@ -1922,26 +1927,47 @@
                 matched = customers.find(c => c.name && String(c.name).trim().toLowerCase() === String(custSnap.name).trim().toLowerCase());
               }
               if (matched) {
-                matched.visits = (matched.visits || 0) + 1;
-                matched.spend = (matched.spend || 0) + bill.grand;
-                matched.last = new Date().toLocaleDateString('en-CA');
-                if (dueAmount > 0) matched.dues = (matched.dues || 0) + dueAmount;
                 if (hasName && !matched.name) matched.name = custSnap.name.trim();
                 if (hasPhone && !matched.phone) matched.phone = custSnap.phone.trim();
+                let earnInfo = null;
+                if (window.RSLoyalty && typeof RSLoyalty.applyLoyaltyEarnToCustomer === 'function') {
+                  earnInfo = RSLoyalty.applyLoyaltyEarnToCustomer(matched, bill, dueAmount);
+                } else {
+                  matched.visits = (matched.visits || 0) + 1;
+                  matched.spend = (matched.spend || 0) + bill.grand;
+                  matched.last = new Date().toLocaleDateString('en-CA');
+                  if (dueAmount > 0) matched.dues = (matched.dues || 0) + dueAmount;
+                }
                 await RS_DB.put('customers', matched.id, matched);
+                if (earnInfo && earnInfo.earned > 0) {
+                  RS.toast(`+${earnInfo.earned} loyalty pts · bal ${earnInfo.balance}`, 'fa-star');
+                }
               } else {
                 const newCust = {
                   id: 'cust-' + Date.now(),
                   name: custSnap.name ? custSnap.name.trim() : 'Guest',
                   phone: custSnap.phone ? custSnap.phone.trim() : '',
                   email: '',
-                  visits: 1,
-                  spend: bill.grand,
+                  visits: 0,
+                  spend: 0,
                   last: new Date().toLocaleDateString('en-CA'),
-                  dues: dueAmount,
-                  tier: bill.grand > 25000 ? 'vip' : bill.grand > 12000 ? 'gold' : 'silver'
+                  dues: 0,
+                  points: 0,
+                  tier: 'silver',
                 };
+                let earnInfo = null;
+                if (window.RSLoyalty && typeof RSLoyalty.applyLoyaltyEarnToCustomer === 'function') {
+                  earnInfo = RSLoyalty.applyLoyaltyEarnToCustomer(newCust, bill, dueAmount);
+                } else {
+                  newCust.visits = 1;
+                  newCust.spend = bill.grand;
+                  newCust.dues = dueAmount;
+                  newCust.tier = bill.grand > 10000 ? 'vip' : bill.grand > 5000 ? 'gold' : 'silver';
+                }
                 await RS_DB.put('customers', newCust.id, newCust);
+                if (earnInfo && earnInfo.earned > 0) {
+                  RS.toast(`Welcome · +${earnInfo.earned} loyalty pts`, 'fa-star');
+                }
               }
               if (typeof loadCustomersForPos === 'function') loadCustomersForPos().catch(() => {});
             } catch (e) {
@@ -2883,6 +2909,9 @@
           insightsPanel.style.display = 'none';
           if (actionRow) actionRow.style.display = 'none';
           paintDuesBanner(null);
+          try {
+            if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(null);
+          } catch (_) {}
           return;
         }
         
@@ -2915,6 +2944,9 @@
           insightsPanel.style.display = 'grid';
           if (actionRow) actionRow.style.display = 'none';
           paintDuesBanner(c);
+          try {
+            if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(c);
+          } catch (_) {}
         } else {
           // Check if temp option exists
           const opt = sel.options[sel.selectedIndex];
@@ -2924,6 +2956,9 @@
           triggerText.innerText = name || currentPhone;
           insightsPanel.style.display = 'none';
           paintDuesBanner(null);
+          try {
+            if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(null);
+          } catch (_) {}
           
           if (name && currentPhone && !currentPhone.startsWith('temp-')) {
             if (actionRow) actionRow.style.display = 'block';

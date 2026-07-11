@@ -43,7 +43,7 @@
     if (global.RS && typeof RS.activateTab === 'function') return RS.activateTab(id);
   }
 
-let activeCat='All', cart=[], discountPct=0, tipAmount=0;
+let activeCat='All', cart=[], discountPct=0, tipAmount=0, loyaltyRedeem=0, loyaltyPointsUsed=0;
 const renderPOS = () => {
   const grid = $('#pos-grid');
   if (!grid) return;
@@ -185,6 +185,9 @@ function renderCart(){
   if (totals.deliveryCharge > 0) {
     metaHTML += `<span>Delivery <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
   }
+  if (totals.loyaltyRedeem > 0) {
+    metaHTML += `<span style="color:var(--violet-soft)">Loyalty <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
+  }
   
   // Ireland handles composition differently (not applicable)
   if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
@@ -295,6 +298,7 @@ function getTotals(){
     serviceChargeAmount = Math.round(netAfterDiscount * (serviceChargePct / 100));
   }
   const tip = Math.max(0, Number(tipAmount) || 0);
+  const loyaltyOff = Math.max(0, Number(loyaltyRedeem) || 0);
   
   const items = cart.map(c => {
     const lineGross = c.price * c.qty;
@@ -413,10 +417,11 @@ function getTotals(){
     sgst = Number((totalGst - cgst).toFixed(2));
   }
   
-  let grand = netAfterDiscount + serviceChargeAmount + tip + deliveryCharge;
+  let grand = netAfterDiscount + serviceChargeAmount + tip + deliveryCharge - loyaltyOff;
   if (!inclusivePricing) {
     grand += totalGst + totalLiquorTax;
   }
+  if (grand < 0) grand = 0;
   
   if (roundOffEnabled) {
     grand = Math.round(grand);
@@ -436,6 +441,8 @@ function getTotals(){
     serviceChargePct,
     tip,
     deliveryCharge,
+    loyaltyRedeem: loyaltyOff,
+    loyaltyPointsUsed: loyaltyPointsUsed || 0,
     grand,
     count: cart.reduce((a,c)=>a+c.qty,0),
     discountPct,
@@ -446,7 +453,7 @@ function getTotals(){
   };
 }
 function clearCart(){
-  cart=[]; discountPct=0; tipAmount=0;
+  cart=[]; discountPct=0; tipAmount=0; loyaltyRedeem=0; loyaltyPointsUsed=0;
   const d=$('#disc-input'); if(d) d.value='';
   const tipEl=$('#tip-input'); if(tipEl) tipEl.value='';
   renderCart();
@@ -858,6 +865,16 @@ function initPOS(){
   function getTip() {
     return tipAmount;
   }
+  function setLoyaltyRedeem(currencyAmount, pointsUsed) {
+    loyaltyRedeem = Math.max(0, Number(currencyAmount) || 0);
+    loyaltyPointsUsed = Math.max(0, Number(pointsUsed) || 0);
+    try {
+      renderCart();
+    } catch (_) {}
+  }
+  function getLoyaltyRedeem() {
+    return { amount: loyaltyRedeem, points: loyaltyPointsUsed };
+  }
 
   global.RSPosUI = {
     renderPOS,
@@ -875,6 +892,8 @@ function initPOS(){
     getDiscountPct,
     setTip,
     getTip,
+    setLoyaltyRedeem,
+    getLoyaltyRedeem,
     updateMobileCartBar,
     openMobilePOSCart,
     closeMobilePOSCart,
@@ -901,6 +920,8 @@ function initPOS(){
     global.RS.initPOS = api.initPOS;
     global.RS.setTip = api.setTip;
     global.RS.getTip = api.getTip;
+    global.RS.setLoyaltyRedeem = api.setLoyaltyRedeem;
+    global.RS.getLoyaltyRedeem = api.getLoyaltyRedeem;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);

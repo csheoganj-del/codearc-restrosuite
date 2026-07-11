@@ -213,7 +213,15 @@
         </div>
         ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
         ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
-        ${toggle('Inclusive pricing','Menu prices include GST',false)}`,
+        ${toggle('Inclusive pricing','Menu prices include GST',false)}
+        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
+          ${toggle('Loyalty program','Earn & redeem points on CRM customers at checkout',true)}
+          <div class="set-section form-grid-2" style="margin-top:10px">
+            ${field('Loyalty earn rate','100','Currency spent per 1 point')}
+            ${field('Loyalty point value','1','Currency value of 1 point when redeemed')}
+          </div>
+          <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Gold earns 2×, VIP 3×. Tiers: Silver → Gold at 5k lifetime spend → VIP at 10k.</p>
+        </div>`,
       printer:`<div class="set-section form-grid-2">${field('Receipt printer','EPSON TM-T82 (USB)')}${sel('Paper size',['58 mm','80 mm'],'80 mm')}</div>
         ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer)',false)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
