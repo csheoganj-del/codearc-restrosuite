@@ -141,6 +141,13 @@ test('receive stock against purchase order', () => {
   assert.match(manage, /status:\s*'received'|receivedAt/);
 });
 
+test('partial receive and cancel purchase order', () => {
+  const manage = fs.readFileSync(path.join(root, 'assets/features-manage.js'), 'utf8');
+  assert.match(manage, /openReceiveModal|linesToReceive|remainingPoLines/);
+  assert.match(manage, /cancelPurchaseOrder|partial/);
+  assert.match(manage, /receivedLines|data-po-cancel|poListFilter/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);
