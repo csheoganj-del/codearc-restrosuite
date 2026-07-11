@@ -21,7 +21,19 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/restrosuite.css?v=v34-20260628">
 <script>
+  // Production: log only. Visual banner only on localhost / ?debug=1 / superadmin flag.
+  window.__RS_DEBUG_UI__ = (function() {
+    try {
+      var h = location.hostname || '';
+      if (h === 'localhost' || h === '127.0.0.1') return true;
+      if (new URLSearchParams(location.search).get('debug') === '1') return true;
+      if (sessionStorage.getItem('rs_debug_ui') === '1') return true;
+    } catch (e) {}
+    return false;
+  })();
   window.onerror = function(msg, url, line, col, error) {
+    try { console.error('[RS]', msg, url, line, col, error); } catch (e) {}
+    if (!window.__RS_DEBUG_UI__) return;
     var div = document.getElementById('debug-error-banner');
     if (!div) {
       div = document.createElement('div');
@@ -33,6 +45,8 @@
     div.innerHTML += '<div><b>JavaScript Error:</b> ' + _e(msg) + ' at <small>' + _e(url) + ':' + _e(line) + ':' + _e(col) + '</small></div>';
   };
   window.onunhandledrejection = function(event) {
+    try { console.error('[RS] unhandledrejection', event && event.reason); } catch (e) {}
+    if (!window.__RS_DEBUG_UI__) return;
     var div = document.getElementById('debug-error-banner');
     if (!div) {
       div = document.createElement('div');
@@ -63,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v46-20260711-receipt-engine';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v47-20260711-competitive-core';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -1471,57 +1485,80 @@
 <script src="src/dashboard/chain.js"></script>
 <script>
   (function() {
-    var lockMessage = 'Logout is disabled while offline to prevent lock-out.';
+    var lockMessage = 'You may have unsynced data. Confirm logout only if you understand bills may still be pending upload.';
+
+    function queueDepth() {
+      try {
+        if (typeof window.RS_DB_SYNC_DEPTH === 'function') return window.RS_DB_SYNC_DEPTH() || 0;
+        return Number(window.__rsSyncQueueDepth || 0) || 0;
+      } catch (e) { return 0; }
+    }
 
     function hasRecentCloudFailure() {
       var last = window.RS_LAST_CLOUD_ERROR;
-      return !!(last && last.time && (Date.now() - last.time < 120000));
+      // Only treat as soft warning (not hard lock) — 60s window
+      return !!(last && last.time && (Date.now() - last.time < 60000));
     }
 
-    function pillShowsOfflineMode() {
-      var pill = document.getElementById('db-mode-pill');
-      var text = ((pill && pill.textContent) || '').toLowerCase();
-      return text.indexOf('local only') !== -1 ||
-        text.indexOf('app offline') !== -1 ||
-        text.indexOf('offline') !== -1 ||
-        text.indexOf('sync error') !== -1;
+    function trulyOffline() {
+      try {
+        return navigator.onLine === false || window.__OFFLINE_CONFIG__ === true;
+      } catch (e) {
+        return false;
+      }
     }
 
+    // Soft lock: warn when offline or queue has money rows; allow force logout with confirm
     window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE = function() {
       try {
-        return navigator.onLine === false ||
-          window.__OFFLINE_CONFIG__ === true ||
-          hasRecentCloudFailure() ||
-          pillShowsOfflineMode() ||
-          document.body.classList.contains('rs-offline-lock');
+        if (document.body.classList.contains('rs-offline-lock') && trulyOffline()) return true;
+        if (trulyOffline()) return true;
+        if (queueDepth() > 0) return true;
+        return false;
       } catch (e) {
         return navigator.onLine === false;
       }
     };
 
     window.RS_SHOW_OFFLINE_LOGOUT_LOCK = function() {
-      if (window.RS && typeof window.RS.toast === 'function') {
-        window.RS.toast(lockMessage, 'fa-circle-xmark');
+      var depth = queueDepth();
+      var msg = depth > 0
+        ? (depth + ' change(s) still pending cloud sync. Logout anyway? Unsynced bills stay on this device until you sign in again.')
+        : 'You appear offline. Logout anyway? Prefer staying signed in until connection returns.';
+      var ok = false;
+      try { ok = window.confirm(msg); } catch (e) { ok = false; }
+      if (!ok) {
+        if (window.RS && typeof window.RS.toast === 'function') {
+          window.RS.toast(lockMessage, 'fa-cloud-arrow-up');
+        }
         return;
       }
-      if (typeof window.toast === 'function') {
-        window.toast(lockMessage, 'fa-circle-xmark');
-        return;
-      }
-      var toast = document.getElementById('toast');
-      if (toast) {
-        toast.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + lockMessage;
-        toast.classList.add('show');
-        clearTimeout(window.__rsOfflineLogoutToastTimer);
-        window.__rsOfflineLogoutToastTimer = setTimeout(function() {
-          toast.classList.remove('show');
-        }, 2400);
-      }
+      // Force logout path — clear soft lock and re-click after releasing guard
+      window.__RS_FORCE_LOGOUT__ = true;
+      try {
+        if (window.RS_API && typeof RS_API.signOut === 'function') {
+          RS_API.signOut();
+          return;
+        }
+      } catch (e) {}
+      try {
+        sessionStorage.clear();
+      } catch (e2) {}
+      location.href = 'login.html';
     };
 
     document.addEventListener('click', function(e) {
       var target = e.target && e.target.closest && e.target.closest('.logout, [data-go="logout"], #sa-settings-logout');
-      if (!target || !window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
+      if (!target) return;
+      if (window.__RS_FORCE_LOGOUT__) {
+        window.__RS_FORCE_LOGOUT__ = false;
+        return;
+      }
+      if (!window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
+      // Soft warn on recent cloud errors only
+      if (!trulyOffline() && queueDepth() === 0 && hasRecentCloudFailure()) {
+        return; // allow logout after brief cloud blip
+      }
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();

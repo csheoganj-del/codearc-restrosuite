@@ -83,3 +83,13 @@ nul
 scripts/.license-signing-key.dev.b64
 *.license-key
 LICENSE_PRIVATE_KEY_KEEP_SECRET.txt
+
+# Secrets / private keys — never commit
+*PRIVATE_KEY*
+*private*key*
+*.pem
+LICENSE_PRIVATE_KEY*
+.env
+.env.*
+!.env.example
+
