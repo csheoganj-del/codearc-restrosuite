@@ -2117,74 +2117,89 @@
     }
 
     /* ---------------- KOT ---------------- */
-    function kot(){
+    function printKotNow(totals, cust, tok, kotInner) {
+      if (window.RSOps && RSOps.printKotThermal) {
+        RSOps.printKotThermal(totals.items, {
+          token: tok,
+          table: cust.table,
+          orderType: orderType(),
+        });
+      } else if (typeof RSPrint === 'function') {
+        RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
+      }
+    }
+
+    async function sendKotToKitchen(totals, cust, tok, opts) {
+      const options = opts || {};
+      if (window.RS_DB) {
+        try {
+          const tempId = 'kot-' + Date.now();
+          const orderData = {
+            orderId: tok,
+            customerName: cust.name || 'Walk-in Guest',
+            customerPhone: cust.phone || '',
+            items: totals.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
+            subtotal: totals.sub,
+            discount: totals.disc,
+            gst: totals.gst,
+            total: totals.grand,
+            paymentMethod: 'Cash',
+            orderType: cust.table === 'Walk-in / Takeaway' ? 'Takeaway' : 'Dine-in',
+            tableNumber: cust.table,
+            status: 'Pending Review',
+            dateTime: new Date().toISOString(),
+            priority: 'normal',
+          };
+          await RS_DB.put('pending_orders', tempId, orderData);
+          if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
+        } catch (e) {
+          console.warn('KOT save failed', e);
+          RS.toast('KOT saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
+        }
+      }
+      markKotSent();
+      if (options.print) {
+        printKotNow(totals, cust, tok, options.kotInner || '');
+      }
+      RS.toast(
+        tok + (options.print ? ' printed + sent to kitchen' : ' fired to kitchen'),
+        'fa-fire'
+      );
+    }
+
+    function kot() {
       const totals = RS.getTotals();
       const cust = RS.getCustomer();
-      if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
+      if (!totals.count) return RS.toast('Cart is empty', 'fa-circle-exclamation');
       const tok = RS.seedToken();
-      const station = (window.RSOps && RSOps.getStationLabel) ? RSOps.getStationLabel() : '';
+      const station =
+        window.RSOps && RSOps.getStationLabel ? RSOps.getStationLabel() : '';
       const kotInner = `<div class="kot-h"><span class="kt">${esc(tok)}</span><span style="font-weight:700">${esc(cust.table)}</span></div>
-        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'})} · ${totals.count} items${station ? ' · ' + esc(station) : ''}</div>
-        ${totals.items.map(i=>`<div class="kot-item"><span class="kq">${i.qty}×</span><span>${esc(i.name)}</span></div>`).join('')}`;
+        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale ? RS_getOutletLocale() : 'en-IN', { hour: 'numeric', minute: '2-digit', timeZone: window.RS_getOutletTimezone ? RS_getOutletTimezone() : 'Asia/Kolkata' })} · ${totals.count} items${station ? ' · ' + esc(station) : ''}</div>
+        ${totals.items.map((i) => `<div class="kot-item"><span class="kq">${i.qty}×</span><span>${esc(i.name)}</span></div>`).join('')}`;
       RSModal.open({
-        title:'Kitchen ticket', sub:tok, icon:'fa-fire', size:'sm',
-        body:`<div class="kot-paper">${kotInner}</div>`,
-        foot:`<button class="btn btn-ghost" id="kot-print" style="flex:1"><i class="fa-solid fa-print"></i> Print ticket</button>
-              <button class="btn btn-primary" id="kot-send" style="flex:1"><i class="fa-solid fa-fire"></i> Send to kitchen</button>`,
-        onMount(modal, close){
-          modal.querySelector('#kot-print').onclick = ()=> {
-            if (window.RSOps && RSOps.printKotThermal) {
-              RSOps.printKotThermal(totals.items, { token: tok, table: cust.table, orderType: orderType() });
-            } else {
-              RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
-            }
+        title: 'Kitchen ticket',
+        sub: tok,
+        icon: 'fa-fire',
+        size: 'sm',
+        body: `<div class="kot-paper">${kotInner}</div>`,
+        foot: `<button class="btn btn-ghost" id="kot-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
+              <button class="btn btn-ghost" id="kot-send" style="flex:1"><i class="fa-solid fa-fire"></i> Send</button>
+              <button class="btn btn-primary" id="kot-print-send" style="flex:1.2"><i class="fa-solid fa-bolt"></i> Print &amp; send</button>`,
+        onMount(modal, close) {
+          modal.querySelector('#kot-print').onclick = () => {
+            printKotNow(totals, cust, tok, kotInner);
           };
-          modal.querySelector('#kot-send').onclick = async ()=>{
+          modal.querySelector('#kot-send').onclick = async () => {
             close();
-            if(window.RS_DB){
-              try {
-                const tempId = 'kot-' + Date.now();
-                const orderData = {
-                  orderId: tok,
-                  customerName: cust.name || 'Walk-in Guest',
-                  customerPhone: cust.phone || '',
-                  items: totals.items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
-                  subtotal: totals.sub,
-                  discount: totals.disc,
-                  gst: totals.gst,
-                  total: totals.grand,
-                  paymentMethod: 'Cash',
-                  orderType: cust.table === 'Walk-in / Takeaway' ? 'Takeaway' : 'Dine-in',
-                  tableNumber: cust.table,
-                  status: 'Pending Review',
-                  dateTime: new Date().toISOString(),
-                  priority: 'normal'
-                };
-                await RS_DB.put('pending_orders', tempId, orderData);
-                if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
-              } catch(e) {
-                console.warn("KOT save failed", e);
-                RS.toast('KOT saved locally. Cloud sync pending.','fa-cloud-arrow-up');
-              }
-            }
-            markKotSent();
-            RS.toast(tok+' fired to kitchen','fa-fire');
-
-            // Auto-print KOT if enabled in settings
-            try {
-              const settings = window.RS_SETTINGS || (window.RS && RS.getSettings ? await RS.getSettings() : null);
-              if (settings && (settings.set_auto_print_kot === true || settings.set_auto_print_kot === 'true' || settings.set_auto_print_kot === 'on')) {
-                if (window.RSOps && RSOps.printKotThermal) {
-                  RSOps.printKotThermal(totals.items, { token: tok, table: cust.table, orderType: orderType() });
-                } else {
-                  RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
-                }
-              }
-            } catch(e) {
-              console.error("Failed to read settings for auto-print KOT", e);
-            }
+            await sendKotToKitchen(totals, cust, tok, { print: false, kotInner });
           };
-        }
+          // One-tap thermal print + kitchen queue
+          modal.querySelector('#kot-print-send').onclick = async () => {
+            close();
+            await sendKotToKitchen(totals, cust, tok, { print: true, kotInner });
+          };
+        },
       });
     }
 
@@ -3279,8 +3294,24 @@
         
         const TABLES = await loadTablesList();
         
-        const stateDot = {free:'var(--green)', occupied:'var(--orange)', billed:'var(--violet-soft)'};
-        const stateTxt = {free:'Available', occupied:'Dining', billed:'Bill printed'};
+        const stateDot = {
+          free: 'var(--green)',
+          occupied: 'var(--orange)',
+          billed: 'var(--violet-soft)',
+          held: '#f59e0b',
+        };
+        const stateBorder = {
+          free: 'var(--stroke-2)',
+          occupied: 'rgba(255,79,0,0.45)',
+          billed: 'rgba(91,108,143,0.45)',
+          held: 'rgba(245,158,11,0.65)',
+        };
+        const stateBg = {
+          free: 'var(--glass)',
+          occupied: 'rgba(255,79,0,0.06)',
+          billed: 'rgba(91,108,143,0.08)',
+          held: 'rgba(245,158,11,0.12)',
+        };
         
         try {
           const pendingRows = window.RS_DB ? await window.RS_DB.list('pending_orders').catch(() => []) : [];
@@ -3288,6 +3319,13 @@
           const reservations = window.RS_DB ? await window.RS_DB.list('reservations').catch(() => []) : [];
           const _resToday = new Date().toISOString().slice(0,10);
           const _resDigits = v => parseInt(String(v==null?'':v).replace(/\D/g,''),10);
+          // Also mark tables parked in memory heldOrders (dine-in holds)
+          const memHeldTables = new Set();
+          try {
+            (heldOrders.dinein || []).forEach((h) => {
+              if (h && h.table) memHeldTables.add(String(h.table));
+            });
+          } catch (_) {}
           
           container.innerHTML = TABLES.map(t => {
             const tableName = `Table ${t.n}`;
@@ -3296,7 +3334,8 @@
               (r.tableNumber === tableName || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}`) &&
               (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'served' || r.status === 'Ready' || r.status === 'Billed')
             );
-            const activeDraft = drafts.find(d => d.draftName === tableName);
+            const activeDraft = drafts.find(d => d.draftName === tableName || d.name === tableName || d.table === tableName);
+            const memHeld = memHeldTables.has(tableName);
             
             let state = 'free';
             let amt = 0;
@@ -3306,19 +3345,21 @@
               state = activeOrder.status === 'Billed' ? 'billed' : 'occupied';
               amt = activeOrder.total || 0;
               label = activeOrder.status === 'Billed' ? 'Bill printed' : 'Dining';
-            } else if (activeDraft) {
-              state = 'occupied';
-              amt = activeDraft.total || 0;
-              label = 'Draft saved';
+            } else if (activeDraft || memHeld) {
+              state = 'held';
+              const mem = (heldOrders.dinein || []).find((h) => h.table === tableName);
+              amt = (activeDraft && activeDraft.total) || (mem && mem.total) || 0;
+              label = 'Held order';
             }
             
             return `
-              <div class="pos-table-card" tabindex="0" role="button" aria-label="${tableName}, ${t.cap} seats, Status: ${label}${amt > 0 ? `, Current Bill: ₹${amt}` : ''}" data-table="${tableName}" data-state="${state}" style="border: 1px solid var(--stroke-2); padding: 16px 12px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: var(--glass); transition: var(--t); position: relative;">
+              <div class="pos-table-card${state === 'held' ? ' pos-table-held' : ''}" tabindex="0" role="button" aria-label="${tableName}, ${t.cap} seats, Status: ${label}${amt > 0 ? `, Current Bill: ₹${amt}` : ''}" data-table="${tableName}" data-state="${state}" style="border: 1.5px solid ${stateBorder[state] || stateBorder.free}; padding: 16px 12px; border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: ${stateBg[state] || stateBg.free}; transition: var(--t); position: relative; box-shadow: ${state === 'held' ? '0 0 0 1px rgba(245,158,11,0.2)' : 'none'};">
                 <span style="position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: ${stateDot[state]};"></span>
+                ${state === 'held' ? `<span style="position:absolute;top:8px;left:8px;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#b45309;background:rgba(245,158,11,0.18);padding:2px 6px;border-radius:4px"><i class="fa-solid fa-pause" style="font-size:8px"></i> Held</span>` : ''}
                 <div style="font-weight: 700; font-size: 13.5px; color: var(--text);">Table ${t.n}</div>
                 <div style="font-size: 11px; color: var(--text-soft);"><i class="fa-solid fa-user-group" style="font-size: 9px;"></i> ${t.cap} seats</div>
                 ${(state==='free' && reservedFor) ? `<div style="font-size:10.5px; font-weight:700; color:#b45309; background:rgba(234,179,8,0.14); border:1px solid rgba(234,179,8,0.3); padding:2px 6px; border-radius:5px; margin-top:4px; align-self:flex-start;"><i class="fa-solid fa-calendar-check" style="font-size:9px;"></i> Reserved ${reservedFor.time||''}${reservedFor.guestName?(' · '+reservedFor.guestName):''}</div>` : ''}
-                <div style="font-size: 11px; font-weight: 600; color: var(--text-soft); margin-top: 4px;">${label}</div>
+                <div style="font-size: 11px; font-weight: 600; color: ${state === 'held' ? '#b45309' : 'var(--text-soft)'}; margin-top: 4px;">${label}</div>
                 ${amt > 0 ? `<div style="font-size: 13px; font-weight: 800; color: var(--text); margin-top: auto; padding-top: 6px;">₹${amt}</div>` : `<div style="font-size: 11px; color: var(--text-faint); margin-top: auto; padding-top: 6px;">Tap to select</div>`}
               </div>
             `;

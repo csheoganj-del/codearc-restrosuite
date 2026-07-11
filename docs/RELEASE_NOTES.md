@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v65 (2026-07-11) — Floor map, KOT one-tap, demo seed
+
+- **Table map**: held tables show amber **Held** badge (drafts + in-memory holds)
+- **KOT**: **Print & send** one-tap (thermal + kitchen queue)
+- **Super-admin**: seedling icon on tenant row — one-click demo seed (confirm dialog)
+
 ## v64 (2026-07-11) — Settle dues from POS
 
 - Cart dues banner: **Settle** (opens CRM settle modal) + **Pay as Due**

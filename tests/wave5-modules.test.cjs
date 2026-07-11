@@ -260,13 +260,17 @@ test('cashier pack: dues banner, hold polish, release notes', () => {
   assert.match(pos, /cart-dues-settle|RS_showSettleDues/);
   assert.match(pos, /Replace current cart with this held order/);
   assert.match(pos, /total holds|rs-held-total-badge/);
+  assert.match(pos, /pos-table-held|Held order/);
+  assert.match(pos, /kot-print-send|Print &amp; send|printKotNow/);
   const growth = fs.readFileSync(path.join(root, 'assets/features-growth.js'), 'utf8');
   assert.match(growth, /RS_showSettleDues/);
   const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
   assert.match(ops, /rs:sync-queue-changed|Offline/);
+  const sa = fs.readFileSync(path.join(root, 'assets/modules/super-admin.js'), 'utf8');
+  assert.match(sa, /quick-seed-btn|seed_tenant_data/);
   assert.ok(fs.existsSync(path.join(root, 'docs/RELEASE_NOTES.md')));
   const rn = fs.readFileSync(path.join(root, 'docs/RELEASE_NOTES.md'), 'utf8');
-  assert.match(rn, /Day pack|dues|Settle dues from POS/i);
+  assert.match(rn, /Day pack|dues|Settle dues from POS|Print & send|demo seed/i);
 });
 
 test('USB and split docs exist', () => {
