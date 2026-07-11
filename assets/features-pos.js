@@ -2822,11 +2822,16 @@
         
         updateTemporaryCustomer(nameVal, phoneVal);
         
+        const duesBannerLive = document.getElementById('cart-customer-dues-banner');
         if (!nameVal && !phoneVal) {
           searchResults.style.display = 'none';
           insightsPanel.style.display = 'none';
           if (actionRow) actionRow.style.display = 'none';
           triggerText.innerText = 'Walk-in';
+          if (duesBannerLive) {
+            duesBannerLive.style.display = 'none';
+            duesBannerLive.innerHTML = '';
+          }
           return;
         }
         
@@ -2839,11 +2844,36 @@
           const matchPhone = cleanPhoneVal ? (c.phone || '').replace(/\D/g, '').includes(cleanPhoneVal) : true;
           return matchName && matchPhone;
         });
+
+        // Live dues banner when phone uniquely matches CRM (or first exact phone hit)
+        if (duesBannerLive) {
+          const exact =
+            matches.find((c) => String(c.phone || '').replace(/\D/g, '') === cleanPhoneVal) ||
+            (cleanPhoneVal.length >= 10 &&
+              matches.find((c) =>
+                String(c.phone || '')
+                  .replace(/\D/g, '')
+                  .endsWith(cleanPhoneVal.slice(-10))
+              ));
+          const due = exact ? Number(exact.dues) || 0 : 0;
+          if (exact && due > 0) {
+            duesBannerLive.style.display = 'block';
+            duesBannerLive.innerHTML =
+              '<i class="fa-solid fa-triangle-exclamation" style="color:var(--orange);margin-right:6px"></i>' +
+              '<b style="color:var(--text)">Outstanding dues ' +
+              rs(due) +
+              '</b> · ' +
+              esc(exact.name || 'Customer');
+          } else if (!exact) {
+            duesBannerLive.style.display = 'none';
+            duesBannerLive.innerHTML = '';
+          }
+        }
         
         if (matches.length > 0) {
           searchResults.innerHTML = matches.map(c => `
             <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}">
-              <span class="res-name">${esc(c.name)}</span>
+              <span class="res-name">${esc(c.name)}${Number(c.dues) > 0 ? ' · Due ₹' + Number(c.dues) : ''}</span>
               <span class="res-phone">${esc(c.phone)}</span>
             </div>
           `).join('');
