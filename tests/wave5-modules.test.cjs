@@ -63,7 +63,7 @@ test('bills-history module extracted (wave 6)', () => {
   assert.ok(!dash.includes('payPill'), 'payPill map should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /bills-history\.js/);
-  assert.match(html, /v54-20260711/);
+  assert.match(html, /v5[0-9]-20260711/);
 });
 
 test('checkout e2e spec present (wave 6)', () => {
@@ -71,6 +71,33 @@ test('checkout e2e spec present (wave 6)', () => {
   const src = fs.readFileSync(path.join(root, 'tests/e2e/checkout.spec.cjs'), 'utf8');
   assert.match(src, /btn-checkout/);
   assert.match(src, /bills-table-body/);
+});
+
+test('inventory-ui module extracted (wave 7)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/inventory-ui.js'), 'utf8');
+  assert.match(src, /RSInventoryUI/);
+  assert.match(src, /renderInventory/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSInventoryUI/);
+  assert.ok(!dash.includes('btn-auto-draft-pos'), 'heavy inventory UI should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /inventory-ui\.js/);
+  assert.match(html, /v55-20260711/);
+});
+
+test('bills-history has server search helpers (wave 7)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/bills-history.js'), 'utf8');
+  assert.match(src, /searchBillsServer|search_bills/);
+  assert.match(src, /normalizeServerBill/);
+  const edge = fs.readFileSync(path.join(root, 'supabase/functions/tenant-data/index.ts'), 'utf8');
+  assert.match(edge, /search_bills/);
+});
+
+test('bills-actions e2e spec present (wave 7)', () => {
+  assert.ok(fs.existsSync(path.join(root, 'tests/e2e/bills-actions.spec.cjs')));
+  const src = fs.readFileSync(path.join(root, 'tests/e2e/bills-actions.spec.cjs'), 'utf8');
+  assert.match(src, /refund-act|rs-refund-overlay|rs-pin-overlay/);
+  assert.match(src, /del-act|rs-del-overlay/);
 });
 
 test('USB and split docs exist', () => {
