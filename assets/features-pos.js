@@ -1677,7 +1677,10 @@
           gst: cust.gst || '',
         };
 
-        const billNo = (RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001'));
+        // Wave 2: server sequence when online; local durable sequence offline
+        const billNo = (RS.allocateBillNo
+          ? await RS.allocateBillNo(RS.BILLS || [])
+          : (RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001')));
         const identity = (RS.newBillIdentity ? RS.newBillIdentity(billNo) : { id: Date.now(), idempotencyKey: 'idem-' + Date.now(), no: billNo });
 
         const bill = {
@@ -1783,7 +1786,11 @@
         // 3) Background: inventory, CRM, drafts, auto-WhatsApp (non-blocking)
         (async () => {
           try {
-            if (RS.deductInventoryForBill) RS.deductInventoryForBill(billRow);
+            if (RS.deductInventoryForBill) {
+              Promise.resolve(RS.deductInventoryForBill(billRow)).catch((e) =>
+                console.warn('Inventory deduct failed', e)
+              );
+            }
             const refreshBills = () => RS.render && RS.render('bills-tab');
             if (window.requestIdleCallback) window.requestIdleCallback(refreshBills, { timeout: 1200 });
             else window.setTimeout(refreshBills, 350);

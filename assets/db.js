@@ -178,8 +178,9 @@
         const status = statusRaw === 'refunded' ? 'refunded' : 'paid';
         const orderType = o.orderType || o.channel || 'dine_in';
         const tableNum = o.table && o.table !== '--' ? String(o.table) : null;
-        return {
-          id: cleanIdForCollection('bills', o.id != null ? o.id : o.no),
+        const body = {
+          // Prefer natural key order_id for upsert; omit hashed client id when
+          // possible so Postgres identity can allocate a stable PK.
           order_id: String(o.no || o.orderId || o.id || ''),
           customer_name: o.customerName || 'Walk-in Guest',
           customer_phone: o.customerPhone || null,
@@ -206,6 +207,17 @@
           table_number: tableNum,
           order_type: String(orderType),
         };
+        if (o.idempotencyKey || o.idempotency_key) {
+          body.idempotency_key = String(o.idempotencyKey || o.idempotency_key);
+        }
+        // Only send id when it is already a real cloud bigint (not a hash of "RS-…")
+        if (o.id != null && Number.isFinite(Number(o.id)) && Number(o.id) < 9e15 && String(o.id).length < 16) {
+          // Keep id for updates of already-synced rows; upsert ignores it on conflict order_id
+          if (known.bills && known.bills.has(String(o.id))) {
+            body.id = Number(o.id);
+          }
+        }
+        return body;
       }
     },
     tax_rates: {
@@ -355,10 +367,12 @@
     businessProfile: { table: 'doppio_business_profile', onConflict: 'tenant_id' },
     menu: { table: 'doppio_menu', onConflict: 'tenant_id,name' },
     recipeCosting: { table: 'doppio_custom_recipes', onConflict: 'tenant_id,item_name' },
-    billSql: 'ON CONFLICT (tenant_id, "orderId") DO UPDATE SET'
+    bills: { table: 'doppio_bills', onConflict: 'tenant_id,order_id' },
+    billSql: 'ON CONFLICT (tenant_id, order_id) DO UPDATE SET'
   });
   const optionalCloudColumns = Object.freeze({
     menu: ['tax_category'],
+    bills: ['idempotency_key', 'cgst', 'sgst', 'igst', 'tax_summary', 'tax_profile', 'channel', 'liquor_tax_amount', 'service_charge_amount', 'transaction_type'],
     // These persist once migration 20260709160000_crm_customer_fields is
     // applied; until then a DB without the columns will drop them gracefully
     // instead of rejecting the whole customer upsert.
@@ -494,6 +508,31 @@
       const cleanId = cleanIdForCollection(c, id);
       const cleanObj = { ...obj, id: cleanId };
       const body = m.to(cleanObj);
+
+      // Bills: upsert on (tenant_id, order_id) — multi-device safe, no hash PK races
+      if (c === 'bills' && body.order_id) {
+        try {
+          const upsertBody = { ...body };
+          // Let identity allocate id when not a known cloud row
+          if (upsertBody.id == null) delete upsertBody.id;
+          let res;
+          try {
+            res = await API.upsert(m.table, upsertBody, 'tenant_id,order_id', { returning: true, columns: '*' });
+          } catch (err) {
+            if (!omitUnsupportedOptionalColumns(c, upsertBody, err)) throw err;
+            res = await API.upsert(m.table, upsertBody, 'tenant_id,order_id', { returning: true, columns: '*' });
+          }
+          const row = Array.isArray(res) ? res[0] : res;
+          const newId = row && row.id != null ? row.id : cleanId;
+          if (!known[c]) known[c] = new Set();
+          known[c].add(String(newId));
+          return { ...obj, id: newId, no: (row && (row.order_id || row.orderId)) || obj.no || body.order_id };
+        } catch (err) {
+          console.warn('[RS_DB] Bill upsert failed, falling back to insert/update:', err.message);
+          // fall through to generic path
+        }
+      }
+
       const isKnown = known[c] && known[c].has(String(cleanId));
       if(isKnown){
         try {
@@ -510,12 +549,28 @@
       // text id (e.g. "PO-123456") that can't live in a uuid column. Leave the id
       // off the insert so the database generates it; the human-readable code is
       // preserved in a dedicated column (po_number / ticket_number / etc.).
+      else if(!body[m.pk] && !m.uuidPK && c !== 'bills') { body[m.pk] = cleanId; }
+      else if (c === 'bills' && body.id == null) { /* leave id for identity */ }
       else if(!body[m.pk] && !m.uuidPK) { body[m.pk] = cleanId; }
       try {
         let res;
         try {
           res = await API.insert(m.table, body);
         } catch (err) {
+          // Unique on order_id → update that row instead of hashing client id
+          const msg = String(err && err.message || '');
+          if (c === 'bills' && body.order_id && /duplicate|unique|order_id/i.test(msg)) {
+            await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
+            const rows = await API.select(m.table, {
+              filters: [{ operator: 'eq', column: 'order_id', value: body.order_id }],
+              limit: 1,
+            }).catch(() => null);
+            const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+            const newId = row && row.id != null ? row.id : cleanId;
+            if (!known[c]) known[c] = new Set();
+            known[c].add(String(newId));
+            return { ...obj, id: newId };
+          }
           if (!omitUnsupportedOptionalColumns(c, body, err)) throw err;
           res = await API.insert(m.table, body);
         }
@@ -526,6 +581,10 @@
       } catch (err) {
         console.warn(`[RS_DB] Cloud insert failed for ${c}/${cleanId}, attempting update fallback:`, err.message);
         try {
+          if (c === 'bills' && body.order_id) {
+            await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
+            return { ...obj, id: cleanId };
+          }
           try {
             await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
           } catch (updateErr) {
