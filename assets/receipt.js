@@ -85,6 +85,7 @@
       price: Number(i.price != null ? i.price : i.unit_price) || 0,
       taxCategory: i.taxCategory || i.tax_category || '',
       cat: i.cat || i.category || '',
+      note: i.note || i.notes || '',
     }));
     const grand = b.grand != null ? Number(b.grand) : Number(b.amount != null ? b.amount : b.total) || 0;
     const sub = b.sub != null ? Number(b.sub) : Number(b.subtotal) || 0;
@@ -154,7 +155,8 @@
 
     const itemsHTML = m.items.map((i) => {
       const rateLabel = isIreland ? (i.taxCategory === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
-      return `<div class="rcp-line"><span><span class="q">${i.qty}× </span>${esc(i.name)}${isIreland ? ` <small style="font-size:10px;color:#6b6960">(${rateLabel})</small>` : ''}</span><span>${$(i.price * i.qty)}</span></div>`;
+      const note = i.note || '';
+      return `<div class="rcp-line"><span><span class="q">${i.qty}× </span>${esc(i.name)}${isIreland ? ` <small style="font-size:10px;color:#6b6960">(${rateLabel})</small>` : ''}${note ? `<div style="font-size:10.5px;color:#6b6960;margin-top:1px">※ ${esc(note)}</div>` : ''}</span><span>${$(i.price * i.qty)}</span></div>`;
     }).join('');
 
     let taxBreakdownHTML = '';
@@ -241,9 +243,10 @@
       m.customer && m.customer !== 'Walk-in' ? `Customer: ${m.customer}` : '',
       m.customerPhone ? `Phone: ${m.customerPhone}` : '',
       '',
-      ...m.items.map((i) => {
+      ...m.items.flatMap((i) => {
         const rateLabel = isIreland ? (i.taxCategory === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
-        return `${i.qty} x ${i.name}${isIreland ? ` (${rateLabel})` : ''} - ${$(i.price * i.qty)}`;
+        const main = `${i.qty} x ${i.name}${isIreland ? ` (${rateLabel})` : ''} - ${$(i.price * i.qty)}`;
+        return i.note ? [main, '  * ' + i.note] : [main];
       }),
       '',
       `Subtotal: ${$(m.sub)}`,

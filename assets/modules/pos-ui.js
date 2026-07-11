@@ -251,6 +251,84 @@ function addToCart(id){
   toast(hh ? `${m.name} · Happy Hour ${rs(price)}` : `${m.name} added`, hh ? 'fa-bolt' : 'fa-plus');
 }
 function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
+function setLineNote(id, note) {
+  const line = cart.find((c) => String(c.id) === String(id));
+  if (!line) return false;
+  const text = String(note == null ? '' : note).trim().slice(0, 140);
+  line.note = text;
+  if (!text) delete line.note;
+  try {
+    renderCart();
+  } catch (_) {}
+  return true;
+}
+function getLineNote(id) {
+  const line = cart.find((c) => String(c.id) === String(id));
+  return line && line.note ? String(line.note) : '';
+}
+function openLineNoteEditor(id) {
+  const line = cart.find((c) => String(c.id) === String(id));
+  if (!line) return;
+  const chips = ['No onion', 'Extra spicy', 'Less oil', 'Well done', 'No ice', 'Pack separate'];
+  if (!global.RSModal) {
+    const n = window.prompt('Kitchen note for ' + (line.name || 'item'), line.note || '');
+    if (n != null) setLineNote(id, n);
+    return;
+  }
+  global.RSModal.open({
+    title: 'Kitchen note',
+    sub: line.name || 'Item',
+    icon: 'fa-comment',
+    size: 'sm',
+    body: `<div style="display:flex;flex-direction:column;gap:10px">
+      <input type="text" id="line-note-input" class="form-input" maxlength="140" placeholder="e.g. No onion, less spicy…" value="${_e(line.note || '')}" style="width:100%;height:36px;font-size:13px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="line-note-chips">
+        ${chips
+          .map(
+            (c) =>
+              `<button type="button" class="btn btn-ghost btn-sm" data-chip="${_e(c)}" style="font-size:11px;height:28px;padding:0 10px">${_e(c)}</button>`
+          )
+          .join('')}
+      </div>
+      <p style="font-size:11.5px;color:var(--text-soft);margin:0">Prints on KOT / kitchen display and appears under the item on the bill.</p>
+    </div>`,
+    foot:
+      '<button class="btn btn-ghost" style="flex:1" data-ln-clear>Clear</button>' +
+      '<button class="btn btn-ghost" style="flex:1" data-ln-x>Cancel</button>' +
+      '<button class="btn btn-primary" style="flex:1" data-ln-ok><i class="fa-solid fa-check"></i> Save</button>',
+    onMount(m, close) {
+      const inp = m.querySelector('#line-note-input');
+      m.querySelectorAll('[data-chip]').forEach((btn) => {
+        btn.onclick = () => {
+          const chip = btn.getAttribute('data-chip') || '';
+          if (!inp) return;
+          const cur = (inp.value || '').trim();
+          if (!cur) inp.value = chip;
+          else if (cur.toLowerCase().includes(chip.toLowerCase())) return;
+          else inp.value = cur + ', ' + chip;
+          inp.focus();
+        };
+      });
+      const x = m.querySelector('[data-ln-x]');
+      if (x) x.onclick = close;
+      const cl = m.querySelector('[data-ln-clear]');
+      if (cl)
+        cl.onclick = () => {
+          setLineNote(id, '');
+          close();
+          toast('Note cleared', 'fa-comment');
+        };
+      const ok = m.querySelector('[data-ln-ok]');
+      if (ok)
+        ok.onclick = () => {
+          setLineNote(id, inp ? inp.value : '');
+          close();
+          toast(inp && inp.value.trim() ? 'Kitchen note saved' : 'Note cleared', 'fa-comment');
+        };
+      if (inp) setTimeout(() => { inp.focus(); inp.select?.(); }, 40);
+    },
+  });
+}
 function renderCart(){
   const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
   $('#cart-count').textContent = count+(count===1?' item':' items');
@@ -304,11 +382,19 @@ function renderCart(){
   else { wrap.innerHTML = cart.map(c=>`
     <div class="cart-line">
       <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
-      <div class="cinfo"><div class="cn">${_e(c.name)}${c.happyHour ? ' <span style="font-size:10px;color:var(--orange);font-weight:800">HH</span>' : ''}</div><div class="cp">${rs(c.price)} each${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' · was ' + rs(c.basePrice) : ''}</div></div>
+      <div class="cinfo"><div class="cn">${_e(c.name)}${c.happyHour ? ' <span style="font-size:10px;color:var(--orange);font-weight:800">HH</span>' : ''}</div><div class="cp">${rs(c.price)} each${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' · was ' + rs(c.basePrice) : ''}</div>${c.note ? `<div class="cnote" style="font-size:11px;color:var(--orange);font-weight:600;margin-top:2px;line-height:1.3"><i class="fa-solid fa-comment" style="font-size:9px;opacity:.85"></i> ${_e(c.note)}</div>` : ''}</div>
+      <button type="button" class="btn btn-ghost btn-sm cart-line-note" data-note-id="${_e(c.id)}" title="Kitchen note" style="height:28px;width:28px;padding:0;flex-shrink:0;opacity:${c.note ? '1' : '.65'};color:${c.note ? 'var(--orange)' : 'var(--text-soft)'}"><i class="fa-solid fa-comment" style="font-size:11px"></i></button>
       <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
       <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
     </div>`).join('');
     $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
+    $$('#cart-items .cart-line-note').forEach((b) =>
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openLineNoteEditor(b.getAttribute('data-note-id'));
+      })
+    );
   }
 
   try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
@@ -1058,6 +1144,9 @@ function initPOS(){
     setPromo,
     getPromo,
     clearPromo,
+    setLineNote,
+    getLineNote,
+    openLineNoteEditor,
     setTip,
     getTip,
     setLoyaltyRedeem,
@@ -1097,6 +1186,9 @@ function initPOS(){
     global.RS.setPromo = api.setPromo;
     global.RS.getPromo = api.getPromo;
     global.RS.clearPromo = api.clearPromo;
+    global.RS.setLineNote = api.setLineNote;
+    global.RS.getLineNote = api.getLineNote;
+    global.RS.openLineNoteEditor = api.openLineNoteEditor;
     global.RS.isHappyHourActive = api.isHappyHourActive;
     global.RS.effectiveMenuPrice = api.effectiveMenuPrice;
   }

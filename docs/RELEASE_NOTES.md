@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v79 (2026-07-11) — Kitchen notes on cart lines
+
+- **Comment** button on each cart line: free-text note + quick chips (No onion, Extra spicy, …)
+- Notes print on **KOT** (preview + thermal HTML + ESC/POS) and flow to **KDS** via `notes`
+- Bill PDF, HTML/text receipt, and rebill preserve line notes
+- Stored on bill `_items` as `note` / `notes`
+
 ## v78 (2026-07-11) — Cash drawer pay-in / pay-out / safe drop
 
 - **Cash** on open shift bar: record pay-in, pay-out, or safe drop with amount + reason
@@ -146,7 +153,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v78-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v79-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

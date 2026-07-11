@@ -528,6 +528,20 @@
               y += 4.5;
             });
           }
+          const lineNote = i.note || i.notes || '';
+          if (lineNote) {
+            const noteLines = actualDoc.splitTextToSize('* ' + lineNote, leftMax);
+            noteLines.forEach((line) => {
+              if (!isMeasurePass) {
+                doc.setTextColor(...MUTED);
+                doc.setFont('helvetica', 'italic');
+                doc.text(line, PAD + 2, y + 3.2);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...INK);
+              }
+              y += 4.2;
+            });
+          }
         });
 
         // Separator
@@ -1857,7 +1871,9 @@
           subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst || 0) - gstHalf,
           _items: itemsSnap.map(i => ({
             name: i.name, qty: i.qty, price: i.price,
-            cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category
+            cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category,
+            note: i.note || i.notes || '',
+            notes: i.note || i.notes || '',
           })),
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile,
           liquorTaxAmount: totals.liquorTax,
@@ -2275,7 +2291,13 @@
             orderId: tok,
             customerName: cust.name || 'Walk-in Guest',
             customerPhone: cust.phone || '',
-            items: totals.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
+            items: totals.items.map((i) => ({
+              name: i.name,
+              qty: i.qty,
+              price: i.price,
+              notes: i.note || i.notes || '',
+              note: i.note || i.notes || '',
+            })),
             subtotal: totals.sub,
             discount: totals.disc,
             gst: totals.gst,
@@ -2313,7 +2335,10 @@
         window.RSOps && RSOps.getStationLabel ? RSOps.getStationLabel() : '';
       const kotInner = `<div class="kot-h"><span class="kt">${esc(tok)}</span><span style="font-weight:700">${esc(cust.table)}</span></div>
         <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale ? RS_getOutletLocale() : 'en-IN', { hour: 'numeric', minute: '2-digit', timeZone: window.RS_getOutletTimezone ? RS_getOutletTimezone() : 'Asia/Kolkata' })} · ${totals.count} items${station ? ' · ' + esc(station) : ''}</div>
-        ${totals.items.map((i) => `<div class="kot-item"><span class="kq">${i.qty}×</span><span>${esc(i.name)}</span></div>`).join('')}`;
+        ${totals.items.map((i) => {
+          const n = i.note || i.notes || '';
+          return `<div class="kot-item"><span class="kq">${i.qty}×</span><span>${esc(i.name)}${n ? `<div style="font-size:11px;font-weight:600;color:#b45309;margin-top:2px">※ ${esc(n)}</div>` : ''}</span></div>`;
+        }).join('')}`;
       RSModal.open({
         title: 'Kitchen ticket',
         sub: tok,

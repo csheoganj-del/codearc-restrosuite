@@ -1498,9 +1498,10 @@
   /* ---------------- KOT thermal print helper ---------------- */
   function printKotThermal(items, meta) {
     const m = meta || {};
-    const lines = (items || []).map((i) =>
-      `<div class="kot-item"><span class="kq">${esc(i.qty)}×</span><span>${esc(i.name)}</span></div>`
-    ).join('');
+    const lines = (items || []).map((i) => {
+      const n = i.note || i.notes || '';
+      return `<div class="kot-item"><span class="kq">${esc(i.qty)}×</span><span>${esc(i.name)}${n ? `<div style="font-size:11px;font-weight:600;color:#b45309;margin-top:2px">※ ${esc(n)}</div>` : ''}</span></div>`;
+    }).join('');
     const html = `<div style="max-width:280px;margin:0 auto">
       <div class="kot-h"><span class="kt">KOT</span><span>${esc(m.token || m.no || '')}</span></div>
       <div style="font-size:12px;margin-bottom:8px">${esc(m.table || '')} · ${esc(m.orderType || '')} · ${esc(getStationLabel())}</div>

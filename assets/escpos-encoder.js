@@ -145,6 +145,8 @@
     enc.hr(32);
     (items || []).forEach((it) => {
       enc.bold(true).line((Number(it.qty) || 1) + ' x ' + String(it.name || '')).bold(false);
+      const n = it.note || it.notes || '';
+      if (n) enc.line('  * ' + String(n).slice(0, 28));
     });
     enc.feed(3).cut();
     return enc;
