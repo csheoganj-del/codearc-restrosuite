@@ -43,8 +43,75 @@
     if (global.RS && typeof RS.activateTab === 'function') return RS.activateTab(id);
   }
 
+  /* ---- Happy hour (time-window menu pricing) ---- */
+  function parseHHMM(str) {
+    const m = String(str || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const h = Number(m[1]);
+    const mi = Number(m[2]);
+    if (h > 23 || mi > 59) return null;
+    return h * 60 + mi;
+  }
+  function isHappyHourActive() {
+    const s = global.RS_SETTINGS || {};
+    if (!(s.set_happy_hour === true || s.set_happy_hour === 'true')) return false;
+    const start = parseHHMM(s.set_happy_hour_start || '17:00');
+    const end = parseHHMM(s.set_happy_hour_end || '20:00');
+    if (start == null || end == null) return false;
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    // Support overnight windows (e.g. 22:00–02:00)
+    if (start <= end) return cur >= start && cur < end;
+    return cur >= start || cur < end;
+  }
+  function happyHourPct() {
+    const n = Number((global.RS_SETTINGS || {}).set_happy_hour_pct);
+    return Number.isFinite(n) && n > 0 && n <= 90 ? n : 15;
+  }
+  function effectiveMenuPrice(m) {
+    if (!m) return 0;
+    const base = Number(m.price) || 0;
+    if (!isHappyHourActive()) return base;
+    if (m.happyHourPrice != null && m.happy_hour_price != null) {
+      const hp = Number(m.happyHourPrice != null ? m.happyHourPrice : m.happy_hour_price);
+      if (Number.isFinite(hp) && hp >= 0) return hp;
+    }
+    if (m.happyHourPrice != null) {
+      const hp = Number(m.happyHourPrice);
+      if (Number.isFinite(hp) && hp >= 0) return hp;
+    }
+    const pct = happyHourPct();
+    return Math.round(base * (1 - pct / 100) * 100) / 100;
+  }
+  function paintHappyHourBanner() {
+    const posTab = document.getElementById('pos-tab');
+    if (!posTab) return;
+    let ban = document.getElementById('rs-happy-hour-banner');
+    const active = isHappyHourActive();
+    if (!active) {
+      if (ban) ban.style.display = 'none';
+      return;
+    }
+    const s = global.RS_SETTINGS || {};
+    const end = s.set_happy_hour_end || '20:00';
+    const pct = happyHourPct();
+    if (!ban) {
+      ban = document.createElement('div');
+      ban.id = 'rs-happy-hour-banner';
+      ban.setAttribute('role', 'status');
+      ban.style.cssText =
+        'margin:0 0 10px;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.1);font-size:12.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px';
+      const grid = document.getElementById('pos-grid');
+      if (grid && grid.parentNode) grid.parentNode.insertBefore(ban, grid);
+      else posTab.insertBefore(ban, posTab.firstChild);
+    }
+    ban.style.display = 'flex';
+    ban.innerHTML = `<i class="fa-solid fa-bolt" style="color:var(--orange)"></i> Happy Hour · ${pct}% off menu until ${esc(end)}`;
+  }
+
 let activeCat='All', cart=[], discountPct=0, tipAmount=0, loyaltyRedeem=0, loyaltyPointsUsed=0;
 const renderPOS = () => {
+  paintHappyHourBanner();
   const grid = $('#pos-grid');
   if (!grid) return;
   const q = ($('#pos-search-input')?.value||'').toLowerCase();
@@ -52,14 +119,21 @@ const renderPOS = () => {
     const mc = ((m.cat || '').trim() || 'Uncategorized').toLowerCase();
     return (activeCat==='All'||mc===String(activeCat).toLowerCase()) && (m.name||'').toLowerCase().includes(q);
   });
+  const hh = isHappyHourActive();
   grid.innerHTML = items.map(m=>{
     const inCart = cart.find(c=>String(c.id)===String(m.id));
+    const base = Number(m.price) || 0;
+    const eff = effectiveMenuPrice(m);
+    const priceHtml = hh && eff < base
+      ? `<span class="pprice" style="color:var(--orange)">${rs(eff)} <small style="text-decoration:line-through;opacity:.55;font-weight:600;color:var(--text-mute)">${rs(base)}</small></span>`
+      : `<span class="pprice">${rs(base)}</span>`;
     return `
-    <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
+    <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}${hh && eff < base ? ' hh-deal' : ''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
       ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
+      ${hh && eff < base ? `<div style="position:absolute;top:6px;right:6px;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--orange);padding:2px 5px;border-radius:4px">HH</div>` : ''}
       <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat || 'Uncategorized')}</span></div>
       <div class="pname">${_e(m.name)}</div>
-      <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockClsMap()[m.stock]}">${stockLabelMap()[m.stock]}</span></div>
+      <div class="prow">${priceHtml}<span class="stock-dot ${stockClsMap()[m.stock]}">${stockLabelMap()[m.stock]}</span></div>
     </div>`;
   }).join('');
   $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
@@ -154,13 +228,25 @@ function addToCart(id){
         toast(`Low stock for ${short.map(s => s.name).slice(0,2).join(', ')}`, 'fa-triangle-exclamation');
       }
     } else if (!m.ingredients || !m.ingredients.length) {
-      // silent ΓÇö competitive-ops banner covers cart-level
+      // silent — competitive-ops banner covers cart-level
     }
   } catch (_) {}
-  const line=cart.find(c=>String(c.id)===String(id));
-  if(line) line.qty++; else cart.push({...m,qty:1});
+  const basePrice = Number(m.price) || 0;
+  const price = effectiveMenuPrice(m);
+  const hh = isHappyHourActive() && price < basePrice;
+  const line=cart.find(c=>String(c.id)===String(id) && Number(c.price)===price);
+  if(line) line.qty++;
+  else {
+    cart.push({
+      ...m,
+      qty: 1,
+      price,
+      basePrice,
+      happyHour: hh,
+    });
+  }
   renderCart();
-  toast(`${m.name} added`,'fa-plus');
+  toast(hh ? `${m.name} · Happy Hour ${rs(price)}` : `${m.name} added`, hh ? 'fa-bolt' : 'fa-plus');
 }
 function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
 function renderCart(){
@@ -213,7 +299,7 @@ function renderCart(){
   else { wrap.innerHTML = cart.map(c=>`
     <div class="cart-line">
       <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
-      <div class="cinfo"><div class="cn">${_e(c.name)}</div><div class="cp">${rs(c.price)} each</div></div>
+      <div class="cinfo"><div class="cn">${_e(c.name)}${c.happyHour ? ' <span style="font-size:10px;color:var(--orange);font-weight:800">HH</span>' : ''}</div><div class="cp">${rs(c.price)} each${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' · was ' + rs(c.basePrice) : ''}</div></div>
       <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
       <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
     </div>`).join('');
@@ -525,6 +611,20 @@ function wireCartActions(){
 }
 // POS init (static parts present in HTML, wire them)
 function initPOS(){
+  // Refresh happy-hour banner periodically (window can start/end mid-shift)
+  if (!global.__rsHappyHourTick) {
+    global.__rsHappyHourTick = true;
+    setInterval(() => {
+      try {
+        const tab = document.getElementById('pos-tab');
+        if (tab && tab.classList.contains('active')) {
+          paintHappyHourBanner();
+          // Re-render prices if HH state flipped
+          if (document.getElementById('pos-grid')) renderPOS();
+        }
+      } catch (_) {}
+    }, 60000);
+  }
   // Helper function to get tab key for an order type (fixed, not dependent on table number)
   function getTabKeyForOrderType(orderTypeText) {
     const lowerText = orderTypeText.toLowerCase();
@@ -742,7 +842,9 @@ function initPOS(){
   });
   $('#disc-input')?.addEventListener('change', async e=>{
     const val = Math.min(100,Math.max(0,+e.target.value||0));
-    if (val > 10) {
+    const thr = Number((window.RS_SETTINGS || {}).set_pin_discount_threshold);
+    const discThr = Number.isFinite(thr) && thr > 0 ? thr : 10;
+    if (val > discThr) {
       if (val === lastAuthorizedDiscount) {
         discountPct = val;
         renderCart();
@@ -750,7 +852,12 @@ function initPOS(){
       }
       if (window.RSPinModal) {
         e.target.disabled = true;
-        const ok = await RSPinModal.request('Discount Override');
+        const ok = typeof RSPinModal.require === 'function'
+          ? await RSPinModal.require('Discount override · ' + val + '%', {
+              settingKey: 'set_pin_gate_discount',
+              always: true,
+            })
+          : await RSPinModal.request('Discount Override');
         e.target.disabled = false;
         if (ok) {
           discountPct = val;
@@ -894,6 +1001,10 @@ function initPOS(){
     getTip,
     setLoyaltyRedeem,
     getLoyaltyRedeem,
+    isHappyHourActive,
+    effectiveMenuPrice,
+    happyHourPct,
+    paintHappyHourBanner,
     updateMobileCartBar,
     openMobilePOSCart,
     closeMobilePOSCart,
@@ -922,6 +1033,8 @@ function initPOS(){
     global.RS.getTip = api.getTip;
     global.RS.setLoyaltyRedeem = api.setLoyaltyRedeem;
     global.RS.getLoyaltyRedeem = api.getLoyaltyRedeem;
+    global.RS.isHappyHourActive = api.isHappyHourActive;
+    global.RS.effectiveMenuPrice = api.effectiveMenuPrice;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);

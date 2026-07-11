@@ -1740,6 +1740,20 @@
       const payment = getPaymentDetails();
       if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
 
+      // Manager PIN: credit / due tenders
+      try {
+        const splitDue = Number(document.getElementById('split-due')?.value) || 0;
+        const isDue =
+          payment.method === 'Due' ||
+          (payment.method === 'Split' && splitDue > 0);
+        if (isDue && window.RSPinModal && typeof RSPinModal.require === 'function') {
+          const ok = await RSPinModal.require('Credit / Due payment', {
+            settingKey: 'set_pin_gate_due',
+          });
+          if (!ok) return RS.toast('Due payment cancelled — PIN required', 'fa-lock');
+        }
+      } catch (_) {}
+
       async function finalizeBill(payMethod, receivedVal, changeVal, customTenders) {
         if (checkoutInFlight) {
           RS.toast('Checkout already in progress…', 'fa-spinner');
@@ -2326,6 +2340,12 @@
         if (btn.id === 'btn-clear-cart') {
           const totals = RS.getTotals();
           if (totals.count > 0 && confirm("Clear current cart?")) {
+            if (window.RSPinModal && typeof RSPinModal.require === 'function') {
+              const ok = await RSPinModal.require('Clear cart with items', {
+                settingKey: 'set_pin_gate_clear_cart',
+              });
+              if (!ok) return RS.toast('Clear cart cancelled — PIN required', 'fa-lock');
+            }
             const tableSelect = document.getElementById('cart-table');
             const tableVal = tableSelect ? tableSelect.value : 'Walk-in / Takeaway';
 
