@@ -433,6 +433,79 @@
       });
     }
 
+    function loadHtml2Canvas() {
+      return new Promise((resolve, reject) => {
+        if (typeof window.html2canvas === 'function') return resolve(window.html2canvas);
+        function tryLoad(src, fallbackSrc) {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => {
+            if (typeof window.html2canvas === 'function') resolve(window.html2canvas);
+            else if (fallbackSrc) tryLoad(fallbackSrc, null);
+            else reject(new Error('html2canvas loaded but not available'));
+          };
+          script.onerror = () => {
+            if (fallbackSrc) tryLoad(fallbackSrc, null);
+            else reject(new Error('Failed to load html2canvas'));
+          };
+          document.head.appendChild(script);
+        }
+        tryLoad(
+          'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+          null
+        );
+      });
+    }
+
+    /**
+     * Build PDF from the EXACT same HTML used in the on-screen bill preview.
+     * This guarantees WhatsApp PDF == "Bill settled" receipt paper.
+     */
+    async function compilePreviewPDF(bill) {
+      const jspdfModule = await loadJsPDF();
+      const { jsPDF } = jspdfModule;
+      const html2canvas = await loadHtml2Canvas();
+      const qrDataUri = await generateReceiptQrDataUri(bill);
+
+      const host = document.createElement('div');
+      host.setAttribute('data-rs-receipt-export', '1');
+      host.style.cssText = [
+        'position:fixed',
+        'left:-10000px',
+        'top:0',
+        'width:320px',
+        'padding:0',
+        'margin:0',
+        'background:#fbfaf7',
+        'z-index:-1',
+        'pointer-events:none',
+      ].join(';');
+      host.innerHTML = `<div class="receipt-paper" style="box-shadow:none;margin:0;max-width:320px;">${receiptHTML(bill, qrDataUri)}</div>`;
+      document.body.appendChild(host);
+
+      try {
+        const paper = host.querySelector('.receipt-paper') || host;
+        const canvas = await html2canvas(paper, {
+          scale: 2.5,
+          backgroundColor: '#fbfaf7',
+          useCORS: true,
+          logging: false,
+          imageTimeout: 0,
+          width: paper.scrollWidth || 320,
+          windowWidth: 360,
+        });
+        const img = canvas.toDataURL('image/jpeg', 0.92);
+        // Thermal-ish portrait page sized to content
+        const pageWmm = 88;
+        const pageHmm = Math.max(120, (canvas.height / canvas.width) * pageWmm);
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
+        doc.addImage(img, 'JPEG', 0, 0, pageWmm, pageHmm);
+        return doc.output('datauristring');
+      } finally {
+        if (host.parentNode) host.parentNode.removeChild(host);
+      }
+    }
+
     async function compileThermalPDF(bill) {
       const jspdfModule = await loadJsPDF();
       const { jsPDF } = jspdfModule;
@@ -869,19 +942,38 @@
         }
       }
 
-      const text = receiptText(bill);
+      // Normalize bill shape so list reprints match POS preview fields
+      const normalized = {
+        ...bill,
+        no: bill.no || bill.orderId || bill.id,
+        grand: bill.grand != null ? bill.grand : bill.amount,
+        sub: bill.sub != null ? bill.sub : bill.subtotal,
+        items: Array.isArray(bill.items) ? bill.items : (bill._items || []),
+        customer: bill.customer || bill.customerName || 'Walk-in',
+        customerPhone: bill.customerPhone || phone,
+        table: bill.table || bill.tableNumber || '--',
+        time: bill.time || bill.dateTime || new Date().toLocaleString(),
+      };
+      // Text = same content as preview (for text-only fallback)
+      const text = receiptText(normalized);
       const cleanPhone = phone.replace(/\D/g, '');
       if (!cleanPhone || cleanPhone.length < 10) {
         RS.toast('Enter a valid WhatsApp number with country code', 'fa-circle-exclamation');
         return;
       }
 
+      // Short label only under the PDF — full bill is inside the PDF (same as preview).
+      const pdfCaption = [
+        receiptProfile.name || 'RestroSuite',
+        `Bill ${normalized.no || ''}`.trim(),
+        normalized.grand != null ? `Total ${rs(normalized.grand)}` : '',
+      ].filter(Boolean).join(' · ');
+
       // Always prefer gateway PDF when cloud is configured.
-      // Re-check live gateway status (do not trust a stale topbar flag alone).
+      // PDF is generated from the EXACT on-screen receipt HTML (preview).
       if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
         try {
-          RS.toast('Sending PDF receipt…', 'fa-file-pdf');
-          // Refresh readiness so first send after connect still works
+          RS.toast('Sending bill PDF…', 'fa-file-pdf');
           try {
             if (typeof window.updateTopbarWhatsAppStatus === 'function') {
               await Promise.race([
@@ -891,7 +983,14 @@
             }
           } catch (_) {}
 
-          const pdfDataUri = await compileThermalPDF(bill);
+          // Prefer preview-identical PDF; fall back to thermal compiler if capture fails
+          let pdfDataUri = null;
+          try {
+            pdfDataUri = await compilePreviewPDF(normalized);
+          } catch (previewErr) {
+            console.warn('[WhatsApp] Preview PDF capture failed, using thermal PDF:', previewErr && previewErr.message);
+            pdfDataUri = await compileThermalPDF(normalized);
+          }
           const base64 = String(pdfDataUri || '').includes(',')
             ? String(pdfDataUri).split(',')[1]
             : String(pdfDataUri || '');
@@ -899,32 +998,34 @@
             throw new Error('PDF generation produced an empty file');
           }
 
-          const timeoutMs = 25000;
+          const timeoutMs = 30000;
           await Promise.race([
             RS_API.data({
               operation: 'gateway_send',
               phone: cleanPhone,
-              message: text,
+              // caption shown under the document (short); full bill is the PDF itself
+              message: pdfCaption,
+              caption: pdfCaption,
               pdfData: base64,
-              filename: `receipt-${bill.no || bill.orderId || 'bill'}.pdf`,
-              orderId: String(bill.no || bill.orderId || bill.id || ''),
+              filename: `receipt-${normalized.no || 'bill'}.pdf`,
+              orderId: String(normalized.no || ''),
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Gateway send timed out')), timeoutMs)),
           ]);
           window.__rsGatewayReady = true;
-          RS.toast('WhatsApp PDF receipt sent!', 'fa-file-pdf');
+          RS.toast('WhatsApp bill PDF sent (same as preview)!', 'fa-file-pdf');
           return;
         } catch (gwErr) {
           console.warn('Gateway PDF send failed:', gwErr && gwErr.message);
-          // Second try: gateway text only (still better than opening a browser tab)
+          // Text fallback uses the same receiptText as the preview content
           try {
             await RS_API.data({
               operation: 'gateway_send',
               phone: cleanPhone,
               message: text,
-              orderId: String(bill.no || bill.orderId || bill.id || ''),
+              orderId: String(normalized.no || ''),
             });
-            RS.toast('PDF failed — text receipt sent on WhatsApp', 'fa-whatsapp');
+            RS.toast('PDF failed — text bill sent (same content as preview)', 'fa-whatsapp');
             return;
           } catch (textErr) {
             console.warn('Gateway text fallback failed:', textErr && textErr.message);
@@ -932,7 +1033,7 @@
         }
       }
 
-      // Last resort: open WhatsApp Web with prefilled text (manual send)
+      // Last resort: open WhatsApp Web with the same receipt text
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
       RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
@@ -983,11 +1084,9 @@
       });
     }
 
-    // Expose the thermal-receipt PDF compiler so it can actually be used by
-    // the WhatsApp send flow below (previously built and fully working, but
-    // never called from anywhere -- every bill went out as a plain text
-    // wa.me link, never a real PDF attachment).
+    // PDF compilers: preview HTML capture (preferred for WhatsApp) + thermal jsPDF
     RS.compileThermalPDF = compileThermalPDF;
+    RS.compilePreviewPDF = compilePreviewPDF;
 
     window.RSReceipt = {
       html: receiptHTML,
