@@ -263,7 +263,12 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const action = String(payload?.action || "");
+    // Normalize action + slug aliases (legacy clients / QR links)
+    let action = String(payload?.action || "");
+    if (action === "get_menu" || action === "menu" || action === "get_public_menu") action = "list_menu";
+    if (payload && typeof payload === "object" && !payload.tenant_slug && (payload.slug || payload.outlet)) {
+      payload.tenant_slug = payload.slug || payload.outlet;
+    }
 
     // ── Public OTP send (no tenant/session required) ──────────────────────────
     if (action === "send_otp") {
@@ -323,7 +328,7 @@ serve(async (req) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    const tenantSlug = normalizeSlug(payload.tenant_slug);
+    const tenantSlug = normalizeSlug(payload.tenant_slug || payload.slug || payload.outlet || "");
     const rateLimit = await checkRateLimit(req, action, tenantSlug);
     if (!rateLimit.allowed) {
       return jsonResponse(

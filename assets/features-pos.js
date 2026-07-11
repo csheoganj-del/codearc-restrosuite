@@ -1704,9 +1704,11 @@
         try {
           const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
           const gstHalf = Math.round((totals.gst||0)/2);
-          const billRow = { id:bill.no, orderId:bill.no, no:bill.no, time:bill.time, dateTime:new Date().toISOString(), table:bill.table, items: totals.count,
+          // Cloud PK is bigint; keep human bill no in order_id via MAP (no/orderId).
+          const billRow = { id: Date.now(), orderId:bill.no, no:bill.no, time:bill.time, dateTime:new Date().toISOString(), table:bill.table, items: totals.count,
             amount: bill.grand, pay: payMethod, paymentMethod: payMethod, total: bill.grand, status:'paid',
-            receivedAmount: receivedVal, changeAmount: changeVal,
+            orderType: (document.querySelector('.order-type-btn.active')?.textContent || '').trim() || bill.table || 'Dine-in',
+            receivedAmount: receivedVal, changeAmount: changeVal, change: changeVal,
             customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
             subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
             _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category })),

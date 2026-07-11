@@ -27,14 +27,18 @@
 
     function getTenantId() {
       try {
+        // Prefer live tab session (RS_API / sessionStorage). Do NOT fall back to
+        // a shared localStorage tenant_id — that is how multi-tab logins used
+        // to cross-contaminate carts and offline caches.
+        if (window.RS_API && typeof window.RS_API.session === 'function') {
+          const s = window.RS_API.session();
+          if (s && s.tenant_id) return s.tenant_id;
+          if (s && s.tenant_slug) return s.tenant_slug;
+        }
         const tid = sessionStorage.getItem('tenant_id');
         if (tid) return tid;
-        const localTid = originalGet.call(localStorage, 'tenant_id');
-        if (localTid) return localTid;
-
-        const sLocal = JSON.parse(originalGet.call(localStorage, 'rs:session') || 'null');
-        if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
-        if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
+        const slug = sessionStorage.getItem('tenant_slug');
+        if (slug) return slug;
       } catch(e) {}
       return 'local-demo';
     }
@@ -81,16 +85,13 @@
     if (isCloudConfigured() && window.RS_API && window.RS_API.session) {
       const s = window.RS_API.session();
       if (s && s.role !== 'superadmin' && s.role !== 'brand_admin' && s.tenant_id) return s.tenant_id;
+      if (s && s.role !== 'superadmin' && s.role !== 'brand_admin' && s.tenant_slug) return s.tenant_slug;
     }
     try {
       const tid = sessionStorage.getItem('tenant_id');
       if (tid) return tid;
-      const localTid = localStorage.getItem('tenant_id');
-      if (localTid) return localTid;
-
-      const sLocal = JSON.parse(localStorage.getItem('rs:session') || 'null');
-      if (sLocal && sLocal.tenant_id) return sLocal.tenant_id;
-      if (sLocal && sLocal.user && sLocal.user.id) return sLocal.user.id;
+      const slug = sessionStorage.getItem('tenant_slug');
+      if (slug) return slug;
     } catch(e) {}
     return 'local-demo';
   }
@@ -172,29 +173,62 @@
                     taxProfile: typeof r.tax_profile === 'string' ? JSON.parse(r.tax_profile) : (r.tax_profile || {}),
                     liquorTaxAmount: num(r.liquor_tax_amount),
                     serviceChargeAmount: num(r.service_charge_amount) }),
-      to: o => ({ id:o.id, order_id:o.no, customer_name:o.customerName||'Walk-in Guest', customer_phone:o.customerPhone||null,
-                  items: JSON.stringify(o._items||[]), subtotal:num(o.subtotal), gst:num(o.gst),
-                  cgst:num(o.cgst), sgst:num(o.sgst), igst:0, total:num(o.amount),
-                  payment_method:o.pay||'UPI', date_time:o.time||new Date().toISOString(), transaction_type:'intra',
-                  tenders: Array.isArray(o.tenders) ? JSON.stringify(o.tenders) : o.tenders || '[]',
-                  change: num(o.change || 0),
-                  tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
-                  channel: o.channel || 'dine_in',
-                  tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
-                  liquor_tax_amount: num(o.liquorTaxAmount),
-                  service_charge_amount: num(o.serviceChargeAmount),
-                  status: o.status || 'paid',
-                  refund_reason: o.refundReason || '',
-                  refunded_at: o.refundedAt || null })
+      to: o => {
+        const statusRaw = String(o.status || 'paid').toLowerCase();
+        const status = statusRaw === 'refunded' ? 'refunded' : 'paid';
+        const orderType = o.orderType || o.channel || 'dine_in';
+        const tableNum = o.table && o.table !== '--' ? String(o.table) : null;
+        return {
+          id: cleanIdForCollection('bills', o.id != null ? o.id : o.no),
+          order_id: String(o.no || o.orderId || o.id || ''),
+          customer_name: o.customerName || 'Walk-in Guest',
+          customer_phone: o.customerPhone || null,
+          items: JSON.stringify(o._items || []),
+          subtotal: num(o.subtotal),
+          gst: num(o.gst),
+          cgst: num(o.cgst),
+          sgst: num(o.sgst),
+          igst: 0,
+          total: num(o.amount != null ? o.amount : o.total),
+          payment_method: o.pay || o.paymentMethod || 'UPI',
+          date_time: o.dateTime || o.time || new Date().toISOString(),
+          transaction_type: 'intra',
+          tenders: Array.isArray(o.tenders) ? JSON.stringify(o.tenders) : (o.tenders || '[]'),
+          change: num(o.change || o.changeAmount || 0),
+          tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
+          channel: o.channel || 'dine_in',
+          tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
+          liquor_tax_amount: num(o.liquorTaxAmount),
+          service_charge_amount: num(o.serviceChargeAmount),
+          status,
+          refund_reason: o.refundReason || '',
+          refunded_at: o.refundedAt || null,
+          table_number: tableNum,
+          order_type: String(orderType),
+        };
+      }
     },
     tax_rates: {
+      // Live table is a shared catalog: country_code / effective_from (no tenant_id).
+      // tenant-data treats doppio_tax_rates as GLOBAL_TABLES for select/write.
       table:'doppio_tax_rates', pk:'id', clientId:true,
-      from: r => ({ id:r.id, country:r.country, rateCode:r.rate_code, label:r.label,
-                    percent:num(r.percent), validFrom:r.valid_from, validTo:r.valid_to,
-                    itcAllowed:!!r.itc_allowed, notes:r.notes||'' }),
-      to: o => ({ id:o.id, country:o.country, rate_code:o.rateCode, label:o.label,
-                  percent:num(o.percent), valid_from:o.validFrom, valid_to:o.validTo||null,
-                  itc_allowed:!!o.itcAllowed, notes:o.notes||'' })
+      from: r => ({ id:r.id,
+                    country: r.country || r.country_code || 'IN',
+                    rateCode: r.rate_code,
+                    label: r.label,
+                    percent: num(r.percent),
+                    validFrom: r.valid_from || r.effective_from || null,
+                    validTo: r.valid_to || r.effective_to || null,
+                    itcAllowed: !!r.itc_allowed,
+                    notes: r.notes || '' }),
+      to: o => ({ id: o.id,
+                  country_code: o.country || 'IN',
+                  rate_code: o.rateCode,
+                  label: o.label,
+                  percent: num(o.percent),
+                  effective_from: o.validFrom || new Date().toISOString().slice(0, 10),
+                  itc_allowed: !!o.itcAllowed,
+                  notes: o.notes || '' })
     },
     inventory: {
       table:'doppio_inventory', pk:'id', clientId:true,
@@ -207,9 +241,12 @@
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
       from: r => ({ id:r.id, name:r.name, phone:r.phone, visits:num(r.visits), spend:num(r.total_spend),
-                    email:r.email, last:r.last_visit, dues:num(r.dues), tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
+                    email:r.email||'', last:r.last_visit, dues:num(r.dues),
+                    marketingOptIn: r.marketing_opt_in !== false,
+                    tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
       to: o => ({ id:o.id, name:o.name, phone:o.phone, visits:num(o.visits)||1, total_spend:num(o.spend),
-                  email:o.email||'', dues:num(o.dues), marketing_opt_in:true })
+                  email:o.email||'', dues:num(o.dues),
+                  marketing_opt_in: o.marketingOptIn !== false && o.marketing_opt_in !== false })
     },
     notifications: {
       table:'doppio_notifications', pk:'id', clientId:true, order:{column:'created_at',ascending:false},
@@ -228,9 +265,18 @@
       table:'doppio_draft_orders', pk:'id', clientId:true,
       from: r => ({ id:r.id, draftId:r.draft_id, name:r.draft_name, draftName:r.draft_name, customerName:r.customer_name, customerPhone:r.customer_phone, total:num(r.total),
                     items: parseItems(r.items) }),
-      to: o => ({ id:o.id, draft_id:o.draftId||fallbackLogicalCode('D'), draft_name:o.draftName||o.name||o.table||'Held order',
-                  customer_name:o.customerName||'', customer_phone:o.customerPhone||'', payment_method:'UPI',
-                  items: JSON.stringify(o.items||[]), subtotal:num(o.subtotal), gst:num(o.gst), total:num(o.total) })
+      to: o => ({
+        id: cleanIdForCollection('drafts', o.id != null ? o.id : Date.now()),
+        draft_id: o.draftId || fallbackLogicalCode('D'),
+        draft_name: o.draftName || o.name || o.table || 'Held order',
+        customer_name: o.customerName || '',
+        customer_phone: o.customerPhone || '',
+        payment_method: o.paymentMethod || 'UPI',
+        items: typeof o.items === 'string' ? o.items : JSON.stringify(o.items || []),
+        subtotal: num(o.subtotal),
+        gst: num(o.gst),
+        total: num(o.total),
+      })
     },
     pending_orders: {
       table:'doppio_pending_orders', pk:'id', clientId:false,
@@ -312,7 +358,11 @@
     billSql: 'ON CONFLICT (tenant_id, "orderId") DO UPDATE SET'
   });
   const optionalCloudColumns = Object.freeze({
-    menu: ['tax_category']
+    menu: ['tax_category'],
+    // These persist once migration 20260709160000_crm_customer_fields is
+    // applied; until then a DB without the columns will drop them gracefully
+    // instead of rejecting the whole customer upsert.
+    customers: ['email', 'dues', 'marketing_opt_in']
   });
   const known = {}; // collection -> Set of ids seen from server
   function newClientId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
@@ -610,8 +660,8 @@
       const now = Date.now();
       const lastFetch = lastListFetchTime[c] || 0;
 
-      // Rate limit background sync to once every 5 seconds per collection, and deduplicate concurrent requests
-      if (!activeListRequests[c] && (now - lastFetch > 5000)) {
+      // Instant paint from local cache; background cloud refresh (deduped, 2.5s min gap)
+      if (!activeListRequests[c] && (now - lastFetch > 2500)) {
         activeListRequests[c] = (async () => {
           try {
             const res = await CLOUD.list(c, ...args);
