@@ -1021,31 +1021,37 @@
   function paintShiftBar() {
     const pos = document.getElementById('pos-tab') || document.querySelector('#pos-tab, .pos-layout');
     if (!pos) return;
+    // Prefer cart-side slot (Petpooja: menu stays clean)
+    let host = document.getElementById('pos-shift-slot');
     let bar = document.getElementById('rs-shift-bar');
     const shift = getOpenShift();
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'rs-shift-bar';
-      bar.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin:0 0 10px;border-radius:10px;border:1px solid var(--stroke);background:var(--panel);font-size:12.5px';
-      const anchor = pos.querySelector('.pos-layout, .pos-main, .toolbar-row, .pos-grid') || pos.firstChild;
+      bar.className = 'rs-shift-bar';
+    }
+    if (host) {
+      if (bar.parentNode !== host) host.appendChild(bar);
+    } else if (!bar.parentNode) {
+      const anchor = pos.querySelector('.pos-cats, .pos-grid') || pos.firstChild;
       if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(bar, anchor);
       else pos.insertBefore(bar, pos.firstChild);
     }
     if (shift) {
       const sum = summarizeShift(shift);
-      const scope = getZScope();
       const movHint =
         sum.payInTotal || sum.payOutTotal || sum.safeDropTotal
-          ? ` · drawer ${rs(sum.expectedCash)}`
+          ? ` · ${rs(sum.expectedCash)}`
           : '';
-      // Day pack lives only under More — keep shift bar short
-      bar.innerHTML = `<span style="font-weight:800"><i class="fa-solid fa-circle" style="color:#22c55e;font-size:9px;margin-right:6px"></i>Shift open</span>
-        <span style="color:var(--text-soft)">${esc(shift.cashierName)} · ${esc(getStationLabel())}</span>
-        <span style="color:var(--text-soft)">${sum.bills} bills · ${rs(sum.gross)}${movHint}</span>
-        <div style="flex:1"></div>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Pay-in, pay-out, safe drop"><i class="fa-solid fa-money-bill-wave"></i> Cash</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z"><i class="fa-solid fa-file-invoice"></i> Z</button>
-        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close"><i class="fa-solid fa-lock"></i> Close</button>`;
+      bar.classList.remove('rs-shift-bar-closed');
+      bar.classList.add('rs-shift-bar-open');
+      bar.innerHTML = `<div class="rs-shift-compact">
+        <span class="rs-shift-dot open"></span>
+        <span class="rs-shift-text"><b>Shift</b> ${esc(sum.bills)} bills · ${rs(sum.gross)}${esc(movHint)}</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Cash drawer"><i class="fa-solid fa-money-bill-wave"></i></button>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z" title="Z-report">Z</button>
+        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close" title="Close shift"><i class="fa-solid fa-lock"></i></button>
+      </div>`;
       const cm = bar.querySelector('#rs-cash-move');
       if (cm) cm.onclick = () => openCashMovementModal();
       const z = bar.querySelector('#rs-shift-z');
@@ -1056,11 +1062,13 @@
       const cl = bar.querySelector('#rs-shift-close');
       if (cl) cl.onclick = () => closeShift();
     } else {
-      // Cashier calm: single primary CTA — Day pack lives under More tools
       bar.classList.add('rs-shift-bar-closed');
-      bar.innerHTML = `<span style="font-weight:800;color:var(--text-soft)"><i class="fa-solid fa-circle" style="color:#eab308;font-size:9px;margin-right:6px"></i>No open shift</span>
-        <span style="color:var(--text-mute);font-size:12px;flex:1">Open a shift for cash drawer &amp; Z-report</span>
-        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" style="min-height:40px;padding:0 16px;font-weight:800"><i class="fa-solid fa-unlock"></i> Open shift</button>`;
+      bar.classList.remove('rs-shift-bar-open');
+      bar.innerHTML = `<div class="rs-shift-compact closed">
+        <span class="rs-shift-dot closed"></span>
+        <span class="rs-shift-text">No shift open</span>
+        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open"><i class="fa-solid fa-unlock"></i> Open shift</button>
+      </div>`;
       const op = bar.querySelector('#rs-shift-open');
       if (op)
         op.onclick = async () => {
@@ -1069,7 +1077,6 @@
           await openShift(Number(f) || 0);
         };
     }
-    if (shift) bar.classList.remove('rs-shift-bar-closed');
   }
 
   /* ---------------- Keyboard-first POS ---------------- */
@@ -1328,114 +1335,21 @@
     toast('Day pack CSV · ' + rows.length + ' bills', 'fa-file-csv');
   }
 
-  /* ---------------- Owner strip on POS (collapsed by default) ---------------- */
+  /* ---------------- Owner strip — hidden; metrics only under More ---------------- */
   function paintOwnerStrip() {
-    const pos = document.getElementById('pos-tab');
-    if (!pos) return;
-    let strip = document.getElementById('rs-owner-strip');
-    if (!strip) {
-      strip = document.createElement('div');
-      strip.id = 'rs-owner-strip';
-      strip.className = 'rs-owner-strip';
-      const shiftBar = document.getElementById('rs-shift-bar');
-      if (shiftBar && shiftBar.parentNode) shiftBar.parentNode.insertBefore(strip, shiftBar.nextSibling);
-      else pos.insertBefore(strip, pos.firstChild);
+    const strip = document.getElementById('rs-owner-strip');
+    if (strip) {
+      strip.style.display = 'none';
+      strip.setAttribute('hidden', '');
     }
-    const today = todayBills(false);
-    const sales = today.reduce((a, b) => a + (Number(b.amount != null ? b.amount : b.total) || 0), 0);
-    const aov = today.length ? Math.round(sales / today.length) : 0;
-    const pending =
-      global.__rsSyncBillPending ||
-      (typeof global.RS_DB_SYNC_DEPTH === 'function' ? global.RS_DB_SYNC_DEPTH() : 0) ||
-      0;
-    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-    const gw = global.__rsGatewayReady
-      ? 'WA linked'
-      : 'WA ' + (global.__rsGatewayLastStatus || '—');
-    const opsLabel = offline
-      ? 'Offline'
-      : pending
-        ? pending + ' sync'
-        : gw;
-    const opsIcon = offline ? 'fa-wifi' : pending ? 'fa-cloud-arrow-up' : 'fa-signal';
-    const shift = getOpenShift();
-    const shiftSum = shift ? summarizeShift(shift) : null;
-    const holds = Number(global.__rsHeldOrderCount) || 0;
-    let lowStock = Number(global.__rsLowStockCount);
-    if (!Number.isFinite(lowStock)) {
-      try {
-        const inv = (global.RS && RS.INVENTORY) || [];
-        lowStock = inv.filter((i) => Number(i.stock) < Number(i.min)).length;
-        global.__rsLowStockCount = lowStock;
-      } catch (_) {
-        lowStock = 0;
-      }
-    }
-    let expanded = false;
-    try { expanded = localStorage.getItem('rs_pos_stats_open') === '1'; } catch (_) {}
-    const summary =
-      rs(sales) +
-      ' today · ' +
-      today.length +
-      ' orders' +
-      (holds ? ' · H' + holds : '') +
-      ' · ' +
-      (shift ? 'Shift open' : 'Shift closed') +
-      (lowStock > 0 ? ' · ' + lowStock + ' low stock' : '');
-    const tiles = [
-      ['Today sales', rs(sales), 'fa-indian-rupee-sign', null],
-      ['Orders', String(today.length) + (holds ? ' · H' + holds : ''), 'fa-receipt', null],
-      ['AOV', rs(aov), 'fa-chart-line', null],
-      [
-        'Shift',
-        shift ? rs(shiftSum.gross) + ' · ' + shiftSum.bills : 'Closed',
-        shift ? 'fa-cash-register' : 'fa-lock',
-        null,
-      ],
-      [
-        'Low stock',
-        lowStock > 0 ? String(lowStock) + ' items' : 'OK',
-        lowStock > 0 ? 'fa-boxes-stacked' : 'fa-circle-check',
-        'inventory-tab',
-      ],
-      ['Ops', opsLabel, opsIcon, null],
-    ]
-      .map(
-        ([l, v, ic, tab]) => `<div class="rs-owner-tile" data-tab="${esc(tab || '')}" style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:var(--panel);${tab ? 'cursor:pointer;' : ''}${l === 'Low stock' && lowStock > 0 ? 'border-color:rgba(234,179,8,.45);' : ''}">
-      <div style="font-size:11px;color:var(--text-mute);font-weight:700"><i class="fa-solid ${ic}" style="margin-right:4px;opacity:.7;${l === 'Low stock' && lowStock > 0 ? 'color:var(--amber)' : ''}"></i>${esc(l)}</div>
-      <div style="font-size:15px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${l === 'Low stock' && lowStock > 0 ? 'color:var(--amber)' : ''}">${esc(v)}</div>
-    </div>`
-      )
-      .join('');
-    strip.innerHTML =
-      `<button type="button" class="rs-stats-toggle" id="rs-stats-toggle" aria-expanded="${expanded ? 'true' : 'false'}">` +
-      `<span class="rs-stats-summary"><i class="fa-solid fa-chart-simple"></i> ${esc(summary)}</span>` +
-      `<span class="rs-stats-chevron"><i class="fa-solid fa-chevron-${expanded ? 'up' : 'down'}"></i></span>` +
-      `</button>` +
-      `<div class="rs-owner-strip-grid" id="rs-owner-strip-grid" ${expanded ? '' : 'hidden'}>${tiles}</div>`;
-    const tog = strip.querySelector('#rs-stats-toggle');
-    const grid = strip.querySelector('#rs-owner-strip-grid');
-    if (tog && grid) {
-      tog.onclick = () => {
-        const open = grid.hasAttribute('hidden');
-        if (open) {
-          grid.removeAttribute('hidden');
-          tog.setAttribute('aria-expanded', 'true');
-          try { localStorage.setItem('rs_pos_stats_open', '1'); } catch (_) {}
-        } else {
-          grid.setAttribute('hidden', '');
-          tog.setAttribute('aria-expanded', 'false');
-          try { localStorage.setItem('rs_pos_stats_open', '0'); } catch (_) {}
-        }
-        const chev = tog.querySelector('.rs-stats-chevron i');
-        if (chev) chev.className = 'fa-solid fa-chevron-' + (open ? 'up' : 'down');
-      };
-    }
-    strip.querySelectorAll('.rs-owner-tile[data-tab="inventory-tab"]').forEach((el) => {
-      el.onclick = () => {
-        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
-      };
-    });
+    try {
+      const today = todayBills(false);
+      const sales = today.reduce((a, b) => a + (Number(b.amount != null ? b.amount : b.total) || 0), 0);
+      global.__rsTodaySales = sales;
+      global.__rsTodayOrders = today.length;
+      global.__rsShiftOpen = !!getOpenShift();
+    } catch (_) {}
+    try { ensurePosQuickTools(); } catch (_) {}
   }
 
   function canShowDemoTools() {
@@ -1444,7 +1358,6 @@
       const sess = global.RS_API && RS_API.session && RS_API.session();
       if (sess && sess.role === 'superadmin') return true;
       if (new URLSearchParams(location.search).get('demo') === '1') return true;
-      // Impersonation support account
       if (sess && String(sess.username || '').indexOf('superadmin:') === 0) return true;
     } catch (_) {}
     return false;
@@ -1458,31 +1371,36 @@
       tools = document.createElement('div');
       tools.id = 'rs-pos-quick-tools';
       tools.className = 'rs-pos-more-tools';
-      const strip = document.getElementById('rs-owner-strip');
-      if (strip && strip.parentNode) strip.parentNode.insertBefore(tools, strip.nextSibling);
-      else {
-        const shiftBar = document.getElementById('rs-shift-bar');
-        if (shiftBar && shiftBar.parentNode) shiftBar.parentNode.insertBefore(tools, shiftBar.nextSibling);
-        else pos.insertBefore(tools, pos.firstChild);
-      }
+    }
+    // Mount into menu toolbar (not a separate row under the menu)
+    const secondary = document.getElementById('pos-toolbar-secondary') || pos.querySelector('.pos-toolbar-secondary');
+    if (secondary) {
+      if (tools.parentNode !== secondary) secondary.appendChild(tools);
+    } else if (!tools.parentNode) {
+      pos.insertBefore(tools, pos.firstChild);
     }
     const lowN = Number(global.__rsLowStockCount) || 0;
     const showDemo = canShowDemoTools();
+    const sales = Number(global.__rsTodaySales) || 0;
+    const orders = Number(global.__rsTodayOrders) || 0;
+    const shiftOpen = !!global.__rsShiftOpen;
+    const summary = rs(sales) + ' today · ' + orders + ' orders · ' + (shiftOpen ? 'Shift open' : 'Shift closed');
     tools.innerHTML = `
       <div class="rs-pos-more" id="rs-pos-more">
-        <button type="button" class="btn btn-ghost btn-sm rs-pos-more-btn" id="rs-pos-more-toggle" aria-expanded="false" aria-haspopup="true" title="Shift tools &amp; extras">
-          <i class="fa-solid fa-ellipsis"></i> More
+        <button type="button" class="btn btn-ghost btn-sm rs-pos-more-btn" id="rs-pos-more-toggle" aria-expanded="false" aria-haspopup="true" title="Tools">
+          <i class="fa-solid fa-ellipsis"></i>
         </button>
         <div class="rs-pos-more-menu" id="rs-pos-more-menu" hidden role="menu">
+          <div class="rs-pos-more-hint rs-pos-more-stats">${esc(summary)}</div>
+          <div class="rs-pos-more-sep"></div>
           <button type="button" role="menuitem" id="rs-day-pack"><i class="fa-solid fa-file-export"></i> Day pack CSV</button>
-          <button type="button" role="menuitem" id="rs-keys-help"><i class="fa-solid fa-keyboard"></i> Keyboard shortcuts</button>
+          <button type="button" role="menuitem" id="rs-keys-help"><i class="fa-solid fa-keyboard"></i> Shortcuts (F1)</button>
           ${lowN > 0 ? `<button type="button" role="menuitem" id="rs-low-stock-btn" class="warn"><i class="fa-solid fa-boxes-stacked"></i> Low stock (${lowN})</button>` : ''}
           ${showDemo ? `<button type="button" role="menuitem" id="rs-demo-btn"><i class="fa-solid fa-clapperboard"></i> Demo checklist</button>` : ''}
           <div class="rs-pos-more-sep"></div>
           <div class="rs-pos-more-hint">F2 search · F4 KOT · F8 pay</div>
         </div>
-      </div>
-      ${lowN > 0 ? `<button type="button" class="btn btn-ghost btn-sm rs-pos-low-chip" id="rs-low-stock-chip" title="Open inventory"><i class="fa-solid fa-boxes-stacked"></i> ${lowN} low</button>` : ''}`;
+      </div>`;
     const toggle = tools.querySelector('#rs-pos-more-toggle');
     const menu = tools.querySelector('#rs-pos-more-menu');
     if (toggle && menu && !toggle.dataset.bound) {
@@ -1512,11 +1430,6 @@
     const lowBtn = tools.querySelector('#rs-low-stock-btn');
     if (lowBtn)
       lowBtn.onclick = () => {
-        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
-      };
-    const lowChip = tools.querySelector('#rs-low-stock-chip');
-    if (lowChip)
-      lowChip.onclick = () => {
         if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
       };
     const demo = tools.querySelector('#rs-demo-btn');

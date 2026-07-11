@@ -108,33 +108,66 @@
 /* ===================== POS ===================== */
 .pos-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 16px; align-items: start; }
 .pos-left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.pos-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.pos-search { flex: 1 1 220px; min-width: 160px; display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: var(--r-pill); background: var(--panel); border: 1px solid var(--stroke-2); }
+/* Petpooja-style menu chrome: search + ⋯ only → more room for categories + cards */
+.pos-left { gap: 10px !important; }
+.pos-toolbar,
+.pos-toolbar-menu { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
+.pos-search { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r-pill); background: var(--panel); border: 1px solid var(--stroke-2); }
 .pos-search i { color: var(--text-mute); }
 .pos-search input { border: none; background: none; outline: none; color: var(--text); font-family: var(--font-body); font-size: 14px; width: 100%; }
-.pos-toolbar-secondary { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.pos-toolbar-secondary { display: flex; align-items: center; gap: 6px; flex: none; }
 .pos-display-opts { position: relative; }
 .pos-display-opts > summary {
-  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-  padding: 9px 12px; border-radius: var(--r-pill); border: 1px solid var(--stroke-2);
-  background: var(--panel); color: var(--text-soft); font-size: 12.5px; font-weight: 700; user-select: none;
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--stroke-2);
+  background: var(--panel); color: var(--text-soft); font-size: 14px; user-select: none;
 }
 .pos-display-opts > summary::-webkit-details-marker { display: none; }
 .pos-display-opts[open] > summary { border-color: rgba(255,79,0,0.35); color: var(--orange); }
-.pos-display-opts .pos-size-control-panel {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40;
-  padding: 10px 12px; background: var(--panel); border: 1px solid var(--stroke);
+.pos-display-panel {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 200px;
+  padding: 12px; background: var(--panel); border: 1px solid var(--stroke);
   border-radius: 12px; box-shadow: var(--shadow-lg, 0 12px 40px rgba(0,0,0,.12));
+  display: flex; flex-direction: column; gap: 10px;
 }
-.order-types { display: flex; gap: 8px; }
-.order-type-btn { padding: 11px 16px; min-height: 42px; border-radius: var(--r-pill); border: 1px solid var(--stroke-2); background: var(--panel); color: var(--text-soft); font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--t); display: inline-flex; align-items: center; gap: 7px; }
-/* Active order type: subtle tint — primary orange reserved for Print & Pay */
-.order-type-btn.active { background: var(--glass-2); color: var(--text); border-color: var(--stroke-hi); box-shadow: inset 0 0 0 1px rgba(255,79,0,0.25); }
-.order-type-btn.active i { color: var(--orange); }
+.pos-display-label { font-size: 11px; font-weight: 700; color: var(--text-mute); display: flex; flex-direction: column; gap: 6px; }
+.pos-display-opts .pos-size-control-panel { position: static; box-shadow: none; border: none; padding: 0; background: transparent; }
+/* Order type on cart (not menu toolbar) */
+.order-types { display: flex; gap: 6px; }
+.order-types-cart,
+#pos-cart-order-types {
+  display: flex; gap: 6px; padding: 8px 12px 4px; border-bottom: none; background: transparent;
+}
+.order-type-btn {
+  flex: 1; justify-content: center; padding: 9px 6px; min-height: 40px;
+  border-radius: 10px; border: 1px solid var(--stroke-2); background: var(--panel);
+  color: var(--text-soft); font-size: 11.5px; font-weight: 700; cursor: pointer;
+  transition: var(--t); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.order-type-btn.active {
+  background: var(--orange); color: #fff; border-color: transparent;
+}
+.order-type-btn.active i { color: #fff; }
 #pos-menu-order-types { display: none; }
-#pos-cart-order-types { display: flex; padding: 10px 12px; border-bottom: 1px solid var(--stroke); gap: 6px; background: var(--glass); }
-#pos-cart-order-types .order-type-btn { flex: 1; justify-content: center; padding: 8px 6px; font-size: 11.5px; border-radius: var(--r-sm); white-space: nowrap; gap: 5px; }
-.pos-cats { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; position: relative; scroll-behavior: smooth; max-width: 100%; }
+/* Compact shift strip on cart (not over menu) */
+.pos-shift-slot { padding: 0 12px 8px; }
+.rs-shift-bar { margin: 0 !important; padding: 0 !important; border: none !important; background: transparent !important; }
+.rs-shift-compact {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--stroke);
+  background: var(--glass); font-size: 12px;
+}
+.rs-shift-compact.closed { border-color: rgba(234,179,8,.35); background: rgba(234,179,8,.07); }
+.rs-shift-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.rs-shift-dot.open { background: #22c55e; }
+.rs-shift-dot.closed { background: #eab308; }
+.rs-shift-text { flex: 1; min-width: 0; color: var(--text-soft); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-shift-text b { color: var(--text); font-weight: 800; margin-right: 4px; }
+.rs-shift-compact .btn { min-height: 32px; padding: 0 10px; font-size: 11.5px; }
+.rs-pos-more-tools { margin: 0 !important; }
+.rs-pos-more-btn { width: 40px; height: 40px; padding: 0 !important; border-radius: 10px !important; }
+.rs-pos-more-stats { font-weight: 700 !important; color: var(--text) !important; }
+.pos-cats { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; position: relative; scroll-behavior: smooth; max-width: 100%; }
 .pos-cats::-webkit-scrollbar { height: 5px; }
 .pos-cat-btn { padding: 8px 15px; border-radius: var(--r-pill); border: 1px solid var(--stroke-2); background: var(--panel); color: var(--text-soft); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: var(--t); display: inline-flex; align-items: center; gap: 7px; }
 .pos-cat-btn:hover { border-color: var(--stroke-hi); color: var(--text); }

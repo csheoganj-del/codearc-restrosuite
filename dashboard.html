@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v86-20260711-pos-calm2';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v87-20260711-petpooja';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -533,10 +533,11 @@
       <section class="tab-content" id="pos-tab" data-screen-label="POS">
         <div class="pos-wrap">
           <div class="pos-left">
-            <div class="pos-toolbar">
+            <!-- Petpooja-style menu chrome: search + tools only (order type lives on cart) -->
+            <div class="pos-toolbar pos-toolbar-menu">
               <div class="pos-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="pos-search-input" placeholder="Search menu…" autocomplete="off" enterkeyhint="search">
+                <input id="pos-search-input" placeholder="Search menu or item code…" autocomplete="off" enterkeyhint="search">
                 <div class="mobile-only-inline pos-m-hold-buttons" id="pos-m-hold-buttons" style="display:none; align-items:center; gap:4px;">
                   <button class="hold-btn hold-btn-takeaway" id="btn-m-hold-takeaway" style="padding: 4px 8px; font-size: 11px;">
                     <i class="fa-solid fa-bag-shopping"></i> <span id="held-count-takeaway-m"></span>
@@ -549,32 +550,32 @@
                   </button>
                 </div>
               </div>
-              <div class="order-types" role="group" aria-label="Order type">
-                <button type="button" class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
-                <button type="button" class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
-                <button type="button" class="order-type-btn"><i class="fa-solid fa-motorcycle"></i> Delivery</button>
-              </div>
-              <div class="pos-toolbar-secondary">
-                <div class="pos-sort">
-                  <select id="pos-sort-select" class="pos-sort-select" aria-label="Sort menu">
-                    <option value="popular">Most Ordered</option>
-                    <option value="default">Default Order</option>
-                    <option value="name-asc">A–Z</option>
-                    <option value="name-desc">Z–A</option>
-                    <option value="price-asc">Price ↑</option>
-                    <option value="price-desc">Price ↓</option>
-                    <option value="veg-first">Veg first</option>
-                    <option value="nonveg-first">Non-veg first</option>
-                  </select>
-                </div>
+              <div class="pos-toolbar-secondary" id="pos-toolbar-secondary">
                 <details class="pos-display-opts" id="pos-display-opts">
-                  <summary title="Card size &amp; display"><i class="fa-solid fa-text-height"></i><span class="hide-sm"> Display</span></summary>
-                  <div class="pos-size-control pos-size-control-panel">
-                    <button type="button" id="btn-grid-dec" title="Smaller cards"><i class="fa-solid fa-minus"></i></button>
-                    <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Card size" aria-label="Menu card size">
-                    <button type="button" id="btn-grid-inc" title="Larger cards"><i class="fa-solid fa-plus"></i></button>
+                  <summary title="Sort &amp; card size"><i class="fa-solid fa-sliders"></i></summary>
+                  <div class="pos-display-panel">
+                    <label class="pos-display-label">Sort
+                      <select id="pos-sort-select" class="pos-sort-select" aria-label="Sort menu">
+                        <option value="popular">Most Ordered</option>
+                        <option value="default">Default</option>
+                        <option value="name-asc">A–Z</option>
+                        <option value="name-desc">Z–A</option>
+                        <option value="price-asc">Price ↑</option>
+                        <option value="price-desc">Price ↓</option>
+                        <option value="veg-first">Veg first</option>
+                        <option value="nonveg-first">Non-veg first</option>
+                      </select>
+                    </label>
+                    <label class="pos-display-label">Card size
+                      <div class="pos-size-control pos-size-control-panel">
+                        <button type="button" id="btn-grid-dec" title="Smaller cards"><i class="fa-solid fa-minus"></i></button>
+                        <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Card size" aria-label="Menu card size">
+                        <button type="button" id="btn-grid-inc" title="Larger cards"><i class="fa-solid fa-plus"></i></button>
+                      </div>
+                    </label>
                   </div>
                 </details>
+                <!-- More tools (Day pack / Keys / Demo) mounts here via JS -->
               </div>
             </div>
             <!-- Active Table Status Banner (Dine-in Only) -->
@@ -614,8 +615,16 @@
                 <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr; gap: 8px; position: relative; align-items: start;">
-              <div style="display:grid;grid-template-columns:1fr 88px;gap:8px;align-items:stretch">
+            <!-- Order type next to cart (Petpooja-style) — frees menu area -->
+            <div class="order-types order-types-cart" id="pos-cart-order-types" role="group" aria-label="Order type">
+              <button type="button" class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
+              <button type="button" class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
+              <button type="button" class="order-type-btn"><i class="fa-solid fa-motorcycle"></i> Delivery</button>
+            </div>
+            <!-- Shift status mounts here (not above menu) -->
+            <div id="pos-shift-slot" class="pos-shift-slot" aria-live="polite"></div>
+            <div class="cart-table-sel" id="cart-table-sel" style="display: grid; grid-template-columns: 1fr; gap: 8px; position: relative; align-items: start;">
+              <div class="cart-table-pax-row" id="cart-table-pax-row" style="display:grid;grid-template-columns:1fr 88px;gap:8px;align-items:stretch">
                 <select class="form-input" id="cart-table" style="height: 44px; padding: 0 32px 0 12px; font-size: 14px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
                 <input type="number" id="cart-covers" class="form-input" min="0" max="99" step="1" placeholder="Pax" title="Guest covers (pax)" inputmode="numeric" style="height:44px;padding:0 8px;font-size:14px;border-radius:8px;box-sizing:border-box;text-align:center;font-weight:700" aria-label="Guest covers">
               </div>

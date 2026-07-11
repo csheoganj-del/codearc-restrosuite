@@ -850,9 +850,20 @@ function wireCartActions(){
   if (checkoutBtn) checkoutBtn.onclick = null;
 }
 // POS init (static parts present in HTML, wire them)
+function syncTablePaxForOrderType() {
+  const row = document.getElementById('cart-table-pax-row');
+  if (!row) return;
+  const active = document.querySelector('.order-type-btn.active');
+  const t = (active && active.textContent || '').toLowerCase();
+  const dineIn = t.includes('dine');
+  // Takeaway/delivery: hide table+pax clutter (Petpooja walk-in default)
+  row.style.display = dineIn ? 'grid' : 'none';
+}
+
 function initPOS(){
   try { wireCartCustomerToggle(); } catch (_) {}
   try { updatePosCartChrome(!cart || cart.length === 0); } catch (_) {}
+  try { syncTablePaxForOrderType(); } catch (_) {}
   // Refresh happy-hour banner periodically (window can start/end mid-shift)
   if (!global.__rsHappyHourTick) {
     global.__rsHappyHourTick = true;
@@ -1037,6 +1048,7 @@ function initPOS(){
       console.error('[Order Type Switch Error]', e);
     }
     $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    try { syncTablePaxForOrderType(); } catch (_) {}
   }));
   let lastAuthorizedDiscount = 0;
   function wireTipControls() {
