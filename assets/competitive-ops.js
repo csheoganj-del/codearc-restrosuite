@@ -890,6 +890,193 @@
     if (global.RSPrint) RSPrint(html, 'KOT');
   }
 
+  /* ---------------- Bill thermal (ESC/POS or HTML width) ---------------- */
+  function outletForPrint() {
+    const s = global.RS_SETTINGS || {};
+    return {
+      name: s.set_business_name || s.set_outlet_name || (session().tenant_name) || 'Outlet',
+      address: s.set_address || '',
+      phone: s.set_phone || '',
+      gstin: s.set_gstin || '',
+    };
+  }
+
+  async function printBillThermal(bill) {
+    if (!bill) {
+      toast('No bill to print', 'fa-circle-exclamation');
+      return { ok: false };
+    }
+    const outlet = outletForPrint();
+    try {
+      if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
+        const res = await RSPrintBridge.printBillEscPos(bill, outlet, {});
+        if (res && res.ok) {
+          toast('Thermal receipt sent', 'fa-print');
+          return res;
+        }
+      }
+    } catch (e) {
+      console.warn('[Thermal] escpos failed', e);
+    }
+    try {
+      if (global.RSReceipt && typeof RSReceipt.print === 'function') {
+        await RSReceipt.print(bill);
+        toast('Print dialog opened', 'fa-print');
+        return { ok: true, mode: 'html' };
+      }
+      if (global.RSPrint && global.RSReceiptEngine && RSReceiptEngine.toHTML) {
+        const html = RSReceiptEngine.toHTML(bill, null, outlet);
+        RSPrint(`<div style="max-width:300px;margin:0 auto">${html}</div>`, 'Receipt ' + (bill.no || ''));
+        toast('Print dialog opened', 'fa-print');
+        return { ok: true, mode: 'html' };
+      }
+    } catch (e) {
+      console.warn('[Thermal] html print failed', e);
+    }
+    toast('Could not print receipt', 'fa-circle-exclamation');
+    return { ok: false };
+  }
+
+  /* ---------------- New QR order alerts (sound + toast) ---------------- */
+  const SEEN_PENDING_KEY = 'rs_seen_pending_order_ids';
+  let floorAlertBooted = false;
+  const seenPendingIds = new Set();
+  let floorAudioCtx = null;
+
+  function loadSeenPending() {
+    try {
+      const raw = sessionStorage.getItem(SEEN_PENDING_KEY);
+      if (!raw) return;
+      JSON.parse(raw).forEach((id) => seenPendingIds.add(String(id)));
+    } catch (_) {}
+  }
+
+  function saveSeenPending() {
+    try {
+      sessionStorage.setItem(SEEN_PENDING_KEY, JSON.stringify([...seenPendingIds].slice(-200)));
+    } catch (_) {}
+  }
+
+  function unlockFloorAudio() {
+    try {
+      const Ctx = global.AudioContext || global.webkitAudioContext;
+      if (!Ctx) return;
+      if (!floorAudioCtx) floorAudioCtx = new Ctx();
+      if (floorAudioCtx.state === 'suspended') floorAudioCtx.resume().catch(() => {});
+    } catch (_) {}
+  }
+
+  function playFloorChime() {
+    try {
+      const mute = localStorage.getItem('rs_service_alert_mute') === '1';
+      if (mute) return;
+      const Ctx = global.AudioContext || global.webkitAudioContext;
+      if (!Ctx) return;
+      if (!floorAudioCtx) floorAudioCtx = new Ctx();
+      const ctx = floorAudioCtx;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+        return;
+      }
+      // Rising three-tone "new order" (distinct from waiter ding-dong)
+      [[880, 0], [1174.7, 0.12], [1396.9, 0.24]].forEach(([freq, delay]) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const t0 = ctx.currentTime + delay;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.32);
+      });
+    } catch (_) {}
+  }
+
+  function tableLabelFromOrder(o) {
+    const raw = String((o && o.table) || '').trim();
+    if (!raw) return '—';
+    const parts = raw.split('-');
+    return parts.length > 1 ? parts[parts.length - 1] : raw.replace(/^table\s*/i, '') || raw;
+  }
+
+  function checkNewPendingOrders() {
+    const orders = (global.RS && Array.isArray(RS.QR_ORDERS) ? RS.QR_ORDERS : []) || [];
+    const pending = orders.filter((o) => String(o.status || '').toLowerCase() === 'pending');
+    const ids = pending.map((o) => String(o.id || o.orderId || '')).filter(Boolean);
+
+    if (!floorAlertBooted) {
+      floorAlertBooted = true;
+      ids.forEach((id) => seenPendingIds.add(id));
+      saveSeenPending();
+      return;
+    }
+
+    const fresh = pending.filter((o) => {
+      const id = String(o.id || o.orderId || '');
+      return id && !seenPendingIds.has(id);
+    });
+    if (!fresh.length) return;
+
+    fresh.forEach((o) => seenPendingIds.add(String(o.id || o.orderId)));
+    // Drop ids no longer pending so re-orders of same id can alert later
+    const live = new Set(ids);
+    [...seenPendingIds].forEach((id) => {
+      if (!live.has(id) && !pending.some((p) => String(p.id || p.orderId) === id)) {
+        // keep history for session; do not prune aggressively
+      }
+    });
+    saveSeenPending();
+
+    playFloorChime();
+    try {
+      if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
+    } catch (_) {}
+
+    const first = fresh[0];
+    const tbl = tableLabelFromOrder(first);
+    const label =
+      fresh.length === 1
+        ? `New QR order · Table ${tbl}`
+        : `${fresh.length} new QR orders`;
+
+    const openQr = () => {
+      if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('qr-orders-tab');
+    };
+    if (typeof global.__toast === 'function') {
+      global.__toast(label + ' — tap to open', 'fa-bell', openQr);
+    } else {
+      toast(label, 'fa-bell');
+    }
+
+    try {
+      if (!document.title.startsWith('🔔')) {
+        const prev = document.title;
+        document.title = '🔔 ' + label + ' · ' + prev.replace(/^🔔\s*/, '');
+        setTimeout(() => {
+          try {
+            document.title = prev;
+          } catch (_) {}
+        }, 8000);
+      }
+    } catch (_) {}
+  }
+
+  function installFloorOrderAlerts() {
+    if (global.__rsFloorOrderAlerts) return;
+    global.__rsFloorOrderAlerts = true;
+    loadSeenPending();
+    document.addEventListener('rs:pending_orders_synced', () => {
+      try {
+        checkNewPendingOrders();
+      } catch (_) {}
+    });
+    document.addEventListener('pointerdown', unlockFloorAudio, { once: true, capture: true });
+    document.addEventListener('keydown', unlockFloorAudio, { once: true, capture: true });
+  }
+
   /* ---------------- Boot ---------------- */
   function refreshOpsUi() {
     try {
@@ -921,11 +1108,13 @@
     installPdfPreference();
     enhanceDuesHint();
     installShiftNudge();
+    installFloorOrderAlerts();
     refreshOpsUi();
 
     document.addEventListener('rs:hydrated', () => {
       installCheckoutHooks();
       installPdfPreference();
+      installFloorOrderAlerts();
       refreshOpsUi();
     });
     document.addEventListener('rs:bill-paid', () => {
@@ -968,6 +1157,8 @@
       setZScope,
       showZReportModal,
       printKotThermal,
+      printBillThermal,
+      checkNewPendingOrders,
       compilePreferredPdf,
       decorateBillMeta,
       estimateCartStockIssues,

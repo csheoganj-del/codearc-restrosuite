@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v66 (2026-07-11) — Floor service alerts & thermal settle
+
+- **New QR order alert**: chime + vibrate + clickable toast when a pending QR order lands (respects service-alert mute)
+- **Bill settled**: one-tap **Thermal** (ESC/POS / print bridge) next to Print + WhatsApp
+- **QR board**: pending cards pulse, guest name, pending-first sort, open-in-POS shortcut, urgent badge
+- **KDS**: ticket count badge, oldest-first queue, aging/urgent card styles
+
 ## v65 (2026-07-11) — Floor map, KOT one-tap, demo seed
 
 - **Table map**: held tables show amber **Held** badge (drafts + in-memory holds)
@@ -50,7 +57,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v63-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v66-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

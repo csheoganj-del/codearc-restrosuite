@@ -17,6 +17,8 @@ test('competitive-ops.js exists and exposes core APIs', () => {
   assert.match(src, /closeShift/);
   assert.match(src, /getStationLabel/);
   assert.match(src, /printKotThermal/);
+  assert.match(src, /printBillThermal/);
+  assert.match(src, /checkNewPendingOrders|installFloorOrderAlerts/);
   assert.match(src, /F8/);
   assert.match(src, /Z-REPORT|zReportHtml/);
 });
@@ -24,7 +26,19 @@ test('competitive-ops.js exists and exposes core APIs', () => {
 test('dashboard loads competitive-ops in critical path', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /competitive-ops\.js|critical\.bundle\.js/);
-  assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
+});
+
+test('bill settled modal has thermal print action', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  assert.match(src, /rc-thermal/);
+  assert.match(src, /printBillThermal|printBillEscPos/);
+});
+
+test('QR orders UI prioritizes pending attention', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/qr-orders-ui.js'), 'utf8');
+  assert.match(src, /needs-attention/);
+  assert.match(src, /data-pos/);
 });
 
 test('receipt engine supports thermal preference', () => {

@@ -161,22 +161,42 @@ function renderQR() {
     }
   }
 
-  // Update the sidebar badge count for QR Orders
+  // Update the sidebar badge count for QR Orders (prefer pending for attention)
   const qrBadge = document.querySelector('.sidebar-link[data-tab="qr-orders-tab"] .badge-count');
   if (qrBadge) {
     const activeCount = pendingCount + preparingCount;
-    qrBadge.textContent = activeCount;
+    qrBadge.textContent = pendingCount > 0 ? pendingCount : activeCount;
     qrBadge.style.display = activeCount > 0 ? '' : 'none';
+    qrBadge.classList.toggle('badge-urgent', pendingCount > 0);
+    if (pendingCount > 0) qrBadge.title = pendingCount + ' awaiting accept';
+    else if (activeCount > 0) qrBadge.title = activeCount + ' active QR orders';
+    else qrBadge.title = '';
   }
 
-  $('#qr-grid').innerHTML = QR_ORDERS.map((o,i)=>`
-    <div class="qr-card s-${o.status}">
-      <div class="qr-ch"><div><span class="tnum">Table ${_e(o.table.split('-')[1]||o.table)}</span><div class="qtime">${_e(o.time)}</div></div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
+  // Pending first so staff see new QR orders without scrolling
+  const sortedIdx = QR_ORDERS.map((o, i) => ({ o, i }))
+    .sort((a, b) => {
+      const rank = (s) => (s === 'pending' ? 0 : s === 'preparing' ? 1 : 2);
+      return rank(a.o.status) - rank(b.o.status);
+    });
+
+  $('#qr-grid').innerHTML = sortedIdx.map(({ o, i }) => {
+    const guest = o.customerName ? `<div class="qguest"><i class="fa-solid fa-user"></i> ${_e(o.customerName)}</div>` : '';
+    const openPosBtn = o.status === 'pending' || o.status === 'preparing'
+      ? `<button class="btn btn-ghost btn-sm" data-pos="${i}" title="Load into POS"><i class="fa-solid fa-cash-register"></i></button>`
+      : '';
+    return `
+    <div class="qr-card s-${o.status}${o.status === 'pending' ? ' needs-attention' : ''}" data-order-id="${_e(o.id || '')}">
+      <div class="qr-ch"><div><span class="tnum">Table ${_e(o.table.split('-')[1]||o.table)}</span><div class="qtime">${_e(o.time)}</div>${guest}</div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'||o.status==='pending'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
       <div class="qr-lines">${o.items.map(it=>`<div class="ql"><span>${_e(qrItemLabel(it))}</span><b>${rs(qrItemTotal(it))}</b></div>`).join('')}</div>
       <div class="qr-cf"><span class="qtot">${rs(o.total)}</span>
-        ${o.status!=='served'?`<button class="btn btn-ghost btn-sm" data-merge="${i}"><i class="fa-solid fa-code-merge"></i> Merge</button><button class="btn btn-primary btn-sm" data-adv="${i}">${o.status==='pending'?'Accept':'Mark served'}</button>`:`<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i> Bill</button>`}
+        ${o.status!=='served'?`${openPosBtn}<button class="btn btn-ghost btn-sm" data-merge="${i}"><i class="fa-solid fa-code-merge"></i> Merge</button><button class="btn btn-primary btn-sm" data-adv="${i}">${o.status==='pending'?'Accept':'Mark served'}</button>`:`<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i> Bill</button>`}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  $$('#qr-grid [data-pos]').forEach(b => b.addEventListener('click', () => {
+    openQrOrderInPos(QR_ORDERS[+b.dataset.pos]);
+  }));
   $$('#qr-grid [data-adv]').forEach(b=>b.addEventListener('click',async ()=>{
     const o=QR_ORDERS[+b.dataset.adv];
     const nextStatus = o.status==='pending'?'preparing':'served';
