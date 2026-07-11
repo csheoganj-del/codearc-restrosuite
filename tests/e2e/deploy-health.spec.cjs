@@ -43,6 +43,6 @@ test.describe('Deploy health', () => {
     expect(html).toMatch(/pos-ui\.js/);
     expect(html).toMatch(/tax-helpers\.js|bills-history\.js/);
     // Version stamp present (v5x or v6x wave series)
-    expect(html).toMatch(/v[5-7][0-9]-20260711|__RESTROSUITE_ASSET_VERSION__/);
+    expect(html).toMatch(/v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711|__RESTROSUITE_ASSET_VERSION__/);
   });
 });
