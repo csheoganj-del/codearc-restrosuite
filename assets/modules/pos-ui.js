@@ -93,19 +93,22 @@
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (open) {
       panel.hidden = false;
-      panel.style.display = 'flex';
       panel.removeAttribute('hidden');
+      panel.classList.add('is-open');
+      // Overlay mode — never use in-flow display that steals cart height
+      panel.style.display = '';
     } else {
       panel.hidden = true;
-      panel.style.display = 'none';
       panel.setAttribute('hidden', '');
-      // hide inline search popover when collapsing
+      panel.classList.remove('is-open');
+      panel.style.display = '';
       const pop = document.getElementById('cust-search-popover');
       if (pop) {
         pop.style.display = 'none';
         pop.innerHTML = '';
       }
     }
+    btn.classList.toggle('is-open', open);
     syncCartCustomerChrome();
   }
 

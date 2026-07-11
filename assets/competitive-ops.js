@@ -96,17 +96,20 @@
       if (ban) ban.style.display = 'none';
       return;
     }
+    // Prefer after dues banner / under customer chip (not inside expanding form overlay)
+    const dues = document.getElementById('cart-customer-dues-banner');
     const host =
-      document.getElementById('cart-customer-dues-banner')?.parentElement ||
-      document.querySelector('.cart-cust-direct-inputs') ||
+      dues?.parentElement ||
+      document.getElementById('custom-customer-widget') ||
       document.querySelector('.pos-cart');
     if (!host) return;
     if (!ban) {
       ban = document.createElement('div');
       ban.id = 'cart-loyalty-banner';
       ban.style.cssText =
-        'display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);color:var(--text-soft);line-height:1.4;margin-top:6px';
-      host.appendChild(ban);
+        'display:none;font-size:11px;padding:5px 8px;border-radius:8px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);color:var(--text-soft);line-height:1.3;margin-top:4px';
+      if (dues && dues.parentElement === host) dues.insertAdjacentElement('afterend', ban);
+      else host.appendChild(ban);
     }
     if (!customer) {
       ban.style.display = 'none';

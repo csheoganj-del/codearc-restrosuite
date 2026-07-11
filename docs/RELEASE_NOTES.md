@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v90 (2026-07-11) — Cart space + inline tender
+
+- **Customer expand is an overlay** — opening Add customer no longer shrinks cart lines to 2 items
+- Name + phone sit side-by-side in a short dropdown over the cart
+- **Cash / Split** tender lives **inline under pay methods** (no floating side tabs over the menu)
+- Cart list keeps a minimum height; foot scrolls if tender chrome is tall
+- Loyalty banner stays compact under the customer chip
+
 ## v89 (2026-07-11) — POS Current Order panel 10/10
 
 - **Cart lines**: name · unit · qty · total only; kitchen note via long-press / double-click (shown only when set)

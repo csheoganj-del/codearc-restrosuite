@@ -1214,17 +1214,43 @@
     }
 
     function openDrawer(drawerId) {
-      const backdrop = document.getElementById('cpay-drawer-backdrop');
-      const drawer   = document.getElementById(drawerId);
+      const drawer = document.getElementById(drawerId);
       if (!drawer) return;
-      document.querySelectorAll('.cpay-side-drawer').forEach(d => d.classList.remove('csd-open'));
+
+      // Cash / Split: expand inline under pay methods (no floating side tab)
+      if (drawer.classList.contains('cart-tender-panel')) {
+        document.querySelectorAll('.cart-tender-panel').forEach((d) => {
+          d.classList.remove('csd-open');
+          d.hidden = true;
+        });
+        drawer.hidden = false;
+        drawer.classList.add('csd-open');
+        // Keep cart lines visible — scroll tender into view only if needed
+        try {
+          drawer.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } catch (_) {}
+        return;
+      }
+
+      const backdrop = document.getElementById('cpay-drawer-backdrop');
+      document.querySelectorAll('.cpay-side-drawer').forEach((d) => d.classList.remove('csd-open'));
       drawer.classList.add('csd-open');
       if (backdrop) backdrop.style.display = 'block';
     }
     function closeAllDrawers() {
-      document.querySelectorAll('.cpay-side-drawer').forEach(d => d.classList.remove('csd-open'));
+      document.querySelectorAll('.cpay-side-drawer').forEach((d) => d.classList.remove('csd-open'));
+      document.querySelectorAll('.cart-tender-panel').forEach((d) => {
+        d.classList.remove('csd-open');
+        d.hidden = true;
+      });
       const backdrop = document.getElementById('cpay-drawer-backdrop');
       if (backdrop) backdrop.style.display = 'none';
+    }
+    function hideTenderPanels() {
+      document.querySelectorAll('.cart-tender-panel').forEach((d) => {
+        d.classList.remove('csd-open');
+        d.hidden = true;
+      });
     }
 
     /* --- Draggable drawer system ---------------------------------------------
@@ -1615,7 +1641,7 @@
       if(note) note.textContent = paymentState.method;
       checkoutBtn.disabled = totals.count < 1;
 
-      // Only open / close drawers when user explicitly triggered (e.g. clicking Cash/Split btn)
+      // Inline tenders: show cash/split panels in the cart foot (never floating side tabs)
       if (paymentState.method === 'Cash') {
         const receivedInput = document.getElementById('inline-cash-received');
         if (receivedInput) {
@@ -1626,10 +1652,10 @@
             delete receivedInput.dataset.userInteracted;
           }
         }
-        if (allowOpen) {
-          openDrawer('cash-drawer');
-        }
+        // Always keep cash tender visible while Cash is selected (compact, in-cart)
+        openDrawer('cash-drawer');
         updateInlineChange();
+        isSplitPaymentActive = false;
       } else if (paymentState.method === 'Split') {
         const splitCash = document.getElementById('split-cash');
         const splitUpi  = document.getElementById('split-upi');
@@ -1646,14 +1672,14 @@
           if (splitDue)  splitDue.value  = '';
         }
         isSplitPaymentActive = true;
-        if (allowOpen) {
-          openDrawer('split-drawer');
-        }
+        openDrawer('split-drawer');
         updateSplitChange();
       } else {
-        closeAllDrawers();
+        hideTenderPanels();
         isSplitPaymentActive = false;
       }
+      // silence unused (explicit open is default for inline)
+      void allowOpen;
     }
 
     function wirePaymentPanel(){
@@ -1668,22 +1694,22 @@
         });
       }
 
-      // Close drawer buttons
+      // Collapse tender panels (method stays selected — panel is optional chrome)
       const cashClose = document.getElementById('cash-drawer-close');
       cashClose?.addEventListener('click', () => {
-        closeAllDrawers();
+        hideTenderPanels();
       });
 
       const splitClose = document.getElementById('split-drawer-close');
       splitClose?.addEventListener('click', () => {
-        closeAllDrawers();
-        isSplitPaymentActive = false;
+        hideTenderPanels();
       });
 
-      // Backdrop click-outside close with animation (CSS handles it)
+      // Backdrop for floating drawers only (customer insights etc.)
       const backdrop = document.getElementById('cpay-drawer-backdrop');
       backdrop?.addEventListener('click', () => {
-        closeAllDrawers();
+        document.querySelectorAll('.cpay-side-drawer').forEach((d) => d.classList.remove('csd-open'));
+        if (backdrop) backdrop.style.display = 'none';
       });
 
       // Wire cash received input
@@ -1741,11 +1767,7 @@
         };
       });
 
-      // -- Initialise drag-to-reposition + resize for both drawers --
-      makeDrawerDraggable(document.getElementById('cash-drawer'));
-      makeDrawerDraggable(document.getElementById('split-drawer'));
-      makeDrawerResizable(document.getElementById('cash-drawer'));
-      makeDrawerResizable(document.getElementById('split-drawer'));
+      // Cash/split are inline cart panels — no drag/resize floating chrome
 
       refreshPaymentPanel();
     }

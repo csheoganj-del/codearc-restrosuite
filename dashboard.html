@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v89-20260711-cart';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v90-20260711-tender';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -343,78 +343,9 @@
 })();
 </script>
 
-<!-- ======= CASH CALCULATOR SIDE DRAWER (slides in from LEFT of cart) ======= -->
+<!-- Backdrop kept for rare floating drawers (customer insights); cash/split are inline in cart -->
 <div id="cpay-drawer-backdrop" style="display:none; position:fixed; inset:0; z-index:299;"></div>
 
-<div id="cash-drawer" class="cpay-side-drawer cpay-drawer-left">
-  <div class="csd-header">
-    <span class="csd-title"><i class="fa-solid fa-money-bill-wave" style="color:#25d366;"></i> Cash</span>
-    <button type="button" id="cash-drawer-close" class="csd-close">&times;</button>
-  </div>
-  <div class="csd-body">
-    <div class="csd-row">
-      <label class="csd-label">Received</label>
-      <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0">
-    </div>
-    <div class="csd-change-row">
-      <span class="csd-label">Change</span>
-      <strong id="inline-cash-change" class="csd-change-amt">₹0</strong>
-    </div>
-    <div class="csd-label" style="margin-top:10px; margin-bottom:4px; font-size:10px; text-transform:uppercase; letter-spacing:.05em;">Quick Amounts</div>
-    <div id="cash-denominations-grid" class="csd-den-grid">
-      <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact">Exact</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
-      <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">Clear</button>
-    </div>
-  </div>
-</div>
-
-<!-- ======= SPLIT PAYMENT SIDE DRAWER (slides in from RIGHT of cart) ======= -->
-<div id="split-drawer" class="cpay-side-drawer cpay-drawer-right">
-  <div class="csd-header">
-    <button type="button" id="split-drawer-close" class="csd-close">&times;</button>
-    <span class="csd-title"><i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0;"></i> Split</span>
-  </div>
-  <div class="csd-body">
-    <div id="split-calc-compact" style="display:contents;">
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(37,211,102,.12); color:#25d366;"><i class="fa-solid fa-money-bill-wave"></i></div>
-        <label class="csd-label">Cash</label>
-        <input type="number" id="split-cash" placeholder="0" class="form-input csd-input">
-      </div>
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(255,79,0,.1); color:var(--orange);"><i class="fa-solid fa-qrcode"></i></div>
-        <label class="csd-label">UPI</label>
-        <input type="number" id="split-upi" placeholder="0" class="form-input csd-input">
-      </div>
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(30,144,255,.1); color:#1e90ff;"><i class="fa-solid fa-credit-card"></i></div>
-        <label class="csd-label">Card</label>
-        <input type="number" id="split-card" placeholder="0" class="form-input csd-input">
-      </div>
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(255,69,58,.1); color:var(--red);"><i class="fa-solid fa-clock-rotate-left"></i></div>
-        <label class="csd-label">Due</label>
-        <input type="number" id="split-due" placeholder="0" class="form-input csd-input">
-      </div>
-    </div>
-    <div id="split-quick-fill" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px">
-      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Put remaining on Cash">Rest → Cash</button>
-      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Put remaining on UPI">Rest → UPI</button>
-      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Put remaining on Card">Rest → Card</button>
-      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Put remaining on Due">Rest → Due</button>
-      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half" title="50/50 Cash + UPI">½ Cash · ½ UPI</button>
-      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear all tenders">Clear</button>
-    </div>
-    <div class="csd-split-status">
-      <span id="split-status-text" class="csd-split-remaining">Remaining: —</span>
-      <strong id="split-total-text" class="csd-split-paid">Paid: —</strong>
-    </div>
-  </div>
-</div>
 <div class="app" id="app">
 
   <!-- ===================== SIDEBAR ===================== -->
@@ -626,10 +557,12 @@
                   </button>
                 </div>
                 <!-- Collapsed by default — walk-in is the common path -->
-                <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden style="display: none; flex-direction: column; gap: 8px; width: 100%; position: relative;">
-                  <input type="text" id="cust-input-name" placeholder="Search name or type guest…" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 40px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
-                  <input type="tel" id="cust-input-phone" placeholder="Phone (optional)" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 40px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
-                  <!-- Inline search results (stay inside cart — no floating over menu) -->
+                <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden>
+                  <div class="cart-cust-fields">
+                    <input type="text" id="cust-input-name" placeholder="Name / search…" class="form-input" autocomplete="off">
+                    <input type="tel" id="cust-input-phone" placeholder="Phone" class="form-input" autocomplete="tel">
+                  </div>
+                  <!-- Search results in overlay (does not push cart lines) -->
                   <div id="cust-search-popover" class="cust-search-popover" style="display:none" role="listbox" aria-label="Matching customers"></div>
                 </div>
                 <!-- Dues stay visible under chip even when form is collapsed -->
@@ -741,6 +674,68 @@
                     </button>
                   </div>
                 </div>
+
+                <!-- Inline tenders (no separate floating tabs) — same field IDs as before -->
+                <div class="cart-tender-host" id="cart-tender-host">
+                  <div id="cash-drawer" class="cart-tender-panel" hidden>
+                    <div class="cart-tender-head">
+                      <span><i class="fa-solid fa-money-bill-wave" style="color:#25d366"></i> Cash tender</span>
+                      <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Collapse">&times;</button>
+                    </div>
+                    <div class="cart-tender-cash-row">
+                      <label class="csd-label" for="inline-cash-received">Received</label>
+                      <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0" inputmode="decimal">
+                      <span class="csd-label">Change</span>
+                      <strong id="inline-cash-change" class="csd-change-amt">₹0</strong>
+                    </div>
+                    <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens">
+                      <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact">Exact</button>
+                      <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
+                      <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
+                      <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
+                      <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
+                      <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">Clear</button>
+                    </div>
+                  </div>
+
+                  <div id="split-drawer" class="cart-tender-panel" hidden>
+                    <div class="cart-tender-head">
+                      <span><i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0"></i> Split tender</span>
+                      <button type="button" id="split-drawer-close" class="cart-tender-close" title="Collapse">&times;</button>
+                    </div>
+                    <div id="split-calc-compact" class="cart-split-grid">
+                      <div class="csd-split-field">
+                        <label class="csd-label" for="split-cash">Cash</label>
+                        <input type="number" id="split-cash" placeholder="0" class="form-input csd-input" inputmode="decimal">
+                      </div>
+                      <div class="csd-split-field">
+                        <label class="csd-label" for="split-upi">UPI</label>
+                        <input type="number" id="split-upi" placeholder="0" class="form-input csd-input" inputmode="decimal">
+                      </div>
+                      <div class="csd-split-field">
+                        <label class="csd-label" for="split-card">Card</label>
+                        <input type="number" id="split-card" placeholder="0" class="form-input csd-input" inputmode="decimal">
+                      </div>
+                      <div class="csd-split-field">
+                        <label class="csd-label" for="split-due">Due</label>
+                        <input type="number" id="split-due" placeholder="0" class="form-input csd-input" inputmode="decimal">
+                      </div>
+                    </div>
+                    <div id="split-quick-fill" class="cart-split-quick">
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash">Rest→Cash</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi">Rest→UPI</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card">Rest→Card</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due">Rest→Due</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half">½·½</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear">Clear</button>
+                    </div>
+                    <div class="csd-split-status cart-split-status">
+                      <span id="split-status-text" class="csd-split-remaining">Remaining: —</span>
+                      <strong id="split-total-text" class="csd-split-paid">Paid: —</strong>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="cart-actions">
                   <div class="hold-kot-row">
                     <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order (uses current type). Right-click to view held orders.">
