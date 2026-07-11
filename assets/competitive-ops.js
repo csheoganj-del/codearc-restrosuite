@@ -1048,10 +1048,10 @@
           : '';
       bar.classList.remove('rs-shift-bar-closed');
       bar.classList.add('rs-shift-bar-open');
-      bar.innerHTML = `<div class="rs-shift-compact">
-        <span class="rs-shift-dot open"></span>
-        <span class="rs-shift-text"><b>Shift</b> ${esc(sum.bills)} bills · ${rs(sum.gross)}${esc(movHint)}</span>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Cash drawer"><i class="fa-solid fa-money-bill-wave"></i></button>
+      bar.innerHTML = `<div class="rs-shift-compact rs-shift-icons" title="Shift open · ${esc(sum.bills)} bills · ${esc(rs(sum.gross))}${esc(movHint)}">
+        <span class="rs-shift-dot open" title="Shift open"></span>
+        <span class="rs-shift-text"><b>${esc(sum.bills)}</b><span class="rs-shift-amt">${esc(rs(sum.gross))}</span></span>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Cash drawer movements"><i class="fa-solid fa-money-bill-wave"></i></button>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z" title="Z-report">Z</button>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close" title="Close shift"><i class="fa-solid fa-lock"></i></button>
       </div>`;
@@ -1067,10 +1067,10 @@
     } else {
       bar.classList.add('rs-shift-bar-closed');
       bar.classList.remove('rs-shift-bar-open');
-      bar.innerHTML = `<div class="rs-shift-compact closed">
+      bar.innerHTML = `<div class="rs-shift-compact closed rs-shift-icons" title="No shift open — tap unlock">
         <span class="rs-shift-dot closed"></span>
-        <span class="rs-shift-text">No shift open</span>
-        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open"><i class="fa-solid fa-unlock"></i> Open shift</button>
+        <span class="rs-shift-text sr-only">No shift</span>
+        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" title="Open shift"><i class="fa-solid fa-unlock"></i></button>
       </div>`;
       const op = bar.querySelector('#rs-shift-open');
       if (op)

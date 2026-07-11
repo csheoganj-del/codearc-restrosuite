@@ -1,5 +1,22 @@
 # RestroSuite release notes
 
+## v93 (2026-07-11) — Symbol chrome: cart items first
+
+Rethought every cart control for space vs necessity:
+
+| Element | Decision |
+|---------|----------|
+| Order type | **Icons only** (bag / utensils / bike) |
+| Shift | **Dot + icons** (unlock / cash / Z / lock) |
+| Customer | **User icon** + short Guest / name chip |
+| Cart lines | **Primary surface** (taller min height) |
+| Totals | Σ / % / tax icons + **large Total** |
+| Disc·Tip·Promo | Collapsed **Adjust** |
+| Pay methods | **Icons only** (Cash/UPI/Card/Due/Split) |
+| Cash / Split | **Popover above pay row** — does not permanently shrink the item list |
+| Hold / KOT | **Icons** (pause / fire) |
+| Checkout | Compact **Pay** CTA |
+
 ## v92 (2026-07-11) — Live browser UX fixes (cashier walkthrough)
 
 Verified in Chromium like a real cashier. Fixes from measurements:

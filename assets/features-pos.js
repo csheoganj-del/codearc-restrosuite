@@ -1684,7 +1684,7 @@
       if (densGrid) densGrid.hidden = true;
       if (densToggle) {
         densToggle.setAttribute('aria-expanded', 'false');
-        densToggle.textContent = '+notes';
+        densToggle.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
       }
       void allowOpen;
     }
@@ -1717,7 +1717,9 @@
           const open = densGrid.hidden;
           densGrid.hidden = !open;
           densToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-          densToggle.textContent = open ? '−notes' : '+notes';
+          densToggle.innerHTML = open
+            ? '<i class="fa-solid fa-minus"></i>'
+            : '<i class="fa-solid fa-ellipsis"></i>';
         });
       }
 

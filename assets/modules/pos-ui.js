@@ -77,7 +77,7 @@
         const phoneBit = phone ? maskPhoneForChip(phone) : '';
         label.textContent = (name || 'Guest') + (phoneBit ? ' · ' + phoneBit : '');
       } else {
-        label.textContent = open ? 'Details' : 'Customer';
+        label.textContent = open ? '…' : 'Guest';
       }
     }
     if (clearBtn) {
@@ -511,7 +511,11 @@ function openLineNoteEditor(id) {
 function renderCart(){
   const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
   const countEl = $('#cart-count');
-  if (countEl) countEl.textContent = count+(count===1?' item':' items');
+  // Symbol chrome: show count number only (title has "items")
+  if (countEl) {
+    countEl.textContent = String(count);
+    countEl.parentElement && countEl.parentElement.setAttribute('title', count + (count === 1 ? ' item' : ' items'));
+  }
   try { syncTablePaxForOrderType(); } catch (_) {}
 
   const totals = getTotals();
