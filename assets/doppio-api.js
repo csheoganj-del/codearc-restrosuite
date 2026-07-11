@@ -389,8 +389,8 @@
       const r = await post('tenant-data', payload, token || 'local-dev-gateway', 'Data request failed');
       return r.data;
     },
-    select(table, { columns='*', filters=[], order=null, limit=null, single=false, maybeSingle=false }={}){
-      return api.data({ table, operation:'select', columns, filters, order, limit, single, maybeSingle });
+    select(table, { columns='*', filters=[], order=null, limit=null, offset=null, single=false, maybeSingle=false }={}){
+      return api.data({ table, operation:'select', columns, filters, order, limit, offset, single, maybeSingle });
     },
     insert(table, data, { returning=true, columns='*' }={}){ return api.data({ table, operation:'insert', data, returning, columns }); },
     update(table, data, filters, { returning=true, columns='*' }={}){ return api.data({ table, operation:'update', data, filters, returning, columns }); },

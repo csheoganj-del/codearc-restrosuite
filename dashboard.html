@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v48-20260711-wave2-server-seq';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v49-20260711-wave2-complete';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -1567,29 +1567,81 @@
   })();
 </script>
 <script>
-  // Load versioned feature scripts in order without document.write.
-  // document.write blocks the HTML parser; this approach does not.
+  // Wave 2: critical path first (POS-ready), lazy-load secondary modules per tab.
   (function() {
-    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v39-20260709-pill-icon');
-    var srcs = [
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v49');
+    var parent = document.currentScript.parentNode;
+    var loaded = {};
+    var loading = {};
+
+    function loadScript(src) {
+      if (loaded[src]) return Promise.resolve();
+      if (loading[src]) return loading[src];
+      loading[src] = new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ver;
+        s.async = true;
+        s.onload = function() { loaded[src] = true; resolve(); };
+        s.onerror = function() { reject(new Error('Failed to load ' + src)); };
+        parent.appendChild(s);
+      });
+      return loading[src];
+    }
+
+    function loadSeq(srcs) {
+      return srcs.reduce(function(p, src) {
+        return p.then(function() { return loadScript(src); });
+      }, Promise.resolve());
+    }
+
+    // Critical: POS + shell so cashier can bill immediately
+    var critical = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
       'assets/receipt.js',
       'assets/features-pos.js',
-      'assets/features-editor.js',
-      'assets/features-manage.js',
-      'assets/features-growth.js',
-      'assets/features-extra.js',
-      'src/dashboard/onboarding.js',
       'assets/features-shell.js'
     ];
-    // Load sequentially (async=false on a runtime-created script preserves order
-    // only for same-origin scripts — here they are all same-origin).
-    srcs.forEach(function(src) {
-      var s = document.createElement('script');
-      s.src = src + '?v=' + ver;
-      s.async = false;
-      document.currentScript.parentNode.appendChild(s);
+
+    // Secondary modules — loaded on first tab that needs them (or idle preload)
+    var TAB_MODULES = {
+      'editor-tab': ['assets/features-editor.js'],
+      'inventory-tab': ['assets/features-manage.js'],
+      'employees-tab': ['assets/features-manage.js'],
+      'aggregator-tab': ['assets/features-growth.js'],
+      'floor-tab': ['assets/features-growth.js'],
+      'customers-tab': ['assets/features-growth.js'],
+      'growth-hub-tab': ['assets/features-growth.js'],
+      'analytics-tab': ['assets/features-extra.js'],
+      'tax-tab': ['assets/features-extra.js'],
+      'reports-tab': ['assets/features-extra.js'],
+      'tokens-tab': ['assets/features-extra.js']
+    };
+
+    window.RS_ensureTabModules = function(tabId) {
+      var mods = TAB_MODULES[tabId] || [];
+      if (!mods.length) return Promise.resolve();
+      return loadSeq(mods);
+    };
+
+    loadSeq(critical).then(function() {
+      // Idle preload of secondary modules so first open is still fast
+      function preloadRest() {
+        var rest = [
+          'assets/features-editor.js',
+          'assets/features-manage.js',
+          'assets/features-growth.js',
+          'assets/features-extra.js',
+          'src/dashboard/onboarding.js'
+        ];
+        rest.forEach(function(src, i) {
+          setTimeout(function() { loadScript(src).catch(function(){}); }, 800 + i * 400);
+        });
+      }
+      if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 5000 });
+      else setTimeout(preloadRest, 2500);
+    }).catch(function(e) {
+      console.error('[boot] critical scripts failed', e);
     });
   })();
 </script>

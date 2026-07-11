@@ -34,6 +34,7 @@
 </script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
+<script src="assets/saas-core.js"></script>
 <script src="assets/country-currency-data.js"></script>
 <style>
   body { min-height: 100vh; display: flex; flex-direction: column; }
@@ -1084,11 +1085,56 @@
     if (tenantInput && !tenantInput.value && s.tenant_slug) tenantInput.value = s.tenant_slug;
     if (userInput && !userInput.value && s.username) userInput.value = s.username;
   }
+  async function offlinePinGate() {
+    // Wave 2: require admin PIN when configured before resuming offline session
+    try {
+      let pinHash = '';
+      try { pinHash = localStorage.getItem('rs:admin_pin_hash') || ''; } catch (_) {}
+      try {
+        const raw = localStorage.getItem('rs:settings') || localStorage.getItem('rs_settings') || '';
+        if (!pinHash && raw) {
+          const parsed = JSON.parse(raw);
+          pinHash = parsed.admin_pin_hash || (parsed.set && parsed.set.admin_pin_hash) || '';
+        }
+      } catch (_) {}
+      // Also check tenant-prefixed settings keys
+      if (!pinHash) {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i) || '';
+            if (!/settings|rs_v2:settings/i.test(k)) continue;
+            const parsed = JSON.parse(localStorage.getItem(k) || '{}');
+            if (parsed && parsed.admin_pin_hash) { pinHash = parsed.admin_pin_hash; break; }
+            if (parsed && parsed.set_admin_pin_hash) { pinHash = parsed.set_admin_pin_hash; break; }
+          }
+        } catch (_) {}
+      }
+      if (!pinHash) return true; // no PIN configured — allow resume (legacy devices)
+      window.RS_SETTINGS = Object.assign({}, window.RS_SETTINGS || {}, { admin_pin_hash: pinHash });
+      if (!window.RSPinModal) {
+        // Minimal inline PIN prompt if saas-core not on login page
+        const pin = window.prompt('Enter admin PIN to continue offline:');
+        if (!pin || !/^\d{4}$/.test(pin)) return false;
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+        const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return hex === pinHash;
+      }
+      return await RSPinModal.request('Offline access — enter admin PIN');
+    } catch (e) {
+      console.warn('offline pin gate', e);
+      return true;
+    }
+  }
   if (continueOfflineBtn) {
-    continueOfflineBtn.onclick = () => {
+    continueOfflineBtn.onclick = async () => {
       const s = savedClientSession();
       if (!s) {
         showErr('No saved workspace session found on this device. Sign in online once before using offline access.');
+        return;
+      }
+      const ok = await offlinePinGate();
+      if (!ok) {
+        showErr('PIN required to open the saved workspace offline.');
         return;
       }
       showOk(navigator.onLine ? 'Opening your dashboard...' : 'Opening offline dashboard...');
@@ -1116,6 +1162,12 @@
     if(!navigator.onLine){
       const saved = savedClientSession();
       if(saved){
+        const ok = await offlinePinGate();
+        if (!ok) {
+          showErr('PIN required to open the saved workspace offline.');
+          loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
+          return;
+        }
         showOk('Offline mode - opening your saved dashboard...');
         setTimeout(()=>location.href='dashboard',350);
       } else {

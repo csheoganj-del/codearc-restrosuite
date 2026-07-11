@@ -19,6 +19,11 @@
     function normalizeReceiptProfile(settings){
       currentSettings = settings || {};
       window.RS_SETTINGS = currentSettings; // Update global reference
+      try {
+        if (currentSettings && currentSettings.admin_pin_hash) {
+          localStorage.setItem('rs:admin_pin_hash', String(currentSettings.admin_pin_hash));
+        }
+      } catch (_) {}
       const raw = (settings && settings._raw) || {};
       return {
         name: settings?.set_restaurant_name || settings?.set_outlet_name || raw.business_name || raw.outlet_name || sessionOutletName(),

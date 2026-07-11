@@ -225,7 +225,7 @@
     }
   }
 
-  function activateTab(id){
+  async function activateTab(id){
     const sess = window.RS_API ? RS_API.session() : null;
     const isSuper = sess && sess.role === 'superadmin';
     const isBrandAdmin = sess && sess.role === 'brand_admin';
@@ -255,6 +255,13 @@
         if (roleInfo.staffRole === 'manager') permitted.push('settings-tab');
         if (!permitted.includes(id)) id = permitted[0];
       }
+    }
+
+    // Wave 2: ensure lazy feature modules for this tab are loaded first
+    try {
+      if (window.RS_ensureTabModules) await window.RS_ensureTabModules(id);
+    } catch (e) {
+      console.warn('[activateTab] module load failed', e);
     }
 
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
@@ -2914,12 +2921,27 @@
   /* ============================================================
      REPORTS
      ============================================================ */
-  const renderReports = (period) => {
+  const renderReports = async (period) => {
     period = period || 'Last 30 days';
     const days = period==='Today'?1:period==='This week'?7:period==='This month'?30:period==='Last 90 days'?90:30;
     const now = Date.now();
     const cutoff = now - days * 86400000;
     const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+
+    // Wave 2: prefer server aggregate (full history, not capped client list)
+    let serverSummary = null;
+    try {
+      if (window.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
+        const res = await Promise.race([
+          RS_API.data({ operation: 'sales_summary', days }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+        ]);
+        const payload = res && res.ok != null ? res : (res && res.data) || res;
+        if (payload && payload.ok) serverSummary = payload;
+      }
+    } catch (e) {
+      console.warn('[Reports] sales_summary unavailable, using local bills', e && e.message);
+    }
 
     const paidBills = BILLS.filter(b => {
       if (b.status !== 'paid') return false;
@@ -2927,9 +2949,14 @@
       return t >= cutoff;
     });
 
-    const totalRevenue = paidBills.reduce((sum,b)=>sum+(b.amount||b.total||0),0);
-    const totalOrders = paidBills.length;
-    const aov = totalOrders>0 ? Math.round(totalRevenue/totalOrders) : 0;
+    let totalRevenue = paidBills.reduce((sum,b)=>sum+(b.amount||b.total||0),0);
+    let totalOrders = paidBills.length;
+    let aov = totalOrders>0 ? Math.round(totalRevenue/totalOrders) : 0;
+    if (serverSummary) {
+      totalRevenue = Number(serverSummary.revenue) || 0;
+      totalOrders = Number(serverSummary.orders) || 0;
+      aov = Number(serverSummary.aov) || (totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0);
+    }
 
     // Tax: use stored fields when available, else estimate by tax category
     let gst5=0, gst12=0, gst18=0, gst28=0;
@@ -2949,8 +2976,12 @@
         if (!b.cgst && !b.sgst) gst5 += Math.round((b.amount||0)/1.05*0.05);
       }
     });
-    const totalGST = gst5+gst12+gst18+gst28;
-    const netSales = totalRevenue - totalGST;
+    let totalGST = gst5+gst12+gst18+gst28;
+    let netSales = totalRevenue - totalGST;
+    if (serverSummary) {
+      totalGST = Number(serverSummary.gst) || totalGST;
+      netSales = serverSummary.net_sales != null ? Number(serverSummary.net_sales) : (totalRevenue - totalGST);
+    }
 
     // Daily revenue (days slots, oldest->newest)
     const dailySlots = Array(days).fill(0);
@@ -2959,23 +2990,37 @@
       const d = new Date(now - i*86400000);
       dailyLabels.push(days<=7 ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] : (d.getDate()+'/'+((d.getMonth()+1))));
     }
-    paidBills.forEach(b => {
-      const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
-      const age = Math.floor((now-t)/86400000);
-      if (age>=0 && age<days) dailySlots[days-1-age] += (b.amount||b.total||0);
-    });
+    if (serverSummary && Array.isArray(serverSummary.daily) && serverSummary.daily.length) {
+      serverSummary.daily.forEach(row => {
+        const t = row.day ? new Date(row.day).getTime() : 0;
+        const age = Math.floor((now - t) / 86400000);
+        if (age >= 0 && age < days) dailySlots[days - 1 - age] += Number(row.revenue || 0);
+      });
+    } else {
+      paidBills.forEach(b => {
+        const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+        const age = Math.floor((now-t)/86400000);
+        if (age>=0 && age<days) dailySlots[days-1-age] += (b.amount||b.total||0);
+      });
+    }
     const maxSlot = Math.max(...dailySlots,1);
     const hasDailyData = dailySlots.some(v=>v>0);
 
     // Payment mix
     const payMap = {};
-    paidBills.forEach(b => {
-      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
-        b.tenders.forEach(t => { const m=t.method||'Cash'; payMap[m]=(payMap[m]||0)+Number(t.amount||0); });
-      } else {
-        const m=b.pay||b.paymentMethod||'Cash'; payMap[m]=(payMap[m]||0)+(b.amount||0);
-      }
-    });
+    if (serverSummary && serverSummary.payment_mix && typeof serverSummary.payment_mix === 'object') {
+      Object.entries(serverSummary.payment_mix).forEach(([m, val]) => {
+        payMap[m] = Number(val) || 0;
+      });
+    } else {
+      paidBills.forEach(b => {
+        if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
+          b.tenders.forEach(t => { const m=t.method||'Cash'; payMap[m]=(payMap[m]||0)+Number(t.amount||0); });
+        } else {
+          const m=b.pay||b.paymentMethod||'Cash'; payMap[m]=(payMap[m]||0)+(b.amount||0);
+        }
+      });
+    }
     const payTotal = Object.values(payMap).reduce((a,v)=>a+v,0)||1;
     const payColors = {Cash:'var(--green)',UPI:'var(--violet)',Card:'var(--orange)',Due:'var(--red)',Stripe:'var(--blue-soft)',Online:'var(--violet-soft)'};
     const payEntries = Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
@@ -3028,7 +3073,7 @@
 
     tab.innerHTML = `
       <div class="toolbar-row" style="margin-bottom:4px">
-        <span class="eyebrow">${period}</span>
+        <span class="eyebrow">${period}${serverSummary ? ' · <span style="color:var(--green);font-weight:700">server totals</span>' : ' · local bills'}</span>
         <div class="grow"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${['Today','This week','This month','Last 30 days','Last 90 days'].map(p=>

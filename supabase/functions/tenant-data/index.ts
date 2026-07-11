@@ -144,8 +144,10 @@ const TABLE_WRITE_ROLES: Record<string, string[]> = {
   doppio_table_sessions: ["cashier", "waiter", "captain"],
 };
 
-const ZERO_COST_DEFAULT_LIMIT = 250;
-const ZERO_COST_MAX_LIMIT = 500;
+// Wave 2: raise caps so multi-month outlets don't silently truncate bills/CRM.
+// Still capped to protect free-tier egress; use sales_summary for full aggregates.
+const ZERO_COST_DEFAULT_LIMIT = 500;
+const ZERO_COST_MAX_LIMIT = 2000;
 
 const PLAN_ENTITLEMENTS: Record<string, { allowedTabs: string[] }> = {
   starter: {
@@ -523,6 +525,20 @@ serve(async (req) => {
       return await proxyGatewayRequest("/send", "POST", req, { phone, message, caption, orderId, pdfData, filename }, verified.tenantId);
     }
 
+    // Wave 2: server-side sales aggregates (reports without loading every bill)
+    if (operation === "sales_summary") {
+      const days = Math.max(1, Math.min(365, Number(payload.days) || 30));
+      const { data, error } = await supabaseAdmin.rpc("rs_sales_summary", {
+        p_tenant_id: verified.tenantId,
+        p_days: days,
+      });
+      if (error) {
+        console.error("sales_summary rpc failed:", error);
+        return jsonResponse({ error: error.message || "Could not load sales summary." }, 500, req);
+      }
+      return jsonResponse({ data }, 200, req);
+    }
+
     // Wave 2: multi-device bill sequence (atomic counter in Postgres)
     if (operation === "next_bill_no") {
       const day = payload.day != null ? String(payload.day) : null;
@@ -627,10 +643,19 @@ serve(async (req) => {
         query = query.order(String(order.column || "id"), { ascending: order.ascending !== false });
       }
       const requestedLimit = payload.limit !== null && payload.limit !== undefined ? Number(payload.limit) : NaN;
+      // Bills/customers get a higher default so POS + reports stay accurate longer
+      const tableDefault = (table === "doppio_bills" || table === "doppio_crm")
+        ? Math.min(1000, ZERO_COST_MAX_LIMIT)
+        : ZERO_COST_DEFAULT_LIMIT;
       const safeLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
         ? Math.min(requestedLimit, ZERO_COST_MAX_LIMIT)
-        : ZERO_COST_DEFAULT_LIMIT;
-      query = query.limit(safeLimit);
+        : tableDefault;
+      const offset = payload.offset !== null && payload.offset !== undefined ? Number(payload.offset) : 0;
+      if (Number.isFinite(offset) && offset > 0) {
+        query = query.range(offset, offset + safeLimit - 1);
+      } else {
+        query = query.limit(safeLimit);
+      }
       if (payload.single === true) query = query.single();
       if (payload.maybeSingle === true) query = query.maybeSingle();
     } else if (operation === "insert") {
