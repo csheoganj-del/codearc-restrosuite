@@ -1,6 +1,6 @@
 # RestroSuite — 15-minute demo script
 
-Use outlet **`bbb`** (or a seeded demo tenant). Hard-refresh after deploys (`v62+`).
+Use outlet **`bbb`** (or a seeded demo tenant). Hard-refresh after deploys (`v67+`).
 
 ## Goal
 
@@ -52,10 +52,12 @@ Show: **login → sell → print/WhatsApp → bills → shift Z-report → inven
 
 ---
 
-### 8:00 — Kitchen / QR (optional 2 min)
+### 8:00 — Floor / Kitchen / QR (optional 2 min)
 
-1. **QR Orders** or **KDS** if demo data has pending tickets  
-2. Or skip if empty — mention QR table ordering + KDS
+1. **Floor & Tables** — free / dining / QR pending / held colors  
+2. Tap occupied table → **Checkout** loads cart on POS (or **Transfer** to a free table)  
+3. **QR Orders** / **KDS** if tickets are live; toast chimes on new QR orders  
+4. On **Bill settled**: **Thermal** one-tap (or enable Auto-print receipt in Settings)
 
 ---
 
@@ -100,7 +102,7 @@ Show: **login → sell → print/WhatsApp → bills → shift Z-report → inven
 
 | Issue | Fix |
 |--------|-----|
-| Stale UI | Hard refresh / `?appv=v61-…` |
+| Stale UI | Hard refresh / `?appv=v67-…` |
 | No menu | Load demo data (super-admin) or wait for cloud hydrate |
 | WA PDF fails | Check Gateway monitor; text fallback still works |
 | Auth errors | Confirm slug/user/pass; rate limit wait |

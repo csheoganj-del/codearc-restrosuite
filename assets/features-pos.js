@@ -1820,7 +1820,13 @@
         resetPayment();
         showReceipt(bill);
         document.dispatchEvent(new CustomEvent('rs:bill-paid', {
-          detail: { total: bill.grand || bill.amount || '', no: bill.no, syncStatus, idempotencyKey: identity.idempotencyKey }
+          detail: {
+            total: bill.grand || bill.amount || '',
+            no: bill.no,
+            bill,
+            syncStatus,
+            idempotencyKey: identity.idempotencyKey,
+          },
         }));
 
         // 3) Background: inventory, CRM, drafts, auto-WhatsApp (non-blocking)

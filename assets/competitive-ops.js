@@ -1117,8 +1117,24 @@
       installFloorOrderAlerts();
       refreshOpsUi();
     });
-    document.addEventListener('rs:bill-paid', () => {
+    document.addEventListener('rs:bill-paid', (ev) => {
       setTimeout(refreshOpsUi, 200);
+      // Wire Settings → Auto-print receipt → thermal/ESC-POS after payment
+      try {
+        const s = global.RS_SETTINGS || {};
+        const auto =
+          s.set_auto_print_receipt === true ||
+          s.set_auto_print_receipt === 'true' ||
+          s.set_auto_print_receipt === 1;
+        if (!auto) return;
+        const bill = ev && ev.detail && ev.detail.bill;
+        if (!bill) return;
+        setTimeout(() => {
+          if (global.RSOps && typeof RSOps.printBillThermal === 'function') {
+            RSOps.printBillThermal(bill).catch(() => {});
+          }
+        }, 450);
+      } catch (_) {}
     });
     window.addEventListener('rs:sync-queue-changed', () => {
       setTimeout(refreshOpsUi, 100);
