@@ -331,6 +331,113 @@ function stopSaaSGatewayPolling() {
   }
 }
 
+function parseReportId(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function notifyIncident(msg, icon) {
+  try {
+    toast(msg, icon);
+  } catch (_) {}
+  // Always log so failures are visible in DevTools if toast is missing
+  if (icon && String(icon).includes('exclamation')) console.warn('[Incidents]', msg);
+  else console.info('[Incidents]', msg);
+}
+
+async function resolveIncidentById(reportId, button) {
+  const id = parseReportId(reportId);
+  if (!id) {
+    notifyIncident('Missing incident id — refresh the page and try again.', 'fa-circle-exclamation');
+    return false;
+  }
+  const api = global.RS_API;
+  if (!api || typeof api.admin !== 'function') {
+    notifyIncident('Admin API not ready. Re-login as super-admin.', 'fa-circle-exclamation');
+    return false;
+  }
+  const label = button ? button.textContent : '';
+  if (button) {
+    button.disabled = true;
+    button.textContent = '…';
+  }
+  try {
+    const out = await api.admin({ action: 'resolve_error_report', report_id: id });
+    if (out && out.error) throw new Error(out.error);
+    notifyIncident('Incident marked resolved.');
+    return true;
+  } catch (error) {
+    const msg = (error && error.message) || 'Could not resolve incident.';
+    notifyIncident(msg, 'fa-circle-exclamation');
+    // Surface hard failures so a missing toast still informs the user
+    if (/session expired|not ready|Valid report|Failed to resolve|401|403/i.test(msg)) {
+      try { alert('Resolve failed: ' + msg); } catch (_) {}
+    }
+    if (button) {
+      button.disabled = false;
+      button.textContent = label || 'Resolve';
+    }
+    return false;
+  }
+}
+
+function bindIncidentResolveButtons(list) {
+  if (!list) return;
+  list.querySelectorAll('.app-incident-resolve-btn').forEach((btn) => {
+    if (btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-report-id');
+      const ok = await resolveIncidentById(id, btn);
+      if (ok) await loadAppIncidents();
+    });
+  });
+}
+
+async function resolveAllOpenIncidents() {
+  const api = global.RS_API;
+  if (!api || typeof api.admin !== 'function') {
+    notifyIncident('Admin API not ready. Re-login as super-admin.', 'fa-circle-exclamation');
+    return;
+  }
+  const btn = document.getElementById('btn-resolve-all-incidents');
+  try {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+    const result = await api.admin({ action: 'list_error_reports', status: 'open', limit: 100 });
+    const reports = Array.isArray(result.reports) ? result.reports : [];
+    if (!reports.length) {
+      notifyIncident('No open incidents to clear.');
+      await loadAppIncidents();
+      return;
+    }
+    if (!confirm('Mark all ' + reports.length + ' open incident(s) as resolved?\n\nThis only clears your inbox — it does not change tenant data.')) {
+      return;
+    }
+    let ok = 0;
+    let fail = 0;
+    for (const r of reports) {
+      const id = parseReportId(r.id);
+      if (!id) { fail++; continue; }
+      try {
+        const out = await api.admin({ action: 'resolve_error_report', report_id: id });
+        if (out && out.error) throw new Error(out.error);
+        ok++;
+      } catch (_) { fail++; }
+    }
+    notifyIncident(fail ? ('Resolved ' + ok + ', failed ' + fail + '.') : ('Resolved ' + ok + ' incident(s).'));
+    await loadAppIncidents();
+  } catch (error) {
+    notifyIncident((error && error.message) || 'Could not clear incidents.', 'fa-circle-exclamation');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Resolve all';
+    }
+  }
+}
+
 async function loadAppIncidents() {
   const list = document.getElementById('app-incidents-list');
   const filter = document.getElementById('app-incidents-status-filter');
@@ -344,6 +451,7 @@ async function loadAppIncidents() {
     }
     const status = filter ? filter.value : 'open';
     const result = await RS_API.admin({ action: 'list_error_reports', status: status === 'all' ? null : status });
+    if (result && result.error) throw new Error(result.error);
     const reports = Array.isArray(result.reports) ? result.reports : [];
     if (!reports.length) {
       list.innerHTML = renderIncidentEmpty('No incidents found', 'This status queue is currently clear.');
@@ -363,11 +471,14 @@ async function loadAppIncidents() {
       const stack = rawStack
         ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px;color:var(--text-mute)">Technical details</summary><code style="display:block;margin-top:6px;font-size:10px;white-space:pre-wrap;max-height:120px;overflow:auto">${escHtml(String(rawStack).slice(0, 1200))}</code></details>`
         : '';
-      const resolveButton = statusLabel === 'open'
-        ? `<button type="button" class="staff-secondary-btn app-incident-resolve-btn" data-report-id="${escHtml(report.id)}" title="Mark as reviewed / fixed (does not undo the original crash)">Resolve</button>`
-        : '';
+      const rid = parseReportId(report.id);
+      const resolveButton = statusLabel === 'open' && rid
+        ? `<button type="button" class="app-incident-resolve-btn" data-report-id="${rid}" title="Mark as reviewed (does not fix the original crash)">Resolve</button>`
+        : (statusLabel === 'open'
+          ? `<span style="font-size:11px;color:var(--red)">No id</span>`
+          : '');
       return `
-        <article class="app-incident-card" title="Client-side error report stored in app_error_reports">
+        <article class="app-incident-card" data-report-id="${rid || ''}" title="Client-side error report stored in app_error_reports">
           <div style="flex: 1; min-width: 0;">
             <strong>${escHtml(msg)}</strong>
             <span>${escHtml(metaLine)}</span>
@@ -385,6 +496,7 @@ async function loadAppIncidents() {
         </article>
       `;
     }).join('');
+    bindIncidentResolveButtons(list);
   } catch (error) {
     list.innerHTML = renderIncidentEmpty('Incidents unavailable', error.message || 'Try refreshing this panel.', 'fa-triangle-exclamation');
   }
@@ -447,30 +559,29 @@ function renderGateway() {
     refreshIncidentsBtn.addEventListener('click', loadAppIncidents);
   }
 
+  const resolveAllBtn = document.getElementById('btn-resolve-all-incidents');
+  if (resolveAllBtn && !resolveAllBtn.dataset.listenerBound) {
+    resolveAllBtn.dataset.listenerBound = 'true';
+    resolveAllBtn.addEventListener('click', resolveAllOpenIncidents);
+  }
+
   const incidentFilter = document.getElementById('app-incidents-status-filter');
   if (incidentFilter && !incidentFilter.dataset.listenerBound) {
     incidentFilter.dataset.listenerBound = 'true';
     incidentFilter.addEventListener('change', loadAppIncidents);
   }
 
+  // Delegation fallback + direct binds after each render
   const incidentsList = document.getElementById('app-incidents-list');
   if (incidentsList && !incidentsList.dataset.listenerBound) {
     incidentsList.dataset.listenerBound = 'true';
     incidentsList.addEventListener('click', async (event) => {
       const target = event.target;
       const button = target && typeof target.closest === 'function' ? target.closest('.app-incident-resolve-btn') : null;
-      if (!button) return;
-      button.disabled = true;
-      try {
-        const api = global.RS_API;
-        if (!api || typeof api.admin !== 'function') throw new Error('Admin API not ready');
-        await api.admin({ action: 'resolve_error_report', report_id: Number(button.dataset.reportId) });
-        toast('Application incident resolved.');
-        await loadAppIncidents();
-      } catch (error) {
-        toast(error.message || 'Could not resolve incident.', 'fa-circle-exclamation');
-        button.disabled = false;
-      }
+      if (!button || button.dataset.bound === '1') return; // direct bind already handles
+      event.preventDefault();
+      const ok = await resolveIncidentById(button.getAttribute('data-report-id'), button);
+      if (ok) await loadAppIncidents();
     });
   }
 
@@ -484,7 +595,11 @@ function renderGateway() {
     startSaaSGatewayPolling,
     stopSaaSGatewayPolling,
     loadAppIncidents,
+    resolveAllOpenIncidents,
+    resolveIncidentById,
   };
   global.startSaaSGatewayPolling = startSaaSGatewayPolling;
   global.stopSaaSGatewayPolling = stopSaaSGatewayPolling;
+  global.RSResolveIncident = resolveIncidentById;
+  global.RSResolveAllIncidents = resolveAllOpenIncidents;
 })(typeof window !== 'undefined' ? window : globalThis);

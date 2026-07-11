@@ -1089,13 +1089,14 @@
             <div class="panel panel-pad" style="margin-bottom: 0; flex: 1; display: flex; flex-direction: column;">
               <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--stroke); padding-bottom: 8px; margin-bottom: 8px;">
                 <h3 style="font-size: 14px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-bug" style="color:var(--orange)"></i> Incidents</h3>
-                <div style="display: flex; gap: 6px; align-items: center;">
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                   <select id="app-incidents-status-filter" style="padding: 3px 6px; border-radius: 6px; border: 1px solid var(--stroke); background: var(--panel); color: var(--text); font-size: 11px;" title="Filter by review status">
                     <option value="open">Open</option>
                     <option value="resolved">Resolved</option>
                     <option value="all">All</option>
                   </select>
-                  <button id="btn-refresh-app-incidents" class="btn btn-ghost btn-sm" title="Refresh incidents" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
+                  <button type="button" id="btn-resolve-all-incidents" class="btn btn-ghost btn-sm" title="Mark all open incidents as resolved" style="padding: 4px 8px; font-size: 11px; color: #16a34a; border-color: rgba(34,197,94,0.35);"><i class="fa-solid fa-check-double"></i> Resolve all</button>
+                  <button type="button" id="btn-refresh-app-incidents" class="btn btn-ghost btn-sm" title="Refresh incidents" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
                 </div>
               </div>
               <p style="font-size:11.5px;color:var(--text-mute);margin:0 0 12px;line-height:1.45">
