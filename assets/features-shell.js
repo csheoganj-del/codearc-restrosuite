@@ -240,7 +240,7 @@
             ${field('Demo promo pct','10','Percent off for demo code')}
           </div>
           <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Looks up active <code>offers</code> by code first; falls back to the demo code. Optional phone-locked offers check cart guest phone.</p>
-        </div>`
+        </div>`,
       printer:`<div class="set-section form-grid-2">${field('Receipt printer','EPSON TM-T82 (USB)')}${sel('Paper size',['58 mm','80 mm'],'80 mm')}</div>
         ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer)',false)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}

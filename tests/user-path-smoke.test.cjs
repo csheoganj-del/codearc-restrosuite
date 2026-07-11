@@ -11,11 +11,19 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-test('v81 asset version and SW cache present', () => {
+test('v82 asset version and SW cache present', () => {
   const html = read('dashboard.html');
   const sw = read('service-worker.js');
-  assert.match(html, /v81-20260711-ux-cx/);
+  assert.match(html, /v82-20260711-super-admin/);
   assert.match(sw, /restrosuite-shell-v20260711/);
+});
+
+test('super-admin defines avatar colors locally (no bare avatarColors)', () => {
+  const sa = read('assets/modules/super-admin.js');
+  assert.match(sa, /function getAvatarColors/);
+  assert.match(sa, /const avatarColors = getAvatarColors/);
+  // Must not reference undeclared free variable from old dashboard closure
+  assert.doesNotMatch(sa, /\$\{avatarColors\[name\.length%avatarColors\.length\]\}/);
 });
 
 test('cashier path: tip promo covers notes cash drawer', () => {
@@ -93,4 +101,13 @@ test('role-first home for staff', () => {
   assert.match(dash, /ROLE_HOME_TAB/);
   assert.match(dash, /waiter:\s*['"]floor-tab['"]/);
   assert.match(dash, /kitchen:\s*['"]kds-tab['"]/);
+});
+
+test('cloud map packs bill ops + shift cash + offer discount without new tables', () => {
+  const db = read('assets/db.js');
+  assert.match(db, /taxProfile\._ops|_ops/);
+  assert.match(db, /cashMovements/);
+  assert.match(db, /discount_type|discount_value/);
+  // waste_log intentionally not in MAP (local device only)
+  assert.doesNotMatch(db, /waste_log:\s*\{/);
 });

@@ -18,6 +18,20 @@ function read(relativePath) {
       "assets/features-extra.js",
       "assets/features-pos.js",
       "assets/features-growth.js",
+      "assets/modules/bill-identity.js",
+      "assets/modules/inventory-ledger.js",
+      "assets/modules/bills-history.js",
+      "assets/modules/inventory-ui.js",
+      "assets/modules/reports-ui.js",
+      "assets/modules/gateway-monitor.js",
+      "assets/modules/super-admin.js",
+      "assets/modules/kds-ui.js",
+      "assets/modules/qr-orders-ui.js",
+      "assets/modules/employees-ui.js",
+      "assets/modules/tax-helpers.js",
+      "assets/modules/pos-ui.js",
+      "assets/modules/growth-hub-shell.js",
+      "assets/modules/demo-script.js",
       "assets/dashboard.js"
     ];
     return files.map(f => fs.readFileSync(path.join(root, f), "utf8")).join("\n");
@@ -532,7 +546,7 @@ test("credential recovery uses expiring one-time tokens and separates privileged
 test("live simulation regressions keep sessions, menu saves, QR sync, and QR billing safe", () => {
   const api = read("assets/doppio-api.js");
   const db = read("assets/db.js");
-  const dashboard = read("assets/dashboard.js");
+  const dashboard = read("dashboard.js");
   const pos = read("assets/features-pos.js");
   const login = read("login.html");
   const tenantPublic = read("supabase/functions/tenant-public/index.ts");

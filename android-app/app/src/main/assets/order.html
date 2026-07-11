@@ -310,6 +310,87 @@
     }
     .mode-banner i { color: var(--brand); }
 
+    /* Diet / filter chips */
+    .filter-row { display:flex; gap:8px; overflow-x:auto; padding: 0 0 8px; scrollbar-width:none; }
+    .filter-row::-webkit-scrollbar { display:none; }
+    .fchip {
+      flex-shrink:0; min-height:36px; padding:6px 14px; border-radius:999px; border:1px solid var(--border);
+      background:var(--surface); font-size:12.5px; font-weight:700; color:var(--text2); cursor:pointer;
+      display:inline-flex; align-items:center; gap:6px; font-family:inherit;
+    }
+    .fchip.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+    .fchip .vegdot { width:10px; height:10px; border-radius:2px; border:1.5px solid #1F8A5B; display:inline-block; position:relative; }
+    .fchip .vegdot::after { content:''; position:absolute; inset:2px; background:#1F8A5B; border-radius:50%; }
+    .fchip .nvdot { width:10px; height:10px; border-radius:2px; border:1.5px solid #C43C2E; display:inline-block; position:relative; }
+    .fchip .nvdot::after { content:''; position:absolute; inset:2px; background:#C43C2E; border-radius:50%; }
+
+    .card.sold-out { opacity:.55; pointer-events:none; position:relative; }
+    .card.sold-out::after {
+      content:'Sold out'; position:absolute; top:10px; right:10px; background:#111827; color:#fff;
+      font-size:10px; font-weight:800; padding:3px 8px; border-radius:6px; letter-spacing:.03em; text-transform:uppercase;
+    }
+    .diet-mark {
+      width:12px; height:12px; border-radius:2px; border:1.5px solid; display:inline-block; margin-right:5px; vertical-align:middle; position:relative;
+    }
+    .diet-mark.veg { border-color:#1F8A5B; }
+    .diet-mark.veg::after { content:''; position:absolute; inset:2px; background:#1F8A5B; border-radius:50%; }
+    .diet-mark.nv { border-color:#C43C2E; }
+    .diet-mark.nv::after { content:''; position:absolute; inset:2px; background:#C43C2E; border-radius:50%; }
+
+    .cart-note-btn {
+      border:none; background:transparent; color:var(--brand); font-size:12px; font-weight:700;
+      cursor:pointer; padding:4px 0; font-family:inherit; display:inline-flex; align-items:center; gap:4px;
+    }
+    .cart-note-txt { font-size:11.5px; color:#b45309; font-weight:600; margin-top:2px; }
+
+    /* Service dock (call waiter / bill) */
+    .svc-dock {
+      position:fixed; right:14px; bottom:92px; z-index:190; display:flex; flex-direction:column; gap:8px;
+    }
+    .svc-dock button {
+      min-width:48px; min-height:48px; border-radius:999px; border:1px solid var(--border);
+      background:var(--surface); color:var(--text); box-shadow:0 6px 18px rgba(17,24,39,.12);
+      cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center;
+    }
+    .svc-dock button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+    .svc-sheet {
+      position:fixed; inset:0; z-index:300; background:rgba(0,0,0,.45); display:none; align-items:flex-end; justify-content:center;
+    }
+    .svc-sheet.on { display:flex; }
+    .svc-sheet-inner {
+      width:100%; max-width:480px; background:var(--surface); border-radius:18px 18px 0 0; padding:16px 16px 28px;
+      box-shadow:0 -8px 32px rgba(0,0,0,.15);
+    }
+    .svc-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+    .svc-grid button {
+      min-height:52px; border-radius:12px; border:1px solid var(--border); background:var(--surface-alt);
+      font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; color:var(--text); padding:10px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    }
+    .lang-toggle {
+      border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:5px 10px;
+      font-size:11.5px; font-weight:800; cursor:pointer; color:var(--text2); font-family:inherit;
+    }
+
+    .success-actions { display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px; margin-top:8px; }
+    .success-actions .done-btn { width:100%; }
+    .success-actions .ghost-btn {
+      width:100%; min-height:46px; border-radius:12px; border:1px solid var(--border); background:var(--surface);
+      font-weight:700; font-size:14px; cursor:pointer; font-family:inherit; color:var(--text);
+    }
+
+    .hdr-brand { background:transparent; border:none; box-shadow:none; padding:0; }
+    .outlet-title {
+      font-family:'Fraunces', Georgia, serif; font-size:17px; font-weight:700; color:var(--text);
+      letter-spacing:.01em; line-height:1.2; max-width:52vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+
+    @media (max-width:480px) {
+      .add-btn, .q-btn { width:44px; height:44px; }
+      .float-btn { min-height:52px; padding:14px 22px; font-size:15px; }
+      .search-input { min-height:44px; font-size:16px; } /* prevents iOS zoom */
+    }
+
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   </style>
@@ -320,22 +401,40 @@
 
 <!-- HEADER -->
 <header class="hdr" style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-  <div style="display: flex; align-items: center; gap: 10px;">
-    <a href="#" class="back-to-portal-btn" id="back-to-portal" style="display: none; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; color: var(--text); background: var(--surface-alt); text-decoration: none; font-size: 16px;"><i class="fa-solid fa-arrow-left"></i></a>
+  <div style="display: flex; align-items: center; gap: 10px; min-width:0;">
+    <a href="#" class="back-to-portal-btn" id="back-to-portal" title="Table home" style="display: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; color: var(--text); background: var(--surface-alt); text-decoration: none; font-size: 16px; flex-shrink:0;"><i class="fa-solid fa-house"></i></a>
     <div class="hdr-brand">
-      <div id="rest-name">Loading...</div>
+      <div id="rest-name" class="outlet-title">Loading...</div>
     </div>
   </div>
-  <div class="table-pill" id="table-pill" style="display:none">
-    <i class="fa-solid fa-chair"></i>
-    <span id="table-pill-txt">Table</span>
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <button type="button" class="lang-toggle" id="lang-toggle" title="Language">EN</button>
+    <div class="table-pill" id="table-pill" style="display:none">
+      <i class="fa-solid fa-chair"></i>
+      <span id="table-pill-txt">Table</span>
+    </div>
   </div>
 </header>
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-title">Browse &amp; <span>Order</span></div>
+  <div class="hero-title" id="hero-title">Browse &amp; <span>Order</span></div>
   <div class="hero-sub" id="hero-sub">Add items to your cart and we'll bring it right to you!</div>
+</div>
+
+<!-- Service dock -->
+<div class="svc-dock" id="svc-dock" style="display:none">
+  <button type="button" class="primary" id="svc-bell" title="Call waiter"><i class="fa-solid fa-bell"></i></button>
+  <button type="button" id="svc-bill" title="Request bill"><i class="fa-solid fa-receipt"></i></button>
+</div>
+<div class="svc-sheet" id="svc-sheet" role="dialog" aria-label="Service requests">
+  <div class="svc-sheet-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong id="svc-sheet-title" style="font-size:16px">Need help?</strong>
+      <button type="button" id="svc-sheet-close" style="border:none;background:var(--surface-alt);width:36px;height:36px;border-radius:50%;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="svc-grid" id="svc-grid"></div>
+  </div>
 </div>
 
 <!-- MAIN -->
@@ -403,7 +502,11 @@
     <hr class="r-div">
     <div class="r-total"><span>Total Paid</span><span id="r-total"></span></div>
   </div>
-  <button class="done-btn" onclick="resetOrder()">Done, Thanks!</button>
+  <div class="success-actions">
+    <button class="done-btn" id="btn-track-orders" type="button">Track my order</button>
+    <button class="ghost-btn" type="button" onclick="resetOrderKeepMenu()">Order more</button>
+    <button class="ghost-btn" type="button" onclick="resetOrder()">Table home</button>
+  </div>
 </div>
 
 <script src="/config.js"></script>
@@ -431,15 +534,57 @@
   const waiterMode = params.get('mode') === 'waiter';
   document.body.classList.toggle('waiter-mode', waiterMode);
 
-  // Configure back to dining portal link
+  // Configure back to dining portal (hub) link
   const backBtn = document.getElementById('back-to-portal');
   if (backBtn && slug) {
-    backBtn.href = 'qr-order.html?tenant=' + slug + '&table=' + tNum + (waiterMode ? '&mode=waiter' : '');
+    backBtn.href = 'qr-order.html?tenant=' + encodeURIComponent(slug) + '&table=' + encodeURIComponent(tNum) + '&hub=1' + (waiterMode ? '&mode=waiter' : '');
     backBtn.style.display = 'inline-flex';
   }
 
   function slugToName(s){ return s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
   const restName = slug ? slugToName(slug) : '';
+  var uiLang = (function(){ try { return localStorage.getItem('rs_guest_lang') || 'en'; } catch(e){ return 'en'; } })();
+  var STR = {
+    en: {
+      browse: 'Browse & Order', heroSub: 'Order from your table — kitchen gets it instantly.',
+      search: 'Search dishes…', all: 'All', veg: 'Veg', nonveg: 'Non-veg',
+      cart: 'Your Order', place: 'Place Order', nameReq: 'Your name (required)',
+      phone: 'Phone (optional)', track: 'Track my order', more: 'Order more', home: 'Table home',
+      help: 'Need help?', sold: 'Sold out', note: 'Kitchen note', notePh: 'e.g. No onion, less spicy',
+      water: 'Water', cutlery: 'Cutlery', clear: 'Clear table', waiter: 'Call waiter', bill: 'Request bill',
+      sent: 'Request sent to staff', empty: 'No items match your filters'
+    },
+    hi: {
+      browse: 'मेनू देखें और ऑर्डर करें', heroSub: 'टेबल से ऑर्डर करें — किचन तुरंत पाएगा।',
+      search: 'डिश खोजें…', all: 'सभी', veg: 'वेज', nonveg: 'नॉन-वेज',
+      cart: 'आपका ऑर्डर', place: 'ऑर्डर करें', nameReq: 'नाम (ज़रूरी)',
+      phone: 'फ़ोन (वैकल्पिक)', track: 'ऑर्डर ट्रैक करें', more: 'और ऑर्डर', home: 'टेबल होम',
+      help: 'मदद चाहिए?', sold: 'खत्म', note: 'किचन नोट', notePh: 'जैसे: प्याज नहीं, कम मसाला',
+      water: 'पानी', cutlery: 'कटलरी', clear: 'टेबल साफ़', waiter: 'वेटर बुलाएँ', bill: 'बिल माँगें',
+      sent: 'स्टाफ़ को भेज दिया', empty: 'फ़िल्टर से कोई आइटम नहीं'
+    }
+  };
+  function t(k){ return (STR[uiLang] && STR[uiLang][k]) || STR.en[k] || k; }
+  function applyLangUI(){
+    var lt = document.getElementById('lang-toggle');
+    if (lt) lt.textContent = uiLang === 'hi' ? 'हिं' : 'EN';
+    var ht = document.getElementById('hero-title');
+    if (ht && !waiterMode) ht.innerHTML = t('browse').replace('Order', '<span>Order</span>').replace('ऑर्डर', '<span>ऑर्डर</span>');
+    var hs = document.getElementById('hero-sub');
+    if (hs && !waiterMode) hs.textContent = t('heroSub');
+    var st = document.getElementById('svc-sheet-title');
+    if (st) st.textContent = t('help');
+    var tr = document.getElementById('btn-track-orders');
+    if (tr) tr.textContent = t('track');
+    var drawerTitle = document.querySelector('.drawer-title');
+    if (drawerTitle && !waiterMode) drawerTitle.textContent = t('cart');
+    var orderBtn = document.querySelector('.order-btn');
+    if (orderBtn && !waiterMode) orderBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ' + t('place');
+    var ni = document.getElementById('cust-name');
+    if (ni && !waiterMode) ni.placeholder = t('nameReq');
+    var pi = document.getElementById('cust-phone');
+    if (pi && !waiterMode) pi.placeholder = t('phone');
+  }
   function pad2(v){ return String(v).padStart(2,'0'); }
   function shortDateKey(d){
     d = d || new Date();
@@ -461,27 +606,36 @@
     return m ? (m[1].toUpperCase() + '-' + m[2] + '-' + m[3]) : String(id || '');
   }
 
-  // ── BRANDING ──
+  // ── BRANDING (outlet name only — no generic product branding) ──
   function applyLogoBranding(nameVal) {
     if(!nameVal) return;
-    document.title = nameVal + ' | Order Online';
-    const parts = nameVal.split(' ');
-    const first = parts[0].toUpperCase();
-    const rest = parts.slice(1).join(' ');
-    
-    document.getElementById('rest-name').innerHTML = 
-      '<span class="logo-doppio">' + escHtml(first) + '</span>' + 
-      (rest ? '<span class="logo-cafe">' + escHtml(rest) + '</span>' : '');
-      
+    document.title = nameVal + ' · Table Order';
+    var el = document.getElementById('rest-name');
+    if (el) {
+      el.className = 'outlet-title';
+      el.textContent = nameVal;
+    }
     document.getElementById('hero-sub').textContent = waiterMode
       ? 'Punch items for this table directly to the kitchen.'
-      : 'Order directly from your table at ' + nameVal + '. Fresh and fast!';
+      : t('heroSub');
   }
 
   if(restName){
     applyLogoBranding(restName);
   } else {
-    document.getElementById('rest-name').innerHTML = '<span class="logo-doppio">RESTAURANT</span>';
+    var rn = document.getElementById('rest-name');
+    if (rn) { rn.className = 'outlet-title'; rn.textContent = 'Restaurant'; }
+  }
+  applyLangUI();
+  var langBtn = document.getElementById('lang-toggle');
+  if (langBtn) {
+    langBtn.onclick = function(){
+      uiLang = uiLang === 'hi' ? 'en' : 'hi';
+      try { localStorage.setItem('rs_guest_lang', uiLang); } catch(e){}
+      applyLangUI();
+      if (items && items.length) buildUI();
+      paintSvcGrid();
+    };
   }
   
   if(tNum){
@@ -762,16 +916,38 @@
   var cart  = [];
   var cat   = 'ALL';
   var q     = '';
+  var dietF = 'all'; // all | veg | nv
 
+  function inferDiet(item){
+    if (item.veg === true || item.isVeg === true || item.diet === 'veg') return 'veg';
+    if (item.veg === false || item.isVeg === false || item.diet === 'nonveg' || item.diet === 'non-veg') return 'nv';
+    var blob = (String(item.name||'') + ' ' + String(item.category||'') + ' ' + String(item.description||'')).toLowerCase();
+    if (/\b(chicken|mutton|fish|prawn|egg|non[\s-]?veg|meat|bacon|ham|keema|seekh|tikka\s*masala)\b/.test(blob)) return 'nv';
+    if (/\b(paneer|dal|dosa|idli|veg|vegetable|palak|aloo|gobi|mushroom|tofu)\b/.test(blob)) return 'veg';
+    return 'unknown';
+  }
+  function isSoldOut(item){
+    if (item.available === false || item.enabled === false) return true;
+    var st = String(item.stock || item.status || '').toLowerCase();
+    return st === 'out' || st === 'sold_out' || st === 'soldout' || st === 'unavailable';
+  }
   function normalizePublicMenuItem(i){
-    return {
+    var row = {
       name: String(i.name || '').trim(),
       price: parseFloat(i.price) || 0,
       category: i.category || i.cat || 'Other',
       description: i.description || i.desc || '',
-      image: i.image || '',
-      bestseller: !!i.bestseller
+      image: i.image || i.image_url || i.photo || '',
+      bestseller: !!i.bestseller,
+      available: i.available !== false && i.enabled !== false,
+      stock: i.stock || '',
+      veg: i.veg,
+      isVeg: i.isVeg,
+      diet: i.diet
     };
+    row.dietKind = inferDiet(row);
+    row.soldOut = isSoldOut(row);
+    return row;
   }
 
   function readPublicMenuCache(){
@@ -838,9 +1014,7 @@
         var data = Array.isArray(res.menu) ? res.menu : [];
         var newItems = [];
         if(data.length>0){
-          newItems = data.map(function(i){
-            return {name:i.name,price:parseFloat(i.price)||0,category:i.category||'Other',description:i.description||'',image:i.image||'',bestseller:!!i.bestseller};
-          });
+          newItems = data.map(normalizePublicMenuItem);
         } else {
           newItems = [];
         }
@@ -909,11 +1083,28 @@
       (waiterMode ? '<div class="mode-banner"><i class="fa-solid fa-user-tie"></i><span>Waiter mode: orders go to KOT/KDS. Payment stays in POS.</span></div>' : '') +
       '<div class="controls">'+
         '<div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i>'+
-          '<input class="search-input" id="si" placeholder="Search menu..." oninput="setQ(this.value)"></div>'+
+          '<input class="search-input" id="si" placeholder="'+escHtml(t('search'))+'" oninput="setQ(this.value)"></div>'+
+        '<div class="filter-row" id="diet-filters">'+
+          '<button type="button" class="fchip'+(dietF==='all'?' on':'')+'" data-diet="all">'+escHtml(t('all'))+'</button>'+
+          '<button type="button" class="fchip'+(dietF==='veg'?' on':'')+'" data-diet="veg"><span class="vegdot"></span> '+escHtml(t('veg'))+'</button>'+
+          '<button type="button" class="fchip'+(dietF==='nv'?' on':'')+'" data-diet="nv"><span class="nvdot"></span> '+escHtml(t('nonveg'))+'</button>'+
+        '</div>'+
         '<div class="chips">'+chipsHtml+'</div>'+
       '</div>'+
       '<div class="grid" id="grid"></div>';
+    document.querySelectorAll('#diet-filters .fchip').forEach(function(btn){
+      btn.onclick = function(){
+        dietF = btn.getAttribute('data-diet') || 'all';
+        document.querySelectorAll('#diet-filters .fchip').forEach(function(b){ b.classList.toggle('on', b===btn); });
+        renderGrid();
+      };
+    });
     renderGrid();
+    if (!waiterMode) {
+      var dock = document.getElementById('svc-dock');
+      if (dock) dock.style.display = 'flex';
+      paintSvcGrid();
+    }
   }
 
   window.setC = function(c,btn){
@@ -933,27 +1124,37 @@
     var grid = document.getElementById('grid');
     if(!grid) return;
     var list = items.filter(function(i){
-      return (cat==='ALL'||i.category===cat) &&
-        (!q || i.name.toLowerCase().includes(q.toLowerCase()) || (i.description||'').toLowerCase().includes(q.toLowerCase()));
+      if (cat!=='ALL' && i.category!==cat) return false;
+      if (dietF === 'veg' && i.dietKind === 'nv') return false;
+      if (dietF === 'nv' && i.dietKind === 'veg') return false;
+      if (q) {
+        var qq = q.toLowerCase();
+        if (!(i.name||'').toLowerCase().includes(qq) && !(i.description||'').toLowerCase().includes(qq)) return false;
+      }
+      return true;
     });
     if(!list.length){
-      grid.innerHTML = '<div class="empty"><i class="fa-solid fa-magnifying-glass"></i><p>No items found.<br>Try a different search!</p></div>';
+      grid.innerHTML = '<div class="empty"><i class="fa-solid fa-magnifying-glass"></i><p>'+escHtml(t('empty'))+'</p></div>';
       return;
     }
     grid.innerHTML = list.map(function(item){
       var inC = cart.find(function(c){ return c.name===item.name; });
       var qty = inC ? inC.qty : 0;
       var sn  = escHtml(item.name);
-      return '<div class="card" onclick="addItem(\''+sn+'\')">'+
+      var sold = !!item.soldOut;
+      var dietCls = item.dietKind === 'veg' ? 'veg' : (item.dietKind === 'nv' ? 'nv' : '');
+      return '<div class="card'+(sold?' sold-out':'')+'" '+(sold?'':'onclick="addItem(\''+sn+'\')"')+'>'+
         '<div class="card-bar"></div>'+
-        (item.image ? '<img class="card-img show" src="'+escHtml(item.image)+'" alt="'+escHtml(item.name)+'" loading="lazy">' : '')+
-        (item.bestseller ? '<span class="best-tag">Best Seller</span>' : '')+
+        (item.image ? '<img class="card-img show" src="'+escHtml(item.image)+'" alt="'+escHtml(item.name)+'" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
+        (item.bestseller && !sold ? '<span class="best-tag">Best Seller</span>' : '')+
         '<div class="card-body">'+
-          '<div class="card-name">'+escHtml(item.name)+'</div>'+
+          '<div class="card-name">'+(dietCls?'<span class="diet-mark '+dietCls+'"></span>':'')+escHtml(item.name)+'</div>'+
           (item.description ? '<div class="card-desc">'+escHtml(item.description)+'</div>' : '')+
           '<div class="card-footer">'+
             '<span class="card-price">'+(window.currencySymbol || '\u20b9')+fmt(item.price)+'</span>'+
-            (qty>0
+            (sold
+              ? '<span style="font-size:11px;font-weight:800;color:var(--muted)">'+escHtml(t('sold'))+'</span>'
+              : (qty>0
               ? '<div class="qty-row" onclick="event.stopPropagation()">'+
                   '<button class="q-btn" onclick="chQty(\''+sn+'\',-1)">&#8722;</button>'+
                   '<span class="q-num">'+qty+'</span>'+
@@ -961,7 +1162,7 @@
                 '</div>'
               : '<button class="add-btn" onclick="event.stopPropagation();addItem(\''+sn+'\')">'+
                   '<i class="fa-solid fa-plus"></i></button>'
-            )+
+            ))+
           '</div>'+
         '</div>'+
       '</div>';
@@ -970,9 +1171,9 @@
 
   window.addItem = function(name){
     var item = items.find(function(i){ return i.name===name; });
-    if(!item) return;
+    if(!item || item.soldOut) return;
     var ex = cart.find(function(c){ return c.name===name; });
-    if(ex){ ex.qty++; } else { cart.push({name:item.name,price:item.price,qty:1,category:item.category}); }
+    if(ex){ ex.qty++; } else { cart.push({name:item.name,price:item.price,qty:1,category:item.category,note:''}); }
     updateFloat(); renderGrid(); bop();
   };
   window.chQty = function(name,d){
@@ -1030,10 +1231,13 @@
     if(!cart.length){ el.innerHTML='<div class="cart-empty"><i class="fa-solid fa-basket-shopping"></i><p>Cart is empty</p></div>'; return; }
     el.innerHTML = cart.map(function(item){
       var sn = escHtml(item.name);
-      return '<div class="cart-row">'+
-        '<div class="cart-info">'+
+      var note = item.note ? '<div class="cart-note-txt"><i class="fa-solid fa-comment"></i> '+escHtml(item.note)+'</div>' : '';
+      return '<div class="cart-row" style="flex-wrap:wrap">'+
+        '<div class="cart-info" style="flex:1;min-width:40%">'+
           '<div class="cart-name">'+escHtml(item.name)+'</div>'+
           '<div class="cart-unit">'+(window.currencySymbol || '\u20b9')+fmt(item.price)+' each</div>'+
+          note+
+          '<button type="button" class="cart-note-btn" onclick="editLineNote(\''+sn+'\')"><i class="fa-solid fa-comment"></i> '+escHtml(t('note'))+'</button>'+
         '</div>'+
         '<div class="cart-ctrl">'+
           '<button class="cc-btn" onclick="chQty(\''+sn+'\',-1)">&#8722;</button>'+
@@ -1044,6 +1248,14 @@
       '</div>';
     }).join('');
   }
+  window.editLineNote = function(name){
+    var item = cart.find(function(c){ return c.name===name; });
+    if(!item) return;
+    var n = window.prompt(t('note') + ' — ' + name, item.note || '');
+    if (n == null) return;
+    item.note = String(n).trim().slice(0, 120);
+    renderCartList();
+  };
   function calcSummary(){
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);
@@ -1076,8 +1288,18 @@
     var sub = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
     var gst = Math.round(sub*0.1525);
     var ts  = new Date().toLocaleString('en-IN');
+    var cartPayload = cart.map(function(c){
+      return {
+        name: c.name,
+        qty: c.qty,
+        price: c.price,
+        category: c.category,
+        notes: c.note || '',
+        note: c.note || ''
+      };
+    });
     var order = {orderId:rid,displayOrderId:displayId,customerName:name,customerPhone:phone||'Dine-in',dateTime:ts,
-      items:JSON.parse(JSON.stringify(cart)),subtotal:sub,discount:0,gst:gst,total:sub,
+      items:JSON.parse(JSON.stringify(cartPayload)),subtotal:sub,discount:0,gst:gst,total:sub,
       paymentMethod:'Pending',orderType:tv==='Takeaway'?'Takeaway':'Dine-in',
       tableNumber:tv,tenant_slug:slug,status:'Pending Review',
       source: waiterMode ? 'waiter_kot' : 'customer_qr',
@@ -1089,7 +1311,7 @@
       orderBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
     }
 
-    apiCall('create_order', { order: Object.assign({}, order, { items: JSON.stringify(cart) }) })
+    apiCall('create_order', { order: Object.assign({}, order, { items: JSON.stringify(cartPayload) }) })
       .then(function(res) {
         if (res.error) {
           alert("Order failed: " + res.error);
@@ -1138,9 +1360,16 @@
     }
     document.getElementById('r-total').textContent = (window.currencySymbol || '\u20b9')+fmt(order.total);
     document.getElementById('r-items').innerHTML = order.items.map(function(i){
-      return '<div class="r-item"><span>'+escHtml(i.name)+' x'+i.qty+'</span><span>'+(window.currencySymbol || '\u20b9')+fmt(i.price*i.qty)+'</span></div>';
+      var note = i.note || i.notes ? '<div style="font-size:11px;color:#6b6960">※ '+escHtml(i.note||i.notes)+'</div>' : '';
+      return '<div class="r-item"><span>'+escHtml(i.name)+' x'+i.qty+note+'</span><span>'+(window.currencySymbol || '\u20b9')+fmt(i.price*i.qty)+'</span></div>';
     }).join('');
     document.getElementById('success').classList.add('on');
+    var trackBtn = document.getElementById('btn-track-orders');
+    if (trackBtn) {
+      trackBtn.onclick = function(){
+        window.location.href = 'qr-order.html?tenant=' + encodeURIComponent(slug) + '&table=' + encodeURIComponent(tNum) + '&hub=1&track=1';
+      };
+    }
     confetti();
     try{
       var ac=new(window.AudioContext||window.webkitAudioContext)();
@@ -1157,14 +1386,68 @@
     }catch(e){}
   }
 
+  window.resetOrderKeepMenu = function(){
+    cart=[];
+    document.getElementById('success').classList.remove('on');
+    updateFloat(); renderGrid();
+  };
+
   window.resetOrder = function(){
     cart=[];
     document.getElementById('success').classList.remove('on');
     updateFloat(); renderGrid();
     if (!waiterMode) {
-      window.location.href = 'qr-order.html?tenant=' + slug + '&table=' + tNum;
+      window.location.href = 'qr-order.html?tenant=' + encodeURIComponent(slug) + '&table=' + encodeURIComponent(tNum) + '&hub=1';
     }
   };
+
+  function paintSvcGrid(){
+    var grid = document.getElementById('svc-grid');
+    if (!grid) return;
+    var opts = [
+      { k:'water', icon:'fa-glass-water', label: t('water'), name:'Drinking Water' },
+      { k:'cutlery', icon:'fa-utensils', label: t('cutlery'), name:'Cutlery / Plates' },
+      { k:'clear', icon:'fa-broom', label: t('clear'), name:'Clear Table' },
+      { k:'waiter', icon:'fa-hand', label: t('waiter'), name:'General Assistant' },
+      { k:'bill', icon:'fa-receipt', label: t('bill'), name:'Request Printed Bill' }
+    ];
+    grid.innerHTML = opts.map(function(o){
+      return '<button type="button" data-svc="'+escHtml(o.name)+'"><i class="fa-solid '+o.icon+'" style="color:var(--brand)"></i>'+escHtml(o.label)+'</button>';
+    }).join('');
+    grid.querySelectorAll('button[data-svc]').forEach(function(btn){
+      btn.onclick = function(){ sendGuestService(btn.getAttribute('data-svc')); };
+    });
+  }
+  function sendGuestService(requestName){
+    closeSvcSheet();
+    apiCall('create_notification', {
+      title: 'Table ' + (tNum || '') + ' Call',
+      message: 'Dine-in Customer requested: ' + requestName,
+      type: 'waiter_call',
+      table: tNum
+    }).then(function(res){
+      alert((res && res.success) ? t('sent') : 'Please wave to a waiter.');
+    }).catch(function(){ alert('Please wave to a waiter.'); });
+  }
+  function openSvcSheet(){
+    paintSvcGrid();
+    var sh = document.getElementById('svc-sheet');
+    if (sh) sh.classList.add('on');
+  }
+  function closeSvcSheet(){
+    var sh = document.getElementById('svc-sheet');
+    if (sh) sh.classList.remove('on');
+  }
+  (function wireSvcDock(){
+    var bell = document.getElementById('svc-bell');
+    var bill = document.getElementById('svc-bill');
+    var close = document.getElementById('svc-sheet-close');
+    var sheet = document.getElementById('svc-sheet');
+    if (bell) bell.onclick = openSvcSheet;
+    if (bill) bill.onclick = function(){ sendGuestService('Request Printed Bill'); };
+    if (close) close.onclick = closeSvcSheet;
+    if (sheet) sheet.addEventListener('click', function(e){ if (e.target === sheet) closeSvcSheet(); });
+  })();
 
   function confetti(){
     var cv=document.getElementById('cc');
