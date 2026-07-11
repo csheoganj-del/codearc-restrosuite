@@ -97,6 +97,7 @@
       customer: b.customer || b.customerName || b.customer_name || 'Walk-in',
       customerPhone: b.customerPhone || b.customer_phone || '',
       customerGst: b.customerGst || b.customer_gst || '',
+      covers: Math.max(0, Number(b.covers != null ? b.covers : b.pax) || 0),
       items,
       sub,
       disc: Number(b.disc != null ? b.disc : b.discount) || 0,
@@ -202,6 +203,7 @@
       <hr class="rcp-hr">
       <div class="rcp-meta"><span>${esc(m.no)}</span><span>${esc(m.time)}</span></div>
       <div class="rcp-meta"><span>Table:</span><span>${esc(m.table)}</span></div>
+      ${m.covers ? `<div class="rcp-meta"><span>Covers:</span><span>${m.covers}</span></div>` : ''}
       ${custSection}
       <hr class="rcp-hr">
       ${itemsHTML}
@@ -240,6 +242,7 @@
       (tax.tax_registration_no || outlet.gstin) ? `${tax.tax_system || 'GST'} No: ${tax.tax_registration_no || outlet.gstin}` : '',
       `Bill: ${m.no}`,
       `${m.table} | ${m.time}`,
+      m.covers ? `Covers: ${m.covers}` : '',
       m.customer && m.customer !== 'Walk-in' ? `Customer: ${m.customer}` : '',
       m.customerPhone ? `Phone: ${m.customerPhone}` : '',
       '',

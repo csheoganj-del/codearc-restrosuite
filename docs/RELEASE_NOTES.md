@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v80 (2026-07-11) — Guest covers (pax)
+
+- **Pax** field next to table on POS cart (0–99)
+- Stored on bill as `covers` / `pax`; shown on PDF, HTML/text receipt, KOT (+ ESC/POS)
+- **Z-report**: total covers + average check per cover
+- Floor **Seat & order** pre-fills from reservation pax or table capacity
+- Clears with cart; KOT / kitchen order carries covers
+
 ## v79 (2026-07-11) — Kitchen notes on cart lines
 
 - **Comment** button on each cart line: free-text note + quick chips (No onion, Extra spicy, …)
@@ -153,7 +161,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v79-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v80-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

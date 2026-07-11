@@ -631,6 +631,8 @@ function getTotals(){
     deliveryCharge,
     loyaltyRedeem: loyaltyOff,
     loyaltyPointsUsed: loyaltyPointsUsed || 0,
+    covers: getCovers(),
+    pax: getCovers(),
     grand,
     count: cart.reduce((a,c)=>a+c.qty,0),
     discountPct,
@@ -684,15 +686,30 @@ function getPromo() {
 function clearCart(){
   cart=[]; discountPct=0; tipAmount=0; loyaltyRedeem=0; loyaltyPointsUsed=0;
   clearPromo();
+  setCovers(0);
   const d=$('#disc-input'); if(d) d.value='';
   const tipEl=$('#tip-input'); if(tipEl) tipEl.value='';
   renderCart();
   if (window.innerWidth <= 1024) closeMobilePOSCart(false);
 }
+function getCovers() {
+  const el = document.getElementById('cart-covers');
+  if (!el) return 0;
+  const n = Math.floor(Number(el.value));
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(99, n);
+}
+function setCovers(n) {
+  const el = document.getElementById('cart-covers');
+  const v = Math.max(0, Math.min(99, Math.floor(Number(n) || 0)));
+  if (el) el.value = v > 0 ? String(v) : '';
+  return v;
+}
 function getCustomer(){
   const nameEl = $('#cust-input-name') || $('#cust-name');
   const phoneEl = $('#cust-input-phone') || $('#cust-phone');
   const gstEl = $('#cust-gst');
+  const covers = getCovers();
   
   let phoneVal = '';
   if (phoneEl) {
@@ -708,10 +725,19 @@ function getCustomer(){
       name: opt.getAttribute('data-name') || '',
       phone: finalPhone,
       gst: opt.getAttribute('data-gst') || '',
-      table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
+      table: ($('#cart-table')?.value || 'Walk-in / Takeaway'),
+      covers,
+      pax: covers,
     };
   }
-  return { name:(nameEl?.value||'').trim(), phone:phoneVal.trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+  return {
+    name: (nameEl?.value || '').trim(),
+    phone: phoneVal.trim(),
+    gst: (gstEl?.value || '').trim(),
+    table: ($('#cart-table')?.value || 'Walk-in / Takeaway'),
+    covers,
+    pax: covers,
+  };
 }
 function runKotAction(){
   if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
@@ -1147,6 +1173,8 @@ function initPOS(){
     setLineNote,
     getLineNote,
     openLineNoteEditor,
+    getCovers,
+    setCovers,
     setTip,
     getTip,
     setLoyaltyRedeem,
@@ -1189,6 +1217,8 @@ function initPOS(){
     global.RS.setLineNote = api.setLineNote;
     global.RS.getLineNote = api.getLineNote;
     global.RS.openLineNoteEditor = api.openLineNoteEditor;
+    global.RS.getCovers = api.getCovers;
+    global.RS.setCovers = api.setCovers;
     global.RS.isHappyHourActive = api.isHappyHourActive;
     global.RS.effectiveMenuPrice = api.effectiveMenuPrice;
   }

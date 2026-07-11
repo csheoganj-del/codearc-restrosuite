@@ -68,6 +68,7 @@
       customer: b.customerName || '',
       customerPhone: b.customerPhone || '',
       customerGst: b.customerGst || '',
+      covers: Math.max(0, Number(b.covers != null ? b.covers : b.pax) || 0),
       items,
       sub,
       disc: Number(b.discount || 0),

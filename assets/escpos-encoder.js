@@ -141,6 +141,8 @@
     enc.line('KOT').size(1, 1).bold(false);
     enc.line(m.token || m.no || '');
     enc.align('left').line((m.table || '') + '  ' + (m.orderType || ''));
+    const coversN = Math.max(0, Number(m.covers != null ? m.covers : m.pax) || 0);
+    if (coversN) enc.line('Pax: ' + coversN);
     if (m.station) enc.line('Station: ' + m.station);
     enc.hr(32);
     (items || []).forEach((it) => {

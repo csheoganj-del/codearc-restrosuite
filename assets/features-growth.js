@@ -193,6 +193,8 @@
               phoneEl.value = row.customerPhone;
               phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
             }
+            const rowCovers = Math.max(0, Number(row.covers != null ? row.covers : row.pax) || 0);
+            if (rowCovers && typeof RS.setCovers === 'function') RS.setCovers(rowCovers);
           }
         } catch (e) {
           console.warn('openTableInPos load order failed', e);
@@ -201,6 +203,22 @@
       if (items && items.length && typeof RS.setCart === 'function') {
         RS.setCart(items);
       }
+      // Prefill covers from reservation pax or table capacity when seating
+      try {
+        const resPax =
+          (t.reservedInfo && (t.reservedInfo.pax || t.reservedInfo.covers)) ||
+          options.covers ||
+          options.pax ||
+          0;
+        const cap = Number(t.cap) || 0;
+        const pref = Math.max(0, Number(resPax) || 0) || 0;
+        if (typeof RS.setCovers === 'function') {
+          const current = typeof RS.getCovers === 'function' ? RS.getCovers() : 0;
+          if (!current && (pref || (options.seat && cap))) {
+            RS.setCovers(pref || cap || 0);
+          }
+        }
+      } catch (e) {}
       try {
         if (typeof RS.renderCart === 'function') RS.renderCart();
       } catch (e) {}
