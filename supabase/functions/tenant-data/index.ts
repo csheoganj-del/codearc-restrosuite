@@ -525,6 +525,50 @@ serve(async (req) => {
       return await proxyGatewayRequest("/send", "POST", req, { phone, message, caption, orderId, pdfData, filename }, verified.tenantId);
     }
 
+    // Wave 7: server-side bill search (history beyond client cache cap)
+    if (operation === "search_bills") {
+      const tabs = (verified.allowedTabs as string[]) || [];
+      const canSearch = tabs.includes("bills-tab")
+        || tabs.includes("pos-tab")
+        || tabs.includes("reports-tab")
+        || verified.actorRole === "admin"
+        || verified.actorRole === "manager"
+        || verified.actorRole === "cashier"
+        || verified.actorRole === "owner";
+      if (!canSearch) {
+        return jsonResponse({ error: "Your role cannot search bills." }, 403, req);
+      }
+      const rawQ = String(payload.q || payload.query || "").trim().slice(0, 80);
+      const limit = Math.min(100, Math.max(1, Number(payload.limit) || 50));
+      // Strip PostgREST wildcard / filter metacharacters from user input
+      const safe = rawQ.replace(/[%_,.*()]/g, " ").replace(/\s+/g, " ").trim();
+      let query = supabaseAdmin
+        .from("doppio_bills")
+        .select("*")
+        .eq("tenant_id", verified.tenantId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (safe.length >= 1) {
+        // Quote patterns so spaces/special chars are safe for PostgREST filters
+        const pat = `"%${safe.replace(/"/g, "")}%"`;
+        query = query.or(
+          [
+            `"orderId".ilike.${pat}`,
+            `"customerName".ilike.${pat}`,
+            `"customerPhone".ilike.${pat}`,
+            `"tableNumber".ilike.${pat}`,
+            `"paymentMethod".ilike.${pat}`,
+          ].join(","),
+        );
+      }
+      const { data, error } = await query;
+      if (error) {
+        console.error("search_bills failed:", error);
+        return jsonResponse({ error: error.message || "Could not search bills." }, 500, req);
+      }
+      return jsonResponse({ data: { rows: data || [], q: safe, limit } }, 200, req);
+    }
+
     // Wave 2: server-side sales aggregates (reports without loading every bill)
     if (operation === "sales_summary") {
       const days = Math.max(1, Math.min(365, Number(payload.days) || 30));

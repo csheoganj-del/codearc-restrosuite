@@ -360,8 +360,7 @@
   }
 
   /**
-   * Wave 6: broader client filter — bill no, table, customer name/phone, pay method.
-   * Server-side search can be layered later via RS_API when bill volume grows.
+   * Wave 6/7: broader client filter — bill no, table, customer name/phone, pay method.
    */
   function filterBills(bills, q, payFilter, statusFilter) {
     const needle = String(q || '').toLowerCase().trim();
@@ -395,28 +394,80 @@
     return filtered;
   }
 
-  function renderBills() {
-    const BILLS = getBills();
-    const paidBills = BILLS.filter((b) => b.status === 'paid');
-    const totalSales = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const count = BILLS.length;
-    const aov = paidBills.length > 0 ? Math.round(totalSales / paidBills.length) : 0;
-    const refunds = BILLS.filter((b) => b.status === 'refunded').length;
+  /** Map cloud doppio_bills row → local bill shape used by the table. */
+  function normalizeServerBill(row) {
+    if (!row || typeof row !== 'object') return null;
+    const items = row.items;
+    let itemCount = row.items;
+    if (Array.isArray(items)) itemCount = items.length;
+    else if (typeof items === 'object' && items) itemCount = Object.keys(items).length;
+    return {
+      id: row.id,
+      no: row.orderId || row.order_id || row.no || String(row.id || ''),
+      orderId: row.orderId || row.order_id || row.no,
+      time: row.dateTime || row.date_time || row.created_at || '',
+      dateTime: row.dateTime || row.date_time || row.created_at || '',
+      table: row.tableNumber || row.table_number || row.table || '',
+      items: itemCount,
+      amount: Number(row.total != null ? row.total : row.amount) || 0,
+      pay: row.paymentMethod || row.payment_method || row.pay || 'Cash',
+      paymentMethod: row.paymentMethod || row.payment_method || row.pay || 'Cash',
+      status: String(row.status || 'paid').toLowerCase() === 'refunded' ? 'refunded' : 'paid',
+      customerName: row.customerName || row.customer_name || '',
+      customerPhone: row.customerPhone || row.customer_phone || '',
+      subtotal: Number(row.subtotal) || 0,
+      gst: Number(row.gst) || 0,
+      discount: Number(row.discount) || 0,
+      _items: Array.isArray(items) ? items : [],
+      _fromServer: true,
+    };
+  }
 
-    const salesEl = document.getElementById('bills-stat-sales');
-    if (salesEl) salesEl.textContent = rs(totalSales);
-    const countEl = document.getElementById('bills-stat-count');
-    if (countEl) countEl.textContent = count;
-    const aovEl = document.getElementById('bills-stat-aov');
-    if (aovEl) aovEl.textContent = rs(aov);
-    const refundsEl = document.getElementById('bills-stat-refunds');
-    if (refundsEl) refundsEl.textContent = refunds;
+  let _serverHits = [];
+  let _searchGen = 0;
 
-    const q = ($('#bills-search')?.value || '').toLowerCase();
-    const payFilter = $('#bills-pay-filter')?.value || 'All';
-    const statusFilter = $('#bills-status-filter')?.value || 'All';
+  /**
+   * Wave 7: query tenant-data search_bills for history beyond the client cache.
+   * Returns [] on empty, null on skip/failure (caller keeps local-only).
+   */
+  async function searchBillsServer(q, limit) {
+    const needle = String(q || '').trim();
+    if (needle.length < 2) return null;
+    if (!global.RS_API || typeof RS_API.data !== 'function') return null;
+    if (global.RS_API.zeroCostLaunchMode) return null;
+    if (navigator.onLine === false) return null;
+    try {
+      const res = await Promise.race([
+        RS_API.data({ operation: 'search_bills', q: needle, limit: limit || 50 }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('search_bills timeout')), 5000)),
+      ]);
+      const rows =
+        (res && res.data && Array.isArray(res.data.rows) && res.data.rows) ||
+        (res && Array.isArray(res.rows) && res.rows) ||
+        (res && Array.isArray(res.data) && res.data) ||
+        [];
+      return rows.map(normalizeServerBill).filter(Boolean);
+    } catch (e) {
+      console.warn('[BillsHistory] server search failed', e && e.message);
+      return null;
+    }
+  }
 
-    const filtered = filterBills(BILLS, q, payFilter, statusFilter);
+  function mergeBillsForDisplay(localFiltered, serverRows, q, payFilter, statusFilter) {
+    const map = new Map();
+    (localFiltered || []).forEach((b) => {
+      const key = String(b.no || b.orderId || b.id || '');
+      if (key) map.set(key, b);
+    });
+    const serverFiltered = filterBills(serverRows || [], q, payFilter, statusFilter);
+    serverFiltered.forEach((b) => {
+      const key = String(b.no || b.orderId || b.id || '');
+      if (key && !map.has(key)) map.set(key, b);
+    });
+    return Array.from(map.values());
+  }
+
+  function paintBillsTable(filtered) {
     const body = $('#bills-table-body');
     if (!body) return;
 
@@ -444,12 +495,68 @@
       const row = btn.closest('tr');
       const bill = visibleBills[[...body.children].indexOf(row)];
       if (!bill) return;
-      if (btn.classList.contains('go')) return showBillReceipt(bill);
-      if (btn.classList.contains('refund-act')) return markBillRefunded(bill);
-      if (btn.classList.contains('del-act')) return deleteBill(bill);
-      return shareBillReceipt(bill);
+      // Prefer live RS.BILLS object when present (mutations stick)
+      const live = getBills().find(
+        (x) => x === bill || String(x.no || x.orderId) === String(bill.no || bill.orderId)
+      );
+      const target = live || bill;
+      if (btn.classList.contains('go')) return showBillReceipt(target);
+      if (btn.classList.contains('refund-act')) return markBillRefunded(target);
+      if (btn.classList.contains('del-act')) return deleteBill(target);
+      return shareBillReceipt(target);
     };
     body.addEventListener('click', body._rsBillActionHandler, true);
+  }
+
+  function renderBills() {
+    const BILLS = getBills();
+    const paidBills = BILLS.filter((b) => b.status === 'paid');
+    const totalSales = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const count = BILLS.length;
+    const aov = paidBills.length > 0 ? Math.round(totalSales / paidBills.length) : 0;
+    const refunds = BILLS.filter((b) => b.status === 'refunded').length;
+
+    const salesEl = document.getElementById('bills-stat-sales');
+    if (salesEl) salesEl.textContent = rs(totalSales);
+    const countEl = document.getElementById('bills-stat-count');
+    if (countEl) countEl.textContent = count;
+    const aovEl = document.getElementById('bills-stat-aov');
+    if (aovEl) aovEl.textContent = rs(aov);
+    const refundsEl = document.getElementById('bills-stat-refunds');
+    if (refundsEl) refundsEl.textContent = refunds;
+
+    const q = ($('#bills-search')?.value || '').toLowerCase();
+    const payFilter = $('#bills-pay-filter')?.value || 'All';
+    const statusFilter = $('#bills-status-filter')?.value || 'All';
+
+    const localFiltered = filterBills(BILLS, q, payFilter, statusFilter);
+    const merged = mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
+    paintBillsTable(merged);
+
+    // Wave 7: async server search when query is long enough
+    const gen = ++_searchGen;
+    if (String(q || '').trim().length >= 2) {
+      searchBillsServer(q, 50).then((rows) => {
+        if (gen !== _searchGen) return;
+        if (!rows) return;
+        _serverHits = rows;
+        // Merge server rows into memory cache (non-destructive for local-only fields)
+        const list = getBills();
+        rows.forEach((r) => {
+          const key = String(r.no || r.orderId || '');
+          if (!key) return;
+          const idx = list.findIndex((b) => String(b.no || b.orderId) === key);
+          if (idx === -1) list.push(r);
+        });
+        const q2 = ($('#bills-search')?.value || '').toLowerCase();
+        const pf2 = $('#bills-pay-filter')?.value || 'All';
+        const sf2 = $('#bills-status-filter')?.value || 'All';
+        const local2 = filterBills(getBills(), q2, pf2, sf2);
+        paintBillsTable(mergeBillsForDisplay(local2, rows, q2, pf2, sf2));
+      });
+    } else {
+      _serverHits = [];
+    }
   }
 
   function debounce(fn, wait) {
@@ -467,7 +574,7 @@
     const search = $('#bills-search');
     if (search && !search._rsListenerBound) {
       search._rsListenerBound = true;
-      search.addEventListener('input', debounce(renderBills, 60));
+      search.addEventListener('input', debounce(renderBills, 180));
     }
     const payFil = $('#bills-pay-filter');
     if (payFil && !payFil._rsListenerBound) {
@@ -490,6 +597,8 @@
     renderBills,
     bindFilters,
     filterBills,
+    searchBillsServer,
+    normalizeServerBill,
     showRefundModal,
     showDeleteConfirm,
   };

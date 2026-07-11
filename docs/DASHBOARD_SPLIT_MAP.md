@@ -9,6 +9,7 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 | Bill numbers / channel series | `assets/modules/bill-identity.js` | ✅ |
 | Inventory deduct/restore | `assets/modules/inventory-ledger.js` | ✅ |
 | Bills history UI (table, refund, delete) | `assets/modules/bills-history.js` | ✅ Wave 6 |
+| Inventory stock/recipes UI | `assets/modules/inventory-ui.js` | ✅ Wave 7 |
 | ESC/POS encode | `assets/escpos-encoder.js` | ✅ |
 | Print routing | `assets/print-bridge.js` | ✅ |
 | Shifts / station / keys | `assets/competitive-ops.js` | ✅ |
@@ -17,11 +18,10 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 
 | # | Domain | Approx lines | Notes |
 |---|--------|--------------|-------|
-| 1 | Bills history UI | ~250 | `renderBills`, refund modal, delete — depends on `BILLS`, `toast`, `rs` |
-| 2 | Reports | ~250 | Already uses `sales_summary` RPC |
-| 3 | Super-admin table | ~1200 | High isolation; own file + `RS.addRenderer` |
-| 4 | Gateway monitor | ~200 | Super-admin only |
-| 5 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last |
+| 1 | Reports | ~250 | Already uses `sales_summary` RPC |
+| 2 | Super-admin table | ~1200 | High isolation; own file + `RS.addRenderer` |
+| 3 | Gateway monitor | ~200 | Super-admin only |
+| 4 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last |
 
 ## Rules
 
@@ -33,6 +33,6 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 ## Boot after remaining
 
 ```
-doppio-api → db → print-bridge → escpos → bill-identity → inventory-ledger → bills-history
+doppio-api → db → print-bridge → escpos → bill-identity → inventory-ledger → bills-history → inventory-ui
 → saas-core → dashboard → features-pos → critical.bundle → shell
 ```
