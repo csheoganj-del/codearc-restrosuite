@@ -77,7 +77,7 @@
         const phoneBit = phone ? maskPhoneForChip(phone) : '';
         label.textContent = (name || 'Guest') + (phoneBit ? ' · ' + phoneBit : '');
       } else {
-        label.textContent = open ? 'Customer details' : 'Add customer';
+        label.textContent = open ? 'Details' : 'Customer';
       }
     }
     if (clearBtn) {
@@ -485,7 +485,9 @@ function openLineNoteEditor(id) {
 }
 function renderCart(){
   const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
-  $('#cart-count').textContent = count+(count===1?' item':' items');
+  const countEl = $('#cart-count');
+  if (countEl) countEl.textContent = count+(count===1?' item':' items');
+  try { syncTablePaxForOrderType(); } catch (_) {}
 
   const totals = getTotals();
   const isIncl = totals.taxProfile.inclusive_pricing;
@@ -537,8 +539,10 @@ function renderCart(){
     <div class="cart-line${c.note ? ' has-note' : ''}" data-line-id="${_e(c.id)}" title="Long-press for kitchen note">
       <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
       <div class="cinfo">
-        <div class="cn">${_e(c.name)}${c.happyHour ? ' <span class="cart-hh">HH</span>' : ''}</div>
-        <div class="cp">${rs(c.price)} each${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' · was ' + rs(c.basePrice) : ''}</div>
+        <div class="cn-row">
+          <span class="cn">${_e(c.name)}${c.happyHour ? ' <span class="cart-hh">HH</span>' : ''}</span>
+          <span class="cp" title="Unit price">${rs(c.price)}${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' <s class="cp-was">' + rs(c.basePrice) + '</s>' : ''}</span>
+        </div>
         ${c.note ? `<button type="button" class="cnote cart-line-note" data-note-id="${_e(c.id)}" title="Edit kitchen note"><i class="fa-solid fa-comment" aria-hidden="true"></i> ${_e(c.note)}</button>` : ''}
       </div>
       <div class="qty"><button type="button" data-d="-1" data-id="${_e(c.id)}" aria-label="Decrease"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button type="button" data-d="1" data-id="${_e(c.id)}" aria-label="Increase"><i class="fa-solid fa-plus"></i></button></div>
@@ -966,13 +970,21 @@ function wireCartActions(){
 }
 // POS init (static parts present in HTML, wire them)
 function syncTablePaxForOrderType() {
-  const row = document.getElementById('cart-table-pax-row');
-  if (!row) return;
   const active = document.querySelector('.order-type-btn.active');
   const t = (active && active.textContent || '').toLowerCase();
   const dineIn = t.includes('dine');
-  // Takeaway/delivery: hide table+pax clutter (Petpooja walk-in default)
-  row.style.display = dineIn ? 'grid' : 'none';
+  const delivery = t.includes('deliv');
+  const cartEl = document.querySelector('.pos-cart');
+  if (cartEl) {
+    cartEl.classList.toggle('is-dinein', dineIn);
+    cartEl.classList.toggle('is-delivery', delivery);
+  }
+  const row = document.getElementById('cart-table-pax-row');
+  if (row) {
+    // Takeaway/delivery: hide table+pax clutter (walk-in default)
+    row.style.display = dineIn ? 'grid' : 'none';
+    row.classList.toggle('is-visible', dineIn);
+  }
 }
 
 function initPOS(){

@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v90-20260711-tender';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v91-20260711-workbench';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -526,84 +526,66 @@
             </div>
           </div>
 
-          <aside class="pos-cart">
+          <aside class="pos-cart pos-cart-workbench">
             <div class="cart-head">
-              <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" style="margin-right:8px; padding: 4px 8px; font-size:12px; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> Back</button>
+              <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" style="margin-right:6px; padding: 4px 8px; font-size:12px; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> Back</button>
               <h3>Current Order</h3>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
-                <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
+              <div class="cart-head-actions">
+                <span class="pill pill-orange cart-count-pill"><span id="cart-count">0 items</span></span>
+                <button class="btn btn-ghost cart-clear-btn" id="btn-clear-cart" title="Clear cart" aria-label="Clear cart"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <!-- Order type next to cart (Petpooja-style) — frees menu area -->
+            <!-- Order type — compact segmented control -->
             <div class="order-types order-types-cart" id="pos-cart-order-types" role="group" aria-label="Order type">
-              <button type="button" class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
-              <button type="button" class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
-              <button type="button" class="order-type-btn"><i class="fa-solid fa-motorcycle"></i> Delivery</button>
+              <button type="button" class="order-type-btn active" title="Takeaway"><i class="fa-solid fa-bag-shopping"></i><span>Takeaway</span></button>
+              <button type="button" class="order-type-btn" title="Dine-in"><i class="fa-solid fa-utensils"></i><span>Dine-in</span></button>
+              <button type="button" class="order-type-btn" title="Delivery"><i class="fa-solid fa-motorcycle"></i><span>Delivery</span></button>
             </div>
-            <!-- Shift status mounts here (not above menu) -->
-            <div id="pos-shift-slot" class="pos-shift-slot" aria-live="polite"></div>
-            <div class="cart-table-sel" id="cart-table-sel" style="display: grid; grid-template-columns: 1fr; gap: 8px; position: relative; align-items: start;">
-              <div class="cart-table-pax-row" id="cart-table-pax-row" style="display:grid;grid-template-columns:1fr 88px;gap:8px;align-items:stretch">
-                <select class="form-input" id="cart-table" style="height: 44px; padding: 0 32px 0 12px; font-size: 14px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
-                <input type="number" id="cart-covers" class="form-input" min="0" max="99" step="1" placeholder="Pax" title="Guest covers (pax)" inputmode="numeric" style="height:44px;padding:0 8px;font-size:14px;border-radius:8px;box-sizing:border-box;text-align:center;font-weight:700" aria-label="Guest covers">
-              </div>
-              <div class="custom-customer-widget" id="custom-customer-widget">
-                <div class="cart-cust-row">
-                  <button type="button" class="cart-cust-toggle" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs">
-                    <i class="fa-solid fa-user"></i>
-                    <span id="cart-cust-toggle-label">Add customer</span>
-                    <i class="fa-solid fa-chevron-down cart-cust-chevron"></i>
-                  </button>
+            <!-- Shift + customer share one utility row → more room for cart lines -->
+            <div class="cart-meta-row" id="cart-meta-row">
+              <div id="pos-shift-slot" class="pos-shift-slot" aria-live="polite"></div>
+              <div class="cart-table-sel" id="cart-table-sel">
+                <div class="cart-table-pax-row" id="cart-table-pax-row">
+                  <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+                  <input type="number" id="cart-covers" class="form-input" min="0" max="99" step="1" placeholder="Pax" title="Guest covers (pax)" inputmode="numeric" aria-label="Guest covers">
                 </div>
-                <!-- Collapsed by default — walk-in is the common path -->
-                <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden>
-                  <div class="cart-cust-fields">
-                    <input type="text" id="cust-input-name" placeholder="Name / search…" class="form-input" autocomplete="off">
-                    <input type="tel" id="cust-input-phone" placeholder="Phone" class="form-input" autocomplete="tel">
+                <div class="custom-customer-widget" id="custom-customer-widget">
+                  <div class="cart-cust-row">
+                    <button type="button" class="cart-cust-toggle" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs">
+                      <i class="fa-solid fa-user"></i>
+                      <span id="cart-cust-toggle-label">Customer</span>
+                      <i class="fa-solid fa-chevron-down cart-cust-chevron"></i>
+                    </button>
                   </div>
-                  <!-- Search results in overlay (does not push cart lines) -->
-                  <div id="cust-search-popover" class="cust-search-popover" style="display:none" role="listbox" aria-label="Matching customers"></div>
-                </div>
-                <!-- Dues stay visible under chip even when form is collapsed -->
-                <div id="cart-customer-dues-banner" style="display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.08);color:var(--text-soft);line-height:1.4;margin-top:6px"></div>
-                
-                <!-- Hidden trigger for backwards compatibility -->
-                <div class="cust-widget-trigger" id="cust-widget-trigger" style="display: none;">
-                  <span id="cust-trigger-text">Walk-in</span>
-                </div>
-
-                <!-- Dropdown overlay for search results, insights and actions -->
-                <div class="cpay-side-drawer cpay-drawer-left" id="cust-widget-dropdown">
-                  <div class="csd-header">
-                    <span class="csd-title"><i class="fa-solid fa-user-gear" style="color:var(--orange);"></i> Customer Insights</span>
-                    <button type="button" id="cust-widget-close" class="csd-close">&times;</button>
+                  <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden>
+                    <div class="cart-cust-fields">
+                      <input type="text" id="cust-input-name" placeholder="Name / search…" class="form-input" autocomplete="off">
+                      <input type="tel" id="cust-input-phone" placeholder="Phone" class="form-input" autocomplete="tel">
+                    </div>
+                    <div id="cust-search-popover" class="cust-search-popover" style="display:none" role="listbox" aria-label="Matching customers"></div>
                   </div>
-                  <div class="csd-body" style="overflow-y: auto;">
-                    <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
-                    
-                    <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
-                      <div class="insight-item">
-                        <span class="insight-label">Visits</span>
-                        <span class="insight-val" id="insight-visits">0</span>
-                      </div>
-                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
-                        <span class="insight-label">Spent</span>
-                        <span class="insight-val" id="insight-spend">₹0</span>
-                      </div>
-                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
-                        <span class="insight-label">Dues</span>
-                        <span class="insight-val" id="insight-dues" style="color:var(--orange)">₹0</span>
-                      </div>
-                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
-                        <span class="insight-label">Favorite</span>
-                        <span class="insight-val" id="insight-favorite" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">None</span>
+                  <div id="cart-customer-dues-banner" class="cart-dues-banner" style="display:none"></div>
+                  <div class="cust-widget-trigger" id="cust-widget-trigger" style="display: none;">
+                    <span id="cust-trigger-text">Walk-in</span>
+                  </div>
+                  <div class="cpay-side-drawer cpay-drawer-left" id="cust-widget-dropdown">
+                    <div class="csd-header">
+                      <span class="csd-title"><i class="fa-solid fa-user-gear" style="color:var(--orange);"></i> Customer Insights</span>
+                      <button type="button" id="cust-widget-close" class="csd-close">&times;</button>
+                    </div>
+                    <div class="csd-body" style="overflow-y: auto;">
+                      <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
+                      <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
+                        <div class="insight-item"><span class="insight-label">Visits</span><span class="insight-val" id="insight-visits">0</span></div>
+                        <div class="insight-item"><span class="insight-label">Spent</span><span class="insight-val" id="insight-spend">₹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Dues</span><span class="insight-val" id="insight-dues" style="color:var(--orange)">₹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Favorite</span><span class="insight-val" id="insight-favorite">None</span></div>
                       </div>
                     </div>
                   </div>
                 </div>
+                <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
               </div>
-              <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
             </div>
             <!-- Delivery Details Row (hidden by default) -->
             <div class="cart-delivery-details" id="cart-delivery-details" style="display: none; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px; background: var(--glass-2); border: 1px solid var(--stroke-2); border-radius: var(--r-sm);">
@@ -675,32 +657,29 @@
                   </div>
                 </div>
 
-                <!-- Inline tenders (no separate floating tabs) — same field IDs as before -->
+                <!-- Compact inline tenders — one row for cash; split expands only when needed -->
                 <div class="cart-tender-host" id="cart-tender-host">
-                  <div id="cash-drawer" class="cart-tender-panel" hidden>
-                    <div class="cart-tender-head">
-                      <span><i class="fa-solid fa-money-bill-wave" style="color:#25d366"></i> Cash tender</span>
-                      <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Collapse">&times;</button>
-                    </div>
+                  <div id="cash-drawer" class="cart-tender-panel cart-tender-cash" hidden>
                     <div class="cart-tender-cash-row">
-                      <label class="csd-label" for="inline-cash-received">Received</label>
-                      <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0" inputmode="decimal">
-                      <span class="csd-label">Change</span>
+                      <label class="csd-label" for="inline-cash-received">Recv</label>
+                      <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0" inputmode="decimal" title="Cash received">
+                      <span class="csd-label">Chg</span>
                       <strong id="inline-cash-change" class="csd-change-amt">₹0</strong>
-                    </div>
-                    <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens">
                       <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact">Exact</button>
+                    </div>
+                    <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens" aria-label="Quick cash amounts">
                       <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
                       <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
                       <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
                       <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
                       <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">Clear</button>
+                      <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Hide cash pad" aria-label="Hide cash pad">&times;</button>
                     </div>
                   </div>
 
-                  <div id="split-drawer" class="cart-tender-panel" hidden>
+                  <div id="split-drawer" class="cart-tender-panel cart-tender-split" hidden>
                     <div class="cart-tender-head">
-                      <span><i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0"></i> Split tender</span>
+                      <span><i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0"></i> Split</span>
                       <button type="button" id="split-drawer-close" class="cart-tender-close" title="Collapse">&times;</button>
                     </div>
                     <div id="split-calc-compact" class="cart-split-grid">
@@ -722,15 +701,15 @@
                       </div>
                     </div>
                     <div id="split-quick-fill" class="cart-split-quick">
-                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash">Rest→Cash</button>
-                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi">Rest→UPI</button>
-                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card">Rest→Card</button>
-                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due">Rest→Due</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash">→Cash</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi">→UPI</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card">→Card</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due">→Due</button>
                       <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half">½·½</button>
                       <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear">Clear</button>
                     </div>
                     <div class="csd-split-status cart-split-status">
-                      <span id="split-status-text" class="csd-split-remaining">Remaining: —</span>
+                      <span id="split-status-text" class="csd-split-remaining">Left: —</span>
                       <strong id="split-total-text" class="csd-split-paid">Paid: —</strong>
                     </div>
                   </div>

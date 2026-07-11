@@ -1,5 +1,15 @@
 # RestroSuite release notes
 
+## v91 (2026-07-11) — Current Order workbench (max cart space)
+
+- **Wider cart** (~400px) and taller sticky panel for the most-used screen
+- **Shift + customer on one row** — frees vertical room for line items
+- **Dense cart lines**: name + unit on one row · qty · total (more items visible)
+- **Compact order types, pay methods, totals** without losing utility
+- **Cash tender**: Recv · Change · Exact on one row + quick notes; dens pad compact
+- **Sticky checkout foot** with robust Hold / KOT / Print & Pay
+- Table/Pax only when **Dine-in**
+
 ## v90 (2026-07-11) — Cart space + inline tender
 
 - **Customer expand is an overlay** — opening Add customer no longer shrinks cart lines to 2 items

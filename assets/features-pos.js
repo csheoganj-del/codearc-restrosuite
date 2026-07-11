@@ -1738,9 +1738,11 @@
         });
       }
 
-      // Wire denomination buttons
-      const inlineDenButtons = document.querySelectorAll('#cash-denominations-grid .btn-den');
+      // Wire denomination / Exact buttons (may live on cash row or dens grid)
+      const inlineDenButtons = document.querySelectorAll('#cash-drawer .btn-den, #cash-denominations-grid .btn-den');
       inlineDenButtons.forEach(btn => {
+        if (btn.dataset.denBound === '1') return;
+        btn.dataset.denBound = '1';
         btn.onclick = (e) => {
           e.preventDefault();
           e.stopPropagation();
