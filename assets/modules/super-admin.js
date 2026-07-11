@@ -224,6 +224,9 @@ function renderTenantTable() {
     const dashboardBtn = !isPending && !isSuspended
       ? `<button class="icon-act open-tenant-dashboard-btn" title="Open workspace dashboard" data-tid="${_e(t.id||'')}" style="font-size:13px;color:var(--orange)"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>`
       : '';
+    const seedBtn = !isPending && !isSuspended
+      ? `<button class="icon-act quick-seed-btn" title="Load demo data (one click)" data-tid="${_e(t.id||'')}" data-tname="${_e(name)}" style="font-size:13px;color:#16a34a"><i class="fa-solid fa-seedling"></i></button>`
+      : '';
     // Renews-on (paid-until) cell with colour: red=expired, amber=<=7 days, green=fine.
     const rawEnd = t.subscription_current_period_end;
     let renewsCell;
@@ -249,6 +252,7 @@ function renderTenantTable() {
         <div class="row-actions" style="gap:5px">
           ${approveBtn}
           ${suspendBtn}
+          ${seedBtn}
           ${dashboardBtn}
           <button class="icon-act manage-tenant-btn" title="Manage workspace" data-tid="${_e(t.id||'')}" style="font-size:13px"><i class="fa-solid fa-gear"></i></button>
         </div>
@@ -289,6 +293,33 @@ function renderTenantTable() {
         toast('Approval failed: ' + (err.message || err), 'fa-circle-exclamation');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-check"></i> Approve';
+      }
+    });
+  });
+
+  // One-click demo seed from tenant row (no manage modal required)
+  tbody.querySelectorAll('.quick-seed-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const tid = btn.getAttribute('data-tid');
+      const tname = btn.getAttribute('data-tname') || 'workspace';
+      if (!tid) return;
+      const ok = window.confirm(
+        'Load demo menu/inventory/bills into "' + tname + '"?\n\nExisting operational data for this workspace will be reset.'
+      );
+      if (!ok) return;
+      const prev = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+      try {
+        await RS_API.admin({ action: 'seed_tenant_data', tenant_id: tid });
+        toast('Demo data loaded for ' + tname, 'fa-seedling');
+        await renderSuper();
+      } catch (err) {
+        console.error(err);
+        toast('Seed failed: ' + (err.message || err), 'fa-circle-exclamation');
+        btn.disabled = false;
+        btn.innerHTML = prev;
       }
     });
   });
