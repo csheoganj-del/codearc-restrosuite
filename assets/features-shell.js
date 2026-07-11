@@ -362,6 +362,7 @@
           ${toggle('Pin gate due','Require PIN for Due / credit payments',gateOn('set_pin_gate_due'))}
           ${toggle('Pin gate clear cart','Require PIN to clear a non-empty cart',gateOn('set_pin_gate_clear_cart'))}
           ${toggle('Pin gate loyalty','Require PIN when redeeming large loyalty points',gateOn('set_pin_gate_loyalty'))}
+          ${toggle('Pin gate cash move','Require PIN for pay-out and safe drop from the drawer',gateOn('set_pin_gate_cash_move'))}
           <div class="set-section form-grid-2" style="margin-top:10px">
             ${field('Pin discount threshold',String(gateVal('set_pin_discount_threshold','10')),'% above which discount needs PIN')}
             ${field('Pin loyalty threshold',String(gateVal('set_pin_loyalty_threshold','100')),'Points at/above which redeem needs PIN')}

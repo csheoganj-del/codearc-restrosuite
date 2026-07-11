@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v78 (2026-07-11) — Cash drawer pay-in / pay-out / safe drop
+
+- **Cash** on open shift bar: record pay-in, pay-out, or safe drop with amount + reason
+- **Expected cash** on Z = float + cash sales + pay-ins − pay-outs − safe drops
+- Z-report HTML/CSV lists movement totals and line detail
+- Shift persists `cashMovements`; close stamps total pay-ins / payouts / safe drops
+- **PIN gate** for pay-out & safe drop (Settings → Security → Pin gate cash move)
+
 ## v77 (2026-07-11) — POS promo / coupon codes
 
 - **Promo code** field on POS cart: Apply / Clear; badge shows code + % or fixed off
@@ -138,7 +146,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v77-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v78-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

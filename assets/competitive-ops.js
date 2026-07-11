@@ -493,6 +493,7 @@
       openedAt: new Date().toISOString(),
       closedAt: null,
       openingFloat: Number(floatAmt) || 0,
+      cashMovements: [],
       status: 'OPEN',
     };
     saveOpenShift(shift);
@@ -503,6 +504,183 @@
     }
     toast('Shift opened · float ' + rs(shift.openingFloat), 'fa-cash-register');
     return shift;
+  }
+
+  /* ---------------- Cash drawer movements (pay-in / pay-out / safe drop) ---------------- */
+  function getShiftMovements(shift) {
+    const m = shift && shift.cashMovements;
+    return Array.isArray(m) ? m : [];
+  }
+  function sumCashMovements(shift) {
+    let payIn = 0;
+    let payOut = 0;
+    let safeDrop = 0;
+    getShiftMovements(shift).forEach((mv) => {
+      const a = Math.max(0, Number(mv.amount) || 0);
+      const t = String(mv.type || '').toLowerCase();
+      if (t === 'pay_in' || t === 'payin' || t === 'in') payIn += a;
+      else if (t === 'pay_out' || t === 'payout' || t === 'out') payOut += a;
+      else if (t === 'safe_drop' || t === 'safedrop' || t === 'drop') safeDrop += a;
+    });
+    return { payIn, payOut, safeDrop };
+  }
+  function movementLabel(type) {
+    const t = String(type || '').toLowerCase();
+    if (t === 'pay_in' || t === 'payin' || t === 'in') return 'Pay-in';
+    if (t === 'pay_out' || t === 'payout' || t === 'out') return 'Pay-out';
+    if (t === 'safe_drop' || t === 'safedrop' || t === 'drop') return 'Safe drop';
+    return type || 'Move';
+  }
+  async function persistOpenShift(shift) {
+    saveOpenShift(shift);
+    try {
+      if (shift && global.RS_DB && RS_DB.put) await RS_DB.put('shifts', shift.shiftId, shift);
+    } catch (e) {
+      console.warn('[Shift] cash move save failed', e);
+    }
+  }
+  async function addCashMovement(type, amount, reason) {
+    const shift = getOpenShift();
+    if (!shift) {
+      toast('Open a shift first', 'fa-circle-exclamation');
+      return false;
+    }
+    const t = String(type || '').toLowerCase();
+    const norm =
+      t === 'pay_in' || t === 'payin' || t === 'in'
+        ? 'pay_in'
+        : t === 'pay_out' || t === 'payout' || t === 'out'
+          ? 'pay_out'
+          : t === 'safe_drop' || t === 'safedrop' || t === 'drop'
+            ? 'safe_drop'
+            : '';
+    if (!norm) {
+      toast('Unknown cash movement type', 'fa-circle-exclamation');
+      return false;
+    }
+    const amt = Math.abs(Number(amount) || 0);
+    if (!(amt > 0)) {
+      toast('Enter an amount greater than zero', 'fa-circle-exclamation');
+      return false;
+    }
+    // PIN for money leaving the drawer (toggle: Settings → Security → Pin gate cash move)
+    if (norm === 'pay_out' || norm === 'safe_drop') {
+      if (global.RSPinModal && typeof RSPinModal.require === 'function') {
+        const pinOk = await RSPinModal.require(movementLabel(norm) + ' ' + rs(amt), {
+          settingKey: 'set_pin_gate_cash_move',
+        });
+        if (!pinOk) {
+          toast('Cash movement cancelled — PIN required', 'fa-lock');
+          return false;
+        }
+      }
+    }
+    const s = session();
+    const mv = {
+      id: 'CM-' + Date.now(),
+      type: norm,
+      amount: amt,
+      reason: String(reason || '').trim().slice(0, 140),
+      at: new Date().toISOString(),
+      by: s.display_name || s.username || shift.cashierName || '',
+      stationId: getStationId(),
+      stationLabel: getStationLabel(),
+    };
+    if (!Array.isArray(shift.cashMovements)) shift.cashMovements = [];
+    shift.cashMovements.push(mv);
+    await persistOpenShift(shift);
+    paintShiftBar();
+    toast(movementLabel(norm) + ' ' + rs(amt), norm === 'pay_in' ? 'fa-arrow-down' : 'fa-arrow-up');
+    return true;
+  }
+  function openCashMovementModal() {
+    const shift = getOpenShift();
+    if (!shift) {
+      toast('Open a shift first', 'fa-circle-exclamation');
+      return;
+    }
+    if (!global.RSModal) {
+      const type = window.prompt('Type: pay_in | pay_out | safe_drop', 'pay_in');
+      if (type == null) return;
+      const amt = window.prompt('Amount', '0');
+      if (amt == null) return;
+      const reason = window.prompt('Reason / note', '') || '';
+      addCashMovement(type, amt, reason);
+      return;
+    }
+    const mov = sumCashMovements(shift);
+    const recent = getShiftMovements(shift)
+      .slice(-6)
+      .reverse()
+      .map(
+        (m) =>
+          `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--stroke-2)">
+            <span><b>${esc(movementLabel(m.type))}</b> · ${esc(m.reason || '—')}</span>
+            <span style="font-weight:700;white-space:nowrap">${rs(m.amount)}</span>
+          </div>`
+      )
+      .join('');
+    RSModal.open({
+      title: 'Cash drawer',
+      sub: 'Pay-in · pay-out · safe drop · ' + (shift.shiftId || ''),
+      icon: 'fa-money-bill-wave',
+      body: `<div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+          <div style="padding:8px;border-radius:8px;border:1px solid var(--stroke-2);background:var(--glass-1)"><div style="color:var(--text-mute);font-size:10px;font-weight:700;text-transform:uppercase">Pay-ins</div><div style="font-weight:800;color:var(--green)">${rs(mov.payIn)}</div></div>
+          <div style="padding:8px;border-radius:8px;border:1px solid var(--stroke-2);background:var(--glass-1)"><div style="color:var(--text-mute);font-size:10px;font-weight:700;text-transform:uppercase">Pay-outs</div><div style="font-weight:800;color:#ef4444">${rs(mov.payOut)}</div></div>
+          <div style="padding:8px;border-radius:8px;border:1px solid var(--stroke-2);background:var(--glass-1)"><div style="color:var(--text-mute);font-size:10px;font-weight:700;text-transform:uppercase">Safe drops</div><div style="font-weight:800">${rs(mov.safeDrop)}</div></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px" id="cm-type-row">
+          <button type="button" class="btn btn-ghost btn-sm active" data-cm-type="pay_in" style="font-weight:700"><i class="fa-solid fa-arrow-down"></i> Pay-in</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-cm-type="pay_out" style="font-weight:700"><i class="fa-solid fa-arrow-up"></i> Pay-out</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-cm-type="safe_drop" style="font-weight:700"><i class="fa-solid fa-vault"></i> Safe drop</button>
+        </div>
+        <div>
+          <label class="fl" style="font-size:12px">Amount</label>
+          <input type="number" id="cm-amount" class="form-input" min="0" step="1" placeholder="0" style="width:100%;height:36px" inputmode="decimal">
+        </div>
+        <div>
+          <label class="fl" style="font-size:12px">Reason / note</label>
+          <input type="text" id="cm-reason" class="form-input" placeholder="e.g. Bank deposit, change order, tips tip-out" style="width:100%;height:36px" maxlength="140">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-mute);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Recent on this shift</div>
+          ${recent || '<div style="font-size:12px;color:var(--text-mute)">No movements yet</div>'}
+        </div>
+        <p style="font-size:11.5px;color:var(--text-soft);margin:0">Expected cash on Z = float + cash sales + pay-ins − pay-outs − safe drops. Pay-out &amp; safe drop ask for manager PIN when configured.</p>
+      </div>`,
+      foot:
+        '<button class="btn btn-ghost" style="flex:1" data-cm-x>Cancel</button>' +
+        '<button class="btn btn-primary" style="flex:1" data-cm-ok><i class="fa-solid fa-check"></i> Record</button>',
+      onMount(m, close) {
+        let chosen = 'pay_in';
+        const row = m.querySelector('#cm-type-row');
+        if (row) {
+          row.querySelectorAll('[data-cm-type]').forEach((btn) => {
+            btn.onclick = () => {
+              chosen = btn.getAttribute('data-cm-type') || 'pay_in';
+              row.querySelectorAll('[data-cm-type]').forEach((b) => b.classList.toggle('active', b === btn));
+            };
+          });
+        }
+        const x = m.querySelector('[data-cm-x]');
+        if (x) x.onclick = close;
+        const ok = m.querySelector('[data-cm-ok]');
+        if (ok)
+          ok.onclick = async () => {
+            const amtEl = m.querySelector('#cm-amount');
+            const reasonEl = m.querySelector('#cm-reason');
+            const done = await addCashMovement(
+              chosen,
+              amtEl && amtEl.value,
+              reasonEl && reasonEl.value
+            );
+            if (done) close();
+          };
+        const amtEl = m.querySelector('#cm-amount');
+        if (amtEl) setTimeout(() => amtEl.focus(), 50);
+      },
+    });
   }
 
   const SHIFT_HISTORY_KEY = 'rs_shift_history';
@@ -567,7 +745,9 @@
       refundTotal += Number(b.amount != null ? b.amount : b.total) || 0;
     });
     const cashSales = byPay.Cash || byPay.cash || 0;
-    const expectedCash = (Number(shift.openingFloat) || 0) + cashSales;
+    const mov = sumCashMovements(shift);
+    const expectedCash =
+      (Number(shift.openingFloat) || 0) + cashSales + mov.payIn - mov.payOut - mov.safeDrop;
     const actual = Number(actualCash);
     const variance = Number.isFinite(actual) ? actual - expectedCash : null;
     return {
@@ -582,6 +762,10 @@
       byPay,
       byStation,
       cashSales,
+      payInTotal: mov.payIn,
+      payOutTotal: mov.payOut,
+      safeDropTotal: mov.safeDrop,
+      cashMovements: getShiftMovements(shift),
       expectedCash,
       actualCash: Number.isFinite(actual) ? actual : null,
       variance,
@@ -624,9 +808,23 @@
       <hr style="border:0;border-top:1px dashed #ccc;margin:10px 0">
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Opening float</span><span>${rs(summary.openingFloat)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Cash sales</span><span>${rs(summary.cashSales)}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Pay-ins</span><span>${rs(summary.payInTotal || 0)}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Pay-outs</span><span>− ${rs(summary.payOutTotal || 0)}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Safe drops</span><span>− ${rs(summary.safeDropTotal || 0)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Expected cash</span><span>${rs(summary.expectedCash)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Actual cash</span><span>${summary.actualCash != null ? rs(summary.actualCash) : '—'}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;padding:6px 0;color:${summary.variance != null && summary.variance !== 0 ? '#ef4444' : 'inherit'}"><span>Variance</span><span>${summary.variance != null ? rs(summary.variance) : '—'}</span></div>
+      ${
+        Array.isArray(summary.cashMovements) && summary.cashMovements.length
+          ? `<hr style="border:0;border-top:1px dashed #ccc;margin:10px 0"><div style="font-size:11px;font-weight:700;margin-bottom:4px">Cash movements</div>` +
+            summary.cashMovements
+              .map(
+                (m) =>
+                  `<div class="rcp-line" style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:#444"><span>${esc(movementLabel(m.type))}${m.reason ? ' · ' + esc(m.reason) : ''}</span><span>${rs(m.amount)}</span></div>`
+              )
+              .join('')
+          : ''
+      }
       <div style="text-align:center;font-size:11px;color:#666;margin-top:14px">Powered by RestroSuite</div>
     </div>`;
   }
@@ -650,12 +848,21 @@
       ['Delivery fees', summary.deliveryTotal || 0],
       ['Opening float', summary.openingFloat],
       ['Cash sales', summary.cashSales],
+      ['Pay-ins', summary.payInTotal || 0],
+      ['Pay-outs', summary.payOutTotal || 0],
+      ['Safe drops', summary.safeDropTotal || 0],
       ['Expected cash', summary.expectedCash],
       ['Actual cash', summary.actualCash != null ? summary.actualCash : ''],
       ['Variance', summary.variance != null ? summary.variance : ''],
     ];
     Object.entries(summary.byPay || {}).forEach(([m, v]) => lines.push(['Pay:' + m, v]));
     Object.entries(summary.byStation || {}).forEach(([m, v]) => lines.push(['Station:' + m, v]));
+    (summary.cashMovements || []).forEach((m) => {
+      lines.push([
+        'Move:' + movementLabel(m.type),
+        (Number(m.amount) || 0) + (m.reason ? ' | ' + m.reason : ''),
+      ]);
+    });
     return lines.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
   }
 
@@ -741,6 +948,9 @@
     shift.expectedCash = summary.expectedCash;
     shift.variance = summary.variance;
     shift.totalSalesCash = summary.cashSales;
+    shift.totalPayIns = summary.payInTotal || 0;
+    shift.totalPayouts = summary.payOutTotal || 0;
+    shift.totalSafeDrops = summary.safeDropTotal || 0;
     shift.zScope = summary.scope;
     try {
       if (global.RS_DB && RS_DB.put) await RS_DB.put('shifts', shift.shiftId, shift);
@@ -774,11 +984,16 @@
     if (shift) {
       const sum = summarizeShift(shift);
       const scope = getZScope();
+      const movHint =
+        sum.payInTotal || sum.payOutTotal || sum.safeDropTotal
+          ? ` · drawer ${rs(sum.expectedCash)}`
+          : '';
       bar.innerHTML = `<span style="font-weight:800"><i class="fa-solid fa-circle" style="color:#22c55e;font-size:9px;margin-right:6px"></i>Shift open</span>
         <span style="color:var(--text-soft)">${esc(shift.cashierName)} · ${esc(getStationLabel())}</span>
-        <span style="color:var(--text-soft)">${sum.bills} bills · ${rs(sum.gross)}</span>
+        <span style="color:var(--text-soft)">${sum.bills} bills · ${rs(sum.gross)}${movHint}</span>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-z-scope" title="Z-report includes ${scope === 'all' ? 'all stations' : 'this station only'}">${scope === 'all' ? 'All stations' : 'This station'}</button>
         <div style="flex:1"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Pay-in, pay-out, safe drop"><i class="fa-solid fa-money-bill-wave"></i> Cash</button>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack-bar" title="Export today bills"><i class="fa-solid fa-file-export"></i> Day pack</button>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z"><i class="fa-solid fa-file-invoice"></i> Preview Z</button>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close"><i class="fa-solid fa-lock"></i> Close shift</button>`;
@@ -789,6 +1004,8 @@
           paintShiftBar();
           toast(getZScope() === 'all' ? 'Z-report: all stations' : 'Z-report: this station only', 'fa-store');
         };
+      const cm = bar.querySelector('#rs-cash-move');
+      if (cm) cm.onclick = () => openCashMovementModal();
       const z = bar.querySelector('#rs-shift-z');
       if (z)
         z.onclick = () => {
@@ -1602,6 +1819,9 @@
       closeShift,
       getOpenShift,
       summarizeShift,
+      addCashMovement,
+      openCashMovementModal,
+      sumCashMovements,
       zReportHtml,
       zReportCsv,
       downloadZCsv,

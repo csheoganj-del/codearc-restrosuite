@@ -156,6 +156,16 @@ test('waste log deducts inventory stock', () => {
   assert.match(html, /data-inv-tab="waste"|Waste log/);
 });
 
+test('cash drawer pay-in pay-out safe drop', () => {
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const shell = fs.readFileSync(path.join(root, 'assets/features-shell.js'), 'utf8');
+  assert.match(ops, /addCashMovement|openCashMovementModal|sumCashMovements/);
+  assert.match(ops, /pay_in|pay_out|safe_drop|cashMovements/);
+  assert.match(ops, /payInTotal|payOutTotal|safeDropTotal/);
+  assert.match(ops, /rs-cash-move|set_pin_gate_cash_move/);
+  assert.match(shell, /Pin gate cash move/);
+});
+
 test('POS promo codes: totals, apply, receipt, settings', () => {
   const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
   const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
