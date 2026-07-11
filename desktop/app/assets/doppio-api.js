@@ -462,7 +462,7 @@
     const errText = document.createTextNode('⚠️ ' + msg.slice(0, 120));
     const reload = document.createElement('button');
     reload.textContent = 'Reload';
-    reload.style.cssText = 'padding:4px 12px;border-radius:8px;border:1px solid var(--orange,#fc8019);background:transparent;color:var(--orange,#fc8019);cursor:pointer;font-size:12px;white-space:nowrap';
+    reload.style.cssText = 'padding:4px 12px;border-radius:8px;border:1px solid var(--orange,#FF4F00);background:transparent;color:var(--orange,#FF4F00);cursor:pointer;font-size:12px;white-space:nowrap';
     reload.onclick = function() { location.reload(); };
     const dismiss = document.createElement('button');
     dismiss.textContent = '×';

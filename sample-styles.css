@@ -16,8 +16,8 @@
   --line: #e5e5e7;               /* Subtle light line */
   --line-strong: #d2d2d7;        /* Stronger gray line */
   
-  --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --serif: 'Plus Jakarta Sans', var(--sans);
+  --sans: 'DM Sans', system-ui, BlinkMacSystemFont, sans-serif;
+  --serif: var(--font-display), var(--sans);
   --ease: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 

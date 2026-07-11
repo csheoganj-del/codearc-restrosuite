@@ -1685,7 +1685,7 @@ body::before {
 .demo-data-badge {
   padding: 4px 7px;
   border-radius: 999px;
-  background: #FF6B00;
+  background: #FF4F00;
   color: #fff;
   font-size: 9px;
   font-weight: 800;
@@ -4745,7 +4745,7 @@ body.role-superadmin .mobile-bottom-nav {
 
 .dropdown-item:hover {
   background-color: rgba(252, 128, 25, 0.08);
-  color: #FC8019;
+  color: #FF4F00;
 }
 
 .dropdown-item.warning-item:hover {
@@ -5838,7 +5838,7 @@ body.dark-theme #page-lock-overlay {
 
 .kds-card.type-dine-in { border-top: 5px solid var(--accent-caramel); }
 .kds-card.type-takeaway { border-top: 5px solid var(--primary-brand); }
-.kds-card.type-swiggy { border-top: 5px solid #fc8019; }
+.kds-card.type-swiggy { border-top: 5px solid #FF4F00; }
 .kds-card.type-zomato { border-top: 5px solid #e23744; }
 
 .kds-card-header {
@@ -6499,7 +6499,7 @@ textarea,
   }
 
   .mobile-nav-link.active i {
-    background: #FF6B00;
+    background: #FF4F00;
     color: #FFFFFF;
   }
 
@@ -6624,7 +6624,7 @@ textarea,
   }
 
   .more-sheet-link i {
-    color: #FF6B00 !important;
+    color: #FF4F00 !important;
   }
 
   .floating-cart-bar {
@@ -6634,7 +6634,7 @@ textarea,
     bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 22px) !important;
     min-height: 52px !important;
     border-radius: 8px !important;
-    background: #FF6B00 !important;
+    background: #FF4F00 !important;
     box-shadow: 0 10px 22px rgba(255, 107, 0, 0.28) !important;
   }
 
@@ -6775,7 +6775,7 @@ button {
 }
 
 .growth-panel-title i {
-  color: #FF6B00;
+  color: #FF4F00;
 }
 
 .growth-mini-form {
@@ -6846,7 +6846,7 @@ button {
   transform: translateY(-1px);
 }
 .growth-item.active-filter {
-  border: 2px solid #FC8019 !important;
+  border: 2px solid #FF4F00 !important;
   background: rgba(252, 128, 25, 0.08) !important;
   box-shadow: 0 4px 12px rgba(252, 128, 25, 0.15) !important;
   transform: translateY(-1px);
@@ -6892,7 +6892,7 @@ body.dark-theme .growth-item.active-filter {
 }
 
 .saas-snapshot-card.active-filter {
-  border: 2px solid #FC8019 !important;
+  border: 2px solid #FF4F00 !important;
   background: rgba(252, 128, 25, 0.06) !important;
   box-shadow: 0 4px 14px rgba(252, 128, 25, 0.12) !important;
 }
@@ -6976,7 +6976,7 @@ body.dark-theme .saas-snapshot-card.active-filter {
 .growth-check input {
   width: 18px;
   height: 18px;
-  accent-color: #FF6B00;
+  accent-color: #FF4F00;
 }
 
 .growth-compliance-grid {
@@ -7474,7 +7474,7 @@ body.product-guide-open {
 .sidebar-hamburger:focus-visible {
   background: var(--bg-cream-light, #F6F7F9);
   box-shadow: 0 4px 14px rgba(0,0,0,.14);
-  outline: 2px solid var(--accent-caramel, #FF6B00);
+  outline: 2px solid var(--accent-caramel, #FF4F00);
 }
 .sidebar-overlay {
   display: none;

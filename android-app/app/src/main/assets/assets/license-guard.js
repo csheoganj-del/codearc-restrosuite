@@ -348,7 +348,7 @@
       'display:flex;align-items:center;justify-content:center;font-size:28px">🔒</div>' +
       '<div style="font-weight:800;font-size:19px;margin-bottom:10px">Reconnect to continue</div>' +
       '<div style="font-size:14px;line-height:1.6;color:#c7cede;margin-bottom:22px">' + msg + '</div>' +
-      '<button id="rs-license-retry" style="background:#FC8019;color:#fff;border:none;border-radius:10px;' +
+      '<button id="rs-license-retry" style="background:#FF4F00;color:#fff;border:none;border-radius:10px;' +
       'padding:12px 22px;font-weight:700;font-size:14px;cursor:pointer">Retry now</button>' +
       '<div style="margin-top:16px;font-size:12px;color:#8b93a7">Need help? Contact RestroSuite support.</div>' +
       '</div>';
@@ -383,7 +383,7 @@
     ].join(';');
     bar.innerHTML =
       '<span>⚠️ RestroSuite will need to reconnect ' + when + ' to stay active.</span>' +
-      '<button id="rs-license-renew" style="background:#FC8019;color:#fff;border:none;border-radius:8px;' +
+      '<button id="rs-license-renew" style="background:#FF4F00;color:#fff;border:none;border-radius:8px;' +
       'padding:7px 12px;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap">Renew now</button>' +
       '<button id="rs-license-dismiss" style="background:transparent;color:#ffd9b8;border:none;' +
       'font-size:16px;cursor:pointer;line-height:1">×</button>';

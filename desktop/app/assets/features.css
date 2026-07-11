@@ -6,8 +6,7 @@
 /* ---------------- MODAL SYSTEM ---------------- */
 .rs-overlay {
   position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center;
-  padding: 24px; background: rgba(6,6,10,0.62); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
-  opacity: 0; pointer-events: none; transition: opacity .28s var(--ease);
+  padding: 24px; background: rgba(6,6,10,0.62); opacity: 0; pointer-events: none; transition: opacity .28s var(--ease);
 }
 .rs-overlay.show { opacity: 1; pointer-events: auto; }
 .rs-modal {
@@ -246,8 +245,7 @@
 /* ---------------- SAAS TENANT MANAGEMENT MODAL ---------------- */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 200000; display: none; align-items: center; justify-content: center;
-  padding: 24px; background: rgba(6,6,10,0.62); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
-  opacity: 0; transition: opacity .25s ease;
+  padding: 24px; background: rgba(6,6,10,0.62); opacity: 0; transition: opacity .25s ease;
 }
 .modal-backdrop.active { display: flex; opacity: 1; }
 .glass-modal {
@@ -462,10 +460,10 @@
 }
 
 
- 
- @ m e d i a   ( m a x - w i d t h :   6 0 0 p x )   {   . r s - o v e r l a y   {   p a d d i n g :   1 2 p x   ! i m p o r t a n t ;   }   . r s - m o d a l   {   m a x - h e i g h t :   c a l c ( 1 0 0 d v h   -   2 4 p x )   ! i m p o r t a n t ;   }   } 
- 
- 
+
+@media (max-width: 600px) { .rs-overlay { padding: 12px !important; } .rs-modal { max-height: calc(100dvh - 24px) !important; } }
+
+
 
 @media (max-width: 1100px) {
   .cust-widget-dropdown {

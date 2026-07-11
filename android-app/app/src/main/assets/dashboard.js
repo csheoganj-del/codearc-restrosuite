@@ -2446,7 +2446,7 @@
       <div class="saas-snapshot-card ${activeClass}" ${filterData}>
         <div class="saas-snapshot-card-header">
           <span class="saas-snapshot-card-title">${escHtml(title)}</span>
-          <i class="${iconClass}" style="color: #FC8019; font-size: 14px;"></i>
+          <i class="${iconClass}" style="color: #FF4F00; font-size: 14px;"></i>
         </div>
         <div>
           <div class="saas-snapshot-card-value">${escHtml(value)}</div>
@@ -2879,7 +2879,7 @@
             if (qrContainer) qrContainer.style.display = 'flex';
             if (qrSpinner) {
               qrSpinner.style.display = 'block';
-              qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FC8019;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
+              qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
             }
             if (qrImg) qrImg.style.display = 'none';
           }

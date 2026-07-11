@@ -16,7 +16,7 @@
 <meta name="description" content="Sign in to your RestroSuite outlet dashboard or register a new restaurant. Manage POS, billing, KDS, and WhatsApp receipts.">
 <title>RestroSuite Access — Sign in or Register your Outlet</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="assets/restrosuite.css?v=20260619-dues">
+<link rel="stylesheet" href="assets/restrosuite.css?v=20260711-human">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,7 +24,7 @@
 <meta name="apple-mobile-web-app-title" content="RestroSuite">
 <link rel="apple-touch-icon" href="assets/restrosuite-mark.png">
 <link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#FF4F00">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script>
@@ -47,8 +47,8 @@
   .access-main { flex: 1; display: grid; grid-template-columns: 1fr 1.04fr; gap: clamp(24px,4vw,56px); align-items: center; width: min(1200px, calc(100% - 48px)); margin: 0 auto; padding: 24px 0 56px; }
 
   /* ===== LEFT — marketing slider ===== */
-  .access-story { position: relative; border-radius: var(--r-xl); overflow: hidden; padding: 44px; min-height: 560px; display: flex; flex-direction: column; border: 1px solid var(--stroke-2); background: linear-gradient(165deg, #3a1606 0%, #15121a 58%); box-shadow: var(--shadow-lg); }
-  .access-story::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(620px 360px at 110% -10%, rgba(255,79,0,0.28), transparent 60%), radial-gradient(520px 340px at -10% 120%, oklch(0.66 0.17 285 / 0.3), transparent 60%); }
+  .access-story { position: relative; border-radius: var(--r-lg); overflow: hidden; padding: 40px; min-height: 560px; display: flex; flex-direction: column; border: 1px solid var(--stroke-2); background: #1A1714; box-shadow: var(--shadow-md); }
+  .access-story::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(160deg, rgba(255,79,0,0.16) 0%, transparent 55%); }
   .story-inner { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
   .story-eyebrow { color: #fff; }
   .access-story .brand { margin-bottom: auto; }
@@ -59,7 +59,7 @@
   .story-slide { position: absolute; inset: 0; opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease), transform .6s var(--ease); pointer-events: none; }
   .story-slide.on { opacity: 1; transform: none; pointer-events: auto; }
   .story-stat { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
-  .story-stat .big { font-family: var(--font-display); font-weight: 800; font-size: 60px; line-height: 1; letter-spacing: -0.04em; color: #fff; }
+  .story-stat .big { font-family: var(--font-display); font-weight: 700; font-size: 52px; line-height: 1; letter-spacing: -0.04em; color: #fff; }
   .story-stat .suf { font-family: var(--font-display); font-weight: 700; font-size: 22px; color: var(--orange); }
 
   /* Currency flip animation */
@@ -95,8 +95,8 @@
   .story-feat i { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-size: 13px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); color: #fff; flex: none; }
 
   /* ===== marketing panel — LIGHT MODE adaptation ===== */
-  [data-theme="light"] .access-story { background: linear-gradient(165deg, rgba(255,79,0,0.16) 0%, #fff 62%); border-color: var(--stroke-2); }
-  [data-theme="light"] .access-story::after { background: radial-gradient(620px 360px at 110% -10%, rgba(255,79,0,0.16), transparent 60%), radial-gradient(520px 340px at -10% 120%, oklch(0.66 0.17 285 / 0.12), transparent 60%); }
+  [data-theme="light"] .access-story { background: #FFFFFF; border-color: var(--stroke-2); }
+  [data-theme="light"] .access-story::after { background: linear-gradient(160deg, rgba(255,79,0,0.08) 0%, transparent 50%); }
   [data-theme="light"] .story-eyebrow,
   [data-theme="light"] .access-story .brand-name,
   [data-theme="light"] .access-story .brand-name b,
@@ -110,7 +110,7 @@
 
   /* ===== RIGHT — auth card ===== */
   .login-container { display: flex; justify-content: center; }
-  .login-card { width: 100%; max-width: 480px; border-radius: var(--r-xl); padding: 38px; position: relative; background: var(--panel); border: 1px solid var(--stroke); -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%); box-shadow: var(--shadow-lg); transition: max-width .4s var(--ease); }
+  .login-card { width: 100%; max-width: 480px; border-radius: var(--r-xl); padding: 38px; position: relative; background: var(--panel); border: 1px solid var(--stroke);  box-shadow: var(--shadow-lg); transition: max-width .4s var(--ease); }
   body.register-mode .login-card { max-width: 560px; }
 
   .auth-head { margin-bottom: 24px; }
@@ -199,7 +199,7 @@
   .plan-opt .pp { margin-left: auto; font-family: var(--font-display); font-weight: 800; font-size: 16px; color: var(--orange); }
 
   /* recovery modal */
-  .recovery-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(4,4,8,0.6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .recovery-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(4,4,8,0.6);  }
   .recovery-modal.active { display: flex; }
   .recovery-card { width: 100%; max-width: 460px; border-radius: var(--r-lg); padding: 30px; background: var(--panel-solid); border: 1px solid var(--stroke-2); box-shadow: var(--shadow-lg); animation: pop .4s var(--ease-spring); }
   @keyframes pop { from { opacity: 0; transform: scale(.94) translateY(10px);} to { opacity: 1; transform: none;} }
@@ -266,9 +266,9 @@
 
       <div class="story-slides" id="story-slides">
         <div class="story-slide on">
-          <div class="story-stat"><span class="big" data-count="4.5">0</span><span class="suf">hours / day</span></div>
-          <h2>Save 4.5 hours daily.</h2>
-          <p>Automated billing, KOT routing and reconciliation hand your team back hours every single shift.</p>
+          <div class="story-stat"><span class="big" data-count="1">0</span><span class="suf">console · whole floor</span></div>
+          <h2>One place for orders, kitchen, and bills.</h2>
+          <p>POS, KOT routing, WhatsApp receipts, and reports stay in one workspace your team can learn in a shift.</p>
         </div>
         <div class="story-slide">
           <div class="story-stat"><span class="big" data-count="100">0</span><span class="suf">% cloud sync</span></div>
@@ -1143,7 +1143,8 @@
         try { found = !!localStorage.getItem(localKey); } catch(e) {}
         if(found){
           showOk('Demo mode — opening your console…');
-          try{ localStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_id', slug); }catch(e){}
+          // Tab-scoped only — never write live tenant identity into shared localStorage.
+          try{ sessionStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_slug', slug); }catch(e){}
           setTimeout(()=>location.href='dashboard',700);
         } else {
           showErr('Outlet "'+slug+'" not found. Register it first or configure Supabase to sign in to a live outlet.');
@@ -1388,8 +1389,10 @@
             set_address:payload.address, set_tax_label:taxInfo.label,
             set_tax_rate_percent:taxInfo.rate, set_calculate_taxes:true
           }));
-          localStorage.setItem('tenant_id', tenantId);
+          // Live identity is tab-scoped (sessionStorage). Settings blob above is
+          // keyed by tenant id so multi-tab demos cannot clobber each other.
           sessionStorage.setItem('tenant_id', tenantId);
+          sessionStorage.setItem('tenant_slug', tenantId);
         } catch(e){}
         showOk('Outlet created! Redirecting to your new console…');
         setTimeout(()=>location.href='dashboard',900);
