@@ -90,16 +90,12 @@
     ['cust-input-name', 'cust-input-phone'].forEach((id) => {
       document.getElementById(id)?.addEventListener('input', syncLabel);
     });
-    // Auto-expand if returning cart already has customer data
-    const name = (document.getElementById('cust-input-name') || {}).value || '';
-    const phone = (document.getElementById('cust-input-phone') || {}).value || '';
-    if (name.trim() || phone.trim()) {
-      btn.setAttribute('aria-expanded', 'true');
-      panel.hidden = false;
-      panel.style.display = 'flex';
-      panel.removeAttribute('hidden');
-      btn.classList.add('is-open');
-    }
+    // Stay collapsed by default (walk-in path). Label still shows name if filled.
+    btn.setAttribute('aria-expanded', 'false');
+    panel.hidden = true;
+    panel.style.display = 'none';
+    panel.setAttribute('hidden', '');
+    btn.classList.remove('is-open');
     syncLabel();
   }
   function catColor(c) {

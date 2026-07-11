@@ -14,7 +14,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 test('v85 asset version and SW cache present', () => {
   const html = read('dashboard.html');
   const sw = read('service-worker.js');
-  assert.match(html, /v85-20260711-pos-calm/);
+  assert.match(html, /v86-20260711-pos-calm2/);
   assert.match(sw, /restrosuite-shell-v20260711/);
 });
 

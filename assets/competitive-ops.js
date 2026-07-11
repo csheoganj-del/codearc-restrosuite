@@ -394,18 +394,11 @@
   function getStationLabel() {
     try {
       let label = localStorage.getItem('rs_station_label');
-      if (!label) {
-        label = 'Counter 1';
-        localStorage.setItem('rs_station_label', label);
-        return label;
-      }
-      // Old auto-ids like ST-ABC123 — show a friendly name instead
-      if (/^ST-[A-Z0-9]+$/i.test(String(label).trim())) {
-        let friendly = localStorage.getItem('rs_station_label_friendly');
-        if (!friendly) {
-          friendly = 'Counter 1';
-          localStorage.setItem('rs_station_label_friendly', friendly);
-        }
+      // Force-migrate ugly auto station ids to a human counter name
+      if (!label || /^ST-[A-Z0-9]+$/i.test(String(label).trim())) {
+        const friendly = localStorage.getItem('rs_station_label_friendly') || 'Counter 1';
+        localStorage.setItem('rs_station_label', friendly);
+        localStorage.setItem('rs_station_label_friendly', friendly);
         return friendly;
       }
       return label;
@@ -1045,22 +1038,14 @@
         sum.payInTotal || sum.payOutTotal || sum.safeDropTotal
           ? ` · drawer ${rs(sum.expectedCash)}`
           : '';
+      // Day pack lives only under More — keep shift bar short
       bar.innerHTML = `<span style="font-weight:800"><i class="fa-solid fa-circle" style="color:#22c55e;font-size:9px;margin-right:6px"></i>Shift open</span>
         <span style="color:var(--text-soft)">${esc(shift.cashierName)} · ${esc(getStationLabel())}</span>
         <span style="color:var(--text-soft)">${sum.bills} bills · ${rs(sum.gross)}${movHint}</span>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-z-scope" title="Z-report includes ${scope === 'all' ? 'all stations' : 'this station only'}">${scope === 'all' ? 'All stations' : 'This station'}</button>
         <div style="flex:1"></div>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Pay-in, pay-out, safe drop"><i class="fa-solid fa-money-bill-wave"></i> Cash</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack-bar" title="Export today bills"><i class="fa-solid fa-file-export"></i> Day pack</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z"><i class="fa-solid fa-file-invoice"></i> Preview Z</button>
-        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close"><i class="fa-solid fa-lock"></i> Close shift</button>`;
-      const sc = bar.querySelector('#rs-z-scope');
-      if (sc)
-        sc.onclick = () => {
-          setZScope(getZScope() === 'all' ? 'station' : 'all');
-          paintShiftBar();
-          toast(getZScope() === 'all' ? 'Z-report: all stations' : 'Z-report: this station only', 'fa-store');
-        };
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z"><i class="fa-solid fa-file-invoice"></i> Z</button>
+        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close"><i class="fa-solid fa-lock"></i> Close</button>`;
       const cm = bar.querySelector('#rs-cash-move');
       if (cm) cm.onclick = () => openCashMovementModal();
       const z = bar.querySelector('#rs-shift-z');
@@ -1068,8 +1053,6 @@
         z.onclick = () => {
           showZReportModal(shift, summarizeShift(shift), 'Z-Report (open shift)');
         };
-      const dp = bar.querySelector('#rs-day-pack-bar');
-      if (dp) dp.onclick = () => exportDayPackCsv();
       const cl = bar.querySelector('#rs-shift-close');
       if (cl) cl.onclick = () => closeShift();
     } else {
@@ -1345,7 +1328,7 @@
     toast('Day pack CSV · ' + rows.length + ' bills', 'fa-file-csv');
   }
 
-  /* ---------------- Owner strip on POS ---------------- */
+  /* ---------------- Owner strip on POS (collapsed by default) ---------------- */
   function paintOwnerStrip() {
     const pos = document.getElementById('pos-tab');
     if (!pos) return;
@@ -1353,8 +1336,7 @@
     if (!strip) {
       strip = document.createElement('div');
       strip.id = 'rs-owner-strip';
-      strip.style.cssText =
-        'display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0 0 12px';
+      strip.className = 'rs-owner-strip';
       const shiftBar = document.getElementById('rs-shift-bar');
       if (shiftBar && shiftBar.parentNode) shiftBar.parentNode.insertBefore(strip, shiftBar.nextSibling);
       else pos.insertBefore(strip, pos.firstChild);
@@ -1389,8 +1371,18 @@
         lowStock = 0;
       }
     }
-    strip.style.gridTemplateColumns = 'repeat(6,minmax(0,1fr))';
-    strip.innerHTML = [
+    let expanded = false;
+    try { expanded = localStorage.getItem('rs_pos_stats_open') === '1'; } catch (_) {}
+    const summary =
+      rs(sales) +
+      ' today · ' +
+      today.length +
+      ' orders' +
+      (holds ? ' · H' + holds : '') +
+      ' · ' +
+      (shift ? 'Shift open' : 'Shift closed') +
+      (lowStock > 0 ? ' · ' + lowStock + ' low stock' : '');
+    const tiles = [
       ['Today sales', rs(sales), 'fa-indian-rupee-sign', null],
       ['Orders', String(today.length) + (holds ? ' · H' + holds : ''), 'fa-receipt', null],
       ['AOV', rs(aov), 'fa-chart-line', null],
@@ -1415,6 +1407,30 @@
     </div>`
       )
       .join('');
+    strip.innerHTML =
+      `<button type="button" class="rs-stats-toggle" id="rs-stats-toggle" aria-expanded="${expanded ? 'true' : 'false'}">` +
+      `<span class="rs-stats-summary"><i class="fa-solid fa-chart-simple"></i> ${esc(summary)}</span>` +
+      `<span class="rs-stats-chevron"><i class="fa-solid fa-chevron-${expanded ? 'up' : 'down'}"></i></span>` +
+      `</button>` +
+      `<div class="rs-owner-strip-grid" id="rs-owner-strip-grid" ${expanded ? '' : 'hidden'}>${tiles}</div>`;
+    const tog = strip.querySelector('#rs-stats-toggle');
+    const grid = strip.querySelector('#rs-owner-strip-grid');
+    if (tog && grid) {
+      tog.onclick = () => {
+        const open = grid.hasAttribute('hidden');
+        if (open) {
+          grid.removeAttribute('hidden');
+          tog.setAttribute('aria-expanded', 'true');
+          try { localStorage.setItem('rs_pos_stats_open', '1'); } catch (_) {}
+        } else {
+          grid.setAttribute('hidden', '');
+          tog.setAttribute('aria-expanded', 'false');
+          try { localStorage.setItem('rs_pos_stats_open', '0'); } catch (_) {}
+        }
+        const chev = tog.querySelector('.rs-stats-chevron i');
+        if (chev) chev.className = 'fa-solid fa-chevron-' + (open ? 'up' : 'down');
+      };
+    }
     strip.querySelectorAll('.rs-owner-tile[data-tab="inventory-tab"]').forEach((el) => {
       el.onclick = () => {
         if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
