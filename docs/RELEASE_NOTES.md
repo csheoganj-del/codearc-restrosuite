@@ -1,5 +1,21 @@
 # RestroSuite release notes
 
+## v81 (2026-07-11) — UX / QR table CX 10× polish
+
+### Guest (table QR)
+- **One-tap menu**: printed QRs open `order.html` directly; hub only for track/pay (`?hub=1`)
+- **Outlet branding** only (no product/Doppio styling); clean Fraunces outlet title
+- **Veg / Non-veg / All** filters + diet marks; sold-out cards blocked
+- **Kitchen notes** on cart lines (flows to KDS as `notes`)
+- **Call waiter / request bill** dock on the menu page
+- **EN ↔ हिं** language toggle for core guest strings
+- Success: **Track order · Order more · Table home**
+
+### Staff
+- POS cart **Discount · Tip · Promo** collapsed under expandable “More”
+- **Role-first home**: waiter/captain → Floor, kitchen → KDS, cashier → POS
+- Larger touch targets on tablet (≤1024px)
+
 ## v80 (2026-07-11) — Guest covers (pax)
 
 - **Pax** field next to table on POS cart (0–99)
@@ -161,7 +177,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v80-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v81-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

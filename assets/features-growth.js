@@ -773,7 +773,7 @@
       if (!window.RSModal) return;
       const tenantName = sessionStorage.getItem('tenant_name') || 'Doppio Cafe';
       const tenantSlug = sessionStorage.getItem('tenant_slug') || 'doppiocl';
-      const orderUrl = `https://restrosuite.codearc.co.in/qr-order.html?tenant=${tenantSlug}&table=${t.n}`;
+      const orderUrl = `https://restrosuite.codearc.co.in/order.html?tenant=${encodeURIComponent(tenantSlug)}&table=${encodeURIComponent(t.n)}`;
       
       let qrCodeUrl = '';
       if (window.QRCode) {
@@ -861,7 +861,7 @@
       const tenantSlug = sessionStorage.getItem('tenant_slug') || 'doppiocl';
       
       const qrPromises = TABLES.map(async t => {
-        const orderUrl = `https://restrosuite.codearc.co.in/qr-order.html?tenant=${tenantSlug}&table=${t.n}`;
+        const orderUrl = `https://restrosuite.codearc.co.in/order.html?tenant=${encodeURIComponent(tenantSlug)}&table=${encodeURIComponent(t.n)}`;
         let qrCodeUrl = '';
         if (window.QRCode) {
           try {

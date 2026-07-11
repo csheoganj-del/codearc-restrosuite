@@ -283,12 +283,24 @@
     try { localStorage.setItem('rs_active_tab', id); } catch(e){}
   }
 
-  // Load saved active tab on startup
+  // Early role-home map (must exist before hydrate may call loadSavedTab)
+  const ROLE_HOME_TAB_EARLY = {
+    cashier: 'pos-tab',
+    waiter: 'floor-tab',
+    captain: 'floor-tab',
+    kitchen: 'kds-tab',
+    inventory: 'inventory-tab',
+    manager: 'pos-tab',
+    customer_display: 'tokens-tab',
+  };
+
+  // Load saved active tab on startup (hash wins; else role home)
   function loadSavedTab() {
     try {
-      const savedTab = localStorage.getItem('rs_active_tab');
       const hashTab = window.location.hash.slice(1);
-      const initialTab = hashTab || savedTab || 'pos-tab';
+      const role = String(sessionStorage.getItem('logged_in_role') || '').toLowerCase().trim();
+      const home = ROLE_HOME_TAB_EARLY[role] || 'pos-tab';
+      const initialTab = hashTab || home;
       activateTab(initialTab);
     } catch(e){
       activateTab('pos-tab');
@@ -1860,6 +1872,9 @@
     inventory: 'Inventory Manager',
   };
 
+  /** Role-first home tab — reduces cognitive load for staff logins */
+  const ROLE_HOME_TAB = ROLE_HOME_TAB_EARLY;
+
   // Resolve current staff role (session meta -> sessionStorage fallback)
   const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
     .toLowerCase().trim();
@@ -2711,8 +2726,12 @@
   window.setTimeout(() => checkForAppUpdate({ silent: true }), 5000);
   window.setInterval(() => checkForAppUpdate({ silent: true }), 2 * 60 * 1000);
 
-  // Set default landing tab
-  const defaultTab = isSuper ? 'super-admin-tab' : (isBrandAdmin ? 'chain-dashboard-tab' : 'pos-tab');
+  // Set default landing tab (role-first for staff)
+  const roleHome =
+    !isSuper && !isBrandAdmin && ROLE_HOME_TAB[staffRole]
+      ? ROLE_HOME_TAB[staffRole]
+      : 'pos-tab';
+  const defaultTab = isSuper ? 'super-admin-tab' : (isBrandAdmin ? 'chain-dashboard-tab' : roleHome);
   const start = (location.hash || '#' + defaultTab).slice(1);
   activateTab((titles[start] || document.getElementById(start)) ? start : defaultTab);
 
