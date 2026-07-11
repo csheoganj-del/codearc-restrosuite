@@ -720,21 +720,29 @@
       global.__rsSyncBillPending ||
       (typeof global.RS_DB_SYNC_DEPTH === 'function' ? global.RS_DB_SYNC_DEPTH() : 0) ||
       0;
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     const gw = global.__rsGatewayReady
       ? 'WA linked'
       : 'WA ' + (global.__rsGatewayLastStatus || '—');
+    const opsLabel = offline
+      ? 'Offline'
+      : pending
+        ? pending + ' sync'
+        : gw;
+    const opsIcon = offline ? 'fa-wifi' : pending ? 'fa-cloud-arrow-up' : 'fa-signal';
     const shift = getOpenShift();
     const shiftSum = shift ? summarizeShift(shift) : null;
+    const holds = Number(global.__rsHeldOrderCount) || 0;
     strip.innerHTML = [
       ['Today sales', rs(sales), 'fa-indian-rupee-sign'],
-      ['Orders', String(today.length), 'fa-receipt'],
+      ['Orders', String(today.length) + (holds ? ' · H' + holds : ''), 'fa-receipt'],
       ['AOV', rs(aov), 'fa-chart-line'],
       [
         'Shift',
         shift ? rs(shiftSum.gross) + ' · ' + shiftSum.bills : 'Closed',
         shift ? 'fa-cash-register' : 'fa-lock',
       ],
-      ['Ops', pending ? pending + ' sync' : gw, pending ? 'fa-cloud-arrow-up' : 'fa-signal'],
+      ['Ops', opsLabel, opsIcon],
     ]
       .map(
         ([l, v, ic]) => `<div style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:var(--panel)">
@@ -923,6 +931,11 @@
     document.addEventListener('rs:bill-paid', () => {
       setTimeout(refreshOpsUi, 200);
     });
+    window.addEventListener('rs:sync-queue-changed', () => {
+      setTimeout(refreshOpsUi, 100);
+    });
+    window.addEventListener('online', () => setTimeout(refreshOpsUi, 300));
+    window.addEventListener('offline', () => setTimeout(refreshOpsUi, 100));
     // Cart mutations — re-check stock
     const cartObs = new MutationObserver(() => paintStockBanner());
     const cartRoot = document.getElementById('pos-tab');

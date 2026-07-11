@@ -2291,6 +2291,31 @@
       const hasAnyHeld = Object.values(heldOrders).some(arr => arr.length > 0);
       const mobileHoldGroup = document.getElementById('pos-m-hold-buttons');
       if (mobileHoldGroup) mobileHoldGroup.style.display = hasAnyHeld ? 'flex' : 'none';
+
+      // Total holds badge on POS quick tools (if present)
+      const totalHeld = Object.values(heldOrders).reduce((a, arr) => a + arr.length, 0);
+      window.__rsHeldOrderCount = totalHeld;
+      let holdBadge = document.getElementById('rs-held-total-badge');
+      if (!holdBadge) {
+        const tools = document.getElementById('rs-pos-quick-tools');
+        if (tools) {
+          holdBadge = document.createElement('button');
+          holdBadge.type = 'button';
+          holdBadge.id = 'rs-held-total-badge';
+          holdBadge.className = 'btn btn-ghost btn-sm';
+          holdBadge.title = 'Open held orders for current type';
+          holdBadge.style.cssText = 'font-size:11px';
+          tools.appendChild(holdBadge);
+          holdBadge.onclick = () => openDrafts(getCurrentOrderTypeKey());
+        }
+      }
+      if (holdBadge) {
+        holdBadge.style.display = totalHeld > 0 ? '' : 'none';
+        holdBadge.innerHTML =
+          '<i class="fa-solid fa-pause"></i> Holds ' +
+          (totalHeld ? '<b>(' + totalHeld + ')</b>' : '');
+        holdBadge.classList.toggle('hold-btn-blinking', totalHeld > 0);
+      }
     }
 
     // Load all held orders from DB and split by type
@@ -2581,6 +2606,15 @@
     updateHeldCount();
     loadHeldFromDB();
     document.addEventListener('rs:hydrated', loadHeldFromDB);
+    document.addEventListener('rs:customer-dues-updated', () => {
+      try {
+        if (typeof syncWidgetWithHiddenSelect === 'function') syncWidgetWithHiddenSelect();
+        else {
+          const phoneInput = document.getElementById('cust-input-phone');
+          if (phoneInput) phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      } catch (_) {}
+    });
 
     async function loadCustomersForPos() {
       const sel = document.getElementById('cart-customer-sel');
@@ -2697,13 +2731,47 @@
           if (due > 0) {
             duesBanner.style.display = 'block';
             duesBanner.innerHTML =
-              '<i class="fa-solid fa-triangle-exclamation" style="color:var(--orange);margin-right:6px"></i>' +
+              '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">' +
+              '<span style="flex:1;min-width:140px"><i class="fa-solid fa-triangle-exclamation" style="color:var(--orange);margin-right:6px"></i>' +
               '<b style="color:var(--text)">Outstanding dues ' +
               rs(due) +
               '</b> · ' +
               esc(c.name || 'Customer') +
               (c.tier ? ' · ' + esc(c.tier) : '') +
-              ' <span style="opacity:.8">(settle in CRM or take Due payment)</span>';
+              '</span>' +
+              '<button type="button" class="btn btn-ghost btn-sm" id="cart-dues-settle" style="font-size:11px;padding:4px 8px">' +
+              '<i class="fa-solid fa-hand-holding-dollar"></i> Settle</button>' +
+              '<button type="button" class="btn btn-ghost btn-sm" id="cart-dues-as-due" style="font-size:11px;padding:4px 8px" title="Select Due as payment method">' +
+              '<i class="fa-solid fa-file-invoice"></i> Pay as Due</button>' +
+              '</div>';
+            const settleBtn = duesBanner.querySelector('#cart-dues-settle');
+            if (settleBtn) {
+              settleBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof window.RS_showSettleDues === 'function') {
+                  window.RS_showSettleDues(c);
+                } else {
+                  RS.toast('Open CRM to settle dues (Growth → Customers)', 'fa-users');
+                }
+              };
+            }
+            const duePay = duesBanner.querySelector('#cart-dues-as-due');
+            if (duePay) {
+              duePay.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const btn = document.querySelector('[data-pay-method="Due"]');
+                if (btn) {
+                  btn.click();
+                  RS.toast('Payment set to Due · will add to customer balance', 'fa-file-invoice');
+                } else {
+                  paymentState.method = 'Due';
+                  if (typeof refreshPaymentPanel === 'function') refreshPaymentPanel();
+                  RS.toast('Payment method: Due', 'fa-file-invoice');
+                }
+              };
+            }
           } else {
             duesBanner.style.display = 'none';
             duesBanner.innerHTML = '';
