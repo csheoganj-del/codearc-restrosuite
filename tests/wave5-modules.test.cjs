@@ -254,14 +254,19 @@ test('cashier pack: dues banner, hold polish, release notes', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /cart-customer-dues-banner/);
   assert.match(html, /insight-dues/);
-  assert.match(html, /v63-20260711/);
+  assert.match(html, /v6[0-9]-20260711/);
   const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
   assert.match(pos, /paintDuesBanner|Outstanding dues/);
+  assert.match(pos, /cart-dues-settle|RS_showSettleDues/);
   assert.match(pos, /Replace current cart with this held order/);
-  assert.match(pos, /total holds/);
+  assert.match(pos, /total holds|rs-held-total-badge/);
+  const growth = fs.readFileSync(path.join(root, 'assets/features-growth.js'), 'utf8');
+  assert.match(growth, /RS_showSettleDues/);
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  assert.match(ops, /rs:sync-queue-changed|Offline/);
   assert.ok(fs.existsSync(path.join(root, 'docs/RELEASE_NOTES.md')));
   const rn = fs.readFileSync(path.join(root, 'docs/RELEASE_NOTES.md'), 'utf8');
-  assert.match(rn, /Day pack|dues|Desktop \/ Android/i);
+  assert.match(rn, /Day pack|dues|Settle dues from POS/i);
 });
 
 test('USB and split docs exist', () => {

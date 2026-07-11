@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v64 (2026-07-11) — Settle dues from POS
+
+- Cart dues banner: **Settle** (opens CRM settle modal) + **Pay as Due**
+- Holds total badge on POS tools; owner strip shows hold count + offline/sync
+- Owner strip Ops tile: Offline / pending sync / WA status
+
 ## v62–v63 (2026-07-11) — Ops & cashier UX
 
 ### POS ops

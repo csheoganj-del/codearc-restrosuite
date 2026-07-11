@@ -1068,6 +1068,9 @@
       };
     }
     function showSettleDuesModal(c, closeParentModal) {
+      if (!c) return;
+      // closeParentModal optional (POS cart may not open CRM modal)
+      const afterClose = typeof closeParentModal === 'function' ? closeParentModal : () => {};
       RSModal.open({
         title: 'Settle Dues',
         sub: `${c.name} · Outstanding: ${rs(c.dues || 0)}`,
@@ -1114,6 +1117,12 @@
               if (window.RS_DB) {
                 await RS_DB.put('customers', c.id, c);
               }
+              // Notify POS cart banner to refresh
+              try {
+                document.dispatchEvent(
+                  new CustomEvent('rs:customer-dues-updated', { detail: { customer: c } })
+                );
+              } catch (_) {}
               
               // Log settlement transaction in bills
               const now = new Date();
@@ -1175,8 +1184,12 @@
               
               // Refresh views
               closeSettle();
-              closeParentModal();
-              renderCustomers();
+              try {
+                afterClose();
+              } catch (_) {}
+              try {
+                renderCustomers();
+              } catch (_) {}
             } catch (err) {
               console.error("Failed to settle dues", err);
               RS.toast('Error settling dues', 'fa-circle-exclamation');
@@ -1185,6 +1198,9 @@
         }
       });
     }
+
+    // POS cart can settle dues without opening CRM
+    window.RS_showSettleDues = (customer) => showSettleDuesModal(customer);
 
     function customerModal(c){
       const custBills = (RS.BILLS || []).filter(b => b.customerPhone === c.phone || (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name));
