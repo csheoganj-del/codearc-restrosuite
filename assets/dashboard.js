@@ -1036,6 +1036,8 @@
     const hasLowStock = (typeof INVENTORY !== 'undefined' && Array.isArray(INVENTORY))
       ? INVENTORY.some(i => Number(i.stock) < Number(i.min))
       : false;
+
+    const hasNewOnline = Number(window.__rsOnlineNewCount || 0) > 0;
       
     document.querySelectorAll('.sidebar-link, .mnav-link').forEach(el => {
       const tab = el.dataset.tab;
@@ -1048,11 +1050,15 @@
         shouldBlink = true;
       } else if (tab === 'inventory-tab' && hasLowStock && activeTabId !== 'inventory-tab') {
         shouldBlink = true;
+      } else if (tab === 'aggregator-tab' && hasNewOnline && activeTabId !== 'aggregator-tab') {
+        shouldBlink = true;
       }
       
       el.classList.toggle('attention-blink', shouldBlink);
     });
   }
+  window.RS = window.RS || {};
+  window.RS.updateTabAttentionBlinking = updateTabAttentionBlinking;
 
   // POS-only mode (Settings -> Printers & KOT -> "POS-only mode"): billing
   // only, no order ever reaches the Kitchen Display or a waiter screen.

@@ -58,6 +58,21 @@ test('auto-print receipt wires bill-paid to thermal', () => {
   assert.match(bills, /thermal-act/);
 });
 
+test('online aggregator: demo seed, POS open, accept KOT', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/features-growth.js'), 'utf8');
+  assert.match(src, /seedDemoOnlineOrder/);
+  assert.match(src, /openOnlineOrderInPos/);
+  assert.match(src, /Accept \+ KOT|printKot/);
+  assert.match(src, /__rsOnlineNewCount/);
+});
+
+test('split pay has fill-remaining chips', () => {
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  assert.match(html, /split-quick-fill|data-split-fill/);
+  assert.match(pos, /fillSplitRemaining/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);

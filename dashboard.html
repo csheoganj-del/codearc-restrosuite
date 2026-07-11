@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v67-20260711-waiter';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v68-20260711-online';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -308,9 +308,17 @@
         <input type="number" id="split-due" placeholder="0" class="form-input csd-input">
       </div>
     </div>
+    <div id="split-quick-fill" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px">
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Put remaining on Cash">Rest → Cash</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Put remaining on UPI">Rest → UPI</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Put remaining on Card">Rest → Card</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Put remaining on Due">Rest → Due</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half" title="50/50 Cash + UPI">½ Cash · ½ UPI</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear all tenders">Clear</button>
+    </div>
     <div class="csd-split-status">
-      <span id="split-status-text" class="csd-split-remaining">Remaining: ₹0</span>
-      <strong id="split-total-text" class="csd-split-paid">Paid: ₹0</strong>
+      <span id="split-status-text" class="csd-split-remaining">Remaining: —</span>
+      <strong id="split-total-text" class="csd-split-paid">Paid: —</strong>
     </div>
   </div>
 </div>
