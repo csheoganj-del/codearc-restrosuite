@@ -548,7 +548,9 @@
   (function paintTableFast() {
     try {
       if (tNum) {
-        var pad = /^\d+$/.test(String(tNum)) ? String(tNum).padStart(2, '0') : String(tNum);
+        var pad = /^\d+$/.test(String(tNum))
+          ? String(parseInt(tNum, 10)).padStart(2, '0')
+          : String(tNum);
         var pill = document.getElementById('table-pill');
         var ptxt = document.getElementById('table-pill-txt');
         if (ptxt) ptxt.textContent = 'Table ' + pad;
@@ -657,7 +659,10 @@
   }
   
   if(tNum){
-    var pad = parseInt(tNum) < 10 ? '0'+tNum : tNum;
+    // Normalize "5" / "05" / "005" → display "05" (never "005")
+    var pad = /^\d+$/.test(String(tNum))
+      ? String(parseInt(tNum, 10)).padStart(2, '0')
+      : String(tNum);
     document.getElementById('table-pill-txt').textContent = 'Table '+pad;
     document.getElementById('table-pill').style.display = 'flex';
     document.getElementById('drawer-tag').textContent = 'Table '+pad;
@@ -697,7 +702,7 @@
     if (status === 'active') return;
 
     var tableTxt = tNum
-      ? ('Table ' + (String(tNum).match(/^\d+$/) ? String(tNum).padStart(2, '0') : tNum))
+      ? ('Table ' + (/^\d+$/.test(String(tNum)) ? String(parseInt(tNum, 10)).padStart(2, '0') : tNum))
       : 'This table';
     var outletTxt = (document.getElementById('rest-name') && document.getElementById('rest-name').textContent) || restName || 'the restaurant';
     if (/loading/i.test(outletTxt)) outletTxt = restName || 'the restaurant';
