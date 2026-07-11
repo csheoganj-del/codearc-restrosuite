@@ -3,7 +3,7 @@
 :root {
   --primary-dark: #111827;
   --primary-brand: #111827;
-  --accent-caramel: #FF6B00;
+  --accent-caramel: #FF4F00;
   --accent-caramel-hover: #E05E00;
   --accent-gold: #F59E0B; /* Amber gold — matches --warning-color and design intent */
   --bg-cream-light: #F6F7F9;
@@ -1304,7 +1304,7 @@ nav a:hover {
 }
 
 .hero-tag {
-  color: #FF6B00;
+  color: #FF4F00;
   letter-spacing: 0.06em;
 }
 

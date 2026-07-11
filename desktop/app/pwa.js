@@ -34,7 +34,7 @@
       "animation:rsUpdateBlink 1.1s ease-in-out infinite;}" +
       "@keyframes rsUpdateBlink{0%,100%{opacity:1}50%{opacity:.55}}" +
       "@media (prefers-reduced-motion: reduce){#rs-update-banner{animation:none}}" +
-      "#rs-update-banner button{background:#FC8019;color:#fff;border:none;border-radius:8px;" +
+      "#rs-update-banner button{background:#FF4F00;color:#fff;border:none;border-radius:8px;" +
       "padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}" +
       "#rs-update-banner button:active{transform:scale(.96);}";
     document.head.appendChild(style);

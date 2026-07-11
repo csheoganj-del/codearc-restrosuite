@@ -485,7 +485,7 @@
           <div style="display: inline-block; padding: 12px; border: 1px solid var(--stroke-2); border-radius: 12px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 16px;">
             <img src="${qrCodeUrl}" style="width: 180px; height: 180px; display: block;" alt="Table ${t.n} QR Code">
           </div>
-          <div style="font-size: 18px; font-weight: 800; color: #FF6B00; margin-bottom: 6px;">Table ${t.n}</div>
+          <div style="font-size: 18px; font-weight: 800; color: #FF4F00; margin-bottom: 6px;">Table ${t.n}</div>
           <div style="font-size: 11px; word-break: break-all; color: var(--text-soft); background: var(--bg-soft); padding: 8px 10px; border-radius: 6px; font-family: monospace; border: 1px solid var(--stroke-2);">${orderUrl}</div>
         </div>
       `;
@@ -512,7 +512,7 @@
                 <div style="display: inline-block; padding: 12px; border: 1px solid #ddd; border-radius: 12px; background: #fff; margin-bottom: 24px;">
                   <img src="${qrCodeUrl}" style="width: 200px; height: 200px; display: block;" />
                 </div>
-                <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 32px; color: #FF6B00; margin-bottom: 8px;">TABLE ${t.n}</div>
+                <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 32px; color: #FF4F00; margin-bottom: 8px;">TABLE ${t.n}</div>
                 <div style="font-size: 11px; color: #777;">Powered by RestroSuite</div>
               </div>
             `;
@@ -576,7 +576,7 @@
             <div style="display: inline-block; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background: #fff; margin-bottom: 15px;">
               <img src="${t.qrCodeUrl}" style="width: 140px; height: 140px; display: block;" />
             </div>
-            <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 24px; color: #FF6B00; margin-bottom: 4px;">TABLE ${t.tableNum}</div>
+            <div style="font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 24px; color: #FF4F00; margin-bottom: 4px;">TABLE ${t.tableNum}</div>
             <div style="font-size: 9px; color: #777;">Powered by RestroSuite</div>
           </div>
         `;

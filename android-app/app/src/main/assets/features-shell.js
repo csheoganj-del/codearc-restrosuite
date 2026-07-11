@@ -271,7 +271,7 @@
         <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:14px;">
-              <div style="width:44px;height:44px;border-radius:50%;background:${hasPIN?'rgba(34,197,94,0.12)':'rgba(255,107,0,0.1)'};display:flex;align-items:center;justify-content:center;font-size:20px;color:${hasPIN?'#22c55e':'#FF6B00'};flex-shrink:0;">
+              <div style="width:44px;height:44px;border-radius:50%;background:${hasPIN?'rgba(34,197,94,0.12)':'rgba(255,107,0,0.1)'};display:flex;align-items:center;justify-content:center;font-size:20px;color:${hasPIN?'#22c55e':'#FF4F00'};flex-shrink:0;">
                 <i class="fa-solid ${hasPIN?'fa-lock':'fa-lock-open'}"></i>
               </div>
               <div>
@@ -296,7 +296,7 @@
 
         <!-- Protected Operations -->
         <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
-          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-shield-halved" style="color:#FF6B00;margin-right:6px;"></i>PIN-Protected Operations</div>
+          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-shield-halved" style="color:#FF4F00;margin-right:6px;"></i>PIN-Protected Operations</div>
           <div style="font-size:12px;color:var(--text-soft);margin-bottom:16px;">The following actions always require admin PIN verification.</div>
           ${[
             ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
@@ -304,12 +304,12 @@
             ['fa-triangle-exclamation','Data Reset','Danger Zone operations always require PIN'],
           ].map(([icon,op,desc])=>`
             <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-2);">
-              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,107,0,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;color:#FF6B00;flex-shrink:0;margin-top:1px;"><i class="fa-solid ${icon}"></i></div>
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,107,0,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;color:#FF4F00;flex-shrink:0;margin-top:1px;"><i class="fa-solid ${icon}"></i></div>
               <div>
                 <div style="font-weight:700;font-size:13px;color:var(--text);">${op}</div>
                 <div style="font-size:11.5px;color:var(--text-soft);margin-top:1px;">${desc}</div>
               </div>
-              <div style="margin-left:auto;"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,107,0,0.1);color:#FF6B00;">PIN Required</span></div>
+              <div style="margin-left:auto;"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,107,0,0.1);color:#FF4F00;">PIN Required</span></div>
             </div>
           `).join('')}
         </div>
@@ -317,7 +317,7 @@
         <!-- Tips -->
         <div style="border:1px solid rgba(255,107,0,0.2);background:rgba(255,107,0,0.03);border-radius:var(--r-sm);padding:14px 16px;">
           <div style="font-size:12px;color:var(--text-soft);line-height:1.6;">
-            <strong style="color:#FF6B00;">Tips:</strong> Share the 4-digit PIN only with managers. Forgotten PIN resets are verified by the backend, and PIN attempts are limited to 3 before a 30-second lockout.
+            <strong style="color:#FF4F00;">Tips:</strong> Share the 4-digit PIN only with managers. Forgotten PIN resets are verified by the backend, and PIN attempts are limited to 3 before a 30-second lockout.
           </div>
         </div>
       `;

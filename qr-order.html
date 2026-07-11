@@ -3,27 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#FF6B00">
+  <meta name="theme-color" content="#FF4F00">
   <title>Dine-In Customer Portal</title>
   <link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="config.js"></script>
   <style>
     :root {
-      --brand: #FF6B00;
-      --brand-hover: #E05E00;
-      --bg: #F8F9FB;
+      --brand: #FF4F00;
+      --brand-hover: #D94300;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --bg: #F3EFE8;
       --surface: #FFFFFF;
-      --text: #111827;
-      --text-muted: #6B7280;
-      --border: rgba(17, 24, 39, 0.08);
-      --shadow: 0 10px 30px rgba(17, 24, 39, 0.04);
-      --r: 20px;
-      --r-sm: 12px;
-      --tr: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --text: #1A1714;
+      --text-muted: #6E675F;
+      --border: rgba(26, 23, 20, 0.1);
+      --shadow: 0 8px 24px rgba(40, 30, 20, 0.08);
+      --r: 14px;
+      --r-sm: 10px;
+      --tr: 0.2s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     * {
@@ -33,7 +34,7 @@
     }
 
     body {
-      font-family: 'Outfit', sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -605,7 +606,7 @@
 
       if (!slug) {
         document.body.innerHTML = '<div style="text-align:center; padding: 80px 20px; font-family:sans-serif;">' +
-          '<i class="fa-solid fa-qrcode" style="font-size:64px; color:#FF6B00; margin-bottom:16px;"></i>' +
+          '<i class="fa-solid fa-qrcode" style="font-size:64px; color:#FF4F00; margin-bottom:16px;"></i>' +
           '<h2>No Restaurant Context</h2><p style="color:#666; margin-top:8px;">Please scan the table QR code to start dining.</p></div>';
         return;
       }

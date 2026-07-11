@@ -698,8 +698,8 @@
     const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
 
     window.RSModal.open({
-      title: justUpdated ? 'RestroSuite Updated Successfully!' : 'Update History & Releases',
-      sub: justUpdated ? 'Discover the new features added to your workspace' : 'Detailed release logs of RestroSuite updates',
+      title: justUpdated ? 'RestroSuite was updated' : 'What\'s new',
+      sub: justUpdated ? 'A short list of recent fixes and improvements' : 'Release notes for this outlet',
       icon: justUpdated ? 'fa-circle-check' : 'fa-clock-rotate-left',
       size: 'md',
       body: `
@@ -1023,18 +1023,17 @@
       } catch (error) { /* profile prompt is best-effort, never block the tour */ }
 
       try {
-        // If we just finished applying an update, automatically trigger the update tour
+        // After an update: quiet badge only — never auto-open a blocking modal.
+        // Staff can open "What's New" from Help when ready.
         if (sessionStorage.getItem('rs_update_applied_at')) {
-          openUpdateHistoryModal();
-          return;
-        }
-
-        const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
-        const updateTourSeen = localStorage.getItem('restrosuite_update_tour_seen:' + currentVer);
-        if (!updateTourSeen) {
-          openUpdateHistoryModal();
-          localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, 'popup');
-          return;
+          sessionStorage.removeItem('rs_update_applied_at');
+          const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || '';
+          if (currentVer) {
+            try { localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, 'badge'); } catch (_) {}
+          }
+          if (typeof window.RS !== 'undefined' && typeof window.RS.toast === 'function') {
+            window.RS.toast('RestroSuite updated. Open Help → What\'s New anytime.', 'fa-circle-check');
+          }
         }
         if (!localStorage.getItem(tourStorageKey())) startTour();
       } catch (error) {

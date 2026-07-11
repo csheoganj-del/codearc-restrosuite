@@ -50,17 +50,17 @@
       @keyframes rsPinFadeIn{from{opacity:0}to{opacity:1}}
       #rs-pin-box{background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:32px 28px 28px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column;align-items:center;gap:20px;animation:rsPinSlideUp .22s cubic-bezier(.34,1.56,.64,1)}
       @keyframes rsPinSlideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-      #rs-pin-icon{width:48px;height:48px;border-radius:50%;background:rgba(255,107,0,.1);display:flex;align-items:center;justify-content:center;font-size:22px;color:#FF6B00}
+      #rs-pin-icon{width:48px;height:48px;border-radius:50%;background:rgba(255,107,0,.1);display:flex;align-items:center;justify-content:center;font-size:22px;color:#FF4F00}
       #rs-pin-title{font-weight:800;font-size:16px;text-align:center;color:var(--text,#111)}
       #rs-pin-label{font-size:12.5px;color:var(--text-soft,#6b7280);text-align:center;max-width:240px;line-height:1.5}
       .rs-pin-dots{display:flex;gap:14px;margin:4px 0}
       .rs-pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--stroke-2,#d1d5db);background:transparent;transition:all .15s}
-      .rs-pin-dot.filled{background:#FF6B00;border-color:#FF6B00;transform:scale(1.15)}
+      .rs-pin-dot.filled{background:#FF4F00;border-color:#FF4F00;transform:scale(1.15)}
       .rs-pin-dot.shake{animation:rsPinShake .4s ease}
       @keyframes rsPinShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
       .rs-pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
       .rs-pin-key{height:52px;border-radius:12px;border:1px solid var(--stroke-2,#e5e7eb);background:var(--glass,#f9fafb);font-size:18px;font-weight:700;cursor:pointer;transition:all .1s;display:flex;align-items:center;justify-content:center;color:var(--text,#111);font-family:inherit}
-      .rs-pin-key:active,.rs-pin-key.pressed{background:#FF6B00;color:#fff;border-color:#FF6B00;transform:scale(.93)}
+      .rs-pin-key:active,.rs-pin-key.pressed{background:#FF4F00;color:#fff;border-color:#FF4F00;transform:scale(.93)}
       .rs-pin-key.del{font-size:15px;color:var(--text-soft,#6b7280)}
       #rs-pin-error{font-size:12px;color:#ef4444;font-weight:600;text-align:center;min-height:18px}
       #rs-pin-cancel{background:none;border:none;font-size:13px;color:var(--text-soft,#6b7280);cursor:pointer;padding:4px 8px;font-family:inherit;text-decoration:underline}
@@ -104,7 +104,7 @@
           <div id="rs-pin-error"></div>
           <div class="rs-pin-grid">
             ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="rs-pin-key" data-k="${n}">${n}</button>`).join('')}
-            <button class="rs-pin-key${showForgot?'':' del'}" data-k="${showForgot?'forgot':'del'}" style="${showForgot?'font-size:11px;color:#FF6B00;':'font-size:15px;'}">${showForgot?'Forgot?':'<i class="fa-solid fa-delete-left"></i>'}</button>
+            <button class="rs-pin-key${showForgot?'':' del'}" data-k="${showForgot?'forgot':'del'}" style="${showForgot?'font-size:11px;color:#FF4F00;':'font-size:15px;'}">${showForgot?'Forgot?':'<i class="fa-solid fa-delete-left"></i>'}</button>
             <button class="rs-pin-key" data-k="0">0</button>
             <button class="rs-pin-key del" data-k="del"><i class="fa-solid fa-delete-left"></i></button>
           </div>
@@ -242,7 +242,7 @@
       <input id="rs-reset-code" type="text" placeholder="Reset code" maxlength="64" autocomplete="off"
         style="width:100%;padding:12px 14px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:18px;text-align:center;letter-spacing:6px;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;">
       <div id="rs-pin-error"></div>
-      <button id="rs-reset-submit" style="width:100%;padding:12px;background:#FF6B00;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Verify &amp; Reset</button>
+      <button id="rs-reset-submit" style="width:100%;padding:12px;background:#FF4F00;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Verify &amp; Reset</button>
       <button id="rs-pin-cancel">Cancel</button>
     </div>`;
     document.body.appendChild(overlay);

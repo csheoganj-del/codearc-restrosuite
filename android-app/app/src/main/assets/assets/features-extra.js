@@ -907,12 +907,12 @@
     }
     function donut(data){
       if (!data || data.length === 0) {
-        return `<svg viewBox="0 0 120 120" style="width:150px;height:150px"><circle r="42" cx="60" cy="60" fill="none" stroke="var(--stroke)" stroke-dasharray="0 263.89" stroke-width="16" /><text x="60" y="56" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="800" font-family="Plus Jakarta Sans">0%</text><text x="60" y="72" text-anchor="middle" fill="var(--text-mute)" font-size="9">payments</text></svg>`;
+        return `<svg viewBox="0 0 120 120" style="width:150px;height:150px"><circle r="42" cx="60" cy="60" fill="none" stroke="var(--stroke)" stroke-dasharray="0 263.89" stroke-width="16" /><text x="60" y="56" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="800" font-family="DM Sans">0%</text><text x="60" y="72" text-anchor="middle" fill="var(--text-mute)" font-size="9">payments</text></svg>`;
       }
       let acc=0, segs='';
       const C=2*Math.PI*42;
       data.forEach(d=>{ const frac=d[1]/100; const len=frac*C; segs+=`<circle r="42" cx="60" cy="60" fill="none" stroke="${d[2]}" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-acc*C}" transform="rotate(-90 60 60)"/>`; acc+=frac; });
-      return `<svg viewBox="0 0 120 120" style="width:150px;height:150px">${segs}<text x="60" y="56" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="800" font-family="Plus Jakarta Sans">100%</text><text x="60" y="72" text-anchor="middle" fill="var(--text-mute)" font-size="9">payments</text></svg>`;
+      return `<svg viewBox="0 0 120 120" style="width:150px;height:150px">${segs}<text x="60" y="56" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="800" font-family="DM Sans">100%</text><text x="60" y="72" text-anchor="middle" fill="var(--text-mute)" font-size="9">payments</text></svg>`;
     }
     // -- Analytics: build data from real bills --------------------------------
     function anDays(period){ return period==='Last 7 days'?7:period==='Last 90 days'?90:30; }
@@ -1007,6 +1007,19 @@
         const trendIcon = d.trend>=0?'fa-arrow-trend-up':'fa-arrow-trend-down';
         const trendLabel = (d.trend>=0?'+':'')+d.trend+'%';
         const maxHour = Math.max.apply(null,d.hours)||1;
+
+        if (!(allBills||[]).length) {
+          sec.innerHTML =
+            '<div class="rs-empty" style="padding:56px 20px">' +
+              '<i class="fa-solid fa-chart-line"></i>' +
+              '<h4>No sales yet</h4>' +
+              '<p>Ring up your first bill on Point of Sale. Revenue, payment mix, and top items will show up here automatically.</p>' +
+              '<button type="button" class="btn btn-primary" id="an-goto-pos"><i class="fa-solid fa-cash-register"></i> Open Point of Sale</button>' +
+            '</div>';
+          const go = document.getElementById('an-goto-pos');
+          if (go) go.onclick = function(){ if (window.RS && RS.activateTab) RS.activateTab('pos-tab'); };
+          return;
+        }
 
         sec.innerHTML =
           '<div class="toolbar-row">' +

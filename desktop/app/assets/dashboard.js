@@ -125,7 +125,7 @@
   // Narrow no-break space (\u202f) gives visible gap without wrapping.
   // Number grouping uses outlet locale so Irish bills show 1,000 not 1,00,000.
   const rs = n => getCurrencySymbol() + '\u202f' + Math.round(n).toLocaleString(window.RS_getOutletLocale());
-  const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
+  const avatarColors = ['#FF4F00','#5B6C8F','#2A9B8F','#1F8A5B','#C47B16'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
   /* ---------- THEME ---------- */
@@ -369,7 +369,8 @@
   function shortDateKey(date = new Date()) { return `${String(date.getFullYear()).slice(-2)}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`; }
   function fileDate(date = new Date()) { return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`; }
   function sequenceScope() {
-    return sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || localStorage.getItem('tenant_id') || 'local';
+    // Tab-scoped only — never fall back to shared localStorage tenant_id.
+    return sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || 'local';
   }
   function hashCode(value) {
     let hash = 0;
@@ -733,7 +734,7 @@
      ============================================================ */
   const MENU = [];
   const CATS = ['All','Starters','Mains','Breads','Beverages','Desserts'];
-  const CAT_COLOR = { Starters:'#FF6A2A', Mains:'#8B7CF6', Breads:'#F0A93B', Beverages:'#2BB8C0', Desserts:'#F472B6' };
+  const CAT_COLOR = { Starters:'#FF4F00', Mains:'#5B6C8F', Breads:'#C47B16', Beverages:'#2A9B8F', Desserts:'#B45A6A' };
   const catColor = c => CAT_COLOR[c] || 'var(--orange)';
   const stockLabel = {ok:'In stock',low:'Low',out:'Out'};
   const stockCls = {ok:'stock-ok',low:'stock-low',out:'stock-out'};
@@ -1749,11 +1750,22 @@
     const pillEl = document.getElementById('topbar-whatsapp-status-pill');
     if (textEl && pillEl) {
       textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-      pillEl.setAttribute('data-tooltip', 'WhatsApp gateway is offline' + (reason ? `: ${reason}` : ''));
+      const friendly = (function (raw) {
+        const s = String(raw || '').toLowerCase();
+        if (!s) return 'WhatsApp is not connected. Open Settings → Gateway to link.';
+        if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings → Gateway.';
+        if (s.includes('timeout')) return 'Gateway took too long to respond. Check the PC running WhatsApp.';
+        if (s.includes('auth')) return 'WhatsApp session expired. Scan the QR code again.';
+        if (s.length > 90 || /[{}\[\]<>]|error code|ECONN/i.test(String(raw))) {
+          return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → Gateway.';
+        }
+        return 'WhatsApp is offline: ' + raw;
+      })(reason);
+      pillEl.setAttribute('data-tooltip', friendly);
       pillEl.title = '';
-      pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-      pillEl.style.color = '#ef4444';
-      pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+      pillEl.style.background = 'var(--red-tint)';
+      pillEl.style.color = 'var(--red)';
+      pillEl.style.border = '1px solid color-mix(in srgb, var(--red) 28%, transparent)';
     }
   }
   function hideGatewayOfflineBanner() {
@@ -1868,15 +1880,33 @@
     // Fallback: postgres_changes events are silently dropped for anon
     // subscribers when RLS denies SELECT on the table (production locks
     // all tables behind Edge Functions). Poll while the app is visible so
-    // new QR orders surface within ~12s even without realtime events.
+    // new QR orders surface quickly even without realtime events.
+    // Active QR / KDS tabs poll every 4s; background tabs every 12s.
     if (!window.__rsPendingOrdersPollTimer) {
-      window.__rsPendingOrdersPollTimer = setInterval(() => {
+      const pollPending = () => {
         if (document.hidden) return;
         syncPendingOrders({ forceCloud: true });
-      }, 12000);
+      };
+      const armPoll = () => {
+        if (window.__rsPendingOrdersPollTimer) clearInterval(window.__rsPendingOrdersPollTimer);
+        const activeId = document.querySelector('.tab-content.active')?.id || '';
+        const hot = activeId === 'qr-orders-tab' || activeId === 'kds-tab' || activeId === 'online-orders-tab';
+        window.__rsPendingOrdersPollTimer = setInterval(pollPending, hot ? 4000 : 12000);
+      };
+      armPoll();
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) syncPendingOrders({ forceCloud: true });
+        if (!document.hidden) {
+          pollPending();
+          armPoll();
+        }
       });
+      // Re-arm when staff switch tabs so the QR board stays snappy.
+      document.addEventListener('click', (ev) => {
+        if (ev.target && ev.target.closest && ev.target.closest('[data-tab], .nav-item, .sb-item, .tab-btn')) {
+          setTimeout(armPoll, 50);
+        }
+      }, true);
+      window.__rsArmPendingOrdersPoll = armPoll;
     }
   }
 
@@ -1926,27 +1956,57 @@
     }
     const tableName = qrTableName(order.table);
     activateTab('pos-tab');
-    await new Promise(resolve => setTimeout(resolve, 80));
+    // Wait for POS tab DOM + cart helpers (RS.setCart) to be ready after tab switch.
+    await new Promise(resolve => setTimeout(resolve, 120));
+    let attempts = 0;
+    while (attempts < 8 && !(window.RS && typeof RS.setCart === 'function')) {
+      await new Promise(resolve => setTimeout(resolve, 60));
+      attempts += 1;
+    }
 
-    const tableSelect = document.getElementById('cart-table');
+    const tableSelect = document.getElementById('cart-table')
+      || document.getElementById('pos-table-select')
+      || document.querySelector('#pos-tab select[name="table"], #pos-tab #table-select');
     if (tableSelect) {
-      let opt = [...tableSelect.options].find(o => o.value === tableName || o.text === tableName);
+      const matchValue = order.table || tableName;
+      let opt = [...tableSelect.options].find(o =>
+        o.value === tableName || o.text === tableName ||
+        o.value === matchValue || o.text === matchValue ||
+        o.value === String(order.table) || o.textContent.trim() === tableName
+      );
       if (!opt) {
         opt = document.createElement('option');
         opt.value = tableName;
         opt.textContent = tableName;
         tableSelect.appendChild(opt);
       }
-      tableSelect.value = tableName;
+      tableSelect.value = opt.value;
       tableSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      tableSelect.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    if (window.RS && typeof RS.setCart === 'function') RS.setCart(items);
+    // Prefer the public cart API; fall back to direct cart mutation used by POS.
+    if (window.RS && typeof RS.setCart === 'function') {
+      RS.setCart(items);
+    } else if (window.RS && Array.isArray(RS.cart)) {
+      RS.cart.length = 0;
+      items.forEach(it => RS.cart.push(it));
+    }
+    if (window.RS && typeof RS.setTable === 'function') {
+      try { RS.setTable(tableName); } catch(e) {}
+    }
     const nameEl = document.getElementById('cust-name') || document.getElementById('cust-input-name');
     const phoneEl = document.getElementById('cust-phone') || document.getElementById('cust-input-phone');
-    if (nameEl && order.customerName) nameEl.value = order.customerName;
-    if (phoneEl && order.customerPhone) phoneEl.value = order.customerPhone;
+    if (nameEl && order.customerName) {
+      nameEl.value = order.customerName;
+      nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (phoneEl && order.customerPhone) {
+      phoneEl.value = order.customerPhone;
+      phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     try { if (window.RS && typeof RS.renderCart === 'function') RS.renderCart(); } catch(e) {}
+    try { if (typeof window.saveActiveCart === 'function') window.saveActiveCart(); } catch(e) {}
     toast(`Loaded ${tableName} in POS`, 'fa-receipt');
   }
   const renderQR = () => {
@@ -3186,7 +3246,7 @@
 
     // Role definitions for edit modal (key -> { label, color, icon, tabs description })
     const ROLE_DEFS = [
-      { key:'owner',     label:'Owner',             color:'#FF6B00', icon:'fa-crown',        desc:'Full access to all tabs' },
+      { key:'owner',     label:'Owner',             color:'#FF4F00', icon:'fa-crown',        desc:'Full access to all tabs' },
       { key:'manager',   label:'Manager',            color:'#7c3aed', icon:'fa-user-tie',     desc:'All ops tabs -- no super-admin' },
       { key:'cashier',   label:'Cashier',            color:'#0891b2', icon:'fa-cash-register',desc:'POS · Floor · Bills · Customers' },
       { key:'waiter',    label:'Waiter',             color:'#059669', icon:'fa-utensils',     desc:'POS · Floor · Kitchen Display' },
@@ -3297,6 +3357,7 @@
   let superAdminSearch = '';
   let superAdminSort = { col: 'joined', dir: 'desc' };
   let _cachedTenants = [];
+  let selectedTenantIds = new Set();
   let saasGatewayPollingInterval = null;
 
   function escHtml(str) {
@@ -3333,7 +3394,7 @@
       <div class="saas-snapshot-card ${activeClass}" ${filterData}>
         <div class="saas-snapshot-card-header">
           <span class="saas-snapshot-card-title">${escHtml(title)}</span>
-          <i class="${iconClass}" style="color: #FC8019; font-size: 14px;"></i>
+          <i class="${iconClass}" style="color: #FF4F00; font-size: 14px;"></i>
         </div>
         <div>
           <div class="saas-snapshot-card-value">${escHtml(value)}</div>
@@ -3365,7 +3426,7 @@
     target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
       item.addEventListener('click', async () => {
         const f = item.getAttribute('data-filter');
-        if (f === 'mrr') return; // MRR card is display-only, not a filter
+        if (f === 'mrr') { openPlanPricingEditor(); return; } // MRR card opens plan pricing
         superAdminFilter = f;
         await renderSuper();
       });
@@ -3374,10 +3435,34 @@
 
   const tStatus={active:'t-active',approved:'t-active',trial:'t-trial',pending:'t-trial',suspended:'t-suspended',past_due:'t-suspended',canceled:'t-suspended'};
 
+  function getTenantRowId(tenant) {
+    return tenant && tenant.id != null ? String(tenant.id) : '';
+  }
+
+  function getSelectedTenants() {
+    return _cachedTenants.filter(t => selectedTenantIds.has(getTenantRowId(t)));
+  }
+
+  function pruneTenantSelection() {
+    const validIds = new Set(_cachedTenants.map(getTenantRowId).filter(Boolean));
+    selectedTenantIds = new Set([...selectedTenantIds].filter(id => validIds.has(id)));
+  }
+
+  function syncTenantSelectAll(visibleTenants = []) {
+    const all = document.getElementById('tenant-select-all');
+    if (!all) return;
+    const visibleIds = visibleTenants.map(getTenantRowId).filter(Boolean);
+    const selectedVisible = visibleIds.filter(id => selectedTenantIds.has(id)).length;
+    all.checked = visibleIds.length > 0 && selectedVisible === visibleIds.length;
+    all.indeterminate = selectedVisible > 0 && selectedVisible < visibleIds.length;
+    all.disabled = visibleIds.length === 0;
+  }
+
   // Render tenant table from cached data (no network call)
   function renderTenantTable() {
     const tbody = $('#tenant-table-body');
     if (!tbody) return;
+    pruneTenantSelection();
 
     let filtered = _cachedTenants.slice();
 
@@ -3405,6 +3490,7 @@
       else if (col === 'outlets') { va = Number(a.outlet_count) || 1; vb = Number(b.outlet_count) || 1; }
       else if (col === 'joined') { va = a.created_at || ''; vb = b.created_at || ''; }
       else if (col === 'status') { va = (a.status || '').toLowerCase(); vb = (b.status || '').toLowerCase(); }
+      else if (col === 'renews') { va = a.subscription_current_period_end || ''; vb = b.subscription_current_period_end || ''; }
       else { va = a.created_at || ''; vb = b.created_at || ''; }
       if (va < vb) return dir === 'asc' ? -1 : 1;
       if (va > vb) return dir === 'asc' ? 1 : -1;
@@ -3431,7 +3517,9 @@
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>${q ? `No tenants match "${_e(q)}"` : `No tenants found for filter "${_e(superAdminFilter)}".`}</td></tr>`;
+      syncTenantSelectAll([]);
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>${q ? `No tenants match "${_e(q)}"` : `No tenants found for filter "${_e(superAdminFilter)}".`}</td></tr>`;
+      updateBulkBar();
       return;
     }
 
@@ -3443,10 +3531,12 @@
       const statusKey = (t.status || 'active').toLowerCase();
       const statusCls = tStatus[statusKey] || 't-active';
       const statusText = t.status ? (t.status.charAt(0).toUpperCase() + t.status.slice(1).replace(/_/g,' ')) : 'Active';
-      const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { month:'short', year:'numeric' }) : '-';
+      const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '-';
       const mrr = t.mrr || 0;
       const name = t.name || t.tenant_name || t.slug || 'Unknown';
       const slug = t.slug || t.tenant_slug || '';
+      const tenantId = getTenantRowId(t);
+      const selected = tenantId && selectedTenantIds.has(tenantId);
       const isPending = statusKey === 'pending';
       const isSuspended = statusKey === 'suspended';
       const approveBtn = isPending
@@ -3460,13 +3550,27 @@
       const dashboardBtn = !isPending && !isSuspended
         ? `<button class="icon-act open-tenant-dashboard-btn" title="Open workspace dashboard" data-tid="${_e(t.id||'')}" style="font-size:13px;color:var(--orange)"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>`
         : '';
-      return `<tr>
-        <td><div style="display:flex;align-items:center;gap:11px"><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
+      // Renews-on (paid-until) cell with colour: red=expired, amber=<=7 days, green=fine.
+      const rawEnd = t.subscription_current_period_end;
+      let renewsCell;
+      if (!rawEnd) {
+        renewsCell = '<span style="color:var(--text-mute)">—</span>';
+      } else {
+        const end = new Date(rawEnd);
+        const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86400000);
+        const dateStr = isNaN(end.getTime()) ? '—' : end.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+        const color = daysLeft < 0 ? '#dc2626' : (daysLeft <= 7 ? '#d97706' : '#16a34a');
+        const label = daysLeft < 0 ? (dateStr + ' (expired)') : (daysLeft <= 7 ? (dateStr + ' (' + daysLeft + 'd)') : dateStr);
+        renewsCell = `<span style="color:${color};font-weight:600;white-space:nowrap">${_e(label)}</span>`;
+      }
+      return `<tr class="${selected ? 'tenant-row-selected' : ''}">
+        <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
         <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
         <td class="td-strong">${mrr ? rs(mrr) : '--'}</td>
         <td>${_e(t.outlet_count || 1)}</td>
         <td>${_e(joined)}</td>
         <td><span class="tenant-status ${_e(statusCls)}">${_e(statusText)}</span></td>
+        <td>${renewsCell}</td>
         <td>
           <div class="row-actions" style="gap:5px">
             ${approveBtn}
@@ -3477,6 +3581,20 @@
         </td>
       </tr>`;
     }).join('');
+
+    syncTenantSelectAll(filtered);
+    updateBulkBar();
+
+    tbody.querySelectorAll('.tenant-row-checkbox').forEach(cb => {
+      cb.addEventListener('click', e => e.stopPropagation());
+      cb.addEventListener('change', () => {
+        const tid = cb.getAttribute('data-tid');
+        if (!tid) return;
+        if (cb.checked) selectedTenantIds.add(tid);
+        else selectedTenantIds.delete(tid);
+        renderTenantTable();
+      });
+    });
 
     // Bind quick-approve buttons
     tbody.querySelectorAll('.quick-approve-btn').forEach(btn => {
@@ -3569,10 +3687,30 @@
     });
   }
 
+  let _superPollTimer = null;
+  async function pollSuperTenants() {
+    try {
+      if (!window.RS_API || !RS_API.configured) return;
+      const body = document.getElementById('tenant-table-body');
+      if (!body || body.offsetParent === null) return;
+      if (document.visibilityState !== 'visible') return;
+      const out = await RS_API.admin({ action: 'list_tenants' }).catch(() => null);
+      if (out && Array.isArray(out.tenants)) {
+        _cachedTenants = out.tenants;
+        renderPlatformSummary(_cachedTenants);
+        renderTenantTable();
+      }
+    } catch (e) { /* quiet */ }
+  }
+  function startSuperPolling() {
+    if (_superPollTimer) return;
+    _superPollTimer = setInterval(pollSuperTenants, 30000);
+  }
+
   const renderSuper = async () => {
     const tbody = $('#tenant-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
     renderPlatformSummary([]);
     try {
       if (window.RS_API) {
@@ -3589,7 +3727,7 @@
         }
         // If still not configured after waiting, session is genuinely missing
         if (!RS_API.configured) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Supabase not reachable — check your internet connection and reload the page.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Supabase not reachable — check your internet connection and reload the page.</td></tr>';
           return;
         }
         const out = await Promise.race([
@@ -3600,13 +3738,15 @@
         if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
         // If we got an auth error, show a helpful message with retry
         if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
           return;
         }
       }
       renderPlatformSummary(_cachedTenants);
       renderTenantTable();
+      bindTenantBulkControls();
       updateBulkBar();
+      startSuperPolling();
 
       // Wire sort headers (only once)
       document.querySelectorAll('th[data-sort-col]').forEach(th => {
@@ -3621,7 +3761,7 @@
         });
       });
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
     }
   };
 
@@ -3629,13 +3769,76 @@
   function updateBulkBar() {
     const bar = document.getElementById('sa-bulk-bar');
     const label = document.getElementById('sa-bulk-label');
+    const icon = document.getElementById('sa-bulk-icon');
+    const selectionActions = document.getElementById('sa-selection-actions');
+    const approveBtn = document.getElementById('sa-bulk-approve-btn');
     if (!bar || !label) return;
+    const selected = getSelectedTenants();
     const pending = _cachedTenants.filter(t => t.status === 'pending');
-    if (pending.length > 0) {
+    if (selected.length > 0) {
       bar.style.display = 'flex';
+      bar.style.background = 'rgba(239,68,68,0.07)';
+      bar.style.borderColor = 'rgba(239,68,68,0.22)';
+      label.style.color = '#dc2626';
+      label.textContent = `${selected.length} client${selected.length > 1 ? 's' : ''} selected`;
+      if (icon) {
+        icon.className = 'fa-solid fa-trash-can';
+        icon.style.color = '#dc2626';
+      }
+      if (selectionActions) selectionActions.style.display = 'flex';
+      if (approveBtn) approveBtn.style.display = 'none';
+    } else if (pending.length > 0) {
+      bar.style.display = 'flex';
+      bar.style.background = 'rgba(245,158,11,0.08)';
+      bar.style.borderColor = 'rgba(245,158,11,0.2)';
+      label.style.color = '#b45309';
       label.textContent = `${pending.length} workspace${pending.length > 1 ? 's' : ''} waiting for approval`;
+      if (icon) {
+        icon.className = 'fa-solid fa-user-clock';
+        icon.style.color = '#b45309';
+      }
+      if (selectionActions) selectionActions.style.display = 'none';
+      if (approveBtn) approveBtn.style.display = 'inline-flex';
     } else {
       bar.style.display = 'none';
+      if (selectionActions) selectionActions.style.display = 'none';
+      if (approveBtn) approveBtn.style.display = 'inline-flex';
+    }
+  }
+
+  function bindTenantBulkControls() {
+    const selectHead = document.querySelector('.tenant-select-head');
+    if (selectHead && !selectHead.dataset.wired) {
+      selectHead.dataset.wired = '1';
+      selectHead.addEventListener('click', e => e.stopPropagation());
+    }
+    const selectAll = document.getElementById('tenant-select-all');
+    if (selectAll && !selectAll.dataset.wired) {
+      selectAll.dataset.wired = '1';
+      selectAll.addEventListener('click', e => e.stopPropagation());
+      selectAll.addEventListener('change', () => {
+        const visibleIds = Array.from(document.querySelectorAll('#tenant-table-body .tenant-row-checkbox'))
+          .map(cb => cb.getAttribute('data-tid'))
+          .filter(Boolean);
+        visibleIds.forEach(id => {
+          if (selectAll.checked) selectedTenantIds.add(id);
+          else selectedTenantIds.delete(id);
+        });
+        renderTenantTable();
+      });
+    }
+    const clearBtn = document.getElementById('sa-clear-selection-btn');
+    if (clearBtn && !clearBtn.dataset.wired) {
+      clearBtn.dataset.wired = '1';
+      clearBtn.addEventListener('click', () => {
+        selectedTenantIds.clear();
+        renderTenantTable();
+      });
+    }
+    const deleteBtn = document.getElementById('sa-bulk-delete-btn');
+    if (deleteBtn && !deleteBtn.dataset.wired) {
+      deleteBtn.dataset.wired = '1';
+      deleteBtn.addEventListener('click', () => bulkDeleteSelectedTenants());
     }
   }
 
@@ -3660,6 +3863,51 @@
     updateBulkBar();
     toast(`${done} workspace${done !== 1 ? 's' : ''} approved${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Approve all pending'; }
+  }
+
+  async function bulkDeleteSelectedTenants() {
+    const selected = getSelectedTenants();
+    if (!selected.length) return toast('Select clients to delete first.', 'fa-circle-info');
+    const sampleNames = selected.slice(0, 4).map(t => t.name || t.tenant_name || t.slug || 'Unnamed client');
+    const more = selected.length > sampleNames.length ? ` and ${selected.length - sampleNames.length} more` : '';
+    confirmDangerAction(
+      `Delete ${selected.length} selected client${selected.length > 1 ? 's' : ''}?`,
+      `This will <strong>permanently erase</strong> the selected client workspace${selected.length > 1 ? 's' : ''} and all related data. This cannot be undone.<br><br><strong>${sampleNames.map(_e).join(', ')}${_e(more)}</strong>`,
+      async () => {
+        const btn = document.getElementById('sa-bulk-delete-btn');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
+        }
+        let done = 0, failed = 0;
+        const deletedIds = [];
+        for (const tenant of selected) {
+          const tenantId = getTenantRowId(tenant);
+          if (!tenantId) { failed++; continue; }
+          try {
+            await RS_API.admin({ action: 'delete_tenant', tenant_id: tenantId });
+            deletedIds.push(tenantId);
+            done++;
+          } catch (err) {
+            console.error('Bulk tenant delete failed', tenantId, err);
+            failed++;
+          }
+        }
+        if (deletedIds.length) {
+          const deleted = new Set(deletedIds);
+          _cachedTenants = _cachedTenants.filter(t => !deleted.has(getTenantRowId(t)));
+          selectedTenantIds = new Set([...selectedTenantIds].filter(id => !deleted.has(id)));
+        }
+        renderPlatformSummary(_cachedTenants);
+        renderTenantTable();
+        updateBulkBar();
+        toast(`${done} client${done !== 1 ? 's' : ''} deleted${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete selected';
+        }
+      }
+    );
   }
 
   // ── Create Tenant Modal ─────────────────────────────────────────────────
@@ -3755,6 +4003,105 @@
     modal.classList.add('active');
   }
 
+  async function openPlanPricingEditor() {
+    document.getElementById('rs-pricing-modal')?.remove();
+    const m = document.createElement('div');
+    m.id = 'rs-pricing-modal';
+    m.className = 'modal-backdrop';
+    m.style.cssText = 'z-index:200010;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto';
+    m.innerHTML = `
+      <div style="background:var(--panel,#fff);border:1px solid var(--stroke);border-radius:16px;max-width:640px;width:100%;padding:22px 22px 18px;box-shadow:0 24px 80px rgba(0,0,0,.35)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <h3 style="margin:0;font-size:16px;font-weight:800">Plan pricing</h3>
+          <button id="rs-pricing-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-mute);line-height:1">×</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-soft);margin:0 0 14px">Edit monthly price, currency, and the Razorpay plan id used for self-serve checkout. Changes apply immediately.</p>
+        <div id="rs-pricing-body" style="font-size:13px;color:var(--text-soft)"><i class="fa-solid fa-spinner fa-spin"></i> Loading plans…</div>
+      </div>`;
+    document.body.appendChild(m);
+    m.querySelector('#rs-pricing-close').onclick = () => m.remove();
+    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+    const body = m.querySelector('#rs-pricing-body');
+    let plans = [];
+    try { const out = await RS_API.admin({ action: 'list_plans' }); plans = (out && out.plans) || []; }
+    catch (e) { body.innerHTML = '<span style="color:#dc2626">Could not load plans (' + _e(e.message || 'error') + ').</span>'; return; }
+    body.innerHTML = plans.map(p => `
+      <div data-plan="${_e(p.plan_code)}" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px">${_e(p.name)} <span style="color:var(--text-mute);font-weight:600">(${_e(p.plan_code)})</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label style="font-size:11px;color:var(--text-mute)">Price / month
+            <input class="rs-pp-price" type="number" min="0" value="${Number(p.price_monthly)||0}" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px">
+          </label>
+          <label style="font-size:11px;color:var(--text-mute)">Currency
+            <input class="rs-pp-cur" type="text" value="${_e(p.currency||'INR')}" maxlength="8" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px">
+          </label>
+          <label style="font-size:11px;color:var(--text-mute);grid-column:1/3">Razorpay plan id (for self-serve checkout)
+            <input class="rs-pp-rzp" type="text" value="${_e(p.razorpay_plan_id||'')}" placeholder="plan_XXXXXXXX" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px;font-family:monospace">
+          </label>
+          <label style="font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;grid-column:1/3">
+            <input class="rs-pp-pub" type="checkbox" ${p.is_public===false?'':'checked'}> Show to tenants in the in-app billing panel
+          </label>
+        </div>
+        <div style="text-align:right;margin-top:8px">
+          <button class="rs-pp-save btn btn-sm" style="background:var(--orange);color:#fff;border:none;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">Save</button>
+        </div>
+      </div>`).join('');
+    body.querySelectorAll('.rs-pp-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('[data-plan]');
+        const payload = {
+          action: 'update_plan',
+          plan_code: row.getAttribute('data-plan'),
+          price_monthly: Number(row.querySelector('.rs-pp-price').value) || 0,
+          currency: (row.querySelector('.rs-pp-cur').value || 'INR').trim().toUpperCase(),
+          razorpay_plan_id: row.querySelector('.rs-pp-rzp').value.trim(),
+          is_public: row.querySelector('.rs-pp-pub').checked,
+        };
+        btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Saving…';
+        try { await RS_API.admin(payload); toast('Plan pricing updated.', 'fa-circle-check'); }
+        catch (e) { toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
+        finally { btn.disabled = false; btn.textContent = orig; }
+      });
+    });
+  }
+
+  async function loadTenantDevices(tenantId) {
+    const box = document.getElementById('manage-devices-box');
+    if (!box) return;
+    if (!tenantId) { box.textContent = 'Save the workspace first to see licensed devices.'; return; }
+    box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading devices…';
+    let devices = [];
+    try { const out = await RS_API.admin({ action: 'list_devices', tenant_id: tenantId }); devices = (out && out.devices) || []; }
+    catch (e) { box.innerHTML = '<span style="color:#dc2626">Could not load devices (' + _e(e.message || 'error') + ').</span>'; return; }
+    if (!devices.length) { box.innerHTML = '<span style="color:var(--text-mute)">No devices have activated a licence yet.</span>'; return; }
+    const rel = (iso) => { if (!iso) return '—'; const ms = Date.now() - new Date(iso).getTime(); const d = Math.floor(ms/86400000); if (d>0) return d+'d ago'; const h=Math.floor(ms/3600000); if(h>0) return h+'h ago'; const mi=Math.floor(ms/60000); return mi>0?mi+'m ago':'just now'; };
+    box.innerHTML = devices.map(d => {
+      const shortId = _e(String(d.device_id || '').replace(/^dev_/, '').slice(0, 12));
+      const revoked = !!d.revoked;
+      const statusChip = revoked ? '<span style="color:#dc2626;font-weight:700">Revoked</span>' : '<span style="color:#16A34A;font-weight:700">Active</span>';
+      const btn = revoked
+        ? `<button class="rs-dev-btn" data-act="restore_device" data-dev="${_e(d.device_id)}" style="background:none;border:1px solid var(--stroke);border-radius:7px;padding:5px 10px;font-size:11px;color:var(--text);cursor:pointer">Restore</button>`
+        : `<button class="rs-dev-btn" data-act="revoke_device" data-dev="${_e(d.device_id)}" style="background:none;border:1px solid rgba(239,68,68,.35);border-radius:7px;padding:5px 10px;font-size:11px;color:#dc2626;cursor:pointer">Revoke</button>`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--stroke)">
+        <div style="min-width:0">
+          <div style="font-weight:700;color:var(--text);font-family:monospace;font-size:12px">${shortId} · ${statusChip}</div>
+          <div style="font-size:11px;color:var(--text-mute)">${_e(d.last_plan || '—')} · last seen ${rel(d.last_lease_at)} · ${_e(String(d.lease_count || 0))} renewals</div>
+        </div>${btn}
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.rs-dev-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const act = btn.getAttribute('data-act'); const dev = btn.getAttribute('data-dev');
+        btn.disabled = true;
+        try {
+          await RS_API.admin({ action: act, tenant_id: tenantId, device_id: dev, reason: 'Toggled from admin console' });
+          toast(act === 'revoke_device' ? 'Device revoked — it will lock within the offline window.' : 'Device restored.', 'fa-circle-check');
+          loadTenantDevices(tenantId);
+        } catch (e) { btn.disabled = false; toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
+      });
+    });
+  }
+
   function openTenantManageModal(tenant) {
     try {
       const modal = document.getElementById('tenant-manage-modal');
@@ -3807,6 +4154,18 @@
       if (emailEl) emailEl.value = tenant.email || '';
       if (planCodeEl) planCodeEl.value = tenant.plan_code || 'starter';
       if (subscriptionStatusEl) subscriptionStatusEl.value = tenant.subscription_status || 'active';
+      const periodEndEl = document.getElementById('manage-period-end');
+      if (periodEndEl) {
+        try { periodEndEl.value = tenant.subscription_current_period_end ? new Date(tenant.subscription_current_period_end).toISOString().slice(0,10) : ''; }
+        catch (e) { periodEndEl.value = ''; }
+      }
+      loadTenantDevices(tenant.id);
+      if (window.__rsDeviceTimer) clearInterval(window.__rsDeviceTimer);
+      window.__rsDeviceTimer = setInterval(function () {
+        const box = document.getElementById('manage-devices-box');
+        if (!box || box.offsetParent === null) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; return; }
+        loadTenantDevices(tenant.id);
+      }, 15000);
       // Notes field — stored in localStorage keyed by tenant ID (no backend needed)
       const notesEl = document.getElementById('manage-notes');
       if (notesEl) {
@@ -3870,6 +4229,7 @@
   function closeTenantModal() {
     const modal = document.getElementById('tenant-manage-modal');
     if (modal) modal.classList.remove('active');
+    if (window.__rsDeviceTimer) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; }
   }
 
   // ── Super-Admin Settings Modal ──────────────────────────────────────────
@@ -4013,6 +4373,7 @@
           const email = document.getElementById('manage-email').value.trim();
           const plan_code = document.getElementById('manage-plan-code').value;
           const subscription_status = document.getElementById('manage-subscription-status').value;
+          const periodEndRaw = (document.getElementById('manage-period-end') || {}).value || '';
 
           const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
 
@@ -4026,6 +4387,7 @@
             phone,
             email
           };
+          updates.subscription_current_period_end = periodEndRaw ? new Date(periodEndRaw + 'T23:59:59Z').toISOString() : '';
 
           if (password !== '') updates.password = password;
 
@@ -4306,7 +4668,7 @@
             if (qrContainer) qrContainer.style.display = 'flex';
             if (qrSpinner) {
               qrSpinner.style.display = 'block';
-              qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FC8019;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
+              qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
             }
             if (qrImg) qrImg.style.display = 'none';
           }
@@ -5721,9 +6083,9 @@
         const formattedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
         const html = `
-          <div style="font-family: 'Inter', monospace; max-width: 280px; margin: 0 auto; color: #111; font-size: 13px; line-height: 1.4;">
+          <div style="font-family: 'DM Sans', monospace; max-width: 280px; margin: 0 auto; color: #111; font-size: 13px; line-height: 1.4;">
             <div style="text-align: center; margin-bottom: 10px;">
-              <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 18px; margin: 0;">${outletName}</h2>
+              <h2 style="font-family: var(--font-body), system-ui, sans-serif; font-weight: 800; font-size: 18px; margin: 0;">${outletName}</h2>
               <p style="font-size: 11px; color: #555; margin-top: 2px;">DAILY SALES SUMMARY</p>
             </div>
             <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
@@ -5765,7 +6127,7 @@
                 <span>Total GST (5%):</span>
                 <span>${rs(gstCollected)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; border-top: 1px dashed #ccc; margin-top: 4px;">
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; font-weight: 800; font-family: var(--font-body), system-ui, sans-serif; border-top: 1px dashed #ccc; margin-top: 4px;">
                 <span>GROSS REVENUE:</span>
                 <span>${rs(totalRevenue)}</span>
               </div>

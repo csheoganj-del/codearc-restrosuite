@@ -125,7 +125,7 @@
   // Narrow no-break space (\u202f) gives visible gap without wrapping.
   // Number grouping uses outlet locale so Irish bills show 1,000 not 1,00,000.
   const rs = n => getCurrencySymbol() + '\u202f' + Math.round(n).toLocaleString(window.RS_getOutletLocale());
-  const avatarColors = ['linear-gradient(135deg,#FF6A2A,#E04300)','linear-gradient(135deg,#8B7CF6,#FF6A2A)','linear-gradient(135deg,#34C7CE,#7C6BF5)','linear-gradient(135deg,#34D399,#0EA5A5)','linear-gradient(135deg,#FBBF24,#FF6A2A)'];
+  const avatarColors = ['#FF4F00','#5B6C8F','#2A9B8F','#1F8A5B','#C47B16'];
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 
   /* ---------- THEME ---------- */
@@ -734,7 +734,7 @@
      ============================================================ */
   const MENU = [];
   const CATS = ['All','Starters','Mains','Breads','Beverages','Desserts'];
-  const CAT_COLOR = { Starters:'#FF6A2A', Mains:'#8B7CF6', Breads:'#F0A93B', Beverages:'#2BB8C0', Desserts:'#F472B6' };
+  const CAT_COLOR = { Starters:'#FF4F00', Mains:'#5B6C8F', Breads:'#C47B16', Beverages:'#2A9B8F', Desserts:'#B45A6A' };
   const catColor = c => CAT_COLOR[c] || 'var(--orange)';
   const stockLabel = {ok:'In stock',low:'Low',out:'Out'};
   const stockCls = {ok:'stock-ok',low:'stock-low',out:'stock-out'};
@@ -1750,11 +1750,22 @@
     const pillEl = document.getElementById('topbar-whatsapp-status-pill');
     if (textEl && pillEl) {
       textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-      pillEl.setAttribute('data-tooltip', 'WhatsApp gateway is offline' + (reason ? `: ${reason}` : ''));
+      const friendly = (function (raw) {
+        const s = String(raw || '').toLowerCase();
+        if (!s) return 'WhatsApp is not connected. Open Settings → Gateway to link.';
+        if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings → Gateway.';
+        if (s.includes('timeout')) return 'Gateway took too long to respond. Check the PC running WhatsApp.';
+        if (s.includes('auth')) return 'WhatsApp session expired. Scan the QR code again.';
+        if (s.length > 90 || /[{}\[\]<>]|error code|ECONN/i.test(String(raw))) {
+          return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → Gateway.';
+        }
+        return 'WhatsApp is offline: ' + raw;
+      })(reason);
+      pillEl.setAttribute('data-tooltip', friendly);
       pillEl.title = '';
-      pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
-      pillEl.style.color = '#ef4444';
-      pillEl.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+      pillEl.style.background = 'var(--red-tint)';
+      pillEl.style.color = 'var(--red)';
+      pillEl.style.border = '1px solid color-mix(in srgb, var(--red) 28%, transparent)';
     }
   }
   function hideGatewayOfflineBanner() {
@@ -3235,7 +3246,7 @@
 
     // Role definitions for edit modal (key -> { label, color, icon, tabs description })
     const ROLE_DEFS = [
-      { key:'owner',     label:'Owner',             color:'#FF6B00', icon:'fa-crown',        desc:'Full access to all tabs' },
+      { key:'owner',     label:'Owner',             color:'#FF4F00', icon:'fa-crown',        desc:'Full access to all tabs' },
       { key:'manager',   label:'Manager',            color:'#7c3aed', icon:'fa-user-tie',     desc:'All ops tabs -- no super-admin' },
       { key:'cashier',   label:'Cashier',            color:'#0891b2', icon:'fa-cash-register',desc:'POS · Floor · Bills · Customers' },
       { key:'waiter',    label:'Waiter',             color:'#059669', icon:'fa-utensils',     desc:'POS · Floor · Kitchen Display' },
@@ -3383,7 +3394,7 @@
       <div class="saas-snapshot-card ${activeClass}" ${filterData}>
         <div class="saas-snapshot-card-header">
           <span class="saas-snapshot-card-title">${escHtml(title)}</span>
-          <i class="${iconClass}" style="color: #FC8019; font-size: 14px;"></i>
+          <i class="${iconClass}" style="color: #FF4F00; font-size: 14px;"></i>
         </div>
         <div>
           <div class="saas-snapshot-card-value">${escHtml(value)}</div>
@@ -4657,7 +4668,7 @@
             if (qrContainer) qrContainer.style.display = 'flex';
             if (qrSpinner) {
               qrSpinner.style.display = 'block';
-              qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FC8019;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
+              qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
             }
             if (qrImg) qrImg.style.display = 'none';
           }

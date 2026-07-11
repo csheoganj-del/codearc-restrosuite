@@ -1212,7 +1212,7 @@ app.get('/', (req, res) => {
         :root {
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
-            --accent: #FF6B00;
+            --accent: #FF4F00;
             --accent-hover: #E05E00;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
@@ -1224,7 +1224,7 @@ app.get('/', (req, res) => {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', system-ui, sans-serif;
         }
         body {
             background-color: var(--bg-primary);
@@ -1977,7 +1977,7 @@ async function performReset(req, res, format = 'json') {
                             The gateway is re-initializing right now! A fresh QR code will display on the dashboard in a few seconds.
                         </p>
                         <hr style="border: 0; border-top: 1px solid #334155; margin-bottom: 20px;">
-                        <a href="/" style="background-color: #FF6B00; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+                        <a href="/" style="background-color: #FF4F00; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
                             Go to Dashboard &rarr;
                         </a>
                     </div>
@@ -2378,7 +2378,7 @@ async function handleNewRegistrationNotification(record) {
           <!-- Orange Divider -->
           <tr>
             <td>
-              <div style="height:4px; background:#FF6B00;"></div>
+              <div style="height:4px; background:#FF4F00;"></div>
             </td>
           </tr>
 
@@ -2523,7 +2523,7 @@ async function handleNewRegistrationNotification(record) {
 
               <a href="https://codearc.co.in"
                 style="
-                  background:#FF6B00;
+                  background:#FF4F00;
                   color:#ffffff;
                   text-decoration:none;
                   padding:14px 28px;
