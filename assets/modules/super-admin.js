@@ -171,6 +171,8 @@ function renderTenantTable() {
   if (!tbody) return;
   pruneTenantSelection();
   const avatarColors = getAvatarColors();
+  superAdminSearch = readVisibleTenantSearch();
+  syncTenantSearchInputs(superAdminSearch);
 
   let filtered = _cachedTenants.slice();
 

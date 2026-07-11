@@ -135,6 +135,7 @@ test('super-admin module extracted (wave 9)', () => {
   assert.match(src, /function initials\(value\)/, 'tenant initials should resolve inside the module scope');
   assert.match(src, /readVisibleTenantSearch\(\)/, 'tenant search should be initialized from visible search inputs');
   assert.match(src, /syncTenantSearchInputs\(superAdminSearch\)/, 'tenant search inputs should stay synchronized with module state');
+  assert.match(src, /function renderTenantTable\(\)[\s\S]*superAdminSearch = readVisibleTenantSearch\(\)/, 'tenant table renders should not reuse stale hidden search state');
   const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
   assert.match(dash, /RSSuperAdmin/);
   assert.ok(!dash.includes('function openCreateTenantModal'), 'tenant create modal should leave dashboard');
