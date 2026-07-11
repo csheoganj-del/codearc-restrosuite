@@ -26,6 +26,202 @@
     try { return (global.RS_API && RS_API.session && RS_API.session()) || {}; } catch (_) { return {}; }
   }
 
+  /* ---------------- Loyalty (earn / redeem / tiers) ---------------- */
+  function loyaltyEnabled() {
+    const s = global.RS_SETTINGS || {};
+    return s.set_loyalty_program !== false && s.set_loyalty_program !== 'false';
+  }
+  function loyaltyEarnRate() {
+    const n = Number((global.RS_SETTINGS || {}).set_loyalty_earn_rate);
+    return Number.isFinite(n) && n > 0 ? n : 100; // 1 pt per N currency of spend
+  }
+  function loyaltyPointValue() {
+    const n = Number((global.RS_SETTINGS || {}).set_loyalty_point_value);
+    return Number.isFinite(n) && n > 0 ? n : 1; // 1 pt = N currency when redeeming
+  }
+  function tierFromSpend(spend) {
+    const s = Number(spend) || 0;
+    if (s >= 10000) return 'vip';
+    if (s >= 5000) return 'gold';
+    return 'silver';
+  }
+  function tierEarnMult(tier) {
+    const t = String(tier || 'silver').toLowerCase();
+    if (t === 'vip' || t === 'platinum') return 3;
+    if (t === 'gold') return 2;
+    return 1;
+  }
+  function calcEarnPoints(spendAmount, tier) {
+    if (!loyaltyEnabled()) return 0;
+    const base = Math.floor(Math.max(0, Number(spendAmount) || 0) / loyaltyEarnRate());
+    return base * tierEarnMult(tier);
+  }
+  function pointsToCurrency(pts) {
+    return Math.round((Math.max(0, Number(pts) || 0) * loyaltyPointValue()) * 100) / 100;
+  }
+  function currencyToPoints(amount) {
+    const v = loyaltyPointValue();
+    if (v <= 0) return 0;
+    return Math.ceil(Math.max(0, Number(amount) || 0) / v);
+  }
+  function customerPoints(c) {
+    if (!c) return 0;
+    if (c.points != null && Number.isFinite(Number(c.points))) return Math.max(0, Math.floor(Number(c.points)));
+    // Backfill from lifetime spend for older CRM rows
+    return Math.max(0, Math.floor((Number(c.spend) || 0) / loyaltyEarnRate()));
+  }
+  function applyLoyaltyEarnToCustomer(matched, bill, dueAmount) {
+    const earnBase = Math.max(
+      0,
+      (Number(bill.grand) || 0) - (Number(bill.tipAmount) || 0) + (Number(bill.loyaltyRedeemAmount) || 0)
+    );
+    // spend still tracks full bill; points earn on food+tax after redeem already applied to grand
+    matched.visits = (matched.visits || 0) + 1;
+    matched.spend = (matched.spend || 0) + (Number(bill.grand) || 0);
+    matched.last = new Date().toLocaleDateString('en-CA');
+    if (dueAmount > 0) matched.dues = (matched.dues || 0) + dueAmount;
+    const ptsUsed = Math.max(0, Number(bill.loyaltyPointsUsed) || 0);
+    let pts = customerPoints(matched);
+    if (ptsUsed > 0) pts = Math.max(0, pts - ptsUsed);
+    matched.tier = tierFromSpend(matched.spend);
+    const earned = calcEarnPoints(earnBase, matched.tier);
+    matched.points = pts + earned;
+    matched.pointsEarnedLast = earned;
+    matched.pointsRedeemedLast = ptsUsed;
+    return { earned, ptsUsed, balance: matched.points, tier: matched.tier };
+  }
+  function paintLoyaltyBanner(customer) {
+    let ban = document.getElementById('cart-loyalty-banner');
+    if (!loyaltyEnabled()) {
+      if (ban) ban.style.display = 'none';
+      return;
+    }
+    const host =
+      document.getElementById('cart-customer-dues-banner')?.parentElement ||
+      document.querySelector('.cart-cust-direct-inputs') ||
+      document.querySelector('.pos-cart');
+    if (!host) return;
+    if (!ban) {
+      ban = document.createElement('div');
+      ban.id = 'cart-loyalty-banner';
+      ban.style.cssText =
+        'display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);color:var(--text-soft);line-height:1.4;margin-top:6px';
+      host.appendChild(ban);
+    }
+    if (!customer) {
+      ban.style.display = 'none';
+      ban.innerHTML = '';
+      return;
+    }
+    const pts = customerPoints(customer);
+    const redeem = (global.RS && RS.getLoyaltyRedeem && RS.getLoyaltyRedeem()) || { amount: 0, points: 0 };
+    const applied =
+      redeem.amount > 0
+        ? ` · applied −${rs(redeem.amount)} (${redeem.points} pts)`
+        : '';
+    ban.style.display = 'block';
+    ban.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span><i class="fa-solid fa-star" style="color:#a78bfa"></i> <b style="color:var(--text)">${pts}</b> pts · ${esc(String(customer.tier || 'silver').toUpperCase())}${applied}</span>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-loyalty-redeem" style="margin-left:auto;height:28px;font-size:11px;padding:0 10px" ${pts < 1 ? 'disabled' : ''}><i class="fa-solid fa-gift"></i> Redeem</button>
+      ${redeem.amount > 0 ? '<button type="button" class="btn btn-ghost btn-sm" id="btn-loyalty-clear" style="height:28px;font-size:11px;padding:0 8px">Clear</button>' : ''}
+    </div>`;
+    const btn = ban.querySelector('#btn-loyalty-redeem');
+    if (btn && !btn.disabled) {
+      btn.onclick = () => openRedeemModal(customer);
+    }
+    const clr = ban.querySelector('#btn-loyalty-clear');
+    if (clr) {
+      clr.onclick = () => {
+        if (global.RS && RS.setLoyaltyRedeem) RS.setLoyaltyRedeem(0, 0);
+        paintLoyaltyBanner(customer);
+        toast('Loyalty redeem cleared', 'fa-gift');
+      };
+    }
+  }
+  function openRedeemModal(customer) {
+    if (!global.RSModal) {
+      toast('Modal unavailable', 'fa-circle-exclamation');
+      return;
+    }
+    const pts = customerPoints(customer);
+    const maxCurrency = pointsToCurrency(pts);
+    const totals = global.RS && RS.getTotals ? RS.getTotals() : { grand: 0 };
+    // Cap redeem so cart still has a non-negative payable (leave tip alone)
+    const cap = Math.max(0, (Number(totals.grand) || 0) + ((global.RS && RS.getLoyaltyRedeem && RS.getLoyaltyRedeem().amount) || 0));
+    const maxApply = Math.min(maxCurrency, cap);
+    RSModal.open({
+      title: 'Redeem loyalty points',
+      sub: `${customer.name || 'Guest'} · ${pts} pts available (≈ ${rs(maxCurrency)})`,
+      icon: 'fa-gift',
+      size: 'sm',
+      body: `<p style="font-size:13px;color:var(--text-soft);margin:0 0 12px">1 pt = ${rs(loyaltyPointValue())}. Earn 1 pt per ${rs(loyaltyEarnRate())} spent (×2 Gold, ×3 VIP).</p>
+        <label class="fl">Points to redeem</label>
+        <input type="number" class="form-input" id="loyal-pts" min="0" max="${pts}" value="${Math.min(pts, currencyToPoints(maxApply))}" style="margin-bottom:8px">
+        <div style="font-size:12.5px;color:var(--text-soft)">Value: <b id="loyal-val">${rs(Math.min(maxApply, pointsToCurrency(Math.min(pts, currencyToPoints(maxApply)))))}</b> · max ${rs(maxApply)}</div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" data-loyal-max>Max</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-loyal-half>Half</button>
+        </div>`,
+      foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-check"></i> Apply</button>`,
+      onMount(m, close) {
+        const inp = m.querySelector('#loyal-pts');
+        const valEl = m.querySelector('#loyal-val');
+        const sync = () => {
+          let p = Math.max(0, Math.min(pts, Math.floor(Number(inp.value) || 0)));
+          let cur = pointsToCurrency(p);
+          if (cur > maxApply) {
+            cur = maxApply;
+            p = currencyToPoints(cur);
+            if (pointsToCurrency(p) > maxApply) p = Math.max(0, p - 1);
+            inp.value = p;
+            cur = pointsToCurrency(p);
+          }
+          if (valEl) valEl.textContent = rs(cur);
+          return { p, cur };
+        };
+        inp.addEventListener('input', sync);
+        m.querySelector('[data-loyal-max]').onclick = () => {
+          inp.value = currencyToPoints(maxApply);
+          if (pointsToCurrency(Number(inp.value)) > maxApply) inp.value = Math.max(0, Number(inp.value) - 1);
+          // walk down until under cap
+          while (pointsToCurrency(Number(inp.value) || 0) > maxApply && Number(inp.value) > 0) {
+            inp.value = Number(inp.value) - 1;
+          }
+          sync();
+        };
+        m.querySelector('[data-loyal-half]').onclick = () => {
+          inp.value = Math.floor(pts / 2);
+          sync();
+        };
+        m.querySelector('[data-x]').onclick = close;
+        m.querySelector('[data-ok]').onclick = () => {
+          const { p, cur } = sync();
+          if (p < 1 || cur <= 0) {
+            toast('Enter points to redeem', 'fa-circle-exclamation');
+            return;
+          }
+          if (global.RS && RS.setLoyaltyRedeem) RS.setLoyaltyRedeem(cur, p);
+          close();
+          paintLoyaltyBanner(customer);
+          toast(`Redeemed ${p} pts (−${rs(cur)})`, 'fa-gift');
+        };
+        sync();
+      },
+    });
+  }
+  global.RSLoyalty = {
+    enabled: loyaltyEnabled,
+    earnRate: loyaltyEarnRate,
+    pointValue: loyaltyPointValue,
+    tierFromSpend,
+    calcEarnPoints,
+    pointsToCurrency,
+    currencyToPoints,
+    customerPoints,
+    applyLoyaltyEarnToCustomer,
+    paintBanner: paintLoyaltyBanner,
+  };
+
   /* ---------------- Multi-station identity ---------------- */
   function getStationId() {
     try {
