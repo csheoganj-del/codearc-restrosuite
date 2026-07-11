@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v72 (2026-07-11) — Manager PIN gates + Happy Hour
+
+- **Happy Hour**: time window + % off (or per-item `happyHourPrice`); POS banner, HH badge, cart labels
+- **PIN gates**: Due/credit, clear cart, large loyalty redeem (toggleable in Security)
+- **Discount threshold** configurable (default 10%); `RSPinModal.require()` for opt-out gates
+- Security panel lists always-on vs optional manager gates
+
 ## v71 (2026-07-11) — Loyalty earn & redeem
 
 - **Earn points** on CRM-matched checkouts (1 pt / ₹100 default; Gold 2×, VIP 3×)
@@ -93,7 +100,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v71-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v72-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

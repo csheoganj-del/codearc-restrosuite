@@ -272,9 +272,37 @@
     overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
   }
 
+  /**
+   * Gate a sensitive action by admin PIN when configured.
+   * @param {string} label - Shown on PIN dialog
+   * @param {object} [opts]
+   * @param {string} [opts.settingKey] - RS_SETTINGS key; when false/'false', skip gate
+   * @param {boolean} [opts.always] - always require when PIN set (ignore settingKey off)
+   * @returns {Promise<boolean>}
+   */
+  async function requirePin(label, opts) {
+    opts = opts || {};
+    if (!getStoredHash()) return true; // no PIN configured
+    try {
+      const s = window.RS_API && RS_API.session && RS_API.session();
+      if (s && (s.role === 'superadmin' || s.role === 'brand_admin' || s.role === 'owner')) {
+        // owners still need PIN for audit trail when always or default gates
+      }
+    } catch (_) {}
+    if (!opts.always && opts.settingKey) {
+      const s = window.RS_SETTINGS || {};
+      const v = s[opts.settingKey];
+      // Default ON unless explicitly disabled
+      if (v === false || v === 'false' || v === 0 || v === '0') return true;
+    }
+    return request(label || 'Admin PIN required');
+  }
+
   window.RSPinModal = {
     /** Show PIN verification dialog. Returns Promise<boolean>. */
     request,
+    /** Conditional PIN gate with settings opt-out. */
+    require: requirePin,
     /** Verify only (no label). */
     verify: () => request('Admin verification required'),
     /** First-time PIN setup. */

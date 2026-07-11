@@ -194,11 +194,22 @@
           sync();
         };
         m.querySelector('[data-x]').onclick = close;
-        m.querySelector('[data-ok]').onclick = () => {
+        m.querySelector('[data-ok]').onclick = async () => {
           const { p, cur } = sync();
           if (p < 1 || cur <= 0) {
             toast('Enter points to redeem', 'fa-circle-exclamation');
             return;
+          }
+          // PIN for large redemptions (default threshold 100 pts)
+          const thr = Number((global.RS_SETTINGS || {}).set_pin_loyalty_threshold) || 100;
+          if (p >= thr && global.RSPinModal && typeof RSPinModal.require === 'function') {
+            const ok = await RSPinModal.require('Redeem ' + p + ' loyalty points', {
+              settingKey: 'set_pin_gate_loyalty',
+            });
+            if (!ok) {
+              toast('Redeem cancelled — PIN required', 'fa-lock');
+              return;
+            }
           }
           if (global.RS && RS.setLoyaltyRedeem) RS.setLoyaltyRedeem(cur, p);
           close();

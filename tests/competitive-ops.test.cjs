@@ -112,6 +112,17 @@ test('loyalty earn redeem APIs', () => {
   assert.match(shell, /Loyalty program|Loyalty earn rate/);
 });
 
+test('happy hour and manager PIN require()', () => {
+  const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
+  const saas = fs.readFileSync(path.join(root, 'assets/saas-core.js'), 'utf8');
+  const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  const shell = fs.readFileSync(path.join(root, 'assets/features-shell.js'), 'utf8');
+  assert.match(posUi, /isHappyHourActive|effectiveMenuPrice|set_happy_hour/);
+  assert.match(saas, /requirePin|require:\s*requirePin/);
+  assert.match(pos, /set_pin_gate_due|set_pin_gate_clear_cart/);
+  assert.match(shell, /Happy hour|Pin gate due|Optional manager gates/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);

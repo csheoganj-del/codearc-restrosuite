@@ -215,6 +215,17 @@
         ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
         ${toggle('Inclusive pricing','Menu prices include GST',false)}
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
+          ${toggle('Happy hour','Apply time-window menu discount on POS',false)}
+          <div class="set-section form-grid-2" style="margin-top:10px">
+            ${field('Happy hour start','17:00','HH:MM')}
+            ${field('Happy hour end','20:00','HH:MM')}
+          </div>
+          <div class="set-section form-grid-2" style="margin-top:8px">
+            ${field('Happy hour pct','15','Percent off menu prices')}
+          </div>
+          <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Menu cards show HH badge &amp; struck regular price. Optional per-item <code>happyHourPrice</code> overrides %.</p>
+        </div>
+        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
           ${toggle('Loyalty program','Earn & redeem points on CRM customers at checkout',true)}
           <div class="set-section form-grid-2" style="margin-top:10px">
             ${field('Loyalty earn rate','100','Currency spent per 1 point')}
@@ -281,6 +292,9 @@
       if (!container) return;
 
       const hasPIN = window.RSPinModal && RSPinModal.isConfigured();
+      const st = Object.assign({}, window.RS_SETTINGS || {}, (typeof SET_STORE !== 'undefined' ? SET_STORE : {}));
+      const gateOn = (k) => st[k] !== false && st[k] !== 'false' && st[k] !== 0 && st[k] !== '0';
+      const gateVal = (k, d) => (st[k] != null && st[k] !== '' ? st[k] : d);
 
       // -- Sections: PIN management + Protected operations list -------------
       container.innerHTML = `
@@ -311,13 +325,15 @@
           </div>` : ''}
         </div>
 
-        <!-- Protected Operations -->
+        <!-- Always protected -->
         <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
-          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-shield-halved" style="color:#FF4F00;margin-right:6px;"></i>PIN-Protected Operations</div>
-          <div style="font-size:12px;color:var(--text-soft);margin-bottom:16px;">The following actions always require admin PIN verification.</div>
+          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-shield-halved" style="color:#FF4F00;margin-right:6px;"></i>Always PIN-protected</div>
+          <div style="font-size:12px;color:var(--text-soft);margin-bottom:16px;">These actions always require admin PIN when a PIN is set.</div>
           ${[
             ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
-            ['fa-rotate-left','Refund','Mark a transaction as refunded and log it'],
+            ['fa-ban','Void / Refund','Void a paid bill and audit the reason'],
+            ['fa-percent','High discount','Discounts above the threshold (default 10%)'],
+            ['fa-lock','Close shift','Z-report close when PIN is configured'],
             ['fa-triangle-exclamation','Data Reset','Danger Zone operations always require PIN'],
           ].map(([icon,op,desc])=>`
             <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-2);">
@@ -329,6 +345,22 @@
               <div style="margin-left:auto;"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,107,0,0.1);color:#FF4F00;">PIN Required</span></div>
             </div>
           `).join('')}
+        </div>
+
+        <!-- Optional manager gates (saved with Settings → Save) -->
+        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
+          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-user-shield" style="color:#FF4F00;margin-right:6px;"></i>Optional manager gates</div>
+          <div style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">Toggle off to allow cashiers without a PIN. Defaults are on. Save settings after changing.</div>
+          ${toggle('Pin gate due','Require PIN for Due / credit payments',gateOn('set_pin_gate_due'))}
+          ${toggle('Pin gate clear cart','Require PIN to clear a non-empty cart',gateOn('set_pin_gate_clear_cart'))}
+          ${toggle('Pin gate loyalty','Require PIN when redeeming large loyalty points',gateOn('set_pin_gate_loyalty'))}
+          <div class="set-section form-grid-2" style="margin-top:10px">
+            ${field('Pin discount threshold',String(gateVal('set_pin_discount_threshold','10')),'% above which discount needs PIN')}
+            ${field('Pin loyalty threshold',String(gateVal('set_pin_loyalty_threshold','100')),'Points at/above which redeem needs PIN')}
+          </div>
+          <div class="set-section form-grid-2" style="margin-top:10px">
+            ${field('Idle lock minutes',String(gateVal('set_idle_lock_minutes','5')),'Lock screen after N minutes idle')}
+          </div>
         </div>
 
         <!-- Tips -->
