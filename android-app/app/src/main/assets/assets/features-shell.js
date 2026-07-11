@@ -1538,10 +1538,13 @@
       if (!document.hidden) {
         await window.updateTopbarWhatsAppStatus();
         const st = window.__rsGatewayLastStatus || 'offline';
-        if (st === 'ready' || st === 'syncing' || st === 'authenticated' || st === 'qr') {
-          topbarWhatsAppDelay = 15000; // actively used / mid-handshake: stay responsive
+        if (st === 'ready' || st === 'authenticated') {
+          topbarWhatsAppDelay = 30000; // healthy: light poll
+        } else if (st === 'syncing' || st === 'qr' || st === 'connecting' || st === 'starting') {
+          topbarWhatsAppDelay = 12000; // mid-handshake: responsive but not thrashing
         } else {
-          topbarWhatsAppDelay = Math.min(Math.max(topbarWhatsAppDelay, 15000) * 2, 300000);
+          // offline / error: exponential backoff up to 5 minutes
+          topbarWhatsAppDelay = Math.min(Math.max(topbarWhatsAppDelay, 20000) * 2, 300000);
         }
       }
       topbarWhatsAppTimer = setTimeout(pollTopbarWhatsApp, topbarWhatsAppDelay);

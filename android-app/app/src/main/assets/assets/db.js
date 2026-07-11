@@ -173,29 +173,62 @@
                     taxProfile: typeof r.tax_profile === 'string' ? JSON.parse(r.tax_profile) : (r.tax_profile || {}),
                     liquorTaxAmount: num(r.liquor_tax_amount),
                     serviceChargeAmount: num(r.service_charge_amount) }),
-      to: o => ({ id:o.id, order_id:o.no, customer_name:o.customerName||'Walk-in Guest', customer_phone:o.customerPhone||null,
-                  items: JSON.stringify(o._items||[]), subtotal:num(o.subtotal), gst:num(o.gst),
-                  cgst:num(o.cgst), sgst:num(o.sgst), igst:0, total:num(o.amount),
-                  payment_method:o.pay||'UPI', date_time:o.time||new Date().toISOString(), transaction_type:'intra',
-                  tenders: Array.isArray(o.tenders) ? JSON.stringify(o.tenders) : o.tenders || '[]',
-                  change: num(o.change || 0),
-                  tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
-                  channel: o.channel || 'dine_in',
-                  tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
-                  liquor_tax_amount: num(o.liquorTaxAmount),
-                  service_charge_amount: num(o.serviceChargeAmount),
-                  status: o.status || 'paid',
-                  refund_reason: o.refundReason || '',
-                  refunded_at: o.refundedAt || null })
+      to: o => {
+        const statusRaw = String(o.status || 'paid').toLowerCase();
+        const status = statusRaw === 'refunded' ? 'refunded' : 'paid';
+        const orderType = o.orderType || o.channel || 'dine_in';
+        const tableNum = o.table && o.table !== '--' ? String(o.table) : null;
+        return {
+          id: cleanIdForCollection('bills', o.id != null ? o.id : o.no),
+          order_id: String(o.no || o.orderId || o.id || ''),
+          customer_name: o.customerName || 'Walk-in Guest',
+          customer_phone: o.customerPhone || null,
+          items: JSON.stringify(o._items || []),
+          subtotal: num(o.subtotal),
+          gst: num(o.gst),
+          cgst: num(o.cgst),
+          sgst: num(o.sgst),
+          igst: 0,
+          total: num(o.amount != null ? o.amount : o.total),
+          payment_method: o.pay || o.paymentMethod || 'UPI',
+          date_time: o.dateTime || o.time || new Date().toISOString(),
+          transaction_type: 'intra',
+          tenders: Array.isArray(o.tenders) ? JSON.stringify(o.tenders) : (o.tenders || '[]'),
+          change: num(o.change || o.changeAmount || 0),
+          tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
+          channel: o.channel || 'dine_in',
+          tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
+          liquor_tax_amount: num(o.liquorTaxAmount),
+          service_charge_amount: num(o.serviceChargeAmount),
+          status,
+          refund_reason: o.refundReason || '',
+          refunded_at: o.refundedAt || null,
+          table_number: tableNum,
+          order_type: String(orderType),
+        };
+      }
     },
     tax_rates: {
+      // Live table is a shared catalog: country_code / effective_from (no tenant_id).
+      // tenant-data treats doppio_tax_rates as GLOBAL_TABLES for select/write.
       table:'doppio_tax_rates', pk:'id', clientId:true,
-      from: r => ({ id:r.id, country:r.country, rateCode:r.rate_code, label:r.label,
-                    percent:num(r.percent), validFrom:r.valid_from, validTo:r.valid_to,
-                    itcAllowed:!!r.itc_allowed, notes:r.notes||'' }),
-      to: o => ({ id:o.id, country:o.country, rate_code:o.rateCode, label:o.label,
-                  percent:num(o.percent), valid_from:o.validFrom, valid_to:o.validTo||null,
-                  itc_allowed:!!o.itcAllowed, notes:o.notes||'' })
+      from: r => ({ id:r.id,
+                    country: r.country || r.country_code || 'IN',
+                    rateCode: r.rate_code,
+                    label: r.label,
+                    percent: num(r.percent),
+                    validFrom: r.valid_from || r.effective_from || null,
+                    validTo: r.valid_to || r.effective_to || null,
+                    itcAllowed: !!r.itc_allowed,
+                    notes: r.notes || '' }),
+      to: o => ({ id: o.id,
+                  country_code: o.country || 'IN',
+                  rate_code: o.rateCode,
+                  label: o.label,
+                  percent: num(o.percent),
+                  effective_from: o.validFrom || new Date().toISOString().slice(0, 10),
+                  itc_allowed: !!o.itcAllowed,
+                  notes: o.notes || '' })
     },
     inventory: {
       table:'doppio_inventory', pk:'id', clientId:true,
@@ -232,9 +265,18 @@
       table:'doppio_draft_orders', pk:'id', clientId:true,
       from: r => ({ id:r.id, draftId:r.draft_id, name:r.draft_name, draftName:r.draft_name, customerName:r.customer_name, customerPhone:r.customer_phone, total:num(r.total),
                     items: parseItems(r.items) }),
-      to: o => ({ id:o.id, draft_id:o.draftId||fallbackLogicalCode('D'), draft_name:o.draftName||o.name||o.table||'Held order',
-                  customer_name:o.customerName||'', customer_phone:o.customerPhone||'', payment_method:'UPI',
-                  items: JSON.stringify(o.items||[]), subtotal:num(o.subtotal), gst:num(o.gst), total:num(o.total) })
+      to: o => ({
+        id: cleanIdForCollection('drafts', o.id != null ? o.id : Date.now()),
+        draft_id: o.draftId || fallbackLogicalCode('D'),
+        draft_name: o.draftName || o.name || o.table || 'Held order',
+        customer_name: o.customerName || '',
+        customer_phone: o.customerPhone || '',
+        payment_method: o.paymentMethod || 'UPI',
+        items: typeof o.items === 'string' ? o.items : JSON.stringify(o.items || []),
+        subtotal: num(o.subtotal),
+        gst: num(o.gst),
+        total: num(o.total),
+      })
     },
     pending_orders: {
       table:'doppio_pending_orders', pk:'id', clientId:false,
@@ -618,8 +660,8 @@
       const now = Date.now();
       const lastFetch = lastListFetchTime[c] || 0;
 
-      // Rate limit background sync to once every 5 seconds per collection, and deduplicate concurrent requests
-      if (!activeListRequests[c] && (now - lastFetch > 5000)) {
+      // Instant paint from local cache; background cloud refresh (deduped, 2.5s min gap)
+      if (!activeListRequests[c] && (now - lastFetch > 2500)) {
         activeListRequests[c] = (async () => {
           try {
             const res = await CLOUD.list(c, ...args);

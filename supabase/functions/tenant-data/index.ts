@@ -430,7 +430,19 @@ async function verifyTenantSession(req: Request) {
   }
 }
 
-function withTenantId(input: unknown, tenantId: string) {
+// Shared catalog tables that are not tenant-scoped on live (legacy shape).
+// Select returns global rows; writes do not force tenant_id.
+const GLOBAL_TABLES = new Set<string>([
+  "doppio_tax_rates",
+]);
+
+function withTenantId(input: unknown, tenantId: string, table?: string) {
+  if (table && GLOBAL_TABLES.has(table)) {
+    if (Array.isArray(input)) {
+      return input.map((row) => ({ ...(row && typeof row === "object" ? row : {}) }));
+    }
+    return { ...(input && typeof input === "object" ? input as Record<string, unknown> : {}) };
+  }
   if (Array.isArray(input)) {
     return input.map((row) => ({ ...(row && typeof row === "object" ? row : {}), tenant_id: tenantId }));
   }
@@ -443,8 +455,8 @@ function withoutTenantId(input: unknown) {
   return safeInput;
 }
 
-function applyFilters(query: any, filters: unknown[], tenantId: string) {
-  let nextQuery = query.eq("tenant_id", tenantId);
+function applyFilters(query: any, filters: unknown[], tenantId: string, table?: string) {
+  let nextQuery = (table && GLOBAL_TABLES.has(table)) ? query : query.eq("tenant_id", tenantId);
   for (const filter of filters) {
     if (!filter || typeof filter !== "object") continue;
     const typed = filter as Record<string, unknown>;
@@ -560,7 +572,7 @@ serve(async (req) => {
 
     let query: any;
     if (operation === "select") {
-      query = applyFilters(supabaseAdmin.from(table).select(columns), filters, verified.tenantId as string);
+      query = applyFilters(supabaseAdmin.from(table).select(columns), filters, verified.tenantId as string, table);
       if (payload.order && typeof payload.order === "object") {
         const order = payload.order as Record<string, unknown>;
         query = query.order(String(order.column || "id"), { ascending: order.ascending !== false });
@@ -573,7 +585,7 @@ serve(async (req) => {
       if (payload.single === true) query = query.single();
       if (payload.maybeSingle === true) query = query.maybeSingle();
     } else if (operation === "insert") {
-      query = supabaseAdmin.from(table).insert(withTenantId(payload.data, verified.tenantId as string));
+      query = supabaseAdmin.from(table).insert(withTenantId(payload.data, verified.tenantId as string, table));
       if (payload.returning) query = query.select(columns);
     } else if (operation === "upsert") {
       const options = payload.options && typeof payload.options === "object" ? payload.options : {};
@@ -581,20 +593,20 @@ serve(async (req) => {
         .split(",")
         .map((column) => column.trim())
         .filter(Boolean);
-      if (!conflictColumns.includes("tenant_id")) {
+      if (!GLOBAL_TABLES.has(table) && !conflictColumns.includes("tenant_id")) {
         return jsonResponse({ error: "Tenant upserts must use a tenant-scoped conflict key." }, 400, req);
       }
-      query = supabaseAdmin.from(table).upsert(withTenantId(payload.data, verified.tenantId as string), options);
+      query = supabaseAdmin.from(table).upsert(withTenantId(payload.data, verified.tenantId as string, table), options);
       if (payload.returning) query = query.select(columns);
     } else if (operation === "update") {
       const safeUpdate = withoutTenantId(payload.data);
       if (Object.keys(safeUpdate).length === 0) {
         return jsonResponse({ error: "No valid fields were provided for update." }, 400, req);
       }
-      query = applyFilters(supabaseAdmin.from(table).update(safeUpdate), filters, verified.tenantId as string);
+      query = applyFilters(supabaseAdmin.from(table).update(safeUpdate), filters, verified.tenantId as string, table);
       if (payload.returning) query = query.select(columns);
     } else if (operation === "delete") {
-      query = applyFilters(supabaseAdmin.from(table).delete(), filters, verified.tenantId as string);
+      query = applyFilters(supabaseAdmin.from(table).delete(), filters, verified.tenantId as string, table);
     } else {
       return jsonResponse({ error: "Unsupported data operation." }, 400, req);
     }
