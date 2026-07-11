@@ -48,6 +48,25 @@ let _cachedTenants = [];
 let selectedTenantIds = new Set();
 let saasGatewayPollingInterval = null;
 
+function tenantSearchInputs() {
+  return [
+    document.querySelector('.tb-search input'),
+    document.getElementById('tenant-search-input'),
+  ].filter(Boolean);
+}
+
+function syncTenantSearchInputs(value) {
+  tenantSearchInputs().forEach(input => {
+    if (input.value !== value) input.value = value;
+  });
+}
+
+function readVisibleTenantSearch() {
+  const inline = document.getElementById('tenant-search-input');
+  const topbar = document.querySelector('.tb-search input');
+  return String((inline && inline.value) || (topbar && topbar.value) || '');
+}
+
 function escHtml(str) {
   if (!str) return '';
   return String(str)
@@ -430,6 +449,8 @@ function startSuperPolling() {
 async function renderSuper() {
   const tbody = $('#tenant-table-body');
   if (!tbody) return;
+  superAdminSearch = readVisibleTenantSearch();
+  syncTenantSearchInputs(superAdminSearch);
   tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
   renderPlatformSummary([]);
   try {
@@ -1326,6 +1347,7 @@ function initTenantManageModalEvents() {
     openPlanPricingEditor,
     setSearch(q) {
       superAdminSearch = String(q || '');
+      syncTenantSearchInputs(superAdminSearch);
       if (typeof renderTenantTable === 'function') renderTenantTable();
     },
     getSearch() {
