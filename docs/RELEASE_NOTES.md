@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v88 (2026-07-11) — POS menu cards 10/10
+
+- **Minimal item cards**: veg marker + name + price only by default (Petpooja-calm)
+- **Category** shows only when browsing **All** or using search
+- **Stock** badge only for **Low** / **Out** — no more “In stock” noise
+- **Qty badge** when item is in cart; happy-hour chip next to price (no overlap)
+- Tighter card height so more menu items fit on screen
+
 ## v85 (2026-07-11) — POS calm mode (cashier 10/10 UX)
 
 - **Money path first**: search + order type on the toolbar; sort/display tucked under **Display**

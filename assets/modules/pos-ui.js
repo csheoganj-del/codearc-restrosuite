@@ -191,20 +191,31 @@ const renderPOS = () => {
     return (activeCat==='All'||mc===String(activeCat).toLowerCase()) && (m.name||'').toLowerCase().includes(q);
   });
   const hh = isHappyHourActive();
+  // 10/10 card: veg + name + price. Category only on All/search. Stock only low/out.
+  const showCat = activeCat === 'All' || !!q;
   grid.innerHTML = items.map(m=>{
     const inCart = cart.find(c=>String(c.id)===String(m.id));
     const base = Number(m.price) || 0;
     const eff = effectiveMenuPrice(m);
-    const priceHtml = hh && eff < base
-      ? `<span class="pprice" style="color:var(--orange)">${rs(eff)} <small style="text-decoration:line-through;opacity:.55;font-weight:600;color:var(--text-mute)">${rs(base)}</small></span>`
+    const stock = m.stock || 'ok';
+    const deal = hh && eff < base;
+    const showStock = stock === 'low' || stock === 'out';
+    const priceHtml = deal
+      ? `<span class="pprice pprice-deal">${rs(eff)} <small class="pprice-was">${rs(base)}</small></span>`
       : `<span class="pprice">${rs(base)}</span>`;
     return `
-    <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}${hh && eff < base ? ' hh-deal' : ''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
-      ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
-      ${hh && eff < base ? `<div style="position:absolute;top:6px;right:6px;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--orange);padding:2px 5px;border-radius:4px">HH</div>` : ''}
-      <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat || 'Uncategorized')}</span></div>
+    <div class="pos-item ${stock==='out'?'out':''} ${inCart?'in-cart':''}${deal ? ' hh-deal' : ''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
+      ${inCart ? `<div class="pos-item-qty-badge bounce-scale" aria-label="${inCart.qty} in cart">${inCart.qty}</div>` : ''}
+      <div class="pi-top">
+        <span class="veg ${m.veg ? '' : 'nonveg'}" title="${m.veg ? 'Veg' : 'Non-veg'}" aria-hidden="true"></span>
+        ${showCat ? `<span class="picat">${_e(m.cat || 'Uncategorized')}</span>` : ''}
+      </div>
       <div class="pname">${_e(m.name)}</div>
-      <div class="prow">${priceHtml}<span class="stock-dot ${stockClsMap()[m.stock]}">${stockLabelMap()[m.stock]}</span></div>
+      <div class="prow">
+        ${priceHtml}
+        ${showStock ? `<span class="stock-dot ${stockClsMap()[stock]}">${stockLabelMap()[stock]}</span>` : ''}
+        ${deal ? `<span class="pos-hh-chip">HH</span>` : ''}
+      </div>
     </div>`;
   }).join('');
   $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
