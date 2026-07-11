@@ -53,50 +53,121 @@
     document.getElementById('pos-tab')?.classList.toggle('pos-cart-is-empty', !!isEmpty);
   }
 
-  function wireCartCustomerToggle() {
+  function maskPhoneForChip(phone) {
+    const d = String(phone || '').replace(/\D/g, '');
+    if (d.length < 4) return phone || '';
+    if (d.length <= 10) return '··' + d.slice(-4);
+    return '··' + d.slice(-4);
+  }
+
+  function syncCartCustomerChrome() {
     const btn = document.getElementById('cart-cust-toggle');
     const panel = document.getElementById('cart-cust-direct-inputs');
     const label = document.getElementById('cart-cust-toggle-label');
+    const clearBtn = document.getElementById('cart-cust-clear');
+    if (!btn || !panel) return;
+    const name = ((document.getElementById('cust-input-name') || {}).value || '').trim();
+    const phone = ((document.getElementById('cust-input-phone') || {}).value || '').trim();
+    const hasCust = !!(name || phone);
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.classList.toggle('has-customer', hasCust);
+    btn.classList.toggle('is-open', open);
+    if (label) {
+      if (hasCust) {
+        const phoneBit = phone ? maskPhoneForChip(phone) : '';
+        label.textContent = (name || 'Guest') + (phoneBit ? ' · ' + phoneBit : '');
+      } else {
+        label.textContent = open ? 'Customer details' : 'Add customer';
+      }
+    }
+    if (clearBtn) {
+      clearBtn.hidden = !hasCust;
+      clearBtn.style.display = hasCust ? '' : 'none';
+    }
+  }
+
+  function setCartCustomerPanelOpen(open) {
+    const btn = document.getElementById('cart-cust-toggle');
+    const panel = document.getElementById('cart-cust-direct-inputs');
+    if (!btn || !panel) return;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      panel.hidden = false;
+      panel.style.display = 'flex';
+      panel.removeAttribute('hidden');
+    } else {
+      panel.hidden = true;
+      panel.style.display = 'none';
+      panel.setAttribute('hidden', '');
+      // hide inline search popover when collapsing
+      const pop = document.getElementById('cust-search-popover');
+      if (pop) {
+        pop.style.display = 'none';
+        pop.innerHTML = '';
+      }
+    }
+    syncCartCustomerChrome();
+  }
+
+  function clearCartCustomer() {
+    const sel = document.getElementById('cart-customer-sel');
+    const nameEl = document.getElementById('cust-input-name');
+    const phoneEl = document.getElementById('cust-input-phone');
+    if (nameEl) nameEl.value = '';
+    if (phoneEl) phoneEl.value = '';
+    if (sel) {
+      const tempOpt = sel.querySelector('option[data-temp="true"]');
+      if (tempOpt) tempOpt.remove();
+      sel.value = '';
+      try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    }
+    const banner = document.getElementById('cart-customer-dues-banner');
+    if (banner) {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    }
+    setCartCustomerPanelOpen(false);
+    syncCartCustomerChrome();
+  }
+
+  function wireCartCustomerToggle() {
+    const btn = document.getElementById('cart-cust-toggle');
+    const panel = document.getElementById('cart-cust-direct-inputs');
     if (!btn || !panel || btn.dataset.bound === '1') return;
     btn.dataset.bound = '1';
-    const syncLabel = () => {
-      const name = (document.getElementById('cust-input-name') || {}).value || '';
-      const phone = (document.getElementById('cust-input-phone') || {}).value || '';
-      const open = btn.getAttribute('aria-expanded') === 'true';
-      if (label) {
-        if (name.trim() || phone.trim()) {
-          label.textContent = (name.trim() || 'Guest') + (phone.trim() ? ' · ' + phone.trim() : '');
-        } else {
-          label.textContent = open ? 'Customer details' : 'Add customer';
-        }
-      }
-    };
+
+    // Ensure clear control sits beside toggle (chip row)
+    if (!document.getElementById('cart-cust-clear')) {
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.id = 'cart-cust-clear';
+      clear.className = 'cart-cust-clear';
+      clear.title = 'Clear customer';
+      clear.setAttribute('aria-label', 'Clear customer');
+      clear.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      clear.hidden = true;
+      clear.style.display = 'none';
+      const row = btn.closest('.cart-cust-row') || btn.parentElement;
+      if (row) row.appendChild(clear);
+      else btn.insertAdjacentElement('afterend', clear);
+      clear.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        clearCartCustomer();
+        toast('Walk-in customer', 'fa-user');
+      });
+    }
+
     btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) {
-        panel.hidden = false;
-        panel.style.display = 'flex';
-        panel.removeAttribute('hidden');
-        setTimeout(() => document.getElementById('cust-input-name')?.focus(), 40);
-      } else {
-        panel.hidden = true;
-        panel.style.display = 'none';
-        panel.setAttribute('hidden', '');
-      }
-      btn.classList.toggle('is-open', open);
-      syncLabel();
+      setCartCustomerPanelOpen(open);
+      if (open) setTimeout(() => document.getElementById('cust-input-name')?.focus(), 40);
     });
     ['cust-input-name', 'cust-input-phone'].forEach((id) => {
-      document.getElementById(id)?.addEventListener('input', syncLabel);
+      document.getElementById(id)?.addEventListener('input', syncCartCustomerChrome);
     });
-    // Stay collapsed by default (walk-in path). Label still shows name if filled.
-    btn.setAttribute('aria-expanded', 'false');
-    panel.hidden = true;
-    panel.style.display = 'none';
-    panel.setAttribute('hidden', '');
-    btn.classList.remove('is-open');
-    syncLabel();
+    // Stay collapsed by default (walk-in path).
+    setCartCustomerPanelOpen(false);
   }
   function catColor(c) {
     if (global.RS && typeof RS.catColor === 'function') return RS.catColor(c);
@@ -460,14 +531,17 @@ function renderCart(){
 
   if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
   else { wrap.innerHTML = cart.map(c=>`
-    <div class="cart-line">
+    <div class="cart-line${c.note ? ' has-note' : ''}" data-line-id="${_e(c.id)}" title="Long-press for kitchen note">
       <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
-      <div class="cinfo"><div class="cn">${_e(c.name)}${c.happyHour ? ' <span style="font-size:10px;color:var(--orange);font-weight:800">HH</span>' : ''}</div><div class="cp">${rs(c.price)} each${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' · was ' + rs(c.basePrice) : ''}</div>${c.note ? `<div class="cnote" style="font-size:11px;color:var(--orange);font-weight:600;margin-top:2px;line-height:1.3"><i class="fa-solid fa-comment" style="font-size:9px;opacity:.85"></i> ${_e(c.note)}</div>` : ''}</div>
-      <button type="button" class="btn btn-ghost btn-sm cart-line-note" data-note-id="${_e(c.id)}" title="Kitchen note" style="height:28px;width:28px;padding:0;flex-shrink:0;opacity:${c.note ? '1' : '.65'};color:${c.note ? 'var(--orange)' : 'var(--text-soft)'}"><i class="fa-solid fa-comment" style="font-size:11px"></i></button>
-      <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
-      <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
+      <div class="cinfo">
+        <div class="cn">${_e(c.name)}${c.happyHour ? ' <span class="cart-hh">HH</span>' : ''}</div>
+        <div class="cp">${rs(c.price)} each${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' · was ' + rs(c.basePrice) : ''}</div>
+        ${c.note ? `<button type="button" class="cnote cart-line-note" data-note-id="${_e(c.id)}" title="Edit kitchen note"><i class="fa-solid fa-comment" aria-hidden="true"></i> ${_e(c.note)}</button>` : ''}
+      </div>
+      <div class="qty"><button type="button" data-d="-1" data-id="${_e(c.id)}" aria-label="Decrease"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button type="button" data-d="1" data-id="${_e(c.id)}" aria-label="Increase"><i class="fa-solid fa-plus"></i></button></div>
+      <div class="cline-total">${rs(c.price*c.qty)}</div>
     </div>`).join('');
-    $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
+    $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',(e)=>{ e.stopPropagation(); changeQty(b.dataset.id,+b.dataset.d); }));
     $$('#cart-items .cart-line-note').forEach((b) =>
       b.addEventListener('click', (e) => {
         e.preventDefault();
@@ -475,6 +549,33 @@ function renderCart(){
         openLineNoteEditor(b.getAttribute('data-note-id'));
       })
     );
+    // Long-press / double-click line body → kitchen note (keeps default row clean)
+    $$('#cart-items .cart-line').forEach((row) => {
+      let pressTimer = null;
+      const id = row.getAttribute('data-line-id');
+      const startPress = (e) => {
+        if (e.target.closest('.qty, .cart-line-note')) return;
+        pressTimer = setTimeout(() => {
+          pressTimer = null;
+          openLineNoteEditor(id);
+        }, 480);
+      };
+      const clearPress = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      };
+      row.addEventListener('pointerdown', startPress);
+      row.addEventListener('pointerup', clearPress);
+      row.addEventListener('pointerleave', clearPress);
+      row.addEventListener('pointercancel', clearPress);
+      row.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.qty, .cart-line-note')) return;
+        e.preventDefault();
+        openLineNoteEditor(id);
+      });
+    });
   }
 
   try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
@@ -1260,6 +1361,9 @@ function initPOS(){
     refreshPosCats,
     getCart,
     updatePosCartChrome,
+    syncCartCustomerChrome,
+    setCartCustomerPanelOpen,
+    clearCartCustomer,
     setCart,
     setDiscountPct,
     getDiscountPct,

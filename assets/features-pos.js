@@ -2466,29 +2466,45 @@
 
     // Update held counts for all order types
     function updateHeldCount() {
-      // Update each type's count and blinking state
+      // Update each type's count and blinking state (legacy/hidden type buttons)
       Object.keys(heldOrders).forEach(key => {
         const count = heldOrders[key].length;
-        // Update desktop button badge
         const countEl = document.getElementById(`held-count-${key}`);
         if (countEl) countEl.textContent = count ? `(${count})` : '';
-        // Update mobile button badge
         const countElM = document.getElementById(`held-count-${key}-m`);
         if (countElM) countElM.textContent = count ? `(${count})` : '';
-        // Toggle blinking animation
         const btn = document.getElementById(`btn-hold-${key}`);
         if (btn) btn.classList.toggle('hold-btn-blinking', count > 0);
         const btnM = document.getElementById(`btn-m-hold-${key}`);
         if (btnM) btnM.classList.toggle('hold-btn-blinking', count > 0);
       });
 
+      // Primary single Hold button (current order type + total held)
+      const totalHeld = Object.values(heldOrders).reduce((a, arr) => a + arr.length, 0);
+      const curKey = typeof getCurrentOrderTypeKey === 'function' ? getCurrentOrderTypeKey() : 'takeaway';
+      const curCount = (heldOrders[curKey] || []).length;
+      const badgeText = totalHeld
+        ? (curCount && curCount !== totalHeld ? `(${curCount}/${totalHeld})` : `(${totalHeld})`)
+        : '';
+      const countCur = document.getElementById('held-count-current');
+      if (countCur) countCur.textContent = badgeText;
+      const countCurM = document.getElementById('held-count-current-m');
+      if (countCurM) countCurM.textContent = totalHeld ? `(${totalHeld})` : '';
+      const btnCur = document.getElementById('btn-hold-current');
+      if (btnCur) {
+        btnCur.classList.toggle('hold-btn-blinking', totalHeld > 0);
+        btnCur.title = totalHeld
+          ? `${totalHeld} held · click to hold current or open list when cart empty`
+          : 'Hold current order (uses selected order type)';
+      }
+      const btnCurM = document.getElementById('btn-m-hold-current');
+      if (btnCurM) btnCurM.classList.toggle('hold-btn-blinking', totalHeld > 0);
+
       // Show/hide mobile hold buttons group
-      const hasAnyHeld = Object.values(heldOrders).some(arr => arr.length > 0);
+      const hasAnyHeld = totalHeld > 0;
       const mobileHoldGroup = document.getElementById('pos-m-hold-buttons');
       if (mobileHoldGroup) mobileHoldGroup.style.display = hasAnyHeld ? 'flex' : 'none';
 
-      // Total holds badge on POS quick tools (if present)
-      const totalHeld = Object.values(heldOrders).reduce((a, arr) => a + arr.length, 0);
       window.__rsHeldOrderCount = totalHeld;
       let holdBadge = document.getElementById('rs-held-total-badge');
       if (!holdBadge) {
@@ -2744,46 +2760,42 @@
         }});
     }
 
-    // Add click listeners to hold buttons (will add them to HTML next)
+    // Single Hold: hold current cart using active order type; open drafts when empty
     document.addEventListener('click', async (e) => {
-      const btnHoldTakeaway = document.getElementById('btn-hold-takeaway');
-      const btnHoldDinein = document.getElementById('btn-hold-dinein');
-      const btnHoldDelivery = document.getElementById('btn-hold-delivery');
-      const btnMHoldTakeaway = document.getElementById('btn-m-hold-takeaway');
-      const btnMHoldDinein = document.getElementById('btn-m-hold-dinein');
-      const btnMHoldDelivery = document.getElementById('btn-m-hold-delivery');
-
-      // Handle hold current order
+      if (e.target.closest('#btn-hold-current')) {
+        const key = getCurrentOrderTypeKey();
+        if (RS.getCart && RS.getCart().length) holdCurrent();
+        else openDrafts(key);
+        return;
+      }
+      // Legacy type buttons (hidden) — keep working if re-enabled
       if (e.target.closest('#btn-hold-takeaway')) {
-        if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('takeaway');
-        }
+        if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) holdCurrent();
+        else openDrafts('takeaway');
       }
       if (e.target.closest('#btn-hold-dinein')) {
-        if (getCurrentOrderTypeKey() === 'dinein' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('dinein');
-        }
+        if (getCurrentOrderTypeKey() === 'dinein' && RS.getCart().length) holdCurrent();
+        else openDrafts('dinein');
       }
       if (e.target.closest('#btn-hold-delivery')) {
-        if (getCurrentOrderTypeKey() === 'delivery' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('delivery');
-        }
+        if (getCurrentOrderTypeKey() === 'delivery' && RS.getCart().length) holdCurrent();
+        else openDrafts('delivery');
       }
 
-      // Handle mobile hold buttons
+      // Mobile: open held list for current type
+      if (e.target.closest('#btn-m-hold-current')) openDrafts(getCurrentOrderTypeKey());
       if (e.target.closest('#btn-m-hold-takeaway')) openDrafts('takeaway');
       if (e.target.closest('#btn-m-hold-dinein')) openDrafts('dinein');
       if (e.target.closest('#btn-m-hold-delivery')) openDrafts('delivery');
     });
 
-    // Add contextmenu listeners to hold buttons to always open drafts
+    // Right-click Hold → always open held drafts for that type
     document.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('#btn-hold-current')) {
+        e.preventDefault();
+        openDrafts(getCurrentOrderTypeKey());
+        return;
+      }
       if (e.target.closest('#btn-hold-takeaway')) {
         e.preventDefault();
         openDrafts('takeaway');
@@ -2976,12 +2988,15 @@
         if (!currentPhone) {
           nameInput.value = '';
           phoneInput.value = '';
-          triggerText.innerText = 'Walk-in';
-          insightsPanel.style.display = 'none';
+          if (triggerText) triggerText.innerText = 'Walk-in';
+          if (insightsPanel) insightsPanel.style.display = 'none';
           if (actionRow) actionRow.style.display = 'none';
           paintDuesBanner(null);
           try {
             if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(null);
+          } catch (_) {}
+          try {
+            if (window.RSPosUI && RSPosUI.syncCartCustomerChrome) RSPosUI.syncCartCustomerChrome();
           } catch (_) {}
           return;
         }
@@ -2997,26 +3012,33 @@
         if (c) {
           nameInput.value = c.name || '';
           phoneInput.value = c.phone || '';
-          triggerText.innerText = c.name || c.phone;
+          if (triggerText) triggerText.innerText = c.name || c.phone;
           
           const visits = c.visits || 0;
           const spend = c.spend || 0;
           const dues = Number(c.dues) || 0;
           const favorite = await getFavoriteItem(c);
           
-          document.getElementById('insight-visits').innerText = visits;
-          document.getElementById('insight-spend').innerText = '₹' + spend;
+          const iv = document.getElementById('insight-visits');
+          const is = document.getElementById('insight-spend');
+          const ifav = document.getElementById('insight-favorite');
+          if (iv) iv.innerText = visits;
+          if (is) is.innerText = '₹' + spend;
           const duesEl = document.getElementById('insight-dues');
           if (duesEl) {
             duesEl.innerText = '₹' + dues;
             duesEl.style.color = dues > 0 ? 'var(--orange)' : '';
           }
-          document.getElementById('insight-favorite').innerText = favorite;
-          insightsPanel.style.display = 'grid';
+          if (ifav) ifav.innerText = favorite;
+          // Insights stay in drawer only when user opens it — don't force-open over menu
+          if (insightsPanel) insightsPanel.style.display = 'grid';
           if (actionRow) actionRow.style.display = 'none';
           paintDuesBanner(c);
           try {
             if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(c);
+          } catch (_) {}
+          try {
+            if (window.RSPosUI && RSPosUI.syncCartCustomerChrome) RSPosUI.syncCartCustomerChrome();
           } catch (_) {}
         } else {
           // Check if temp option exists
@@ -3024,8 +3046,8 @@
           const name = opt ? (opt.getAttribute('data-name') || '') : '';
           nameInput.value = name;
           phoneInput.value = currentPhone.startsWith('temp-') ? '' : currentPhone;
-          triggerText.innerText = name || currentPhone;
-          insightsPanel.style.display = 'none';
+          if (triggerText) triggerText.innerText = name || currentPhone;
+          if (insightsPanel) insightsPanel.style.display = 'none';
           paintDuesBanner(null);
           try {
             if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(null);
@@ -3036,28 +3058,43 @@
           } else {
             if (actionRow) actionRow.style.display = 'none';
           }
+          try {
+            if (window.RSPosUI && RSPosUI.syncCartCustomerChrome) RSPosUI.syncCartCustomerChrome();
+          } catch (_) {}
         }
       }
       
-      // Toggle dropdown on inputs click/focus
-      nameInput.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
-      nameInput.addEventListener('focus', () => {
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
-      phoneInput.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
-      phoneInput.addEventListener('focus', () => {
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
+      const searchPopover = document.getElementById('cust-search-popover');
+
+      function hideCustomerSearchPopover() {
+        if (searchPopover) {
+          searchPopover.style.display = 'none';
+          searchPopover.innerHTML = '';
+        }
+        if (searchResults) searchResults.style.display = 'none';
+      }
+
+      function collapseCustomerPanel() {
+        try {
+          if (window.RSPosUI && typeof RSPosUI.setCartCustomerPanelOpen === 'function') {
+            RSPosUI.setCartCustomerPanelOpen(false);
+          } else if (window.RSPosUI && typeof RSPosUI.syncCartCustomerChrome === 'function') {
+            RSPosUI.syncCartCustomerChrome();
+          }
+        } catch (_) {}
+      }
+
+      function paintCustomerChrome() {
+        try {
+          if (window.RSPosUI && typeof RSPosUI.syncCartCustomerChrome === 'function') {
+            RSPosUI.syncCartCustomerChrome();
+          }
+        } catch (_) {}
+      }
+
+      // Typing focuses search only — do not open the floating insights drawer over the menu
+      nameInput.addEventListener('click', (e) => e.stopPropagation());
+      phoneInput.addEventListener('click', (e) => e.stopPropagation());
 
       if (trigger) {
         trigger.addEventListener('click', (e) => {
@@ -3075,31 +3112,35 @@
       }
       
       // Prevent closing when clicking inside the dropdown
-      dropdown.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
+      if (dropdown) {
+        dropdown.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
       
-      // Close dropdown when clicking outside
+      // Close floating drawer / search when clicking outside
       document.addEventListener('click', (e) => {
         if (widgetContainer && !widgetContainer.contains(e.target)) {
-          dropdown.classList.remove('csd-open');
+          if (dropdown) dropdown.classList.remove('csd-open');
           widgetContainer.classList.remove('active');
+          hideCustomerSearchPopover();
         }
       });
       
-      // Live search input handling
+      // Live search → inline popover inside cart (not over the menu grid)
       const handleInput = async () => {
         const nameVal = nameInput.value.trim();
         const phoneVal = phoneInput.value.trim();
         
         updateTemporaryCustomer(nameVal, phoneVal);
+        paintCustomerChrome();
         
         const duesBannerLive = document.getElementById('cart-customer-dues-banner');
         if (!nameVal && !phoneVal) {
-          searchResults.style.display = 'none';
-          insightsPanel.style.display = 'none';
+          hideCustomerSearchPopover();
+          if (insightsPanel) insightsPanel.style.display = 'none';
           if (actionRow) actionRow.style.display = 'none';
-          triggerText.innerText = 'Walk-in';
+          if (triggerText) triggerText.innerText = 'Walk-in';
           if (duesBannerLive) {
             duesBannerLive.style.display = 'none';
             duesBannerLive.innerHTML = '';
@@ -3107,15 +3148,18 @@
           return;
         }
         
-        triggerText.innerText = nameVal || phoneVal;
+        if (triggerText) triggerText.innerText = nameVal || phoneVal;
         
         const allCustomers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
         const cleanPhoneVal = phoneVal.replace(/\D/g, '');
         const matches = allCustomers.filter(c => {
           const matchName = nameVal ? (c.name || '').toLowerCase().includes(nameVal.toLowerCase()) : true;
           const matchPhone = cleanPhoneVal ? (c.phone || '').replace(/\D/g, '').includes(cleanPhoneVal) : true;
+          // When only name typed, still match; when only phone, match phone
+          if (nameVal && !phoneVal) return matchName;
+          if (!nameVal && phoneVal) return matchPhone;
           return matchName && matchPhone;
-        });
+        }).slice(0, 8);
 
         // Live dues banner when phone uniquely matches CRM (or first exact phone hit)
         if (duesBannerLive) {
@@ -3141,17 +3185,18 @@
             duesBannerLive.innerHTML = '';
           }
         }
-        
-        if (matches.length > 0) {
-          searchResults.innerHTML = matches.map(c => `
-            <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}">
+
+        const target = searchPopover || searchResults;
+        if (matches.length > 0 && target) {
+          target.innerHTML = matches.map(c => `
+            <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}" role="option">
               <span class="res-name">${esc(c.name)}${Number(c.dues) > 0 ? ' · Due ₹' + Number(c.dues) : ''}</span>
               <span class="res-phone">${esc(c.phone)}</span>
             </div>
           `).join('');
-          searchResults.style.display = 'flex';
+          target.style.display = 'flex';
           
-          searchResults.querySelectorAll('.search-result-item').forEach(item => {
+          target.querySelectorAll('.search-result-item').forEach(item => {
             item.onclick = async () => {
               const selectedPhone = item.dataset.phone;
               const selectedName = item.dataset.name;
@@ -3164,20 +3209,22 @@
                 sel.appendChild(opt);
               }
               
-              // Remove temporary option if exists
               const tempOpt = sel.querySelector('option[data-temp="true"]');
               if (tempOpt) tempOpt.remove();
               
               sel.value = selectedPhone;
               sel.dispatchEvent(new Event('change'));
               
-              searchResults.style.display = 'none';
+              hideCustomerSearchPopover();
               await syncWidgetWithHiddenSelect();
+              // Chip mode: collapse form after pick
+              collapseCustomerPanel();
+              paintCustomerChrome();
             };
           });
         } else {
-          searchResults.style.display = 'none';
-          insightsPanel.style.display = 'none';
+          hideCustomerSearchPopover();
+          if (insightsPanel) insightsPanel.style.display = 'none';
         }
         
         const exactMatch = allCustomers.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhoneVal);

@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v88-20260711-cards';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v89-20260711-cart';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -208,50 +208,42 @@
     .support-dropdown .dropdown-trigger i:last-child { display: none; }
   }
 
-  /* Hold Buttons Styling */
-  .hold-buttons-group {
-    display: flex;
-    gap: 8px;
+  /* Hold Buttons Styling — single primary Hold + Send KOT */
+  .hold-buttons-group,
+  .hold-kot-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
   }
   .hold-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 12px;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
     padding: 8px 10px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid var(--stroke-2);
     background: var(--glass-2);
     color: var(--text-soft);
     cursor: pointer;
     transition: var(--t);
+    --hold-color: var(--orange);
   }
   .hold-btn:hover {
     background: var(--glass-3);
     color: var(--text);
     border-color: var(--stroke-hi);
   }
-  .hold-btn-takeaway {
-    --hold-color: var(--orange);
-  }
-  .hold-btn-dinein {
-    --hold-color: var(--green);
-  }
-  .hold-btn-delivery {
-    --hold-color: var(--violet-soft);
-  }
-  .hold-btn-takeaway:hover {
+  .hold-btn-current:hover {
     border-color: var(--orange);
     color: var(--orange);
   }
-  .hold-btn-dinein:hover {
-    border-color: var(--green);
-    color: var(--green);
-  }
-  .hold-btn-delivery:hover {
-    border-color: var(--violet-soft);
-    color: var(--violet-soft);
-  }
+  .hold-btn-takeaway { --hold-color: var(--orange); }
+  .hold-btn-dinein { --hold-color: var(--green); }
+  .hold-btn-delivery { --hold-color: var(--violet-soft); }
+  .hold-btn-legacy { display: none !important; }
   .hold-btn-blinking {
     animation: holdBtnBlink 1s ease-in-out infinite;
     border-color: var(--hold-color);
@@ -539,15 +531,12 @@
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input id="pos-search-input" placeholder="Search menu or item code…" autocomplete="off" enterkeyhint="search">
                 <div class="mobile-only-inline pos-m-hold-buttons" id="pos-m-hold-buttons" style="display:none; align-items:center; gap:4px;">
-                  <button class="hold-btn hold-btn-takeaway" id="btn-m-hold-takeaway" style="padding: 4px 8px; font-size: 11px;">
-                    <i class="fa-solid fa-bag-shopping"></i> <span id="held-count-takeaway-m"></span>
+                  <button type="button" class="hold-btn hold-btn-current" id="btn-m-hold-current" style="padding: 4px 10px; font-size: 11px;" title="Held orders">
+                    <i class="fa-solid fa-pause"></i> Holds <span id="held-count-current-m"></span>
                   </button>
-                  <button class="hold-btn hold-btn-dinein" id="btn-m-hold-dinein" style="padding: 4px 8px; font-size: 11px;">
-                    <i class="fa-solid fa-utensils"></i> <span id="held-count-dinein-m"></span>
-                  </button>
-                  <button class="hold-btn hold-btn-delivery" id="btn-m-hold-delivery" style="padding: 4px 8px; font-size: 11px;">
-                    <i class="fa-solid fa-motorcycle"></i> <span id="held-count-delivery-m"></span>
-                  </button>
+                  <button type="button" class="hold-btn hold-btn-takeaway hold-btn-legacy" id="btn-m-hold-takeaway" hidden aria-hidden="true" tabindex="-1"><span id="held-count-takeaway-m"></span></button>
+                  <button type="button" class="hold-btn hold-btn-dinein hold-btn-legacy" id="btn-m-hold-dinein" hidden aria-hidden="true" tabindex="-1"><span id="held-count-dinein-m"></span></button>
+                  <button type="button" class="hold-btn hold-btn-delivery hold-btn-legacy" id="btn-m-hold-delivery" hidden aria-hidden="true" tabindex="-1"><span id="held-count-delivery-m"></span></button>
                 </div>
               </div>
               <div class="pos-toolbar-secondary" id="pos-toolbar-secondary">
@@ -629,17 +618,22 @@
                 <input type="number" id="cart-covers" class="form-input" min="0" max="99" step="1" placeholder="Pax" title="Guest covers (pax)" inputmode="numeric" style="height:44px;padding:0 8px;font-size:14px;border-radius:8px;box-sizing:border-box;text-align:center;font-weight:700" aria-label="Guest covers">
               </div>
               <div class="custom-customer-widget" id="custom-customer-widget">
-                <button type="button" class="cart-cust-toggle" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs">
-                  <i class="fa-solid fa-user"></i>
-                  <span id="cart-cust-toggle-label">Add customer</span>
-                  <i class="fa-solid fa-chevron-down cart-cust-chevron"></i>
-                </button>
-                <!-- Collapsed by default — walk-in is the common path -->
-                <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden style="display: none; flex-direction: column; gap: 8px; width: 100%;">
-                  <input type="text" id="cust-input-name" placeholder="Guest name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
-                  <input type="tel" id="cust-input-phone" placeholder="Guest phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
-                  <div id="cart-customer-dues-banner" style="display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.08);color:var(--text-soft);line-height:1.4"></div>
+                <div class="cart-cust-row">
+                  <button type="button" class="cart-cust-toggle" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs">
+                    <i class="fa-solid fa-user"></i>
+                    <span id="cart-cust-toggle-label">Add customer</span>
+                    <i class="fa-solid fa-chevron-down cart-cust-chevron"></i>
+                  </button>
                 </div>
+                <!-- Collapsed by default — walk-in is the common path -->
+                <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden style="display: none; flex-direction: column; gap: 8px; width: 100%; position: relative;">
+                  <input type="text" id="cust-input-name" placeholder="Search name or type guest…" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 40px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
+                  <input type="tel" id="cust-input-phone" placeholder="Phone (optional)" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 40px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
+                  <!-- Inline search results (stay inside cart — no floating over menu) -->
+                  <div id="cust-search-popover" class="cust-search-popover" style="display:none" role="listbox" aria-label="Matching customers"></div>
+                </div>
+                <!-- Dues stay visible under chip even when form is collapsed -->
+                <div id="cart-customer-dues-banner" style="display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.08);color:var(--text-soft);line-height:1.4;margin-top:6px"></div>
                 
                 <!-- Hidden trigger for backwards compatibility -->
                 <div class="cust-widget-trigger" id="cust-widget-trigger" style="display: none;">
@@ -748,13 +742,17 @@
                   </div>
                 </div>
                 <div class="cart-actions">
-                  <div class="hold-buttons-group">
-                    <button class="hold-btn hold-btn-takeaway" id="btn-hold-takeaway"><i class="fa-solid fa-bag-shopping"></i> Hold <span id="held-count-takeaway"></span></button>
-                    <button class="hold-btn hold-btn-dinein" id="btn-hold-dinein"><i class="fa-solid fa-utensils"></i> Hold <span id="held-count-dinein"></span></button>
-                    <button class="hold-btn hold-btn-delivery" id="btn-hold-delivery"><i class="fa-solid fa-motorcycle"></i> Hold <span id="held-count-delivery"></span></button>
+                  <div class="hold-kot-row">
+                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order (uses current type). Right-click to view held orders.">
+                      <i class="fa-solid fa-pause"></i> Hold <span id="held-count-current"></span>
+                    </button>
+                    <button type="button" class="btn btn-ghost" id="btn-kot"><i class="fa-solid fa-fire"></i> Send KOT</button>
+                    <!-- Type-specific holds kept for script compatibility; visually merged into primary Hold -->
+                    <button type="button" class="hold-btn hold-btn-takeaway hold-btn-legacy" id="btn-hold-takeaway" hidden aria-hidden="true" tabindex="-1"><span id="held-count-takeaway"></span></button>
+                    <button type="button" class="hold-btn hold-btn-dinein hold-btn-legacy" id="btn-hold-dinein" hidden aria-hidden="true" tabindex="-1"><span id="held-count-dinein"></span></button>
+                    <button type="button" class="hold-btn hold-btn-delivery hold-btn-legacy" id="btn-hold-delivery" hidden aria-hidden="true" tabindex="-1"><span id="held-count-delivery"></span></button>
                   </div>
-                  <button class="btn btn-ghost" id="btn-kot"><i class="fa-solid fa-fire"></i> Send KOT</button>
-                  <button class="btn btn-primary" id="btn-checkout" style="grid-column:1 / -1;min-height:48px;font-weight:800"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
+                  <button type="button" class="btn btn-primary" id="btn-checkout" style="grid-column:1 / -1;min-height:48px;font-weight:800"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
                 </div>
               </div>
               <p class="cart-empty-hint" id="cart-empty-hint">Add items from the menu to enable pay &amp; KOT</p>

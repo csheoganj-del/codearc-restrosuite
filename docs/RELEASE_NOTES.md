@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v89 (2026-07-11) — POS Current Order panel 10/10
+
+- **Cart lines**: name · unit · qty · total only; kitchen note via long-press / double-click (shown only when set)
+- **Customer chip**: collapsed by default; pick → chip with masked phone + clear (×); search results stay inside the cart
+- **Hold**: one **Hold** (uses current order type) + **Send KOT** — no triple Hold row
+- **Shift strip**: tighter icon actions so cart + total + Print & Pay dominate
+
 ## v88 (2026-07-11) — POS menu cards 10/10
 
 - **Minimal item cards**: veg marker + name + price only by default (Petpooja-calm)
