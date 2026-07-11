@@ -88,6 +88,17 @@
     toast('Receipt preview is unavailable on this screen', 'fa-circle-exclamation');
   }
 
+  function printBillThermal(b) {
+    const payload = receiptPayloadFromBill(b);
+    if (global.RSOps && typeof RSOps.printBillThermal === 'function') {
+      return RSOps.printBillThermal(payload);
+    }
+    if (global.RSReceipt && typeof RSReceipt.print === 'function') {
+      return RSReceipt.print(payload);
+    }
+    toast('Thermal print unavailable', 'fa-circle-exclamation');
+  }
+
   function shareBillReceipt(b) {
     const bill = receiptPayloadFromBill(b);
     if (global.RSReceipt && typeof RSReceipt.share === 'function') {
@@ -479,7 +490,7 @@
         <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
         <td>${b.status === 'paid' ? '<span class="pill pill-green" style="padding:3px 9px">Paid</span>' : '<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-rotate-left"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
+        <td><div class="row-actions"><button class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-rotate-left"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
       </tr>`
       )
       .join('');
@@ -501,6 +512,7 @@
       );
       const target = live || bill;
       if (btn.classList.contains('go')) return showBillReceipt(target);
+      if (btn.classList.contains('thermal-act')) return printBillThermal(target);
       if (btn.classList.contains('refund-act')) return markBillRefunded(target);
       if (btn.classList.contains('del-act')) return deleteBill(target);
       return shareBillReceipt(target);

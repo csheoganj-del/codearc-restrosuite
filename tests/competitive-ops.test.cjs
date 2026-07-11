@@ -41,6 +41,23 @@ test('QR orders UI prioritizes pending attention', () => {
   assert.match(src, /data-pos/);
 });
 
+test('waiter floor opens table into POS and can transfer', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/features-growth.js'), 'utf8');
+  assert.match(src, /openTableInPos/);
+  assert.match(src, /transferTable/);
+  assert.match(src, /Checkout|loadOrder/);
+});
+
+test('auto-print receipt wires bill-paid to thermal', () => {
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  const bills = fs.readFileSync(path.join(root, 'assets/modules/bills-history.js'), 'utf8');
+  assert.match(ops, /set_auto_print_receipt/);
+  assert.match(ops, /printBillThermal/);
+  assert.match(pos, /detail:\s*\{[\s\S]*bill/);
+  assert.match(bills, /thermal-act/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);

@@ -62,8 +62,209 @@
       return DEFAULT_TABLES.map(t => ({ ...t, state: 'free' }));
     }
 
-    const stateDot = {free:'var(--green)',occupied:'var(--orange)',billed:'var(--violet-soft)'};
-    const stateTxt = {free:'Available',occupied:'Dining',billed:'Bill printed'};
+    const stateDot = {
+      free: 'var(--green)',
+      occupied: 'var(--orange)',
+      pending: 'var(--amber)',
+      held: '#f59e0b',
+      billed: 'var(--violet-soft)',
+    };
+    const stateTxt = {
+      free: 'Available',
+      occupied: 'Dining',
+      pending: 'QR pending',
+      held: 'Held order',
+      billed: 'Bill printed',
+    };
+
+    function tableNameLabel(n) {
+      const raw = String(n == null ? '' : n).trim();
+      if (!raw) return 'Table';
+      if (/^table\s+/i.test(raw)) return raw.replace(/^table/i, 'Table');
+      if (/^\d+$/.test(raw)) return `Table ${raw}`;
+      return raw;
+    }
+
+    function matchTableOrder(row, t) {
+      if (!row || !t) return false;
+      const candidates = [
+        `Table ${t.n}`,
+        String(t.n),
+        t.name,
+        tableNameLabel(t.n),
+        `0${parseInt(t.n, 10)}`,
+      ].filter(Boolean).map(String);
+      const tn = String(row.tableNumber || row.table || '').trim();
+      if (!tn) return false;
+      if (candidates.some((c) => c === tn || c.toLowerCase() === tn.toLowerCase())) return true;
+      const dig = (v) => parseInt(String(v == null ? '' : v).replace(/\D/g, ''), 10);
+      const a = dig(t.n);
+      const b = dig(tn);
+      return Number.isFinite(a) && Number.isFinite(b) && a === b;
+    }
+
+    function orderItemsForPos(row) {
+      return (row && row.items ? row.items : []).map((it) => {
+        if (Array.isArray(it)) {
+          const label = String(it[0] || 'Item').replace(/^\s*\d+\s*[×x]\s*/i, '').trim() || 'Item';
+          return { id: label, name: label, qty: 1, price: Number(it[1] || 0), cat: 'Floor', stock: 'ok' };
+        }
+        return {
+          id: it.id || it.name,
+          name: it.name || 'Item',
+          qty: Math.max(1, Number(it.qty || 1)),
+          price: Number(it.price || 0),
+          cat: it.cat || it.category || 'Floor',
+          stock: 'ok',
+          taxCategory: it.taxCategory || it.tax_category,
+          notes: it.notes || '',
+        };
+      }).filter((i) => i.name);
+    }
+
+    function setPosDineIn() {
+      const btns = document.querySelectorAll('.order-type-btn');
+      let dine = null;
+      btns.forEach((b) => {
+        const t = (b.textContent || '').trim().toLowerCase();
+        if (t.includes('dine')) dine = b;
+      });
+      if (dine) {
+        btns.forEach((b) => b.classList.remove('active'));
+        dine.classList.add('active');
+        dine.click();
+      }
+    }
+
+    async function openTableInPos(t, opts) {
+      const options = opts || {};
+      const tableLabel = tableNameLabel(t.n || t.name);
+      if (RS.activateTab) await RS.activateTab('pos-tab');
+      await new Promise((r) => setTimeout(r, 120));
+      let attempts = 0;
+      while (attempts < 8 && !(typeof RS.setCart === 'function')) {
+        await new Promise((r) => setTimeout(r, 60));
+        attempts += 1;
+      }
+      setPosDineIn();
+      const tableSelect =
+        document.getElementById('cart-table') ||
+        document.getElementById('pos-table-select') ||
+        document.querySelector('#pos-tab select[name="table"]');
+      if (tableSelect) {
+        let opt = [...tableSelect.options].find(
+          (o) =>
+            o.value === tableLabel ||
+            o.text === tableLabel ||
+            o.value === String(t.n) ||
+            o.textContent.trim() === tableLabel ||
+            o.value === `Table ${t.n}`
+        );
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = tableLabel;
+          opt.textContent = tableLabel;
+          tableSelect.appendChild(opt);
+        }
+        tableSelect.value = opt.value;
+        tableSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        tableSelect.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (typeof RS.setTable === 'function') {
+        try {
+          RS.setTable(tableLabel);
+        } catch (e) {}
+      }
+
+      let items = options.items || null;
+      if (!items && options.loadOrder && t.dbId && window.RS_DB) {
+        try {
+          const rows = await RS_DB.list('pending_orders');
+          const row = rows.find((r) => r.id === t.dbId) || rows.find((r) => matchTableOrder(r, t));
+          if (row) {
+            items = orderItemsForPos(row);
+            const nameEl = document.getElementById('cust-name') || document.getElementById('cust-input-name');
+            const phoneEl = document.getElementById('cust-phone') || document.getElementById('cust-input-phone');
+            if (nameEl && row.customerName) {
+              nameEl.value = row.customerName;
+              nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (phoneEl && row.customerPhone) {
+              phoneEl.value = row.customerPhone;
+              phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+        } catch (e) {
+          console.warn('openTableInPos load order failed', e);
+        }
+      }
+      if (items && items.length && typeof RS.setCart === 'function') {
+        RS.setCart(items);
+      }
+      try {
+        if (typeof RS.renderCart === 'function') RS.renderCart();
+      } catch (e) {}
+      try {
+        if (typeof window.saveActiveCart === 'function') window.saveActiveCart();
+      } catch (e) {}
+      const msg =
+        options.toast ||
+        (items && items.length
+          ? `Table ${t.n} loaded · ${items.length} item(s)`
+          : `Table ${t.n} selected on POS`);
+      RS.toast(msg, options.icon || 'fa-cash-register');
+    }
+
+    async function transferTable(fromTable, toTableN) {
+      if (!fromTable || !toTableN || !window.RS_DB || !fromTable.dbId) {
+        RS.toast('Nothing to transfer', 'fa-circle-exclamation');
+        return false;
+      }
+      try {
+        const rows = await RS_DB.list('pending_orders');
+        const row = rows.find((r) => r.id === fromTable.dbId);
+        if (!row) {
+          RS.toast('Open order not found', 'fa-circle-exclamation');
+          return false;
+        }
+        const destLabel = tableNameLabel(toTableN);
+        row.tableNumber = destLabel;
+        await RS_DB.put('pending_orders', row.id, row);
+        // Move active QR session if any
+        try {
+          const normKey = (raw) => {
+            let key = String(raw == null ? '' : raw)
+              .trim()
+              .toLowerCase();
+            if (!key) return '';
+            key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
+            if (/^t\d+$/.test(key)) key = key.slice(1);
+            if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+            return key;
+          };
+          const sessions = await RS_DB.list('table_sessions').catch(() => []);
+          const fromKey = normKey(fromTable.n);
+          const sess = sessions.find((s) => normKey(s.tableNumber) === fromKey && s.status !== 'closed');
+          if (sess) {
+            await RS_DB.put('table_sessions', sess.id, {
+              ...sess,
+              tableNumber: normKey(toTableN),
+            });
+          }
+        } catch (e) {}
+        if (window.RS_SYNC && RS_SYNC.syncPendingOrders) {
+          await RS_SYNC.syncPendingOrders({ forceCloud: true });
+        }
+        RS.toast(`Moved Table ${fromTable.n} → ${toTableN}`, 'fa-right-left');
+        renderFloor();
+        return true;
+      } catch (e) {
+        console.warn('transferTable failed', e);
+        RS.toast('Transfer failed', 'fa-circle-exclamation');
+        return false;
+      }
+    }
+
     function parseLocalTimestamp(dateStr) {
       if (!dateStr) return null;
       const nativeTime = new Date(dateStr).getTime();
@@ -99,34 +300,82 @@
       
       if (window.RS_DB) {
         sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
-        Promise.all([RS_DB.list('pending_orders'), RS_DB.list('reservations').catch(()=>[])]).then(([rows, reservations]) => {
-          const _resToday = new Date().toISOString().slice(0,10);
-          const _resDigits = v => parseInt(String(v==null?'':v).replace(/\D/g,''),10);
-          TABLES.forEach(t => {
-            const activeOrder = rows.find(r => 
-              (r.tableNumber === `Table ${t.n}` || r.tableNumber === t.n || r.tableNumber === `0${parseInt(t.n)}` || r.tableNumber === t.name) &&
-              (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'Billed')
+        Promise.all([
+          RS_DB.list('pending_orders'),
+          RS_DB.list('reservations').catch(() => []),
+          RS_DB.list('drafts').catch(() => []),
+        ]).then(([rows, reservations, drafts]) => {
+          const _resToday = new Date().toISOString().slice(0, 10);
+          const _resDigits = (v) => parseInt(String(v == null ? '' : v).replace(/\D/g, ''), 10);
+          const heldTableSet = new Set();
+          (drafts || []).forEach((d) => {
+            const tbl = d && (d.table || d.tableNumber || d.draftName);
+            if (tbl) heldTableSet.add(String(tbl).toLowerCase());
+          });
+          try {
+            // POS in-memory dine-in holds (if module already booted)
+            if (window.__rsHeldOrderTables && Array.isArray(window.__rsHeldOrderTables)) {
+              window.__rsHeldOrderTables.forEach((x) => heldTableSet.add(String(x).toLowerCase()));
+            }
+          } catch (e) {}
+
+          TABLES.forEach((t) => {
+            const activeOrder = (rows || []).find(
+              (r) =>
+                matchTableOrder(r, t) &&
+                ['DineIn Active', 'Accepted', 'preparing', 'Pending Review', 'Billed', 'Ready', 'served'].includes(
+                  r.status
+                )
             );
+            const labelCandidates = [`table ${t.n}`, String(t.n), tableNameLabel(t.n), t.name]
+              .filter(Boolean)
+              .map((s) => String(s).toLowerCase());
+            const isHeld = labelCandidates.some((c) => heldTableSet.has(c) || [...heldTableSet].some((h) => h.includes(c) || c.includes(h)));
+
             if (activeOrder) {
-              t.state = activeOrder.status === 'Billed' ? 'billed' : 'occupied';
+              if (activeOrder.status === 'Billed') t.state = 'billed';
+              else if (activeOrder.status === 'Pending Review') t.state = 'pending';
+              else t.state = 'occupied';
               t.amt = activeOrder.total || 0;
               t.since = activeOrder.dateTime ? getElapsedDesc(activeOrder.dateTime) : 'just now';
               t.orderId = activeOrder.orderId;
               t.dbId = activeOrder.id;
+              t.guest = activeOrder.customerName || '';
+              t.itemCount = Array.isArray(activeOrder.items) ? activeOrder.items.length : 0;
+              t.orderStatus = activeOrder.status;
+            } else if (isHeld) {
+              t.state = 'held';
+              t.amt = 0;
+              t.since = '';
+              t.orderId = null;
+              t.dbId = null;
+              t.guest = '';
+              t.itemCount = 0;
+              t.orderStatus = null;
             } else {
               t.state = 'free';
               t.amt = 0;
               t.since = '';
               t.orderId = null;
               t.dbId = null;
+              t.guest = '';
+              t.itemCount = 0;
+              t.orderStatus = null;
             }
-            t.reservedInfo = (t.state === 'free')
-              ? (reservations.find(rv => rv && (rv.status==='confirmed'||rv.status==='booked'||rv.status==='pending') && (!rv.date || rv.date===_resToday) && _resDigits(rv.tableNumber)===_resDigits(t.n)) || null)
-              : null;
+            t.reservedInfo =
+              t.state === 'free'
+                ? reservations.find(
+                    (rv) =>
+                      rv &&
+                      (rv.status === 'confirmed' || rv.status === 'booked' || rv.status === 'pending') &&
+                      (!rv.date || rv.date === _resToday) &&
+                      _resDigits(rv.tableNumber) === _resDigits(t.n)
+                  ) || null
+                : null;
           });
           drawFloorUI(sec);
-        }).catch(e => {
-          console.warn("Failed loading floor tables from DB", e);
+        }).catch((e) => {
+          console.warn('Failed loading floor tables from DB', e);
           drawFloorUI(sec);
         });
       } else {
@@ -134,32 +383,50 @@
       }
     }
 
-    function drawFloorUI(sec){
-      const occ = TABLES.filter(t=>t.state!=='free').length;
+    function drawFloorUI(sec) {
+      const free = TABLES.filter((t) => t.state === 'free').length;
+      const dining = TABLES.filter((t) => t.state === 'occupied' || t.state === 'pending').length;
+      const billed = TABLES.filter((t) => t.state === 'billed').length;
+      const pendingQr = TABLES.filter((t) => t.state === 'pending').length;
       sec.innerHTML = `
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-chair"></i></div><div><div class="sv">${TABLES.length-occ}</div><div class="sl">Free tables</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-utensils"></i></div><div><div class="sv">${TABLES.filter(t=>t.state==='occupied').length}</div><div class="sl">Dining now</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-file-invoice"></i></div><div><div class="sv">${TABLES.filter(t=>t.state==='billed').length}</div><div class="sl">Awaiting payment</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(TABLES.reduce((a,t)=>a+(t.amt||0),0))}</div><div class="sl">Open table value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-chair"></i></div><div><div class="sv">${free}</div><div class="sl">Free tables</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-utensils"></i></div><div><div class="sv">${dining}</div><div class="sl">Dining now</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-file-invoice"></i></div><div><div class="sv">${billed}</div><div class="sl">Awaiting payment</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(TABLES.reduce((a, t) => a + (t.amt || 0), 0))}</div><div class="sl">Open table value${pendingQr ? ' · ' + pendingQr + ' QR' : ''}</div></div></div>
         </div>
         <div class="toolbar-row"><div class="floor-legend">
           <span class="lg"><span class="sw" style="background:var(--green)"></span> Available</span>
           <span class="lg"><span class="sw" style="background:var(--orange)"></span> Dining</span>
+          <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
+          <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill"><i class="fa-solid fa-location-dot"></i> Ground floor</span></div>
-        <div class="floor-grid">${TABLES.map(t=>`
-          <div class="table-card ${t.state}" data-n="${t.n}">
-            <span class="tdot" style="background:${stateDot[t.state]}"></span>
-            <div class="tnum2">Table ${t.n}</div><div class="tcap"><i class="fa-solid fa-user-group" style="font-size:10px"></i> ${t.cap} seats</div>
-            <div class="tstate">${stateTxt[t.state]}${(t.state==='free'&&t.reservedInfo)?` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time||'')}${t.reservedInfo.guestName?(' · '+esc(t.reservedInfo.guestName)):''}</span>`:''}</div>
-            ${t.amt?`<div class="tamt">${rs(t.amt)}</div><div class="tcap">${t.since}</div>`:'<div class="tcap" style="margin-top:auto">Tap to seat</div>'}
-          </div>`).join('')}</div>`;
-      $$('.table-card', sec).forEach(c=> c.onclick=()=> tableModal(TABLES.find(t=>t.n===c.dataset.n)));
+        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill"><i class="fa-solid fa-location-dot"></i> Ground floor</span></div>
+        <div class="floor-grid">${TABLES.map(
+          (t) => `
+          <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}" data-n="${esc(t.n)}">
+            <span class="tdot" style="background:${stateDot[t.state] || stateDot.free}"></span>
+            ${t.state === 'held' ? '<span class="table-held-badge"><i class="fa-solid fa-pause"></i> Held</span>' : ''}
+            ${t.state === 'pending' ? '<span class="table-held-badge table-qr-badge"><i class="fa-solid fa-qrcode"></i> New</span>' : ''}
+            <div class="tnum2">Table ${esc(t.n)}</div><div class="tcap"><i class="fa-solid fa-user-group" style="font-size:10px"></i> ${esc(t.cap)} seats</div>
+            <div class="tstate">${stateTxt[t.state] || t.state}${(t.state === 'free' && t.reservedInfo) ? ` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time || '')}${t.reservedInfo.guestName ? ' · ' + esc(t.reservedInfo.guestName) : ''}</span>` : ''}${t.guest ? ` · ${esc(t.guest)}` : ''}</div>
+            ${t.amt ? `<div class="tamt">${rs(t.amt)}</div><div class="tcap">${esc(t.since)}${t.itemCount ? ' · ' + t.itemCount + ' items' : ''}</div>` : '<div class="tcap" style="margin-top:auto">Tap to seat</div>'}
+          </div>`
+        ).join('')}</div>`;
+      $$('.table-card', sec).forEach(
+        (c) =>
+          (c.onclick = () => tableModal(TABLES.find((t) => String(t.n) === String(c.dataset.n))))
+      );
       const btnPrint = $('#btn-print-floor-qrs', sec);
       if (btnPrint) btnPrint.onclick = () => showAllTableQRs();
       const btnManage = $('#btn-manage-seating', sec);
       if (btnManage) btnManage.onclick = () => openManageSeatingModal();
+      const btnRefresh = $('#btn-refresh-floor', sec);
+      if (btnRefresh)
+        btnRefresh.onclick = () => {
+          if (window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: true });
+          renderFloor();
+        };
     }
 
     function openManageSeatingModal() {
@@ -269,8 +536,10 @@
 
     function tableModal(t){
       let bodyHtml = t.state==='free'
-        ? `<p style="color:var(--text-soft);font-size:14.5px">Table ${t.n} is available (${t.cap} seats). Seat guests and start a new order on the POS.</p>`
-        : `<div class="crm-stats" style="margin-bottom:6px"><div class="cs"><div class="csv">${rs(t.amt)}</div><div class="csl">Running bill</div></div><div class="cs"><div class="csv">${t.since}</div><div class="csl">Seated for</div></div><div class="cs"><div class="csv">${t.cap}</div><div class="csl">Seats</div></div></div>`;
+        ? `<p style="color:var(--text-soft);font-size:14.5px">Table ${esc(t.n)} is available (${esc(t.cap)} seats). Seat guests and start a new order on the POS.</p>`
+        : `<div class="crm-stats" style="margin-bottom:6px"><div class="cs"><div class="csv">${rs(t.amt)}</div><div class="csl">Running bill</div></div><div class="cs"><div class="csv">${esc(t.since || '—')}</div><div class="csl">Seated for</div></div><div class="cs"><div class="csv">${esc(t.cap)}</div><div class="csl">Seats</div></div></div>
+           ${t.guest ? `<div style="font-size:13px;color:var(--text-soft);margin-bottom:8px"><i class="fa-solid fa-user"></i> ${esc(t.guest)}</div>` : ''}
+           ${t.itemCount ? `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:4px">${t.itemCount} line item(s) · ${esc(t.orderStatus || '')}</div>` : ''}`;
       
       bodyHtml += `
         <div class="qr-session-controls" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke-2); font-family: var(--font-body), sans-serif;">
@@ -285,14 +554,57 @@
         </div>
       `;
 
-      const foot = t.state==='free'
-        ? `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px;margin-right:8px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button><button class="btn btn-ghost" style="flex:1" data-x>Close</button><button class="btn btn-primary" style="flex:1" data-pos><i class="fa-solid fa-cash-register"></i> Seat & order</button>`
-        : `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px;margin-right:8px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button><button class="btn btn-ghost" style="flex:1" data-pos><i class="fa-solid fa-plus"></i> Add items</button><button class="btn btn-primary" style="flex:1" data-bill><i class="fa-solid fa-print"></i> ${t.state==='billed'?'Settle payment':'Print bill'}</button>`;
+      const freeTargets = TABLES.filter((x) => x.state === 'free' && String(x.n) !== String(t.n));
+      const foot =
+        t.state === 'free'
+          ? `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px;margin-right:8px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button><button class="btn btn-ghost" style="flex:1" data-x>Close</button><button class="btn btn-primary" style="flex:1" data-pos><i class="fa-solid fa-cash-register"></i> Seat & order</button>`
+          : `<button class="btn btn-ghost" id="tbl-view-qr" style="padding:0 12px" title="View Table QR"><i class="fa-solid fa-qrcode"></i></button>
+             <button class="btn btn-ghost" id="tbl-transfer" style="padding:0 10px" title="Transfer table" ${t.dbId && freeTargets.length ? '' : 'disabled'}><i class="fa-solid fa-right-left"></i></button>
+             <button class="btn btn-ghost" style="flex:1" data-pos><i class="fa-solid fa-plus"></i> Add items</button>
+             <button class="btn btn-primary" style="flex:1" data-bill><i class="fa-solid fa-cash-register"></i> ${t.state === 'billed' ? 'Settle' : 'Checkout'}</button>`;
       
-      RSModal.open({ title:'Table '+t.n, sub:stateTxt[t.state], icon:'fa-chair', size:'sm', body: bodyHtml, foot,
+      RSModal.open({ title:'Table '+t.n, sub:stateTxt[t.state] || t.state, icon:'fa-chair', size:'sm', body: bodyHtml, foot,
         onMount(modal,close){
           modal.querySelector('[data-x]')&&(modal.querySelector('[data-x]').onclick=close);
-          modal.querySelector('[data-pos]').onclick=()=>{ close(); RS.activateTab('pos-tab'); RS.toast('Table '+t.n+' selected on POS','fa-cash-register'); };
+          const posBtn = modal.querySelector('[data-pos]');
+          if (posBtn) {
+            posBtn.onclick = async () => {
+              close();
+              await openTableInPos(t, {
+                loadOrder: t.state !== 'free',
+                toast:
+                  t.state === 'free'
+                    ? `Table ${t.n} seated — add items`
+                    : `Table ${t.n} open for add-ons`,
+              });
+            };
+          }
+          const xferBtn = modal.querySelector('#tbl-transfer');
+          if (xferBtn && !xferBtn.disabled) {
+            xferBtn.onclick = () => {
+              const opts = freeTargets
+                .map((x) => `<option value="${esc(x.n)}">Table ${esc(x.n)} (${esc(x.cap)} seats)</option>`)
+                .join('');
+              RSModal.open({
+                title: 'Transfer Table ' + t.n,
+                sub: 'Move open order to another free table',
+                icon: 'fa-right-left',
+                size: 'sm',
+                body: `<label class="fl">Destination</label><select class="form-input" id="xfer-dest">${opts}</select>
+                  <p style="font-size:12px;color:var(--text-soft);margin-top:10px">Running bill and QR session move with the table. Guests keep their cart.</p>`,
+                foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-right-left"></i> Transfer</button>`,
+                onMount(m2, c2) {
+                  m2.querySelector('[data-x]').onclick = c2;
+                  m2.querySelector('[data-ok]').onclick = async () => {
+                    const dest = m2.querySelector('#xfer-dest').value;
+                    c2();
+                    close();
+                    await transferTable(t, dest);
+                  };
+                },
+              });
+            };
+          }
           const qrBtn = modal.querySelector('#tbl-view-qr');
           if (qrBtn) {
             qrBtn.onclick = () => {
@@ -425,38 +737,17 @@
 
           checkStatus();
 
-          const bb=modal.querySelector('[data-bill]'); if(bb) bb.onclick=async ()=>{
-            close();
-            if (t.state === 'billed' || t.state === 'occupied') {
-              if (t.dbId && window.RS_DB) {
-                try {
-                  await RS_DB.del('pending_orders', t.dbId);
-                  
-                  // Clear session locally/cloud on checkout
-                  const normKey = raw => {
-                    let key = String(raw == null ? '' : raw).trim().toLowerCase();
-                    if (!key) return '';
-                    key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
-                    if (/^t\d+$/.test(key)) key = key.slice(1);
-                    if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
-                    return key;
-                  };
-                  const sessions = await RS_DB.list('table_sessions').catch(() => []);
-                  const curSess = sessions.find(s => normKey(s.tableNumber) === normKey(t.n));
-                  if (curSess) {
-                    await RS_DB.put('table_sessions', curSess.id, { ...curSess, status: 'closed', closedAt: new Date().toISOString() });
-                  }
-
-                  RS.toast('Table '+t.n+' settled / bill cleared','fa-check');
-                  renderFloor();
-                } catch(e) {
-                  console.warn("Failed to delete table order", e);
-                }
-              } else {
-                RS.toast('Table '+t.n+(t.state==='billed'?' settled':' bill printed'),'fa-print');
-              }
-            }
-          };
+          const bb = modal.querySelector('[data-bill]');
+          if (bb)
+            bb.onclick = async () => {
+              close();
+              // Load order into POS for real checkout (do not silently delete)
+              await openTableInPos(t, {
+                loadOrder: true,
+                toast: `Table ${t.n} ready to checkout`,
+                icon: 'fa-file-invoice-dollar',
+              });
+            };
         }});
     }
 
@@ -631,7 +922,29 @@
       }
     }
 
-    RS.titles['floor-tab']=['Floor & Tables','Live table status & seating']; RS.addRenderer('floor-tab', renderFloor);
+    RS.titles['floor-tab'] = ['Floor & Tables', 'Live table status & seating'];
+    RS.addRenderer('floor-tab', renderFloor);
+    RS.openTableInPos = openTableInPos;
+    RS.transferTable = transferTable;
+    // Live refresh when QR/KDS sync lands new tickets
+    if (!window.__rsFloorSyncBound) {
+      window.__rsFloorSyncBound = true;
+      document.addEventListener('rs:pending_orders_synced', () => {
+        const tab = document.getElementById('floor-tab');
+        if (tab && tab.classList.contains('active')) {
+          try {
+            renderFloor();
+          } catch (e) {}
+        }
+      });
+      document.addEventListener('rs:bill-paid', () => {
+        setTimeout(() => {
+          try {
+            renderFloor();
+          } catch (e) {}
+        }, 400);
+      });
+    }
 
     /* ===================== ONLINE / AGGREGATOR ORDERS ===================== */
     const ONLINE = [];

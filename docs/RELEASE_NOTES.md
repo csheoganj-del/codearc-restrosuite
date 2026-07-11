@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v67 (2026-07-11) — Waiter floor → POS + auto thermal
+
+- **Floor → POS**: Seat / Add items / Checkout load table + order lines into the cart (Dine-in)
+- **Transfer table**: move open order (+ QR session) to a free table
+- **Floor map**: QR pending pulse, held state, guest/item hints, live refresh on order sync
+- **Auto-print receipt** setting wired to thermal/ESC-POS after payment
+- **Bills**: thermal reprint action next to preview reprint
+
 ## v66 (2026-07-11) — Floor service alerts & thermal settle
 
 - **New QR order alert**: chime + vibrate + clickable toast when a pending QR order lands (respects service-alert mute)
@@ -57,7 +65,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v66-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v67-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 
