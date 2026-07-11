@@ -136,9 +136,70 @@
       }
     }
 
+    /** Normalize table key the same way tenant-public edge function does. */
+    function normTableKey(raw) {
+      let key = String(raw == null ? '' : raw)
+        .trim()
+        .toLowerCase();
+      if (!key) return '';
+      key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
+      if (/^t\d+$/.test(key)) key = key.slice(1);
+      if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+      return key;
+    }
+
+    /**
+     * Ensure guests can order the moment staff seats a table.
+     * Without this, printed QR scans hit “session closed” — the #1 guest CX fail.
+     */
+    async function ensureTableQrSession(tableN, opts) {
+      const options = opts || {};
+      if (!window.RS_DB) return false;
+      const key = normTableKey(tableN);
+      if (!key) return false;
+      try {
+        const sessions = await RS_DB.list('table_sessions').catch(() => []);
+        let session = (sessions || []).find((s) => normTableKey(s.tableNumber) === key);
+        if (session && session.status === 'active') {
+          if (options.toast) RS.toast('QR ordering already open for this table', 'fa-qrcode');
+          return true;
+        }
+        if (session && session.status === 'paused') {
+          await RS_DB.put('table_sessions', session.id, { ...session, status: 'active' });
+          if (options.toast !== false) RS.toast('QR ordering resumed for Table ' + tableN, 'fa-qrcode');
+          document.dispatchEvent(new Event('rs:tables-updated'));
+          return true;
+        }
+        const randomToken =
+          Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const updatedSess = {
+          tableNumber: key,
+          token: randomToken,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        };
+        if (session && session.id) updatedSess.id = session.id;
+        const saved = await RS_DB.put('table_sessions', session && session.id, updatedSess);
+        if (options.toast !== false) {
+          RS.toast('QR ordering open · guests can scan Table ' + tableN, 'fa-qrcode');
+        }
+        document.dispatchEvent(new Event('rs:tables-updated'));
+        return !!(saved || true);
+      } catch (e) {
+        console.warn('ensureTableQrSession failed', e);
+        return false;
+      }
+    }
+
     async function openTableInPos(t, opts) {
       const options = opts || {};
       const tableLabel = tableNameLabel(t.n || t.name);
+      // Seat guests → open QR session automatically (unless staff opts out)
+      if (options.openQrSession !== false) {
+        try {
+          await ensureTableQrSession(t.n || t.name, { toast: !!options.seat });
+        } catch (e) {}
+      }
       if (RS.activateTab) await RS.activateTab('pos-tab');
       await new Promise((r) => setTimeout(r, 120));
       let attempts = 0;
@@ -603,9 +664,11 @@
               close();
               await openTableInPos(t, {
                 loadOrder: t.state !== 'free',
+                seat: t.state === 'free',
+                openQrSession: true,
                 toast:
                   t.state === 'free'
-                    ? `Table ${t.n} seated — add items`
+                    ? `Table ${t.n} seated · QR ordering on`
                     : `Table ${t.n} open for add-ons`,
               });
             };
@@ -645,17 +708,7 @@
           }
 
           let session = null;
-          // Mirror of normalizeTableKey() in the tenant-public edge function:
-          // sessions must be stored/matched on the SAME normalized key
-          // ("Table 05" -> "5") or the customer QR page never finds them.
-          const normTableKey = raw => {
-            let key = String(raw == null ? '' : raw).trim().toLowerCase();
-            if (!key) return '';
-            key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
-            if (/^t\d+$/.test(key)) key = key.slice(1);
-            if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
-            return key;
-          };
+          // Uses module-level normTableKey (matches tenant-public edge function)
           const checkStatus = async () => {
             if (!window.RS_DB) return;
             try {
@@ -1113,6 +1166,8 @@
     RS.addRenderer('floor-tab', renderFloor);
     RS.openTableInPos = openTableInPos;
     RS.transferTable = transferTable;
+    RS.ensureTableQrSession = ensureTableQrSession;
+    RS.normTableKey = normTableKey;
     // Live refresh when QR/KDS sync lands new tickets
     if (!window.__rsFloorSyncBound) {
       window.__rsFloorSyncBound = true;

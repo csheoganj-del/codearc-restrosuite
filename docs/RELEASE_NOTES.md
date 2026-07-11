@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v102 (2026-07-11) — Guest QR 10/10 end-to-end
+
+- **Seat & order auto-opens QR session** so guests don’t hit “session closed” after staff seats them
+- Guest **browse-while-waiting**: soft banner + 5s poll; unlocks with toast when staff open table
+- Place-order blocked with friendly gate (not cryptic errors); toasts instead of `alert()`
+- Prefill name/phone; better empty menu; service requests toast
+- Portal: primary Menu card, trust hint, no RESTRONAME flash
+- `RS.ensureTableQrSession` for floor/POS seating path
+
 ## v101 (2026-07-11) — Guest-first table QR (print + scan landing)
 
 - **Printed table QR cards redesigned for guests**: TABLE # is primary, large high-ECC QR, 3-step “camera → QR → order”, Wi‑Fi/no-app hint, cut guides
