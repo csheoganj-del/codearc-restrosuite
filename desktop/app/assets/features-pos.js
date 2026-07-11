@@ -871,43 +871,71 @@
 
       const text = receiptText(bill);
       const cleanPhone = phone.replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 10) {
+        RS.toast('Enter a valid WhatsApp number with country code', 'fa-circle-exclamation');
+        return;
+      }
 
-      // Real PDF attachment via the self-hosted gateway, when it's linked and
-      // reachable. This actually sends the bill as a PDF document inside
-      // WhatsApp (server-side, no cashier action needed) instead of just a
-      // pre-filled text message. Only attempted when the topbar's periodic
-      // gateway_status poll last reported "ready" (checked every 15s), so an
-      // unlinked/offline gateway never makes checkout wait on a network call.
-      if (window.__rsGatewayReady === true && window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
+      // Always prefer gateway PDF when cloud is configured.
+      // Re-check live gateway status (do not trust a stale topbar flag alone).
+      if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
         try {
+          RS.toast('Sending PDF receipt…', 'fa-file-pdf');
+          // Refresh readiness so first send after connect still works
+          try {
+            if (typeof window.updateTopbarWhatsAppStatus === 'function') {
+              await Promise.race([
+                window.updateTopbarWhatsAppStatus(),
+                new Promise((r) => setTimeout(r, 2500)),
+              ]);
+            }
+          } catch (_) {}
+
           const pdfDataUri = await compileThermalPDF(bill);
-          const base64 = String(pdfDataUri || '').split(',')[1] || '';
-          if (base64) {
-            const timeoutMs = 12000;
-            await Promise.race([
-              RS_API.data({
-                operation: 'gateway_send',
-                phone: cleanPhone,
-                message: text,
-                pdfData: base64,
-                filename: `receipt-${bill.no || 'bill'}.pdf`,
-                orderId: String(bill.no || '')
-              }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Gateway send timed out')), timeoutMs))
-            ]);
-            RS.toast('WhatsApp PDF receipt sent!', 'fa-whatsapp');
-            return;
+          const base64 = String(pdfDataUri || '').includes(',')
+            ? String(pdfDataUri).split(',')[1]
+            : String(pdfDataUri || '');
+          if (!base64 || base64.length < 100) {
+            throw new Error('PDF generation produced an empty file');
           }
+
+          const timeoutMs = 25000;
+          await Promise.race([
+            RS_API.data({
+              operation: 'gateway_send',
+              phone: cleanPhone,
+              message: text,
+              pdfData: base64,
+              filename: `receipt-${bill.no || bill.orderId || 'bill'}.pdf`,
+              orderId: String(bill.no || bill.orderId || bill.id || ''),
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Gateway send timed out')), timeoutMs)),
+          ]);
+          window.__rsGatewayReady = true;
+          RS.toast('WhatsApp PDF receipt sent!', 'fa-file-pdf');
+          return;
         } catch (gwErr) {
-          console.warn('Gateway PDF send failed, falling back to text link:', gwErr && gwErr.message);
-          // Fall through to the plain-text link below so the cashier still has
-          // a way to reach the customer even if the gateway just dropped.
+          console.warn('Gateway PDF send failed:', gwErr && gwErr.message);
+          // Second try: gateway text only (still better than opening a browser tab)
+          try {
+            await RS_API.data({
+              operation: 'gateway_send',
+              phone: cleanPhone,
+              message: text,
+              orderId: String(bill.no || bill.orderId || bill.id || ''),
+            });
+            RS.toast('PDF failed — text receipt sent on WhatsApp', 'fa-whatsapp');
+            return;
+          } catch (textErr) {
+            console.warn('Gateway text fallback failed:', textErr && textErr.message);
+          }
         }
       }
 
+      // Last resort: open WhatsApp Web with prefilled text (manual send)
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
-      RS.toast('WhatsApp receipt ready!', 'fa-whatsapp');
+      RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
     }
 
     function generateReceiptQrDataUri(bill) {

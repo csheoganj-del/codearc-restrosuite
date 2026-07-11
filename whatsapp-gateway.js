@@ -2043,21 +2043,44 @@ app.post('/send', async (req, res) => {
 
         // 3. Process the delivery in the background (asynchronously)
         (async () => {
-            // A. Send text message first
-            if (message) {
-                await humanSend(tenantData.client, chatId, message, {}, tenantId);
-                console.log(`[Background Sent] WhatsApp text message successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
+            // Normalize PDF payload (accept raw base64 or data-URI)
+            let pdfBase64 = pdfData ? String(pdfData).trim() : '';
+            if (pdfBase64.startsWith('data:')) {
+                const comma = pdfBase64.indexOf(',');
+                if (comma >= 0) pdfBase64 = pdfBase64.slice(comma + 1);
             }
+            // Strip whitespace/newlines that sometimes appear in transport
+            pdfBase64 = pdfBase64.replace(/\s+/g, '');
 
-            // B. Send PDF message second
-            if (pdfData) {
+            const hasPdf = pdfBase64.length > 64;
+            let delivered = 'none';
+
+            // Prefer a single WhatsApp document message with the receipt caption.
+            // Text-then-PDF was unreliable: text succeeded and PDF often failed silently.
+            if (hasPdf) {
+                const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+                if (pdfBuffer.length < 100 || pdfBuffer.slice(0, 4).toString() !== '%PDF') {
+                    throw new Error(`Invalid PDF payload (${pdfBuffer.length} bytes, header=${pdfBuffer.slice(0, 8).toString('hex')})`);
+                }
+                const caption = message
+                    ? String(message).slice(0, 900)
+                    : `Receipt ${orderId || ''}`.trim();
+                // Baileys document message format
                 const media = {
-                    document: Buffer.from(pdfData, 'base64'),
+                    document: pdfBuffer,
                     mimetype: 'application/pdf',
-                    fileName: filename || 'receipt.pdf'
+                    fileName: String(filename || `receipt-${orderId || 'bill'}.pdf`).replace(/[^\w.\-]+/g, '_'),
+                    caption: caption || undefined,
                 };
                 await humanSend(tenantData.client, chatId, media, {}, tenantId);
-                console.log(`[Background Sent] WhatsApp PDF receipt successfully delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
+                delivered = 'pdf';
+                console.log(`[Background Sent] WhatsApp PDF receipt delivered for tenant ${tenantId} to: +${maskPhone(phone)} (${pdfBuffer.length} bytes)`);
+            } else if (message) {
+                await humanSend(tenantData.client, chatId, message, {}, tenantId);
+                delivered = 'text';
+                console.log(`[Background Sent] WhatsApp text message delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
+            } else {
+                throw new Error('Nothing to send: empty message and no valid pdfData');
             }
 
             // C. Broadcast success back to Supabase Realtime & Health Log
@@ -2065,7 +2088,8 @@ app.post('/send', async (req, res) => {
                 tenant_id: tenantId,
                 phone: maskPhone(phone),
                 orderId: orderId,
-                message: `Receipt for tenant ${tenantId} successfully sent to +${maskPhone(phone)}`
+                delivered,
+                message: `Receipt for tenant ${tenantId} successfully sent to +${maskPhone(phone)} (${delivered})`
             });
 
             if (orderId && supabase) {
@@ -2221,10 +2245,11 @@ app.post('/supabase-webhook', async (req, res) => {
                     return res.json({ status: 'skipped', reason: 'Auto-send receipts disabled' });
                 }
 
-                const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
-                if (billFormat === 'Thermal PDF receipt') {
-                    console.log(`[Webhook Skipped] Tenant ${tenantId} uses PDF receipts -- auto-text skipped.`);
-                    return res.json({ status: 'skipped', reason: 'Thermal PDF receipt format selected' });
+                // Default PDF: POS frontend sends document via /send
+                const billFormat = uiSettings.set_whatsapp_bill_format || 'Thermal PDF receipt';
+                if (billFormat !== 'Text receipt' && billFormat !== 'text') {
+                    console.log(`[Webhook Skipped] Tenant ${tenantId} uses PDF receipts (${billFormat}) -- POS will send PDF via /send.`);
+                    return res.json({ status: 'skipped', reason: 'PDF receipt format — POS handles send' });
                 }
             }
         }
@@ -2843,9 +2868,11 @@ if (dbClientForRealtime) {
                                 return;
                             }
 
-                            const billFormat = uiSettings.set_whatsapp_bill_format || 'Text receipt';
-                            if (billFormat === 'Thermal PDF receipt') {
-                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts -- auto-text skipped. POS frontend will send PDF via /send.`);
+                            // Default to PDF: POS generates thermal PDF and calls /send.
+                            // Only auto-text when the outlet explicitly chooses text receipts.
+                            const billFormat = uiSettings.set_whatsapp_bill_format || 'Thermal PDF receipt';
+                            if (billFormat !== 'Text receipt' && billFormat !== 'text') {
+                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts (${billFormat}) -- POS will send PDF via /send.`);
                                 return;
                             }
                         }
