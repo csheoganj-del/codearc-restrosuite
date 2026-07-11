@@ -95,18 +95,26 @@
       panel.hidden = false;
       panel.removeAttribute('hidden');
       panel.classList.add('is-open');
-      // Overlay mode — never use in-flow display that steals cart height
       panel.style.display = '';
+      panel.style.pointerEvents = 'auto';
+      panel.style.visibility = 'visible';
     } else {
       panel.hidden = true;
       panel.setAttribute('hidden', '');
       panel.classList.remove('is-open');
       panel.style.display = '';
+      panel.style.pointerEvents = 'none';
+      panel.style.visibility = 'hidden';
       const pop = document.getElementById('cust-search-popover');
       if (pop) {
         pop.style.display = 'none';
         pop.innerHTML = '';
       }
+      // Blur phone widgets so country picker cannot keep intercepting cart clicks
+      try {
+        document.getElementById('cust-input-name')?.blur();
+        document.getElementById('cust-input-phone')?.blur();
+      } catch (_) {}
     }
     btn.classList.toggle('is-open', open);
     syncCartCustomerChrome();
@@ -169,6 +177,23 @@
     ['cust-input-name', 'cust-input-phone'].forEach((id) => {
       document.getElementById(id)?.addEventListener('input', syncCartCustomerChrome);
     });
+    // Clicking cart lines / pay foot closes customer so phone picker never blocks qty
+    if (!document.body.dataset.cartCustOutsideBound) {
+      document.body.dataset.cartCustOutsideBound = '1';
+      document.addEventListener(
+        'pointerdown',
+        (e) => {
+          const t = e.target;
+          if (!t || !t.closest) return;
+          if (t.closest('#custom-customer-widget')) return;
+          if (t.closest('#cart-items, .cart-foot, #pos-grid, .order-type-btn')) {
+            const open = btn.getAttribute('aria-expanded') === 'true';
+            if (open) setCartCustomerPanelOpen(false);
+          }
+        },
+        true
+      );
+    }
     // Stay collapsed by default (walk-in path).
     setCartCustomerPanelOpen(false);
   }

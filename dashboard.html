@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v91-20260711-workbench';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v92-20260711-liveux';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -657,7 +657,7 @@
                   </div>
                 </div>
 
-                <!-- Compact inline tenders — one row for cash; split expands only when needed -->
+                <!-- Cash = one compact row by default (browser UX: full dens was 211px and crushed the cart) -->
                 <div class="cart-tender-host" id="cart-tender-host">
                   <div id="cash-drawer" class="cart-tender-panel cart-tender-cash" hidden>
                     <div class="cart-tender-cash-row">
@@ -666,14 +666,15 @@
                       <span class="csd-label">Chg</span>
                       <strong id="inline-cash-change" class="csd-change-amt">₹0</strong>
                       <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact">Exact</button>
+                      <button type="button" class="btn btn-ghost btn-sm cart-cash-more" id="cash-dens-toggle" title="Quick notes" aria-expanded="false">+notes</button>
+                      <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Hide" aria-label="Hide cash pad">&times;</button>
                     </div>
-                    <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens" aria-label="Quick cash amounts">
+                    <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens" hidden aria-label="Quick cash amounts">
                       <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
                       <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
                       <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
                       <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
                       <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">Clear</button>
-                      <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Hide cash pad" aria-label="Hide cash pad">&times;</button>
                     </div>
                   </div>
 

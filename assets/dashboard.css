@@ -156,6 +156,13 @@
   display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   gap: 6px; padding: 0 10px 6px; align-items: start; flex-shrink: 0;
   position: relative; z-index: 6;
+  /* Never paint over cart lines unless customer panel is open */
+  isolation: isolate;
+}
+.cart-meta-row .cart-cust-direct-inputs[hidden],
+.cart-meta-row .cart-cust-direct-inputs:not(.is-open) {
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 .pos-shift-slot { padding: 0; min-width: 0; }
 .rs-shift-bar { margin: 0 !important; padding: 0 !important; border: none !important; background: transparent !important; height: 100%; }
@@ -553,8 +560,10 @@
 .cart-items {
   flex: 1 1 auto; overflow-y: auto; padding: 6px 10px;
   display: flex; flex-direction: column; gap: 4px;
-  min-height: 180px;
+  min-height: 220px; /* live UX: was 237px / 29% — push work surface up */
   scrollbar-gutter: stable;
+  position: relative;
+  z-index: 1;
 }
 .cart-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text-faint); text-align: center; padding: 12px; }
 .cart-empty i { font-size: 24px; opacity: .5; }
@@ -606,22 +615,26 @@
 .qty button:hover { background: var(--orange-tint); color: var(--orange); border-color: rgba(255,79,0,0.4); }
 .qty .qn { font-weight: 800; font-size: 12.5px; min-width: 16px; text-align: center; }
 
-/* Sticky checkout foot — always usable; scrolls only if tender is tall */
+/* Sticky checkout foot — keep short so cart-items stays ≥40% of panel (live UX target) */
 .cart-foot {
-  border-top: 1px solid var(--stroke); padding: 7px 10px 9px;
-  flex-shrink: 0; max-height: min(46vh, 420px); overflow-y: auto;
+  border-top: 1px solid var(--stroke); padding: 6px 10px 8px;
+  flex-shrink: 0; max-height: min(38vh, 340px); overflow-y: auto;
   background: color-mix(in srgb, var(--panel) 92%, var(--glass));
   box-shadow: 0 -6px 16px rgba(0,0,0,.04);
 }
 
-/* Inline Cash / Split tenders */
-.cart-tender-host { margin-top: 5px; }
+/* Inline Cash / Split — cash is ONE row unless +notes expanded */
+.cart-tender-host { margin-top: 4px; }
 .cart-tender-panel {
   display: none;
-  flex-direction: column; gap: 5px;
-  padding: 6px 8px; margin: 0;
+  flex-direction: column; gap: 3px;
+  padding: 4px 6px; margin: 0;
   border: 1px solid var(--stroke-2); border-radius: 9px;
   background: var(--glass-1, var(--glass));
+}
+.cart-tender-cash.csd-open {
+  /* one compact row only unless +notes */
+  min-height: 0;
 }
 .cart-tender-panel.csd-open,
 .cart-tender-panel:not([hidden]) {
@@ -635,22 +648,31 @@
 .cart-tender-close {
   width: 26px; height: 26px; border: 0; border-radius: 7px;
   background: transparent; color: var(--text-mute); cursor: pointer; font-size: 15px; line-height: 1;
+  flex: none;
 }
 .cart-tender-close:hover { background: var(--glass-2); color: var(--text); }
 .cart-tender-cash-row {
-  display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 4px 6px; align-items: center;
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
 }
-.cart-tender-cash-row .csd-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-mute); }
-.cart-tender-cash-row .csd-input { height: 32px; font-size: 13px; font-weight: 700; padding: 2px 8px; }
-.cart-tender-cash-row .csd-change-amt { font-size: 13px; font-weight: 800; color: var(--green); min-width: 40px; text-align: right; }
+.cart-tender-cash-row .csd-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-mute); flex: none; }
+.cart-tender-cash-row .csd-input {
+  height: 30px; font-size: 13px; font-weight: 700; padding: 2px 8px;
+  flex: 1 1 88px; min-width: 72px; max-width: 140px;
+}
+.cart-tender-cash-row .csd-change-amt { font-size: 12.5px; font-weight: 800; color: var(--green); min-width: 36px; text-align: right; flex: none; }
 .cart-tender-cash-row .csd-den-exact {
-  min-height: 32px; padding: 0 8px; font-size: 11px; font-weight: 800;
+  min-height: 30px; height: 30px; padding: 0 10px; font-size: 11px; font-weight: 800;
   border-radius: 8px; border: 1px solid rgba(255,79,0,.4); background: var(--orange-tint);
-  color: var(--orange); cursor: pointer;
+  color: var(--orange); cursor: pointer; white-space: nowrap; flex: none;
+}
+.cart-tender-cash-row .cart-cash-more {
+  min-height: 30px; height: 30px; padding: 0 6px; font-size: 10px; font-weight: 700;
+  border-radius: 8px; white-space: nowrap; flex: none;
 }
 .cart-tender-dens {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) 26px; gap: 3px; align-items: center;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; align-items: center;
 }
+.cart-tender-dens[hidden] { display: none !important; }
 .cart-tender-dens .btn-den,
 .cart-tender-dens .csd-den-btn {
   min-height: 28px; padding: 2px 2px; font-size: 10.5px; font-weight: 700;
@@ -658,8 +680,12 @@
   color: var(--text-soft); cursor: pointer;
 }
 .cart-tender-dens .btn-den:hover { border-color: rgba(255,79,0,.35); color: var(--orange); }
-.cart-tender-dens .csd-den-exact { border-color: rgba(255,79,0,.4); color: var(--orange); background: var(--orange-tint); }
-.cart-tender-dens .cart-tender-close { width: 100%; height: 28px; }
+.cart-tender-cash { max-height: none; }
+/* Split stays compact so Hold/KOT stay on-screen */
+.cart-tender-split { gap: 4px; padding: 5px 6px; }
+.cart-split-grid { gap: 4px; }
+.cart-split-grid .csd-input { height: 30px !important; font-size: 12px !important; }
+.cart-split-quick .btn { min-height: 26px; font-size: 10px; padding: 0 6px; }
 .cart-split-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
 }

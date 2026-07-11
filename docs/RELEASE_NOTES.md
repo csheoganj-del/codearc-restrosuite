@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v92 (2026-07-11) — Live browser UX fixes (cashier walkthrough)
+
+Verified in Chromium like a real cashier. Fixes from measurements:
+
+- **Cart work surface was ~29% of panel** — foot max-height reduced; cash dens collapsed by default
+- **Cash tender was ~211px** — now one row (Recv · Change · Exact · +notes)
+- **Customer overlay blocked qty buttons** (phone flag interceptor) — close on pay/cart click; pointer-events when closed
+- Split/cash stay inline; Hold / KOT stay reachable
+
 ## v91 (2026-07-11) — Current Order workbench (max cart space)
 
 - **Wider cart** (~400px) and taller sticky panel for the most-used screen

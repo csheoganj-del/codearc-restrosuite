@@ -1678,7 +1678,14 @@
         hideTenderPanels();
         isSplitPaymentActive = false;
       }
-      // silence unused (explicit open is default for inline)
+      // Keep cash notes pad collapsed after method switch (preserves cart height)
+      const densGrid = document.getElementById('cash-denominations-grid');
+      const densToggle = document.getElementById('cash-dens-toggle');
+      if (densGrid) densGrid.hidden = true;
+      if (densToggle) {
+        densToggle.setAttribute('aria-expanded', 'false');
+        densToggle.textContent = '+notes';
+      }
       void allowOpen;
     }
 
@@ -1689,8 +1696,28 @@
           const btn = e.target.closest('[data-pay-method]');
           if(!btn) return;
           paymentState.method = btn.dataset.payMethod;
-          // Pass allowOpen:true so the drawer opens on explicit user click
+          // Collapse customer overlay so it never blocks cart qty controls (live UX bug)
+          try {
+            if (window.RSPosUI && typeof RSPosUI.setCartCustomerPanelOpen === 'function') {
+              RSPosUI.setCartCustomerPanelOpen(false);
+            }
+          } catch (_) {}
           refreshPaymentPanel({ allowOpen: true });
+        });
+      }
+
+      // Cash quick-notes pad is collapsed by default (saves ~170px cart height)
+      const densToggle = document.getElementById('cash-dens-toggle');
+      const densGrid = document.getElementById('cash-denominations-grid');
+      if (densToggle && densGrid && densToggle.dataset.bound !== '1') {
+        densToggle.dataset.bound = '1';
+        densToggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const open = densGrid.hidden;
+          densGrid.hidden = !open;
+          densToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          densToggle.textContent = open ? '−notes' : '+notes';
         });
       }
 
