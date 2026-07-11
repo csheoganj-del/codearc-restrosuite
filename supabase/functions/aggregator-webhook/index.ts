@@ -108,10 +108,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Prefix order ID for clarity in KDS/POS
     const prefix = platform === "swiggy" ? "SWI-" : platform === "ondc" ? "OND-" : "ZOM-";
-    const orderId = `${prefix}${extOrderId.slice(-6)}`;
+    const orderId = `${prefix}${extOrderId.slice(-8)}`;
 
-    // Build the pending order row
-    const pendingOrderRow = {
+    // Idempotent: skip if same platform order already ingested for this tenant
+    const platformOrderKey = `${platform}:${extOrderId}`;
+    const { data: existing } = await supabase
+      .from("doppio_pending_orders")
+      .select("id, order_id")
+      .eq("tenant_id", tenantId)
+      .eq("order_id", orderId)
+      .maybeSingle();
+    if (existing) {
+      return new Response(JSON.stringify({
+        status: "duplicate",
+        orderId,
+        id: existing.id,
+        platform_order_key: platformOrderKey,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Build the pending order row (snake_case live schema)
+    const pendingOrderRow: Record<string, unknown> = {
       tenant_id: tenantId,
       order_id: orderId,
       customer_name: customerName,
@@ -124,9 +144,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       payment_method: String(payload.payment_method || "UPI"),
       order_type: "Delivery",
       table_number: `Online (${platform.toUpperCase()})`,
-      status: "Pending Review", // Stays in Pending Review until staff accepts
+      status: "Pending Review",
       priority: "normal",
-      date_time: new Date().toISOString()
+      date_time: new Date().toISOString(),
     };
 
     // 5. Insert order into doppio_pending_orders table
@@ -136,6 +156,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .select();
 
     if (error) {
+      // Unique race: treat as success duplicate
+      if (/duplicate|unique/i.test(error.message || "")) {
+        return new Response(JSON.stringify({ status: "duplicate", orderId }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       console.error("Failed to insert pending order:", error.message);
       throw error;
     }

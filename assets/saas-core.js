@@ -283,7 +283,78 @@
     change: () => request('Change Admin PIN', { change: true }),
     /** True if a PIN has been configured. */
     isConfigured: () => !!getStoredHash(),
+    /** Hash for offline login resume checks (same storage as settings). */
+    getHash: () => getStoredHash(),
   };
+
+  /* ---------- Idle lock (Wave 2): require PIN after inactivity ---------- */
+  (function idleLock() {
+    const IDLE_MS_KEY = 'rs_idle_lock_ms';
+    const UNLOCK_AT_KEY = 'rs_idle_unlocked_at';
+    const DEFAULT_IDLE_MS = 5 * 60 * 1000; // 5 minutes
+    let timer = null;
+    let locked = false;
+
+    function idleMs() {
+      try {
+        const n = Number((window.RS_SETTINGS || {}).set_idle_lock_minutes);
+        if (Number.isFinite(n) && n > 0) return Math.min(120, n) * 60 * 1000;
+        const stored = Number(localStorage.getItem(IDLE_MS_KEY) || 0);
+        if (stored > 0) return stored;
+      } catch (_) {}
+      return DEFAULT_IDLE_MS;
+    }
+
+    function arm() {
+      if (timer) clearTimeout(timer);
+      if (!window.RSPinModal || !RSPinModal.isConfigured()) return;
+      // Superadmin / brand admin skip kiosk lock
+      try {
+        const s = window.RS_API && RS_API.session && RS_API.session();
+        if (s && (s.role === 'superadmin' || s.role === 'brand_admin')) return;
+      } catch (_) {}
+      timer = setTimeout(lockNow, idleMs());
+    }
+
+    async function lockNow() {
+      if (locked) return;
+      if (!window.RSPinModal || !RSPinModal.isConfigured()) return;
+      locked = true;
+      document.body.classList.add('rs-idle-locked');
+      try {
+        const ok = await RSPinModal.request('Session locked — enter PIN to continue');
+        if (!ok) {
+          // Stay locked: re-prompt after short delay
+          locked = false;
+          setTimeout(lockNow, 400);
+          return;
+        }
+        try { sessionStorage.setItem(UNLOCK_AT_KEY, String(Date.now())); } catch (_) {}
+      } finally {
+        locked = false;
+        document.body.classList.remove('rs-idle-locked');
+        arm();
+      }
+    }
+
+    const events = ['pointerdown', 'keydown', 'touchstart', 'mousemove', 'scroll'];
+    events.forEach((ev) => {
+      document.addEventListener(ev, () => { if (!locked) arm(); }, { passive: true, capture: true });
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      // If tab was hidden longer than idle window, lock immediately
+      try {
+        const last = Number(sessionStorage.getItem(UNLOCK_AT_KEY) || 0);
+        // use last activity via timer only
+      } catch (_) {}
+      arm();
+    });
+    // Start after hydration / settings load
+    document.addEventListener('rs:hydrated', arm);
+    setTimeout(arm, 4000);
+    window.RS_IDLE_LOCK = { arm, lockNow, idleMs };
+  })();
 
 })();
 

@@ -426,7 +426,7 @@
       }catch(e){ return []; }
     },
     write:(c,a)=>{ try{ localStorage.setItem(LS.key(c), JSON.stringify(a)); }catch(e){} },
-    async list(c){ return LS.read(c); },
+    async list(c, _opts){ return LS.read(c); },
     async put(c,id,obj){
       const cleanId = cleanIdForCollection(c, id);
       const a=LS.read(c);
@@ -497,9 +497,22 @@
   }
 
   const CLOUD = {
-    async list(c){
+    async list(c, opts){
       const m=MAP[c]; if(!m) return [];
-      const rows = await API.select(m.table, { order:m.order||{column:m.pk,ascending:true}, limit:500 });
+      const options = opts && typeof opts === 'object' ? opts : {};
+      // Higher default for money/CRM collections (Wave 2 pagination)
+      const defaultLimit = (c === 'bills' || c === 'customers') ? 1000 : 500;
+      const limit = Number.isFinite(Number(options.limit)) && Number(options.limit) > 0
+        ? Math.min(Number(options.limit), 2000)
+        : defaultLimit;
+      const offset = Number.isFinite(Number(options.offset)) && Number(options.offset) > 0
+        ? Number(options.offset)
+        : 0;
+      const rows = await API.select(m.table, {
+        order: options.order || m.order || { column: m.pk, ascending: true },
+        limit,
+        offset: offset || null,
+      });
       known[c] = new Set((rows||[]).map(r=>String(r[m.pk])));
       return (rows||[]).map(m.from);
     },
@@ -1031,27 +1044,41 @@
     async session(){ if(window.RS_API) { const s = window.RS_API.session(); if(s) return s; } try{ return JSON.parse(localStorage.getItem('rs:session'))||null; }catch(e){ return null; } }
   };
 
+  function cachePinHashFromSettings(settings) {
+    try {
+      if (settings && settings.admin_pin_hash) {
+        localStorage.setItem('rs:admin_pin_hash', String(settings.admin_pin_hash));
+      }
+    } catch (_) {}
+  }
+
   window.RS_DB = {
     get mode(){ return mode(); },
     get isCloud(){ return signedIn(); },
     get cloudConfigured(){ return isCloudConfigured(); },
-    list:(c)=>guard('list',c),
+    list:(c, opts)=>guard('list',c, opts),
     listLocal:(c)=>LS.list(c),
-    listCloud:(c)=>CLOUD.list(c),
+    listCloud:(c, opts)=>CLOUD.list(c, opts),
     writeLocal:(c,arr)=>LS.write(c,arr),
     put:(c,id,obj)=>guard('put',c,id,obj),
     bulkPut:(c,arr)=>guard('bulkPut',c,arr),
     del:(c,id)=>guard('del',c,id),
-    getSettings:()=>guard('getSettings','settings'),
+    getSettings: async ()=>{
+      const s = await guard('getSettings','settings');
+      cachePinHashFromSettings(s);
+      return s;
+    },
     setSettings: async (o)=> {
       const tenantId = getActiveTenantId();
       cachedSettingsMap[tenantId] = o;
+      cachePinHashFromSettings(o);
       await LS.setSettings(o);
       if (signedIn()) {
         try {
           const res = await CLOUD.setSettings(o);
           if (res) {
             cachedSettingsMap[tenantId] = res;
+            cachePinHashFromSettings(res);
             await LS.setSettings(res);
           }
           return res;

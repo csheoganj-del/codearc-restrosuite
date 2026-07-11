@@ -637,14 +637,17 @@
     const ONLINE = [];
     const platName = {zomato:'Zomato',swiggy:'Swiggy',ondc:'ONDC'};
     function detectPlatform(order){
-      const raw = `${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''}`.toLowerCase();
-      if(raw.includes('swiggy') || raw.includes('swi-')) return 'swiggy';
+      const raw = `${order.platform || ''} ${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''} ${order.channel || ''}`.toLowerCase();
+      if(raw.includes('swiggy') || raw.includes('swi-') || raw.includes('swig')) return 'swiggy';
       if(raw.includes('ondc') || raw.includes('ond-')) return 'ondc';
+      if(raw.includes('zomato') || raw.includes('zom-') || raw.includes('zom')) return 'zomato';
       return 'zomato';
     }
     function isOnlineOrder(order){
-      const raw = `${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''}`.toLowerCase();
-      return raw.includes('online') || raw.includes('delivery') || /(^|[^a-z])(zom|swi|ond)-/.test(raw);
+      const raw = `${order.platform || ''} ${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''} ${order.channel || ''} ${order.source || ''}`.toLowerCase();
+      return raw.includes('online') || raw.includes('delivery') || raw.includes('aggregator')
+        || raw.includes('swiggy') || raw.includes('zomato') || raw.includes('ondc')
+        || /(^|[^a-z])(zom|swi|ond)-/.test(raw);
     }
     function aggStatus(status){
       const s = String(status || '').toLowerCase();
@@ -710,7 +713,13 @@
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-bell-concierge"></i></div><div><div class="sv">${ONLINE.filter(o=>o.status==='ready').length}</div><div class="sl">Ready for pickup</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(ONLINE.reduce((a,o)=>a+o.total,0))}</div><div class="sl">Online sales (open)</div></div></div>
         </div>
-        <div class="toolbar-row"><span class="eyebrow">Live aggregator feed</span><div class="grow"></div><span class="pill pill-green"><span class="dot dot-live"></span> Auto-accept on</span></div>
+        <div class="toolbar-row" style="flex-wrap:wrap;gap:8px">
+          <span class="eyebrow">Live aggregator feed</span>
+          <div class="grow"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="agg-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="agg-webhook-info" title="Webhook setup"><i class="fa-solid fa-link"></i> Webhook</button>
+          <span class="pill pill-green"><span class="dot dot-live"></span> Live</span>
+        </div>
         <div class="agg-grid">${ONLINE.map((o,i)=>`
           <div class="agg-card" data-i="${i}">
             <div class="agg-top ${o.plat}"><i class="fa-solid ${o.plat==='ondc'?'fa-network-wired':'fa-bowl-food'}"></i><span class="plat">${platName[o.plat]}</span><span class="oid">${o.oid}</span></div>
@@ -724,18 +733,54 @@
               </div>
             </div>
           </div>`).join('')}</div>`;
-      $$('[data-acc]',sec).forEach(b=>b.onclick=()=>{ ONLINE[+b.dataset.acc].status='preparing'; ONLINE[+b.dataset.acc].prep=10; renderAgg(); RS.toast('Order accepted · KOT fired','fa-check'); });
-      $$('[data-ready]',sec).forEach(b=>b.onclick=()=>{ ONLINE[+b.dataset.ready].status='ready'; renderAgg(); RS.toast('Marked ready for pickup','fa-bell-concierge'); });
-      $$('[data-rej]',sec).forEach(b=>b.onclick=()=>RS.toast('Order rejected','fa-xmark'));
-      $$('[data-rider]',sec).forEach(b=>b.onclick=()=>RS.toast('Rider on the way','fa-motorcycle'));
       if(!ONLINE.length) {
         const grid = $('.agg-grid', sec);
-        if(grid) grid.innerHTML = '<div class="sr-empty">No online orders received yet</div>';
+        if(grid) grid.innerHTML = `<div class="sr-empty" style="padding:28px 16px">
+          <div style="font-weight:700;margin-bottom:6px">No online orders right now</div>
+          <div style="font-size:12.5px;color:var(--text-soft);max-width:420px;margin:0 auto;line-height:1.5">
+            Connect Zomato / Swiggy / ONDC to the aggregator webhook (Settings → Online, or Webhook button). Orders land in Pending Review automatically.
+          </div>
+        </div>`;
       }
-      $$('[data-acc]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.acc, 'Accepted', 'Order accepted - KOT fired','fa-check'));
+      $$('[data-acc]',sec).forEach(b=>b.onclick=async()=>{
+        const i = +b.dataset.acc;
+        if (ONLINE[i]) ONLINE[i].prep = 10;
+        await persistOnlineStatus(i, 'Accepted', 'Order accepted · KOT fired', 'fa-check');
+        // Push to KDS attention if available
+        try { document.dispatchEvent(new CustomEvent('rs:kot-new', { detail: ONLINE[i] && ONLINE[i].row })); } catch(_){}
+      });
       $$('[data-ready]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.ready, 'Ready', 'Marked ready for pickup','fa-bell-concierge'));
       $$('[data-rej]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.rej, 'Rejected', 'Order rejected','fa-xmark'));
       $$('[data-rider]',sec).forEach(b=>b.onclick=()=>persistOnlineStatus(+b.dataset.rider, 'Picked Up', 'Rider pickup recorded','fa-motorcycle'));
+
+      const refreshBtn = sec.querySelector('#agg-refresh');
+      if (refreshBtn) refreshBtn.onclick = () => renderAgg();
+      const whBtn = sec.querySelector('#agg-webhook-info');
+      if (whBtn) whBtn.onclick = () => {
+        const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
+        const tid = sess.tenant_id || '';
+        const base = (window.RS_API && RS_API.functionsBase) || (window.__SUPABASE_URL__ ? (String(window.__SUPABASE_URL__).replace(/\/+$/,'') + '/functions/v1') : 'https://YOUR_PROJECT.supabase.co/functions/v1');
+        const url = `${base}/aggregator-webhook?tenant_id=${encodeURIComponent(tid)}`;
+        const body = `<div style="font-size:13px;line-height:1.55;color:var(--text-soft)">
+          <p style="margin:0 0 10px;color:var(--text)"><b>Webhook URL</b> (POST JSON, Authorization: Bearer AGGREGATOR_WEBHOOK_SECRET)</p>
+          <code style="display:block;padding:10px;border-radius:8px;background:var(--glass);border:1px solid var(--stroke);word-break:break-all;font-size:11.5px">${esc(url)}</code>
+          <p style="margin:12px 0 0">Body fields: <code>platform</code>, <code>order_id</code>, <code>customer_name</code>, <code>customer_phone</code>, <code>items[]</code>, <code>total_amount</code>.</p>
+        </div>`;
+        if (window.RSModal) {
+          RSModal.open({ title: 'Aggregator webhook', icon: 'fa-link', size: 'sm', body, foot: '<button class="btn btn-primary" id="agg-wh-close">Close</button>',
+            onMount(m, close) { const c = m.querySelector('#agg-wh-close'); if (c) c.onclick = close; } });
+        } else {
+          window.prompt('Webhook URL', url);
+        }
+      };
+
+      // Auto-refresh while tab is active
+      if (window.__rsAggPoll) clearInterval(window.__rsAggPoll);
+      window.__rsAggPoll = setInterval(() => {
+        const active = document.getElementById('aggregator-tab');
+        if (active && active.classList.contains('active')) renderAgg();
+        else { clearInterval(window.__rsAggPoll); window.__rsAggPoll = null; }
+      }, 12000);
     }
     RS.titles['aggregator-tab']=['Online Orders','Zomato, Swiggy & ONDC orders']; RS.addRenderer('aggregator-tab', renderAgg);
 
