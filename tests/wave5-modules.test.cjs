@@ -216,6 +216,17 @@ test('growth-hub-shell module extracted (wave 12)', () => {
   assert.match(html, /growth-hub-shell\.js/);
 });
 
+test('prod asset checker and deploy-health e2e exist (wave 13)', () => {
+  assert.ok(fs.existsSync(path.join(root, 'scripts/check-prod-assets.cjs')));
+  const checker = fs.readFileSync(path.join(root, 'scripts/check-prod-assets.cjs'), 'utf8');
+  assert.match(checker, /tax-helpers|pos-ui/);
+  assert.ok(fs.existsSync(path.join(root, 'tests/e2e/deploy-health.spec.cjs')));
+  const e2e = fs.readFileSync(path.join(root, 'tests/e2e/deploy-health.spec.cjs'), 'utf8');
+  assert.match(e2e, /Deploy health|pos-ui\.js/);
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.equal(pkg.scripts['check:prod-assets'], 'node scripts/check-prod-assets.cjs');
+});
+
 test('USB and split docs exist', () => {
   assert.ok(fs.existsSync(path.join(root, 'docs/USB_THERMAL_PRINTING.md')));
   assert.ok(fs.existsSync(path.join(root, 'docs/DASHBOARD_SPLIT_MAP.md')));
