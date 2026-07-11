@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v70 (2026-07-11) — Delivery fee, Z tips, void/rebill
+
+- **Delivery charge** included in cart grand total, bill, and receipt (live update on fee field)
+- **Z-report**: tips, service charge, delivery fees, void count/amount
+- **Bills**: Void/Refund wording, **Rebill** loads lines into POS; auto-rebill after amend reasons
+
 ## v69 (2026-07-11) — Tips, service charge %, cash drawer
 
 - **Tip on cart**: amount input + No tip / 5% / 10% chips; included in total, bill, and receipt
@@ -79,7 +85,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v69-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v70-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

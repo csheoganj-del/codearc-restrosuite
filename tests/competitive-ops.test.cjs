@@ -26,7 +26,7 @@ test('competitive-ops.js exists and exposes core APIs', () => {
 test('dashboard loads competitive-ops in critical path', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /competitive-ops\.js|critical\.bundle\.js/);
-  assert.match(html, /v[56][0-9]-20260711/);
+  assert.match(html, /v[5-7][0-9]-20260711/);
 });
 
 test('bill settled modal has thermal print action', () => {
@@ -87,6 +87,18 @@ test('tip, service charge pct, and cash drawer APIs', () => {
   assert.match(bridge, /openCashDrawer/);
   assert.match(ops, /openCashDrawer|billHasCashTender/);
   assert.match(receipt, /tipAmount/);
+});
+
+test('delivery in totals, Z tips, rebill void polish', () => {
+  const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const bills = fs.readFileSync(path.join(root, 'assets/modules/bills-history.js'), 'utf8');
+  const receipt = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
+  assert.match(posUi, /deliveryCharge/);
+  assert.match(ops, /tipsTotal|serviceChargeTotal|deliveryTotal/);
+  assert.match(bills, /rebillToPos|rebill-act/);
+  assert.match(bills, /Void \/ Refund|voided/);
+  assert.match(receipt, /deliveryCharge/);
 });
 
 test('receipt engine supports thermal preference', () => {

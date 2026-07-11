@@ -195,14 +195,24 @@
     const byStation = {};
     let gross = 0;
     let taxTotal = 0;
+    let tipsTotal = 0;
+    let serviceChargeTotal = 0;
+    let deliveryTotal = 0;
+    let refundTotal = 0;
     paid.forEach((b) => {
       const amt = Number(b.amount != null ? b.amount : b.total) || 0;
       gross += amt;
       taxTotal += Number(b.gst || b.tax || 0) || 0;
+      tipsTotal += Number(b.tipAmount || b.tip || 0) || 0;
+      serviceChargeTotal += Number(b.serviceChargeAmount || 0) || 0;
+      deliveryTotal += Number(b.deliveryCharge || b.delivery_charge || 0) || 0;
       const method = b.pay || b.paymentMethod || 'Cash';
       byPay[method] = (byPay[method] || 0) + amt;
       const st = b.stationLabel || b.stationId || shift.stationLabel || 'This station';
       byStation[st] = (byStation[st] || 0) + amt;
+    });
+    refunded.forEach((b) => {
+      refundTotal += Number(b.amount != null ? b.amount : b.total) || 0;
     });
     const cashSales = byPay.Cash || byPay.cash || 0;
     const expectedCash = (Number(shift.openingFloat) || 0) + cashSales;
@@ -211,8 +221,12 @@
     return {
       bills: paid.length,
       refunds: refunded.length,
+      refundTotal,
       gross,
       taxTotal,
+      tipsTotal,
+      serviceChargeTotal,
+      deliveryTotal,
       byPay,
       byStation,
       cashSales,
@@ -245,8 +259,11 @@
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Closed</span><span>${esc(shift.closedAt ? new Date(shift.closedAt).toLocaleString() : '—')}</span></div>
       <hr style="border:0;border-top:1px dashed #ccc;margin:10px 0">
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Bills</span><span>${summary.bills}</span></div>
-      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Refunds</span><span>${summary.refunds}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Voids / refunds</span><span>${summary.refunds}${summary.refundTotal ? ' · ' + rs(summary.refundTotal) : ''}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Tax (GST/VAT)</span><span>${rs(summary.taxTotal || 0)}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Tips</span><span>${rs(summary.tipsTotal || 0)}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Service charge</span><span>${rs(summary.serviceChargeTotal || 0)}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Delivery fees</span><span>${rs(summary.deliveryTotal || 0)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:6px 0"><span>Gross</span><span>${rs(summary.gross)}</span></div>
       <hr style="border:0;border-top:1px dashed #ccc;margin:10px 0">
       <div style="font-size:11px;font-weight:700;margin-bottom:4px">Payment mix</div>
@@ -273,8 +290,12 @@
       ['Closed', shift.closedAt || ''],
       ['Bills', summary.bills],
       ['Refunds', summary.refunds],
+      ['Refund total', summary.refundTotal || 0],
       ['Gross', summary.gross],
       ['Tax', summary.taxTotal || 0],
+      ['Tips', summary.tipsTotal || 0],
+      ['Service charge', summary.serviceChargeTotal || 0],
+      ['Delivery fees', summary.deliveryTotal || 0],
       ['Opening float', summary.openingFloat],
       ['Cash sales', summary.cashSales],
       ['Expected cash', summary.expectedCash],

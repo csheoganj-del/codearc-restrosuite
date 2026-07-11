@@ -80,8 +80,74 @@
       serviceChargeAmount: Number(b.serviceChargeAmount || 0),
       serviceChargePct: b.serviceChargePct,
       tipAmount: Number(b.tipAmount || b.tip || 0),
+      deliveryCharge: Number(b.deliveryCharge || 0),
       liquorTaxAmount: Number(b.liquorTaxAmount || 0),
     };
+  }
+
+  /** Load bill lines into POS cart for rebill / amend (new sale). */
+  async function rebillToPos(b) {
+    if (!b) return;
+    const items =
+      Array.isArray(b._items) && b._items.length
+        ? b._items.map((i) => ({
+            id: i.id || i.name,
+            name: i.name || 'Item',
+            qty: Math.max(1, Number(i.qty || 1)),
+            price: Number(i.price || 0),
+            cat: i.cat || i.category || 'Rebill',
+            stock: 'ok',
+            taxCategory: i.taxCategory || i.tax_category,
+          }))
+        : [];
+    if (!items.length) {
+      toast('No line items on this bill to rebill', 'fa-circle-exclamation');
+      return;
+    }
+    if (global.RS && typeof RS.activateTab === 'function') await RS.activateTab('pos-tab');
+    await new Promise((r) => setTimeout(r, 100));
+    if (global.RS && typeof RS.setCart === 'function') RS.setCart(items);
+    const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+    const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+    if (nameEl && b.customerName) {
+      nameEl.value = b.customerName;
+      nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (phoneEl && b.customerPhone) {
+      phoneEl.value = b.customerPhone;
+      phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    const tableSelect = document.getElementById('cart-table');
+    if (tableSelect && b.table) {
+      let opt = [...tableSelect.options].find(
+        (o) => o.value === b.table || o.text === b.table
+      );
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = b.table;
+        opt.textContent = b.table;
+        tableSelect.appendChild(opt);
+      }
+      tableSelect.value = opt.value;
+      tableSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (b.tipAmount && global.RS && typeof RS.setTip === 'function') {
+      RS.setTip(b.tipAmount);
+    }
+    if (b.deliveryCharge) {
+      const dc = document.getElementById('delivery-charge');
+      if (dc) {
+        dc.value = b.deliveryCharge;
+        dc.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    try {
+      if (global.RS && typeof RS.renderCart === 'function') RS.renderCart();
+    } catch (_) {}
+    toast(
+      'Rebill loaded · ' + (b.no || '') + (b.status === 'refunded' ? ' (voided original)' : ' — void first if correcting a paid bill'),
+      'fa-rotate'
+    );
   }
 
   function showBillReceipt(b) {
@@ -141,13 +207,14 @@
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
             <div style="width:42px;height:42px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;color:#ef4444;flex-shrink:0;"><i class="fa-solid fa-rotate-left"></i></div>
             <div>
-              <div style="font-weight:800;font-size:15px;color:var(--text,#111);">Process Refund</div>
+              <div style="font-weight:800;font-size:15px;color:var(--text,#111);">Void / Refund</div>
               <div style="font-size:12px;color:var(--text-soft,#6b7280);">${_e(b.no || b.id)} &middot; ${amt}</div>
             </div>
           </div>
-          <div style="font-size:12.5px;color:var(--text-soft,#6b7280);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Reason for refund</div>
+          <p style="font-size:12.5px;color:var(--text-soft);line-height:1.45;margin:0 0 12px">Marks the bill voided. Stock is not restored (food already served). Use <b>Rebill</b> after to correct items on a new bill.</p>
+          <div style="font-size:12.5px;color:var(--text-soft,#6b7280);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Reason</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;" id="rfund-reason-chips">
-            ${['Customer complaint', 'Wrong order', 'Quality issue', 'Duplicate charge', 'Changed mind', 'Other']
+            ${['Customer complaint', 'Wrong order', 'Quality issue', 'Duplicate charge', 'Amend / rebill', 'Other']
               .map(
                 (r) =>
                   `<button data-r="${_e(r)}" style="padding:8px 10px;border-radius:10px;border:1.5px solid var(--stroke-2,#e5e7eb);background:var(--glass,#f9fafb);font-size:12px;cursor:pointer;font-family:inherit;color:var(--text,#111);text-align:left;transition:all .15s;" class="rfund-chip">${_e(r)}</button>`
@@ -157,7 +224,7 @@
           <textarea id="rfund-note" placeholder="Additional notes (optional)..." rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:13px;resize:none;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;"></textarea>
           <div style="display:flex;gap:10px;margin-top:16px;">
             <button id="rfund-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
-            <button id="rfund-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Confirm Refund</button>
+            <button id="rfund-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Confirm void</button>
           </div>
         </div>
       `;
@@ -235,7 +302,7 @@
     if (!b || b.status === 'refunded') return;
 
     if (global.RSPinModal) {
-      const ok = await RSPinModal.request(`Refund ${b.no || b.id || 'bill'}`);
+      const ok = await RSPinModal.request(`Void / Refund ${b.no || b.id || 'bill'}`);
       if (!ok) return;
     }
 
@@ -243,8 +310,9 @@
     if (reason === null) return;
 
     b.status = 'refunded';
-    b.refundReason = reason || 'POS refund';
+    b.refundReason = reason || 'POS void/refund';
     b.refundedAt = new Date().toISOString();
+    b.voided = true;
     try {
       const s = global.RS_API && RS_API.session ? RS_API.session() : {};
       b.refundedBy = s.display_name || s.username || 'staff';
@@ -314,10 +382,18 @@
       console.warn('Refund cloud update failed', e);
     }
     renderBills();
-    toast(
-      cloudMarked ? 'Refund recorded + audit trail' : 'Refund marked locally. Cloud sync pending.',
-      'fa-rotate-left'
-    );
+    const msg = cloudMarked
+      ? 'Void recorded + audit · tap to rebill'
+      : 'Void marked locally · tap to rebill';
+    if (typeof global.__toast === 'function') {
+      global.__toast(msg, 'fa-rotate-left', () => rebillToPos(b));
+    } else {
+      toast(msg, 'fa-rotate-left');
+    }
+    // Auto-offer rebill when reason is amend
+    if (/amend|rebill|wrong order|duplicate/i.test(String(reason || ''))) {
+      setTimeout(() => rebillToPos(b), 350);
+    }
   }
 
   async function deleteBill(b) {
@@ -493,8 +569,8 @@
         <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(b.time || b.dateTime || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
         <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
-        <td>${b.status === 'paid' ? '<span class="pill pill-green" style="padding:3px 9px">Paid</span>' : '<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-rotate-left"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
+        <td>${b.status === 'paid' ? '<span class="pill pill-green" style="padding:3px 9px">Paid</span>' : '<span class="pill pill-red" style="padding:3px 9px">Voided</span>'}</td>
+        <td><div class="row-actions"><button class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button><button class="icon-act rebill-act" title="Rebill / load into POS" aria-label="Rebill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-rotate"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Void / refund" aria-label="Void bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-ban"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
       </tr>`
       )
       .join('');
@@ -517,6 +593,7 @@
       const target = live || bill;
       if (btn.classList.contains('go')) return showBillReceipt(target);
       if (btn.classList.contains('thermal-act')) return printBillThermal(target);
+      if (btn.classList.contains('rebill-act')) return rebillToPos(target);
       if (btn.classList.contains('refund-act')) return markBillRefunded(target);
       if (btn.classList.contains('del-act')) return deleteBill(target);
       return shareBillReceipt(target);
@@ -608,6 +685,7 @@
     receiptPayloadFromBill,
     showBillReceipt,
     shareBillReceipt,
+    rebillToPos,
     markBillRefunded,
     deleteBill,
     renderBills,
