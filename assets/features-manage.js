@@ -548,9 +548,23 @@
             </tbody></table></div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="waste">
-            <div class="panel-head"><h3>Waste log</h3><div class="row" style="gap:8px"><span class="pill pill-red" style="padding:4px 11px">${rs(WASTE.reduce((a,w)=>a+w.cost,0))} lost</span><button class="btn btn-primary btn-sm" id="add-waste"><i class="fa-solid fa-plus"></i> Log waste</button></div></div>
-            <div class="table-scroll"><table class="data-table"><thead><tr><th>Item</th><th>Quantity</th><th>Reason</th><th>Cost lost</th><th>When</th></tr></thead><tbody>
-            ${WASTE.map(w=>`<tr><td><b>${w.item}</b></td><td>${w.qty}</td><td><span class="pill" style="padding:3px 9px">${w.reason}</span></td><td class="td-strong" style="color:var(--red)">${rs(w.cost)}</td><td>${w.date}</td></tr>`).join('')}
+            <div class="panel-head" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <h3 style="margin:0">Waste log</h3>
+              <span class="pill pill-red" style="padding:4px 11px">${rs(WASTE.reduce((a,w)=>a+(Number(w.cost)||0),0))} lost</span>
+              <span class="pill" style="padding:4px 11px">${WASTE.length} entries</span>
+              <div class="grow"></div>
+              <button class="btn btn-ghost btn-sm" id="btn-export-waste"><i class="fa-solid fa-file-csv"></i> CSV</button>
+              <button class="btn btn-primary btn-sm" id="add-waste"><i class="fa-solid fa-plus"></i> Log waste</button>
+            </div>
+            <div class="table-scroll"><table class="data-table"><thead><tr><th>Item</th><th>Quantity</th><th>Reason</th><th>Cost lost</th><th>When</th><th>By</th></tr></thead><tbody>
+            ${WASTE.length ? WASTE.map(w=>`<tr>
+              <td><b>${esc(w.item)}</b></td>
+              <td>${esc(w.qtyLabel || (w.qty + ' ' + (w.unit||'')))}</td>
+              <td><span class="pill" style="padding:3px 9px">${esc(w.reason)}</span></td>
+              <td class="td-strong" style="color:var(--red)">${rs(w.cost)}</td>
+              <td>${esc(w.date)}</td>
+              <td style="font-size:12px;color:var(--text-soft)">${esc(w.by || '—')}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-soft)">No waste logged yet. Logging deducts stock from inventory.</td></tr>`}
             </tbody></table></div>
           </div>`;
 
@@ -896,51 +910,181 @@
         // Expose for inventory auto-draft refresh
         window.RS_receivePurchaseOrder = receivePurchaseOrder;
 
+        async function logWasteEntry({ invId, itemName, qty, unit, reason, note }) {
+          const inv = RS.INVENTORY || [];
+          let item =
+            (invId && inv.find((i) => String(i.id) === String(invId))) ||
+            inv.find((i) => i.name && String(i.name).toLowerCase() === String(itemName).toLowerCase());
+          if (!item) {
+            RS.toast('Ingredient not found in inventory', 'fa-circle-exclamation');
+            return false;
+          }
+          const q = Math.max(0, Number(qty) || 0);
+          if (!(q > 0)) {
+            RS.toast('Enter a quantity greater than 0', 'fa-circle-exclamation');
+            return false;
+          }
+          const have = Math.max(0, Number(item.stock) || 0);
+          if (q > have) {
+            if (!confirm(`Only ${have} ${item.unit || unit || ''} in stock. Log ${q} and set stock to 0?`)) return false;
+          }
+          const deducted = Math.min(q, have);
+          item.stock = Math.max(0, have - q);
+          const cost = Math.round(deducted * (Number(item.cost) || 0) * 100) / 100;
+          await saveInventoryItem(item);
+
+          const now = new Date();
+          const entry = {
+            id: 'waste_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            invId: item.id,
+            item: item.name,
+            qty: deducted,
+            qtyLogged: q,
+            unit: item.unit || unit || 'unit',
+            qtyLabel: deducted + ' ' + (item.unit || unit || 'unit'),
+            reason: reason || 'Other',
+            note: note || '',
+            cost,
+            dateTime: now.toISOString(),
+            date: now.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+            by: staffName(),
+          };
+          try {
+            if (window.RS_DB && RS_DB.put) await RS_DB.put('waste_log', entry.id, entry);
+            else if (RS.saveOne) await RS.saveOne('waste_log', entry);
+          } catch (e) {
+            console.warn('waste_log save failed', e);
+          }
+          WASTE.unshift(entry);
+          try {
+            if (window.RSInventoryUI && RSInventoryUI.paintInventoryBadge) RSInventoryUI.paintInventoryBadge();
+            if (RS.renderInventory) RS.renderInventory();
+          } catch (_) {}
+          RS.toast(
+            `Waste logged: ${entry.qtyLabel} ${item.name} (−${rs(cost)})`,
+            'fa-trash-can'
+          );
+          return true;
+        }
+
+        function exportWasteCsv() {
+          if (!WASTE.length) return RS.toast('No waste entries to export', 'fa-circle-info');
+          const lines = [['item', 'qty', 'unit', 'reason', 'cost', 'when', 'by', 'note'].join(',')];
+          WASTE.forEach((w) => {
+            lines.push(
+              [w.item, w.qty, w.unit, w.reason, w.cost, w.dateTime || w.date, w.by, w.note || '']
+                .map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"')
+                .join(',')
+            );
+          });
+          const csv = lines.join('\n');
+          const name = 'waste-log-' + new Date().toISOString().slice(0, 10) + '.csv';
+          if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
+          else {
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = name;
+            a.click();
+          }
+          RS.toast('Waste CSV · ' + WASTE.length + ' rows', 'fa-file-csv');
+        }
+
+        const btnExportWaste = $('#btn-export-waste');
+        if (btnExportWaste) btnExportWaste.onclick = () => exportWasteCsv();
+
         const btnAddWaste = $('#add-waste');
         if (btnAddWaste) {
           btnAddWaste.onclick = () => {
             if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
+            const inv = RS.INVENTORY || [];
+            const opts = inv
+              .slice()
+              .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+              .map(
+                (i) =>
+                  `<option value="${esc(i.id)}" data-unit="${esc(i.unit || 'unit')}" data-name="${esc(i.name)}" data-stock="${Number(i.stock) || 0}" data-cost="${Number(i.cost) || 0}">${esc(i.name)} (${Number(i.stock) || 0} ${esc(i.unit || '')})</option>`
+              )
+              .join('');
+            if (!opts) return RS.toast('Add inventory ingredients first', 'fa-circle-exclamation');
             const body = `
               <div style="display:flex;flex-direction:column;gap:12px">
-                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                  <label class="fl">Ingredient</label>
+                  <select id="waste-item" class="form-input">${opts}</select>
+                  <div id="waste-stock-hint" style="font-size:12px;color:var(--text-soft);margin-top:4px"></div>
+                </div>
+                <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                   <div>
-                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Ingredient/Item</label>
-                    <input type="text" id="waste-item" class="form-control" placeholder="e.g. Tomato" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    <label class="fl">Quantity wasted</label>
+                    <input type="number" id="waste-qty" class="form-input" min="0" step="any" value="1" placeholder="Qty">
                   </div>
                   <div>
-                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Quantity Wasted</label>
-                    <input type="text" id="waste-qty" class="form-control" placeholder="e.g. 2 kg" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    <label class="fl">Unit</label>
+                    <input type="text" id="waste-unit" class="form-input" readonly>
                   </div>
                 </div>
                 <div>
-                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Reason for Waste</label>
-                  <select id="waste-reason" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  <label class="fl">Reason</label>
+                  <select id="waste-reason" class="form-input">
                     <option value="Spoiled">Spoiled / Expired</option>
                     <option value="Dropped">Dropped / Spilled</option>
                     <option value="Incorrect prep">Incorrect preparation</option>
+                    <option value="Overproduction">Overproduction</option>
                     <option value="Other">Other</option>
                   </select>
                 </div>
+                <div>
+                  <label class="fl">Note (optional)</label>
+                  <input type="text" id="waste-note" class="form-input" placeholder="e.g. fridge failure">
+                </div>
+                <div style="font-size:12.5px;color:var(--text-soft)">Est. cost lost: <b id="waste-cost-preview" style="color:var(--red)">${rs(0)}</b> · stock will be deducted</div>
               </div>
             `;
             RSModal.open({
-              title: 'Log Kitchen Waste',
-              sub: 'Track inventory loss and spoilage',
+              title: 'Log kitchen waste',
+              sub: 'Deducts from inventory stock',
               icon: 'fa-trash-can',
               size: 'sm',
               body,
-              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-circle-check"></i> Log Loss</button>`,
+              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm style="background:var(--red);border-color:var(--red)"><i class="fa-solid fa-trash-can"></i> Log &amp; deduct</button>`,
               onMount(modal, close) {
-                modal.querySelector('[data-cancel]').onclick = close;
-                modal.querySelector('[data-confirm]').onclick = () => {
-                  const item = modal.querySelector('#waste-item').value || '';
-                  if (!item) return RS.toast('Item name is required', 'fa-circle-exclamation');
-                  const qty = modal.querySelector('#waste-qty').value || '';
-                  const reason = modal.querySelector('#waste-reason').value || '';
-                  close();
-                  RS.toast(`Logged waste: ${qty} of ${item} (${reason})`, 'fa-circle-check');
+                const sel = modal.querySelector('#waste-item');
+                const qtyEl = modal.querySelector('#waste-qty');
+                const unitEl = modal.querySelector('#waste-unit');
+                const hint = modal.querySelector('#waste-stock-hint');
+                const costEl = modal.querySelector('#waste-cost-preview');
+                const sync = () => {
+                  const opt = sel.options[sel.selectedIndex];
+                  if (!opt) return;
+                  unitEl.value = opt.dataset.unit || 'unit';
+                  const stock = Number(opt.dataset.stock) || 0;
+                  const cost = Number(opt.dataset.cost) || 0;
+                  const q = Math.max(0, Number(qtyEl.value) || 0);
+                  hint.textContent = `On hand: ${stock} ${opt.dataset.unit || ''}`;
+                  costEl.textContent = rs(Math.round(Math.min(q, stock) * cost * 100) / 100);
                 };
-              }
+                sel.onchange = sync;
+                qtyEl.oninput = sync;
+                sync();
+                modal.querySelector('[data-cancel]').onclick = close;
+                modal.querySelector('[data-confirm]').onclick = async () => {
+                  const opt = sel.options[sel.selectedIndex];
+                  if (!opt) return;
+                  const ok = await logWasteEntry({
+                    invId: sel.value,
+                    itemName: opt.dataset.name || opt.textContent,
+                    qty: qtyEl.value,
+                    unit: unitEl.value,
+                    reason: modal.querySelector('#waste-reason').value,
+                    note: modal.querySelector('#waste-note').value.trim(),
+                  });
+                  if (ok) {
+                    close();
+                    drawPanes();
+                    if (RS.render) RS.render('inventory-tab');
+                  }
+                };
+              },
             });
           };
         }
@@ -956,7 +1100,11 @@
 
       // Load from DB
       if (window.RS_DB) {
-        Promise.all([RS_DB.list('vendors'), RS_DB.list('purchase_orders')]).then(([vRows, poRows]) => {
+        Promise.all([
+          RS_DB.list('vendors'),
+          RS_DB.list('purchase_orders'),
+          RS_DB.list('waste_log').catch(() => []),
+        ]).then(([vRows, poRows, wasteRows]) => {
           if (vRows && vRows.length) {
             SUPPLIERS.length = 0;
             vRows.forEach(r => {
@@ -1003,9 +1151,37 @@
             });
             mapped.forEach((row) => POS_ORDERS.push(row));
           }
+
+          WASTE.length = 0;
+          (wasteRows || [])
+            .slice()
+            .sort((a, b) => String(b.dateTime || b.date || '').localeCompare(String(a.dateTime || a.date || '')))
+            .forEach((w) => {
+              WASTE.push({
+                ...w,
+                item: w.item || w.name || 'Item',
+                qty: Number(w.qty) || 0,
+                unit: w.unit || '',
+                qtyLabel: w.qtyLabel || `${w.qty || 0} ${w.unit || ''}`.trim(),
+                reason: w.reason || 'Other',
+                cost: Number(w.cost) || 0,
+                date:
+                  w.date ||
+                  (w.dateTime
+                    ? new Date(w.dateTime).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—'),
+                by: w.by || w.loggedBy || '',
+              });
+            });
+
           drawPanes();
         }).catch(e => {
-          console.warn("Failed loading vendors/purchase orders from DB", e);
+          console.warn("Failed loading vendors/purchase orders/waste from DB", e);
           drawPanes();
         });
       } else {

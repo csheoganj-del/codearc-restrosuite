@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v76 (2026-07-11) — Waste log deducts stock
+
+- **Log waste** picks inventory ingredient, numeric qty, reason/note
+- **Stock deducted** and cost estimated from unit cost; persisted to `waste_log`
+- Waste table + **CSV export**; Inventory tabs include Purchase orders & Waste log
+- Empty stock confirmation when logging more than on hand
+
 ## v75 (2026-07-11) — Partial receive & cancel PO
 
 - **Partial receive**: edit qty per line; tracks cumulative `receivedLines` / receipts
@@ -122,7 +129,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v75-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v76-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

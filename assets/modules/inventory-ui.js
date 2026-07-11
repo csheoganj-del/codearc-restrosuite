@@ -634,17 +634,32 @@
     const seg = $('#inv-seg');
     if (seg && !seg.dataset.wired) {
       seg.dataset.wired = '1';
-      const panels = { stock: '#inv-panel-stock', recipes: '#inv-panel-recipes', suppliers: '#inv-panel-suppliers' };
       seg.querySelectorAll('[data-inv-tab]').forEach((btn) => {
         btn.onclick = () => {
+          const tab = btn.dataset.invTab || 'stock';
           seg.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
           btn.classList.add('active');
-          Object.values(panels).forEach((p) => {
-            const el = $(p);
-            if (el) el.style.display = 'none';
+          // Legacy stock panel
+          const stockPanel = $('#inv-panel-stock');
+          if (stockPanel) {
+            stockPanel.style.display = tab === 'stock' ? '' : 'none';
+            stockPanel.classList.toggle('active', tab === 'stock');
+          }
+          // features-manage sub-panes (recipes / suppliers / pos / waste)
+          document.querySelectorAll('#inventory-tab .subtab-pane').forEach((p) => {
+            const isStockPane = p.id === 'inv-panel-stock' || p.dataset.pane === 'stock';
+            const match = p.dataset.pane === tab || (tab === 'stock' && isStockPane);
+            p.classList.toggle('active', match);
+            if (p.id && p.id.startsWith('inv-panel-')) {
+              p.style.display = match ? '' : 'none';
+            }
           });
-          const panel = $(panels[btn.dataset.invTab]);
-          if (panel) panel.style.display = '';
+          // Hide toolbar actions that only apply to stock list when on other tabs
+          const stockOnly = ['btn-add-ingredient', 'btn-import-inventory', 'btn-download-inventory-template', 'btn-export-low-stock-toolbar'];
+          stockOnly.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = tab === 'stock' ? '' : 'none';
+          });
         };
       });
     }
