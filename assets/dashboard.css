@@ -726,20 +726,35 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .totals-grand { padding-top: 4px; }
 .totals-grand .amt { font-size: 20px !important; }
 
-/* Pay icons + tender popover (overlays cart items, does not permanently shrink list) */
+/* Pay: icon + short label · tender popover above */
 .cart-payment,
-.cart-payment-icons {
+.cart-payment-icons,
+.cart-payment-labeled {
   margin: 4px 0 0; padding: 4px; border: 1px solid var(--stroke-2);
-  border-radius: 9px; background: var(--glass); position: relative;
+  border-radius: 10px; background: var(--glass); position: relative;
 }
+.cart-payment-labeled .cpay-methods,
 .cart-payment-icons .cpay-methods {
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; margin: 0;
 }
+.cart-payment-labeled .cpay-methods button {
+  min-height: 40px; padding: 4px 2px; font-size: 10px; font-weight: 700;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; border-radius: 8px; line-height: 1.1;
+}
+.cart-payment-labeled .cpay-methods button i { font-size: 13px; }
+.cart-payment-labeled .cpay-lbl { font-size: 9.5px; font-weight: 700; color: inherit; letter-spacing: .01em; }
 .cart-payment-icons .cpay-methods button {
   min-height: 34px; padding: 0; font-size: 14px;
   display: grid; place-items: center; border-radius: 8px;
 }
 .cart-payment-icons .cpay-methods button i { font-size: 14px; }
+.cpay-methods button.active {
+  border-color: rgba(255,79,0,.5) !important;
+  background: var(--orange-tint) !important;
+  color: var(--orange) !important;
+  box-shadow: 0 0 0 1px rgba(255,79,0,.12);
+}
 .cart-tender-host,
 .cart-tender-popover {
   margin-top: 0;
@@ -852,47 +867,92 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .cpay-methods button:hover { border-color: rgba(255,79,0,0.35); color: var(--orange); background: var(--orange-tint); }
 .cpay-methods button.active { border-color: rgba(255,79,0,0.45); background: var(--orange-tint); color: var(--orange); }
 
-/* Hold + KOT icons · Pay primary CTA */
+/* Hold + KOT labeled · Print & Pay primary */
 .cart-actions,
-.cart-actions-symbols {
-  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px; margin-top: 5px; align-items: stretch;
+.cart-actions-symbols,
+.cart-actions-final {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; margin-top: 6px; align-items: stretch;
 }
 .cart-actions .hold-kot-row {
-  display: grid; grid-template-columns: 40px 40px; gap: 4px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 118px;
 }
 .cart-actions .hold-btn-legacy { display: none !important; }
-.cart-actions-symbols .hold-btn-current,
-.cart-actions-symbols #btn-kot {
-  min-height: 40px; width: 40px; height: 40px; justify-content: center; padding: 0 !important;
-  font-size: 14px; font-weight: 700; border-radius: 9px;
-  display: inline-flex !important; align-items: center; justify-content: center; gap: 2px;
+.cart-actions-final .hold-btn-current,
+.cart-actions-final #btn-kot,
+.cart-actions-final .btn-kot {
+  min-height: 42px; height: 42px; justify-content: center; padding: 0 8px !important;
+  font-size: 11px; font-weight: 800; border-radius: 10px;
+  display: inline-flex !important; align-items: center; justify-content: center; gap: 5px;
   border: 1px solid var(--stroke-2); background: var(--glass-2); color: var(--text);
+  position: relative;
 }
-.cart-actions-symbols #btn-kot { color: var(--orange); }
-.cart-actions-symbols .hold-btn-current i,
-.cart-actions-symbols #btn-kot i { font-size: 14px; line-height: 1; }
-.cart-actions-symbols .hold-count { font-size: 9px; font-weight: 800; position: absolute; top: 2px; right: 3px; }
-.cart-actions-symbols .hold-btn-current { position: relative; }
-.cart-actions .btn { padding: 7px; font-size: 12px; min-height: 40px; }
+.cart-actions-final #btn-kot,
+.cart-actions-final .btn-kot { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 28%, var(--stroke)); }
+.cart-actions-final .hold-btn-current i,
+.cart-actions-final #btn-kot i { font-size: 12px; line-height: 1; }
+.cart-actions-final .act-lbl { font-size: 11px; font-weight: 800; letter-spacing: .01em; }
+.cart-actions-final .hold-count {
+  position: absolute; top: -5px; right: -4px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 99px; background: var(--orange); color: #fff;
+  font-size: 9px; font-weight: 800; display: none;
+  align-items: center; justify-content: center;
+  border: 2px solid var(--panel-solid, var(--panel));
+  line-height: 1;
+}
+.cart-actions-final .hold-count:not(:empty) { display: inline-flex; }
+.cart-actions-final .hold-btn-current.hold-btn-blinking {
+  border-color: var(--orange); color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 8%, var(--glass-2));
+}
+.cart-actions .btn { padding: 7px; font-size: 12px; min-height: 42px; }
 .cart-actions #btn-checkout {
-  min-height: 40px; font-weight: 800; letter-spacing: 0.01em; border-radius: 10px;
+  min-height: 42px; font-weight: 800; letter-spacing: 0.01em; border-radius: 11px;
   font-size: 13.5px; width: 100%;
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  box-shadow: 0 4px 14px rgba(255, 79, 0, 0.22);
 }
 /* Tender popover must not steal foot layout when closed */
 .cart-tender-popover .cart-tender-panel[hidden] { display: none !important; pointer-events: none; }
 .cart-foot .totals-compact { position: relative; z-index: 1; }
 .cart-empty-hint { font-size: 11px; padding: 8px !important; }
 .cart-empty-hint i { margin-right: 4px; opacity: .7; }
-/* Customer chip: icon + short label */
+/* Walk-in customer: light optional chip */
 .cart-cust-toggle {
-  min-height: 32px !important; padding: 5px 8px !important; font-size: 11.5px !important;
+  min-height: 30px !important; padding: 4px 10px !important; font-size: 11.5px !important;
+  border-style: dashed !important;
+}
+.cart-cust-toggle.is-walkin {
+  border-color: var(--stroke) !important;
+  background: transparent !important;
+  color: var(--text-mute) !important;
+  font-weight: 600 !important;
+}
+.cart-cust-toggle.has-customer {
+  border-style: solid !important;
+  font-weight: 700 !important;
 }
 .cart-cust-toggle .cart-cust-label {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14ch;
 }
-.cart-cust-toggle:not(.has-customer) .cart-cust-label { opacity: .65; }
-.cart-cust-toggle:not(.has-customer) .cart-cust-chevron { opacity: .5; }
+.cart-cust-hint {
+  font-size: 9.5px; font-weight: 600; opacity: .55; margin-left: 2px;
+  text-transform: lowercase; letter-spacing: .02em;
+}
+.cart-cust-toggle:not(.has-customer) .cart-cust-chevron { opacity: .45; }
+.totals-readable .totals-meta {
+  font-size: 11px; gap: 6px 12px;
+}
+.totals-readable .totals-meta b { font-variant-numeric: tabular-nums; }
+.totals-readable .totals-grand .amt {
+  font-size: 22px !important; letter-spacing: -.02em;
+}
+.cart-line {
+  border-radius: 10px;
+}
+.cart-line .qty button {
+  border-radius: 8px;
+}
 
 /* Customer chip — dense, sits beside shift */
 .cart-cust-toggle {

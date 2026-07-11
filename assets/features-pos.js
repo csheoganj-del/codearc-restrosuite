@@ -1040,7 +1040,8 @@
     };
 
     /* ---------------- inline cart payment ---------------- */
-    const paymentState = { method: 'Cash' };
+    // Default UPI (India counter) — cash pad only when Cash is chosen (calmer cart)
+    const paymentState = { method: 'UPI' };
     let kotSentKey = '';
     let isSplitPaymentActive = false;
     const orderType = () => (document.querySelector('.order-type-btn.active')?.textContent || 'Takeaway').trim();
@@ -1083,7 +1084,7 @@
       return { method, received: totals.grand, change: 0, valid: totals.count > 0 };
     }
     function resetPayment(){
-      paymentState.method = 'Cash';
+      paymentState.method = 'UPI';
       kotSentKey = '';
       const splitCash = document.getElementById('split-cash');
       const splitUpi = document.getElementById('split-upi');
@@ -2536,11 +2537,15 @@
       const totalHeld = Object.values(heldOrders).reduce((a, arr) => a + arr.length, 0);
       const curKey = typeof getCurrentOrderTypeKey === 'function' ? getCurrentOrderTypeKey() : 'takeaway';
       const curCount = (heldOrders[curKey] || []).length;
+      // Compact badge number only (label is "Hold" on the button)
       const badgeText = totalHeld
-        ? (curCount && curCount !== totalHeld ? `(${curCount}/${totalHeld})` : `(${totalHeld})`)
+        ? (curCount && curCount !== totalHeld ? String(curCount) : String(totalHeld))
         : '';
       const countCur = document.getElementById('held-count-current');
-      if (countCur) countCur.textContent = badgeText;
+      if (countCur) {
+        countCur.textContent = badgeText;
+        countCur.hidden = !badgeText;
+      }
       const countCurM = document.getElementById('held-count-current-m');
       if (countCurM) countCurM.textContent = totalHeld ? `(${totalHeld})` : '';
       const btnCur = document.getElementById('btn-hold-current');

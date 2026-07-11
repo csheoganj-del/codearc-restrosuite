@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v96 (2026-07-11) — Cart 10/10 polish
+
+- **Pay methods**: icon + short labels (Cash / UPI / Card / Due / Split)
+- **Default tender: UPI** — cash pad only when Cash is chosen
+- **Hold · KOT** with readable labels + orange count badge on Hold
+- **Totals**: plain Sub / Tax (not cryptic symbols)
+- **Walk-in** chip lighter with “optional” hint
+- **Print & Pay** primary CTA for settle clarity
+
 ## v94 (2026-07-11) — Shift off cart (Petpooja-style order panel)
 
 - **Shift / cash drawer / Z / lock** moved to the **top bar** (register-level, next to station)

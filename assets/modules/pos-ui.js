@@ -71,13 +71,16 @@
     const hasCust = !!(name || phone);
     const open = btn.getAttribute('aria-expanded') === 'true';
     btn.classList.toggle('has-customer', hasCust);
+    btn.classList.toggle('is-walkin', !hasCust);
     btn.classList.toggle('is-open', open);
+    const hint = btn.querySelector('.cart-cust-hint');
+    if (hint) hint.style.display = hasCust ? 'none' : '';
     if (label) {
       if (hasCust) {
         const phoneBit = phone ? maskPhoneForChip(phone) : '';
         label.textContent = (name || 'Guest') + (phoneBit ? ' · ' + phoneBit : '');
       } else {
-        label.textContent = open ? '…' : 'Guest';
+        label.textContent = open ? 'Add details' : 'Walk-in';
       }
     }
     if (clearBtn) {
@@ -523,35 +526,36 @@ function renderCart(){
   const taxLabel = totals.taxProfile.tax_system || 'GST';
   const settings = window.RS_SETTINGS || {};
   
-  // Symbol labels (hover for full name) — keeps foot short for cart lines
-  let metaHTML = `<span title="Subtotal"><span class="tot-sym">Σ</span> <b id="t-sub">${rs(totals.sub)}</b></span>`;
+  // Plain labels — Sub / Tax / Total always scannable (10/10 readability)
+  let metaHTML = `<span title="Subtotal">Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
   if (totals.disc > 0) {
-    metaHTML += `<span style="color:var(--orange)" title="Discount"><i class="fa-solid fa-percent"></i> <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
+    metaHTML += `<span style="color:var(--orange)" title="Discount">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
   }
   if (totals.promo > 0) {
-    metaHTML += `<span style="color:var(--orange)" title="Promo${totals.promoCode ? ' ' + _e(totals.promoCode) : ''}"><i class="fa-solid fa-tags"></i> <b id="t-promo">- ${rs(totals.promo)}</b></span>`;
+    metaHTML += `<span style="color:var(--orange)" title="Promo${totals.promoCode ? ' ' + _e(totals.promoCode) : ''}">Promo <b id="t-promo">- ${rs(totals.promo)}</b></span>`;
   }
   if (totals.serviceCharge > 0) {
-    metaHTML += `<span title="Service charge ${totals.serviceChargePct || 5}%"><i class="fa-solid fa-concierge-bell"></i> <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
+    metaHTML += `<span title="Service charge">SC <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
   }
   if (totals.tip > 0) {
-    metaHTML += `<span style="color:var(--green)" title="Tip"><i class="fa-solid fa-heart"></i> <b id="t-tip">${rs(totals.tip)}</b></span>`;
+    metaHTML += `<span style="color:var(--green)" title="Tip">Tip <b id="t-tip">${rs(totals.tip)}</b></span>`;
   }
   if (totals.deliveryCharge > 0) {
-    metaHTML += `<span title="Delivery"><i class="fa-solid fa-motorcycle"></i> <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
+    metaHTML += `<span title="Delivery">Del <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
   }
   if (totals.loyaltyRedeem > 0) {
-    metaHTML += `<span style="color:var(--violet-soft)" title="Loyalty"><i class="fa-solid fa-star"></i> <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
+    metaHTML += `<span style="color:var(--violet-soft)" title="Loyalty">Pts <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
   }
   
   if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
     metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
   } else {
-    metaHTML += `<span title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}"><i class="fa-solid fa-receipt"></i> <b id="t-gst">${rs(totals.gst)}</b></span>`;
+    const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
+    metaHTML += `<span title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
   }
   
   if (totals.liquorTax > 0) {
-    metaHTML += `<span title="Liquor tax"><i class="fa-solid fa-wine-glass"></i> <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
+    metaHTML += `<span title="Liquor tax">Liquor <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
   }
   
   const metaDiv = document.querySelector('.totals-meta');

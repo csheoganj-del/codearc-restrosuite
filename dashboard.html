@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v95-20260711-phone-fit';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v96-20260711-ten';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -551,9 +551,10 @@
                 </div>
                 <div class="custom-customer-widget" id="custom-customer-widget">
                   <div class="cart-cust-row">
-                    <button type="button" class="cart-cust-toggle" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs" title="Customer">
+                    <button type="button" class="cart-cust-toggle is-walkin" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs" title="Add customer (optional)">
                       <i class="fa-solid fa-user"></i>
-                      <span id="cart-cust-toggle-label" class="cart-cust-label">Guest</span>
+                      <span id="cart-cust-toggle-label" class="cart-cust-label">Walk-in</span>
+                      <span class="cart-cust-hint">optional</span>
                       <i class="fa-solid fa-chevron-down cart-cust-chevron"></i>
                     </button>
                   </div>
@@ -600,22 +601,22 @@
             </div>
             <div class="cart-items" id="cart-items"></div>
               <div class="cart-foot">
-              <!-- Money strip: symbols + total (always readable) -->
-              <div class="totals-compact totals-symbols">
+              <!-- Plain Sub / Tax / Total — readable at a glance -->
+              <div class="totals-compact totals-readable">
                 <div class="totals-meta">
-                  <span title="Subtotal"><span class="tot-sym" aria-hidden="true">Σ</span> <b id="t-sub">₹0</b></span>
-                  <span id="t-disc-wrap" style="color:var(--orange)" title="Discount"><i class="fa-solid fa-percent" aria-hidden="true"></i> <b id="t-disc">₹0</b></span>
-                  <span title="Tax"><i class="fa-solid fa-receipt" aria-hidden="true"></i> <b id="t-gst">₹0</b></span>
+                  <span title="Subtotal">Sub <b id="t-sub">₹0</b></span>
+                  <span id="t-disc-wrap" style="color:var(--orange);display:none" title="Discount">Disc <b id="t-disc">₹0</b></span>
+                  <span title="Tax">Tax <b id="t-gst">₹0</b></span>
                 </div>
                 <div class="totals-grand">
-                  <span class="totals-grand-lbl" title="Grand total">Total</span>
+                  <span class="totals-grand-lbl">Total</span>
                   <span class="amt" id="t-grand">₹0</span>
                 </div>
               </div>
               <details class="cart-more-opts" id="cart-more-opts">
                 <summary title="Discount, tip, promo">
                   <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                  <span class="cart-more-summary-txt">Adjust</span>
+                  <span class="cart-more-summary-txt">Discount · Tip · Promo</span>
                 </summary>
                 <div class="cart-tip-row" id="cart-tip-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 8px">
                   <input type="number" id="disc-input" min="0" max="100" step="1" placeholder="Disc %" title="Discount percent" class="form-input" style="width:68px;height:36px;font-size:12px;padding:4px 6px">
@@ -632,28 +633,28 @@
                 </div>
               </details>
               <div class="cart-pay-zone" id="cart-pay-zone">
-                <!-- Pay methods: icons only (title tooltips). Tender popover anchors here. -->
-                <div class="cart-payment cart-payment-icons" id="cart-payment">
+                <!-- Pay: icon + short label (discoverable, still compact) -->
+                <div class="cart-payment cart-payment-labeled" id="cart-payment">
                   <div class="cpay-methods" id="cart-pay-methods">
-                    <button type="button" class="active" data-pay-method="Cash" title="Cash" aria-label="Cash">
+                    <button type="button" data-pay-method="Cash" title="Cash" aria-label="Cash">
                       <i class="fa-solid fa-money-bill-wave" style="color:#25d366"></i>
-                      <span class="sr-only">Cash</span>
+                      <span class="cpay-lbl">Cash</span>
                     </button>
-                    <button type="button" data-pay-method="UPI" title="UPI" aria-label="UPI">
+                    <button type="button" class="active" data-pay-method="UPI" title="UPI" aria-label="UPI">
                       <i class="fa-solid fa-qrcode" style="color:var(--orange)"></i>
-                      <span class="sr-only">UPI</span>
+                      <span class="cpay-lbl">UPI</span>
                     </button>
                     <button type="button" data-pay-method="Card" title="Card" aria-label="Card">
                       <i class="fa-solid fa-credit-card" style="color:#1e90ff"></i>
-                      <span class="sr-only">Card</span>
+                      <span class="cpay-lbl">Card</span>
                     </button>
                     <button type="button" data-pay-method="Due" title="Due / credit" aria-label="Due">
                       <i class="fa-solid fa-clock-rotate-left" style="color:var(--red)"></i>
-                      <span class="sr-only">Due</span>
+                      <span class="cpay-lbl">Due</span>
                     </button>
                     <button type="button" data-pay-method="Split" title="Split payment" aria-label="Split">
                       <i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0"></i>
-                      <span class="sr-only">Split</span>
+                      <span class="cpay-lbl">Split</span>
                     </button>
                   </div>
                   <!-- Cash/Split: popover above pay icons so cart list keeps height -->
@@ -716,17 +717,22 @@
                   </div>
                 </div>
 
-                <div class="cart-actions cart-actions-symbols">
+                <div class="cart-actions cart-actions-final">
                   <div class="hold-kot-row">
-                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order (right-click: held list)" aria-label="Hold order">
-                      <i class="fa-solid fa-pause"></i><span id="held-count-current" class="hold-count"></span>
+                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order · right-click for held list" aria-label="Hold order">
+                      <i class="fa-solid fa-pause"></i>
+                      <span class="act-lbl">Hold</span>
+                      <span id="held-count-current" class="hold-count"></span>
                     </button>
-                    <button type="button" class="btn btn-ghost" id="btn-kot" title="Send KOT to kitchen" aria-label="Send KOT"><i class="fa-solid fa-fire"></i></button>
+                    <button type="button" class="btn btn-ghost btn-kot" id="btn-kot" title="Send KOT to kitchen" aria-label="Send KOT">
+                      <i class="fa-solid fa-fire"></i>
+                      <span class="act-lbl">KOT</span>
+                    </button>
                     <button type="button" class="hold-btn hold-btn-takeaway hold-btn-legacy" id="btn-hold-takeaway" hidden aria-hidden="true" tabindex="-1"><span id="held-count-takeaway"></span></button>
                     <button type="button" class="hold-btn hold-btn-dinein hold-btn-legacy" id="btn-hold-dinein" hidden aria-hidden="true" tabindex="-1"><span id="held-count-dinein"></span></button>
                     <button type="button" class="hold-btn hold-btn-delivery hold-btn-legacy" id="btn-hold-delivery" hidden aria-hidden="true" tabindex="-1"><span id="held-count-delivery"></span></button>
                   </div>
-                  <button type="button" class="btn btn-primary" id="btn-checkout" title="Print bill and take payment"><i class="fa-solid fa-print"></i> Pay</button>
+                  <button type="button" class="btn btn-primary" id="btn-checkout" title="Print bill and take payment"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
                 </div>
               </div>
               <p class="cart-empty-hint" id="cart-empty-hint"><i class="fa-solid fa-arrow-left"></i> Tap menu items</p>
