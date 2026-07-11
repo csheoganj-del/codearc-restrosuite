@@ -148,6 +148,14 @@ test('partial receive and cancel purchase order', () => {
   assert.match(manage, /receivedLines|data-po-cancel|poListFilter/);
 });
 
+test('waste log deducts inventory stock', () => {
+  const manage = fs.readFileSync(path.join(root, 'assets/features-manage.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(manage, /logWasteEntry|waste_log/);
+  assert.match(manage, /exportWasteCsv|item\.stock/);
+  assert.match(html, /data-inv-tab="waste"|Waste log/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);
