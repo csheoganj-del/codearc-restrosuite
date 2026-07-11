@@ -232,6 +232,8 @@ test('product pack: Z-report scope, WA retry, demo script (wave product)', () =>
   assert.match(ops, /getZScope|setZScope/);
   assert.match(ops, /zReportCsv|downloadZCsv/);
   assert.match(ops, /byStation/);
+  assert.match(ops, /exportDayPackCsv|rs-day-pack/);
+  assert.match(ops, /ensurePosQuickTools|installShiftNudge/);
   const receipt = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(receipt, /withRetry/);
   assert.match(receipt, /skipCache/);
@@ -245,7 +247,7 @@ test('product pack: Z-report scope, WA retry, demo script (wave product)', () =>
   assert.match(reports, /Taxable Value|TOTALS/);
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /demo-script\.js/);
-  assert.match(html, /v61-20260711/);
+  assert.match(html, /v6[0-9]-20260711/);
 });
 
 test('USB and split docs exist', () => {

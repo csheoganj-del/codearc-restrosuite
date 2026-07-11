@@ -1,6 +1,6 @@
 # RestroSuite — 15-minute demo script
 
-Use outlet **`bbb`** (or a seeded demo tenant). Hard-refresh after deploys (`v60+`).
+Use outlet **`bbb`** (or a seeded demo tenant). Hard-refresh after deploys (`v62+`).
 
 ## Goal
 
@@ -23,8 +23,9 @@ Show: **login → sell → print/WhatsApp → bills → shift Z-report → inven
 1. Note **station chip** (top/ops bar) — rename if useful (“Counter 1”)
 2. **Open shift** with float (e.g. ₹2000)
 3. Toggle **This station / All stations** for Z-report scope
+4. Point out **owner strip** (today sales, shift total) + **Day pack / Keys / Demo** buttons
 
-**Talk track:** “Each counter has an identity; Z-report can reconcile this station or the whole floor.”
+**Talk track:** “Each counter has an identity; Z-report can reconcile this station or the whole floor. Day pack is today’s sales CSV in one click.”
 
 ---
 
@@ -79,7 +80,7 @@ Show: **login → sell → print/WhatsApp → bills → shift Z-report → inven
 
 ### 14:00 — Help & next steps (1 min)
 
-1. Sidebar **Help & Setup** (product guide / onboarding tour)  
+1. Click **Demo** on POS (or right-click **Help & Setup**) for the checklist  
 2. Super-admin (if logging in as SA): tenants, gateway monitor  
 
 ---
