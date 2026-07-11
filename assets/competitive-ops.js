@@ -728,6 +728,7 @@
     let tipsTotal = 0;
     let serviceChargeTotal = 0;
     let deliveryTotal = 0;
+    let coversTotal = 0;
     let refundTotal = 0;
     paid.forEach((b) => {
       const amt = Number(b.amount != null ? b.amount : b.total) || 0;
@@ -736,6 +737,7 @@
       tipsTotal += Number(b.tipAmount || b.tip || 0) || 0;
       serviceChargeTotal += Number(b.serviceChargeAmount || 0) || 0;
       deliveryTotal += Number(b.deliveryCharge || b.delivery_charge || 0) || 0;
+      coversTotal += Math.max(0, Number(b.covers != null ? b.covers : b.pax) || 0);
       const method = b.pay || b.paymentMethod || 'Cash';
       byPay[method] = (byPay[method] || 0) + amt;
       const st = b.stationLabel || b.stationId || shift.stationLabel || 'This station';
@@ -759,6 +761,8 @@
       tipsTotal,
       serviceChargeTotal,
       deliveryTotal,
+      coversTotal,
+      avgPerCover: coversTotal > 0 ? Math.round((gross / coversTotal) * 100) / 100 : null,
       byPay,
       byStation,
       cashSales,
@@ -800,6 +804,12 @@
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Tips</span><span>${rs(summary.tipsTotal || 0)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Service charge</span><span>${rs(summary.serviceChargeTotal || 0)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Delivery fees</span><span>${rs(summary.deliveryTotal || 0)}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Covers (pax)</span><span>${summary.coversTotal || 0}</span></div>
+      ${
+        summary.avgPerCover != null
+          ? `<div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Avg / cover</span><span>${rs(summary.avgPerCover)}</span></div>`
+          : ''
+      }
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:6px 0"><span>Gross</span><span>${rs(summary.gross)}</span></div>
       <hr style="border:0;border-top:1px dashed #ccc;margin:10px 0">
       <div style="font-size:11px;font-weight:700;margin-bottom:4px">Payment mix</div>
@@ -846,6 +856,8 @@
       ['Tips', summary.tipsTotal || 0],
       ['Service charge', summary.serviceChargeTotal || 0],
       ['Delivery fees', summary.deliveryTotal || 0],
+      ['Covers (pax)', summary.coversTotal || 0],
+      ['Avg per cover', summary.avgPerCover != null ? summary.avgPerCover : ''],
       ['Opening float', summary.openingFloat],
       ['Cash sales', summary.cashSales],
       ['Pay-ins', summary.payInTotal || 0],
@@ -1502,9 +1514,10 @@
       const n = i.note || i.notes || '';
       return `<div class="kot-item"><span class="kq">${esc(i.qty)}×</span><span>${esc(i.name)}${n ? `<div style="font-size:11px;font-weight:600;color:#b45309;margin-top:2px">※ ${esc(n)}</div>` : ''}</span></div>`;
     }).join('');
+    const coversN = Math.max(0, Number(m.covers != null ? m.covers : m.pax) || 0);
     const html = `<div style="max-width:280px;margin:0 auto">
       <div class="kot-h"><span class="kt">KOT</span><span>${esc(m.token || m.no || '')}</span></div>
-      <div style="font-size:12px;margin-bottom:8px">${esc(m.table || '')} · ${esc(m.orderType || '')} · ${esc(getStationLabel())}</div>
+      <div style="font-size:12px;margin-bottom:8px">${esc(m.table || '')} · ${esc(m.orderType || '')}${coversN ? ' · ' + coversN + ' pax' : ''} · ${esc(getStationLabel())}</div>
       ${lines}
       <div style="margin-top:12px;font-size:11px;color:#666">${new Date().toLocaleString()}</div>
     </div>`;

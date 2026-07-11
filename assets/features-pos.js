@@ -449,6 +449,8 @@
           { left: bill.no, right: bill.time },
           { left: 'Table:', right: bill.table }
         ];
+        const billCovers = Math.max(0, Number(bill.covers != null ? bill.covers : bill.pax) || 0);
+        if (billCovers) metaRows.push({ left: 'Covers:', right: String(billCovers) });
         const custName = bill.customer || 'Walk-in';
         if (custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
           metaRows.push({ left: 'Customer:', right: custName });
@@ -1805,6 +1807,7 @@
           name: cust.name || '',
           phone: cust.phone || '',
           gst: cust.gst || '',
+          covers: Math.max(0, Number(cust.covers != null ? cust.covers : cust.pax) || Number(totals.covers) || 0),
         };
 
         // Wave 2/3: server sequence + channel series (DI/TK/DL)
@@ -1824,6 +1827,8 @@
           customer: custSnap.name,
           customerPhone: custSnap.phone,
           customerGst: custSnap.gst,
+          covers: custSnap.covers || 0,
+          pax: custSnap.covers || 0,
           items: itemsSnap,
           sub: totals.sub,
           disc: totals.disc,
@@ -1868,6 +1873,8 @@
           orderType: (document.querySelector('.order-type-btn.active')?.textContent || '').trim() || bill.table || 'Dine-in',
           receivedAmount: receivedVal, changeAmount: changeVal, change: changeVal,
           customerName: custSnap.name || 'Walk-in Guest', customerPhone: custSnap.phone || '',
+          covers: custSnap.covers || 0,
+          pax: custSnap.covers || 0,
           subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst || 0) - gstHalf,
           _items: itemsSnap.map(i => ({
             name: i.name, qty: i.qty, price: i.price,
@@ -2276,6 +2283,7 @@
           token: tok,
           table: cust.table,
           orderType: orderType(),
+          covers: cust.covers || totals.covers || 0,
         });
       } else if (typeof RSPrint === 'function') {
         RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
@@ -2284,6 +2292,7 @@
 
     async function sendKotToKitchen(totals, cust, tok, opts) {
       const options = opts || {};
+      const covers = Math.max(0, Number(cust.covers != null ? cust.covers : totals.covers) || 0);
       if (window.RS_DB) {
         try {
           const tempId = 'kot-' + Date.now();
@@ -2291,6 +2300,8 @@
             orderId: tok,
             customerName: cust.name || 'Walk-in Guest',
             customerPhone: cust.phone || '',
+            covers,
+            pax: covers,
             items: totals.items.map((i) => ({
               name: i.name,
               qty: i.qty,
@@ -2333,8 +2344,9 @@
       const tok = RS.seedToken();
       const station =
         window.RSOps && RSOps.getStationLabel ? RSOps.getStationLabel() : '';
+      const coversN = Math.max(0, Number(cust.covers != null ? cust.covers : totals.covers) || 0);
       const kotInner = `<div class="kot-h"><span class="kt">${esc(tok)}</span><span style="font-weight:700">${esc(cust.table)}</span></div>
-        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale ? RS_getOutletLocale() : 'en-IN', { hour: 'numeric', minute: '2-digit', timeZone: window.RS_getOutletTimezone ? RS_getOutletTimezone() : 'Asia/Kolkata' })} · ${totals.count} items${station ? ' · ' + esc(station) : ''}</div>
+        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale ? RS_getOutletLocale() : 'en-IN', { hour: 'numeric', minute: '2-digit', timeZone: window.RS_getOutletTimezone ? RS_getOutletTimezone() : 'Asia/Kolkata' })} · ${totals.count} items${coversN ? ' · ' + coversN + ' pax' : ''}${station ? ' · ' + esc(station) : ''}</div>
         ${totals.items.map((i) => {
           const n = i.note || i.notes || '';
           return `<div class="kot-item"><span class="kq">${i.qty}×</span><span>${esc(i.name)}${n ? `<div style="font-size:11px;font-weight:600;color:#b45309;margin-top:2px">※ ${esc(n)}</div>` : ''}</span></div>`;
