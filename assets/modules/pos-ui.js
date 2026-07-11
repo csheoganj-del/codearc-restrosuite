@@ -182,6 +182,9 @@ function renderCart(){
   if (totals.tip > 0) {
     metaHTML += `<span style="color:var(--green)">Tip <b id="t-tip">${rs(totals.tip)}</b></span>`;
   }
+  if (totals.deliveryCharge > 0) {
+    metaHTML += `<span>Delivery <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
+  }
   
   // Ireland handles composition differently (not applicable)
   if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
@@ -277,6 +280,15 @@ function getTotals(){
   const rawSubtotal = cart.reduce((a,c)=>a+c.price*c.qty,0);
   const discAmount = Math.round(rawSubtotal * discountPct / 100);
   const netAfterDiscount = rawSubtotal - discAmount;
+
+  // Delivery fee from cart field (shown for Delivery order type)
+  let deliveryCharge = 0;
+  try {
+    const dcEl = document.getElementById('delivery-charge');
+    if (dcEl && (channel === 'delivery' || (Number(dcEl.value) || 0) > 0)) {
+      deliveryCharge = Math.max(0, Number(dcEl.value) || 0);
+    }
+  } catch (_) {}
   
   let serviceChargeAmount = 0;
   if (serviceChargeEnabled && serviceChargePct > 0) {
@@ -401,7 +413,7 @@ function getTotals(){
     sgst = Number((totalGst - cgst).toFixed(2));
   }
   
-  let grand = netAfterDiscount + serviceChargeAmount + tip;
+  let grand = netAfterDiscount + serviceChargeAmount + tip + deliveryCharge;
   if (!inclusivePricing) {
     grand += totalGst + totalLiquorTax;
   }
@@ -423,6 +435,7 @@ function getTotals(){
     serviceCharge: serviceChargeAmount,
     serviceChargePct,
     tip,
+    deliveryCharge,
     grand,
     count: cart.reduce((a,c)=>a+c.qty,0),
     discountPct,
@@ -701,6 +714,17 @@ function initPOS(){
     });
   }
   wireTipControls();
+
+  // Delivery charge recalculates cart total live
+  const delChargeEl = document.getElementById('delivery-charge');
+  if (delChargeEl && !delChargeEl.dataset.boundTotals) {
+    delChargeEl.dataset.boundTotals = '1';
+    delChargeEl.addEventListener('input', () => {
+      try {
+        renderCart();
+      } catch (_) {}
+    });
+  }
 
   $('#disc-input')?.addEventListener('input', e=>{
     const val = Math.min(100,Math.max(0,+e.target.value||0));

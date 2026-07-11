@@ -546,6 +546,7 @@
           totalsRows.push({ left: 'Service Charge (' + scPct + '%)', right: rs(bill.serviceChargeAmount) });
         }
         if (bill.tipAmount) totalsRows.push({ left: 'Tip', right: rs(bill.tipAmount) });
+        if (bill.deliveryCharge) totalsRows.push({ left: 'Delivery', right: rs(bill.deliveryCharge) });
         if (bill.liquorTaxAmount) totalsRows.push({ left: 'Liquor VAT', right: rs(bill.liquorTaxAmount) });
 
         totalsRows.forEach(row => {
@@ -1802,6 +1803,7 @@
           serviceChargeAmount: totals.serviceCharge,
           serviceChargePct: totals.serviceChargePct,
           tipAmount: totals.tip || 0,
+          deliveryCharge: totals.deliveryCharge || 0,
           idempotencyKey: identity.idempotencyKey,
           syncStatus: 'saving',
         };
@@ -1835,6 +1837,7 @@
           serviceChargeAmount: totals.serviceCharge,
           serviceChargePct: totals.serviceChargePct,
           tipAmount: totals.tip || 0,
+          deliveryCharge: totals.deliveryCharge || 0,
         };
         if (window.RSOps && RSOps.decorateBillMeta) RSOps.decorateBillMeta(billRow, bill);
 
