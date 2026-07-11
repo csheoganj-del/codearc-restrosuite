@@ -28,6 +28,7 @@ async function main() {
     'assets/escpos-encoder.js',
     'assets/modules/bill-identity.js',
     'assets/modules/inventory-ledger.js',
+    'assets/modules/bills-history.js',
     'assets/print-bridge.js',
     'assets/receipt.js',
     'assets/competitive-ops.js',

@@ -33,15 +33,19 @@ test('receipt engine supports thermal preference', () => {
 });
 
 test('allocateBillNo supports channel series', () => {
-  const src = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
-  assert.match(src, /chCode|RS-DI|allocateBillNo\(existingBills/);
-  assert.match(src, /refundedBy|bill\.refund/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  const identity = fs.readFileSync(path.join(root, 'assets/modules/bill-identity.js'), 'utf8');
+  const billsUi = fs.readFileSync(path.join(root, 'assets/modules/bills-history.js'), 'utf8');
+  assert.match(dash + identity, /chCode|RS-DI|allocateBillNo\(existingBills/);
+  // Wave 6: refund audit metadata lives in bills-history module
+  assert.match(billsUi, /refundedBy|bill\.refund|bill\.refunded/);
 });
 
 test('service worker caches competitive-ops', () => {
   const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
   assert.match(sw, /competitive-ops\.js/);
-  assert.match(sw, /wave[3-5]|remaining/i);
+  assert.match(sw, /bills-history\.js/);
+  assert.match(sw, /restrosuite-shell-v\d{8}/i);
 });
 
 test('features-shell has WhatsApp PDF mode setting', () => {
