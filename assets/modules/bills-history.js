@@ -1,0 +1,507 @@
+/* ============================================================
+   RestroSuite — Bills history UI (Wave 6 code-split)
+   Extracted from dashboard.js — operates on window.RS.BILLS.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  const payPill = {
+    UPI: 'pill-violet',
+    Cash: 'pill-green',
+    Card: 'pill-orange',
+    Split: 'pill-amber',
+    Due: 'pill-red',
+  };
+
+  function toast(msg, icon) {
+    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+  }
+
+  function rs(n) {
+    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    const v = Number(n) || 0;
+    return '₹' + v.toLocaleString('en-IN');
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  const _e = esc;
+
+  function $(sel) {
+    return document.querySelector(sel);
+  }
+
+  function getBills() {
+    return (global.RS && Array.isArray(RS.BILLS) ? RS.BILLS : []) || [];
+  }
+
+  function getMenu() {
+    return (global.RS && RS.MENU) || [];
+  }
+
+  function getInventory() {
+    return (global.RS && RS.INVENTORY) || [];
+  }
+
+  function receiptPayloadFromBill(b) {
+    const items =
+      Array.isArray(b._items) && b._items.length
+        ? b._items.map((i) => ({
+            name: i.name || 'Item',
+            qty: Number(i.qty || 1),
+            price: Number(i.price || 0),
+          }))
+        : [{ name: 'Bill total', qty: 1, price: Number(b.amount || 0) }];
+    const sub = Number(b.subtotal || items.reduce((sum, i) => sum + i.price * i.qty, 0));
+    const gst = Number(b.gst || 0);
+    const grand = Number(b.amount || sub + gst);
+    return {
+      no: b.no || b.id || 'Invoice',
+      time: b.time || '',
+      table: b.table || 'Walk-in / Takeaway',
+      customer: b.customerName || '',
+      customerPhone: b.customerPhone || '',
+      customerGst: b.customerGst || '',
+      items,
+      sub,
+      disc: Number(b.discount || 0),
+      gst,
+      grand,
+      tenders:
+        Array.isArray(b.tenders) && b.tenders.length
+          ? b.tenders
+          : [{ method: b.pay || b.paymentMethod || 'Cash', amount: grand }],
+      change: Number(b.changeAmount || b.change || 0),
+    };
+  }
+
+  function showBillReceipt(b) {
+    if (global.RSReceipt && typeof RSReceipt.show === 'function') {
+      RSReceipt.show(receiptPayloadFromBill(b));
+      return;
+    }
+    toast('Receipt preview is unavailable on this screen', 'fa-circle-exclamation');
+  }
+
+  function shareBillReceipt(b) {
+    const bill = receiptPayloadFromBill(b);
+    if (global.RSReceipt && typeof RSReceipt.share === 'function') {
+      RSReceipt.share(bill);
+    } else {
+      const text =
+        global.RSReceipt && typeof RSReceipt.text === 'function'
+          ? RSReceipt.text(bill)
+          : `${bill.no}\nTotal: ${rs(bill.grand)}`;
+
+      let phone = bill.customerPhone ? bill.customerPhone.replace(/\D/g, '') : '';
+      if (phone.length === 10) {
+        phone = '91' + phone;
+      }
+
+      const url = phone
+        ? `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`
+        : `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast('WhatsApp receipt ready', 'fa-whatsapp');
+    }
+  }
+
+  /** Refund detail modal — returns reason string, or null if cancelled */
+  function showRefundModal(b) {
+    return new Promise((resolve) => {
+      document.getElementById('rs-refund-overlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rs-refund-overlay';
+      overlay.style.cssText =
+        'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
+      const amt = rs(b.amount || 0);
+      overlay.innerHTML = `
+        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+            <div style="width:42px;height:42px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;color:#ef4444;flex-shrink:0;"><i class="fa-solid fa-rotate-left"></i></div>
+            <div>
+              <div style="font-weight:800;font-size:15px;color:var(--text,#111);">Process Refund</div>
+              <div style="font-size:12px;color:var(--text-soft,#6b7280);">${_e(b.no || b.id)} &middot; ${amt}</div>
+            </div>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-soft,#6b7280);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Reason for refund</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;" id="rfund-reason-chips">
+            ${['Customer complaint', 'Wrong order', 'Quality issue', 'Duplicate charge', 'Changed mind', 'Other']
+              .map(
+                (r) =>
+                  `<button data-r="${_e(r)}" style="padding:8px 10px;border-radius:10px;border:1.5px solid var(--stroke-2,#e5e7eb);background:var(--glass,#f9fafb);font-size:12px;cursor:pointer;font-family:inherit;color:var(--text,#111);text-align:left;transition:all .15s;" class="rfund-chip">${_e(r)}</button>`
+              )
+              .join('')}
+          </div>
+          <textarea id="rfund-note" placeholder="Additional notes (optional)..." rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:13px;resize:none;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;"></textarea>
+          <div style="display:flex;gap:10px;margin-top:16px;">
+            <button id="rfund-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
+            <button id="rfund-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Confirm Refund</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      let selectedReason = '';
+      overlay.querySelectorAll('.rfund-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          overlay.querySelectorAll('.rfund-chip').forEach((c) => {
+            c.style.cssText +=
+              ';background:var(--glass,#f9fafb);border-color:var(--stroke-2,#e5e7eb);color:var(--text,#111);font-weight:normal;';
+          });
+          chip.style.background = '#ef4444';
+          chip.style.borderColor = '#ef4444';
+          chip.style.color = '#fff';
+          chip.style.fontWeight = '700';
+          selectedReason = chip.dataset.r;
+        });
+      });
+      document.getElementById('rfund-confirm').onclick = () => {
+        const note = document.getElementById('rfund-note').value.trim();
+        const reason = [selectedReason, note].filter(Boolean).join(' -- ') || 'POS refund';
+        overlay.remove();
+        resolve(reason);
+      };
+      document.getElementById('rfund-cancel').onclick = () => {
+        overlay.remove();
+        resolve(null);
+      };
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.remove();
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  function showDeleteConfirm(b) {
+    return new Promise((resolve) => {
+      document.getElementById('rs-del-overlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'rs-del-overlay';
+      overlay.style.cssText =
+        'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
+      overlay.innerHTML = `
+        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);text-align:center;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:#ef4444;margin:0 auto 16px;"><i class="fa-solid fa-trash-can"></i></div>
+          <div style="font-weight:800;font-size:16px;color:var(--text,#111);margin-bottom:8px;">Delete Bill?</div>
+          <div style="font-size:13px;color:var(--text-soft,#6b7280);line-height:1.6;margin-bottom:22px;"><strong>${_e(b.no || b.id || 'This bill')}</strong> will be permanently removed from records.<br>This action <strong>cannot be undone</strong>.</div>
+          <div style="display:flex;gap:10px;">
+            <button id="rs-del-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
+            <button id="rs-del-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Yes, Delete</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById('rs-del-confirm').onclick = () => {
+        overlay.remove();
+        resolve(true);
+      };
+      document.getElementById('rs-del-cancel').onclick = () => {
+        overlay.remove();
+        resolve(false);
+      };
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.remove();
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  async function markBillRefunded(b) {
+    if (!b || b.status === 'refunded') return;
+
+    if (global.RSPinModal) {
+      const ok = await RSPinModal.request(`Refund ${b.no || b.id || 'bill'}`);
+      if (!ok) return;
+    }
+
+    const reason = await showRefundModal(b);
+    if (reason === null) return;
+
+    b.status = 'refunded';
+    b.refundReason = reason || 'POS refund';
+    b.refundedAt = new Date().toISOString();
+    try {
+      const s = global.RS_API && RS_API.session ? RS_API.session() : {};
+      b.refundedBy = s.display_name || s.username || 'staff';
+      b.refundStation =
+        global.RSOps && RSOps.getStationLabel ? RSOps.getStationLabel() : '';
+      b.refundShiftId =
+        global.RSOps && RSOps.getOpenShift && RSOps.getOpenShift()
+          ? RSOps.getOpenShift().shiftId
+          : b.shiftId || '';
+    } catch (_) {}
+
+    const BILLS = getBills();
+    let cloudMarked = false;
+    try {
+      if (global.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      if (global.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
+        await RS_API.data({
+          table: 'doppio_refund_requests',
+          operation: 'insert',
+          data: {
+            order_id: String(b.no || b.orderId || b.id),
+            amount: Number(b.amount || b.total || 0),
+            reason: b.refundReason,
+            status: 'approved',
+            metadata: {
+              refunded_by: b.refundedBy || '',
+              station: b.refundStation || '',
+              shift_id: b.refundShiftId || '',
+              bill_id: b.id,
+            },
+          },
+          returning: false,
+        }).catch(() => {});
+        try {
+          await RS_API.data({
+            table: 'tenant_audit_logs',
+            operation: 'insert',
+            data: {
+              action: 'bill.refund',
+              target_type: 'doppio_bills',
+              metadata: {
+                order_id: b.no || b.orderId,
+                amount: Number(b.amount || b.total || 0),
+                reason: b.refundReason,
+                station: b.refundStation,
+              },
+            },
+            returning: false,
+          });
+        } catch (_) {}
+        const billFilters = Number.isFinite(Number(b.id))
+          ? [{ operator: 'eq', column: 'id', value: Number(b.id) }]
+          : [{ operator: 'eq', column: 'order_id', value: String(b.no || b.orderId || '') }];
+        await RS_API.update(
+          'doppio_bills',
+          {
+            status: 'refunded',
+            refund_reason: b.refundReason,
+            refunded_at: b.refundedAt,
+          },
+          billFilters,
+          { returning: false }
+        );
+        cloudMarked = true;
+      }
+    } catch (e) {
+      console.warn('Refund cloud update failed', e);
+    }
+    renderBills();
+    toast(
+      cloudMarked ? 'Refund recorded + audit trail' : 'Refund marked locally. Cloud sync pending.',
+      'fa-rotate-left'
+    );
+  }
+
+  async function deleteBill(b) {
+    if (!b) return;
+    if (global.RSPinModal) {
+      const ok = await RSPinModal.request(`Delete Bill ${b.no || b.id || ''}`);
+      if (!ok) return;
+    }
+    const confirmed = await showDeleteConfirm(b);
+    if (!confirmed) return;
+
+    const BILLS = getBills();
+    const idx = BILLS.findIndex((x) => x === b || x.no === b.no);
+    if (idx !== -1) BILLS.splice(idx, 1);
+
+    // Only on DELETE — refund does NOT restore stock (food was served)
+    try {
+      const MENU = getMenu();
+      const INVENTORY = getInventory();
+      const bItems = b._items || [];
+      let invChanged = false;
+      bItems.forEach((it) => {
+        const menuItem = MENU.find((m) => m.name === it.name);
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        const orderedQty = Number(it.qty) || 1;
+        menuItem.ingredients.forEach((ing) => {
+          const invItem = INVENTORY.find((x) => x.name === ing.name);
+          if (!invItem) return;
+          invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
+          invChanged = true;
+        });
+      });
+      if (invChanged && global.RS_DB && RS_DB.writeLocal) {
+        await RS_DB.writeLocal('inventory', INVENTORY);
+      }
+    } catch (e) {
+      console.warn('Inventory restore failed', e);
+    }
+
+    try {
+      if (global.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      if (global.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
+        await RS_API.data({
+          table: 'doppio_bills',
+          operation: 'delete',
+          filters: { bill_no: b.no || b.id },
+          returning: false,
+        }).catch((e) => console.warn('Cloud delete', e));
+      }
+    } catch (e) {
+      console.warn('Bill delete sync failed', e);
+    }
+    renderBills();
+    toast(`Bill ${b.no || b.id || ''} deleted -- inventory restored`, 'fa-trash');
+  }
+
+  /**
+   * Wave 6: broader client filter — bill no, table, customer name/phone, pay method.
+   * Server-side search can be layered later via RS_API when bill volume grows.
+   */
+  function filterBills(bills, q, payFilter, statusFilter) {
+    const needle = String(q || '').toLowerCase().trim();
+    let filtered = bills;
+    if (needle) {
+      filtered = bills.filter((b) => {
+        const hay = [
+          b.no,
+          b.orderId,
+          b.id,
+          b.table,
+          b.customerName,
+          b.customer,
+          b.customerPhone,
+          b.pay,
+          b.paymentMethod,
+        ]
+          .map((x) => String(x || '').toLowerCase())
+          .join(' ');
+        return hay.includes(needle);
+      });
+    }
+    const pf = String(payFilter || 'All').toLowerCase();
+    if (pf !== 'all') {
+      filtered = filtered.filter((b) => b.pay && String(b.pay).toLowerCase() === pf);
+    }
+    const sf = String(statusFilter || 'All').toLowerCase();
+    if (sf !== 'all') {
+      filtered = filtered.filter((b) => b.status && String(b.status).toLowerCase() === sf);
+    }
+    return filtered;
+  }
+
+  function renderBills() {
+    const BILLS = getBills();
+    const paidBills = BILLS.filter((b) => b.status === 'paid');
+    const totalSales = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const count = BILLS.length;
+    const aov = paidBills.length > 0 ? Math.round(totalSales / paidBills.length) : 0;
+    const refunds = BILLS.filter((b) => b.status === 'refunded').length;
+
+    const salesEl = document.getElementById('bills-stat-sales');
+    if (salesEl) salesEl.textContent = rs(totalSales);
+    const countEl = document.getElementById('bills-stat-count');
+    if (countEl) countEl.textContent = count;
+    const aovEl = document.getElementById('bills-stat-aov');
+    if (aovEl) aovEl.textContent = rs(aov);
+    const refundsEl = document.getElementById('bills-stat-refunds');
+    if (refundsEl) refundsEl.textContent = refunds;
+
+    const q = ($('#bills-search')?.value || '').toLowerCase();
+    const payFilter = $('#bills-pay-filter')?.value || 'All';
+    const statusFilter = $('#bills-status-filter')?.value || 'All';
+
+    const filtered = filterBills(BILLS, q, payFilter, statusFilter);
+    const body = $('#bills-table-body');
+    if (!body) return;
+
+    body.innerHTML = filtered
+      .map(
+        (b) => `
+      <tr data-bill-no="${_e(b.no || b.orderId || b.id || '')}">
+        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(b.time || b.dateTime || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
+        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
+        <td class="td-strong">${rs(b.amount)}</td>
+        <td>${b.status === 'paid' ? '<span class="pill pill-green" style="padding:3px 9px">Paid</span>' : '<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
+        <td><div class="row-actions"><button class="icon-act go" title="Reprint" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-rotate-left"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
+      </tr>`
+      )
+      .join('');
+
+    const visibleBills = filtered;
+    if (body._rsBillActionHandler) body.removeEventListener('click', body._rsBillActionHandler, true);
+    body._rsBillActionHandler = (e) => {
+      const btn = e.target.closest('.icon-act');
+      if (!btn || !body.contains(btn) || btn.disabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const row = btn.closest('tr');
+      const bill = visibleBills[[...body.children].indexOf(row)];
+      if (!bill) return;
+      if (btn.classList.contains('go')) return showBillReceipt(bill);
+      if (btn.classList.contains('refund-act')) return markBillRefunded(bill);
+      if (btn.classList.contains('del-act')) return deleteBill(bill);
+      return shareBillReceipt(bill);
+    };
+    body.addEventListener('click', body._rsBillActionHandler, true);
+  }
+
+  function debounce(fn, wait) {
+    let t;
+    return function debounced() {
+      const args = arguments;
+      const ctx = this;
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(ctx, args), wait || 60);
+    };
+  }
+
+  function bindFilters() {
+    renderBills();
+    const search = $('#bills-search');
+    if (search && !search._rsListenerBound) {
+      search._rsListenerBound = true;
+      search.addEventListener('input', debounce(renderBills, 60));
+    }
+    const payFil = $('#bills-pay-filter');
+    if (payFil && !payFil._rsListenerBound) {
+      payFil._rsListenerBound = true;
+      payFil.addEventListener('change', renderBills);
+    }
+    const statusFil = $('#bills-status-filter');
+    if (statusFil && !statusFil._rsListenerBound) {
+      statusFil._rsListenerBound = true;
+      statusFil.addEventListener('change', renderBills);
+    }
+  }
+
+  const api = {
+    receiptPayloadFromBill,
+    showBillReceipt,
+    shareBillReceipt,
+    markBillRefunded,
+    deleteBill,
+    renderBills,
+    bindFilters,
+    filterBills,
+    showRefundModal,
+    showDeleteConfirm,
+  };
+
+  global.RSBillsHistory = api;
+
+  // Attach thin helpers on RS when ready
+  function attachToRS() {
+    if (!global.RS) return;
+    global.RS.renderBills = renderBills;
+    global.RS.receiptPayloadFromBill = receiptPayloadFromBill;
+  }
+  if (global.RS) attachToRS();
+  document.addEventListener('rs:ready', attachToRS);
+})(typeof window !== 'undefined' ? window : globalThis);

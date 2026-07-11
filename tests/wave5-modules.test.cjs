@@ -33,6 +33,7 @@ test('dashboard loads wave5 modules', () => {
   assert.match(html, /escpos-encoder\.js/);
   assert.match(html, /bill-identity\.js/);
   assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /bills-history\.js|inventory-ledger\.js/);
 });
 
 test('playwright config present', () => {
@@ -48,6 +49,28 @@ test('inventory-ledger module extracted', () => {
   const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
   assert.match(dash, /RSInventoryLedger/);
   assert.ok(!dash.includes('operation: \'deduct_inventory\''), 'heavy deduct body should leave dashboard');
+});
+
+test('bills-history module extracted (wave 6)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/bills-history.js'), 'utf8');
+  assert.match(src, /RSBillsHistory/);
+  assert.match(src, /renderBills/);
+  assert.match(src, /markBillRefunded/);
+  assert.match(src, /filterBills/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSBillsHistory/);
+  assert.ok(!dash.includes('rs-refund-overlay'), 'refund modal should leave dashboard');
+  assert.ok(!dash.includes('payPill'), 'payPill map should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /bills-history\.js/);
+  assert.match(html, /v54-20260711/);
+});
+
+test('checkout e2e spec present (wave 6)', () => {
+  assert.ok(fs.existsSync(path.join(root, 'tests/e2e/checkout.spec.cjs')));
+  const src = fs.readFileSync(path.join(root, 'tests/e2e/checkout.spec.cjs'), 'utf8');
+  assert.match(src, /btn-checkout/);
+  assert.match(src, /bills-table-body/);
 });
 
 test('USB and split docs exist', () => {

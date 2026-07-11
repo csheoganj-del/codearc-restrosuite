@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v53-20260711-remaining';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v54-20260711-wave6';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -636,7 +636,7 @@
         </div>
         <div class="panel panel-pad">
           <div class="toolbar-row">
-            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill no. or table…"></div>
+            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…"></div>
             <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-filter"></i> Filter</button>
             <button class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
             <button class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print day report</button>
@@ -1465,6 +1465,7 @@
 <script src="assets/escpos-encoder.js"></script>
 <script src="assets/modules/bill-identity.js"></script>
 <script src="assets/modules/inventory-ledger.js"></script>
+<script src="assets/modules/bills-history.js"></script>
 <script src="assets/saas-core.js"></script>
 <script src="assets/license-config.js"></script>
 <script src="assets/license-guard.js"></script>

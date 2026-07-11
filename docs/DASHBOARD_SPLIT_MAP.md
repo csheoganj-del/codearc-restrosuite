@@ -8,6 +8,7 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 |--------|--------|--------|
 | Bill numbers / channel series | `assets/modules/bill-identity.js` | ✅ |
 | Inventory deduct/restore | `assets/modules/inventory-ledger.js` | ✅ |
+| Bills history UI (table, refund, delete) | `assets/modules/bills-history.js` | ✅ Wave 6 |
 | ESC/POS encode | `assets/escpos-encoder.js` | ✅ |
 | Print routing | `assets/print-bridge.js` | ✅ |
 | Shifts / station / keys | `assets/competitive-ops.js` | ✅ |
@@ -32,6 +33,6 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 ## Boot after remaining
 
 ```
-doppio-api → db → print-bridge → escpos → bill-identity → inventory-ledger
+doppio-api → db → print-bridge → escpos → bill-identity → inventory-ledger → bills-history
 → saas-core → dashboard → features-pos → critical.bundle → shell
 ```
