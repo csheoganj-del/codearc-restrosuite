@@ -250,14 +250,15 @@
       }
       finishOperationStatus('Drafted ' + n + ' PO(s)');
       toast(`Created ${n} purchase order${n === 1 ? '' : 's'}`, 'fa-truck');
-      // Offer print of first PO
-      if (drafts[0] && global.RSModal) {
+      // Offer print / jump to Purchase orders
+      if (drafts[0]) {
         setTimeout(() => {
           if (typeof global.__toast === 'function') {
-            global.__toast('Tap to print first PO', 'fa-print', () => printPurchaseOrder(drafts[0]));
+            global.__toast('POs ready · tap to print first', 'fa-print', () => printPurchaseOrder(drafts[0]));
           }
         }, 400);
       }
+      document.dispatchEvent(new CustomEvent('rs:render-inventory'));
       renderInventory();
       if (global.RS && RS.render) RS.render('inventory-tab');
     } catch (e) {
