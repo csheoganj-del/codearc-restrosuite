@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v75 (2026-07-11) — Partial receive & cancel PO
+
+- **Partial receive**: edit qty per line; tracks cumulative `receivedLines` / receipts
+- Status **partial** until fully received; remaining qty shown on view
+- **Cancel PO** with reason (not allowed after full receive)
+- Filters: Open / Received / Cancelled / All
+
 ## v74 (2026-07-11) — Receive stock against PO
 
 - **Purchase orders**: View / Print / **Receive stock** (adds qty to inventory)
@@ -115,7 +122,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v74-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v75-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

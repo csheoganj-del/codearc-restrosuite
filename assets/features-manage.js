@@ -27,10 +27,12 @@
     const poPill = {
       pending: 'pill-amber',
       sent: 'pill-violet',
+      partial: 'pill-orange',
       received: 'pill-green',
       cancelled: 'pill-red',
       canceled: 'pill-red',
     };
+    let poListFilter = 'open'; // open | all | received | cancelled
 
     function parsePoLines(p) {
       if (Array.isArray(p.lines) && p.lines.length) {
@@ -64,22 +66,38 @@
       if (window.RS_DB && RS_DB.put) return RS_DB.put('purchase_orders', row.id, row);
     }
 
-    async function receivePurchaseOrder(p, opts) {
+    function staffName() {
+      try {
+        const s = window.RS_API && RS_API.session && RS_API.session();
+        return (s && (s.display_name || s.username)) || 'staff';
+      } catch (_) {
+        return 'staff';
+      }
+    }
+
+    function remainingPoLines(p) {
+      const ordered = parsePoLines(p);
+      const receivedMap = {};
+      (Array.isArray(p.receivedLines) ? p.receivedLines : []).forEach((r) => {
+        const k = String(r.name || '').toLowerCase();
+        receivedMap[k] = (receivedMap[k] || 0) + (Number(r.qty) || 0);
+      });
+      return ordered
+        .map((l) => {
+          const got = receivedMap[String(l.name).toLowerCase()] || 0;
+          const left = Math.max(0, (Number(l.qty) || 0) - got);
+          return { ...l, orderedQty: Number(l.qty) || 0, receivedQty: got, qty: left };
+        })
+        .filter((l) => l.qty > 0.0001);
+    }
+
+    async function applyStockForLines(lines, opts) {
       const options = opts || {};
-      if (!p || p.status === 'received') {
-        RS.toast('PO already received', 'fa-circle-info');
-        return false;
-      }
-      const lines = parsePoLines(p);
-      if (!lines.length) {
-        RS.toast('No lines to receive on this PO', 'fa-circle-exclamation');
-        return false;
-      }
       const inv = RS.INVENTORY || [];
       let updated = 0;
       let created = 0;
       for (const line of lines) {
-        if (!line.name || !(line.qty > 0)) continue;
+        if (!line.name || !(Number(line.qty) > 0)) continue;
         let item =
           (line.invId && inv.find((i) => String(i.id) === String(line.invId))) ||
           inv.find((i) => i.name && String(i.name).toLowerCase() === String(line.name).toLowerCase());
@@ -111,28 +129,159 @@
           created++;
         }
       }
-      p.status = 'received';
+      return { updated, created };
+    }
+
+    async function receivePurchaseOrder(p, opts) {
+      const options = opts || {};
+      if (!p || p.status === 'received') {
+        RS.toast('PO already fully received', 'fa-circle-info');
+        return false;
+      }
+      if (p.status === 'cancelled' || p.status === 'canceled') {
+        RS.toast('PO is cancelled', 'fa-circle-exclamation');
+        return false;
+      }
+      // linesToReceive: optional override for partial; default all remaining
+      const remaining = remainingPoLines(p);
+      const lines = Array.isArray(options.linesToReceive)
+        ? options.linesToReceive.filter((l) => l && Number(l.qty) > 0)
+        : remaining;
+      if (!lines.length) {
+        RS.toast('Nothing left to receive on this PO', 'fa-circle-exclamation');
+        return false;
+      }
+      const { updated, created } = await applyStockForLines(lines, options);
+
+      // Track cumulative received quantities
+      if (!Array.isArray(p.receivedLines)) p.receivedLines = [];
+      lines.forEach((l) => {
+        p.receivedLines.push({
+          name: l.name,
+          unit: l.unit,
+          qty: Number(l.qty) || 0,
+          at: new Date().toISOString(),
+          by: staffName(),
+        });
+      });
+      if (!Array.isArray(p.receipts)) p.receipts = [];
+      p.receipts.push({
+        at: new Date().toISOString(),
+        by: staffName(),
+        lines: lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit })),
+      });
+
+      const stillLeft = remainingPoLines(p);
+      const full = stillLeft.length === 0;
+      p.status = full ? 'received' : 'partial';
       p.receivedAt = new Date().toISOString();
-      p.receivedBy = (() => {
-        try {
-          const s = window.RS_API && RS_API.session && RS_API.session();
-          return (s && (s.display_name || s.username)) || 'staff';
-        } catch (_) {
-          return 'staff';
-        }
-      })();
-      // Keep display fields in sync
+      p.receivedBy = staffName();
       p.po = p.poNumber || p.po || p.id;
+      // Refresh items string for open remainder
+      if (!full) {
+        p.items = stillLeft.map((l) => `${l.qty} ${l.unit} ${l.name}`).join(', ');
+      }
       await savePo(p);
       try {
         if (window.RSInventoryUI && RSInventoryUI.paintInventoryBadge) RSInventoryUI.paintInventoryBadge();
         if (RS.renderInventory) RS.renderInventory();
       } catch (_) {}
       RS.toast(
-        `Received ${p.poNumber || p.po || p.id}: +stock on ${updated} item(s)${created ? ', ' + created + ' new' : ''}`,
+        `${full ? 'Fully received' : 'Partial receive'} ${p.poNumber || p.po || p.id}: +stock on ${updated} item(s)${created ? ', ' + created + ' new' : ''}`,
         'fa-box-open'
       );
       return true;
+    }
+
+    async function cancelPurchaseOrder(p, reason) {
+      if (!p) return false;
+      if (p.status === 'received') {
+        RS.toast('Cannot cancel a fully received PO', 'fa-circle-exclamation');
+        return false;
+      }
+      if (p.status === 'cancelled' || p.status === 'canceled') {
+        RS.toast('PO already cancelled', 'fa-circle-info');
+        return false;
+      }
+      p.status = 'cancelled';
+      p.cancelledAt = new Date().toISOString();
+      p.cancelledBy = staffName();
+      p.cancelReason = reason || 'Cancelled';
+      p.po = p.poNumber || p.po || p.id;
+      await savePo(p);
+      RS.toast('PO ' + (p.poNumber || p.po) + ' cancelled', 'fa-ban');
+      return true;
+    }
+
+    function openReceiveModal(p) {
+      if (!window.RSModal) {
+        return receivePurchaseOrder(p);
+      }
+      const remaining = remainingPoLines(p);
+      if (!remaining.length) {
+        RS.toast('Nothing left to receive', 'fa-circle-check');
+        return Promise.resolve(false);
+      }
+      const rows = remaining
+        .map(
+          (l, i) => `
+        <tr>
+          <td style="font-weight:600">${esc(l.name)}</td>
+          <td style="color:var(--text-soft);font-size:12px">${esc(l.orderedQty)} ${esc(l.unit)}${l.receivedQty ? ' · got ' + l.receivedQty : ''}</td>
+          <td><input type="number" class="form-input" data-recv-i="${i}" min="0" step="any" max="${l.qty}" value="${l.qty}" style="width:90px;padding:6px 8px;font-size:13px"></td>
+        </tr>`
+        )
+        .join('');
+      return new Promise((resolve) => {
+        RSModal.open({
+          title: 'Receive stock · ' + (p.poNumber || p.po || p.id),
+          sub: 'Edit qty for partial delivery · leave 0 to skip a line',
+          icon: 'fa-box-open',
+          size: 'md',
+          body: `<table class="data-table"><thead><tr><th>Item</th><th>Ordered / prior</th><th>Receive now</th></tr></thead>
+            <tbody>${rows}</tbody></table>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn btn-ghost btn-sm" data-all>All remaining</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-zero>Clear all</button>
+            </div>`,
+          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+            <button class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-box-open"></i> Confirm receive</button>`,
+          onMount(modal, close) {
+            modal.querySelector('[data-x]').onclick = () => {
+              close();
+              resolve(false);
+            };
+            modal.querySelector('[data-all]').onclick = () => {
+              remaining.forEach((l, i) => {
+                const inp = modal.querySelector(`[data-recv-i="${i}"]`);
+                if (inp) inp.value = l.qty;
+              });
+            };
+            modal.querySelector('[data-zero]').onclick = () => {
+              modal.querySelectorAll('[data-recv-i]').forEach((inp) => {
+                inp.value = '0';
+              });
+            };
+            modal.querySelector('[data-ok]').onclick = async () => {
+              const toRecv = remaining
+                .map((l, i) => {
+                  const inp = modal.querySelector(`[data-recv-i="${i}"]`);
+                  let q = Math.max(0, Number(inp && inp.value) || 0);
+                  if (q > l.qty) q = l.qty;
+                  return { ...l, qty: q };
+                })
+                .filter((l) => l.qty > 0);
+              if (!toRecv.length) {
+                RS.toast('Enter at least one quantity', 'fa-circle-exclamation');
+                return;
+              }
+              close();
+              const ok = await receivePurchaseOrder(p, { linesToReceive: toRecv });
+              resolve(ok);
+            };
+          },
+        });
+      });
     }
 
     function printPoRow(p) {
@@ -158,15 +307,25 @@
     function viewPoModal(p) {
       if (!window.RSModal) return;
       const lines = parsePoLines(p);
+      const remaining = remainingPoLines(p);
       const bodyLines = lines.length
         ? lines
-            .map(
-              (l) =>
-                `<tr><td>${esc(l.name)}</td><td>${esc(l.qty)} ${esc(l.unit)}</td><td style="text-align:right">${rs(l.value || l.qty * (l.cost || 0))}</td></tr>`
-            )
+            .map((l) => {
+              const got = (Array.isArray(p.receivedLines) ? p.receivedLines : [])
+                .filter((r) => String(r.name).toLowerCase() === String(l.name).toLowerCase())
+                .reduce((a, r) => a + (Number(r.qty) || 0), 0);
+              const left = Math.max(0, (Number(l.qty) || 0) - got);
+              return `<tr><td>${esc(l.name)}</td><td>${esc(l.qty)} ${esc(l.unit)}${got ? ' <span style="color:var(--text-mute)">(got ' + got + (left ? ', left ' + left : '') + ')</span>' : ''}</td><td style="text-align:right">${rs(l.value || l.qty * (l.cost || 0))}</td></tr>`;
+            })
             .join('')
         : `<tr><td colspan="3">${esc(p.items || '—')}</td></tr>`;
-      const canReceive = p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
+      const canReceive =
+        p.status !== 'received' &&
+        p.status !== 'cancelled' &&
+        p.status !== 'canceled' &&
+        remaining.length > 0;
+      const canCancel =
+        p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
       RSModal.open({
         title: 'PO ' + (p.poNumber || p.po || p.id),
         sub: (p.sup || p.supplier || '') + ' · ' + (p.status || 'pending'),
@@ -174,25 +333,47 @@
         size: 'md',
         body: `<div style="font-size:12.5px;color:var(--text-soft);margin-bottom:10px">
           Date: <b style="color:var(--text)">${esc(p.dateRaw || p.date || '—')}</b>
-          ${p.receivedAt ? ' · Received: <b style="color:var(--text)">' + esc(new Date(p.receivedAt).toLocaleString()) + '</b>' : ''}
+          ${p.receivedAt ? ' · Last receive: <b style="color:var(--text)">' + esc(new Date(p.receivedAt).toLocaleString()) + '</b>' : ''}
+          ${p.cancelReason ? ' · Cancel: ' + esc(p.cancelReason) : ''}
         </div>
         <table class="data-table"><thead><tr><th>Item</th><th>Qty</th><th style="text-align:right">Value</th></tr></thead>
         <tbody>${bodyLines}</tbody></table>
         <div style="margin-top:12px;font-weight:800;text-align:right">Total ${rs(p.value)}</div>`,
         foot: `<button class="btn btn-ghost" style="flex:1" data-x>Close</button>
           <button class="btn btn-ghost" style="flex:1" data-print><i class="fa-solid fa-print"></i> Print</button>
-          ${canReceive ? '<button class="btn btn-primary" style="flex:1.2" data-recv><i class="fa-solid fa-box-open"></i> Receive stock</button>' : ''}`,
+          ${canCancel ? '<button class="btn btn-ghost" style="flex:1;color:var(--red)" data-cancel-po><i class="fa-solid fa-ban"></i> Cancel</button>' : ''}
+          ${canReceive ? '<button class="btn btn-primary" style="flex:1.2" data-recv><i class="fa-solid fa-box-open"></i> Receive…</button>' : ''}`,
         onMount(modal, close) {
           modal.querySelector('[data-x]').onclick = close;
           modal.querySelector('[data-print]').onclick = () => printPoRow(p);
+          const cancelBtn = modal.querySelector('[data-cancel-po]');
+          if (cancelBtn)
+            cancelBtn.onclick = async () => {
+              const reason = window.prompt('Cancel reason (optional)', 'Not needed');
+              if (reason === null) return;
+              close();
+              const ok = await cancelPurchaseOrder(p, reason || 'Cancelled');
+              if (ok) drawPanes();
+            };
           const recv = modal.querySelector('[data-recv]');
           if (recv)
             recv.onclick = async () => {
               close();
-              const ok = await receivePurchaseOrder(p);
+              const ok = await openReceiveModal(p);
               if (ok) drawPanes();
             };
         },
+      });
+    }
+
+    function filteredPosOrders() {
+      return POS_ORDERS.filter((p) => {
+        const s = String(p.status || 'pending').toLowerCase();
+        if (poListFilter === 'all') return true;
+        if (poListFilter === 'received') return s === 'received';
+        if (poListFilter === 'cancelled') return s === 'cancelled' || s === 'canceled';
+        // open = pending, sent, partial
+        return s === 'pending' || s === 'sent' || s === 'partial';
       });
     }
 
@@ -320,15 +501,37 @@
           <div class="panel panel-pad subtab-pane" data-pane="pos">
             <div class="panel-head" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
               <h3 style="margin:0">Purchase orders</h3>
-              <span class="pill pill-amber" style="padding:3px 9px">${POS_ORDERS.filter(p=>p.status==='pending'||p.status==='sent').length} open</span>
+              <span class="pill pill-amber" style="padding:3px 9px">${POS_ORDERS.filter(p=>['pending','sent','partial'].includes(p.status)).length} open</span>
+              <div class="seg" id="po-filter-seg" style="margin-left:4px">
+                ${[['open','Open'],['received','Received'],['cancelled','Cancelled'],['all','All']].map(([k,lab])=>
+                  `<button type="button" data-po-filter="${k}" class="${poListFilter===k?'active':''}" style="font-size:11.5px;padding:4px 10px">${lab}</button>`
+                ).join('')}
+              </div>
               <div class="grow"></div>
               <button class="btn btn-ghost btn-sm" id="btn-po-refresh" title="Reload POs"><i class="fa-solid fa-rotate"></i></button>
               <button class="btn btn-primary btn-sm" id="add-po"><i class="fa-solid fa-plus"></i> Raise PO</button>
             </div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>PO No.</th><th>Supplier</th><th>Items</th><th>Value</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-            ${POS_ORDERS.length ? POS_ORDERS.map((p, idx) => {
-              const canRecv = p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
-              return `<tr data-po-idx="${idx}">
+            ${(() => {
+              const list = filteredPosOrders();
+              if (!list.length) {
+                return `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-soft)">${
+                  POS_ORDERS.length
+                    ? 'No POs in this filter.'
+                    : 'No purchase orders yet. Use <b>Auto-draft POs</b> on Stock when items are low, or Raise PO.'
+                }</td></tr>`;
+              }
+              return list
+                .map((p) => {
+                  const idx = POS_ORDERS.indexOf(p);
+                  const canRecv =
+                    p.status !== 'received' &&
+                    p.status !== 'cancelled' &&
+                    p.status !== 'canceled' &&
+                    remainingPoLines(p).length > 0;
+                  const canCancel =
+                    p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
+                  return `<tr data-po-idx="${idx}">
               <td><b>${esc(p.po)}</b></td><td>${esc(p.sup)}</td>
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.items)}">${esc(p.items)}</td>
               <td class="td-strong">${rs(p.value)}</td><td>${esc(p.date)}</td>
@@ -336,9 +539,12 @@
               <td><div class="row-actions">
                 <button class="icon-act go" data-po-view="${idx}" title="View" aria-label="View PO"><i class="fa-solid fa-eye"></i></button>
                 <button class="icon-act" data-po-print="${idx}" title="Print" aria-label="Print PO"><i class="fa-solid fa-print"></i></button>
-                ${canRecv ? `<button class="icon-act" data-po-recv="${idx}" title="Receive stock" aria-label="Receive stock" style="color:var(--green)"><i class="fa-solid fa-box-open"></i></button>` : ''}
+                ${canRecv ? `<button class="icon-act" data-po-recv="${idx}" title="Receive stock (partial OK)" aria-label="Receive stock" style="color:var(--green)"><i class="fa-solid fa-box-open"></i></button>` : ''}
+                ${canCancel ? `<button class="icon-act" data-po-cancel="${idx}" title="Cancel PO" aria-label="Cancel PO" style="color:var(--red)"><i class="fa-solid fa-ban"></i></button>` : ''}
               </div></td></tr>`;
-            }).join('') : `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-soft)">No purchase orders yet. Use <b>Auto-draft POs</b> on Stock when items are low, or Raise PO.</td></tr>`}
+                })
+                .join('');
+            })()}
             </tbody></table></div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="waste">
@@ -361,43 +567,21 @@
             if (p) printPoRow(p);
           };
         });
+        $$('[data-po-filter]', panes).forEach((b) => {
+          b.onclick = () => {
+            poListFilter = b.dataset.poFilter || 'open';
+            drawPanes();
+          };
+        });
         $$('[data-po-recv]', panes).forEach((b) => {
           b.onclick = async () => {
             const p = POS_ORDERS[+b.dataset.poRecv];
             if (!p) return;
-            if (!confirm('Receive stock for ' + (p.po || p.poNumber) + ' into inventory?')) return;
-            const ok = await receivePurchaseOrder(p);
+            const ok = await openReceiveModal(p);
             if (ok) {
-              // reload from DB if possible
               if (window.RS_DB) {
                 try {
-                  const poRows = await RS_DB.list('purchase_orders');
-                  if (poRows && poRows.length) {
-                    POS_ORDERS.length = 0;
-                    poRows.forEach((r) => {
-                      POS_ORDERS.push({
-                        ...r,
-                        id: r.id || r.poNumber,
-                        po: r.poNumber || r.po || r.id,
-                        poNumber: r.poNumber || r.po || r.id,
-                        sup: r.supplier || '',
-                        supplier: r.supplier || '',
-                        items: r.items || '',
-                        lines: r.lines || null,
-                        value: Number(r.value) || 0,
-                        status: String(r.status || 'pending').toLowerCase(),
-                        dateRaw: r.date || '',
-                        date: r.date
-                          ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                          : '--',
-                        receivedAt: r.receivedAt || null,
-                      });
-                    });
-                    POS_ORDERS.sort((a, b) => {
-                      const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : 1);
-                      return rank(a.status) - rank(b.status);
-                    });
-                  }
+                  await reloadPosOrdersFromDb();
                 } catch (_) {}
               }
               drawPanes();
@@ -405,36 +589,59 @@
             }
           };
         });
+        $$('[data-po-cancel]', panes).forEach((b) => {
+          b.onclick = async () => {
+            const p = POS_ORDERS[+b.dataset.poCancel];
+            if (!p) return;
+            if (!confirm('Cancel PO ' + (p.po || p.poNumber) + '?')) return;
+            const reason = window.prompt('Cancel reason (optional)', 'Not needed');
+            if (reason === null) return;
+            const ok = await cancelPurchaseOrder(p, reason.trim() || 'Cancelled');
+            if (ok) {
+              drawPanes();
+              if (RS.render) RS.render('inventory-tab');
+            }
+          };
+        });
         const btnPoRefresh = $('#btn-po-refresh', panes);
+        async function reloadPosOrdersFromDb() {
+          if (!window.RS_DB) return;
+          const poRows = await RS_DB.list('purchase_orders');
+          POS_ORDERS.length = 0;
+          (poRows || []).forEach((r) => {
+            POS_ORDERS.push({
+              ...r,
+              id: r.id || r.poNumber,
+              po: r.poNumber || r.po || r.id,
+              poNumber: r.poNumber || r.po || r.id,
+              sup: r.supplier || '',
+              supplier: r.supplier || '',
+              items: r.items || '',
+              lines: r.lines || null,
+              receivedLines: r.receivedLines || null,
+              receipts: r.receipts || null,
+              value: Number(r.value) || 0,
+              status: String(r.status || 'pending').toLowerCase(),
+              dateRaw: r.date || '',
+              date: r.date
+                ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                : '--',
+              receivedAt: r.receivedAt || null,
+              cancelReason: r.cancelReason || null,
+            });
+          });
+          POS_ORDERS.sort((a, b) => {
+            const rank = (s) =>
+              s === 'pending' || s === 'sent' || s === 'partial' ? 0 : s === 'received' ? 1 : 2;
+            return rank(a.status) - rank(b.status);
+          });
+        }
+
         if (btnPoRefresh) {
           btnPoRefresh.onclick = async () => {
             if (!window.RS_DB) return RS.toast('Database unavailable', 'fa-circle-exclamation');
             try {
-              const poRows = await RS_DB.list('purchase_orders');
-              POS_ORDERS.length = 0;
-              (poRows || []).forEach((r) => {
-                POS_ORDERS.push({
-                  ...r,
-                  id: r.id || r.poNumber,
-                  po: r.poNumber || r.po || r.id,
-                  poNumber: r.poNumber || r.po || r.id,
-                  sup: r.supplier || '',
-                  supplier: r.supplier || '',
-                  items: r.items || '',
-                  lines: r.lines || null,
-                  value: Number(r.value) || 0,
-                  status: String(r.status || 'pending').toLowerCase(),
-                  dateRaw: r.date || '',
-                  date: r.date
-                    ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                    : '--',
-                  receivedAt: r.receivedAt || null,
-                });
-              });
-              POS_ORDERS.sort((a, b) => {
-                const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : 1);
-                return rank(a.status) - rank(b.status);
-              });
+              await reloadPosOrdersFromDb();
               drawPanes();
               RS.toast('Purchase orders refreshed', 'fa-rotate');
             } catch (e) {
@@ -775,6 +982,8 @@
               supplier: r.supplier || r.sup || '',
               items: r.items || (Array.isArray(r.lines) ? r.lines.map((l) => `${l.qty} ${l.unit || ''} ${l.name}`).join(', ') : ''),
               lines: r.lines || null,
+              receivedLines: r.receivedLines || null,
+              receipts: r.receipts || null,
               value: Number(r.value) || 0,
               status: String(r.status || 'pending').toLowerCase(),
               dateRaw: r.date || '',
@@ -782,10 +991,12 @@
                 ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
                 : '--',
               receivedAt: r.receivedAt || null,
+              cancelReason: r.cancelReason || null,
             }));
             // Open first, then newest
             mapped.sort((a, b) => {
-              const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : s === 'received' ? 1 : 2);
+              const rank = (s) =>
+                s === 'pending' || s === 'sent' || s === 'partial' ? 0 : s === 'received' ? 1 : 2;
               const d = rank(a.status) - rank(b.status);
               if (d) return d;
               return String(b.dateRaw || '').localeCompare(String(a.dateRaw || ''));
