@@ -156,6 +156,22 @@ test('waste log deducts inventory stock', () => {
   assert.match(html, /data-inv-tab="waste"|Waste log/);
 });
 
+test('POS promo codes: totals, apply, receipt, settings', () => {
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
+  const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  const shell = fs.readFileSync(path.join(root, 'assets/features-shell.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  const receipt = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
+  assert.match(ops, /RSPromo|applyPromoCode|findOfferByCode|wirePromoUi/);
+  assert.match(ops, /WELCOME10|set_demo_promo_code|set_pos_promo_codes/);
+  assert.match(posUi, /activePromo|setPromo|clearPromo|promoOff/);
+  assert.match(pos, /promoCode|promoAmount|promoOfferId/);
+  assert.match(shell, /POS promo codes|Demo promo code|Demo promo pct/);
+  assert.match(html, /promo-input|promo-apply|promo-clear|promo-applied-badge/);
+  assert.match(receipt, /promoAmount|promoCode/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);

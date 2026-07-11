@@ -548,6 +548,12 @@
         if (bill.tipAmount) totalsRows.push({ left: 'Tip', right: rs(bill.tipAmount) });
         if (bill.deliveryCharge) totalsRows.push({ left: 'Delivery', right: rs(bill.deliveryCharge) });
         if (bill.loyaltyRedeemAmount) totalsRows.push({ left: 'Loyalty redeem', right: '- ' + rs(bill.loyaltyRedeemAmount) });
+        if (bill.promoAmount) {
+          totalsRows.push({
+            left: 'Promo' + (bill.promoCode ? ' ' + bill.promoCode : ''),
+            right: '- ' + rs(bill.promoAmount),
+          });
+        }
         if (bill.liquorTaxAmount) totalsRows.push({ left: 'Liquor VAT', right: rs(bill.liquorTaxAmount) });
 
         totalsRows.forEach(row => {
@@ -1821,6 +1827,10 @@
           deliveryCharge: totals.deliveryCharge || 0,
           loyaltyRedeemAmount: totals.loyaltyRedeem || 0,
           loyaltyPointsUsed: totals.loyaltyPointsUsed || 0,
+          promoCode: totals.promoCode || '',
+          promoAmount: totals.promo || 0,
+          promoTitle: totals.promoTitle || '',
+          promoOfferId: totals.promoOfferId || null,
           idempotencyKey: identity.idempotencyKey,
           syncStatus: 'saving',
         };
@@ -1857,6 +1867,10 @@
           deliveryCharge: totals.deliveryCharge || 0,
           loyaltyRedeemAmount: totals.loyaltyRedeem || 0,
           loyaltyPointsUsed: totals.loyaltyPointsUsed || 0,
+          promoCode: totals.promoCode || '',
+          promoAmount: totals.promo || 0,
+          promoTitle: totals.promoTitle || '',
+          promoOfferId: totals.promoOfferId || null,
         };
         if (window.RSOps && RSOps.decorateBillMeta) RSOps.decorateBillMeta(billRow, bill);
 
