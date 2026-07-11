@@ -305,9 +305,14 @@
           taxBreakdownHTML += `</div>`;
         } else if (bill.gst > 0) {
           const halfGst = Math.round((bill.gst || 0) / 2);
-          taxBreakdownHTML = `
+          taxBreakdownHTML = country === 'IN'
+            ? `
             <div class="rcp-line"><span>CGST (2.5%)</span><span>${rs(halfGst)}</span></div>
             <div class="rcp-line"><span>SGST (2.5%)</span><span>${rs(bill.gst - halfGst)}</span></div>
+            <div class="rcp-sub" style="font-size:10.5px;color:#6b6960;margin-top:2px;">SAC 9963</div>
+          `
+            : `
+            <div class="rcp-line"><span>Tax</span><span>${rs(bill.gst)}</span></div>
           `;
         }
       }
@@ -330,9 +335,9 @@
         ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${esc(t.method)}</span><span>${rs(t.amount)}</span></div>`).join('')}
         ${bill.change?`<div class="rcp-line"><span class="q">Change</span><span>${rs(bill.change)}</span></div>`:''}
         ${qrDataUri ? `
-          <div class="rcp-center" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--stroke-2);display:flex;flex-direction:column;align-items:center;">
-            <div style="font-size:10px;color:var(--text-soft);margin-bottom:6px;text-align:center;">Scan to view digital bill</div>
-            <img src="${qrDataUri}" style="width:100px;height:100px;display:block;" />
+          <div class="rcp-center rcp-qr-wrap">
+            <div style="font-size:10px;color:#6b6960;margin-bottom:6px;text-align:center;">Scan to view digital bill</div>
+            <img src="${qrDataUri}" width="100" height="100" alt="Digital bill QR" style="width:100px;height:100px;display:block;" crossorigin="anonymous" />
           </div>
         ` : ''}
         <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
@@ -457,9 +462,30 @@
       });
     }
 
+    /** Inline styles so export PDF matches preview even if CSS vars/theme differ. */
+    const RECEIPT_EXPORT_CSS = `
+      .receipt-paper {
+        background: #fbfaf7; color: #16151c; border-radius: 10px;
+        padding: 22px 22px 26px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        max-width: 320px; margin: 0 auto; position: relative; box-sizing: border-box;
+      }
+      .rcp-center { text-align: center; }
+      .rcp-logo { font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 20px; letter-spacing: -.02em; color: #16151c; }
+      .rcp-sub { font-size: 11px; color: #6b6960; margin-top: 2px; }
+      .rcp-hr { border: 0; border-top: 1px dashed #c9c6bd; margin: 13px 0; }
+      .rcp-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #4a4842; gap: 8px; }
+      .rcp-line { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; color: #16151c; gap: 8px; }
+      .rcp-line .q { color: #6b6960; }
+      .rcp-tot { display: flex; justify-content: space-between; font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 17px; margin-top: 6px; color: #16151c; }
+      .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
+      .rcp-foot b { color: #16151c; }
+      .rcp-qr-wrap { margin-top:10px;padding-top:10px;border-top:1px dashed #c9c6bd;display:flex;flex-direction:column;align-items:center; }
+      .rcp-qr-wrap img { width:100px;height:100px;display:block; }
+    `;
+
     /**
      * Build PDF from the EXACT same HTML used in the on-screen bill preview.
-     * This guarantees WhatsApp PDF == "Bill settled" receipt paper.
+     * Captures receiptHTML with the same receipt-paper styles (QR, SAC, totals).
      */
     async function compilePreviewPDF(bill) {
       const jspdfModule = await loadJsPDF();
@@ -469,37 +495,43 @@
 
       const host = document.createElement('div');
       host.setAttribute('data-rs-receipt-export', '1');
-      host.style.cssText = [
-        'position:fixed',
-        'left:-10000px',
-        'top:0',
-        'width:320px',
-        'padding:0',
-        'margin:0',
-        'background:#fbfaf7',
-        'z-index:-1',
-        'pointer-events:none',
-      ].join(';');
-      host.innerHTML = `<div class="receipt-paper" style="box-shadow:none;margin:0;max-width:320px;">${receiptHTML(bill, qrDataUri)}</div>`;
+      host.style.cssText = 'position:fixed;left:-10000px;top:0;width:360px;padding:16px;margin:0;background:#efebe6;z-index:2147483000;pointer-events:none;';
+      // Inline CSS so capture is independent of theme / loaded stylesheets
+      host.innerHTML = `<style>${RECEIPT_EXPORT_CSS}</style>
+        <div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`;
       document.body.appendChild(host);
 
       try {
+        // Wait for QR image to decode so it appears in the capture
+        const qrImg = host.querySelector('img');
+        if (qrImg && !qrImg.complete) {
+          await new Promise((resolve) => {
+            qrImg.onload = resolve;
+            qrImg.onerror = resolve;
+            setTimeout(resolve, 1500);
+          });
+        }
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
         const paper = host.querySelector('.receipt-paper') || host;
         const canvas = await html2canvas(paper, {
-          scale: 2.5,
+          scale: 3,
           backgroundColor: '#fbfaf7',
           useCORS: true,
+          allowTaint: true,
           logging: false,
-          imageTimeout: 0,
-          width: paper.scrollWidth || 320,
-          windowWidth: 360,
+          imageTimeout: 4000,
+          width: Math.max(paper.scrollWidth || 320, 280),
+          windowWidth: 400,
         });
-        const img = canvas.toDataURL('image/jpeg', 0.92);
-        // Thermal-ish portrait page sized to content
-        const pageWmm = 88;
-        const pageHmm = Math.max(120, (canvas.height / canvas.width) * pageWmm);
+        const img = canvas.toDataURL('image/png');
+        // Page size follows receipt aspect (thermal-ish width)
+        const pageWmm = 80;
+        const pageHmm = Math.max(110, (canvas.height / canvas.width) * pageWmm + 2);
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
-        doc.addImage(img, 'JPEG', 0, 0, pageWmm, pageHmm);
+        doc.setFillColor(251, 250, 247);
+        doc.rect(0, 0, pageWmm, pageHmm, 'F');
+        doc.addImage(img, 'PNG', 0, 0, pageWmm, pageHmm);
         return doc.output('datauristring');
       } finally {
         if (host.parentNode) host.parentNode.removeChild(host);
@@ -983,14 +1015,8 @@
             }
           } catch (_) {}
 
-          // Prefer preview-identical PDF; fall back to thermal compiler if capture fails
-          let pdfDataUri = null;
-          try {
-            pdfDataUri = await compilePreviewPDF(normalized);
-          } catch (previewErr) {
-            console.warn('[WhatsApp] Preview PDF capture failed, using thermal PDF:', previewErr && previewErr.message);
-            pdfDataUri = await compileThermalPDF(normalized);
-          }
+          // ONLY the on-screen preview capture — same paper as "Bill settled"
+          const pdfDataUri = await compilePreviewPDF(normalized);
           const base64 = String(pdfDataUri || '').includes(',')
             ? String(pdfDataUri).split(',')[1]
             : String(pdfDataUri || '');
