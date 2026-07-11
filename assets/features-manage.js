@@ -24,7 +24,177 @@
     const SUPPLIERS = [];
     const POS_ORDERS = [];
     const WASTE = [];
-    const poPill = {pending:'pill-amber',sent:'pill-violet',received:'pill-green'};
+    const poPill = {
+      pending: 'pill-amber',
+      sent: 'pill-violet',
+      received: 'pill-green',
+      cancelled: 'pill-red',
+      canceled: 'pill-red',
+    };
+
+    function parsePoLines(p) {
+      if (Array.isArray(p.lines) && p.lines.length) {
+        return p.lines.map((l) => ({
+          name: l.name || 'Item',
+          unit: l.unit || 'unit',
+          qty: Math.max(0, Number(l.qty) || 0),
+          cost: Number(l.cost) || 0,
+          value: Number(l.value) || 0,
+          invId: l.invId || l.id || null,
+        }));
+      }
+      return String(p.items || p.itemsText || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => {
+          const m = s.match(/^(\d+(?:\.\d+)?)\s+(\S+)\s+(.+)$/);
+          if (m) return { name: m[3].trim(), unit: m[2], qty: Number(m[1]) || 1, cost: 0, value: 0, invId: null };
+          return { name: s, unit: 'unit', qty: 1, cost: 0, value: 0, invId: null };
+        });
+    }
+
+    async function saveInventoryItem(item) {
+      if (window.RS_DB && RS_DB.put) await RS_DB.put('inventory', item.id, item);
+      else if (RS.saveOne) await RS.saveOne('inventory', item);
+    }
+
+    async function savePo(row) {
+      if (RS.saveOne) return RS.saveOne('purchase_orders', row);
+      if (window.RS_DB && RS_DB.put) return RS_DB.put('purchase_orders', row.id, row);
+    }
+
+    async function receivePurchaseOrder(p, opts) {
+      const options = opts || {};
+      if (!p || p.status === 'received') {
+        RS.toast('PO already received', 'fa-circle-info');
+        return false;
+      }
+      const lines = parsePoLines(p);
+      if (!lines.length) {
+        RS.toast('No lines to receive on this PO', 'fa-circle-exclamation');
+        return false;
+      }
+      const inv = RS.INVENTORY || [];
+      let updated = 0;
+      let created = 0;
+      for (const line of lines) {
+        if (!line.name || !(line.qty > 0)) continue;
+        let item =
+          (line.invId && inv.find((i) => String(i.id) === String(line.invId))) ||
+          inv.find((i) => i.name && String(i.name).toLowerCase() === String(line.name).toLowerCase());
+        if (item) {
+          item.stock = Math.max(0, Number(item.stock) || 0) + Number(line.qty);
+          if (line.cost > 0 && !(Number(item.cost) > 0)) item.cost = line.cost;
+          await saveInventoryItem(item);
+          updated++;
+        } else if (options.createMissing !== false) {
+          const id =
+            'inv_' +
+            String(line.name)
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '_')
+              .replace(/^_|_$/g, '') +
+            '_' +
+            Date.now().toString(36);
+          const neo = {
+            id,
+            name: line.name,
+            cat: 'Received',
+            unit: line.unit || 'unit',
+            stock: Number(line.qty) || 0,
+            min: 10,
+            cost: Number(line.cost) || 0,
+          };
+          inv.push(neo);
+          await saveInventoryItem(neo);
+          created++;
+        }
+      }
+      p.status = 'received';
+      p.receivedAt = new Date().toISOString();
+      p.receivedBy = (() => {
+        try {
+          const s = window.RS_API && RS_API.session && RS_API.session();
+          return (s && (s.display_name || s.username)) || 'staff';
+        } catch (_) {
+          return 'staff';
+        }
+      })();
+      // Keep display fields in sync
+      p.po = p.poNumber || p.po || p.id;
+      await savePo(p);
+      try {
+        if (window.RSInventoryUI && RSInventoryUI.paintInventoryBadge) RSInventoryUI.paintInventoryBadge();
+        if (RS.renderInventory) RS.renderInventory();
+      } catch (_) {}
+      RS.toast(
+        `Received ${p.poNumber || p.po || p.id}: +stock on ${updated} item(s)${created ? ', ' + created + ' new' : ''}`,
+        'fa-box-open'
+      );
+      return true;
+    }
+
+    function printPoRow(p) {
+      if (window.RSInventoryUI && typeof RSInventoryUI.printPurchaseOrder === 'function') {
+        RSInventoryUI.printPurchaseOrder({
+          ...p,
+          poNumber: p.poNumber || p.po || p.id,
+          lines: parsePoLines(p),
+        });
+        return;
+      }
+      if (typeof window.RSPrint === 'function') {
+        const lines = parsePoLines(p)
+          .map((l) => `<div>${esc(l.qty)} ${esc(l.unit)} · ${esc(l.name)}</div>`)
+          .join('');
+        RSPrint(
+          `<div style="max-width:320px;margin:0 auto"><b>PO ${esc(p.poNumber || p.po)}</b><br>${esc(p.sup || p.supplier)}<br>${lines}<br>Total ${rs(p.value)}</div>`,
+          'PO'
+        );
+      }
+    }
+
+    function viewPoModal(p) {
+      if (!window.RSModal) return;
+      const lines = parsePoLines(p);
+      const bodyLines = lines.length
+        ? lines
+            .map(
+              (l) =>
+                `<tr><td>${esc(l.name)}</td><td>${esc(l.qty)} ${esc(l.unit)}</td><td style="text-align:right">${rs(l.value || l.qty * (l.cost || 0))}</td></tr>`
+            )
+            .join('')
+        : `<tr><td colspan="3">${esc(p.items || '—')}</td></tr>`;
+      const canReceive = p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
+      RSModal.open({
+        title: 'PO ' + (p.poNumber || p.po || p.id),
+        sub: (p.sup || p.supplier || '') + ' · ' + (p.status || 'pending'),
+        icon: 'fa-file-invoice',
+        size: 'md',
+        body: `<div style="font-size:12.5px;color:var(--text-soft);margin-bottom:10px">
+          Date: <b style="color:var(--text)">${esc(p.dateRaw || p.date || '—')}</b>
+          ${p.receivedAt ? ' · Received: <b style="color:var(--text)">' + esc(new Date(p.receivedAt).toLocaleString()) + '</b>' : ''}
+        </div>
+        <table class="data-table"><thead><tr><th>Item</th><th>Qty</th><th style="text-align:right">Value</th></tr></thead>
+        <tbody>${bodyLines}</tbody></table>
+        <div style="margin-top:12px;font-weight:800;text-align:right">Total ${rs(p.value)}</div>`,
+        foot: `<button class="btn btn-ghost" style="flex:1" data-x>Close</button>
+          <button class="btn btn-ghost" style="flex:1" data-print><i class="fa-solid fa-print"></i> Print</button>
+          ${canReceive ? '<button class="btn btn-primary" style="flex:1.2" data-recv><i class="fa-solid fa-box-open"></i> Receive stock</button>' : ''}`,
+        onMount(modal, close) {
+          modal.querySelector('[data-x]').onclick = close;
+          modal.querySelector('[data-print]').onclick = () => printPoRow(p);
+          const recv = modal.querySelector('[data-recv]');
+          if (recv)
+            recv.onclick = async () => {
+              close();
+              const ok = await receivePurchaseOrder(p);
+              if (ok) drawPanes();
+            };
+        },
+      });
+    }
 
     function enhanceInventory(){
       const sec = $('#inventory-tab'); if(!sec || sec.dataset.enhanced) return; sec.dataset.enhanced='1';
@@ -148,9 +318,27 @@
             <div class="crm-grid">${SUPPLIERS.map(s=>`<div class="crm-card"><div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[s.name.length%RS.avatarColors.length]}"><i class="fa-solid fa-truck-field" style="font-size:15px"></i></div><div><div class="crm-name">${s.name}</div><div class="crm-phone">${s.cat}</div></div></div><div style="font-size:12.5px;color:var(--text-soft);line-height:1.9"><div><i class="fa-solid fa-phone" style="width:16px;color:var(--text-mute)"></i> ${s.contact}</div><div><i class="fa-solid fa-file-contract" style="width:16px;color:var(--text-mute)"></i> ${s.terms} · ${s.items} items</div><div><i class="fa-solid fa-star" style="width:16px;color:var(--amber)"></i> ${s.rating} rating</div></div></div>`).join('')}</div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="pos">
-            <div class="panel-head"><h3>Purchase orders</h3><button class="btn btn-primary btn-sm" id="add-po"><i class="fa-solid fa-plus"></i> Raise PO</button></div>
+            <div class="panel-head" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <h3 style="margin:0">Purchase orders</h3>
+              <span class="pill pill-amber" style="padding:3px 9px">${POS_ORDERS.filter(p=>p.status==='pending'||p.status==='sent').length} open</span>
+              <div class="grow"></div>
+              <button class="btn btn-ghost btn-sm" id="btn-po-refresh" title="Reload POs"><i class="fa-solid fa-rotate"></i></button>
+              <button class="btn btn-primary btn-sm" id="add-po"><i class="fa-solid fa-plus"></i> Raise PO</button>
+            </div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>PO No.</th><th>Supplier</th><th>Items</th><th>Value</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-            ${POS_ORDERS.map(p=>`<tr><td><b>${p.po}</b></td><td>${p.sup}</td><td>${p.items}</td><td class="td-strong">${rs(p.value)}</td><td>${p.date}</td><td><span class="pill ${poPill[p.status]}" style="padding:3px 9px;text-transform:capitalize">${p.status}</span></td><td><div class="row-actions"><button class="icon-act go" title="View"><i class="fa-solid fa-eye"></i></button><button class="icon-act" title="Print"><i class="fa-solid fa-print"></i></button></div></td></tr>`).join('')}
+            ${POS_ORDERS.length ? POS_ORDERS.map((p, idx) => {
+              const canRecv = p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
+              return `<tr data-po-idx="${idx}">
+              <td><b>${esc(p.po)}</b></td><td>${esc(p.sup)}</td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.items)}">${esc(p.items)}</td>
+              <td class="td-strong">${rs(p.value)}</td><td>${esc(p.date)}</td>
+              <td><span class="pill ${poPill[p.status] || 'pill-amber'}" style="padding:3px 9px;text-transform:capitalize">${esc(p.status || 'pending')}</span></td>
+              <td><div class="row-actions">
+                <button class="icon-act go" data-po-view="${idx}" title="View" aria-label="View PO"><i class="fa-solid fa-eye"></i></button>
+                <button class="icon-act" data-po-print="${idx}" title="Print" aria-label="Print PO"><i class="fa-solid fa-print"></i></button>
+                ${canRecv ? `<button class="icon-act" data-po-recv="${idx}" title="Receive stock" aria-label="Receive stock" style="color:var(--green)"><i class="fa-solid fa-box-open"></i></button>` : ''}
+              </div></td></tr>`;
+            }).join('') : `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-soft)">No purchase orders yet. Use <b>Auto-draft POs</b> on Stock when items are low, or Raise PO.</td></tr>`}
             </tbody></table></div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="waste">
@@ -159,6 +347,101 @@
             ${WASTE.map(w=>`<tr><td><b>${w.item}</b></td><td>${w.qty}</td><td><span class="pill" style="padding:3px 9px">${w.reason}</span></td><td class="td-strong" style="color:var(--red)">${rs(w.cost)}</td><td>${w.date}</td></tr>`).join('')}
             </tbody></table></div>
           </div>`;
+
+        // Purchase order row actions
+        $$('[data-po-view]', panes).forEach((b) => {
+          b.onclick = () => {
+            const p = POS_ORDERS[+b.dataset.poView];
+            if (p) viewPoModal(p);
+          };
+        });
+        $$('[data-po-print]', panes).forEach((b) => {
+          b.onclick = () => {
+            const p = POS_ORDERS[+b.dataset.poPrint];
+            if (p) printPoRow(p);
+          };
+        });
+        $$('[data-po-recv]', panes).forEach((b) => {
+          b.onclick = async () => {
+            const p = POS_ORDERS[+b.dataset.poRecv];
+            if (!p) return;
+            if (!confirm('Receive stock for ' + (p.po || p.poNumber) + ' into inventory?')) return;
+            const ok = await receivePurchaseOrder(p);
+            if (ok) {
+              // reload from DB if possible
+              if (window.RS_DB) {
+                try {
+                  const poRows = await RS_DB.list('purchase_orders');
+                  if (poRows && poRows.length) {
+                    POS_ORDERS.length = 0;
+                    poRows.forEach((r) => {
+                      POS_ORDERS.push({
+                        ...r,
+                        id: r.id || r.poNumber,
+                        po: r.poNumber || r.po || r.id,
+                        poNumber: r.poNumber || r.po || r.id,
+                        sup: r.supplier || '',
+                        supplier: r.supplier || '',
+                        items: r.items || '',
+                        lines: r.lines || null,
+                        value: Number(r.value) || 0,
+                        status: String(r.status || 'pending').toLowerCase(),
+                        dateRaw: r.date || '',
+                        date: r.date
+                          ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                          : '--',
+                        receivedAt: r.receivedAt || null,
+                      });
+                    });
+                    POS_ORDERS.sort((a, b) => {
+                      const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : 1);
+                      return rank(a.status) - rank(b.status);
+                    });
+                  }
+                } catch (_) {}
+              }
+              drawPanes();
+              if (RS.render) RS.render('inventory-tab');
+            }
+          };
+        });
+        const btnPoRefresh = $('#btn-po-refresh', panes);
+        if (btnPoRefresh) {
+          btnPoRefresh.onclick = async () => {
+            if (!window.RS_DB) return RS.toast('Database unavailable', 'fa-circle-exclamation');
+            try {
+              const poRows = await RS_DB.list('purchase_orders');
+              POS_ORDERS.length = 0;
+              (poRows || []).forEach((r) => {
+                POS_ORDERS.push({
+                  ...r,
+                  id: r.id || r.poNumber,
+                  po: r.poNumber || r.po || r.id,
+                  poNumber: r.poNumber || r.po || r.id,
+                  sup: r.supplier || '',
+                  supplier: r.supplier || '',
+                  items: r.items || '',
+                  lines: r.lines || null,
+                  value: Number(r.value) || 0,
+                  status: String(r.status || 'pending').toLowerCase(),
+                  dateRaw: r.date || '',
+                  date: r.date
+                    ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                    : '--',
+                  receivedAt: r.receivedAt || null,
+                });
+              });
+              POS_ORDERS.sort((a, b) => {
+                const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : 1);
+                return rank(a.status) - rank(b.status);
+              });
+              drawPanes();
+              RS.toast('Purchase orders refreshed', 'fa-rotate');
+            } catch (e) {
+              RS.toast('Could not refresh POs', 'fa-circle-exclamation');
+            }
+          };
+        }
 
         const recipeListBody = $('#recipe-list-body', panes);
         if (recipeListBody) {
@@ -373,21 +656,38 @@
                     poNumber: poNum,
                     supplier,
                     items,
+                    lines: parsePoLines({ items }),
                     value,
                     date: new Date().toISOString(),
-                    status: 'pending'
+                    status: 'pending',
                   };
                   close();
-                  if (RS.saveOne) {
-                    await RS.saveOne('purchase_orders', newPo);
+                  try {
+                    await savePo(newPo);
+                    POS_ORDERS.unshift({
+                      ...newPo,
+                      po: poNum,
+                      sup: supplier,
+                      dateRaw: newPo.date,
+                      date: new Date(newPo.date).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                      }),
+                    });
                     RS.toast('Purchase order raised successfully', 'fa-circle-check');
+                    drawPanes();
                     if (RS.render) RS.render('inventory-tab');
+                  } catch (e) {
+                    RS.toast('Could not save PO', 'fa-circle-exclamation');
                   }
                 };
               }
             });
           };
         }
+
+        // Expose for inventory auto-draft refresh
+        window.RS_receivePurchaseOrder = receivePurchaseOrder;
 
         const btnAddWaste = $('#add-waste');
         if (btnAddWaste) {
@@ -466,16 +766,31 @@
 
           if (poRows && poRows.length) {
             POS_ORDERS.length = 0;
-            poRows.forEach(r => {
-              POS_ORDERS.push({
-                po: r.poNumber,
-                sup: r.supplier,
-                items: r.items,
-                value: r.value,
-                status: r.status,
-                date: r.date ? new Date(r.date).toLocaleDateString('en-IN', {day:'numeric', month:'short'}) : '--'
-              });
+            const mapped = poRows.map((r) => ({
+              ...r,
+              id: r.id || r.poNumber,
+              po: r.poNumber || r.po || r.id,
+              poNumber: r.poNumber || r.po || r.id,
+              sup: r.supplier || r.sup || '',
+              supplier: r.supplier || r.sup || '',
+              items: r.items || (Array.isArray(r.lines) ? r.lines.map((l) => `${l.qty} ${l.unit || ''} ${l.name}`).join(', ') : ''),
+              lines: r.lines || null,
+              value: Number(r.value) || 0,
+              status: String(r.status || 'pending').toLowerCase(),
+              dateRaw: r.date || '',
+              date: r.date
+                ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                : '--',
+              receivedAt: r.receivedAt || null,
+            }));
+            // Open first, then newest
+            mapped.sort((a, b) => {
+              const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : s === 'received' ? 1 : 2);
+              const d = rank(a.status) - rank(b.status);
+              if (d) return d;
+              return String(b.dateRaw || '').localeCompare(String(a.dateRaw || ''));
             });
+            mapped.forEach((row) => POS_ORDERS.push(row));
           }
           drawPanes();
         }).catch(e => {
@@ -487,6 +802,44 @@
       }
 
       wireSeg('#inventory-tab', ['stock','recipes','suppliers','pos','waste']);
+
+      // Reload POs when inventory re-renders (after auto-draft)
+      if (!sec._poReloadBound) {
+        sec._poReloadBound = true;
+        document.addEventListener('rs:render-inventory', () => {
+          if (window.RS_DB) {
+            RS_DB.list('purchase_orders')
+              .then((poRows) => {
+                if (!poRows) return;
+                POS_ORDERS.length = 0;
+                poRows.forEach((r) => {
+                  POS_ORDERS.push({
+                    ...r,
+                    id: r.id || r.poNumber,
+                    po: r.poNumber || r.po || r.id,
+                    poNumber: r.poNumber || r.po || r.id,
+                    sup: r.supplier || '',
+                    supplier: r.supplier || '',
+                    items: r.items || '',
+                    lines: r.lines || null,
+                    value: Number(r.value) || 0,
+                    status: String(r.status || 'pending').toLowerCase(),
+                    dateRaw: r.date || '',
+                    date: r.date
+                      ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                      : '--',
+                    receivedAt: r.receivedAt || null,
+                  });
+                });
+                POS_ORDERS.sort((a, b) => {
+                  const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : 1);
+                  return rank(a.status) - rank(b.status);
+                });
+              })
+              .catch(() => {});
+          }
+        });
+      }
     }
 
     /* ============== EMPLOYEES ============== */

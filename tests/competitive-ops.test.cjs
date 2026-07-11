@@ -133,6 +133,14 @@ test('low-stock auto PO and CSV export', () => {
   assert.match(html, /btn-export-low-stock|btn-auto-draft-pos/);
 });
 
+test('receive stock against purchase order', () => {
+  const manage = fs.readFileSync(path.join(root, 'assets/features-manage.js'), 'utf8');
+  assert.match(manage, /receivePurchaseOrder/);
+  assert.match(manage, /data-po-recv|Receive stock/);
+  assert.match(manage, /parsePoLines/);
+  assert.match(manage, /status:\s*'received'|receivedAt/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);

@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v74 (2026-07-11) — Receive stock against PO
+
+- **Purchase orders**: View / Print / **Receive stock** (adds qty to inventory)
+- Missing ingredients auto-created on receive when not in stock list
+- Open POs sorted first; empty state + refresh; open-count pill
+- Manual Raise PO parses item lines for later receive
+
 ## v73 (2026-07-11) — Low-stock reorder pack
 
 - **Auto-draft POs**: preview modal (by supplier/category), structured lines, pending POs
@@ -108,7 +115,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v73-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v74-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 
