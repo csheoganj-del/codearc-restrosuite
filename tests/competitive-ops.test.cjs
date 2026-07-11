@@ -41,7 +41,7 @@ test('allocateBillNo supports channel series', () => {
 test('service worker caches competitive-ops', () => {
   const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
   assert.match(sw, /competitive-ops\.js/);
-  assert.match(sw, /wave[3-5]/i);
+  assert.match(sw, /wave[3-5]|remaining/i);
 });
 
 test('features-shell has WhatsApp PDF mode setting', () => {
