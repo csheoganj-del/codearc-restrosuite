@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v52-20260711-wave5';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v53-20260711-remaining';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -1464,6 +1464,7 @@
 <script src="assets/print-bridge.js"></script>
 <script src="assets/escpos-encoder.js"></script>
 <script src="assets/modules/bill-identity.js"></script>
+<script src="assets/modules/inventory-ledger.js"></script>
 <script src="assets/saas-core.js"></script>
 <script src="assets/license-config.js"></script>
 <script src="assets/license-guard.js"></script>
