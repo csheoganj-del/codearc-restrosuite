@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v101 (2026-07-11) — Guest-first table QR (print + scan landing)
+
+- **Printed table QR cards redesigned for guests**: TABLE # is primary, large high-ECC QR, 3-step “camera → QR → order”, Wi‑Fi/no-app hint, cut guides
+- **Staff tip sheet** on multi-print (open QR session, seating checklist)
+- Single-card modal explains guest path + staff session warning
+- **Session closed gate** is warm/branded (not scary black “power off”) — clear “ask host + refresh”
+- **Instant first paint** of table # + outlet from URL on `order.html` / `qr-order.html`
+- Hero copy: “No app needed”
+
 ## v100 (2026-07-11) — Ops screens 10/10 (except Online Orders)
 
 - **QR Orders**: live relative timers (no frozen “9h ago”), empty state with Floor/Refresh CTAs, aging highlight, item notes, dynamic table count, oldest-first within status

@@ -416,10 +416,10 @@
   </div>
 </header>
 
-<!-- HERO -->
+<!-- HERO — first impression after table QR scan -->
 <div class="hero">
   <div class="hero-title" id="hero-title">Browse &amp; <span>Order</span></div>
-  <div class="hero-sub" id="hero-sub">Add items to your cart and we'll bring it right to you!</div>
+  <div class="hero-sub" id="hero-sub">Order from your phone — food comes to your table. No app needed.</div>
 </div>
 
 <!-- Service dock -->
@@ -543,10 +543,28 @@
 
   function slugToName(s){ return s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
   const restName = slug ? slugToName(slug) : '';
+
+  // Instant first paint from URL (before API) — guest must see table # immediately
+  (function paintTableFast() {
+    try {
+      if (tNum) {
+        var pad = /^\d+$/.test(String(tNum)) ? String(tNum).padStart(2, '0') : String(tNum);
+        var pill = document.getElementById('table-pill');
+        var ptxt = document.getElementById('table-pill-txt');
+        if (ptxt) ptxt.textContent = 'Table ' + pad;
+        if (pill) pill.style.display = 'flex';
+        document.title = 'Table ' + pad + (restName ? ' · ' + restName : ' · Order');
+      }
+      if (restName) {
+        var rn = document.getElementById('rest-name');
+        if (rn && (/loading/i.test(rn.textContent) || !rn.textContent.trim())) rn.textContent = restName;
+      }
+    } catch (e) {}
+  })();
   var uiLang = (function(){ try { return localStorage.getItem('rs_guest_lang') || 'en'; } catch(e){ return 'en'; } })();
   var STR = {
     en: {
-      browse: 'Browse & Order', heroSub: 'Order from your table — kitchen gets it instantly.',
+      browse: 'Browse & Order', heroSub: 'Order from your phone — food comes to your table. No app needed.',
       search: 'Search dishes…', all: 'All', veg: 'Veg', nonveg: 'Non-veg',
       cart: 'Your Order', place: 'Place Order', nameReq: 'Your name (required)',
       phone: 'Phone (optional)', track: 'Track my order', more: 'Order more', home: 'Table home',
@@ -555,7 +573,7 @@
       sent: 'Request sent to staff', empty: 'No items match your filters'
     },
     hi: {
-      browse: 'मेनू देखें और ऑर्डर करें', heroSub: 'टेबल से ऑर्डर करें — किचन तुरंत पाएगा।',
+      browse: 'मेनू देखें और ऑर्डर करें', heroSub: 'फ़ोन से ऑर्डर करें — खाना टेबल पर आएगा। ऐप नहीं चाहिए।',
       search: 'डिश खोजें…', all: 'सभी', veg: 'वेज', nonveg: 'नॉन-वेज',
       cart: 'आपका ऑर्डर', place: 'ऑर्डर करें', nameReq: 'नाम (ज़रूरी)',
       phone: 'फ़ोन (वैकल्पिक)', track: 'ऑर्डर ट्रैक करें', more: 'और ऑर्डर', home: 'टेबल होम',
@@ -678,30 +696,55 @@
 
     if (status === 'active') return;
 
-    var title = 'Table Session Closed';
-    var desc = 'This table does not have an active session. Please contact staff or scan the QR code again once seated.';
-    var icon = 'fa-power-off';
-    var color = '#ef4444';
+    var tableTxt = tNum
+      ? ('Table ' + (String(tNum).match(/^\d+$/) ? String(tNum).padStart(2, '0') : tNum))
+      : 'This table';
+    var outletTxt = (document.getElementById('rest-name') && document.getElementById('rest-name').textContent) || restName || 'the restaurant';
+    if (/loading/i.test(outletTxt)) outletTxt = restName || 'the restaurant';
+
+    var title = 'Almost ready';
+    var desc =
+      tableTxt +
+      ' is not open for phone ordering yet. Wave to your host — they open the table in a second, then tap Refresh.';
+    var icon = 'fa-mug-hot';
+    var accent = '#FF4F00';
+    var tip = 'You scanned the right QR. Staff just need to open the session.';
 
     if (status === 'paused') {
-      title = 'QR Ordering Paused';
-      desc = 'Ordering is temporarily paused for this table. Please ask staff for assistance.';
+      title = 'Ordering paused';
+      desc = tableTxt + ' is temporarily paused. Ask staff to resume, then refresh this page.';
       icon = 'fa-pause';
-      color = 'var(--orange)';
+      tip = 'Your host can turn QR ordering back on from the floor map.';
     }
 
-    var overlayHtml = `
-      <div id="session-status-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; font-family:sans-serif; color:#fff;">
-        <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:40px 30px; border-radius:24px; max-width:400px; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
-          <i class="fa-solid ${icon}" style="font-size:64px; color:${color}; margin-bottom:20px;"></i>
-          <h2 style="font-size:24px; font-weight:800; margin:0 0 12px 0;">${title}</h2>
-          <p style="font-size:14px; line-height:1.6; color:#a1a1aa; margin:0 0 24px 0;">${desc}</p>
-          <button onclick="window.location.reload();" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:12px; font-size:14px;">
-            <i class="fa-solid fa-rotate-right" style="margin-right:6px;"></i> Refresh Page
-          </button>
-        </div>
-      </div>
-    `;
+    var overlayHtml =
+      '<div id="session-status-overlay" role="alertdialog" aria-modal="true" aria-labelledby="sess-title" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(165deg,#1A1714 0%,#2C241C 55%,#1A1714 100%);font-family:\'DM Sans\',system-ui,sans-serif;color:#fff">' +
+      '<div style="width:100%;max-width:380px;background:#FAF6F1;color:#1A1714;border-radius:20px;padding:28px 22px 22px;box-shadow:0 24px 48px rgba(0,0,0,.35);text-align:center">' +
+      '<div style="width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:rgba(255,79,0,.12);display:flex;align-items:center;justify-content:center">' +
+      '<i class="fa-solid ' +
+      icon +
+      '" style="font-size:28px;color:' +
+      accent +
+      '"></i></div>' +
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6E675F;margin-bottom:6px">' +
+      escHtml(outletTxt) +
+      ' · ' +
+      escHtml(tableTxt) +
+      '</div>' +
+      '<h2 id="sess-title" style="font-family:\'Fraunces\',Georgia,serif;font-size:22px;font-weight:700;margin:0 0 10px;color:#1A1714">' +
+      title +
+      '</h2>' +
+      '<p style="font-size:14px;line-height:1.55;color:#4A453F;margin:0 0 12px">' +
+      desc +
+      '</p>' +
+      '<p style="font-size:12px;line-height:1.45;color:#6E675F;margin:0 0 20px;padding:10px 12px;background:#fff;border-radius:10px;border:1px solid rgba(26,23,20,.08)">' +
+      tip +
+      '</p>' +
+      '<button type="button" onclick="window.location.reload();" style="width:100%;padding:14px 18px;font-weight:700;border-radius:12px;font-size:15px;border:none;cursor:pointer;background:#FF4F00;color:#fff;font-family:inherit;box-shadow:0 6px 16px rgba(255,79,0,.28)">' +
+      '<i class="fa-solid fa-rotate-right" style="margin-right:8px"></i>I\'m ready — refresh' +
+      '</button>' +
+      '<button type="button" onclick="document.getElementById(\'session-status-overlay\').remove()" style="width:100%;margin-top:8px;padding:12px;font-weight:600;border-radius:12px;font-size:13px;border:1px solid rgba(26,23,20,.12);cursor:pointer;background:transparent;color:#4A453F;font-family:inherit">Browse menu only (can\'t order yet)</button>' +
+      '</div></div>';
     document.body.insertAdjacentHTML('beforeend', overlayHtml);
   }
 
