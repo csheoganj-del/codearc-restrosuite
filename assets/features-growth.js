@@ -1206,7 +1206,9 @@
           ];
       const total = items.reduce((a, i) => a + Number(i.price) * Number(i.qty), 0);
       const stamp = Date.now();
+      const id = stamp * 1000 + Math.floor(Math.random() * 1000);
       const row = {
+        id,
         orderId: `${plat.slice(0, 3).toUpperCase()}-${String(stamp).slice(-6)}`,
         tableNumber: 'Delivery',
         orderType: 'Online Delivery',
@@ -1222,7 +1224,7 @@
         priority: 'normal',
       };
       try {
-        const saved = await RS_DB.put('pending_orders', null, row);
+        const saved = await RS_DB.put('pending_orders', id, row);
         if (saved && saved.id) row.id = saved.id;
         if (window.RS_SYNC && RS_SYNC.syncPendingOrders) await RS_SYNC.syncPendingOrders({ forceCloud: true });
         RS.toast(`Demo ${platName[plat] || plat} order seeded`, 'fa-seedling');
