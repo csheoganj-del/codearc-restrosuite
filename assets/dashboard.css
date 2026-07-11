@@ -1297,8 +1297,13 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 }
 .qr-ch { display: flex; align-items: center; justify-content: space-between; padding: 13px 15px; border-bottom: 1px solid var(--stroke); }
 .qr-ch .tnum { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
-.qr-ch .qtime { font-size: 11.5px; color: var(--text-mute); }
+.qr-ch .qtime { font-size: 11.5px; color: var(--text-mute); font-variant-numeric: tabular-nums; }
+.qr-ch .qtime.mid { color: var(--amber); font-weight: 600; }
+.qr-ch .qtime.late { color: var(--red); font-weight: 700; }
+.qr-card.qr-aging { border-color: color-mix(in srgb, var(--red) 35%, var(--stroke)); }
 .qr-ch .qguest { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+.qr-lines .qnote { font-size: 11px; color: var(--amber); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+.qr-empty, .kds-empty { border: 1px dashed var(--stroke); border-radius: var(--r-md); background: color-mix(in srgb, var(--panel) 92%, transparent); }
 .badge-count.badge-urgent {
   background: var(--amber) !important;
   color: #1a1a1a !important;
@@ -1329,6 +1334,37 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .kds-item .knote { font-size: 11.5px; color: var(--amber); }
 .kds-item.done .kn { text-decoration: line-through; color: var(--text-faint); }
 .kds-foot { padding: 12px 15px; border-top: 1px solid var(--stroke); }
+
+/* Bills filters */
+.bills-result-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mute);
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.bills-filter-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  background: color-mix(in srgb, var(--orange) 8%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--orange) 22%, var(--stroke));
+  border-radius: var(--r-sm);
+  line-height: 1.4;
+}
+.bills-filter-hint i { color: var(--orange); margin-top: 2px; }
+#bills-pay-filter.bills-filter-flash,
+#bills-status-filter.bills-filter-flash {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+  border-color: var(--orange) !important;
+  transition: outline .2s ease;
+}
+.data-table .td-time { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--text-soft); }
 
 /* ===================== REPORTS / charts ===================== */
 .report-grid { display: grid; grid-template-columns: var(--cols, 1.6fr 1fr); gap: 16px; }

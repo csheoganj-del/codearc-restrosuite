@@ -132,6 +132,8 @@
 .table-card.held .tstate { color: #b45309; }
 .table-card.billed { border-color: color-mix(in srgb, var(--violet) 40%, transparent); }
 .table-card.billed .tstate { color: var(--violet-soft); }
+.table-card.table-long { box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 30%, transparent); }
+.table-card:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .table-card .tdot { position: absolute; top: 14px; right: 14px; width: 9px; height: 9px; border-radius: 50%; }
 .table-held-badge {
   position: absolute;

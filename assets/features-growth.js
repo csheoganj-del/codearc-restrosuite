@@ -419,32 +419,45 @@
           <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
           <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill"><i class="fa-solid fa-location-dot"></i> Ground floor</span></div>
-        <div class="floor-grid">${TABLES.map(
+        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill" title="Live seating map"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
+        <div class="floor-grid">${TABLES.length ? TABLES.map(
           (t) => `
-          <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}" data-n="${esc(t.n)}">
+          <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}">
             <span class="tdot" style="background:${stateDot[t.state] || stateDot.free}"></span>
             ${t.state === 'held' ? '<span class="table-held-badge"><i class="fa-solid fa-pause"></i> Held</span>' : ''}
             ${t.state === 'pending' ? '<span class="table-held-badge table-qr-badge"><i class="fa-solid fa-qrcode"></i> New</span>' : ''}
-            <div class="tnum2">Table ${esc(t.n)}</div><div class="tcap"><i class="fa-solid fa-user-group" style="font-size:10px"></i> ${esc(t.cap)} seats</div>
+            <div class="tnum2">Table ${esc(t.name || t.n)}</div><div class="tcap"><i class="fa-solid fa-user-group" style="font-size:10px"></i> ${esc(t.cap)} seats</div>
             <div class="tstate">${stateTxt[t.state] || t.state}${(t.state === 'free' && t.reservedInfo) ? ` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time || '')}${t.reservedInfo.guestName ? ' · ' + esc(t.reservedInfo.guestName) : ''}</span>` : ''}${t.guest ? ` · ${esc(t.guest)}` : ''}</div>
             ${t.amt ? `<div class="tamt">${rs(t.amt)}</div><div class="tcap">${esc(t.since)}${t.itemCount ? ' · ' + t.itemCount + ' items' : ''}</div>` : '<div class="tcap" style="margin-top:auto">Tap to seat</div>'}
           </div>`
-        ).join('')}</div>`;
-      $$('.table-card', sec).forEach(
-        (c) =>
-          (c.onclick = () => tableModal(TABLES.find((t) => String(t.n) === String(c.dataset.n))))
-      );
+        ).join('') : `<div class="sr-empty" style="grid-column:1/-1;padding:40px 20px"><i class="fa-solid fa-chair" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i><div style="font-weight:700;margin-bottom:4px">No tables configured</div><div style="color:var(--text-soft);font-size:13px;margin-bottom:12px">Add tables with Edit Tables to start seating guests.</div><button type="button" class="btn btn-primary btn-sm" id="btn-manage-seating-empty"><i class="fa-solid fa-plus"></i> Add tables</button></div>`}</div>`;
+      $$('.table-card', sec).forEach((c) => {
+        const open = () => tableModal(TABLES.find((t) => String(t.n) === String(c.dataset.n)));
+        c.onclick = open;
+        c.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            open();
+          }
+        };
+      });
       const btnPrint = $('#btn-print-floor-qrs', sec);
       if (btnPrint) btnPrint.onclick = () => showAllTableQRs();
-      const btnManage = $('#btn-manage-seating', sec);
+      const btnManage = $('#btn-manage-seating', sec) || $('#btn-manage-seating-empty', sec);
       if (btnManage) btnManage.onclick = () => openManageSeatingModal();
       const btnRefresh = $('#btn-refresh-floor', sec);
       if (btnRefresh)
         btnRefresh.onclick = () => {
           if (window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: true });
           renderFloor();
+          try {
+            if (window.RS && typeof RS.toast === 'function') RS.toast('Floor refreshed', 'fa-rotate');
+          } catch (e) {}
         };
+      // Expose live table count for QR stats (active / total)
+      try {
+        if (window.RS) window.RS.TABLES = TABLES.slice();
+      } catch (e) {}
     }
 
     function openManageSeatingModal() {
@@ -962,6 +975,15 @@
           } catch (e) {}
         }, 400);
       });
+      // Keep seated durations fresh while floor is visible
+      setInterval(() => {
+        const tab = document.getElementById('floor-tab');
+        if (tab && tab.classList.contains('active')) {
+          try {
+            renderFloor();
+          } catch (e) {}
+        }
+      }, 60000);
     }
 
     /* ===================== ONLINE / AGGREGATOR ORDERS ===================== */

@@ -1000,27 +1000,33 @@
           replaceArr(KDS, mappedKds);
         }
 
-        // 2. Update QR_ORDERS
+        // 2. Update QR_ORDERS — keep dateTime so UI can live-refresh relative ages
         const activeQr = rows.filter(r => r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready');
-        const mappedQr = activeQr.map(r => ({
-          id: r.id,
-          orderId: r.orderId,
-          table: r.tableNumber,
-          customerName: r.customerName || '',
-          customerPhone: r.customerPhone || '',
-          orderType: r.orderType || 'Dine-in',
-          time: getRelativeTime(r.dateTime),
-          status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
-          items: (r.items || []).map(it => ({
-            id: it.id,
-            name: it.name || 'Item',
-            qty: Number(it.qty || 1),
-            price: Number(it.price || 0),
-            taxCategory: it.taxCategory || it.tax_category,
-            notes: it.notes || ''
-          })),
-          total: r.total
-        }));
+        const mappedQr = activeQr.map(r => {
+          const ts = parseOrderTimestamp(r.dateTime);
+          return {
+            id: r.id,
+            orderId: r.orderId,
+            table: r.tableNumber,
+            customerName: r.customerName || '',
+            customerPhone: r.customerPhone || '',
+            orderType: r.orderType || 'Dine-in',
+            dateTime: r.dateTime || null,
+            start: ts || Date.now(),
+            time: getRelativeTime(r.dateTime),
+            status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
+            items: (r.items || []).map(it => ({
+              id: it.id,
+              name: it.name || 'Item',
+              qty: Number(it.qty || 1),
+              price: Number(it.price || 0),
+              taxCategory: it.taxCategory || it.tax_category,
+              notes: it.notes || '',
+              cat: it.cat || it.category || it.station || ''
+            })),
+            total: r.total
+          };
+        });
         replaceArr(QR_ORDERS, mappedQr);
 
         // Re-render KDS and QR boards

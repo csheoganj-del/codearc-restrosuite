@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v100 (2026-07-11) — Ops screens 10/10 (except Online Orders)
+
+- **QR Orders**: live relative timers (no frozen “9h ago”), empty state with Floor/Refresh CTAs, aging highlight, item notes, dynamic table count, oldest-first within status
+- **Kitchen Display**: real empty state (“Send KOT from POS”), station filters wired (All / Tandoor / Curry / Beverages), search empty, mark-ready clears to empty properly
+- **Floor**: table count pill, empty seating CTA, keyboard focus, long-stay hint, 60s age refresh, refresh toast, exposes `RS.TABLES` for QR stats
+- **Bills**: Filter button works (highlights Payment/Status headers), result count meta, empty table state, Refunded (not Voided) label, denser time column
+
 ## v99 (2026-07-11) — Bills Export CSV + ops fixes
 
 - **Export CSV fixed**: no longer depends on missing `RS_ProgressOverlay` (was a silent crash)

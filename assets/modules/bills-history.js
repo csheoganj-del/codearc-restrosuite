@@ -757,19 +757,76 @@
     });
   }
 
+  /** Filter button focuses the inline Payment / Status selects (no dead control). */
+  function wireFilterButton() {
+    const btn = document.getElementById('btn-bills-filter');
+    if (!btn || btn.dataset.rsFilterBound === '1') return;
+    btn.dataset.rsFilterBound = '1';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const pay = document.getElementById('bills-pay-filter');
+      const status = document.getElementById('bills-status-filter');
+      const bar = document.getElementById('bills-filter-hint');
+      if (bar) {
+        bar.hidden = !bar.hidden;
+        bar.setAttribute('aria-hidden', bar.hidden ? 'true' : 'false');
+      }
+      // Highlight header filters so staff see Payment / Status dropdowns
+      [pay, status].forEach((el) => {
+        if (!el) return;
+        el.classList.add('bills-filter-flash');
+        setTimeout(() => el.classList.remove('bills-filter-flash'), 1600);
+      });
+      if (pay) {
+        try {
+          pay.focus();
+        } catch (_) {}
+      }
+      toast('Use Payment & Status filters in the table header', 'fa-filter');
+    });
+  }
+
+  function statusPillHtml(b) {
+    const st = String((b && b.status) || '').toLowerCase();
+    if (st === 'paid') return '<span class="pill pill-green" style="padding:3px 9px">Paid</span>';
+    if (st === 'refunded' || st === 'voided' || st === 'void')
+      return '<span class="pill pill-red" style="padding:3px 9px">Refunded</span>';
+    return `<span class="pill" style="padding:3px 9px">${_e(b.status || '—')}</span>`;
+  }
+
   function paintBillsTable(filtered) {
     const body = $('#bills-table-body');
     if (!body) return;
+
+    if (!filtered.length) {
+      const q = ($('#bills-search') && $('#bills-search').value) || '';
+      const hasFilter =
+        q.trim() ||
+        (($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All') !== 'All' ||
+        (($('#bills-status-filter') && $('#bills-status-filter').value) || 'All') !== 'All';
+      body.innerHTML = `<tr class="bills-empty-row"><td colspan="8" style="padding:0;border:none">
+        <div class="sr-empty" style="padding:40px 20px">
+          <i class="fa-solid fa-file-invoice-dollar" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i>
+          <div style="font-weight:700;color:var(--text);margin-bottom:4px">${hasFilter ? 'No bills match your filters' : 'No bills yet today'}</div>
+          <div style="color:var(--text-soft);font-size:13px;max-width:360px;margin:0 auto">${
+            hasFilter
+              ? 'Clear search or set Payment / Status to All.'
+              : 'Completed sales from POS appear here for reprint, export, and day report.'
+          }</div>
+        </div>
+      </td></tr>`;
+      return;
+    }
 
     body.innerHTML = filtered
       .map(
         (b) => `
       <tr data-bill-no="${_e(b.no || b.orderId || b.id || '')}">
-        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(formatBillTime(b) || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
-        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
+        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td class="td-time" title="${_e(formatBillTimeIsoExcel(b) || '')}">${_e(formatBillTime(b) || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
+        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay || '—')}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
-        <td>${b.status === 'paid' ? '<span class="pill pill-green" style="padding:3px 9px">Paid</span>' : '<span class="pill pill-red" style="padding:3px 9px">Voided</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button><button class="icon-act rebill-act" title="Rebill / load into POS" aria-label="Rebill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-rotate"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Void / refund" aria-label="Void bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-ban"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
+        <td>${statusPillHtml(b)}</td>
+        <td><div class="row-actions"><button type="button" class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button type="button" class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button><button type="button" class="icon-act rebill-act" title="Rebill / load into POS" aria-label="Rebill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-rotate"></i></button><button type="button" class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button type="button" class="icon-act danger refund-act" title="Void / refund" aria-label="Void bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-ban"></i></button><button type="button" class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
       </tr>`
       )
       .join('');
@@ -825,6 +882,16 @@
     const merged = mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
     paintBillsTable(merged);
 
+    // Visible count chip next to search
+    const meta = document.getElementById('bills-result-meta');
+    if (meta) {
+      const n = merged.length;
+      const filtered =
+        (q && q.trim()) || payFilter !== 'All' || statusFilter !== 'All';
+      meta.textContent = filtered ? `${n} of ${count}` : n ? `${n} bill${n === 1 ? '' : 's'}` : '';
+      meta.hidden = !n && !filtered;
+    }
+
     // Wave 7: async server search when query is long enough
     const gen = ++_searchGen;
     if (String(q || '').trim().length >= 2) {
@@ -864,6 +931,7 @@
   function bindFilters() {
     renderBills();
     wireExportButton();
+    wireFilterButton();
     const search = $('#bills-search');
     if (search && !search._rsListenerBound) {
       search._rsListenerBound = true;
@@ -898,6 +966,7 @@
     exportBillsCsv,
     formatBillTime,
     wireExportButton,
+    wireFilterButton,
   };
 
   global.RSBillsHistory = api;
@@ -916,11 +985,13 @@
     document.addEventListener('DOMContentLoaded', () => {
       try {
         wireExportButton();
+        wireFilterButton();
       } catch (_) {}
     });
   } else {
     try {
       wireExportButton();
+      wireFilterButton();
     } catch (_) {}
   }
 })(typeof window !== 'undefined' ? window : globalThis);

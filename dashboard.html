@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v99-20260711-ops';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v100-20260711-ops10';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -791,10 +791,15 @@
         </div>
         <div class="panel panel-pad">
           <div class="toolbar-row">
-            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…"></div>
-            <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-filter"></i> Filter</button>
-            <button class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
-            <button class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print day report</button>
+            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…" autocomplete="off" aria-label="Search bills"></div>
+            <span id="bills-result-meta" class="bills-result-meta" hidden></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Payment & status filters are in the table header"><i class="fa-solid fa-filter"></i> Filter</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print day report</button>
+          </div>
+          <div id="bills-filter-hint" class="bills-filter-hint" hidden aria-hidden="true">
+            <i class="fa-solid fa-circle-info"></i>
+            Filters live in the <b>Payment</b> and <b>Status</b> columns of the table header. Export CSV respects the same filters.
           </div>
           <div class="table-scroll"><table class="data-table">
             <thead>
