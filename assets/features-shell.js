@@ -215,12 +215,16 @@
         ${toggle('Auto-print receipt','Print automatically after payment',true)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
         <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}</div>
+        <div class="set-section form-grid-2" style="margin-top:12px">
+          ${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}
+        </div>
+        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices.</p>
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
           ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or the waiter app. QR ordering still works, but every order lands only in your own POS/order dashboard, never the KDS or waiter screens. Manager/admin only.',false)}
         </div>`,
       gateway:`<div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Configure your WhatsApp gateway for this outlet</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</span></div></div>
         ${toggle('Auto-send receipts','WhatsApp the bill to customer after payment',true)}
-        ${sel('WhatsApp bill format',['Text receipt','Thermal PDF receipt'],'Text receipt')}
+        ${sel('WhatsApp bill format',['Text receipt','Thermal PDF receipt'],'Thermal PDF receipt')}
         ${toggle('Order updates','Notify customer when order is ready',true)}
         ${toggle('Marketing broadcasts','Allow promotional campaigns',true)}
         <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining with us. Your bill is attached.</textarea></div>

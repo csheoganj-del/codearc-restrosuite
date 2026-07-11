@@ -360,9 +360,24 @@
     }
   }
 
-  /** PDF = pixel capture of the same HTML used in Bill settled preview. */
+  /** PDF = pixel capture of the same HTML used in Bill settled preview.
+   *  opts.mode = 'thermal' uses lighter pure-jsPDF path when RS.compileThermalPDF exists.
+   */
   async function toPDF(bill, opts) {
     const options = opts || {};
+    const preferThermal = options.mode === 'thermal'
+      || (global.RS_SETTINGS && (global.RS_SETTINGS.set_wa_thermal_pdf === true || global.RS_SETTINGS.set_wa_thermal_pdf === 'true' || global.RS_SETTINGS.set_receipt_pdf_mode === 'thermal'));
+    if (preferThermal && global.RS && typeof global.RS.compileThermalPDF === 'function') {
+      try {
+        const thermal = await global.RS.compileThermalPDF(bill);
+        if (thermal) {
+          setCachedPdf(bill, thermal);
+          return thermal;
+        }
+      } catch (e) {
+        console.warn('[Receipt] thermal PDF failed, using preview capture', e && e.message);
+      }
+    }
     if (!options.skipCache) {
       const cached = getCachedPdf(bill);
       if (cached) return cached;

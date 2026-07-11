@@ -449,15 +449,19 @@
   }
 
   /** Server-allocated bill number (Wave 2). Falls back to nextBillNo locally. */
-  async function allocateBillNo(existingBills = []) {
+  async function allocateBillNo(existingBills = [], channel) {
     const day = shortDateKey();
+    // Wave 3: channel series prefix (DI/TK/DL) while keeping server sequence when possible
+    const ch = String(channel || '').toLowerCase();
+    const chCode = ch.includes('deliver') || ch.includes('online') ? 'DL'
+      : (ch.includes('take') || ch.includes('parcel') ? 'TK' : 'DI');
     try {
       if (window.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
         const res = await Promise.race([
           RS_API.data({ operation: 'next_bill_no', day }),
           new Promise((_, rej) => setTimeout(() => rej(new Error('next_bill_no timeout')), 4000)),
         ]);
-        const no = (res && (res.no || res.order_id || res.data)) || null;
+        let no = (res && (res.no || res.order_id || res.data)) || null;
         if (no && typeof no === 'string' && /^RS-\d{6}-\d+$/i.test(no)) {
           // Keep local counter at least as high as server (avoid offline collisions later)
           try {
@@ -470,13 +474,16 @@
               if (seq > stored) localStorage.setItem(seqKey, String(seq));
             }
           } catch (_) {}
+          // Optional channel-tagged human number: RS-DI-YYMMDD-001
+          no = no.replace(/^RS-/, 'RS-' + chCode + '-');
           return no;
         }
       }
     } catch (e) {
       console.warn('[BillNo] server allocate failed, using local sequence:', e && e.message);
     }
-    return nextBillNo(existingBills);
+    const local = nextBillNo(existingBills);
+    return String(local).replace(/^RS-/, 'RS-' + chCode + '-');
   }
 
   /** Client idempotency key + temporary local id (cloud may replace with identity PK). */
@@ -1003,7 +1010,28 @@
       if (e.key === 'Enter' || e.key === ' ') openMobilePOSCart(e);
     });
   }
-  function addToCart(id){ const m=MENU.find(x=>String(x.id)===String(id)); const line=cart.find(c=>String(c.id)===String(id)); if(line) line.qty++; else cart.push({...m,qty:1}); renderCart(); toast(`${m.name} added`,'fa-plus'); }
+  function addToCart(id){
+    const m=MENU.find(x=>String(x.id)===String(id));
+    if (!m) return;
+    // Wave 3: soft stock/recipe warning before add
+    try {
+      if (Array.isArray(m.ingredients) && m.ingredients.length && INVENTORY.length) {
+        const short = m.ingredients.filter(ing => {
+          const inv = INVENTORY.find(i => i.name === ing.name);
+          return inv && (Number(inv.stock) || 0) < (Number(ing.qty) || 0);
+        });
+        if (short.length) {
+          toast(`Low stock for ${short.map(s => s.name).slice(0,2).join(', ')}`, 'fa-triangle-exclamation');
+        }
+      } else if (!m.ingredients || !m.ingredients.length) {
+        // silent — competitive-ops banner covers cart-level
+      }
+    } catch (_) {}
+    const line=cart.find(c=>String(c.id)===String(id));
+    if(line) line.qty++; else cart.push({...m,qty:1});
+    renderCart();
+    toast(`${m.name} added`,'fa-plus');
+  }
   function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
   function renderCart(){
     const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
@@ -2281,6 +2309,13 @@
     b.status = 'refunded';
     b.refundReason = reason || 'POS refund';
     b.refundedAt = new Date().toISOString();
+    // Wave 3: audit trail metadata
+    try {
+      const s = window.RS_API && RS_API.session ? RS_API.session() : {};
+      b.refundedBy = s.display_name || s.username || 'staff';
+      b.refundStation = (window.RSOps && RSOps.getStationLabel) ? RSOps.getStationLabel() : '';
+      b.refundShiftId = (window.RSOps && RSOps.getOpenShift && RSOps.getOpenShift()) ? RSOps.getOpenShift().shiftId : (b.shiftId || '');
+    } catch (_) {}
     let cloudMarked = false;
     try {
       if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
@@ -2289,13 +2324,37 @@
           table:'doppio_refund_requests',
           operation:'insert',
           data:{
-            order_id:String(b.id || b.no),
-            amount:Number(b.amount || 0),
+            order_id:String(b.no || b.orderId || b.id),
+            amount:Number(b.amount || b.total || 0),
             reason:b.refundReason,
-            status:'approved'
+            status:'approved',
+            metadata: {
+              refunded_by: b.refundedBy || '',
+              station: b.refundStation || '',
+              shift_id: b.refundShiftId || '',
+              bill_id: b.id,
+            }
           },
           returning:false
-        });
+        }).catch(() => {});
+        // Also write tenant audit log when available
+        try {
+          await RS_API.data({
+            table: 'tenant_audit_logs',
+            operation: 'insert',
+            data: {
+              action: 'bill.refund',
+              target_type: 'doppio_bills',
+              metadata: {
+                order_id: b.no || b.orderId,
+                amount: Number(b.amount || b.total || 0),
+                reason: b.refundReason,
+                station: b.refundStation,
+              },
+            },
+            returning: false,
+          });
+        } catch (_) {}
         const billFilters = Number.isFinite(Number(b.id))
           ? [{ operator:'eq', column:'id', value:Number(b.id) }]
           : [{ operator:'eq', column:'order_id', value:String(b.no || b.orderId || '') }];
@@ -2310,7 +2369,7 @@
       console.warn('Refund cloud update failed', e);
     }
     renderBills();
-    toast(cloudMarked ? 'Refund recorded in cloud' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
+    toast(cloudMarked ? 'Refund recorded + audit trail' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
   }
 
   /** Refund detail modal -- returns reason string, or null if cancelled */
