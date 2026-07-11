@@ -82,7 +82,7 @@ test('inventory-ui module extracted (wave 7)', () => {
   assert.ok(!dash.includes('btn-auto-draft-pos'), 'heavy inventory UI should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /inventory-ui\.js/);
-  assert.match(html, /v55-20260711/);
+  assert.match(html, /v5[0-9]-20260711/);
 });
 
 test('bills-history has server search helpers (wave 7)', () => {
@@ -98,6 +98,31 @@ test('bills-actions e2e spec present (wave 7)', () => {
   const src = fs.readFileSync(path.join(root, 'tests/e2e/bills-actions.spec.cjs'), 'utf8');
   assert.match(src, /refund-act|rs-refund-overlay|rs-pin-overlay/);
   assert.match(src, /del-act|rs-del-overlay/);
+});
+
+test('reports-ui module extracted (wave 8)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/reports-ui.js'), 'utf8');
+  assert.match(src, /RSReportsUI/);
+  assert.match(src, /sales_summary/);
+  assert.match(src, /GSTR/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSReportsUI/);
+  assert.ok(!dash.includes('GSTR_report_'), 'GSTR export should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /reports-ui\.js/);
+  assert.match(html, /v56-20260711/);
+});
+
+test('gateway-monitor module extracted (wave 8)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/gateway-monitor.js'), 'utf8');
+  assert.match(src, /RSGatewayMonitor/);
+  assert.match(src, /pollSuperAdminGateway/);
+  assert.match(src, /loadAppIncidents/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSGatewayMonitor/);
+  assert.ok(!dash.includes('saas-notification-logs-container'), 'gateway logs UI should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /gateway-monitor\.js/);
 });
 
 test('USB and split docs exist', () => {

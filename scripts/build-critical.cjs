@@ -30,6 +30,8 @@ async function main() {
     'assets/modules/inventory-ledger.js',
     'assets/modules/bills-history.js',
     'assets/modules/inventory-ui.js',
+    'assets/modules/reports-ui.js',
+    'assets/modules/gateway-monitor.js',
     'assets/print-bridge.js',
     'assets/receipt.js',
     'assets/competitive-ops.js',

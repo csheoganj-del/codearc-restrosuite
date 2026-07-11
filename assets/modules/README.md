@@ -8,6 +8,8 @@ Small IIFE modules loaded **before** `dashboard.js` so the god file can delegate
 | `inventory-ledger.js` | `RSInventoryLedger` | Atomic/local stock deduct + restore |
 | `bills-history.js` | `RSBillsHistory` | Bills table UI, refund/delete, server search |
 | `inventory-ui.js` | `RSInventoryUI` | Stock table, recipes, PO draft, ingredient CRUD |
+| `reports-ui.js` | `RSReportsUI` | Sales reports, GSTR CSV, payment/category charts |
+| `gateway-monitor.js` | `RSGatewayMonitor` | Super-admin WhatsApp gateway + app incidents |
 | `../escpos-encoder.js` | `RSEscPos` | ESC/POS thermal encoding |
 | `../print-bridge.js` | `RSPrintBridge` | Desktop/web print routing |
 | `../competitive-ops.js` | `RSOps` | Shifts, station, keyboard, Z-report |

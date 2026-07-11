@@ -10,6 +10,8 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 | Inventory deduct/restore | `assets/modules/inventory-ledger.js` | ✅ |
 | Bills history UI (table, refund, delete) | `assets/modules/bills-history.js` | ✅ Wave 6 |
 | Inventory stock/recipes UI | `assets/modules/inventory-ui.js` | ✅ Wave 7 |
+| Reports UI | `assets/modules/reports-ui.js` | ✅ Wave 8 |
+| Gateway monitor + incidents | `assets/modules/gateway-monitor.js` | ✅ Wave 8 |
 | ESC/POS encode | `assets/escpos-encoder.js` | ✅ |
 | Print routing | `assets/print-bridge.js` | ✅ |
 | Shifts / station / keys | `assets/competitive-ops.js` | ✅ |
@@ -18,10 +20,9 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 
 | # | Domain | Approx lines | Notes |
 |---|--------|--------------|-------|
-| 1 | Reports | ~250 | Already uses `sales_summary` RPC |
-| 2 | Super-admin table | ~1200 | High isolation; own file + `RS.addRenderer` |
-| 3 | Gateway monitor | ~200 | Super-admin only |
-| 4 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last |
+| 1 | Super-admin table | ~1200 | High isolation; own file + `RS.addRenderer` |
+| 2 | KDS / QR orders | ~200 | Medium coupling to pending_orders |
+| 3 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last |
 
 ## Rules
 
@@ -34,5 +35,5 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 
 ```
 doppio-api → db → print-bridge → escpos → bill-identity → inventory-ledger → bills-history → inventory-ui
-→ saas-core → dashboard → features-pos → critical.bundle → shell
+→ reports-ui → gateway-monitor → saas-core → dashboard → features-pos → critical.bundle → shell
 ```
