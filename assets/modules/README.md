@@ -5,9 +5,12 @@ Small IIFE modules loaded **before** `dashboard.js` so the god file can delegate
 | Module | Global | Purpose |
 |--------|--------|---------|
 | `bill-identity.js` | `RSBillIdentity` | Bill numbers, channel series, idempotency |
+| `inventory-ledger.js` | `RSInventoryLedger` | Atomic/local stock deduct + restore |
 | `../escpos-encoder.js` | `RSEscPos` | ESC/POS thermal encoding |
 | `../print-bridge.js` | `RSPrintBridge` | Desktop/web print routing |
 | `../competitive-ops.js` | `RSOps` | Shifts, station, keyboard, Z-report |
+
+See also: `docs/DASHBOARD_SPLIT_MAP.md`, `docs/USB_THERMAL_PRINTING.md`.
 
 ## Convention
 

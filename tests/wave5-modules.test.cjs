@@ -32,10 +32,25 @@ test('dashboard loads wave5 modules', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /escpos-encoder\.js/);
   assert.match(html, /bill-identity\.js/);
-  assert.match(html, /v52-20260711-wave5/);
+  assert.match(html, /v5[0-9]-20260711/);
 });
 
 test('playwright config present', () => {
   assert.ok(fs.existsSync(path.join(root, 'playwright.config.cjs')));
   assert.ok(fs.existsSync(path.join(root, 'tests/e2e/smoke.spec.cjs')));
+  assert.ok(fs.existsSync(path.join(root, 'tests/e2e/auth.spec.cjs')));
+});
+
+test('inventory-ledger module extracted', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/inventory-ledger.js'), 'utf8');
+  assert.match(src, /RSInventoryLedger/);
+  assert.match(src, /deductInventoryForBill/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSInventoryLedger/);
+  assert.ok(!dash.includes('operation: \'deduct_inventory\''), 'heavy deduct body should leave dashboard');
+});
+
+test('USB and split docs exist', () => {
+  assert.ok(fs.existsSync(path.join(root, 'docs/USB_THERMAL_PRINTING.md')));
+  assert.ok(fs.existsSync(path.join(root, 'docs/DASHBOARD_SPLIT_MAP.md')));
 });

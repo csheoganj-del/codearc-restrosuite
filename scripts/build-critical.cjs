@@ -27,6 +27,7 @@ async function main() {
   const sources = [
     'assets/escpos-encoder.js',
     'assets/modules/bill-identity.js',
+    'assets/modules/inventory-ledger.js',
     'assets/print-bridge.js',
     'assets/receipt.js',
     'assets/competitive-ops.js',

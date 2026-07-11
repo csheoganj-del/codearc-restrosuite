@@ -1,12 +1,13 @@
 {
-  "builtAt": "2026-07-11T08:25:01.689Z",
+  "builtAt": "2026-07-11T08:29:33.597Z",
   "sources": [
     "assets/escpos-encoder.js",
     "assets/modules/bill-identity.js",
+    "assets/modules/inventory-ledger.js",
     "assets/print-bridge.js",
     "assets/receipt.js",
     "assets/competitive-ops.js"
   ],
-  "bytes": 44647,
-  "kb": 44
+  "bytes": 50424,
+  "kb": 49
 }
