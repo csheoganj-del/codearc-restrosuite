@@ -797,24 +797,33 @@
 /* Hold + KOT icons · Pay primary CTA */
 .cart-actions,
 .cart-actions-symbols {
-  display: grid; grid-template-columns: auto 1fr; gap: 5px; margin-top: 5px; align-items: stretch;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px; margin-top: 5px; align-items: stretch;
 }
 .cart-actions .hold-kot-row {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 88px;
+  display: grid; grid-template-columns: 40px 40px; gap: 4px;
 }
 .cart-actions .hold-btn-legacy { display: none !important; }
 .cart-actions-symbols .hold-btn-current,
 .cart-actions-symbols #btn-kot {
-  min-height: 40px; width: 100%; justify-content: center; padding: 0;
+  min-height: 40px; width: 40px; height: 40px; justify-content: center; padding: 0 !important;
   font-size: 14px; font-weight: 700; border-radius: 9px;
-  display: inline-flex; align-items: center; gap: 3px;
+  display: inline-flex !important; align-items: center; justify-content: center; gap: 2px;
+  border: 1px solid var(--stroke-2); background: var(--glass-2); color: var(--text);
 }
-.cart-actions-symbols .hold-count { font-size: 10px; font-weight: 800; }
+.cart-actions-symbols #btn-kot { color: var(--orange); }
+.cart-actions-symbols .hold-btn-current i,
+.cart-actions-symbols #btn-kot i { font-size: 14px; line-height: 1; }
+.cart-actions-symbols .hold-count { font-size: 9px; font-weight: 800; position: absolute; top: 2px; right: 3px; }
+.cart-actions-symbols .hold-btn-current { position: relative; }
 .cart-actions .btn { padding: 7px; font-size: 12px; min-height: 40px; }
 .cart-actions #btn-checkout {
   min-height: 40px; font-weight: 800; letter-spacing: 0.01em; border-radius: 10px;
   font-size: 13.5px; width: 100%;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
+/* Tender popover must not steal foot layout when closed */
+.cart-tender-popover .cart-tender-panel[hidden] { display: none !important; pointer-events: none; }
+.cart-foot .totals-compact { position: relative; z-index: 1; }
 .cart-empty-hint { font-size: 11px; padding: 8px !important; }
 .cart-empty-hint i { margin-right: 4px; opacity: .7; }
 /* Customer chip: icon + short label */

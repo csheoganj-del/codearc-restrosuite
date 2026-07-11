@@ -523,35 +523,35 @@ function renderCart(){
   const taxLabel = totals.taxProfile.tax_system || 'GST';
   const settings = window.RS_SETTINGS || {};
   
-  let metaHTML = `<span>Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
+  // Symbol labels (hover for full name) — keeps foot short for cart lines
+  let metaHTML = `<span title="Subtotal"><span class="tot-sym">Σ</span> <b id="t-sub">${rs(totals.sub)}</b></span>`;
   if (totals.disc > 0) {
-    metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
+    metaHTML += `<span style="color:var(--orange)" title="Discount"><i class="fa-solid fa-percent"></i> <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
   }
   if (totals.promo > 0) {
-    metaHTML += `<span style="color:var(--orange)">Promo${totals.promoCode ? ' ' + _e(totals.promoCode) : ''} <b id="t-promo">- ${rs(totals.promo)}</b></span>`;
+    metaHTML += `<span style="color:var(--orange)" title="Promo${totals.promoCode ? ' ' + _e(totals.promoCode) : ''}"><i class="fa-solid fa-tags"></i> <b id="t-promo">- ${rs(totals.promo)}</b></span>`;
   }
   if (totals.serviceCharge > 0) {
-    metaHTML += `<span>SC ${totals.serviceChargePct || 5}% <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
+    metaHTML += `<span title="Service charge ${totals.serviceChargePct || 5}%"><i class="fa-solid fa-concierge-bell"></i> <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
   }
   if (totals.tip > 0) {
-    metaHTML += `<span style="color:var(--green)">Tip <b id="t-tip">${rs(totals.tip)}</b></span>`;
+    metaHTML += `<span style="color:var(--green)" title="Tip"><i class="fa-solid fa-heart"></i> <b id="t-tip">${rs(totals.tip)}</b></span>`;
   }
   if (totals.deliveryCharge > 0) {
-    metaHTML += `<span>Delivery <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
+    metaHTML += `<span title="Delivery"><i class="fa-solid fa-motorcycle"></i> <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
   }
   if (totals.loyaltyRedeem > 0) {
-    metaHTML += `<span style="color:var(--violet-soft)">Loyalty <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
+    metaHTML += `<span style="color:var(--violet-soft)" title="Loyalty"><i class="fa-solid fa-star"></i> <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
   }
   
-  // Ireland handles composition differently (not applicable)
   if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
-    metaHTML += `<span style="font-size:10px;color:var(--text-mute)">Composition Scheme</span>`;
+    metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
   } else {
-    metaHTML += `<span>${taxLabel}${isIncl ? ' (Incl.)' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
+    metaHTML += `<span title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}"><i class="fa-solid fa-receipt"></i> <b id="t-gst">${rs(totals.gst)}</b></span>`;
   }
   
   if (totals.liquorTax > 0) {
-    metaHTML += `<span>Liquor VAT <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
+    metaHTML += `<span title="Liquor tax"><i class="fa-solid fa-wine-glass"></i> <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
   }
   
   const metaDiv = document.querySelector('.totals-meta');
