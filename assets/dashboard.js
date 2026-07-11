@@ -2493,84 +2493,62 @@
       };
     }
 
-    // 5. Bills Export Excel
+    // 5. Bills Export Excel-friendly CSV (delegates to bills-history — no ProgressOverlay stub)
     const btnExportBills = document.getElementById('btn-export-bills');
-    if (btnExportBills) {
-      btnExportBills.onclick = () => {
-        if (!BILLS || !BILLS.length) return toast('No bills to export', 'fa-circle-exclamation');
-        
-        const steps = ['Compiling billing data...', 'Formatting Excel spreadsheet...', 'Triggering secure download...'];
-        window.RS_ProgressOverlay.show('Exporting Bills', steps);
-        window.RS_ProgressOverlay.update(0, 33);
-        
-        setTimeout(() => {
-          window.RS_ProgressOverlay.update(1, 66);
-          
-          setTimeout(() => {
-            window.RS_ProgressOverlay.update(2, 90);
-            
-            const settings = window.RS_SETTINGS || {};
-            const taxLabel = settings.set_tax_label || 'GST';
-            const headers = [
-              'Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone',
-              'Subtotal', taxLabel, 'Discount', 'Total', 'Payment', 'Tenders',
-              'Status', 'Channel', 'Station', 'Shift', 'Cashier', 'Order Type',
-            ];
-            const rows = BILLS.map((b) => {
-              const tenders = Array.isArray(b.tenders)
-                ? b.tenders.map((t) => (t.method || '') + ':' + (t.amount || 0)).join('|')
-                : '';
-              return [
-                b.no || b.orderId || b.id || '',
-                b.dateTime || b.time || '',
-                b.table || '',
-                b.items || '',
-                b.customerName || '',
-                b.customerPhone || '',
-                b.subtotal != null ? b.subtotal : '',
-                b.gst != null ? b.gst : '',
-                b.discount != null ? b.discount : (b.disc != null ? b.disc : ''),
-                b.amount != null ? b.amount : b.total || '',
-                b.pay || b.paymentMethod || '',
-                tenders,
-                b.status || '',
-                b.channel || b.channelCode || '',
-                b.stationLabel || b.stationId || '',
-                b.shiftId || '',
-                b.cashier || b.refundedBy || '',
-                b.orderType || '',
-              ]
-                .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-                .join(',');
-            });
-            const csv = [headers.join(','), ...rows].join('\n');
-            RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
-            
-            window.RS_ProgressOverlay.update(3, 100);
-            window.RS_ProgressOverlay.hide();
-            toast('Bills exported successfully', 'fa-circle-check');
-          }, 600);
-        }, 600);
-      };
+    if (btnExportBills && !btnExportBills.dataset.rsExportDashBound) {
+      btnExportBills.dataset.rsExportDashBound = '1';
+      btnExportBills.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (window.RSBillsHistory && typeof RSBillsHistory.exportBillsCsv === 'function') {
+          RSBillsHistory.exportBillsCsv();
+          return;
+        }
+        if (window.RS && typeof RS.exportBillsCsv === 'function') {
+          RS.exportBillsCsv();
+          return;
+        }
+        // Fallback if module not loaded
+        const list = (window.RS && RS.BILLS) || BILLS || [];
+        if (!list.length) return toast('No bills to export', 'fa-circle-exclamation');
+        const headers = ['Bill No', 'Date', 'Table', 'Total', 'Payment', 'Status'];
+        const rows = list.map((b) =>
+          [b.no || '', b.dateTime || b.time || '', b.table || '', b.amount || b.total || '', b.pay || '', b.status || '']
+            .map((v) => '"' + String(v).replace(/"/g, '""') + '"')
+            .join(',')
+        );
+        const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
+        toast('Exported ' + list.length + ' bills', 'fa-file-csv');
+      });
     }
 
     // 5b. Print Day Report
     const btnPrintDayReport = document.getElementById('btn-print-day-report');
     if (btnPrintDayReport) {
       btnPrintDayReport.onclick = () => {
-        const paidBills = BILLS.filter(b => b.status === 'paid');
+        const paidBills = BILLS.filter((b) => String(b.status || 'paid').toLowerCase() === 'paid');
         if (!paidBills.length) return toast('No sales data for day report', 'fa-circle-exclamation');
 
-        const outletName = document.getElementById('manage-tenant-name')?.textContent || 'RestroSuite Outlet';
+        const settings = window.RS_SETTINGS || {};
+        const sess = window.RS_API && RS_API.session ? RS_API.session() : null;
+        let outletName =
+          settings.set_restaurant_name ||
+          settings.set_outlet_name ||
+          (sess && (sess.tenant_name || sess.business_name)) ||
+          document.querySelector('.user-pill .ur')?.textContent?.split('·')[0]?.trim() ||
+          document.getElementById('manage-tenant-name')?.textContent ||
+          '';
+        if (!outletName || /outlet name/i.test(outletName)) outletName = 'RestroSuite Outlet';
         
         // Calculate stats
-        const totalRevenue = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+        const totalRevenue = paidBills.reduce((sum, b) => sum + (Number(b.amount) || Number(b.total) || 0), 0);
         const totalOrders = paidBills.length;
         const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
         
-        // Estimate GST collected (assume 5% average)
-        const netTaxableSales = Math.round(totalRevenue / 1.05);
-        const gstCollected = totalRevenue - netTaxableSales;
+        // Prefer stored GST; fall back to 5% inclusive estimate
+        const gstFromBills = paidBills.reduce((sum, b) => sum + (Number(b.gst) || 0), 0);
+        const gstCollected = gstFromBills > 0 ? Math.round(gstFromBills) : Math.round(totalRevenue - totalRevenue / 1.05);
+        const netTaxableSales = Math.round(totalRevenue - gstCollected);
 
         // Payment Breakdown
         const paymentMethods = {};

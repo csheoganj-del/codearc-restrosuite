@@ -565,6 +565,198 @@
     return Array.from(map.values());
   }
 
+  /** Human + Excel-friendly bill timestamp */
+  function formatBillTime(b) {
+    const raw = b && (b.dateTime || b.time || b.created_at || '');
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      try {
+        const loc =
+          typeof global.RS_getOutletLocale === 'function' ? RS_getOutletLocale() : 'en-IN';
+        const tz =
+          typeof global.RS_getOutletTimezone === 'function' ? RS_getOutletTimezone() : 'Asia/Kolkata';
+        return d.toLocaleString(loc, {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: tz,
+        });
+      } catch (_) {
+        return d.toLocaleString();
+      }
+    }
+    // Already formatted (e.g. "11 Jul, 3:30 pm")
+    return String(raw);
+  }
+
+  function formatBillTimeIsoExcel(b) {
+    const raw = b && (b.dateTime || b.time || b.created_at || '');
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return String(raw);
+    const pad = (n) => String(n).padStart(2, '0');
+    // Local wall time yyyy-mm-dd HH:mm:ss — Excel-friendly
+    return (
+      d.getFullYear() +
+      '-' +
+      pad(d.getMonth() + 1) +
+      '-' +
+      pad(d.getDate()) +
+      ' ' +
+      pad(d.getHours()) +
+      ':' +
+      pad(d.getMinutes()) +
+      ':' +
+      pad(d.getSeconds())
+    );
+  }
+
+  function lineItemsSummary(b) {
+    const items = Array.isArray(b._items) ? b._items : [];
+    if (items.length) {
+      return items
+        .map((i) => {
+          const q = Number(i.qty) || 1;
+          const name = String(i.name || 'Item').replace(/[;\n\r]+/g, ' ');
+          return q + 'x ' + name;
+        })
+        .join('; ');
+    }
+    if (b.items != null && b.items !== '') return String(b.items);
+    return '';
+  }
+
+  function csvEscape(value) {
+    const s = value == null ? '' : String(value);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  /**
+   * Export bills as Excel-friendly CSV (UTF-8 BOM).
+   * Respects current search / payment / status filters when present.
+   */
+  function exportBillsCsv() {
+    const q = ($('#bills-search') && $('#bills-search').value) || '';
+    const payFilter = ($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All';
+    const statusFilter = ($('#bills-status-filter') && $('#bills-status-filter').value) || 'All';
+    const all = getBills();
+    const localFiltered = filterBills(all, q, payFilter, statusFilter);
+    const list = mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
+    if (!list.length) {
+      toast('No bills to export', 'fa-circle-exclamation');
+      return false;
+    }
+
+    const settings = global.RS_SETTINGS || {};
+    const taxLabel = settings.set_tax_label || 'GST';
+    const headers = [
+      'Bill No',
+      'Date (Excel)',
+      'Date (Display)',
+      'Table',
+      'Item Count',
+      'Line Items',
+      'Customer',
+      'Phone',
+      'Subtotal',
+      taxLabel,
+      'Discount',
+      'Total',
+      'Payment',
+      'Tenders',
+      'Status',
+      'Channel',
+      'Station',
+      'Shift',
+      'Cashier',
+      'Order Type',
+    ];
+
+    const rows = list.map((b) => {
+      const tenders = Array.isArray(b.tenders)
+        ? b.tenders.map((t) => (t.method || '') + ':' + (Number(t.amount) || 0)).join('|')
+        : '';
+      const itemCount =
+        Array.isArray(b._items) && b._items.length
+          ? b._items.reduce((s, i) => s + (Number(i.qty) || 1), 0)
+          : b.items != null
+            ? b.items
+            : '';
+      return [
+        b.no || b.orderId || b.id || '',
+        formatBillTimeIsoExcel(b),
+        formatBillTime(b),
+        b.table || '',
+        itemCount,
+        lineItemsSummary(b),
+        b.customerName || b.customer || '',
+        b.customerPhone || '',
+        b.subtotal != null ? b.subtotal : '',
+        b.gst != null ? b.gst : '',
+        b.discount != null ? b.discount : b.disc != null ? b.disc : '',
+        b.amount != null ? b.amount : b.total != null ? b.total : '',
+        b.pay || b.paymentMethod || '',
+        tenders,
+        b.status || '',
+        b.channel || b.channelCode || '',
+        b.stationLabel || b.stationId || '',
+        b.shiftId || '',
+        b.cashier || '',
+        b.orderType || '',
+      ]
+        .map(csvEscape)
+        .join(',');
+    });
+
+    // BOM so Excel opens UTF-8 (₹, names) correctly
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const day = new Date();
+    const fname =
+      'bills-' +
+      day.getFullYear() +
+      String(day.getMonth() + 1).padStart(2, '0') +
+      String(day.getDate()).padStart(2, '0') +
+      '.csv';
+
+    try {
+      if (global.RS && typeof RS.downloadFile === 'function') {
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', fname);
+      } else {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+      toast('Exported ' + list.length + ' bills · Excel CSV', 'fa-file-csv');
+      return true;
+    } catch (e) {
+      console.warn('[BillsHistory] export failed', e);
+      toast('Export failed — try again', 'fa-circle-exclamation');
+      return false;
+    }
+  }
+
+  function wireExportButton() {
+    const btn = document.getElementById('btn-export-bills');
+    if (!btn || btn.dataset.rsExportBound === '1') return;
+    btn.dataset.rsExportBound = '1';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      exportBillsCsv();
+    });
+  }
+
   function paintBillsTable(filtered) {
     const body = $('#bills-table-body');
     if (!body) return;
@@ -573,7 +765,7 @@
       .map(
         (b) => `
       <tr data-bill-no="${_e(b.no || b.orderId || b.id || '')}">
-        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(b.time || b.dateTime || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
+        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(formatBillTime(b) || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
         <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
         <td>${b.status === 'paid' ? '<span class="pill pill-green" style="padding:3px 9px">Paid</span>' : '<span class="pill pill-red" style="padding:3px 9px">Voided</span>'}</td>
@@ -671,6 +863,7 @@
 
   function bindFilters() {
     renderBills();
+    wireExportButton();
     const search = $('#bills-search');
     if (search && !search._rsListenerBound) {
       search._rsListenerBound = true;
@@ -702,6 +895,9 @@
     normalizeServerBill,
     showRefundModal,
     showDeleteConfirm,
+    exportBillsCsv,
+    formatBillTime,
+    wireExportButton,
   };
 
   global.RSBillsHistory = api;
@@ -711,7 +907,20 @@
     if (!global.RS) return;
     global.RS.renderBills = renderBills;
     global.RS.receiptPayloadFromBill = receiptPayloadFromBill;
+    global.RS.exportBillsCsv = exportBillsCsv;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);
+  // Late-bind export if bills tab mounts after ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        wireExportButton();
+      } catch (_) {}
+    });
+  } else {
+    try {
+      wireExportButton();
+    } catch (_) {}
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

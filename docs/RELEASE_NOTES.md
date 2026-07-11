@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v99 (2026-07-11) — Bills Export CSV + ops fixes
+
+- **Export CSV fixed**: no longer depends on missing `RS_ProgressOverlay` (was a silent crash)
+- Excel-friendly CSV: UTF-8 BOM, `yyyy-mm-dd HH:mm:ss` date column, line-item detail, filtered export
+- Bill table **time** formatted for humans (not raw ISO)
+- **Day report** uses real outlet name from settings (not “Outlet Name”)
+
 ## v98 (2026-07-11) — Sidebar 10/10
 
 - Calmer identity card (outlet + role, ellipsis overflow)
