@@ -153,28 +153,56 @@
     return shift;
   }
 
-  function billsForShift(shift) {
+  const SHIFT_HISTORY_KEY = 'rs_shift_history';
+  const Z_SCOPE_KEY = 'rs_z_scope'; // station | all
+
+  function getZScope() {
+    try {
+      return localStorage.getItem(Z_SCOPE_KEY) === 'all' ? 'all' : 'station';
+    } catch (_) {
+      return 'station';
+    }
+  }
+  function setZScope(scope) {
+    try {
+      localStorage.setItem(Z_SCOPE_KEY, scope === 'all' ? 'all' : 'station');
+    } catch (_) {}
+  }
+
+  function billsForShift(shift, opts) {
     const bills = (global.RS && RS.BILLS) || [];
     if (!shift) return [];
+    const scope = (opts && opts.scope) || getZScope();
+    const stationId = getStationId();
     const openTs = new Date(shift.openedAt).getTime();
     return bills.filter((b) => {
+      if (scope === 'station') {
+        // Prefer stamped station; fall back to "no stamp" as this station (legacy bills)
+        const bid = b.stationId || b.station_id || '';
+        if (bid && bid !== stationId) return false;
+      }
       if (shift.shiftId && b.shiftId === shift.shiftId) return true;
       const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
       return t >= openTs && (!shift.closedAt || t <= new Date(shift.closedAt).getTime());
     });
   }
 
-  function summarizeShift(shift, actualCash) {
-    const rows = billsForShift(shift);
+  function summarizeShift(shift, actualCash, opts) {
+    const rows = billsForShift(shift, opts);
     const paid = rows.filter((b) => String(b.status || 'paid').toLowerCase() !== 'refunded');
     const refunded = rows.filter((b) => String(b.status || '').toLowerCase() === 'refunded');
     const byPay = {};
+    const byStation = {};
     let gross = 0;
+    let taxTotal = 0;
     paid.forEach((b) => {
       const amt = Number(b.amount != null ? b.amount : b.total) || 0;
       gross += amt;
-      const method = (b.pay || b.paymentMethod || 'Cash');
+      taxTotal += Number(b.gst || b.tax || 0) || 0;
+      const method = b.pay || b.paymentMethod || 'Cash';
       byPay[method] = (byPay[method] || 0) + amt;
+      const st = b.stationLabel || b.stationId || shift.stationLabel || 'This station';
+      byStation[st] = (byStation[st] || 0) + amt;
     });
     const cashSales = byPay.Cash || byPay.cash || 0;
     const expectedCash = (Number(shift.openingFloat) || 0) + cashSales;
@@ -184,32 +212,46 @@
       bills: paid.length,
       refunds: refunded.length,
       gross,
+      taxTotal,
       byPay,
+      byStation,
       cashSales,
       expectedCash,
       actualCash: Number.isFinite(actual) ? actual : null,
       variance,
       openingFloat: Number(shift.openingFloat) || 0,
+      scope: (opts && opts.scope) || getZScope(),
+      stationId: getStationId(),
+      stationLabel: getStationLabel(),
     };
   }
 
   function zReportHtml(shift, summary) {
     const payLines = Object.entries(summary.byPay || {})
-      .map(([m, v]) => `<div class="rcp-line"><span>${esc(m)}</span><span>${rs(v)}</span></div>`)
+      .sort((a, b) => b[1] - a[1])
+      .map(([m, v]) => `<div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>${esc(m)}</span><span>${rs(v)}</span></div>`)
       .join('');
+    const stationLines = Object.entries(summary.byStation || {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([m, v]) => `<div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>${esc(m)}</span><span>${rs(v)}</span></div>`)
+      .join('');
+    const scopeLabel = summary.scope === 'all' ? 'All stations' : 'This station only';
     return `<div class="receipt-paper" style="max-width:320px;margin:0 auto;padding:16px;font-family:system-ui,sans-serif">
       <div style="text-align:center;font-weight:800;font-size:18px">Z-REPORT</div>
-      <div style="text-align:center;font-size:12px;color:#666;margin:4px 0 12px">${esc(shift.shiftId)} · ${esc(shift.stationLabel || '')}</div>
+      <div style="text-align:center;font-size:12px;color:#666;margin:4px 0 4px">${esc(shift.shiftId)} · ${esc(shift.stationLabel || summary.stationLabel || '')}</div>
+      <div style="text-align:center;font-size:11px;color:#888;margin:0 0 12px">${esc(scopeLabel)}</div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Cashier</span><span>${esc(shift.cashierName)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Opened</span><span>${esc(new Date(shift.openedAt).toLocaleString())}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Closed</span><span>${esc(shift.closedAt ? new Date(shift.closedAt).toLocaleString() : '—')}</span></div>
       <hr style="border:0;border-top:1px dashed #ccc;margin:10px 0">
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Bills</span><span>${summary.bills}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Refunds</span><span>${summary.refunds}</span></div>
+      <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Tax (GST/VAT)</span><span>${rs(summary.taxTotal || 0)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:6px 0"><span>Gross</span><span>${rs(summary.gross)}</span></div>
       <hr style="border:0;border-top:1px dashed #ccc;margin:10px 0">
       <div style="font-size:11px;font-weight:700;margin-bottom:4px">Payment mix</div>
       ${payLines || '<div style="font-size:12px;color:#666">No sales</div>'}
+      ${stationLines && summary.scope === 'all' ? `<hr style="border:0;border-top:1px dashed #ccc;margin:10px 0"><div style="font-size:11px;font-weight:700;margin-bottom:4px">By station</div>${stationLines}` : ''}
       <hr style="border:0;border-top:1px dashed #ccc;margin:10px 0">
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Opening float</span><span>${rs(summary.openingFloat)}</span></div>
       <div class="rcp-line" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>Cash sales</span><span>${rs(summary.cashSales)}</span></div>
@@ -220,6 +262,94 @@
     </div>`;
   }
 
+  function zReportCsv(shift, summary) {
+    const lines = [
+      ['Field', 'Value'],
+      ['Shift', shift.shiftId || ''],
+      ['Station', shift.stationLabel || summary.stationLabel || ''],
+      ['Scope', summary.scope === 'all' ? 'all stations' : 'this station'],
+      ['Cashier', shift.cashierName || ''],
+      ['Opened', shift.openedAt || ''],
+      ['Closed', shift.closedAt || ''],
+      ['Bills', summary.bills],
+      ['Refunds', summary.refunds],
+      ['Gross', summary.gross],
+      ['Tax', summary.taxTotal || 0],
+      ['Opening float', summary.openingFloat],
+      ['Cash sales', summary.cashSales],
+      ['Expected cash', summary.expectedCash],
+      ['Actual cash', summary.actualCash != null ? summary.actualCash : ''],
+      ['Variance', summary.variance != null ? summary.variance : ''],
+    ];
+    Object.entries(summary.byPay || {}).forEach(([m, v]) => lines.push(['Pay:' + m, v]));
+    Object.entries(summary.byStation || {}).forEach(([m, v]) => lines.push(['Station:' + m, v]));
+    return lines.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+  }
+
+  function downloadZCsv(shift, summary) {
+    const csv = zReportCsv(shift, summary);
+    const name = 'z-report-' + (shift.shiftId || 'shift') + '.csv';
+    if (global.RS && typeof RS.downloadFile === 'function') {
+      RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
+    } else {
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+      a.download = name;
+      a.click();
+    }
+    toast('Z-report CSV downloaded', 'fa-file-csv');
+  }
+
+  function pushShiftHistory(shift, summary) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(SHIFT_HISTORY_KEY) || '[]');
+      const list = Array.isArray(raw) ? raw : [];
+      list.unshift({
+        shiftId: shift.shiftId,
+        stationLabel: shift.stationLabel,
+        cashierName: shift.cashierName,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        gross: summary.gross,
+        variance: summary.variance,
+        bills: summary.bills,
+        scope: summary.scope,
+      });
+      while (list.length > 20) list.pop();
+      localStorage.setItem(SHIFT_HISTORY_KEY, JSON.stringify(list));
+    } catch (_) {}
+  }
+
+  function showZReportModal(shift, summary, title) {
+    const html = zReportHtml(shift, summary);
+    if (global.RSModal) {
+      RSModal.open({
+        title: title || 'Z-Report',
+        sub: shift.shiftId + ' · ' + (summary.scope === 'all' ? 'All stations' : 'This station'),
+        icon: 'fa-file-invoice-dollar',
+        body: html,
+        foot:
+          '<button class="btn btn-ghost" id="zr-csv"><i class="fa-solid fa-file-csv"></i> CSV</button>' +
+          '<button class="btn btn-ghost" id="zr-print"><i class="fa-solid fa-print"></i> Print</button>' +
+          '<button class="btn btn-primary" id="zr-ok">Done</button>',
+        onMount(m, close) {
+          const ok = m.querySelector('#zr-ok');
+          if (ok) ok.onclick = close;
+          const pr = m.querySelector('#zr-print');
+          if (pr)
+            pr.onclick = () => {
+              if (global.RSPrint) RSPrint(html, 'Z-Report ' + shift.shiftId);
+              else window.print();
+            };
+          const csv = m.querySelector('#zr-csv');
+          if (csv) csv.onclick = () => downloadZCsv(shift, summary);
+        },
+      });
+    } else if (global.RSPrint) {
+      RSPrint(html, 'Z-Report ' + shift.shiftId);
+    }
+  }
+
   async function closeShift() {
     const shift = getOpenShift();
     if (!shift) return toast('No open shift', 'fa-circle-exclamation');
@@ -227,7 +357,8 @@
       const ok = await RSPinModal.request('Close shift · Z-report');
       if (!ok) return;
     }
-    const actualStr = window.prompt('Actual cash in drawer (count)', String(summarizeShift(shift).expectedCash));
+    const pre = summarizeShift(shift);
+    const actualStr = window.prompt('Actual cash in drawer (count)', String(pre.expectedCash));
     if (actualStr === null) return;
     const actual = Number(actualStr);
     shift.closedAt = new Date().toISOString();
@@ -237,23 +368,19 @@
     shift.expectedCash = summary.expectedCash;
     shift.variance = summary.variance;
     shift.totalSalesCash = summary.cashSales;
+    shift.zScope = summary.scope;
     try {
       if (global.RS_DB && RS_DB.put) await RS_DB.put('shifts', shift.shiftId, shift);
     } catch (e) {
       console.warn('[Shift] close save failed', e);
     }
+    pushShiftHistory(shift, summary);
     saveOpenShift(null);
-    const html = zReportHtml(shift, summary);
-    if (global.RSPrint) RSPrint(html, 'Z-Report ' + shift.shiftId);
-    else if (global.RSModal) {
-      RSModal.open({
-        title: 'Z-Report',
-        sub: shift.shiftId,
-        icon: 'fa-file-invoice-dollar',
-        body: html,
-        foot: '<button class="btn btn-primary" id="zr-ok">Done</button>',
-        onMount(m, close) { const b = m.querySelector('#zr-ok'); if (b) b.onclick = close; },
-      });
+    showZReportModal(shift, summary, 'Z-Report · shift closed');
+    if (global.RSPrint) {
+      try {
+        RSPrint(zReportHtml(shift, summary), 'Z-Report ' + shift.shiftId);
+      } catch (_) {}
     }
     toast('Shift closed · variance ' + (summary.variance != null ? rs(summary.variance) : 'n/a'), 'fa-lock');
   }
@@ -273,17 +400,26 @@
     }
     if (shift) {
       const sum = summarizeShift(shift);
+      const scope = getZScope();
       bar.innerHTML = `<span style="font-weight:800"><i class="fa-solid fa-circle" style="color:#22c55e;font-size:9px;margin-right:6px"></i>Shift open</span>
         <span style="color:var(--text-soft)">${esc(shift.cashierName)} · ${esc(getStationLabel())}</span>
         <span style="color:var(--text-soft)">${sum.bills} bills · ${rs(sum.gross)}</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-z-scope" title="Z-report includes ${scope === 'all' ? 'all stations' : 'this station only'}">${scope === 'all' ? 'All stations' : 'This station'}</button>
         <div style="flex:1"></div>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z"><i class="fa-solid fa-file-invoice"></i> Preview Z</button>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close"><i class="fa-solid fa-lock"></i> Close shift</button>`;
+      const sc = bar.querySelector('#rs-z-scope');
+      if (sc)
+        sc.onclick = () => {
+          setZScope(getZScope() === 'all' ? 'station' : 'all');
+          paintShiftBar();
+          toast(getZScope() === 'all' ? 'Z-report: all stations' : 'Z-report: this station only', 'fa-store');
+        };
       const z = bar.querySelector('#rs-shift-z');
-      if (z) z.onclick = () => {
-        const html = zReportHtml(shift, summarizeShift(shift));
-        if (global.RSModal) RSModal.open({ title: 'Z-Report (open shift)', body: html, foot: '<button class="btn btn-primary" id="zok">Close</button>', onMount(m, c) { const b = m.querySelector('#zok'); if (b) b.onclick = c; } });
-      };
+      if (z)
+        z.onclick = () => {
+          showZReportModal(shift, summarizeShift(shift), 'Z-Report (open shift)');
+        };
       const cl = bar.querySelector('#rs-shift-close');
       if (cl) cl.onclick = () => closeShift();
     } else {
@@ -292,11 +428,12 @@
         <div style="flex:1"></div>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open"><i class="fa-solid fa-unlock"></i> Open shift</button>`;
       const op = bar.querySelector('#rs-shift-open');
-      if (op) op.onclick = async () => {
-        const f = window.prompt('Opening cash float', '0');
-        if (f === null) return;
-        await openShift(Number(f) || 0);
-      };
+      if (op)
+        op.onclick = async () => {
+          const f = window.prompt('Opening cash float', '0');
+          if (f === null) return;
+          await openShift(Number(f) || 0);
+        };
     }
   }
 
@@ -613,6 +750,11 @@
       getOpenShift,
       summarizeShift,
       zReportHtml,
+      zReportCsv,
+      downloadZCsv,
+      getZScope,
+      setZScope,
+      showZReportModal,
       printKotThermal,
       compilePreferredPdf,
       decorateBillMeta,

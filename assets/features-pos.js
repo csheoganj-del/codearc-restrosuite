@@ -841,7 +841,17 @@
             return;
           }
           if (result.mode === 'text') {
-            RS.toast('PDF failed — text bill sent (same content as preview)', 'fa-whatsapp');
+            const why = result.warning ? String(result.warning).slice(0, 60) : 'PDF compile/send failed';
+            RS.toast('Text bill sent · PDF: ' + why, 'fa-whatsapp');
+            return;
+          }
+          if (result.mode === 'wa.me') {
+            RS.toast(
+              result.warning
+                ? 'Opened WhatsApp Web (gateway: ' + String(result.warning).slice(0, 50) + ')'
+                : 'Opened WhatsApp Web — paste/send the message',
+              'fa-whatsapp'
+            );
             return;
           }
           if (result.mode === 'wa.me') {

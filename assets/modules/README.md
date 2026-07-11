@@ -17,6 +17,7 @@ Small IIFE modules loaded **before** `dashboard.js` so the god file can delegate
 | `pos-ui.js` | `RSPosUI` | POS menu grid, cart, totals, init (Wave 11) |
 | `tax-helpers.js` | `RSTax` / `RS_resolveRate` | Rate tables + tenant tax profile (Wave 12) |
 | `growth-hub-shell.js` | `RSGrowthHubShell` | Growth Hub tile shell (Wave 12) |
+| `demo-script.js` | `RSDemoScript` | In-app 15-min demo checklist |
 | `../escpos-encoder.js` | `RSEscPos` | ESC/POS thermal encoding |
 | `../print-bridge.js` | `RSPrintBridge` | Desktop/web print routing |
 | `../competitive-ops.js` | `RSOps` | Shifts, station, keyboard, Z-report |

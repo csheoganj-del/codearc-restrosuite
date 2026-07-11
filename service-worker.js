@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260711-1506";
+const CACHE_NAME = "restrosuite-shell-v20260711-1521";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -64,6 +64,7 @@ const APP_SHELL = [
   "/assets/modules/pos-ui.js",
   "/assets/modules/tax-helpers.js",
   "/assets/modules/growth-hub-shell.js",
+  "/assets/modules/demo-script.js",
   "/assets/dist/critical.bundle.js",
   "/assets/features-editor.js",
   "/assets/features-manage.js",
