@@ -32,7 +32,7 @@ test('dashboard loads wave5 modules', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /escpos-encoder\.js/);
   assert.match(html, /bill-identity\.js/);
-  assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
   assert.match(html, /bills-history\.js|inventory-ledger\.js/);
 });
 
@@ -63,7 +63,7 @@ test('bills-history module extracted (wave 6)', () => {
   assert.ok(!dash.includes('payPill'), 'payPill map should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /bills-history\.js/);
-  assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
 });
 
 test('checkout e2e spec present (wave 6)', () => {
@@ -82,7 +82,7 @@ test('inventory-ui module extracted (wave 7)', () => {
   assert.ok(!dash.includes('btn-auto-draft-pos'), 'heavy inventory UI should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /inventory-ui\.js/);
-  assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
 });
 
 test('bills-history has server search helpers (wave 7)', () => {
@@ -110,7 +110,7 @@ test('reports-ui module extracted (wave 8)', () => {
   assert.ok(!dash.includes('GSTR_report_'), 'GSTR export should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /reports-ui\.js/);
-  assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
 });
 
 test('gateway-monitor module extracted (wave 8)', () => {
@@ -136,7 +136,7 @@ test('super-admin module extracted (wave 9)', () => {
   assert.ok(!dash.includes('function openCreateTenantModal'), 'tenant create modal should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /super-admin\.js/);
-  assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
 });
 
 test('kds-ui module extracted (wave 9)', () => {
@@ -161,7 +161,7 @@ test('qr-orders-ui module extracted (wave 10)', () => {
   assert.ok(!dash.includes('qr-grid'), 'QR grid markup should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /qr-orders-ui\.js/);
-  assert.match(html, /v5[0-9]-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
 });
 
 test('employees-ui module extracted (wave 10)', () => {
@@ -186,10 +186,34 @@ test('pos-ui module extracted (wave 11)', () => {
   const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
   assert.match(dash, /RSPosUI/);
   assert.ok(!dash.includes('pos-item'), 'POS menu tiles should leave dashboard');
-  assert.match(dash, /RS_resolveRate/); // tax helpers remain
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /pos-ui\.js/);
-  assert.match(html, /v59-20260711/);
+  assert.match(html, /v[56][0-9]-20260711/);
+});
+
+test('tax-helpers module extracted (wave 12)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/tax-helpers.js'), 'utf8');
+  assert.match(src, /RSTax|RS_resolveRate/);
+  assert.match(src, /RS_getTenantTaxProfile|getTenantTaxProfile/);
+  assert.match(src, /IN_REST_5|IE_FOOD/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.ok(!dash.includes('function(country, rateCode, dateStr)'), 'resolveRate body should leave dashboard');
+  assert.match(dash, /tax-helpers|RS_TAX_RATES|RSTax/);
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /tax-helpers\.js/);
+  assert.match(html, /v60-20260711/);
+});
+
+test('growth-hub-shell module extracted (wave 12)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/growth-hub-shell.js'), 'utf8');
+  assert.match(src, /RSGrowthHubShell/);
+  assert.match(src, /renderGrowthHub|renderHub/);
+  assert.match(src, /hub-grid|Reservations/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSGrowthHubShell/);
+  assert.ok(!dash.includes('hub-card'), 'hub cards should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /growth-hub-shell\.js/);
 });
 
 test('USB and split docs exist', () => {
