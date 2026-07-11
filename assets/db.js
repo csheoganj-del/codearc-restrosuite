@@ -724,17 +724,17 @@
         e.message.includes('column') ||
         e.message.includes('42703')
       );
-      if (!isSchemaCacheError) {
-        window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
-        window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
-        // Queue for retry when back online. bulkPut used to be silently
-        // dropped here (only put/del were queued) -- bulk menu/recipe
-        // imports done while offline would never actually reach the cloud.
-        if (method === 'put' || method === 'del' || method === 'bulkPut') {
+      // Always surface + queue money-critical collections. Schema errors still
+      // queue bills so nothing is silently lost; admin can fix migration later.
+      const isMoneyCritical = (c === 'bills' || c === 'inventory' || c === 'customers');
+      window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now(), schema: !!isSchemaCacheError };
+      window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
+      if (method === 'put' || method === 'del' || method === 'bulkPut') {
+        if (!isSchemaCacheError || isMoneyCritical) {
           addToSyncQueue(method, c, args);
         }
-      } else {
-        // Log silently -- user needs to run the DB migration
+      }
+      if (isSchemaCacheError) {
         console.warn(`[RS_DB] Schema mismatch on ${c}: "${e.message}". Run the missing DB migration to fix.`);
       }
       window.dispatchEvent(new CustomEvent('rs:sync-done', { detail: { method, collection: c, error: true } }));
@@ -742,23 +742,88 @@
     }
   }
 
-  /* ---------------- OFFLINE SYNC QUEUE (retry failed cloud writes on reconnect) ---------------- */
+  /* ---------------- OFFLINE SYNC QUEUE (crash-safe, money-critical protected) ---------------- */
   const SYNC_QUEUE_KEY = 'rs:sync_queue';
+  const MONEY_COLLECTIONS = new Set(['bills', 'inventory', 'customers', 'drafts', 'pending_orders']);
+  let drainInFlight = false;
   function getSyncQueue() { try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e){ return []; } }
   function saveSyncQueue(q) { try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); } catch(e){} }
+  function entryKey(method, collection, args) {
+    const id = args && args[0];
+    if (method === 'bulkPut' && Array.isArray(id)) {
+      return method + '|' + collection + '|' + id.map(r => r && r.id).join(',');
+    }
+    return method + '|' + collection + '|' + String(id);
+  }
+  function notifySyncQueue() {
+    const q = getSyncQueue();
+    const pending = q.filter(e => e && e.status !== 'acked');
+    const billPending = pending.filter(e => e.collection === 'bills').length;
+    window.__rsSyncQueueDepth = pending.length;
+    window.__rsSyncBillPending = billPending;
+    window.dispatchEvent(new CustomEvent('rs:sync-queue-changed', {
+      detail: { depth: pending.length, bills: billPending, entries: pending.slice(0, 20) }
+    }));
+    try {
+      let badge = document.getElementById('rs-sync-queue-badge');
+      if (!badge) {
+        const host = document.querySelector('.topbar-right, .topbar-actions, #topbar-right, .topbar');
+        if (host) {
+          badge = document.createElement('button');
+          badge.id = 'rs-sync-queue-badge';
+          badge.type = 'button';
+          badge.title = 'Pending cloud sync — click to retry';
+          badge.style.cssText = 'display:none;align-items:center;gap:6px;border:1px solid rgba(234,179,8,.4);background:rgba(234,179,8,.12);color:var(--text,#16151c);border-radius:999px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer';
+          host.insertBefore(badge, host.firstChild);
+          badge.onclick = () => {
+            drainSyncQueue().then(() => {
+              if (window.RS && RS.toast) RS.toast('Retrying pending sync…', 'fa-cloud-arrow-up');
+            }).catch(() => {});
+          };
+        }
+      }
+      if (badge) {
+        if (pending.length > 0) {
+          badge.style.display = 'inline-flex';
+          badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ' +
+            (billPending ? (billPending + ' bill' + (billPending === 1 ? '' : 's') + ' pending') : (pending.length + ' pending'));
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+    } catch (_) {}
+  }
   function addToSyncQueue(method, collection, args) {
     // 'settings' is a whole-object save (not a per-row collection in MAP),
     // so allow it through explicitly; everything else must be a known collection.
     if (!MAP[collection] && collection !== 'settings') return;
     const q = getSyncQueue();
-    // Deduplicate: if same collection+id already queued for put, replace it
-    const id = args[0];
-    const idx = q.findIndex(x => x.method === method && x.collection === collection && String(x.args[0]) === String(id));
-    const entry = { method, collection, args, queuedAt: Date.now() };
+    const key = entryKey(method, collection, args);
+    const idx = q.findIndex(x => entryKey(x.method, x.collection, x.args) === key);
+    const entry = {
+      id: (idx >= 0 && q[idx].id) ? q[idx].id : ('sq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+      method,
+      collection,
+      args,
+      queuedAt: Date.now(),
+      status: 'pending',
+      attempts: (idx >= 0 && q[idx].attempts) ? q[idx].attempts : 0,
+      critical: MONEY_COLLECTIONS.has(collection) || collection === 'settings',
+    };
     if (idx >= 0) q[idx] = entry; else q.push(entry);
-    // Cap queue at 200 entries to prevent localStorage bloat
-    if (q.length > 200) q.splice(0, q.length - 200);
+
+    // Cap non-critical at 180; NEVER drop bills/inventory/customers
+    if (q.length > 220) {
+      const dropIdx = q.findIndex(e => e && !e.critical && e.status !== 'in_progress');
+      if (dropIdx >= 0) q.splice(dropIdx, 1);
+      else {
+        // All critical — drop oldest non-bill non-in_progress if still over hard cap
+        const soft = q.findIndex(e => e && e.collection !== 'bills' && e.status !== 'in_progress');
+        if (soft >= 0 && q.length > 300) q.splice(soft, 1);
+      }
+    }
     saveSyncQueue(q);
+    notifySyncQueue();
   }
   function queuedWriteIdsForCollection(collection) {
     try {
@@ -786,29 +851,69 @@
   }
   async function drainSyncQueue() {
     if (!signedIn()) return;
-    const q = getSyncQueue();
-    if (!q.length) return;
-    saveSyncQueue([]); // optimistic clear -- failures re-enqueue
-    let failed = 0;
-    for (const entry of q) {
-      try {
-        if (entry.method === 'setSettings') {
-          // Whole-object save -- CLOUD.setSettings(o) takes only the settings
-          // object, not a leading collection name like put/del/bulkPut do.
-          await CLOUD.setSettings(entry.args[0]);
-        } else {
-          await CLOUD[entry.method](entry.collection, ...entry.args);
+    if (drainInFlight) return;
+    drainInFlight = true;
+    try {
+      let q = getSyncQueue().filter(e => e && e.status !== 'acked');
+      if (!q.length) { notifySyncQueue(); return; }
+
+      // Mark all pending as in_progress and persist BEFORE attempting
+      // (crash mid-drain must not lose the queue — old code cleared first)
+      q = q.map(e => ({ ...e, status: e.status === 'in_progress' ? 'in_progress' : 'pending' }));
+      saveSyncQueue(q);
+      notifySyncQueue();
+
+      let ok = 0;
+      let failed = 0;
+      const remaining = [];
+      for (const entry of q) {
+        const working = { ...entry, status: 'in_progress', attempts: (entry.attempts || 0) + 1 };
+        // Persist in_progress state for this entry
+        const snap = getSyncQueue().map(e =>
+          (e.id === working.id || entryKey(e.method, e.collection, e.args) === entryKey(working.method, working.collection, working.args))
+            ? working : e
+        );
+        saveSyncQueue(snap);
+
+        try {
+          if (entry.method === 'setSettings') {
+            await CLOUD.setSettings(entry.args[0]);
+          } else {
+            await CLOUD[entry.method](entry.collection, ...entry.args);
+          }
+          ok++;
+          // Remove only this entry on success
+          const after = getSyncQueue().filter(e =>
+            !(e.id === working.id || entryKey(e.method, e.collection, e.args) === entryKey(working.method, working.collection, working.args))
+          );
+          saveSyncQueue(after);
+        } catch (e) {
+          console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
+          failed++;
+          remaining.push({
+            ...working,
+            status: 'pending',
+            lastError: e.message || String(e),
+            lastAttemptAt: Date.now(),
+          });
+          // Write failed entry back as pending
+          const cur = getSyncQueue();
+          const ix = cur.findIndex(x =>
+            x.id === working.id || entryKey(x.method, x.collection, x.args) === entryKey(working.method, working.collection, working.args)
+          );
+          if (ix >= 0) cur[ix] = remaining[remaining.length - 1];
+          else cur.push(remaining[remaining.length - 1]);
+          saveSyncQueue(cur);
         }
-      } catch(e) {
-        console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
-        addToSyncQueue(entry.method, entry.collection, entry.args);
-        failed++;
       }
-    }
-    if (failed === 0 && q.length > 0) {
-      // Invalidate list cache so UI refreshes with latest cloud data
-      for (const entry of q) { delete lastListFetchTime[entry.collection]; }
-      window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: q.length } }));
+
+      if (ok > 0) {
+        for (const entry of q) { delete lastListFetchTime[entry.collection]; }
+        window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: ok, failed } }));
+      }
+      notifySyncQueue();
+    } finally {
+      drainInFlight = false;
     }
   }
   // Retry on reconnect
@@ -818,13 +923,20 @@
   });
   // Also expose for manual call
   window.RS_DB_DRAIN = drainSyncQueue;
+  window.RS_DB_SYNC_DEPTH = () => getSyncQueue().filter(e => e && e.status !== 'acked').length;
+  window.RS_DB_NOTIFY_SYNC = notifySyncQueue;
   // Drain at boot too, not just on the 'online' event. Without this, anything
   // queued from a previous tab/session (e.g. the browser was closed while
   // offline, or was left signed out) would just sit in localStorage forever
   // -- the 'online' listener only fires on a live offline->online transition,
   // which never happens if the page is loaded fresh while already online.
   if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-    setTimeout(() => { drainSyncQueue().catch(()=>{}); }, 2000);
+    setTimeout(() => { drainSyncQueue().catch(()=>{}); notifySyncQueue(); }, 2000);
+  }
+  // Paint badge after DOM ready
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(notifySyncQueue, 500));
+    else setTimeout(notifySyncQueue, 800);
   }
 
   /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */

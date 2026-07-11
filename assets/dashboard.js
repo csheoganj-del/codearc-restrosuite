@@ -418,15 +418,50 @@
     return raw;
   }
   function nextBillNo(existingBills = []) {
+    // Industry-style daily sequence: max(memory bills, durable local counter).
+    // Survives multi-tab / refresh better than scanning only the last 500 rows.
     const key = shortDateKey();
     const prefix = `RS-${key}-`;
-    const max = existingBills.reduce((highest, bill) => {
+    const maxFromList = (existingBills || []).reduce((highest, bill) => {
       const no = String((bill && (bill.no || bill.orderId || bill.id)) || '');
       if (!no.startsWith(prefix)) return highest;
       const seq = Number.parseInt(no.slice(prefix.length), 10);
       return Number.isFinite(seq) ? Math.max(highest, seq) : highest;
     }, 0);
-    return `${prefix}${String(max + 1).padStart(3, '0')}`;
+    let tenant = 'local';
+    try {
+      const s = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      tenant = s.tenant_id || s.tenant_slug || sessionStorage.getItem('tenant_slug') || 'local';
+    } catch (_) {}
+    const seqKey = `rs_bill_seq:${tenant}:${key}`;
+    let stored = 0;
+    try { stored = Number(localStorage.getItem(seqKey) || 0) || 0; } catch (_) {}
+    const next = Math.max(maxFromList, stored) + 1;
+    try { localStorage.setItem(seqKey, String(next)); } catch (_) {}
+    return `${prefix}${String(next).padStart(3, '0')}`;
+  }
+
+  /** Stable numeric PK for bills (tenant-salted) + client idempotency key. */
+  function newBillIdentity(billNo) {
+    let tenant = 'local';
+    try {
+      const s = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      tenant = s.tenant_id || s.tenant_slug || sessionStorage.getItem('tenant_slug') || 'local';
+    } catch (_) {}
+    const idempotencyKey = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : ('idem-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+    // Prefer engine-compatible stable hash if db.js exposes cleaner path via put(MAP)
+    let id = Date.now();
+    try {
+      // Use same salt pattern as db.cleanIdForCollection for string order ids
+      const raw = String(tenant) + ':bill:' + String(billNo || '') + ':' + idempotencyKey.slice(0, 8);
+      let hash = 5381;
+      for (let i = 0; i < raw.length; i++) hash = (hash * 33) ^ raw.charCodeAt(i);
+      id = Math.abs(hash) % 9007199254740991;
+      if (!id) id = Date.now();
+    } catch (_) {}
+    return { id, idempotencyKey, no: billNo };
   }
 
   function ensureOperationStatusBar() {
@@ -5037,7 +5072,7 @@
   function getModalRoot(){ if(!modalRoot){ modalRoot = document.getElementById('rs-modal-root') || (()=>{ const d=document.createElement('div'); d.id='rs-modal-root'; document.body.appendChild(d); return d; })(); } return modalRoot; }
   window.RS = {
     toast, activateTab, rs, initials, avatarColors, catColor,
-    nextBillNo, nextLogicalNo, formatDisplayOrderId, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
+    nextBillNo, newBillIdentity, nextLogicalNo, formatDisplayOrderId, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
     MENU, CATS, stockLabel, stockCls,
     getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
     setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
@@ -5056,9 +5091,26 @@
 
     // -- Inventory deduction/restoration helpers -------------------------------
     // Called after bill is generated. Deducts recipe ingredients from stock.
+    // Idempotent per bill id / idempotencyKey so double-checkout cannot double-deduct.
+    _inventoryDeductedKeys: (typeof window !== 'undefined' && window.__rsInvDeducted) ? window.__rsInvDeducted : new Set(),
     deductInventoryForBill(billRow) {
       const items = billRow._items || [];
       if (!items.length) return;
+      const deductKey = String(
+        (billRow && (billRow.idempotencyKey || billRow.no || billRow.orderId || billRow.id)) || ''
+      );
+      if (!window.__rsInvDeducted) window.__rsInvDeducted = new Set();
+      // Persist across soft reloads within the day
+      try {
+        const dayKey = 'rs_inv_deducted:' + (new Date().toISOString().slice(0, 10));
+        const stored = JSON.parse(localStorage.getItem(dayKey) || '[]');
+        stored.forEach(k => window.__rsInvDeducted.add(String(k)));
+        if (deductKey && window.__rsInvDeducted.has(deductKey)) {
+          console.info('[Inventory] Skip duplicate deduction for', deductKey);
+          return;
+        }
+      } catch (_) {}
+
       let changed = false;
       let deductedCount = 0;   // ingredient lines deducted
       let noRecipeCount = 0;   // sold items with no recipe linked
@@ -5082,10 +5134,20 @@
         });
       });
       if (changed) {
+        if (deductKey) {
+          window.__rsInvDeducted.add(deductKey);
+          try {
+            const dayKey = 'rs_inv_deducted:' + (new Date().toISOString().slice(0, 10));
+            const stored = JSON.parse(localStorage.getItem(dayKey) || '[]');
+            if (stored.indexOf(deductKey) === -1) {
+              stored.push(deductKey);
+              // Cap daily list
+              while (stored.length > 500) stored.shift();
+              localStorage.setItem(dayKey, JSON.stringify(stored));
+            }
+          } catch (_) {}
+        }
         // Persist locally AND push to cloud so stock levels survive/sync.
-        // Local write is effectively instant, so the "stock updated" toast reflects that.
-        // Cloud sync is intentionally non-blocking here (keeps checkout fast) but its
-        // outcome is no longer swallowed silently -- a failure surfaces its own toast.
         if (window.RS_DB && RS_DB.writeLocal) { try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {} }
         try {
           if (RS.save) {
@@ -5100,7 +5162,6 @@
         } catch (e) { console.warn('Inventory save failed', e); }
         const rendered = document.querySelector('#inventory-tab.active');
         if (rendered && window.RS && RS.render) RS.render('inventory-tab');
-        // Make the deduction visible instead of silent
         toast(`Stock updated: ${deductedCount} ingredient${deductedCount === 1 ? '' : 's'} deducted from inventory`, 'fa-boxes-stacked');
         if (noRecipeCount) {
           setTimeout(() => toast(`${noRecipeCount} sold item${noRecipeCount === 1 ? '' : 's'} skipped: no recipe linked`, 'fa-triangle-exclamation'), 1400);

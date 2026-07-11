@@ -906,6 +906,16 @@
       const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
       const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
       const waLabel = gwReady ? 'WhatsApp' : 'WhatsApp';
+      const st = bill.syncStatus || 'synced';
+      const syncBanner = st === 'pending' || st === 'local' || st === 'saving'
+        ? `<div style="margin:0 0 10px;padding:8px 11px;border-radius:10px;border:1px solid rgba(234,179,8,.35);background:rgba(234,179,8,.1);font-size:12px;line-height:1.45;color:var(--text-soft);display:flex;gap:8px;align-items:center">
+            <i class="fa-solid fa-cloud-arrow-up" style="color:#ca8a04"></i>
+            <span><b style="color:var(--text)">Saved on this device</b> — cloud sync ${st === 'saving' ? 'in progress' : 'pending'}. Bill is safe; will upload when online.</span>
+          </div>`
+        : `<div style="margin:0 0 10px;padding:6px 10px;border-radius:10px;border:1px solid rgba(34,197,94,.28);background:rgba(34,197,94,.08);font-size:11.5px;color:var(--text-soft);display:flex;gap:8px;align-items:center">
+            <i class="fa-solid fa-circle-check" style="color:#16a34a"></i>
+            <span>Bill synced · ${esc(bill.no || '')}</span>
+          </div>`;
       const connectBanner = !gwReady
         ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
             <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
@@ -921,7 +931,7 @@
         sub: `${bill.no} \u00b7 ${rs(bill.grand)}`,
         icon: 'fa-circle-check',
         size: 'sm',
-        body: `${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
+        body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
         foot: `${waBtn}
               <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
@@ -1621,7 +1631,13 @@
 
       refreshPaymentPanel();
     }
+    // Hard debounce — industry POS never double-finalizes payment
+    let checkoutInFlight = false;
+
     async function checkout(){
+      if (checkoutInFlight) {
+        return RS.toast('Checkout already in progress…', 'fa-spinner');
+      }
       const totals = RS.getTotals();
       const cust = RS.getCustomer();
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
@@ -1629,7 +1645,18 @@
       if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
 
       async function finalizeBill(payMethod, receivedVal, changeVal, customTenders) {
+        if (checkoutInFlight) {
+          RS.toast('Checkout already in progress…', 'fa-spinner');
+          return;
+        }
         if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
+
+        checkoutInFlight = true;
+        const checkoutBtn = document.getElementById('btn-checkout');
+        if (checkoutBtn) {
+          checkoutBtn.disabled = true;
+          checkoutBtn.dataset.wasBusy = '1';
+        }
 
         let dueAmount = 0;
         if (customTenders) {
@@ -1639,7 +1666,8 @@
           dueAmount = totals.grand;
         }
 
-        // Snapshot cart + customer before clearing (optimistic UI)
+        try {
+        // Snapshot cart + customer before any mutation
         const itemsSnap = (totals.items || []).map(i => ({ ...i }));
         const countSnap = totals.count;
         const custSnap = {
@@ -1649,8 +1677,11 @@
           gst: cust.gst || '',
         };
 
+        const billNo = (RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001'));
+        const identity = (RS.newBillIdentity ? RS.newBillIdentity(billNo) : { id: Date.now(), idempotencyKey: 'idem-' + Date.now(), no: billNo });
+
         const bill = {
-          no: (RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001')),
+          no: billNo,
           time: new Date().toLocaleString(window.RS_getOutletLocale ? RS_getOutletLocale() : 'en-IN', {
             day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true,
             timeZone: window.RS_getOutletTimezone ? RS_getOutletTimezone() : 'Asia/Kolkata'
@@ -1670,14 +1701,27 @@
           channel: totals.channel,
           taxProfile: totals.taxProfile,
           liquorTaxAmount: totals.liquorTax,
-          serviceChargeAmount: totals.serviceCharge
+          serviceChargeAmount: totals.serviceCharge,
+          idempotencyKey: identity.idempotencyKey,
+          syncStatus: 'saving',
         };
 
         const gstHalf = Math.round((totals.gst || 0) / 2);
         const billRow = {
-          id: Date.now(), orderId: bill.no, no: bill.no, time: bill.time, dateTime: new Date().toISOString(),
-          table: bill.table, items: countSnap, amount: bill.grand, pay: payMethod, paymentMethod: payMethod,
-          total: bill.grand, status: 'paid',
+          id: identity.id,
+          orderId: bill.no,
+          no: bill.no,
+          idempotencyKey: identity.idempotencyKey,
+          time: bill.time,
+          dateTime: new Date().toISOString(),
+          table: bill.table,
+          items: countSnap,
+          amount: bill.grand,
+          pay: payMethod,
+          paymentMethod: payMethod,
+          total: bill.grand,
+          status: 'paid',
+          syncStatus: 'local',
           orderType: (document.querySelector('.order-type-btn.active')?.textContent || '').trim() || bill.table || 'Dine-in',
           receivedAmount: receivedVal, changeAmount: changeVal, change: changeVal,
           customerName: custSnap.name || 'Walk-in Guest', customerPhone: custSnap.phone || '',
@@ -1690,30 +1734,61 @@
           liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
         };
 
-        // Instant feedback: memory bill + clear cart + show receipt (no await)
+        // 1) Memory + DURABLE local/cloud put BEFORE clearing cart (money integrity)
         RS.BILLS.unshift(billRow);
+        let syncStatus = 'local';
+        try {
+          const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+          if (RS.saveOne) {
+            const saved = await RS.saveOne('bills', billRow);
+            if (saved && saved.id != null) {
+              billRow.id = saved.id;
+            }
+          } else if (window.RS_DB && RS_DB.put) {
+            await RS_DB.put('bills', billRow.id, billRow);
+          }
+          const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+          if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
+            syncStatus = 'pending';
+            billRow.syncStatus = 'pending';
+            bill.syncStatus = 'pending';
+            RS.toast('Bill saved on this device. Cloud sync pending.', 'fa-cloud-arrow-up');
+          } else if (navigator.onLine === false) {
+            syncStatus = 'pending';
+            billRow.syncStatus = 'pending';
+            bill.syncStatus = 'pending';
+          } else {
+            syncStatus = 'synced';
+            billRow.syncStatus = 'synced';
+            bill.syncStatus = 'synced';
+          }
+        } catch (e) {
+          console.warn('Bill save failed', e);
+          syncStatus = 'pending';
+          billRow.syncStatus = 'pending';
+          bill.syncStatus = 'pending';
+          // Local write already attempted inside guard(); still show receipt so cashier is not stuck
+          RS.toast('Bill kept on this device. Will sync when online.', 'fa-cloud-arrow-up');
+        }
+
+        // 2) Only now clear cart + show receipt (cart was held until durable write path ran)
         RS.clearCart();
         resetCustomerFields();
         resetPayment();
         showReceipt(bill);
-        document.dispatchEvent(new CustomEvent('rs:bill-paid', { detail: { total: bill.grand || bill.amount || '' } }));
+        document.dispatchEvent(new CustomEvent('rs:bill-paid', {
+          detail: { total: bill.grand || bill.amount || '', no: bill.no, syncStatus, idempotencyKey: identity.idempotencyKey }
+        }));
 
-        // Background: persist, CRM, drafts, inventory, auto-WhatsApp
+        // 3) Background: inventory, CRM, drafts, auto-WhatsApp (non-blocking)
         (async () => {
           try {
-            const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-            if (RS.saveOne) await RS.saveOne('bills', billRow);
             if (RS.deductInventoryForBill) RS.deductInventoryForBill(billRow);
-            const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-            if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
-              RS.toast('Bill saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
-            }
             const refreshBills = () => RS.render && RS.render('bills-tab');
             if (window.requestIdleCallback) window.requestIdleCallback(refreshBills, { timeout: 1200 });
             else window.setTimeout(refreshBills, 350);
           } catch (e) {
-            console.warn('Bill save failed', e);
-            RS.toast('Bill saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
+            console.warn('Post-checkout inventory/refresh failed', e);
           }
 
           const hasPhone = custSnap.phone && custSnap.phone.trim();
@@ -1795,6 +1870,19 @@
             }
           }
         })();
+        } finally {
+          checkoutInFlight = false;
+          // Button re-enabled by cart refresh when items added; force clear busy flag
+          if (checkoutBtn) {
+            delete checkoutBtn.dataset.wasBusy;
+            try {
+              const t = RS.getTotals && RS.getTotals();
+              checkoutBtn.disabled = !(t && t.count > 0);
+            } catch (_) {
+              checkoutBtn.disabled = false;
+            }
+          }
+        }
       }
 
       if (payment.method === 'Due' && !cust.phone) {
