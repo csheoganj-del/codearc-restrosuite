@@ -418,8 +418,8 @@
     return raw;
   }
   function nextBillNo(existingBills = []) {
-    // Industry-style daily sequence: max(memory bills, durable local counter).
-    // Survives multi-tab / refresh better than scanning only the last 500 rows.
+    // Local fallback sequence (offline / server RPC unavailable).
+    // Prefer allocateBillNo() when online for multi-device safety.
     const key = shortDateKey();
     const prefix = `RS-${key}-`;
     const maxFromList = (existingBills || []).reduce((highest, bill) => {
@@ -441,26 +441,44 @@
     return `${prefix}${String(next).padStart(3, '0')}`;
   }
 
-  /** Stable numeric PK for bills (tenant-salted) + client idempotency key. */
-  function newBillIdentity(billNo) {
-    let tenant = 'local';
+  /** Server-allocated bill number (Wave 2). Falls back to nextBillNo locally. */
+  async function allocateBillNo(existingBills = []) {
+    const day = shortDateKey();
     try {
-      const s = (window.RS_API && RS_API.session && RS_API.session()) || {};
-      tenant = s.tenant_id || s.tenant_slug || sessionStorage.getItem('tenant_slug') || 'local';
-    } catch (_) {}
+      if (window.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
+        const res = await Promise.race([
+          RS_API.data({ operation: 'next_bill_no', day }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('next_bill_no timeout')), 4000)),
+        ]);
+        const no = (res && (res.no || res.order_id || res.data)) || null;
+        if (no && typeof no === 'string' && /^RS-\d{6}-\d+$/i.test(no)) {
+          // Keep local counter at least as high as server (avoid offline collisions later)
+          try {
+            const s = (RS_API.session && RS_API.session()) || {};
+            const tenant = s.tenant_id || s.tenant_slug || sessionStorage.getItem('tenant_slug') || 'local';
+            const seq = Number.parseInt(String(no).split('-').pop(), 10);
+            if (Number.isFinite(seq)) {
+              const seqKey = `rs_bill_seq:${tenant}:${day}`;
+              const stored = Number(localStorage.getItem(seqKey) || 0) || 0;
+              if (seq > stored) localStorage.setItem(seqKey, String(seq));
+            }
+          } catch (_) {}
+          return no;
+        }
+      }
+    } catch (e) {
+      console.warn('[BillNo] server allocate failed, using local sequence:', e && e.message);
+    }
+    return nextBillNo(existingBills);
+  }
+
+  /** Client idempotency key + temporary local id (cloud may replace with identity PK). */
+  function newBillIdentity(billNo) {
     const idempotencyKey = (typeof crypto !== 'undefined' && crypto.randomUUID)
       ? crypto.randomUUID()
       : ('idem-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
-    // Prefer engine-compatible stable hash if db.js exposes cleaner path via put(MAP)
-    let id = Date.now();
-    try {
-      // Use same salt pattern as db.cleanIdForCollection for string order ids
-      const raw = String(tenant) + ':bill:' + String(billNo || '') + ':' + idempotencyKey.slice(0, 8);
-      let hash = 5381;
-      for (let i = 0; i < raw.length; i++) hash = (hash * 33) ^ raw.charCodeAt(i);
-      id = Math.abs(hash) % 9007199254740991;
-      if (!id) id = Date.now();
-    } catch (_) {}
+    // Temporary local id only — cloud upsert uses order_id and returns real bigint
+    const id = Date.now() + Math.floor(Math.random() * 1000);
     return { id, idempotencyKey, no: billNo };
   }
 
@@ -5072,7 +5090,7 @@
   function getModalRoot(){ if(!modalRoot){ modalRoot = document.getElementById('rs-modal-root') || (()=>{ const d=document.createElement('div'); d.id='rs-modal-root'; document.body.appendChild(d); return d; })(); } return modalRoot; }
   window.RS = {
     toast, activateTab, rs, initials, avatarColors, catColor,
-    nextBillNo, newBillIdentity, nextLogicalNo, formatDisplayOrderId, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
+    nextBillNo, allocateBillNo, newBillIdentity, nextLogicalNo, formatDisplayOrderId, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
     MENU, CATS, stockLabel, stockCls,
     getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
     setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
@@ -5090,17 +5108,15 @@
     BILLS, INVENTORY, EMPLOYEES, QR_ORDERS,
 
     // -- Inventory deduction/restoration helpers -------------------------------
-    // Called after bill is generated. Deducts recipe ingredients from stock.
-    // Idempotent per bill id / idempotencyKey so double-checkout cannot double-deduct.
+    // Wave 2: prefer server RPC (atomic + idempotent). Local path is offline fallback.
     _inventoryDeductedKeys: (typeof window !== 'undefined' && window.__rsInvDeducted) ? window.__rsInvDeducted : new Set(),
-    deductInventoryForBill(billRow) {
+    async deductInventoryForBill(billRow) {
       const items = billRow._items || [];
       if (!items.length) return;
       const deductKey = String(
         (billRow && (billRow.idempotencyKey || billRow.no || billRow.orderId || billRow.id)) || ''
       );
       if (!window.__rsInvDeducted) window.__rsInvDeducted = new Set();
-      // Persist across soft reloads within the day
       try {
         const dayKey = 'rs_inv_deducted:' + (new Date().toISOString().slice(0, 10));
         const stored = JSON.parse(localStorage.getItem(dayKey) || '[]');
@@ -5111,27 +5127,120 @@
         }
       } catch (_) {}
 
-      let changed = false;
-      let deductedCount = 0;   // ingredient lines deducted
-      let noRecipeCount = 0;   // sold items with no recipe linked
-      const lowStock = [];     // ingredients that fell below their min level
-      const missingIngredients = [];
+      // Build ingredient lines from recipes
+      let noRecipeCount = 0;
+      const lines = [];
       items.forEach(it => {
         const menuItem = MENU.find(m => m.name === it.name);
-        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) { noRecipeCount++; return; }
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) {
+          noRecipeCount++;
+          return;
+        }
         const orderedQty = Number(it.qty) || 1;
         menuItem.ingredients.forEach(ing => {
-          const invItem = INVENTORY.find(x => x.name === ing.name);
-          if (!invItem) {
-            if (ing.name && missingIngredients.indexOf(ing.name) === -1) missingIngredients.push(ing.name);
+          const qty = (Number(ing.qty) || 0) * orderedQty;
+          if (qty <= 0) return;
+          const key = String(ing.key || ing.name || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '');
+          lines.push({ key, name: ing.name || key, qty });
+        });
+      });
+
+      if (!lines.length) {
+        if (noRecipeCount === items.length) {
+          toast('No stock deducted: link recipes under Inventory > Recipes', 'fa-triangle-exclamation');
+        }
+        return;
+      }
+
+      // --- Server atomic path ---
+      try {
+        if (window.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
+          const res = await Promise.race([
+            RS_API.data({
+              operation: 'deduct_inventory',
+              bill_key: deductKey,
+              order_id: billRow.no || billRow.orderId || '',
+              lines,
+            }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('deduct_inventory timeout')), 8000)),
+          ]);
+          const payload = res && res.results != null ? res : (res && res.data) || res;
+          if (payload && (payload.ok || payload.duplicate || Array.isArray(payload.results))) {
+            // Mark idempotent locally
+            if (deductKey) {
+              window.__rsInvDeducted.add(deductKey);
+              try {
+                const dayKey = 'rs_inv_deducted:' + (new Date().toISOString().slice(0, 10));
+                const stored = JSON.parse(localStorage.getItem(dayKey) || '[]');
+                if (stored.indexOf(deductKey) === -1) {
+                  stored.push(deductKey);
+                  while (stored.length > 500) stored.shift();
+                  localStorage.setItem(dayKey, JSON.stringify(stored));
+                }
+              } catch (_) {}
+            }
+            // Mirror stock into local INVENTORY array for instant UI
+            const results = Array.isArray(payload.results) ? payload.results : [];
+            results.forEach(r => {
+              if (!r || r.status !== 'ok') return;
+              const invItem = INVENTORY.find(x =>
+                String(x.id) === String(r.id)
+                || (x.key && r.key && String(x.key).toLowerCase() === String(r.key).toLowerCase())
+                || (x.name && r.name && String(x.name).toLowerCase() === String(r.name).toLowerCase())
+              );
+              if (invItem && r.stock_after != null) invItem.stock = Number(r.stock_after);
+            });
+            if (window.RS_DB && RS_DB.writeLocal) {
+              try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {}
+            }
+            const deductedCount = Number(payload.deducted) || results.filter(r => r && r.status === 'ok').length;
+            const missing = Array.isArray(payload.missing) ? payload.missing : [];
+            const lowStock = Array.isArray(payload.low_stock) ? payload.low_stock : [];
+            if (payload.duplicate) {
+              console.info('[Inventory] Server reported duplicate deduction for', deductKey);
+            } else if (deductedCount > 0) {
+              toast(`Stock updated: ${deductedCount} ingredient${deductedCount === 1 ? '' : 's'} deducted`, 'fa-boxes-stacked');
+            }
+            if (missing.length) {
+              setTimeout(() => toast(`Recipe ingredient not in stock: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`, 'fa-triangle-exclamation'), 1200);
+            }
+            if (lowStock.length) {
+              setTimeout(() => toast(`Low stock: ${lowStock.slice(0, 3).join(', ')}${lowStock.length > 3 ? '…' : ''}`, 'fa-triangle-exclamation'), 2200);
+            }
+            if (noRecipeCount) {
+              setTimeout(() => toast(`${noRecipeCount} sold item${noRecipeCount === 1 ? '' : 's'} skipped: no recipe linked`, 'fa-triangle-exclamation'), 1600);
+            }
+            const rendered = document.querySelector('#inventory-tab.active');
+            if (rendered && window.RS && RS.render) RS.render('inventory-tab');
             return;
           }
-          invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(ing.qty) || 0) * orderedQty);
-          changed = true;
-          deductedCount++;
-          const minLevel = Number(invItem.min != null ? invItem.min : (invItem.minStock || 0));
-          if (minLevel && invItem.stock <= minLevel && lowStock.indexOf(invItem.name) === -1) lowStock.push(invItem.name);
-        });
+        }
+      } catch (e) {
+        console.warn('[Inventory] server deduct failed, using local fallback:', e && e.message);
+      }
+
+      // --- Local fallback (offline / RPC not deployed yet) ---
+      let changed = false;
+      let deductedCount = 0;
+      const lowStock = [];
+      const missingIngredients = [];
+      lines.forEach(line => {
+        const invItem = INVENTORY.find(x =>
+          (x.name && line.name && String(x.name).toLowerCase() === String(line.name).toLowerCase())
+          || (x.key && line.key && String(x.key).toLowerCase() === String(line.key).toLowerCase())
+        );
+        if (!invItem) {
+          if (line.name && missingIngredients.indexOf(line.name) === -1) missingIngredients.push(line.name);
+          return;
+        }
+        invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(line.qty) || 0));
+        changed = true;
+        deductedCount++;
+        const minLevel = Number(invItem.min != null ? invItem.min : (invItem.minStock || 0));
+        if (minLevel && invItem.stock <= minLevel && lowStock.indexOf(invItem.name) === -1) lowStock.push(invItem.name);
       });
       if (changed) {
         if (deductKey) {
@@ -5141,13 +5250,11 @@
             const stored = JSON.parse(localStorage.getItem(dayKey) || '[]');
             if (stored.indexOf(deductKey) === -1) {
               stored.push(deductKey);
-              // Cap daily list
               while (stored.length > 500) stored.shift();
               localStorage.setItem(dayKey, JSON.stringify(stored));
             }
           } catch (_) {}
         }
-        // Persist locally AND push to cloud so stock levels survive/sync.
         if (window.RS_DB && RS_DB.writeLocal) { try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {} }
         try {
           if (RS.save) {

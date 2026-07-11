@@ -43,29 +43,54 @@ DROP POLICY IF EXISTS "deny_anon_all" ON public.doppio_tax_rates;
 CREATE POLICY "deny_anon_all" ON public.doppio_tax_rates
     AS RESTRICTIVE FOR ALL TO anon USING (false);
 
--- 3) Seed defaults for every tenant that has no rates yet
+-- 3) Seed defaults for every tenant that has no rates yet.
+-- Live table may use uuid id (not text). Detect and seed accordingly.
 DO $$
 DECLARE
   t record;
+  id_udt text;
 BEGIN
+  SELECT udt_name INTO id_udt
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'doppio_tax_rates' AND column_name = 'id';
+
   FOR t IN SELECT id FROM public.saas_tenants LOOP
     IF NOT EXISTS (SELECT 1 FROM public.doppio_tax_rates r WHERE r.tenant_id = t.id LIMIT 1) THEN
-      INSERT INTO public.doppio_tax_rates (id, tenant_id, country, rate_code, label, percent, valid_from, valid_to, itc_allowed, notes)
-      VALUES
-        ('IN_REST_5_'  || t.id, t.id, 'IN', 'IN_REST_5',  'GST Restaurant AC/Non-AC', 5.0,  '2025-09-22', NULL, false, 'Standalone restaurant'),
-        ('IN_REST_18_' || t.id, t.id, 'IN', 'IN_REST_18', 'GST Specified Premises',   18.0, '2025-09-22', NULL, true,  'Hotel room tariff >= 7500/night'),
-        ('IN_CATER_18_'|| t.id, t.id, 'IN', 'IN_CATER_18','GST Outdoor Catering',     18.0, '2025-09-22', NULL, true,  'Catering services'),
-        ('IN_COMP_5_'  || t.id, t.id, 'IN', 'IN_COMP_5',  'GST Composition Scheme',   5.0,  '2025-09-22', NULL, false, 'Flat 5% borne by restaurant'),
-        ('IN_GOODS_5_' || t.id, t.id, 'IN', 'IN_GOODS_5', 'GST Packaged Goods 5%',    5.0,  '2025-09-22', NULL, false, 'Packaged food goods'),
-        ('IN_GOODS_18_'|| t.id, t.id, 'IN', 'IN_GOODS_18','GST Branded Goods 18%',    18.0, '2025-09-22', NULL, true,  'Branded retail goods'),
-        ('IN_NIL_0_'   || t.id, t.id, 'IN', 'IN_NIL_0',   'GST Nil Rated',            0.0,  '2025-09-22', NULL, false, 'Essential foods'),
-        ('IE_FOOD_135_'|| t.id, t.id, 'IE', 'IE_FOOD_135','VAT Hot Food (Pre-Jul 26)',13.5, '2019-01-01', '2026-06-30', true, 'Restaurant food until 30-Jun-2026'),
-        ('IE_FOOD_9_'  || t.id, t.id, 'IE', 'IE_FOOD_9',  'VAT Hot Food (Post-Jul 26)',9.0, '2026-07-01', NULL, true,  'Restaurant food from 1-Jul-2026'),
-        ('IE_DRINK_23_'|| t.id, t.id, 'IE', 'IE_DRINK_23','VAT Drinks/Alcohol',       23.0, '2019-01-01', NULL, true,  'Alcohol & soft drinks'),
-        ('IE_COLD_0_'  || t.id, t.id, 'IE', 'IE_COLD_0',  'VAT Cold Takeaway',         0.0, '2019-01-01', NULL, true,  'Chilled food to-go'),
-        ('IE_DELIVERY_23_'|| t.id, t.id, 'IE', 'IE_DELIVERY_23', 'VAT Delivery Services', 23.0, '2019-01-01', NULL, true, 'Delivery service charge'),
-        ('IE_ACCOM_135_'|| t.id, t.id, 'IE', 'IE_ACCOM_135', 'VAT Accommodation',    13.5, '2019-01-01', NULL, true,  'Hotel rooms')
-      ON CONFLICT (id) DO NOTHING;
+      IF id_udt = 'uuid' THEN
+        INSERT INTO public.doppio_tax_rates (id, tenant_id, country, rate_code, label, percent, valid_from, valid_to, itc_allowed, notes)
+        VALUES
+          (gen_random_uuid(), t.id, 'IN', 'IN_REST_5',  'GST Restaurant AC/Non-AC', 5.0,  '2025-09-22', NULL, false, 'Standalone restaurant'),
+          (gen_random_uuid(), t.id, 'IN', 'IN_REST_18', 'GST Specified Premises',   18.0, '2025-09-22', NULL, true,  'Hotel room tariff >= 7500/night'),
+          (gen_random_uuid(), t.id, 'IN', 'IN_CATER_18','GST Outdoor Catering',     18.0, '2025-09-22', NULL, true,  'Catering services'),
+          (gen_random_uuid(), t.id, 'IN', 'IN_COMP_5',  'GST Composition Scheme',   5.0,  '2025-09-22', NULL, false, 'Flat 5% borne by restaurant'),
+          (gen_random_uuid(), t.id, 'IN', 'IN_GOODS_5', 'GST Packaged Goods 5%',    5.0,  '2025-09-22', NULL, false, 'Packaged food goods'),
+          (gen_random_uuid(), t.id, 'IN', 'IN_GOODS_18','GST Branded Goods 18%',    18.0, '2025-09-22', NULL, true,  'Branded retail goods'),
+          (gen_random_uuid(), t.id, 'IN', 'IN_NIL_0',   'GST Nil Rated',            0.0,  '2025-09-22', NULL, false, 'Essential foods'),
+          (gen_random_uuid(), t.id, 'IE', 'IE_FOOD_135','VAT Hot Food (Pre-Jul 26)',13.5, '2019-01-01', '2026-06-30', true, 'Restaurant food until 30-Jun-2026'),
+          (gen_random_uuid(), t.id, 'IE', 'IE_FOOD_9',  'VAT Hot Food (Post-Jul 26)',9.0, '2026-07-01', NULL, true,  'Restaurant food from 1-Jul-2026'),
+          (gen_random_uuid(), t.id, 'IE', 'IE_DRINK_23','VAT Drinks/Alcohol',       23.0, '2019-01-01', NULL, true,  'Alcohol & soft drinks'),
+          (gen_random_uuid(), t.id, 'IE', 'IE_COLD_0',  'VAT Cold Takeaway',         0.0, '2019-01-01', NULL, true,  'Chilled food to-go'),
+          (gen_random_uuid(), t.id, 'IE', 'IE_DELIVERY_23', 'VAT Delivery Services', 23.0, '2019-01-01', NULL, true, 'Delivery service charge'),
+          (gen_random_uuid(), t.id, 'IE', 'IE_ACCOM_135', 'VAT Accommodation',    13.5, '2019-01-01', NULL, true,  'Hotel rooms')
+        ON CONFLICT DO NOTHING;
+      ELSE
+        INSERT INTO public.doppio_tax_rates (id, tenant_id, country, rate_code, label, percent, valid_from, valid_to, itc_allowed, notes)
+        VALUES
+          ('IN_REST_5_'  || t.id, t.id, 'IN', 'IN_REST_5',  'GST Restaurant AC/Non-AC', 5.0,  '2025-09-22', NULL, false, 'Standalone restaurant'),
+          ('IN_REST_18_' || t.id, t.id, 'IN', 'IN_REST_18', 'GST Specified Premises',   18.0, '2025-09-22', NULL, true,  'Hotel room tariff >= 7500/night'),
+          ('IN_CATER_18_'|| t.id, t.id, 'IN', 'IN_CATER_18','GST Outdoor Catering',     18.0, '2025-09-22', NULL, true,  'Catering services'),
+          ('IN_COMP_5_'  || t.id, t.id, 'IN', 'IN_COMP_5',  'GST Composition Scheme',   5.0,  '2025-09-22', NULL, false, 'Flat 5% borne by restaurant'),
+          ('IN_GOODS_5_' || t.id, t.id, 'IN', 'IN_GOODS_5', 'GST Packaged Goods 5%',    5.0,  '2025-09-22', NULL, false, 'Packaged food goods'),
+          ('IN_GOODS_18_'|| t.id, t.id, 'IN', 'IN_GOODS_18','GST Branded Goods 18%',    18.0, '2025-09-22', NULL, true,  'Branded retail goods'),
+          ('IN_NIL_0_'   || t.id, t.id, 'IN', 'IN_NIL_0',   'GST Nil Rated',            0.0,  '2025-09-22', NULL, false, 'Essential foods'),
+          ('IE_FOOD_135_'|| t.id, t.id, 'IE', 'IE_FOOD_135','VAT Hot Food (Pre-Jul 26)',13.5, '2019-01-01', '2026-06-30', true, 'Restaurant food until 30-Jun-2026'),
+          ('IE_FOOD_9_'  || t.id, t.id, 'IE', 'IE_FOOD_9',  'VAT Hot Food (Post-Jul 26)',9.0, '2026-07-01', NULL, true,  'Restaurant food from 1-Jul-2026'),
+          ('IE_DRINK_23_'|| t.id, t.id, 'IE', 'IE_DRINK_23','VAT Drinks/Alcohol',       23.0, '2019-01-01', NULL, true,  'Alcohol & soft drinks'),
+          ('IE_COLD_0_'  || t.id, t.id, 'IE', 'IE_COLD_0',  'VAT Cold Takeaway',         0.0, '2019-01-01', NULL, true,  'Chilled food to-go'),
+          ('IE_DELIVERY_23_'|| t.id, t.id, 'IE', 'IE_DELIVERY_23', 'VAT Delivery Services', 23.0, '2019-01-01', NULL, true, 'Delivery service charge'),
+          ('IE_ACCOM_135_'|| t.id, t.id, 'IE', 'IE_ACCOM_135', 'VAT Accommodation',    13.5, '2019-01-01', NULL, true,  'Hotel rooms')
+        ON CONFLICT (id) DO NOTHING;
+      END IF;
     END IF;
   END LOOP;
 END $$;

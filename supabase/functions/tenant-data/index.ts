@@ -523,6 +523,54 @@ serve(async (req) => {
       return await proxyGatewayRequest("/send", "POST", req, { phone, message, caption, orderId, pdfData, filename }, verified.tenantId);
     }
 
+    // Wave 2: multi-device bill sequence (atomic counter in Postgres)
+    if (operation === "next_bill_no") {
+      const day = payload.day != null ? String(payload.day) : null;
+      const { data, error } = await supabaseAdmin.rpc("rs_next_bill_no", {
+        p_tenant_id: verified.tenantId,
+        p_day: day,
+      });
+      if (error) {
+        console.error("next_bill_no rpc failed:", error);
+        return jsonResponse({ error: error.message || "Could not allocate bill number." }, 500, req);
+      }
+      return jsonResponse({ data: { no: data, order_id: data } }, 200, req);
+    }
+
+    // Wave 2: atomic, idempotent inventory deduction by bill_key
+    if (operation === "deduct_inventory") {
+      const tabs = (verified.allowedTabs as string[]) || [];
+      const canBill = tabs.includes("pos-tab")
+        || tabs.includes("bills-tab")
+        || verified.actorRole === "admin"
+        || verified.actorRole === "manager"
+        || verified.actorRole === "cashier"
+        || verified.actorRole === "owner";
+      if (!canBill) {
+        return jsonResponse({ error: "Your role cannot deduct inventory." }, 403, req);
+      }
+      const billKey = String(payload.bill_key || payload.billKey || payload.idempotencyKey || "").trim();
+      const orderId = String(payload.order_id || payload.orderId || payload.no || "").trim();
+      const lines = Array.isArray(payload.lines) ? payload.lines : [];
+      if (!billKey) {
+        return jsonResponse({ error: "Missing bill_key for inventory deduction." }, 400, req);
+      }
+      const { data, error } = await supabaseAdmin.rpc("rs_deduct_inventory", {
+        p_tenant_id: verified.tenantId,
+        p_bill_key: billKey,
+        p_lines: lines,
+        p_order_id: orderId,
+      });
+      if (error) {
+        console.error("deduct_inventory rpc failed:", error);
+        return jsonResponse({ error: error.message || "Inventory deduction failed." }, 500, req);
+      }
+      try {
+        await broadcastTenantDataChange(verified.tenantId as string, "doppio_inventory", "update");
+      } catch (_) { /* non-fatal */ }
+      return jsonResponse({ data }, 200, req);
+    }
+
     if (operation === "verify_pin_reset_code") {
       const code = String(payload.code || "").trim();
       if (!/^[A-Za-z0-9_-]{6,64}$/.test(code)) {
