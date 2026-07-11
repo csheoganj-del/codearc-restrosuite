@@ -433,11 +433,25 @@
 .qr-card { border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--stroke); overflow: hidden; transition: var(--t); }
 .qr-card:hover { border-color: var(--stroke-hi); box-shadow: var(--shadow-md); }
 .qr-card.s-pending { border-left: 3px solid var(--amber); }
+.qr-card.s-pending.needs-attention {
+  animation: qr-pending-pulse 1.8s ease-in-out infinite;
+  background: color-mix(in srgb, var(--amber) 6%, var(--panel));
+}
 .qr-card.s-preparing { border-left: 3px solid var(--orange); }
 .qr-card.s-served { border-left: 3px solid var(--green); }
+@keyframes qr-pending-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 0%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 28%, transparent); }
+}
 .qr-ch { display: flex; align-items: center; justify-content: space-between; padding: 13px 15px; border-bottom: 1px solid var(--stroke); }
 .qr-ch .tnum { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
 .qr-ch .qtime { font-size: 11.5px; color: var(--text-mute); }
+.qr-ch .qguest { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+.badge-count.badge-urgent {
+  background: var(--amber) !important;
+  color: #1a1a1a !important;
+  animation: qr-pending-pulse 1.6s ease-in-out infinite;
+}
 .qr-lines { padding: 12px 15px; display: flex; flex-direction: column; gap: 7px; }
 .qr-lines .ql { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-soft); }
 .qr-lines .ql b { color: var(--text); }
@@ -447,6 +461,7 @@
 /* ===================== KDS ===================== */
 .kds-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 14px; }
 .kds-card { border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--stroke); overflow: hidden; display: flex; flex-direction: column; }
+.kds-card.aging { border-color: color-mix(in srgb, var(--amber) 45%, var(--stroke)); }
 .kds-card.urgent { border-color: oklch(0.66 0.20 25 / 0.5); box-shadow: 0 0 0 1px oklch(0.66 0.20 25 / 0.3), var(--shadow-md); animation: urgentpulse 2s infinite; }
 @keyframes urgentpulse { 0%,100%{box-shadow:0 0 0 1px oklch(0.66 0.20 25 / 0.3), var(--shadow-md);} 50%{box-shadow:0 0 0 3px oklch(0.66 0.20 25 / 0.18), var(--shadow-md);} }
 .kds-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--stroke); background: var(--glass); }

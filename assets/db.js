@@ -159,25 +159,69 @@
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
-      from: r => ({ id:r.id, no:r.order_id, time:r.date_time, table:(r.table_number||'--'), dateTime:r.created_at,
-                    _items:parseItems(r.items),
-                    items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
-                    subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
-                    amount:num(r.total), pay:r.payment_method, status:r.status || 'paid',
-                    refundReason:r.refund_reason || '',
-                    refundedAt:r.refunded_at || '',
-                    customerName:r.customer_name, customerPhone:r.customer_phone,
-                    tenders:parseTenders(r.tenders), change:num(r.change),
-                    taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
-                    channel: r.channel || 'dine_in',
-                    taxProfile: typeof r.tax_profile === 'string' ? JSON.parse(r.tax_profile) : (r.tax_profile || {}),
-                    liquorTaxAmount: num(r.liquor_tax_amount),
-                    serviceChargeAmount: num(r.service_charge_amount) }),
+      from: r => {
+        const taxProfile = typeof r.tax_profile === 'string' ? (()=>{ try { return JSON.parse(r.tax_profile); } catch(e){ return {}; } })() : (r.tax_profile || {});
+        // Competitive packs store tip/promo/covers/etc in tax_profile._ops (no new columns/tables).
+        const ops = (taxProfile && taxProfile._ops) || {};
+        return {
+          id:r.id, no:r.order_id, time:r.date_time, table:(r.table_number||'--'), dateTime:r.created_at,
+          _items:parseItems(r.items),
+          items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
+          subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
+          amount:num(r.total), pay:r.payment_method, status:r.status || 'paid',
+          refundReason:r.refund_reason || '',
+          refundedAt:r.refunded_at || '',
+          customerName:r.customer_name, customerPhone:r.customer_phone,
+          tenders:parseTenders(r.tenders), change:num(r.change),
+          taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
+          channel: r.channel || 'dine_in',
+          taxProfile,
+          liquorTaxAmount: num(r.liquor_tax_amount),
+          serviceChargeAmount: num(r.service_charge_amount),
+          tipAmount: num(ops.tipAmount),
+          deliveryCharge: num(ops.deliveryCharge),
+          promoCode: ops.promoCode || '',
+          promoAmount: num(ops.promoAmount),
+          promoTitle: ops.promoTitle || '',
+          promoOfferId: ops.promoOfferId || null,
+          covers: num(ops.covers),
+          pax: num(ops.covers),
+          loyaltyRedeemAmount: num(ops.loyaltyRedeemAmount),
+          loyaltyPointsUsed: num(ops.loyaltyPointsUsed),
+          stationId: ops.stationId || '',
+          stationLabel: ops.stationLabel || '',
+          cashier: ops.cashier || '',
+          shiftId: ops.shiftId || r.shift_id || '',
+          disc: num(ops.disc != null ? ops.disc : r.discount),
+        };
+      },
       to: o => {
         const statusRaw = String(o.status || 'paid').toLowerCase();
         const status = statusRaw === 'refunded' ? 'refunded' : 'paid';
         const orderType = o.orderType || o.channel || 'dine_in';
         const tableNum = o.table && o.table !== '--' ? String(o.table) : null;
+        let taxProfile = {};
+        try {
+          taxProfile = typeof o.taxProfile === 'object' && o.taxProfile
+            ? { ...o.taxProfile }
+            : (typeof o.taxProfile === 'string' ? JSON.parse(o.taxProfile || '{}') : {});
+        } catch (_) { taxProfile = {}; }
+        taxProfile._ops = {
+          tipAmount: num(o.tipAmount),
+          deliveryCharge: num(o.deliveryCharge),
+          promoCode: o.promoCode || '',
+          promoAmount: num(o.promoAmount),
+          promoTitle: o.promoTitle || '',
+          promoOfferId: o.promoOfferId || null,
+          covers: num(o.covers != null ? o.covers : o.pax),
+          loyaltyRedeemAmount: num(o.loyaltyRedeemAmount),
+          loyaltyPointsUsed: num(o.loyaltyPointsUsed),
+          stationId: o.stationId || '',
+          stationLabel: o.stationLabel || '',
+          cashier: o.cashier || '',
+          shiftId: o.shiftId || '',
+          disc: num(o.disc != null ? o.disc : o.discount),
+        };
         const body = {
           // Prefer natural key order_id for upsert; omit hashed client id when
           // possible so Postgres identity can allocate a stable PK.
@@ -198,7 +242,7 @@
           change: num(o.change || o.changeAmount || 0),
           tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
           channel: o.channel || 'dine_in',
-          tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
+          tax_profile: JSON.stringify(taxProfile),
           liquor_tax_amount: num(o.liquorTaxAmount),
           service_charge_amount: num(o.serviceChargeAmount),
           status,
@@ -311,16 +355,53 @@
     },
     shifts: {
       table:'doppio_shifts', pk:'shift_id', clientId:true,
-      from: r => ({ shiftId:r.shift_id, cashierName:r.cashier_name, openedAt:r.opened_at, closedAt:r.closed_at,
-                    openingFloat:num(r.opening_float), expectedCash:num(r.expected_cash), actualCash:num(r.actual_cash),
-                    variance:num(r.variance), totalSalesCash:num(r.total_sales_cash), totalSalesUpi:num(r.total_sales_upi),
-                    totalSalesCard:num(r.total_sales_card), totalPayouts:num(r.total_payouts), totalSafeDrops:num(r.total_safe_drops),
-                    status:r.status, notes:r.notes }),
-      to: o => ({ shift_id:o.shiftId, cashier_name:o.cashierName||'', opened_at:o.openedAt, closed_at:o.closedAt||null,
-                  opening_float:num(o.openingFloat), expected_cash:num(o.expectedCash), actual_cash:num(o.actualCash),
-                  variance:num(o.variance), total_sales_cash:num(o.totalSalesCash), total_sales_upi:num(o.totalSalesUpi),
-                  total_sales_card:num(o.totalSalesCard), total_payouts:num(o.totalPayouts), total_safe_drops:num(o.totalSafeDrops),
-                  status:o.status||'OPEN', notes:o.notes||'' })
+      from: r => {
+        // Cash movements packed into notes as JSON (existing text column — no new table).
+        let notes = r.notes || '';
+        let cashMovements = [];
+        let totalPayIns = 0;
+        let stationId = '';
+        let stationLabel = '';
+        let zScope = '';
+        try {
+          const parsed = notes && String(notes).trim().startsWith('{') ? JSON.parse(notes) : null;
+          if (parsed && typeof parsed === 'object') {
+            cashMovements = Array.isArray(parsed.cashMovements) ? parsed.cashMovements : [];
+            totalPayIns = num(parsed.totalPayIns);
+            stationId = parsed.stationId || '';
+            stationLabel = parsed.stationLabel || '';
+            zScope = parsed.zScope || '';
+            notes = parsed.note || parsed.notes || '';
+          }
+        } catch (_) {}
+        return {
+          shiftId:r.shift_id, cashierName:r.cashier_name, openedAt:r.opened_at, closedAt:r.closed_at,
+          openingFloat:num(r.opening_float), expectedCash:num(r.expected_cash), actualCash:num(r.actual_cash),
+          variance:num(r.variance), totalSalesCash:num(r.total_sales_cash), totalSalesUpi:num(r.total_sales_upi),
+          totalSalesCard:num(r.total_sales_card), totalPayouts:num(r.total_payouts), totalSafeDrops:num(r.total_safe_drops),
+          totalPayIns, cashMovements, stationId, stationLabel, zScope,
+          status:r.status, notes,
+        };
+      },
+      to: o => {
+        const payIns = num(o.totalPayIns);
+        const moves = Array.isArray(o.cashMovements) ? o.cashMovements : [];
+        const notesPayload = {
+          note: o.notes || '',
+          cashMovements: moves,
+          totalPayIns: payIns,
+          stationId: o.stationId || '',
+          stationLabel: o.stationLabel || '',
+          zScope: o.zScope || '',
+        };
+        return {
+          shift_id:o.shiftId, cashier_name:o.cashierName||'', opened_at:o.openedAt, closed_at:o.closedAt||null,
+          opening_float:num(o.openingFloat), expected_cash:num(o.expectedCash), actual_cash:num(o.actualCash),
+          variance:num(o.variance), total_sales_cash:num(o.totalSalesCash), total_sales_upi:num(o.totalSalesUpi),
+          total_sales_card:num(o.totalSalesCard), total_payouts:num(o.totalPayouts), total_safe_drops:num(o.totalSafeDrops),
+          status:o.status||'OPEN', notes: JSON.stringify(notesPayload),
+        };
+      }
     },
     shift_events: {
       table:'doppio_shift_events', pk:'event_id', clientId:true,
@@ -344,8 +425,41 @@
     },
     offers: {
       table:'doppio_offers', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, code:r.code, description:r.title, usageCount:num(r.usage_count), status:r.status }),
-      to: o => ({ code:o.code||'', title:o.description||o.code||'Offer', usage_count:num(o.usageCount), status:o.status||'active' })
+      from: r => {
+        const dtype = String(r.discount_type || 'percent').toLowerCase();
+        const dval = num(r.discount_value);
+        const pct = dtype === 'amount' ? 0 : dval;
+        const fixed = dtype === 'amount' ? dval : 0;
+        return {
+          id: r.id,
+          code: r.code,
+          title: r.title,
+          description: r.title,
+          pct,
+          fixed,
+          discount_pct: pct,
+          amount: fixed,
+          usageCount: num(r.usage_count),
+          status: r.status,
+          expiresAt: r.ends_at || null,
+          expires_at: r.ends_at || null,
+          startsAt: r.starts_at || null,
+        };
+      },
+      to: o => {
+        const fixed = num(o.fixed != null ? o.fixed : o.amount);
+        const pct = num(o.pct != null ? o.pct : o.discount_pct);
+        return {
+          code: o.code || '',
+          title: o.title || o.description || o.code || 'Offer',
+          discount_type: fixed > 0 ? 'amount' : 'percent',
+          discount_value: fixed > 0 ? fixed : pct,
+          ends_at: o.expiresAt || o.expires_at || null,
+          starts_at: o.startsAt || o.starts_at || null,
+          usage_count: num(o.usageCount),
+          status: o.status || 'active',
+        };
+      }
     },
     vendors: {
       table:'doppio_vendors', pk:'id', clientId:false, uuidPK:true,

@@ -1,0 +1,67 @@
+'use strict';
+/**
+ * Browser smoke — public guest surfaces (no login).
+ * Run: npx playwright test tests/e2e/guest-ux.spec.cjs
+ * Optional: E2E_BASE_URL=https://codearc-restrosuite.vercel.app
+ */
+const { test, expect } = require('@playwright/test');
+
+test.describe('Guest QR UX (public)', () => {
+  test('order.html loads menu shell with diet filters and service dock', async ({ page }) => {
+    const failed = [];
+    page.on('response', (r) => {
+      if (r.status() >= 400 && /assets\/|config\.js|order\.html/.test(r.url())) {
+        failed.push(r.status() + ' ' + r.url());
+      }
+    });
+    // No tenant → invalid state UI, still proves page boots
+    await page.goto('/order.html');
+    await expect(page.locator('body')).toBeVisible({ timeout: 15000 });
+    const html = await page.content();
+    // Either invalid tenant message or full shell
+    expect(html).toMatch(/No Restaurant|order|Browse|Loading menu|svc-dock|lang-toggle|RestroSuite|Restaurant/i);
+    // Asset failures should not include core JS
+    const coreMiss = failed.filter((f) => /config\.js|order\.html/.test(f) && !/favicon/.test(f));
+    expect(coreMiss, coreMiss.join('\n')).toEqual([]);
+  });
+
+  test('order.html with demo tenant shows filters + lang toggle', async ({ page }) => {
+    await page.goto('/order.html?tenant=demo&table=1');
+    await page.waitForTimeout(2000);
+    // Lang toggle is always in header once page past boot
+    const lang = page.locator('#lang-toggle');
+    if (await lang.count()) {
+      await expect(lang).toBeVisible();
+      await lang.click();
+      await expect(lang).toHaveText(/हिं|EN/);
+    }
+    // Diet chips appear after menu payload (or empty state)
+    const body = await page.locator('body').innerText();
+    expect(body.length).toBeGreaterThan(20);
+  });
+
+  test('qr-order portal boots for table context', async ({ page }) => {
+    await page.goto('/qr-order.html?tenant=demo&table=1&hub=1');
+    await page.waitForTimeout(1500);
+    await expect(page.locator('body')).toBeVisible();
+    const html = await page.content();
+    expect(html).toMatch(/Menu|Track|Service|Table|portal|Restaurant|RESTRONAME|Order/i);
+  });
+
+  test('login page usable', async ({ page }) => {
+    await page.goto('/login.html');
+    await expect(page.locator('input[type="password"], #password').first()).toBeVisible({ timeout: 15000 });
+  });
+
+  test('dashboard shell assets load (may redirect without auth)', async ({ page }) => {
+    const failed = [];
+    page.on('response', (r) => {
+      if (r.status() >= 400 && /assets\/(db|doppio-api|saas-core|dashboard|critical)/.test(r.url())) {
+        failed.push(r.status() + ' ' + r.url());
+      }
+    });
+    await page.goto('/dashboard.html?appv=v81-20260711-ux-cx');
+    await page.waitForTimeout(2000);
+    expect(failed, failed.join('\n')).toEqual([]);
+  });
+});

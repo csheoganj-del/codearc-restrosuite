@@ -23,5 +23,5 @@
   <!-- > bracket -->
   <path d="M126 82 L112 96 L126 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <!-- / slash -->
-  <line x1="106" y1="78" x2="86" y2="114" stroke="#FF6A2A" stroke-width="6" stroke-linecap="round"/>
+  <line x1="106" y1="78" x2="86" y2="114" stroke="#FF4F00" stroke-width="6" stroke-linecap="round"/>
 </svg>

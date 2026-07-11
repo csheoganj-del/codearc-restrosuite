@@ -17,6 +17,20 @@ function read(relativePath) {
       "assets/features-extra.js",
       "assets/features-pos.js",
       "assets/features-growth.js",
+      "assets/modules/bill-identity.js",
+      "assets/modules/inventory-ledger.js",
+      "assets/modules/bills-history.js",
+      "assets/modules/inventory-ui.js",
+      "assets/modules/reports-ui.js",
+      "assets/modules/gateway-monitor.js",
+      "assets/modules/super-admin.js",
+      "assets/modules/kds-ui.js",
+      "assets/modules/qr-orders-ui.js",
+      "assets/modules/employees-ui.js",
+      "assets/modules/tax-helpers.js",
+      "assets/modules/pos-ui.js",
+      "assets/modules/growth-hub-shell.js",
+      "assets/modules/demo-script.js",
       "assets/dashboard.js"
     ];
     return files.map(f => fs.readFileSync(path.join(root, f), "utf8")).join("\n");
@@ -79,7 +93,7 @@ test("dashboard upserts always use tenant-scoped conflict targets", () => {
   for (const target of conflictTargets) {
     assert.ok(target.split(",").includes("tenant_id"), `${target} must include tenant_id`);
   }
-  assert.match(dashboard, /ON CONFLICT \(tenant_id, "orderId"\) DO UPDATE SET/);
+  assert.match(dashboard, /ON CONFLICT \(tenant_id, (?:order_id|"orderId")\) DO UPDATE SET/);
 });
 
 test("tenant data backend rejects unsafe cross-tenant upserts", () => {

@@ -8,22 +8,23 @@
   <link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="config.js"></script>
   <style>
     :root {
       --brand: #FF4F00;
-      --brand-hover: #E05E00;
-      --bg: #F8F9FB;
+      --brand-hover: #D94300;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --bg: #F3EFE8;
       --surface: #FFFFFF;
-      --text: #111827;
-      --text-muted: #6B7280;
-      --border: rgba(17, 24, 39, 0.08);
-      --shadow: 0 10px 30px rgba(17, 24, 39, 0.04);
-      --r: 20px;
-      --r-sm: 12px;
-      --tr: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --text: #1A1714;
+      --text-muted: #6E675F;
+      --border: rgba(26, 23, 20, 0.1);
+      --shadow: 0 8px 24px rgba(40, 30, 20, 0.08);
+      --r: 14px;
+      --r-sm: 10px;
+      --tr: 0.2s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     * {
@@ -33,7 +34,7 @@
     }
 
     body {
-      font-family: 'Outfit', sans-serif;
+      font-family: 'DM Sans', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -76,12 +77,13 @@
     }
 
     .brand-logo {
-      font-family: 'Shadows Into Light', cursive;
-      font-size: 26px;
-      font-weight: 800;
-      color: var(--brand);
-      letter-spacing: 1px;
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.02em;
       margin-bottom: 4px;
+      line-height: 1.25;
     }
 
     .outlet-name {
@@ -833,8 +835,9 @@
         apiCall('list_menu')
           .then(res => {
             if (res.tenantName) {
-              document.getElementById('brand-logo').textContent = res.tenantName.toUpperCase();
-              document.title = `${res.tenantName} - Dining Portal`;
+              document.getElementById('brand-logo').textContent = res.tenantName;
+              document.getElementById('outlet-name').textContent = 'Table service';
+              document.title = res.tenantName + ' · Table';
             }
             if (res.upiVpa) {
               upiVpaAddress = res.upiVpa;
@@ -848,6 +851,23 @@
           .catch(err => console.error("Branding failed to fetch:", err));
       }
       
+      // One-tap CX: table QR lands on menu unless guest explicitly opens the hub
+      // (?hub=1) for track / pay / service. Staff waiter mode always stays optional.
+      const forceHub = params.get('hub') === '1' || params.get('track') === '1' || params.get('pay') === '1';
+      function menuUrl(token) {
+        const q = new URLSearchParams();
+        q.set('tenant', slug);
+        if (table) q.set('table', table);
+        if (token) q.set('token', token);
+        if (waiterMode) q.set('mode', 'waiter');
+        return 'order.html?' + q.toString();
+      }
+      function goMenu(token) {
+        if (forceHub || waiterMode) return false;
+        window.location.replace(menuUrl(token));
+        return true;
+      }
+
       configPromise.then(() => {
         initBranding();
         
@@ -856,7 +876,7 @@
           if (!staffToken) {
             showStaffLoginOverlay();
           } else {
-            document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}&mode=waiter`;
+            document.getElementById('menu-btn').href = menuUrl();
           }
         } else {
           // Verify active table session
@@ -872,8 +892,15 @@
                     params.set('token', res.session_token);
                     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
                   }
-                  document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}&token=${res.session_token}`;
+                  document.getElementById('menu-btn').href = menuUrl(res.session_token);
+                  if (goMenu(res.session_token)) return;
                   showSessionStatusOverlay('active');
+                  if (params.get('track') === '1') {
+                    setTimeout(function(){ try { openModal('tracker-modal'); } catch(e){} }, 200);
+                  }
+                  if (params.get('pay') === '1') {
+                    setTimeout(function(){ try { openModal('checkout-modal'); } catch(e){} }, 200);
+                  }
                 }
               } else {
                 showSessionStatusOverlay('closed');
@@ -884,6 +911,9 @@
               // In local dev/fallback, let it go if Supabase URL is not present, otherwise block
               if (SU) {
                 showSessionStatusOverlay('closed');
+              } else {
+                document.getElementById('menu-btn').href = menuUrl();
+                goMenu();
               }
             });
         }

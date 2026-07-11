@@ -225,7 +225,7 @@
     }
   }
 
-  function activateTab(id){
+  async function activateTab(id){
     const sess = window.RS_API ? RS_API.session() : null;
     const isSuper = sess && sess.role === 'superadmin';
     const isBrandAdmin = sess && sess.role === 'brand_admin';
@@ -257,6 +257,13 @@
       }
     }
 
+    // Wave 2: ensure lazy feature modules for this tab are loaded first
+    try {
+      if (window.RS_ensureTabModules) await window.RS_ensureTabModules(id);
+    } catch (e) {
+      console.warn('[activateTab] module load failed', e);
+    }
+
     $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
     $$('.sidebar-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
     $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
@@ -276,12 +283,24 @@
     try { localStorage.setItem('rs_active_tab', id); } catch(e){}
   }
 
-  // Load saved active tab on startup
+  // Early role-home map (must exist before hydrate may call loadSavedTab)
+  const ROLE_HOME_TAB_EARLY = {
+    cashier: 'pos-tab',
+    waiter: 'floor-tab',
+    captain: 'floor-tab',
+    kitchen: 'kds-tab',
+    inventory: 'inventory-tab',
+    manager: 'pos-tab',
+    customer_display: 'tokens-tab',
+  };
+
+  // Load saved active tab on startup (hash wins; else role home)
   function loadSavedTab() {
     try {
-      const savedTab = localStorage.getItem('rs_active_tab');
       const hashTab = window.location.hash.slice(1);
-      const initialTab = hashTab || savedTab || 'pos-tab';
+      const role = String(sessionStorage.getItem('logged_in_role') || '').toLowerCase().trim();
+      const home = ROLE_HOME_TAB_EARLY[role] || 'pos-tab';
+      const initialTab = hashTab || home;
       activateTab(initialTab);
     } catch(e){
       activateTab('pos-tab');
@@ -417,16 +436,79 @@
     }
     return raw;
   }
+  // Wave 5: prefer extracted module (assets/modules/bill-identity.js) when loaded
   function nextBillNo(existingBills = []) {
+    if (window.RSBillIdentity && typeof RSBillIdentity.nextBillNo === 'function') {
+      return RSBillIdentity.nextBillNo(existingBills);
+    }
+    // Local fallback sequence (offline / server RPC unavailable).
     const key = shortDateKey();
     const prefix = `RS-${key}-`;
-    const max = existingBills.reduce((highest, bill) => {
+    const maxFromList = (existingBills || []).reduce((highest, bill) => {
       const no = String((bill && (bill.no || bill.orderId || bill.id)) || '');
       if (!no.startsWith(prefix)) return highest;
       const seq = Number.parseInt(no.slice(prefix.length), 10);
       return Number.isFinite(seq) ? Math.max(highest, seq) : highest;
     }, 0);
-    return `${prefix}${String(max + 1).padStart(3, '0')}`;
+    let tenant = 'local';
+    try {
+      const s = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      tenant = s.tenant_id || s.tenant_slug || sessionStorage.getItem('tenant_slug') || 'local';
+    } catch (_) {}
+    const seqKey = `rs_bill_seq:${tenant}:${key}`;
+    let stored = 0;
+    try { stored = Number(localStorage.getItem(seqKey) || 0) || 0; } catch (_) {}
+    const next = Math.max(maxFromList, stored) + 1;
+    try { localStorage.setItem(seqKey, String(next)); } catch (_) {}
+    return `${prefix}${String(next).padStart(3, '0')}`;
+  }
+
+  async function allocateBillNo(existingBills = [], channel) {
+    if (window.RSBillIdentity && typeof RSBillIdentity.allocateBillNo === 'function') {
+      return RSBillIdentity.allocateBillNo(existingBills, channel);
+    }
+    const day = shortDateKey();
+    const ch = String(channel || '').toLowerCase();
+    const chCode = ch.includes('deliver') || ch.includes('online') ? 'DL'
+      : (ch.includes('take') || ch.includes('parcel') ? 'TK' : 'DI');
+    try {
+      if (window.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
+        const res = await Promise.race([
+          RS_API.data({ operation: 'next_bill_no', day }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('next_bill_no timeout')), 4000)),
+        ]);
+        let no = (res && (res.no || res.order_id || res.data)) || null;
+        if (no && typeof no === 'string' && /^RS-\d{6}-\d+$/i.test(no)) {
+          try {
+            const s = (RS_API.session && RS_API.session()) || {};
+            const tenant = s.tenant_id || s.tenant_slug || sessionStorage.getItem('tenant_slug') || 'local';
+            const seq = Number.parseInt(String(no).split('-').pop(), 10);
+            if (Number.isFinite(seq)) {
+              const seqKey = `rs_bill_seq:${tenant}:${day}`;
+              const stored = Number(localStorage.getItem(seqKey) || 0) || 0;
+              if (seq > stored) localStorage.setItem(seqKey, String(seq));
+            }
+          } catch (_) {}
+          no = no.replace(/^RS-/, 'RS-' + chCode + '-');
+          return no;
+        }
+      }
+    } catch (e) {
+      console.warn('[BillNo] server allocate failed, using local sequence:', e && e.message);
+    }
+    const local = nextBillNo(existingBills);
+    return String(local).replace(/^RS-/, 'RS-' + chCode + '-');
+  }
+
+  function newBillIdentity(billNo) {
+    if (window.RSBillIdentity && typeof RSBillIdentity.newBillIdentity === 'function') {
+      return RSBillIdentity.newBillIdentity(billNo);
+    }
+    const idempotencyKey = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : ('idem-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    return { id, idempotencyKey, no: billNo };
   }
 
   function ensureOperationStatusBar() {
@@ -497,8 +579,8 @@
         role: sessionStorage.getItem('logged_in_role') || ''
       },
       activeTab: document.querySelector('.tab-content.active')?.id || '',
-      cart: typeof cart !== 'undefined' ? cart : [],
-      discountPct: typeof discountPct !== 'undefined' ? discountPct : 0
+      cart: (window.RSPosUI && RSPosUI.getCart) ? RSPosUI.getCart() : (typeof cart !== 'undefined' ? cart : []),
+      discountPct: (window.RSPosUI && RSPosUI.getDiscountPct) ? RSPosUI.getDiscountPct() : (typeof discountPct !== 'undefined' ? discountPct : 0)
     };
     try {
       localStorage.setItem(updateSnapshotKey, JSON.stringify(snapshot));
@@ -740,816 +822,77 @@
   const stockCls = {ok:'stock-ok',low:'stock-low',out:'stock-out'};
 
   /* ============================================================
-     POS
+     TAX — Wave 12: assets/modules/tax-helpers.js
+     Share the same array instance the module owns.
      ============================================================ */
-  const TAX_RATES = [];
+  const TAX_RATES =
+    (window.RSTax && Array.isArray(RSTax.TAX_RATES) && RSTax.TAX_RATES) ||
+    (Array.isArray(window.RS_TAX_RATES) && window.RS_TAX_RATES) ||
+    (window.RS_TAX_RATES = []);
   window.RS_TAX_RATES = TAX_RATES;
 
-  window.RS_resolveRate = function(country, rateCode, dateStr) {
-    const list = window.RS_TAX_RATES || [];
-    const date = dateStr ? new Date(dateStr) : new Date();
-    const matches = list.filter(r => 
-      String(r.country).toUpperCase() === String(country || 'IN').toUpperCase() && 
-      String(r.rateCode || r.rate_code).toUpperCase() === String(rateCode).toUpperCase()
-    );
-    const active = matches.find(r => {
-      const from = new Date(r.validFrom || r.valid_from);
-      const to = r.validTo || r.valid_to ? new Date(r.validTo || r.valid_to) : null;
-      return date >= from && (!to || date <= to);
-    });
-    if (active) {
-      return { 
-        percent: Number(active.percent), 
-        itc_allowed: !!(active.itcAllowed || active.itc_allowed),
-        label: active.label
-      };
-    }
-    if (String(country).toUpperCase() === 'IE') {
-      if (rateCode === 'IE_FOOD_9' || rateCode === 'IE_FOOD_135') {
-        const cutover = new Date('2026-07-01');
-        return { percent: date >= cutover ? 9.0 : 13.5, itc_allowed: true, label: 'VAT Hot Food' };
-      }
-      if (rateCode === 'IE_DRINK_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Drinks' };
-      if (rateCode === 'IE_COLD_0') return { percent: 0.0, itc_allowed: true, label: 'VAT Cold Takeaway' };
-      if (rateCode === 'IE_DELIVERY_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Delivery' };
-      if (rateCode === 'IE_ACCOM_135') return { percent: 13.5, itc_allowed: true, label: 'VAT Accommodation' };
-    }
-    if (String(country).toUpperCase() === 'IN') {
-      if (rateCode === 'IN_REST_5') return { percent: 5.0, itc_allowed: false, label: 'GST Standalone' };
-      if (rateCode === 'IN_REST_18') return { percent: 18.0, itc_allowed: true, label: 'GST Specified' };
-      if (rateCode === 'IN_CATER_18') return { percent: 18.0, itc_allowed: true, label: 'GST Catering' };
-      if (rateCode === 'IN_COMP_5') return { percent: 5.0, itc_allowed: false, label: 'GST Composition' };
-      if (rateCode === 'IN_GOODS_5') return { percent: 5.0, itc_allowed: false, label: 'GST Goods' };
-      if (rateCode === 'IN_GOODS_18') return { percent: 18.0, itc_allowed: true, label: 'GST Goods' };
-      if (rateCode === 'IN_NIL_0') return { percent: 0.0, itc_allowed: false, label: 'GST Nil Rated' };
-    }
-    const m = String(rateCode).match(/_(\d+)(?:5)?$/);
-    const pct = m ? Number(m[1]) : 5;
-    return { percent: pct, itc_allowed: false, label: rateCode };
-  };
-
-  window.RS_getTenantTaxProfile = function() {
-    const settings = window.RS_SETTINGS || {};
-
-    // Use RS_COUNTRIES lookup table for full world coverage
-    let country = 'IN';
-    if (settings.set_country) {
-      const entry = (window.RS_getCountryByName && window.RS_getCountryByName(settings.set_country)) || null;
-      if (entry) {
-        country = entry.code;
-      } else {
-        // Fallback map for common country names/aliases
-        const fallbackMap = {
-          'india': 'IN', 'ireland': 'IE', 'united kingdom': 'GB', 'uk': 'GB', 'great britain': 'GB',
-          'united states': 'US', 'usa': 'US', 'australia': 'AU', 'canada': 'CA',
-          'new zealand': 'NZ', 'singapore': 'SG', 'united arab emirates': 'AE', 'uae': 'AE',
-          'saudi arabia': 'SA', 'south africa': 'ZA', 'germany': 'DE', 'france': 'FR',
-          'netherlands': 'NL', 'spain': 'ES', 'italy': 'IT', 'portugal': 'PT', 'belgium': 'BE',
-          'austria': 'AT', 'sweden': 'SE', 'denmark': 'DK', 'norway': 'NO', 'finland': 'FI',
-          'greece': 'GR', 'malaysia': 'MY', 'thailand': 'TH', 'vietnam': 'VN', 'indonesia': 'ID',
-          'philippines': 'PH', 'kenya': 'KE', 'nigeria': 'NG', 'ghana': 'GH',
-          'pakistan': 'PK', 'bangladesh': 'BD', 'sri lanka': 'LK', 'nepal': 'NP'
-        };
-        country = fallbackMap[String(settings.set_country || '').toLowerCase()] || 'IN';
-      }
-    }
-
-    // Tax system by country code
-    const vatCountries  = ['IE', 'GB', 'DE', 'FR', 'NL', 'ES', 'IT', 'PT', 'BE', 'AT', 'FI', 'GR', 'DK', 'SE', 'NO', 'SA', 'AE', 'ZA', 'KE', 'NG', 'GH', 'PH', 'TH', 'ID'];
-    const salesTaxCodes = ['US'];
-    let taxSystem;
-    if (vatCountries.includes(country))  taxSystem = 'VAT';
-    else if (salesTaxCodes.includes(country)) taxSystem = 'Sales Tax';
-    else taxSystem = 'GST';
-
-    // Honor explicit override from settings
-    if (settings.set_tax_label) taxSystem = settings.set_tax_label;
-
-    let profile = {};
-    try {
-      if (settings.set_tax_profile) {
-        profile = typeof settings.set_tax_profile === 'string' ? JSON.parse(settings.set_tax_profile) : settings.set_tax_profile;
-      }
-    } catch(e) {}
-    return {
-      country: country,
-      tax_system: taxSystem,
-      inclusive_pricing: !!settings.set_inclusive_pricing,
-      tax_registration_no: settings.set_gstin || profile.tax_registration_no || '',
-      gst_scheme: profile.gst_scheme || (settings.set_gst_scheme) || 'regular',
-      state_code: settings.set_gst_state || profile.state_code || (country === 'IN' ? '07' : ''),
-      specified_premises: !!(profile.specified_premises || settings.set_specified_premises),
-      vat_filing_frequency: profile.vat_filing_frequency || 'bi_monthly',
-      accounting_year_end: profile.accounting_year_end || null,
-      apply_gst_on_service_charge: !!(profile.apply_gst_on_service_charge || settings.set_apply_gst_on_service_charge),
-      liquor_vat_rate: Number(settings.set_liquor_vat_rate || profile.liquor_vat_rate || 20)
-    };
-  };
-
-  let activeCat='All', cart=[], discountPct=0;
+  /* ============================================================
+     POS UI — Wave 11: assets/modules/pos-ui.js
+     Cart state lives in RSPosUI; tax helpers in tax-helpers.js.
+     ============================================================ */
+  let activeCat = 'All';
+  let cart = [];
+  let discountPct = 0;
+  // Legacy bindings kept so any residual free refs don't throw before module loads.
+  // Preferred path: RS / RSPosUI.
   const renderPOS = () => {
-    const grid = $('#pos-grid');
-    if (!grid) return;
-    const q = ($('#pos-search-input')?.value||'').toLowerCase();
-    const items = MENU.filter(m=>{
-      const mc = ((m.cat || '').trim() || 'Uncategorized').toLowerCase();
-      return (activeCat==='All'||mc===String(activeCat).toLowerCase()) && (m.name||'').toLowerCase().includes(q);
-    });
-    grid.innerHTML = items.map(m=>{
-      const inCart = cart.find(c=>String(c.id)===String(m.id));
-      return `
-      <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
-        ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
-        <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat || 'Uncategorized')}</span></div>
-        <div class="pname">${_e(m.name)}</div>
-        <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></div>
-      </div>`;
-    }).join('');
-    $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
+    if (window.RSPosUI && RSPosUI.renderPOS) return RSPosUI.renderPOS();
   };
-  function refreshPosCats(){
-    const catsEl = $('#pos-cats');
-    if (!catsEl) return;
-    const liveCats = ['All'].concat(Array.from(new Set(
-      MENU.map(m => (m.cat || '').trim() || 'Uncategorized')
-    )).sort((a, b) => a.localeCompare(b)));
-    if (!liveCats.some(c => c.toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
-    catsEl.innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${c.toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
-    $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
-      activeCat=b.dataset.cat;
-      $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
-      renderPOS();
-      const container = document.getElementById('pos-cats');
-      if (container) {
-        container.scrollTo({
-          left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
-          behavior: 'smooth'
-        });
-      }
-    }));
+  function refreshPosCats() {
+    if (window.RSPosUI && RSPosUI.refreshPosCats) return RSPosUI.refreshPosCats();
   }
   window.refreshPosCats = refreshPosCats;
-  let lastMobileCartOpenAt = 0;
-  function updateMobileCartBar(countArg, totalsArg){
-    const barCount = $('#pos-m-cart-bar-count');
-    const barTotal = $('#pos-m-cart-bar-total');
-    const cartBar = $('#pos-m-cart-bar');
-    if (!barCount || !barTotal || !cartBar) return;
-    const count = countArg != null ? countArg : cart.reduce((a,c)=>a+c.qty,0);
-    const totals = totalsArg || getTotals();
-    barCount.textContent = count + (count === 1 ? ' item' : ' items');
-    barTotal.textContent = rs(totals.grand);
-    const posActive = !!document.querySelector('#pos-tab.active');
-    const cartViewOpen = !!document.querySelector('.pos-cart.active');
-    const shouldShow = count > 0 && window.innerWidth <= 1024 && posActive && !cartViewOpen;
-    cartBar.classList.toggle('hidden', !shouldShow);
+  function updateMobileCartBar(countArg, totalsArg) {
+    if (window.RSPosUI && RSPosUI.updateMobileCartBar) return RSPosUI.updateMobileCartBar(countArg, totalsArg);
   }
-  function openMobilePOSCart(e){
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const now = Date.now();
-    if (now - lastMobileCartOpenAt < 250) return;
-    lastMobileCartOpenAt = now;
-    if (window.innerWidth > 1024 || !cart.length) return;
-    const posLeft = $('.pos-left');
-    const posCart = $('.pos-cart');
-    const cartBar = $('#pos-m-cart-bar');
-    if (!posLeft || !posCart || !cartBar) return;
-    posLeft.classList.add('hidden');
-    posCart.classList.add('active');
-    cartBar.classList.add('hidden');
-    const content = document.querySelector('.content');
-    if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+  function openMobilePOSCart() {
+    if (window.RSPosUI && RSPosUI.openMobilePOSCart) return RSPosUI.openMobilePOSCart();
   }
-  function closeMobilePOSCart(showBar = true){
-    const posLeft = $('.pos-left');
-    const posCart = $('.pos-cart');
-    const cartBar = $('#pos-m-cart-bar');
-    if (!posLeft || !posCart || !cartBar) return;
-    posLeft.classList.remove('hidden');
-    posCart.classList.remove('active');
-    if (showBar) updateMobileCartBar();
-    else cartBar.classList.add('hidden');
+  function closeMobilePOSCart(v) {
+    if (window.RSPosUI && RSPosUI.closeMobilePOSCart) return RSPosUI.closeMobilePOSCart(v);
   }
-  function bindMobileCartBar(){
-    const cartBar = $('#pos-m-cart-bar');
-    if (!cartBar || cartBar.dataset.rsBound) return;
-    cartBar.dataset.rsBound = '1';
-    cartBar.addEventListener('click', openMobilePOSCart);
-    cartBar.addEventListener('pointerup', openMobilePOSCart);
-    cartBar.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') openMobilePOSCart(e);
-    });
+  function bindMobileCartBar() {
+    if (window.RSPosUI && RSPosUI.bindMobileCartBar) return RSPosUI.bindMobileCartBar();
   }
-  function addToCart(id){ const m=MENU.find(x=>String(x.id)===String(id)); const line=cart.find(c=>String(c.id)===String(id)); if(line) line.qty++; else cart.push({...m,qty:1}); renderCart(); toast(`${m.name} added`,'fa-plus'); }
-  function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
-  function renderCart(){
-    const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
-    $('#cart-count').textContent = count+(count===1?' item':' items');
-
-    const totals = getTotals();
-    const isIncl = totals.taxProfile.inclusive_pricing;
-    const taxLabel = totals.taxProfile.tax_system || 'GST';
-    const settings = window.RS_SETTINGS || {};
-    
-    let metaHTML = `<span>Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
-    if (totals.disc > 0) {
-      metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
-    }
-    if (totals.serviceCharge > 0) {
-      metaHTML += `<span>SC <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
-    }
-    
-    // Ireland handles composition differently (not applicable)
-    if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
-      metaHTML += `<span style="font-size:10px;color:var(--text-mute)">Composition Scheme</span>`;
-    } else {
-      metaHTML += `<span>${taxLabel}${isIncl ? ' (Incl.)' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
-    }
-    
-    if (totals.liquorTax > 0) {
-      metaHTML += `<span>Liquor VAT <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
-    }
-    
-    const metaDiv = document.querySelector('.totals-meta');
-    if (metaDiv) {
-      metaDiv.innerHTML = metaHTML;
-    }
-    
-    $('#t-grand').textContent=rs(totals.grand);
-
-    updateMobileCartBar(count, totals);
-
-    if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
-    else { wrap.innerHTML = cart.map(c=>`
-      <div class="cart-line">
-        <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
-        <div class="cinfo"><div class="cn">${_e(c.name)}</div><div class="cp">${rs(c.price)} each</div></div>
-        <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
-        <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
-      </div>`).join('');
-      $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
-    }
-
-    try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
-    wireCartActions();
-
-    // Refresh POS Grid to update card badges
-    try { renderPOS(); } catch (e) {}
-
-    // Auto-save active cart to localStorage (per order type)
-    try {
-      const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
-      const activeOrderType = activeOrderTypeBtn ? activeOrderTypeBtn.textContent.trim() : 'Takeaway';
-      // Helper function to get tab key (same as in initPOS)
-      const getTabKeyForOrderType = (orderTypeText) => {
-        const lowerText = orderTypeText.toLowerCase();
-        if (lowerText.includes('delivery')) return 'Delivery';
-        if (lowerText.includes('dine')) return 'Dine-in';
-        return 'Takeaway';
-      };
-      const tabKey = getTabKeyForOrderType(activeOrderType);
-      const da = document.getElementById('delivery-address');
-      const dc = document.getElementById('delivery-charge');
-      const dr = document.getElementById('delivery-rider');
-      // Save per-order-type cart
-      localStorage.setItem('rs_tab_cart_' + tabKey, JSON.stringify({
-        items: cart.map(c=>({...c})),
-        total: cart.reduce((a,c)=>a+c.price*c.qty,0),
-        deliveryAddress: da ? da.value : '',
-        deliveryCharge: dc ? dc.value : '',
-        deliveryRider: dr ? dr.value : ''
-      }));
-      // Also save to old key for backwards compatibility
-      localStorage.setItem('rs_active_cart', JSON.stringify(cart));
-      localStorage.setItem('rs_active_cart_discount', String(discountPct));
-      localStorage.setItem('rs_active_cart_customer', JSON.stringify(getCustomer()));
-      localStorage.setItem('rs_active_order_type', activeOrderType.toLowerCase());
-    } catch (e) {
-      console.warn('[Cart Persistence Warning] Failed to persist active cart:', e);
-    }
+  function addToCart(id) {
+    if (window.RSPosUI && RSPosUI.addToCart) return RSPosUI.addToCart(id);
   }
-  function getTotals(){
-    const settings = window.RS_SETTINGS || {};
-    const taxProfile = window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular', specified_premises: false };
-    const country = taxProfile.country;
-    
-    let channel = 'dine_in';
-    const activeTypeBtn = document.querySelector('.order-type-btn.active');
-    if (activeTypeBtn) {
-      const t = activeTypeBtn.textContent.trim().toLowerCase();
-      if (t.includes('dine')) channel = 'dine_in';
-      else if (t.includes('take') || t.includes('carry')) channel = 'takeaway';
-      else if (t.includes('deliv')) channel = 'delivery';
-    }
-    
-    const calculateTaxesEnabled = settings.set_calculate_taxes !== false;
-    const serviceChargeEnabled = settings.set_service_charge === true && channel === 'dine_in';
-    const roundOffEnabled = settings.set_round_off_totals !== false;
-    const inclusivePricing = settings.set_inclusive_pricing === true;
-    
-    const rawSubtotal = cart.reduce((a,c)=>a+c.price*c.qty,0);
-    const discAmount = Math.round(rawSubtotal * discountPct / 100);
-    const netAfterDiscount = rawSubtotal - discAmount;
-    
-    let serviceChargeAmount = 0;
-    if (serviceChargeEnabled) {
-      serviceChargeAmount = Math.round(netAfterDiscount * 0.05);
-    }
-    
-    const items = cart.map(c => {
-      const lineGross = c.price * c.qty;
-      const lineDisc = Math.round(lineGross * discountPct / 100);
-      const lineTaxableBase = lineGross - lineDisc;
-      
-      let lineServiceCharge = 0;
-      if (serviceChargeEnabled && rawSubtotal > 0) {
-        lineServiceCharge = Math.round(serviceChargeAmount * (lineTaxableBase / netAfterDiscount));
-      }
-      
-      let lineTaxableValue = lineTaxableBase;
-      if (serviceChargeEnabled && taxProfile.apply_gst_on_service_charge) {
-        lineTaxableValue += lineServiceCharge;
-      }
-      
-      let rateCode = c.taxCategory || c.tax_category;
-      if (!rateCode) {
-        if (country === 'IE') {
-          rateCode = 'IE_FOOD_9';
-        } else {
-          if (taxProfile.gst_scheme === 'composition') {
-            rateCode = 'IN_COMP_5';
-          } else if (taxProfile.specified_premises) {
-            rateCode = 'IN_REST_18';
-          } else {
-            rateCode = 'IN_REST_5';
-          }
-        }
-      }
-      
-      const resolved = window.RS_resolveRate(country, rateCode);
-      let taxPercent = resolved.percent;
-      let isAlcohol = (rateCode === 'IN_ALCOHOL_EXEMPT');
-      let liquorTax = 0;
-      let tax = 0;
-      
-      if (isAlcohol) {
-        const liquorRate = taxProfile.liquor_vat_rate || 20;
-        if (inclusivePricing) {
-          liquorTax = Number((lineTaxableValue - (lineTaxableValue / (1 + liquorRate/100))).toFixed(2));
-          lineTaxableValue = Number((lineTaxableValue - liquorTax).toFixed(2));
-        } else {
-          liquorTax = Number((lineTaxableValue * (liquorRate / 100)).toFixed(2));
-        }
-      } else {
-        if (calculateTaxesEnabled) {
-          if (inclusivePricing) {
-            tax = Number((lineTaxableValue - (lineTaxableValue / (1 + taxPercent/100))).toFixed(2));
-            lineTaxableValue = Number((lineTaxableValue - tax).toFixed(2));
-          } else {
-            tax = Number((lineTaxableValue * (taxPercent / 100)).toFixed(2));
-          }
-        }
-      }
-      
-      return {
-        ...c,
-        lineGross,
-        lineDisc,
-        lineTaxableValue,
-        taxPercent,
-        tax,
-        liquorTax,
-        rateCode,
-        serviceCharge: lineServiceCharge,
-        itcAllowed: resolved.itc_allowed,
-        label: resolved.label
-      };
-    });
-    
-    const bandMap = {};
-    let totalGst = 0;
-    let totalLiquorTax = 0;
-    let totalTaxableValue = 0;
-    
-    items.forEach(item => {
-      totalGst += item.tax;
-      totalLiquorTax += item.liquorTax;
-      totalTaxableValue += item.lineTaxableValue;
-      
-      if (item.tax > 0 || item.liquorTax > 0 || item.taxPercent >= 0) {
-        const key = item.rateCode;
-        if (!bandMap[key]) {
-          bandMap[key] = {
-            rateCode: key,
-            label: item.label,
-            percent: item.taxPercent,
-            net: 0,
-            tax: 0,
-            gross: 0,
-            itcAllowed: item.itcAllowed
-          };
-        }
-        bandMap[key].net += item.lineTaxableValue;
-        bandMap[key].tax += item.tax + item.liquorTax;
-        bandMap[key].gross += item.lineTaxableValue + item.tax + item.liquorTax;
-      }
-    });
-    
-    const taxSummary = Object.values(bandMap).map(b => ({
-      rateCode: b.rateCode,
-      label: b.label,
-      percent: Number(b.percent.toFixed(2)),
-      net: Number(b.net.toFixed(2)),
-      tax: Number(b.tax.toFixed(2)),
-      gross: Number(b.gross.toFixed(2)),
-      itcAllowed: b.itcAllowed
-    }));
-    
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
-    if (country === 'IN' && taxProfile.gst_scheme !== 'composition') {
-      cgst = Number((totalGst / 2).toFixed(2));
-      sgst = Number((totalGst - cgst).toFixed(2));
-    }
-    
-    let grand = netAfterDiscount + serviceChargeAmount;
-    if (!inclusivePricing) {
-      grand += totalGst + totalLiquorTax;
-    }
-    
-    if (roundOffEnabled) {
-      grand = Math.round(grand);
-    } else {
-      grand = Number(grand.toFixed(2));
-    }
-    
-    return {
-      sub: rawSubtotal,
-      disc: discAmount,
-      gst: totalGst,
-      cgst,
-      sgst,
-      igst,
-      liquorTax: totalLiquorTax,
-      serviceCharge: serviceChargeAmount,
-      grand,
-      count: cart.reduce((a,c)=>a+c.qty,0),
-      discountPct,
-      taxSummary,
-      taxProfile,
-      channel,
-      items
-    };
+  function changeQty(id, d) {
+    if (window.RSPosUI && RSPosUI.changeQty) return RSPosUI.changeQty(id, d);
   }
-  function clearCart(){
-    cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart();
-    if (window.innerWidth <= 1024) closeMobilePOSCart(false);
+  function renderCart() {
+    if (window.RSPosUI && RSPosUI.renderCart) return RSPosUI.renderCart();
   }
-  function getCustomer(){
-    const nameEl = $('#cust-input-name') || $('#cust-name');
-    const phoneEl = $('#cust-input-phone') || $('#cust-phone');
-    const gstEl = $('#cust-gst');
-    
-    let phoneVal = '';
-    if (phoneEl) {
-      phoneVal = window.RS_getFullPhoneNumber ? window.RS_getFullPhoneNumber(phoneEl) : phoneEl.value;
-    }
-    
-    const sel = $('#cart-customer-sel');
-    if (sel && sel.value) {
-      const opt = sel.options[sel.selectedIndex];
-      const selPhone = sel.value;
-      const finalPhone = (selPhone.startsWith('temp-') || !selPhone.startsWith('+')) ? phoneVal.trim() : selPhone.trim();
-      return {
-        name: opt.getAttribute('data-name') || '',
-        phone: finalPhone,
-        gst: opt.getAttribute('data-gst') || '',
-        table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
-      };
-    }
-    return { name:(nameEl?.value||'').trim(), phone:phoneVal.trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+  function getTotals() {
+    if (window.RSPosUI && RSPosUI.getTotals) return RSPosUI.getTotals();
+    return { sub: 0, disc: 0, gst: 0, grand: 0, count: 0, items: [], discountPct: 0 };
   }
-  function runKotAction(){
-    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
-    try {
-      if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
-    } catch (err) {
-      console.error('[KOT Error]', err);
-      return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
-    }
-    toast('KOT sent to kitchen','fa-fire');
+  function clearCart() {
+    if (window.RSPosUI && RSPosUI.clearCart) return RSPosUI.clearCart();
   }
-  function runCheckoutAction(){
-    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
-    try {
-      if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
-    } catch (err) {
-      console.error('[Checkout Error]', err);
-      return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
-    }
-    // RSPOS module not loaded -- do not silently show false success
-    return toast('Checkout module not ready -- please refresh', 'fa-circle-exclamation');
+  function getCustomer() {
+    if (window.RSPosUI && RSPosUI.getCustomer) return RSPosUI.getCustomer();
+    return { name: '', phone: '', gst: '', table: 'Walk-in / Takeaway' };
   }
-  let cartActionsDelegated = false;
-  function ensureCartActionDelegation(){
-    if (cartActionsDelegated) return;
-    cartActionsDelegated = true;
-    document.addEventListener('click', e => {
-      const btn = e.target.closest('#btn-kot, #btn-checkout');
-      if (!btn) return;
-      e.preventDefault();
-      if (btn.id === 'btn-kot') return runKotAction();
-      runCheckoutAction();
-    });
+  function runKotAction() {
+    if (window.RSPosUI && RSPosUI.runKotAction) return RSPosUI.runKotAction();
   }
-  function wireCartActions(){
-    ensureCartActionDelegation();
-    const kotBtn = $('#btn-kot');
-    if (kotBtn) kotBtn.onclick = null;
-    const checkoutBtn = $('#btn-checkout');
-    if (checkoutBtn) checkoutBtn.onclick = null;
+  function runCheckoutAction() {
+    if (window.RSPosUI && RSPosUI.runCheckoutAction) return RSPosUI.runCheckoutAction();
   }
-  // POS init (static parts present in HTML, wire them)
-  function initPOS(){
-    // Helper function to get tab key for an order type (fixed, not dependent on table number)
-    function getTabKeyForOrderType(orderTypeText) {
-      const lowerText = orderTypeText.toLowerCase();
-      if (lowerText.includes('delivery')) return 'Delivery';
-      if (lowerText.includes('dine')) return 'Dine-in';
-      return 'Takeaway';
-    }
-
-    // Load saved active order type and corresponding cart
-    try {
-      // Load saved active order type
-      let savedOrderType = localStorage.getItem('rs_active_order_type');
-      let activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
-      
-      // If we have a saved order type, activate that button first
-      if (savedOrderType) {
-        const btns = document.querySelectorAll('.order-type-btn');
-        let matched = false;
-        btns.forEach(b => {
-          const match = b.textContent.trim().toLowerCase() === savedOrderType.toLowerCase();
-          b.classList.toggle('active', match);
-          if (match) {
-            activeOrderTypeBtn = b;
-            matched = true;
-          }
-        });
-        // Fallback: activate first button if no match
-        if (!matched && btns.length) {
-          btns[0].classList.add('active');
-          activeOrderTypeBtn = btns[0];
-        }
-      } else if (!activeOrderTypeBtn) {
-        // No active button and no saved type, activate first button
-        const btns = document.querySelectorAll('.order-type-btn');
-        if (btns.length) {
-          btns[0].classList.add('active');
-          activeOrderTypeBtn = btns[0];
-        }
-      }
-
-      // Now load the cart for the active order type
-      const activeOrderType = activeOrderTypeBtn ? activeOrderTypeBtn.textContent.trim() : 'Takeaway';
-      const initialTabKey = getTabKeyForOrderType(activeOrderType);
-      const savedTabCart = localStorage.getItem('rs_tab_cart_' + initialTabKey);
-      if (savedTabCart) {
-        const tabData = JSON.parse(savedTabCart);
-        cart = tabData.items || [];
-        // Also load delivery-specific fields if applicable
-        const da = document.getElementById('delivery-address');
-        const dc = document.getElementById('delivery-charge');
-        const dr = document.getElementById('delivery-rider');
-        if (da) da.value = tabData.deliveryAddress || '';
-        if (dc) dc.value = tabData.deliveryCharge || '';
-        if (dr) dr.value = tabData.deliveryRider || '';
-      } else {
-        // Fall back to the old active cart key if no tab-specific cart exists
-        const savedCart = localStorage.getItem('rs_active_cart');
-        if (savedCart) {
-          cart = JSON.parse(savedCart);
-        }
-      }
-      const savedDiscount = localStorage.getItem('rs_active_cart_discount');
-      if (savedDiscount) {
-        discountPct = Number(savedDiscount) || 0;
-        const discInput = $('#disc-input');
-        if (discInput) discInput.value = discountPct;
-      }
-      const savedCustomer = localStorage.getItem('rs_active_cart_customer');
-      if (savedCustomer) {
-        const customer = JSON.parse(savedCustomer);
-        const cartTable = $('#cart-table');
-        if (cartTable && customer.table) cartTable.value = customer.table;
-        const custName = $('#cust-input-name') || $('#cust-name');
-        if (custName && customer.name) custName.value = customer.name;
-        const custPhone = $('#cust-input-phone') || $('#cust-phone');
-        if (custPhone && customer.phone) custPhone.value = customer.phone;
-        const custGst = $('#cust-gst');
-        if (custGst && customer.gst) custGst.value = customer.gst;
-      }
-    } catch (e) {
-      console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
-    }
-
-    // -- Mount country-code prefix picker on cart customer phone --
-    (function mountCartPhonePicker() {
-      const phoneEl = document.getElementById('cust-input-phone');
-      if (!phoneEl || phoneEl.dataset.phonePrefixBuilt) return;
-      const settings = window.RS_SETTINGS || {};
-      let countryCode = 'IN';
-      if (settings.set_country && window.RS_getCountryByName) {
-        const entry = window.RS_getCountryByName(settings.set_country);
-        if (entry) countryCode = entry.code;
-      }
-      if (window.RS_buildPhonePrefix) {
-        window.RS_buildPhonePrefix(phoneEl, countryCode);
-      }
-    })();
-
-    // Category chips are derived from the live menu, including custom categories.
-    refreshPosCats();
-    $('#pos-search-input').addEventListener('input', renderPOS);
-    $('#pos-sort-select').addEventListener('change', renderPOS);
-    $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
-      // Snapshot the outgoing tab's cart to localStorage before the active class changes,
-      // so the per-tab fallback always has the latest data even without RS_DB.
-      try {
-        const curActiveBtn = document.querySelector('.order-type-btn.active');
-        if (curActiveBtn && curActiveBtn !== b) {
-          const outType = curActiveBtn.textContent.trim().toLowerCase();
-          const tabKey = getTabKeyForOrderType(curActiveBtn.textContent.trim());
-          const da = document.getElementById('delivery-address');
-          const dc = document.getElementById('delivery-charge');
-          const dr = document.getElementById('delivery-rider');
-          localStorage.setItem('rs_tab_cart_' + tabKey, JSON.stringify({
-            items: cart.map(c=>({...c})),
-            total: cart.reduce((a,c)=>a+c.price*c.qty,0),
-            deliveryAddress: da ? da.value : '',
-            deliveryCharge: dc ? dc.value : '',
-            deliveryRider: dr ? dr.value : ''
-          }));
-          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
-          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
-          localStorage.setItem('rs_tab_cust_' + tabKey, JSON.stringify({
-            name: nameEl ? nameEl.value.trim() : '',
-            phone: phoneEl ? phoneEl.value.trim() : ''
-          }));
-
-          // Now load the new tab's cart!
-          const newTabKey = getTabKeyForOrderType(b.textContent.trim());
-          // Save new active order type
-          localStorage.setItem('rs_active_order_type', b.textContent.trim().toLowerCase());
-          const savedNewTabCart = localStorage.getItem('rs_tab_cart_' + newTabKey);
-          if (savedNewTabCart) {
-            const newTabData = JSON.parse(savedNewTabCart);
-            cart = newTabData.items || [];
-            // Load delivery fields if applicable
-            if (da) da.value = newTabData.deliveryAddress || '';
-            if (dc) dc.value = newTabData.deliveryCharge || '';
-            if (dr) dr.value = newTabData.deliveryRider || '';
-          } else {
-            cart = []; // If no saved cart for new tab, start fresh!
-            // Clear delivery fields too
-            if (da) da.value = '';
-            if (dc) dc.value = '';
-            if (dr) dr.value = '';
-          }
-
-          // Load the new tab's customer data
-          const savedNewTabCust = localStorage.getItem('rs_tab_cust_' + newTabKey);
-          if (savedNewTabCust) {
-            const newCustData = JSON.parse(savedNewTabCust);
-            const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
-            const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
-            if (nameEl) nameEl.value = newCustData.name || '';
-            if (phoneEl) phoneEl.value = newCustData.phone || '';
-          }
-
-          // Re-render the cart!
-          renderCart();
-        }
-      } catch(e) {
-        console.error('[Order Type Switch Error]', e);
-      }
-      $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
-    }));
-    let lastAuthorizedDiscount = 0;
-    $('#disc-input')?.addEventListener('input', e=>{
-      const val = Math.min(100,Math.max(0,+e.target.value||0));
-      if (val <= 10) {
-        discountPct = val;
-        renderCart();
-      }
-    });
-    $('#disc-input')?.addEventListener('change', async e=>{
-      const val = Math.min(100,Math.max(0,+e.target.value||0));
-      if (val > 10) {
-        if (val === lastAuthorizedDiscount) {
-          discountPct = val;
-          renderCart();
-          return;
-        }
-        if (window.RSPinModal) {
-          e.target.disabled = true;
-          const ok = await RSPinModal.request('Discount Override');
-          e.target.disabled = false;
-          if (ok) {
-            discountPct = val;
-            lastAuthorizedDiscount = val;
-            renderCart();
-            toast('Discount override approved', 'fa-percent');
-          } else {
-            e.target.value = discountPct > 0 ? discountPct : '';
-            toast('Discount override rejected', 'fa-circle-xmark');
-            renderCart();
-          }
-        } else {
-          discountPct = val;
-          renderCart();
-        }
-      } else {
-        discountPct = val;
-        lastAuthorizedDiscount = val;
-        renderCart();
-      }
-    });
-    $('#btn-kot').onclick = () => {
-      if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
-      try {
-        if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
-      } catch (err) {
-        console.error('[KOT Error]', err);
-        return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
-      }
-      toast('KOT sent to kitchen','fa-fire');
-    };
-    $('#btn-checkout').onclick = () => {
-      if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
-      try {
-        if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
-      } catch (err) {
-        console.error('[Checkout Error]', err);
-        return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
-      }
-      return toast('Checkout module not ready -- please refresh', 'fa-circle-exclamation');
-    };
-
-    // Grid size slider controls
-    const slider = $('#pos-grid-slider');
-    const grid = $('#pos-grid');
-    const decBtn = $('#btn-grid-dec');
-    const incBtn = $('#btn-grid-inc');
-    if (slider && grid && decBtn && incBtn) {
-      const updateGridSize = (val) => {
-        val = Math.min(250, Math.max(110, val));
-        slider.value = val;
-        grid.style.setProperty('--pos-grid-size', val + 'px');
-        try { localStorage.setItem('rs-pos-grid-size', val); } catch(e){}
-      };
-      slider.oninput = () => updateGridSize(parseInt(slider.value) || 158);
-      decBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) - 15);
-      incBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) + 15);
-      try {
-        const savedSize = localStorage.getItem('rs-pos-grid-size') || 158;
-        updateGridSize(parseInt(savedSize));
-      } catch(e) {
-        updateGridSize(158);
-      }
-    }
-
-    // Mobile view toggles
-    const cartBar = $('#pos-m-cart-bar');
-    const backBtn = $('#btn-pos-back-menu');
-    bindMobileCartBar();
-    if (backBtn && cartBar) backBtn.onclick = () => { if (window.innerWidth <= 1024) closeMobilePOSCart(true); };
-
-    renderPOS(); renderCart();
-
-    // Mobile "More" bottom nav sheet
-    const mnavMore = document.getElementById('mnav-more');
-    const moreSheet = document.getElementById('mobile-more-sheet');
-    if (mnavMore && moreSheet) {
-      mnavMore.addEventListener('click', () => {
-        moreSheet.style.display = moreSheet.style.display === 'none' ? 'block' : 'none';
-      });
-      moreSheet.querySelectorAll('.mnav-more-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          moreSheet.style.display = 'none';
-          if (window.RS_ROLE && Array.isArray(RS_ROLE.allowedTabs) && RS_ROLE.allowedTabs.length && !RS_ROLE.allowedTabs.includes(btn.dataset.tab)) {
-            activateTab(RS_ROLE.allowedTabs[0]);
-            return;
-          }
-          activateTab(btn.dataset.tab);
-        });
-      });
-    }
+  function ensureCartActionDelegation() {
+    if (window.RSPosUI && RSPosUI.ensureCartActionDelegation) return RSPosUI.ensureCartActionDelegation();
+  }
+  function wireCartActions() {
+    if (window.RSPosUI && RSPosUI.wireCartActions) return RSPosUI.wireCartActions();
+  }
+  function initPOS() {
+    if (window.RSPosUI && RSPosUI.initPOS) return RSPosUI.initPOS();
   }
 
   /* ============================================================
@@ -1704,7 +1047,9 @@
       
     const hasLowStock = (typeof INVENTORY !== 'undefined' && Array.isArray(INVENTORY))
       ? INVENTORY.some(i => Number(i.stock) < Number(i.min))
-      : false;
+      : Number(window.__rsLowStockCount || 0) > 0;
+
+    const hasNewOnline = Number(window.__rsOnlineNewCount || 0) > 0;
       
     document.querySelectorAll('.sidebar-link, .mnav-link').forEach(el => {
       const tab = el.dataset.tab;
@@ -1717,11 +1062,15 @@
         shouldBlink = true;
       } else if (tab === 'inventory-tab' && hasLowStock && activeTabId !== 'inventory-tab') {
         shouldBlink = true;
+      } else if (tab === 'aggregator-tab' && hasNewOnline && activeTabId !== 'aggregator-tab') {
+        shouldBlink = true;
       }
       
       el.classList.toggle('attention-blink', shouldBlink);
     });
   }
+  window.RS = window.RS || {};
+  window.RS.updateTabAttentionBlinking = updateTabAttentionBlinking;
 
   // POS-only mode (Settings -> Printers & KOT -> "POS-only mode"): billing
   // only, no order ever reaches the Kitchen Display or a waiter screen.
@@ -1912,924 +1261,52 @@
 
   window.RS_SYNC = { syncPendingOrders, setupSupabaseRealtime };
 
-  const statusPill = {pending:'pill-amber',preparing:'pill-orange',served:'pill-green'};
-  const statusTxt = {pending:'Pending',preparing:'Preparing',served:'Served'};
-  function qrItemLabel(item) {
-    if (Array.isArray(item)) return item[0];
-    return `${Number(item.qty || 1)}× ${item.name || 'Item'}`;
-  }
-  function qrItemTotal(item) {
-    if (Array.isArray(item)) return Number(item[1] || 0);
-    return Number(item.price || 0) * Number(item.qty || 1);
-  }
-  function qrTableName(table) {
-    const raw = String(table || '').trim();
-    if (!raw) return 'Walk-in / Takeaway';
-    if (/^table\s+/i.test(raw)) return raw.replace(/^table/i, 'Table');
-    if (/^\d+$/.test(raw)) return `Table ${raw}`;
-    return raw;
-  }
-  function qrCartItems(order) {
-    return (order.items || []).map(item => {
-      if (Array.isArray(item)) {
-        const label = String(item[0] || 'Item').replace(/^\s*\d+\s*[×x]\s*/i, '').trim() || 'Item';
-        return { id: label, name: label, qty: 1, price: Number(item[1] || 0), cat: 'QR Orders', stock: 'ok' };
-      }
-      const qty = Math.max(1, Number(item.qty || 1));
-      return {
-        id: item.id || item.name,
-        name: item.name || 'Item',
-        qty,
-        price: Number(item.price || 0),
-        cat: item.cat || item.category || 'QR Orders',
-        stock: 'ok',
-        taxCategory: item.taxCategory || item.tax_category
-      };
-    }).filter(item => item.name && Number.isFinite(item.price));
-  }
+  /* ============================================================
+     QR ORDERS UI — Wave 10: assets/modules/qr-orders-ui.js
+     ============================================================ */
   async function openQrOrderInPos(order) {
-    if (!order) return;
-    const items = qrCartItems(order);
-    if (!items.length) {
-      toast('This QR order has no billable items', 'fa-circle-exclamation');
-      return;
+    if (window.RSQrOrdersUI && RSQrOrdersUI.openQrOrderInPos) {
+      return RSQrOrdersUI.openQrOrderInPos(order);
     }
-    const tableName = qrTableName(order.table);
-    activateTab('pos-tab');
-    // Wait for POS tab DOM + cart helpers (RS.setCart) to be ready after tab switch.
-    await new Promise(resolve => setTimeout(resolve, 120));
-    let attempts = 0;
-    while (attempts < 8 && !(window.RS && typeof RS.setCart === 'function')) {
-      await new Promise(resolve => setTimeout(resolve, 60));
-      attempts += 1;
-    }
-
-    const tableSelect = document.getElementById('cart-table')
-      || document.getElementById('pos-table-select')
-      || document.querySelector('#pos-tab select[name="table"], #pos-tab #table-select');
-    if (tableSelect) {
-      const matchValue = order.table || tableName;
-      let opt = [...tableSelect.options].find(o =>
-        o.value === tableName || o.text === tableName ||
-        o.value === matchValue || o.text === matchValue ||
-        o.value === String(order.table) || o.textContent.trim() === tableName
-      );
-      if (!opt) {
-        opt = document.createElement('option');
-        opt.value = tableName;
-        opt.textContent = tableName;
-        tableSelect.appendChild(opt);
-      }
-      tableSelect.value = opt.value;
-      tableSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      tableSelect.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    // Prefer the public cart API; fall back to direct cart mutation used by POS.
-    if (window.RS && typeof RS.setCart === 'function') {
-      RS.setCart(items);
-    } else if (window.RS && Array.isArray(RS.cart)) {
-      RS.cart.length = 0;
-      items.forEach(it => RS.cart.push(it));
-    }
-    if (window.RS && typeof RS.setTable === 'function') {
-      try { RS.setTable(tableName); } catch(e) {}
-    }
-    const nameEl = document.getElementById('cust-name') || document.getElementById('cust-input-name');
-    const phoneEl = document.getElementById('cust-phone') || document.getElementById('cust-input-phone');
-    if (nameEl && order.customerName) {
-      nameEl.value = order.customerName;
-      nameEl.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    if (phoneEl && order.customerPhone) {
-      phoneEl.value = order.customerPhone;
-      phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    try { if (window.RS && typeof RS.renderCart === 'function') RS.renderCart(); } catch(e) {}
-    try { if (typeof window.saveActiveCart === 'function') window.saveActiveCart(); } catch(e) {}
-    toast(`Loaded ${tableName} in POS`, 'fa-receipt');
   }
   const renderQR = () => {
-    // Dynamically calculate QR Orders statistics
-    const pendingCount = QR_ORDERS.filter(o => o.status === 'pending').length;
-    const preparingCount = QR_ORDERS.filter(o => o.status === 'preparing').length;
-    const servedCount = QR_ORDERS.filter(o => o.status === 'served').length;
-    const activeTables = new Set(QR_ORDERS.map(o => o.table)).size;
-
-    const qrTab = document.getElementById('qr-orders-tab');
-    if (qrTab) {
-      const svElements = qrTab.querySelectorAll('.stat-row .stat-card .sv');
-      if (svElements.length >= 4) {
-        svElements[0].textContent = pendingCount;
-        svElements[1].textContent = preparingCount;
-        svElements[2].textContent = servedCount;
-        svElements[3].textContent = `${activeTables} / 12`;
-      }
-    }
-
-    // Update the sidebar badge count for QR Orders
-    const qrBadge = document.querySelector('.sidebar-link[data-tab="qr-orders-tab"] .badge-count');
-    if (qrBadge) {
-      const activeCount = pendingCount + preparingCount;
-      qrBadge.textContent = activeCount;
-      qrBadge.style.display = activeCount > 0 ? '' : 'none';
-    }
-
-    $('#qr-grid').innerHTML = QR_ORDERS.map((o,i)=>`
-      <div class="qr-card s-${o.status}">
-        <div class="qr-ch"><div><span class="tnum">Table ${_e(o.table.split('-')[1]||o.table)}</span><div class="qtime">${_e(o.time)}</div></div><span class="pill ${statusPill[o.status]}"><span class="dot ${o.status==='preparing'?'dot-live':''}"></span>${statusTxt[o.status]}</span></div>
-        <div class="qr-lines">${o.items.map(it=>`<div class="ql"><span>${_e(qrItemLabel(it))}</span><b>${rs(qrItemTotal(it))}</b></div>`).join('')}</div>
-        <div class="qr-cf"><span class="qtot">${rs(o.total)}</span>
-          ${o.status!=='served'?`<button class="btn btn-ghost btn-sm" data-merge="${i}"><i class="fa-solid fa-code-merge"></i> Merge</button><button class="btn btn-primary btn-sm" data-adv="${i}">${o.status==='pending'?'Accept':'Mark served'}</button>`:`<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i> Bill</button>`}
-        </div>
-      </div>`).join('');
-    $$('#qr-grid [data-adv]').forEach(b=>b.addEventListener('click',async ()=>{
-      const o=QR_ORDERS[+b.dataset.adv];
-      const nextStatus = o.status==='pending'?'preparing':'served';
-      const dbStatus = nextStatus==='preparing'?'preparing':'served';
-      const tableLabel = o.table.split('-')[1]||o.table;
-      if(o.id && window.RS_DB){
-        try {
-          const rows = await RS_DB.list('pending_orders');
-          const row = rows.find(r => r.id === o.id);
-          if (row) {
-            row.status = dbStatus;
-            await RS_DB.put('pending_orders', o.id, row);
-            syncPendingOrders();
-          }
-          // Toast only after the write has actually completed successfully.
-          toast('Table '+tableLabel+' -> '+statusTxt[nextStatus]);
-        } catch(e) {
-          console.warn("Failed updating order status", e);
-          toast('Could not update Table '+tableLabel+' -- try again', 'fa-circle-exclamation');
-        }
-      } else {
-        o.status=nextStatus; renderQR();
-        toast('Table '+tableLabel+' -> '+statusTxt[nextStatus]);
-      }
-    }));
-    $$('#qr-grid [data-merge]').forEach(b=>b.addEventListener('click',()=>{
-      const srcIdx = +b.dataset.merge;
-      const src = QR_ORDERS[srcIdx];
-      if (!src) return;
-      const candidates = QR_ORDERS
-        .map((o,idx)=>({o,idx}))
-        .filter(({o,idx})=> idx!==srcIdx && o.status!=='served' && o.table!==src.table);
-      if (!candidates.length) {
-        toast('No other open tables to merge into', 'fa-code-merge');
-        return;
-      }
-      if (!window.RSModal) {
-        toast('Modal module is unavailable', 'fa-circle-exclamation');
-        return;
-      }
-      const options = candidates.map(({o,idx})=>`<option value="${idx}">Table ${_e(o.table.split('-')[1]||o.table)} -- ${rs(o.total)}</option>`).join('');
-      RSModal.open({
-        title: 'Merge table',
-        sub: 'Combine Table ' + (src.table.split('-')[1]||src.table) + ' into another open table',
-        icon: 'fa-code-merge',
-        size: 'sm',
-        body: `
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <div style="font-size:13px;color:var(--text-soft)">
-              This will move all items from Table ${_e(src.table.split('-')[1]||src.table)} onto the table you pick below, then close out Table ${_e(src.table.split('-')[1]||src.table)}. This cannot be undone.
-            </div>
-            <div>
-              <label class="fl">Merge into</label>
-              <select class="form-input" id="merge-target">${options}</select>
-            </div>
-          </div>`,
-        foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-code-merge"></i> Merge tables</button>`,
-        onMount(modal, close) {
-          modal.querySelector('[data-cancel]').onclick = close;
-          modal.querySelector('[data-confirm]').onclick = async () => {
-            const targetIdx = +modal.querySelector('#merge-target').value;
-            const target = QR_ORDERS[targetIdx];
-            if (!target) { close(); return; }
-            close();
-            setOperationStatus('Merging tables...');
-            const mergedItems = target.items.concat(src.items);
-            const mergedTotal = (Number(target.total)||0) + (Number(src.total)||0);
-            target.items = mergedItems;
-            target.total = mergedTotal;
-            try {
-              if (window.RS_DB) {
-                const rows = await RS_DB.list('pending_orders');
-                const targetRow = rows.find(r => r.id === target.id);
-                const srcRow = rows.find(r => r.id === src.id);
-                if (targetRow) {
-                  targetRow.items = mergedItems;
-                  targetRow.total = mergedTotal;
-                  await RS_DB.put('pending_orders', target.id, targetRow);
-                }
-                if (srcRow) {
-                  await RS_DB.del('pending_orders', src.id);
-                }
-                await syncPendingOrders();
-              } else {
-                QR_ORDERS.splice(srcIdx, 1);
-                renderQR();
-              }
-              finishOperationStatus('Tables merged');
-              toast('Merged into Table ' + (target.table.split('-')[1]||target.table), 'fa-code-merge');
-            } catch (e) {
-              console.warn('Failed to merge tables', e);
-              finishOperationStatus('Merge failed', 'error');
-              toast('Could not merge tables -- try again', 'fa-circle-exclamation');
-            }
-          };
-        }
-      });
-    }));
-    $$('#qr-grid [data-bill]').forEach(b=>b.addEventListener('click',()=>{
-      openQrOrderInPos(QR_ORDERS[+b.dataset.bill]);
-    }));
+    if (window.RSQrOrdersUI && RSQrOrdersUI.renderQR) return RSQrOrdersUI.renderQR();
   };
 
   /* ============================================================
-     BILLS
+     BILLS — Wave 6: UI lives in assets/modules/bills-history.js
+     Array stays here so RS.BILLS reference remains stable for POS.
      ============================================================ */
   const BILLS = [];
-  const payPill = {UPI:'pill-violet',Cash:'pill-green',Card:'pill-orange',Split:'pill-amber',Due:'pill-red'};
   function receiptPayloadFromBill(b) {
-    const items = Array.isArray(b._items) && b._items.length
-      ? b._items.map(i => ({ name:i.name || 'Item', qty:Number(i.qty || 1), price:Number(i.price || 0) }))
-      : [{ name:'Bill total', qty:1, price:Number(b.amount || 0) }];
-    const sub = Number(b.subtotal || items.reduce((sum, i) => sum + (i.price * i.qty), 0));
-    const gst = Number(b.gst || 0);
-    const grand = Number(b.amount || sub + gst);
-    return {
-      no:b.no || b.id || 'Invoice',
-      time:b.time || '',
-      table:b.table || 'Walk-in / Takeaway',
-      customer:b.customerName || '',
-      customerPhone:b.customerPhone || '',
-      customerGst:b.customerGst || '',
-      items,
-      sub,
-      disc:Number(b.discount || 0),
-      gst,
-      grand,
-      tenders:(Array.isArray(b.tenders) && b.tenders.length) ? b.tenders : [{ method:b.pay || b.paymentMethod || 'Cash', amount:grand }],
-      change:Number(b.changeAmount || b.change || 0)
-    };
+    if (window.RSBillsHistory && RSBillsHistory.receiptPayloadFromBill) {
+      return RSBillsHistory.receiptPayloadFromBill(b);
+    }
+    return { no: (b && (b.no || b.id)) || 'Invoice', items: [], sub: 0, disc: 0, gst: 0, grand: Number((b && b.amount) || 0), tenders: [], change: 0 };
   }
   function showBillReceipt(b) {
-    if (window.RSReceipt && typeof RSReceipt.show === 'function') {
-      RSReceipt.show(receiptPayloadFromBill(b));
-      return;
-    }
-    toast('Receipt preview is unavailable on this screen','fa-circle-exclamation');
+    if (window.RSBillsHistory && RSBillsHistory.showBillReceipt) return RSBillsHistory.showBillReceipt(b);
   }
   function shareBillReceipt(b) {
-    const bill = receiptPayloadFromBill(b);
-    if (window.RSReceipt && typeof RSReceipt.share === 'function') {
-      RSReceipt.share(bill);
-    } else {
-      const text = window.RSReceipt && typeof RSReceipt.text === 'function'
-        ? RSReceipt.text(bill)
-        : `${bill.no}\nTotal: ${rs(bill.grand)}`;
-      
-      // Clean phone number (remove non-digits)
-      let phone = bill.customerPhone ? bill.customerPhone.replace(/\D/g, '') : '';
-      // Ensure country code is present (default to 91 if it is a 10-digit Indian number)
-      if (phone.length === 10) {
-        phone = '91' + phone;
-      }
-      
-      const url = phone 
-        ? `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`
-        : `https://wa.me/?text=${encodeURIComponent(text)}`;
-        
-      window.open(url, '_blank', 'noopener,noreferrer');
-      toast('WhatsApp receipt ready','fa-whatsapp');
-    }
+    if (window.RSBillsHistory && RSBillsHistory.shareBillReceipt) return RSBillsHistory.shareBillReceipt(b);
   }
   async function markBillRefunded(b) {
-    if (!b || b.status === 'refunded') return;
-
-    // -- PIN gate -------------------------------------------------------------
-    if (window.RSPinModal) {
-      const ok = await RSPinModal.request(`Refund ${b.no || b.id || 'bill'}`);
-      if (!ok) return;
-    }
-
-    // -- Refund reason modal --------------------------------------------------
-    const reason = await showRefundModal(b);
-    if (reason === null) return; // cancelled
-
-    b.status = 'refunded';
-    b.refundReason = reason || 'POS refund';
-    b.refundedAt = new Date().toISOString();
-    let cloudMarked = false;
-    try {
-      if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
-      if (window.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
-        await RS_API.data({
-          table:'doppio_refund_requests',
-          operation:'insert',
-          data:{
-            order_id:String(b.id || b.no),
-            amount:Number(b.amount || 0),
-            reason:b.refundReason,
-            status:'approved'
-          },
-          returning:false
-        });
-        const billFilters = Number.isFinite(Number(b.id))
-          ? [{ operator:'eq', column:'id', value:Number(b.id) }]
-          : [{ operator:'eq', column:'order_id', value:String(b.no || b.orderId || '') }];
-        await RS_API.update('doppio_bills', {
-          status:'refunded',
-          refund_reason:b.refundReason,
-          refunded_at:b.refundedAt
-        }, billFilters, { returning:false });
-        cloudMarked = true;
-      }
-    } catch(e) {
-      console.warn('Refund cloud update failed', e);
-    }
-    renderBills();
-    toast(cloudMarked ? 'Refund recorded in cloud' : 'Refund marked locally. Cloud sync pending.','fa-rotate-left');
+    if (window.RSBillsHistory && RSBillsHistory.markBillRefunded) return RSBillsHistory.markBillRefunded(b);
   }
-
-  /** Refund detail modal -- returns reason string, or null if cancelled */
-  function showRefundModal(b) {
-    return new Promise(resolve => {
-      document.getElementById('rs-refund-overlay')?.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'rs-refund-overlay';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
-      const amt = rs(b.amount || 0);
-      overlay.innerHTML = `
-        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-            <div style="width:42px;height:42px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;color:#ef4444;flex-shrink:0;"><i class="fa-solid fa-rotate-left"></i></div>
-            <div>
-              <div style="font-weight:800;font-size:15px;color:var(--text,#111);">Process Refund</div>
-              <div style="font-size:12px;color:var(--text-soft,#6b7280);">${b.no || b.id} &middot; ${amt}</div>
-            </div>
-          </div>
-          <div style="font-size:12.5px;color:var(--text-soft,#6b7280);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Reason for refund</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;" id="rfund-reason-chips">
-            ${['Customer complaint','Wrong order','Quality issue','Duplicate charge','Changed mind','Other'].map(r=>`<button data-r="${r}" style="padding:8px 10px;border-radius:10px;border:1.5px solid var(--stroke-2,#e5e7eb);background:var(--glass,#f9fafb);font-size:12px;cursor:pointer;font-family:inherit;color:var(--text,#111);text-align:left;transition:all .15s;" class="rfund-chip">${r}</button>`).join('')}
-          </div>
-          <textarea id="rfund-note" placeholder="Additional notes (optional)..." rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:13px;resize:none;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;"></textarea>
-          <div style="display:flex;gap:10px;margin-top:16px;">
-            <button id="rfund-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
-            <button id="rfund-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Confirm Refund</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      let selectedReason = '';
-      overlay.querySelectorAll('.rfund-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-          overlay.querySelectorAll('.rfund-chip').forEach(c => { c.style.cssText += ';background:var(--glass,#f9fafb);border-color:var(--stroke-2,#e5e7eb);color:var(--text,#111);font-weight:normal;'; });
-          chip.style.background = '#ef4444'; chip.style.borderColor = '#ef4444'; chip.style.color = '#fff'; chip.style.fontWeight = '700';
-          selectedReason = chip.dataset.r;
-        });
-      });
-      document.getElementById('rfund-confirm').onclick = () => {
-        const note = document.getElementById('rfund-note').value.trim();
-        const reason = [selectedReason, note].filter(Boolean).join(' -- ') || 'POS refund';
-        overlay.remove(); resolve(reason);
-      };
-      document.getElementById('rfund-cancel').onclick = () => { overlay.remove(); resolve(null); };
-      overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(null); } });
-    });
-  }
-
   async function deleteBill(b) {
-    if (!b) return;
-    // -- PIN gate -------------------------------------------------------------
-    if (window.RSPinModal) {
-      const ok = await RSPinModal.request(`Delete Bill ${b.no || b.id || ''}`);
-      if (!ok) return;
-    }
-    // -- Confirm ---------------------------------------------------------------
-    const confirmed = await showDeleteConfirm(b);
-    if (!confirmed) return;
-
-    const idx = BILLS.findIndex(x => x === b || x.no === b.no);
-    if (idx !== -1) BILLS.splice(idx, 1);
-
-    // -- Restore inventory (sale never happened) -------------------------------
-    // Only on DELETE -- refund does NOT restore stock (food was served)
-    try {
-      const bItems = b._items || [];
-      let invChanged = false;
-      bItems.forEach(it => {
-        const menuItem = MENU.find(m => m.name === it.name);
-        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
-        const orderedQty = Number(it.qty) || 1;
-        menuItem.ingredients.forEach(ing => {
-          const invItem = INVENTORY.find(x => x.name === ing.name);
-          if (!invItem) return;
-          invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
-          invChanged = true;
-        });
-      });
-      if (invChanged && window.RS_DB && RS_DB.writeLocal) {
-        await RS_DB.writeLocal('inventory', INVENTORY);
-      }
-    } catch(e) { console.warn('Inventory restore failed', e); }
-
-    try {
-      if (window.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
-      if (window.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
-        await RS_API.data({ table:'doppio_bills', operation:'delete', filters:{ bill_no: b.no || b.id }, returning:false }).catch(e=>console.warn('Cloud delete',e));
-      }
-    } catch(e) { console.warn('Bill delete sync failed', e); }
-    renderBills();
-    toast(`Bill ${b.no || b.id || ''} deleted -- inventory restored`, 'fa-trash');
-  }
-
-  function showDeleteConfirm(b) {
-    return new Promise(resolve => {
-      document.getElementById('rs-del-overlay')?.remove();
-      const overlay = document.createElement('div');
-      overlay.id = 'rs-del-overlay';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(17,24,39,0.5);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;animation:rsPinFadeIn 0.18s ease;';
-      overlay.innerHTML = `
-        <div style="background:var(--surface,#fff);border:1px solid var(--stroke-2,#e5e7eb);border-radius:20px;padding:28px 24px 24px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.15);animation:rsPinSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);text-align:center;">
-          <div style="width:48px;height:48px;border-radius:50%;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:#ef4444;margin:0 auto 16px;"><i class="fa-solid fa-trash-can"></i></div>
-          <div style="font-weight:800;font-size:16px;color:var(--text,#111);margin-bottom:8px;">Delete Bill?</div>
-          <div style="font-size:13px;color:var(--text-soft,#6b7280);line-height:1.6;margin-bottom:22px;"><strong>${b.no || b.id || 'This bill'}</strong> will be permanently removed from records.<br>This action <strong>cannot be undone</strong>.</div>
-          <div style="display:flex;gap:10px;">
-            <button id="rs-del-cancel" style="flex:1;padding:11px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;color:var(--text-soft,#6b7280);">Cancel</button>
-            <button id="rs-del-confirm" style="flex:2;padding:11px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Yes, Delete</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      document.getElementById('rs-del-confirm').onclick = () => { overlay.remove(); resolve(true); };
-      document.getElementById('rs-del-cancel').onclick  = () => { overlay.remove(); resolve(false); };
-      overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
-    });
+    if (window.RSBillsHistory && RSBillsHistory.deleteBill) return RSBillsHistory.deleteBill(b);
   }
   const renderBills = () => {
-    // Dynamically compute stats from BILLS
-    const paidBills = BILLS.filter(b => b.status === 'paid');
-    const totalSales = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const count = BILLS.length;
-    const aov = paidBills.length > 0 ? Math.round(totalSales / paidBills.length) : 0;
-    const refunds = BILLS.filter(b => b.status === 'refunded').length;
-
-    const salesEl = document.getElementById('bills-stat-sales');
-    if (salesEl) salesEl.textContent = rs(totalSales);
-    const countEl = document.getElementById('bills-stat-count');
-    if (countEl) countEl.textContent = count;
-    const aovEl = document.getElementById('bills-stat-aov');
-    if (aovEl) aovEl.textContent = rs(aov);
-    const refundsEl = document.getElementById('bills-stat-refunds');
-    if (refundsEl) refundsEl.textContent = refunds;
-
-    const q=($('#bills-search')?.value||'').toLowerCase();
-    const payFilter = ($('#bills-pay-filter')?.value || 'All').toLowerCase();
-    const statusFilter = ($('#bills-status-filter')?.value || 'All').toLowerCase();
-
-    let filtered = BILLS.filter(b=>String(b.no || b.orderId || '').toLowerCase().includes(q)||String(b.table || '').toLowerCase().includes(q));
-    if (payFilter !== 'all') {
-      filtered = filtered.filter(b => b.pay && b.pay.toLowerCase() === payFilter);
-    }
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(b => b.status && b.status.toLowerCase() === statusFilter);
-    }
-
-    $('#bills-table-body').innerHTML = filtered.map(b=>`
-      <tr>
-        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(b.time || b.dateTime || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
-        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
-        <td class="td-strong">${rs(b.amount)}</td>
-        <td>${b.status==='paid'?'<span class="pill pill-green" style="padding:3px 9px">Paid</span>':'<span class="pill pill-red" style="padding:3px 9px">Refunded</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Refund" aria-label="Refund bill ${_e(b.no || b.orderId || '')}" ${b.status==='refunded'?'disabled style="opacity:.4"':''}><i class="fa-solid fa-rotate-left"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
-      </tr>`).join('');
-    const billBody = $('#bills-table-body');
-    const visibleBills = filtered;
-    if (billBody._rsBillActionHandler) billBody.removeEventListener('click', billBody._rsBillActionHandler, true);
-    billBody._rsBillActionHandler = e => {
-      const btn = e.target.closest('.icon-act');
-      if (!btn || !billBody.contains(btn) || btn.disabled) return;
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      const row = btn.closest('tr');
-      const bill = visibleBills[[...billBody.children].indexOf(row)];
-      if (!bill) return;
-      if (btn.classList.contains('go'))         return showBillReceipt(bill);
-      if (btn.classList.contains('refund-act')) return markBillRefunded(bill);
-      if (btn.classList.contains('del-act'))    return deleteBill(bill);
-      return shareBillReceipt(bill);
-    };
-    billBody.addEventListener('click', billBody._rsBillActionHandler, true);
+    if (window.RSBillsHistory && RSBillsHistory.renderBills) return RSBillsHistory.renderBills();
   };
 
   /* ============================================================
-     INVENTORY
+     INVENTORY — Wave 7: UI lives in assets/modules/inventory-ui.js
+     Array stays here so RS.INVENTORY reference remains stable.
      ============================================================ */
   const INVENTORY = [];
   const renderInventory = () => {
-    const low = INVENTORY.filter(i=>i.stock<i.min);
-    $('#inv-banner').style.display = low.length?'flex':'none';
-    $('#inv-low-count').textContent = low.length;
-
-    const btnAutoDraft = $('#btn-auto-draft-pos');
-    if (btnAutoDraft) {
-      btnAutoDraft.onclick = async () => {
-        const lowItems = INVENTORY.filter(i => i.stock < i.min);
-        if (!lowItems.length) return toast('All inventory levels are healthy', 'fa-circle-check');
-        
-        setOperationStatus('Auto-drafting POs...');
-        try {
-          const byCat = {};
-          lowItems.forEach(i => {
-            if (!byCat[i.cat]) byCat[i.cat] = [];
-            byCat[i.cat].push(i);
-          });
-
-          let draftedCount = 0;
-          for (const [cat, items] of Object.entries(byCat)) {
-            const poNum = nextLogicalNo('PO') + '-' + cat.substring(0, 3).toUpperCase();
-            const value = items.reduce((sum, i) => sum + ((i.min * 2 - i.stock) * i.cost), 0);
-            const poRow = {
-              id: poNum,
-              poNumber: poNum,
-              supplier: cat + ' Supplier Ltd.',
-              items: items.map(i => `${Math.round(i.min * 2 - i.stock)} ${i.unit} ${i.name}`).join(', '),
-              value: Math.round(value),
-              date: new Date().toISOString(),
-              status: 'pending'
-            };
-            if (RS.saveOne) await RS.saveOne('purchase_orders', poRow);
-            draftedCount++;
-          }
-          finishOperationStatus(`Drafted ${draftedCount} POs`);
-          toast(`Auto-drafted ${draftedCount} POs successfully`, 'fa-truck');
-          renderInventory();
-          if (window.RS && RS.render) RS.render('inventory-tab');
-        } catch (e) {
-          console.warn('Auto-draft POs failed', e);
-          finishOperationStatus('Auto-draft failed', 'error');
-        }
-      };
-    }
-
-    // render stock table
-    const invBody = $('#inv-table-body');
-    if (invBody) {
-      const catFil = $('#inv-cat-filter');
-      if (catFil && !catFil._rsListenerBound) {
-        catFil._rsListenerBound = true;
-        catFil.addEventListener('change', renderInventory);
-      }
-      const statusFil = $('#inv-status-filter');
-      if (statusFil && !statusFil._rsListenerBound) {
-        statusFil._rsListenerBound = true;
-        statusFil.addEventListener('change', renderInventory);
-      }
-
-      const catFilter = ($('#inv-cat-filter')?.value || 'All').toLowerCase();
-      const statusFilter = ($('#inv-status-filter')?.value || 'All').toLowerCase();
-
-      let filtered = INVENTORY;
-      if (catFilter !== 'all') {
-        filtered = filtered.filter(i => i.cat && i.cat.toLowerCase() === catFilter);
-      }
-      if (statusFilter !== 'all') {
-        filtered = filtered.filter(i => {
-          const st = i.stock<i.min?'out':(i.stock<i.min*1.4?'low':'ok');
-          return st === statusFilter;
-        });
-      }
-
-      invBody.innerHTML = filtered.map(i=>{
-        const st = i.stock<i.min?'out':(i.stock<i.min*1.4?'low':'ok'); const pct=Math.min(100,Math.round(i.stock/(i.min*2)*100));
-        return `<tr>
-          <td><b>${_e(i.name)}</b></td><td>${_e(i.cat)}</td>
-          <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${_e(i.unit)}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st==='out'?'var(--red)':st==='low'?'var(--amber)':'var(--green)'}"></span></div></div></td>
-          <td>${i.min} ${_e(i.unit)}</td><td>${rs(i.cost)}/${_e(i.unit)}</td>
-          <td><span class="stock-dot ${stockCls[st]}">${st==='out'?'Reorder':st==='low'?'Low':'Healthy'}</span></td>
-          <td><div class="row-actions"><button class="icon-act go" title="Restock" aria-label="Restock ${_e(i.name)}"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit" aria-label="Edit ${_e(i.name)}"><i class="fa-solid fa-pen"></i></button></div></td>
-        </tr>`; }).join('');
-
-      $$('#inv-table-body .icon-act.go').forEach(b => {
-        b.addEventListener('click', () => {
-          const row = b.closest('tr');
-          const name = row.querySelector('b').textContent;
-          const inv = INVENTORY.find(x => x.name === name);
-          if (!inv) return;
-          const qtyToOrder = Math.max(1, Math.round(inv.min * 2 - inv.stock));
-          const estimatedCost = Math.round(qtyToOrder * inv.cost);
-          
-          if (!window.RSModal) {
-            toast('Modal module is unavailable', 'fa-circle-exclamation');
-            return;
-          }
-
-          const body = `
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <div style="font-size:13px;color:var(--text-soft)">
-                Create a purchase order to restock <b>${inv.name}</b> (current: ${inv.stock} ${inv.unit}, min: ${inv.min} ${inv.unit}).
-              </div>
-              <div class="form-grid-2" style="margin-top:8px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div>
-                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Order Qty (${inv.unit})</label>
-                  <input type="number" id="po-qty" class="form-control" value="${qtyToOrder}" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
-                </div>
-                <div>
-                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Supplier</label>
-                  <input type="text" id="po-supplier" class="form-control" value="${inv.cat} Supplier Ltd." style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
-                </div>
-              </div>
-              <div style="font-size:12px;color:var(--text-mute);margin-top:4px">
-                Estimated Value: <strong style="color:var(--orange)" id="po-cost-preview">${rs(estimatedCost)}</strong>
-              </div>
-            </div>
-          `;
-
-          RSModal.open({
-            title: 'Raise Purchase Order',
-            sub: 'Restock ' + inv.name,
-            icon: 'fa-truck',
-            size: 'sm',
-            body,
-            foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-file-invoice"></i> Create PO</button>`,
-            onMount(modal, close) {
-              const qtyInput = modal.querySelector('#po-qty');
-              qtyInput.oninput = () => {
-                const q = Math.max(0, Number(qtyInput.value) || 0);
-                modal.querySelector('#po-cost-preview').textContent = rs(Math.round(q * inv.cost));
-              };
-              modal.querySelector('[data-cancel]').onclick = close;
-              modal.querySelector('[data-confirm]').onclick = async () => {
-                const qty = Math.max(1, Number(qtyInput.value) || 1);
-                const supplier = modal.querySelector('#po-supplier').value || 'Default Supplier';
-                const poNum = nextLogicalNo('PO');
-                const poRow = {
-                  id: poNum,
-                  poNumber: poNum,
-                  supplier,
-                  items: `${qty} ${inv.unit} ${inv.name}`,
-                  value: Math.round(qty * inv.cost),
-                  date: new Date().toISOString(),
-                  status: 'pending'
-                };
-                close();
-                setOperationStatus('Creating PO...');
-                try {
-                  if (RS.saveOne) await RS.saveOne('purchase_orders', poRow);
-                  finishOperationStatus('PO created');
-                  toast('Purchase order raised successfully', 'fa-circle-check');
-                  renderInventory();
-                  if (window.RS && RS.render) RS.render('inventory-tab');
-                } catch (e) {
-                  console.warn('Failed to save PO', e);
-                  finishOperationStatus('Failed to create PO', 'error');
-                  toast('Failed to save purchase order -- saved locally', 'fa-circle-exclamation');
-                }
-              };
-            }
-          });
-        });
-      });
-
-      // Edit ingredient (previously unwired -- clicking the pencil icon did nothing at all)
-      $$('#inv-table-body .icon-act:not(.go)').forEach(b => {
-        b.addEventListener('click', () => {
-          const row = b.closest('tr');
-          const name = row.querySelector('b').textContent;
-          const inv = INVENTORY.find(x => x.name === name);
-          if (!inv) return;
-
-          if (!window.RSModal) {
-            toast('Modal module is unavailable', 'fa-circle-exclamation');
-            return;
-          }
-
-          const body = `
-            <div style="display:flex;flex-direction:column;gap:14px">
-              <div><label class="fl">Ingredient name</label><input class="form-input" id="edit-ing-name" value="${_e(inv.name)}"></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Category</label><input class="form-input" id="edit-ing-cat" value="${_e(inv.cat || '')}"></div>
-                <div><label class="fl">Unit</label><input class="form-input" id="edit-ing-unit" value="${_e(inv.unit || '')}"></div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Current stock</label><input class="form-input" id="edit-ing-stock" type="number" min="0" value="${inv.stock}"></div>
-                <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="edit-ing-min" type="number" min="0" value="${inv.min}"></div>
-              </div>
-              <div><label class="fl">Unit cost (${rs(1).replace(/[\d.,]/g,'').trim() || '₹'})</label><input class="form-input" id="edit-ing-cost" type="number" min="0" value="${inv.cost}"></div>
-            </div>`;
-
-          RSModal.open({
-            title: 'Edit ingredient',
-            sub: 'Update ' + inv.name,
-            icon: 'fa-pen',
-            size: 'sm',
-            body,
-            foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-danger" style="flex:0" data-delete title="Remove ingredient"><i class="fa-solid fa-trash"></i></button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-circle-check"></i> Save changes</button>`,
-            onMount(modal, close) {
-              modal.querySelector('[data-cancel]').onclick = close;
-              modal.querySelector('[data-delete]').onclick = async () => {
-                close();
-                setOperationStatus('Removing ingredient...');
-                try {
-                  const idx = INVENTORY.findIndex(x => x.id === inv.id);
-                  if (idx > -1) INVENTORY.splice(idx, 1);
-                  if (window.RS_DB) await RS_DB.del('inventory', inv.id);
-                  finishOperationStatus('Ingredient removed');
-                  toast(`${inv.name} removed from inventory`, 'fa-circle-check');
-                  renderInventory();
-                } catch (e) {
-                  console.warn('Failed to remove ingredient', e);
-                  finishOperationStatus('Failed to remove ingredient', 'error');
-                  toast('Could not remove ingredient -- try again', 'fa-circle-exclamation');
-                }
-              };
-              modal.querySelector('[data-confirm]').onclick = async () => {
-                const name = modal.querySelector('#edit-ing-name').value.trim();
-                if (!name) return toast('Enter ingredient name', 'fa-circle-exclamation');
-                inv.name = name;
-                inv.cat = modal.querySelector('#edit-ing-cat').value.trim() || 'General';
-                inv.unit = modal.querySelector('#edit-ing-unit').value.trim() || 'unit';
-                inv.stock = +modal.querySelector('#edit-ing-stock').value || 0;
-                inv.min = +modal.querySelector('#edit-ing-min').value || 0;
-                inv.cost = +modal.querySelector('#edit-ing-cost').value || 0;
-                close();
-                setOperationStatus('Saving changes...');
-                try {
-                  if (window.RS_DB) await RS_DB.put('inventory', inv.id, inv);
-                  finishOperationStatus('Ingredient updated');
-                  toast(`${inv.name} updated`, 'fa-circle-check');
-                  renderInventory();
-                } catch (e) {
-                  console.warn('Failed to save ingredient edit', e);
-                  finishOperationStatus('Saved locally -- cloud sync pending', 'error');
-                  toast('Saved locally. Cloud sync pending.', 'fa-circle-exclamation');
-                  renderInventory();
-                }
-              };
-            }
-          });
-        });
-      });
-    }
-
-    // render recipe table
-    const recipeBody = $('#recipe-table-body');
-    if (recipeBody) {
-      const invCost = name => { const inv=(INVENTORY||[]).find(x=>x.name===name); return inv?inv.cost:0; };
-      recipeBody.innerHTML = MENU.length
-        ? MENU.map(m => {
-          const ings = m.ingredients || [];
-          const cost = ings.reduce((a,g)=>a+g.qty*invCost(g.name),0);
-          const margin = m.price && cost ? Math.round((1-cost/m.price)*100) : (m.price?100:0);
-          const ingText = ings.length ? ings.map(g=>`${_e(g.qty)}${_e(g.unit)} ${_e(g.name)}`).join(', ') : '<span style="color:var(--text-mute)">No recipe -- click ✎ to define</span>';
-          return `<tr>
-            <td><div style="display:flex;align-items:center;gap:9px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${_e(m.name)}</b></div></td>
-            <td>${_e(m.cat)}</td>
-            <td style="max-width:220px;font-size:12px">${ingText}</td>
-            <td class="td-strong">${cost?rs(cost):'--'}</td>
-            <td class="td-strong">${rs(m.price)}</td>
-            <td><span class="stock-dot ${margin>=50?'stock-ok':margin>=20?'stock-low':'stock-out'}">${cost?margin+'%':'--'}</span></td>
-            <td><button class="icon-act go" data-recipe-edit="${_e(m.id)}" title="Define recipe"><i class="fa-solid fa-pen"></i></button></td>
-          </tr>`;
-        }).join('')
-        : '<tr><td colspan="7" style="text-align:center;color:var(--text-mute);padding:30px">No menu items yet - add items in Menu Editor first</td></tr>';
-
-      // clicking recipe edit navigates to menu editor and opens that item
-      $$('#recipe-table-body [data-recipe-edit]').forEach(btn => {
-        btn.onclick = () => {
-          window.RS && window.RS.activateTab('editor-tab');
-          setTimeout(() => {
-            const m = MENU.find(x=>String(x.id)===String(btn.dataset.recipeEdit));
-            if (m && window.buildFormLoad) window.buildFormLoad(m);
-          }, 200);
-        };
-      });
-    }
-
-    // Bulk Import Recipes -- paste CSV (Item, Ingredient, Qty, Unit) to link many
-    // recipes at once. Lives on the live Recipes panel (not the dormant module).
-    const bulkRecBtn = $('#btn-bulk-recipe-import');
-    if (bulkRecBtn && !bulkRecBtn._wired) {
-      bulkRecBtn._wired = true;
-      bulkRecBtn.onclick = () => {
-        const root = getModalRoot();
-        const wrap = document.createElement('div');
-        wrap.className = 'dash-modal active';
-        wrap.innerHTML =
-          '<div class="dm-card" style="max-width:520px">' +
-          '<h3 style="margin:0 0 4px;font-size:17px">Bulk Import Recipes</h3>' +
-          '<p style="margin:0 0 12px;color:var(--text-mute);font-size:12.5px">One ingredient per line: <b>Menu Item, Ingredient, Qty, Unit</b>. Items &amp; ingredients must already exist. Repeated item rows accumulate; existing recipes for listed items are replaced.</p>' +
-          '<textarea id="bulk-rec-ta" rows="8" placeholder="Masala Dosa, Dosa Batter, 0.15, kg\nMasala Dosa, Potato, 0.1, kg" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12.5px;padding:10px;border:1px solid var(--stroke-2);border-radius:8px;background:var(--panel);color:var(--text);resize:vertical"></textarea>' +
-          '<div id="bulk-rec-out" style="font-size:12px;margin-top:8px;line-height:1.5"></div>' +
-          '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn btn-ghost" id="bulk-rec-cancel" style="flex:1">Cancel</button><button class="btn btn-primary" id="bulk-rec-go" style="flex:1"><i class="fa-solid fa-circle-check"></i> Import</button></div>' +
-          '</div>';
-        root.appendChild(wrap);
-        const close = () => { try { root.removeChild(wrap); } catch(e){} };
-        wrap.querySelector('#bulk-rec-cancel').onclick = close;
-        wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
-        wrap.querySelector('#bulk-rec-go').onclick = async () => {
-          const raw = (wrap.querySelector('#bulk-rec-ta').value || '').trim();
-          const out = wrap.querySelector('#bulk-rec-out');
-          if (!raw) { out.innerHTML = '<span style="color:var(--red)">Nothing to import.</span>'; return; }
-          const byItem = {}; const errors = [];
-          raw.split(/\r?\n/).forEach((line, idx) => {
-            const t = line.trim(); if (!t) return;
-            const parts = t.split(',').map(s => s.trim());
-            if (parts.length < 3) { errors.push('Line ' + (idx+1) + ': need Item, Ingredient, Qty, Unit'); return; }
-            const menuItem = MENU.find(m => m.name.toLowerCase() === parts[0].toLowerCase());
-            if (!menuItem) { errors.push('Line ' + (idx+1) + ': item "' + _e(parts[0]) + '" not found'); return; }
-            const invItem = (INVENTORY || []).find(i => i.name.toLowerCase() === parts[1].toLowerCase());
-            if (!invItem) { errors.push('Line ' + (idx+1) + ': ingredient "' + _e(parts[1]) + '" not in inventory'); return; }
-            const qty = parseFloat(parts[2]);
-            if (!(qty > 0)) { errors.push('Line ' + (idx+1) + ': bad qty "' + _e(parts[2]) + '"'); return; }
-            (byItem[menuItem.id] = byItem[menuItem.id] || { m: menuItem, ings: [] }).ings.push({ name: invItem.name, qty: qty, unit: parts[3] || invItem.unit || '' });
-          });
-          const ids = Object.keys(byItem);
-          if (!ids.length) { out.innerHTML = '<span style="color:var(--red)">No valid rows.</span>' + (errors.length ? '<br>' + errors.slice(0,6).join('<br>') : ''); return; }
-          let links = 0;
-          ids.forEach(id => { byItem[id].m.ingredients = byItem[id].ings; links += byItem[id].ings.length; });
-          try {
-            if (RS.save) await RS.save('menu');
-            // Toast only after the save has actually completed successfully.
-            toast('Recipes imported: ' + ids.length + ' item(s), ' + links + ' ingredient links', 'fa-circle-check');
-            if (errors.length) { out.innerHTML = '<span style="color:var(--green)">Imported ' + ids.length + '.</span> <span style="color:var(--red)">' + errors.length + ' skipped:</span><br>' + errors.slice(0,6).join('<br>'); }
-            else { close(); renderInventory(); }
-          } catch(e) {
-            console.warn('Recipe import save failed', e);
-            out.innerHTML = '<span style="color:var(--red)">Save failed -- recipes were not saved. Try again.</span>';
-            toast('Recipe import failed to save -- try again', 'fa-circle-exclamation');
-          }
-        };
-      };
-    }
-
-    // wire sub-tab seg buttons (only once)
-    const seg = $('#inv-seg');
-    if (seg && !seg.dataset.wired) {
-      seg.dataset.wired = '1';
-      const panels = { stock:'#inv-panel-stock', recipes:'#inv-panel-recipes', suppliers:'#inv-panel-suppliers' };
-      seg.querySelectorAll('[data-inv-tab]').forEach(btn => {
-        btn.onclick = () => {
-          seg.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
-          btn.classList.add('active');
-          Object.values(panels).forEach(p=>{ const el=$(p); if(el) el.style.display='none'; });
-          const panel = $(panels[btn.dataset.invTab]);
-          if (panel) panel.style.display = '';
-        };
-      });
-    }
-
-    // wire Add ingredient button
-    const addIngBtn = $('#btn-add-ingredient');
-    if (addIngBtn && !addIngBtn.dataset.wired) {
-      addIngBtn.dataset.wired = '1';
-      addIngBtn.onclick = () => {
-        if (!window.RSModal) return;
-        RSModal.open({ title:'Add ingredient', sub:'Add a raw material to inventory', icon:'fa-cube', size:'sm',
-          body:`
-            <div style="display:flex;flex-direction:column;gap:14px">
-              <div><label class="fl">Ingredient name</label><input class="form-input" id="add-ing-name" placeholder="e.g. Paneer"></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Category</label><input class="form-input" id="add-ing-cat" placeholder="e.g. dairy"></div>
-                <div><label class="fl">Unit</label><input class="form-input" id="add-ing-unit" placeholder="kg / L / g"></div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Current stock</label><input class="form-input" id="add-ing-stock" type="number" min="0" placeholder="0"></div>
-                <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="add-ing-min" type="number" min="0" placeholder="10"></div>
-              </div>
-              <div><label class="fl">Unit cost (₹)</label><input class="form-input" id="add-ing-cost" type="number" min="0" placeholder="0"></div>
-            </div>`,
-          foot:`<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Add ingredient</button>`,
-          onMount(modal, close) {
-            modal.querySelector('[data-x]').onclick = close;
-            modal.querySelector('[data-ok]').onclick = async () => {
-              const name = modal.querySelector('#add-ing-name').value.trim();
-              if (!name) return toast('Enter ingredient name','fa-circle-exclamation');
-              const item = {
-                id: 'inv_' + name.toLowerCase().replace(/[^a-z0-9]+/g,'_') + '_' + Date.now(),
-                name, cat: modal.querySelector('#add-ing-cat').value.trim() || 'General',
-                unit: modal.querySelector('#add-ing-unit').value.trim() || 'unit',
-                stock: +modal.querySelector('#add-ing-stock').value || 0,
-                min: +modal.querySelector('#add-ing-min').value || 10,
-                cost: +modal.querySelector('#add-ing-cost').value || 0
-              };
-              INVENTORY.push(item);
-              if (window.RS_DB) await RS_DB.put('inventory', item.id, item);
-              close();
-              renderInventory();
-              toast(`${name} added to inventory`,'fa-circle-check');
-            };
-          }
-        });
-      };
-    }
-
-    // Dispatch custom event to notify other modules
-    document.dispatchEvent(new CustomEvent('rs:render-inventory'));
-    try { updateTabAttentionBlinking(); } catch(e){}
+    if (window.RSInventoryUI && RSInventoryUI.renderInventory) return RSInventoryUI.renderInventory();
   };
 
   /* ============================================================
@@ -2859,2016 +1336,79 @@
   };
 
   /* ============================================================
-     REPORTS
+     REPORTS — Wave 8: assets/modules/reports-ui.js
      ============================================================ */
-  const renderReports = (period) => {
-    period = period || 'Last 30 days';
-    const days = period==='Today'?1:period==='This week'?7:period==='This month'?30:period==='Last 90 days'?90:30;
-    const now = Date.now();
-    const cutoff = now - days * 86400000;
-    const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
-
-    const paidBills = BILLS.filter(b => {
-      if (b.status !== 'paid') return false;
-      const t = b.dateTime ? new Date(b.dateTime).getTime() : (b.time ? new Date(b.time).getTime() : 0);
-      return t >= cutoff;
-    });
-
-    const totalRevenue = paidBills.reduce((sum,b)=>sum+(b.amount||b.total||0),0);
-    const totalOrders = paidBills.length;
-    const aov = totalOrders>0 ? Math.round(totalRevenue/totalOrders) : 0;
-
-    // Tax: use stored fields when available, else estimate by tax category
-    let gst5=0, gst12=0, gst18=0, gst28=0;
-    paidBills.forEach(b => {
-      if (b.taxSummary && typeof b.taxSummary === 'object') {
-        Object.entries(b.taxSummary).forEach(([rate, obj]) => {
-          const tax = (obj && obj.tax) ? obj.tax : 0;
-          if (rate==='5') gst5+=tax;
-          else if (rate==='12') gst12+=tax;
-          else if (rate==='18') gst18+=tax;
-          else if (rate==='28') gst28+=tax;
-          else gst5+=tax;
-        });
-      } else {
-        // Fallback estimate
-        gst5 += Math.round((b.cgst||0) + (b.sgst||0));
-        if (!b.cgst && !b.sgst) gst5 += Math.round((b.amount||0)/1.05*0.05);
-      }
-    });
-    const totalGST = gst5+gst12+gst18+gst28;
-    const netSales = totalRevenue - totalGST;
-
-    // Daily revenue (days slots, oldest->newest)
-    const dailySlots = Array(days).fill(0);
-    const dailyLabels = [];
-    for (let i=days-1;i>=0;i--) {
-      const d = new Date(now - i*86400000);
-      dailyLabels.push(days<=7 ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] : (d.getDate()+'/'+((d.getMonth()+1))));
-    }
-    paidBills.forEach(b => {
-      const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
-      const age = Math.floor((now-t)/86400000);
-      if (age>=0 && age<days) dailySlots[days-1-age] += (b.amount||b.total||0);
-    });
-    const maxSlot = Math.max(...dailySlots,1);
-    const hasDailyData = dailySlots.some(v=>v>0);
-
-    // Payment mix
-    const payMap = {};
-    paidBills.forEach(b => {
-      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
-        b.tenders.forEach(t => { const m=t.method||'Cash'; payMap[m]=(payMap[m]||0)+Number(t.amount||0); });
-      } else {
-        const m=b.pay||b.paymentMethod||'Cash'; payMap[m]=(payMap[m]||0)+(b.amount||0);
-      }
-    });
-    const payTotal = Object.values(payMap).reduce((a,v)=>a+v,0)||1;
-    const payColors = {Cash:'var(--green)',UPI:'var(--violet)',Card:'var(--orange)',Due:'var(--red)',Stripe:'var(--blue-soft)',Online:'var(--violet-soft)'};
-    const payEntries = Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
-    let acc=0;
-    const payMix = payEntries.map(([name,val])=>{
-      const pct=Math.round(val/payTotal*100);
-      return [name,pct,payColors[name]||'var(--amber)'];
-    }).filter(p=>p[1]>0);
-    let conicAcc=0;
-    const seg = payMix.map(p=>{const s=`${p[2]} ${conicAcc}% ${conicAcc+p[1]}%`;conicAcc+=p[1];return s;}).join(',');
-
-    // Category breakdown from _items
-    const catSales = {};
-    paidBills.forEach(b => {
-      (b._items||[]).forEach(it => {
-        if (!it||!it.name) return;
-        // Older bills didn't store the category on each line item -- fall back
-        // to looking the item up in the current menu by name so it isn't
-        // lumped under "Uncategorized" in the category breakdown.
-        let cat = it.category||it.cat;
-        if (!cat) { const mm = MENU.find(x=>x.name===it.name); cat = (mm && mm.cat) || 'Uncategorized'; }
-        catSales[cat] = (catSales[cat]||0) + (it.price||0)*(it.qty||1);
-      });
-      // fallback: parse old string-format items
-      if (!b._items || !b._items.length) {
-        const items = typeof b.items==='string' ? b.items.split(',') : [];
-        items.forEach(str => {
-          const m = MENU.find(x=>str.trim().startsWith(x.name));
-          if (m) { const cat=m.cat||'Uncategorized'; catSales[cat]=(catSales[cat]||0)+(m.price||0); }
-        });
-      }
-    });
-    const catTotal = Object.values(catSales).reduce((a,v)=>a+v,0)||1;
-    const sortedCats = Object.entries(catSales).sort((a,b)=>b[1]-a[1]).map(([name,val])=>[name,Math.round(val/catTotal*100)]);
-
-    // Top items table
-    const itemMap = {};
-    paidBills.forEach(b => {
-      (b._items||[]).forEach(it => {
-        if (!it||!it.name) return;
-        if (!itemMap[it.name]) itemMap[it.name]={qty:0,rev:0};
-        itemMap[it.name].qty += (it.qty||1);
-        itemMap[it.name].rev += (it.price||0)*(it.qty||1);
-      });
-    });
-    const topItems = Object.entries(itemMap).sort((a,b)=>b[1].rev-a[1].rev).slice(0,6);
-
-    const tab = document.getElementById('reports-tab');
-    if (!tab) return;
-
-    tab.innerHTML = `
-      <div class="toolbar-row" style="margin-bottom:4px">
-        <span class="eyebrow">${period}</span>
-        <div class="grow"></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${['Today','This week','This month','Last 30 days','Last 90 days'].map(p=>
-            `<button class="btn btn-sm ${p===period?'btn-primary':'btn-ghost'}" onclick="window._renderReports('${p}')">${p}</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      <div class="stat-row">
-        <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(totalRevenue)}</div><div class="sl">Revenue</div><div class="sd">${period}</div></div></div>
-        <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">${totalOrders}</div><div class="sl">Orders</div><div class="sd">bills generated</div></div></div>
-        <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">${rs(aov)}</div><div class="sl">Avg order value</div></div></div>
-        <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">${rs(totalGST)}</div><div class="sl">GST collected</div></div></div>
-      </div>
-
-      <div class="report-grid">
-        <div class="panel panel-pad">
-          <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">${period} · hover for value</span></div>
-          <div class="chart-bars" id="chart-revenue">
-            ${hasDailyData
-              ? dailySlots.map((v,i)=>`<div class="cbar"><div class="bar" style="height:0" data-h="${Math.round(v/maxSlot*100)}"><span class="bv">${rs(v)}</span></div><span class="bl">${dailyLabels[i]}</span></div>`).join('')
-              : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px;width:100%">No sales data for this period</div>`
-            }
-          </div>
-        </div>
-        <div class="panel panel-pad">
-          <div class="panel-head"><h3>Payment mix</h3></div>
-          <div class="donut-wrap">
-            <div class="donut" id="donut-pay" style="${seg?`background:conic-gradient(${seg})`:'background:var(--glass-2)'}">
-              <div class="donut-center"><div class="dc-v">${rs(totalRevenue)}</div><div class="dc-l">collected</div></div>
-            </div>
-            <div class="legend" id="legend-pay">
-              ${payMix.length>0
-                ? payMix.map(p=>`<div class="lg-item"><span class="lg-sw" style="background:${p[2]}"></span>${_e(p[0])}<span class="lg-val">${p[1]}%</span></div>`).join('')
-                : '<div style="color:var(--text-mute);font-size:12px;margin-top:10px;text-align:center">No payments recorded</div>'
-              }
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="report-grid" style="margin-top:16px">
-        <div class="panel panel-pad">
-          <div class="panel-head"><h3>Top categories by revenue</h3></div>
-          <div id="cat-bars">
-            ${sortedCats.length>0
-              ? sortedCats.map(c=>`<div style="margin-bottom:13px">
-                  <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${_e(c[0])}</span><b style="color:var(--text)">${c[1]}%</b></div>
-                  <div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div>
-                </div>`).join('')
-              : '<div style="color:var(--text-mute);font-size:12px;text-align:center;padding:20px">No category data yet</div>'
-            }
-          </div>
-        </div>
-        <div class="panel panel-pad">
-          <div class="panel-head"><h3>Tax summary</h3></div>
-          <table class="data-table"><tbody>
-            <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">${rs(gst5)}</td></tr>
-            ${gst12>0?`<tr><td>GST @ 12%</td><td class="td-strong" style="text-align:right">${rs(gst12)}</td></tr>`:''}
-            ${gst18>0?`<tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">${rs(gst18)}</td></tr>`:''}
-            ${gst28>0?`<tr><td>GST @ 28% (luxury)</td><td class="td-strong" style="text-align:right">${rs(gst28)}</td></tr>`:''}
-            <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">${rs(netSales)}</td></tr>
-            <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">${rs(totalGST)}</b></td></tr>
-          </tbody></table>
-          <button class="btn btn-ghost btn-block" id="btn-download-gstr" style="margin-top:14px"><i class="fa-solid fa-file-arrow-down"></i> Download GSTR-ready CSV</button>
-        </div>
-      </div>
-
-      ${topItems.length>0?`
-      <div class="panel panel-pad" style="margin-top:16px">
-        <div class="panel-head"><h3>Top items by revenue</h3><span class="pill">${period}</span></div>
-        <table class="data-table"><thead><tr><th>#</th><th>Item</th><th>Qty sold</th><th style="text-align:right">Revenue</th></tr></thead><tbody>
-          ${topItems.map(([name,d],i)=>`<tr><td style="color:var(--text-mute);width:24px">${i+1}</td><td><b>${_e(name)}</b></td><td>${d.qty}</td><td style="text-align:right;color:var(--green)">${rs(d.rev)}</td></tr>`).join('')}
-        </tbody></table>
-      </div>`:''}
-    `;
-
-    // Animate bars
-    setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
-    setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
-
-    // GSTR CSV download
-    const gstrBtn = document.getElementById('btn-download-gstr');
-    if (gstrBtn) gstrBtn.onclick = () => {
-      const rows = [['Bill No','Date','Customer','Amount','GST 5%','GST 12%','GST 18%','GST 28%','Payment Method']];
-      paidBills.forEach(b => {
-        const ts = b.taxSummary||{};
-        rows.push([
-          b.no||b.id||'',
-          b.dateTime ? new Date(b.dateTime).toLocaleDateString('en-IN') : '',
-          b.customerName||'Walk-in Guest',
-          b.amount||b.total||0,
-          ts['5']?ts['5'].tax||0:0,
-          ts['12']?ts['12'].tax||0:0,
-          ts['18']?ts['18'].tax||0:0,
-          ts['28']?ts['28'].tax||0:0,
-          b.pay||b.paymentMethod||''
-        ]);
-      });
-      const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
-      const a = document.createElement('a');
-      a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
-      a.download = 'GSTR_report_'+new Date().toISOString().slice(0,10)+'.csv';
-      a.click();
-      toast('GSTR CSV downloaded','fa-file-arrow-down');
-    };
+  const renderReports = async (period) => {
+    if (window.RSReportsUI && RSReportsUI.renderReports) return RSReportsUI.renderReports(period);
   };
   window._renderReports = (p) => renderReports(p);
 
   /* ============================================================
-     KDS
+     KDS — Wave 9: assets/modules/kds-ui.js
+     Array stays here so syncPendingOrders can mutate RS.KDS.
      ============================================================ */
-  let kdsState={};
+  let kdsState = {};
   const renderKDS = () => {
-    // Update KDS avg prep time pill
-    const avgPrepEl = document.getElementById('kds-avg-prep');
-    if (avgPrepEl) {
-      if (KDS.length > 0) {
-        let totalMins = 0;
-        KDS.forEach(o => {
-          const mins = (Date.now() - o.start) / 60000;
-          totalMins += mins;
-        });
-        const avg = totalMins / KDS.length;
-        const m = Math.floor(avg), s = Math.floor((avg - m) * 60);
-        avgPrepEl.textContent = `Avg prep ${m}:${String(s).padStart(2, '0')}`;
-      } else {
-        avgPrepEl.textContent = 'Avg prep --:--';
-      }
-    }
-
-    const _ksEl = document.getElementById('kds-search');
-    if (_ksEl && !_ksEl.dataset.bound) { _ksEl.dataset.bound='1'; _ksEl.addEventListener('input', ()=>{ try{ renderKDS(); }catch(e){} }); }
-    const _kq = ((_ksEl && _ksEl.value) || '').trim().toLowerCase();
-    const _kmatch = (o) => !_kq || String(o.tok||'').toLowerCase().includes(_kq) || String(o.type||'').toLowerCase().includes(_kq) || (o.items||[]).some(it => String(it[1]||'').toLowerCase().includes(_kq));
-    $('#kds-grid').innerHTML = (KDS.length && !KDS.some(_kmatch))
-      ? `<div class="sr-empty" style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-soft)">No orders match your search.</div>`
-      : KDS.map((o,i)=> _kmatch(o) ? `
-      <div class="kds-card" data-k="${i}">
-        <div class="kds-h"><div><div class="ktok">${_e(o.tok)}</div><div class="ktype">${_e(o.type)}</div></div><span class="kds-timer" data-start="${_e(o.start)}">0:00</span></div>
-        <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${_e(it[0])}×</span><div><span class="kn">${_e(it[1])}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${_e(it[2])}</div>`:''}</div></div>`).join('')}</div>
-        <div class="kds-eta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 0 2px;border-top:1px dashed var(--stroke);margin-top:6px">
-          <span style="font-size:11px;color:var(--text-soft);font-weight:600;margin-right:2px">${o.prepMinutes?('ETA '+o.prepMinutes+'m'):'Prep:'}</span>
-          ${[10,15,20,30].map(mn=>`<button class="kds-eta-btn" data-eta="${i}" data-mins="${mn}" style="font-size:11px;padding:3px 8px;border:1px solid var(--stroke);border-radius:5px;background:${o.prepMinutes===mn?'var(--orange)':'var(--panel)'};color:${o.prepMinutes===mn?'#fff':'var(--text)'};cursor:pointer">${mn}m</button>`).join('')}
-          <button class="kds-eta-btn" data-eta="${i}" data-mins="custom" style="font-size:11px;padding:3px 8px;border:1px solid var(--stroke);border-radius:5px;background:var(--panel);color:var(--text);cursor:pointer">…</button>
-        </div>
-        <div class="kds-foot"><button class="btn btn-primary btn-block" data-done="${i}"><i class="fa-solid fa-check"></i> Mark ready</button></div>
-      </div>` : '').join('');
-    $$('#kds-grid .kds-item').forEach(it=> it.addEventListener('click',()=>it.classList.toggle('done')));
-    $$('#kds-grid [data-done]').forEach(b=> b.addEventListener('click',async ()=>{
-      const item = KDS[+b.dataset.done];
-      let failed = false;
-      if(item && item.id && window.RS_DB){
-        try {
-          const rows = await RS_DB.list('pending_orders');
-          const row = rows.find(r => r.id === item.id);
-          if (row) {
-            row.status = 'Ready';
-            await RS_DB.put('pending_orders', item.id, row);
-            syncPendingOrders();
-          }
-        } catch(e) {
-          console.warn("Failed updating KDS status", e);
-          failed = true;
-        }
-      }
-      if (failed) {
-        toast('Could not mark order ready -- try again', 'fa-circle-exclamation');
-        return;
-      }
-      const c=b.closest('.kds-card');
-      c.style.transition='all .4s var(--ease)'; c.style.opacity='0'; c.style.transform='scale(.9)';
-      toast('Order '+(item ? item.tok : '')+' ready','fa-bell');
-      setTimeout(()=>c.remove(),400);
-    }));
-    $$('#kds-grid [data-eta]').forEach(b=> b.addEventListener('click', async ()=>{
-      const item = KDS[+b.dataset.eta];
-      if(!item || !item.id || !window.RS_DB) return;
-      let mins = b.dataset.mins;
-      if(mins==='custom'){ const v = prompt('Prep time in minutes?', item.prepMinutes||'15'); if(v==null) return; mins = parseInt(v,10); } else { mins = parseInt(mins,10); }
-      if(!Number.isFinite(mins) || mins<=0) return;
-      try {
-        const rows = await RS_DB.list('pending_orders');
-        const row = rows.find(r => r.id === item.id);
-        if(row){
-          row.prepMinutes = mins;
-          row.prepStartedAt = new Date().toISOString();
-          if(row.status==='Pending Review' || row.status==='Accepted') row.status='preparing';
-          await RS_DB.put('pending_orders', item.id, row);
-          item.prepMinutes = mins; item.prepStartedAt = row.prepStartedAt;
-          if(typeof syncPendingOrders==='function') syncPendingOrders();
-          toast('ETA set: '+mins+' min','fa-clock');
-          renderKDS();
-        }
-      } catch(e){ console.warn('set ETA failed', e); toast('Could not set prep time','fa-circle-exclamation'); }
-    }));
-    tickKDS();
+    if (window.RSKdsUI && RSKdsUI.renderKDS) return RSKdsUI.renderKDS();
   };
-  function tickKDS(){
-    $$('#kds-grid .kds-timer').forEach(t=>{
-      const mins=(Date.now()-+t.dataset.start)/60000; const m=Math.floor(mins), s=Math.floor((mins-m)*60);
-      t.textContent=m+':'+String(s).padStart(2,'0');
-      t.className='kds-timer '+(mins>10?'late':mins>5?'mid':''); 
-      const card=t.closest('.kds-card'); if(card) card.classList.toggle('urgent',mins>10);
-    });
+  function tickKDS() {
+    if (window.RSKdsUI && RSKdsUI.tickKDS) return RSKdsUI.tickKDS();
   }
-  setInterval(()=>{ if($('#kds-tab')?.classList.contains('active')) tickKDS(); },1000);
 
   /* ============================================================
-     GROWTH HUB
+     GROWTH HUB — Wave 12: assets/modules/growth-hub-shell.js
      ============================================================ */
-  const HUB = [
-    {ic:'fa-calendar-check',bg:'bg-o',t:'Reservations',d:'Manage table bookings & waitlist',m:'8 today'},
-    {ic:'fa-headset',bg:'bg-v',t:'Support Tickets',d:'Customer queries & complaints',m:'2 open'},
-    {ic:'fa-truck-ramp-box',bg:'bg-t',t:'Purchase Orders',d:'Raise & track supplier POs',m:'3 pending'},
-    {ic:'fa-flask-vial',bg:'bg-g',t:'Recipe Costing',d:'Plate cost & margin calculator',m:'68% margin'},
-    {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'4 live'},
-    {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'3.1k reach'},
-    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 ★'},
-    {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'412 members'}
-  ];
   const renderHub = () => {
-    $('#hub-grid').innerHTML = HUB.map(h=>`
-      <div class="hub-card">
-        <div class="hub-ic ${h.bg}"><i class="fa-solid ${h.ic}"></i></div>
-        <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
-        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(h.m)}</span>
-      </div>`).join('');
-    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>{
-      const screen = c.querySelector('h4')?.textContent || '';
-      if(window.RS && typeof RS.openGrowthHubScreen === 'function') {
-        RS.openGrowthHubScreen(screen);
-        return;
-      }
-      toast('Growth Hub module is still loading. Try again in a moment.','fa-arrow-up-right-from-square');
-    }));
+    if (window.RSGrowthHubShell && RSGrowthHubShell.renderHub) return RSGrowthHubShell.renderHub();
   };
-  function renderGrowthHub(){ return renderHub(); }
+  function renderGrowthHub() {
+    if (window.RSGrowthHubShell && RSGrowthHubShell.renderGrowthHub) return RSGrowthHubShell.renderGrowthHub();
+    return renderHub();
+  }
 
   /* ============================================================
-     EMPLOYEES
+     EMPLOYEES — Wave 10: assets/modules/employees-ui.js
+     Array stays here so RS.EMPLOYEES reference remains stable.
      ============================================================ */
   const EMPLOYEES = [];
   const renderEmployees = () => {
-    const totalStaff = EMPLOYEES.length;
-    const onShift = EMPLOYEES.filter(e => e.shift && e.shift !== 'Off').length;
-    let payrollSum = 0;
-    EMPLOYEES.forEach(e => {
-      if (e.payroll) {
-        const num = parseFloat(String(e.payroll).replace(/[^0-9.]/g, ''));
-        if (!isNaN(num)) payrollSum += num;
-      }
-    });
-
-    const empTab = document.getElementById('employees-tab');
-    if (empTab) {
-      const svElements = empTab.querySelectorAll('.stat-row .stat-card .sv');
-      if (svElements.length >= 4) {
-        svElements[0].textContent = totalStaff;
-        svElements[1].textContent = onShift;
-        svElements[2].textContent = payrollSum > 0 ? rs(payrollSum) : '₹0';
-        svElements[3].textContent = totalStaff > 0 ? '100%' : '0%';
-      }
-    }
-
-    // Dispatch custom event to notify other modules
-    document.dispatchEvent(new CustomEvent('rs:render-employees'));
-
-    // Role definitions for edit modal (key -> { label, color, icon, tabs description })
-    const ROLE_DEFS = [
-      { key:'owner',     label:'Owner',             color:'#FF4F00', icon:'fa-crown',        desc:'Full access to all tabs' },
-      { key:'manager',   label:'Manager',            color:'#7c3aed', icon:'fa-user-tie',     desc:'All ops tabs -- no super-admin' },
-      { key:'cashier',   label:'Cashier',            color:'#0891b2', icon:'fa-cash-register',desc:'POS · Floor · Bills · Customers' },
-      { key:'waiter',    label:'Waiter',             color:'#059669', icon:'fa-utensils',     desc:'POS · Floor · Kitchen Display' },
-      { key:'captain',   label:'Captain',            color:'#2563eb', icon:'fa-star',         desc:'POS · Floor · KDS · QR Orders' },
-      { key:'kitchen',   label:'Kitchen Staff',      color:'#dc2626', icon:'fa-fire-burner',  desc:'Kitchen Display only' },
-      { key:'inventory', label:'Inventory Manager',  color:'#b45309', icon:'fa-boxes-stacked',desc:'Inventory · Menu Editor · Reports' },
-    ];
-
-    async function openEditRoleModal(empIndex) {
-      const emp = EMPLOYEES[empIndex];
-      if (!emp) return;
-      const currentKey = (emp.roleKey || emp.role || '').toLowerCase();
-      const body = `
-        <div style="margin-bottom:12px;font-size:13px;color:var(--text-soft)">
-          Choosing a role controls which tabs <b>${_e(emp.name)}</b> can see after login.
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px" id="role-picker">
-          ${ROLE_DEFS.map(r=>`
-            <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass);transition:var(--t)" class="role-opt ${currentKey===r.key?'selected':''}">
-              <input type="radio" name="emp-role" value="${r.key}" ${currentKey===r.key?'checked':''} style="display:none">
-              <span style="width:34px;height:34px;border-radius:50%;background:${r.color}22;display:grid;place-items:center;flex-shrink:0">
-                <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:14px"></i>
-              </span>
-              <div style="flex:1">
-                <div style="font-weight:700;font-size:14px">${r.label}</div>
-                <div style="font-size:12px;color:var(--text-mute)">${r.desc}</div>
-              </div>
-              <i class="fa-solid fa-circle-check" style="color:${r.color};font-size:16px;opacity:${currentKey===r.key?1:0};transition:var(--t)" class="role-chk"></i>
-            </label>`).join('')}
-        </div>`;
-      if (!window.RSModal) {
-        const pick = prompt(`Role for ${emp.name}:\n${ROLE_DEFS.map((r,i)=>`${i+1}. ${r.label} -- ${r.desc}`).join('\n')}\n\nEnter number:`);
-        const idx = parseInt(pick,10)-1;
-        if (idx>=0 && idx<ROLE_DEFS.length) {
-          const chosen = ROLE_DEFS[idx];
-          EMPLOYEES[empIndex].role = chosen.label;
-          EMPLOYEES[empIndex].roleKey = chosen.key;
-          EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
-          await RS_DB.save('employees', EMPLOYEES[empIndex]);
-          renderEmployees();
-          toast(`${emp.name} -> ${chosen.label}`,'fa-user-check');
-        }
-        return;
-      }
-      const modal = RSModal.open({
-        title: `Set role -- ${emp.name}`,
-        icon: 'fa-user-gear',
-        body,
-        foot: `<button class="btn btn-ghost" id="role-cancel">Cancel</button>
-               <button class="btn btn-primary" id="role-save"><i class="fa-solid fa-check"></i> Save role</button>`,
-        onOpen: (el) => {
-          // Style selected state on click
-          el.querySelectorAll('.role-opt').forEach(opt => {
-            opt.addEventListener('click', () => {
-              el.querySelectorAll('.role-opt').forEach(o => {
-                o.style.borderColor=''; o.style.background='var(--glass)';
-                o.querySelector('.fa-circle-check').style.opacity='0';
-              });
-              opt.style.borderColor='var(--orange)';
-              opt.style.background='var(--orange-tint)';
-              opt.querySelector('.fa-circle-check').style.opacity='1';
-              opt.querySelector('input').checked=true;
-            });
-          });
-          // Pre-highlight current
-          el.querySelectorAll('.role-opt').forEach(opt => {
-            if (opt.querySelector('input').checked) {
-              opt.style.borderColor='var(--orange)';
-              opt.style.background='var(--orange-tint)';
-              opt.querySelector('.fa-circle-check').style.opacity='1';
-            }
-          });
-          el.querySelector('#role-cancel').onclick = () => RSModal.close();
-          el.querySelector('#role-save').onclick = async () => {
-            const checked = el.querySelector('input[name="emp-role"]:checked');
-            if (!checked) return;
-            const chosen = ROLE_DEFS.find(r=>r.key===checked.value);
-            if (!chosen) return;
-            EMPLOYEES[empIndex].role = chosen.label;
-            EMPLOYEES[empIndex].roleKey = chosen.key;
-            EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
-            try { await RS_DB.save('employees', EMPLOYEES[empIndex]); } catch(e) { console.warn('Role save failed',e); }
-            RSModal.close();
-            renderEmployees();
-            toast(`${emp.name} is now ${chosen.label}`,'fa-user-check');
-          };
-        }
-      });
-    }
-
-    $('#emp-grid').innerHTML = EMPLOYEES.map((e,i)=>`
-      <div class="emp-card">
-        <div class="emp-top"><div class="emp-av" style="background:${avatarColors[i%avatarColors.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email)}</div></div></div>
-        <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc)}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift)}</span></div>
-        <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales)}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders)}</div><div class="esl">Orders</div></div></div>
-        <div class="emp-actions"><button class="btn btn-ghost btn-sm edit-role-btn" data-idx="${i}" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button></div>
-      </div>`).join('');
-    $$('#emp-grid .edit-role-btn').forEach(b=>b.addEventListener('click', () => openEditRoleModal(+b.dataset.idx)));
+    if (window.RSEmployeesUI && RSEmployeesUI.renderEmployees) return RSEmployeesUI.renderEmployees();
   };
 
   /* ============================================================
-     SUPER-ADMIN
+     SUPER-ADMIN — Wave 9: assets/modules/super-admin.js
      ============================================================ */
-  /* ============================================================
-     SUPER-ADMIN & GATEWAY MONITOR SYSTEMS
-     ============================================================ */
-  let superAdminFilter = 'all';
-  let superAdminSearch = '';
-  let superAdminSort = { col: 'joined', dir: 'desc' };
-  let _cachedTenants = [];
-  let selectedTenantIds = new Set();
-  let saasGatewayPollingInterval = null;
-
-  function escHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  function formatIncidentTime(value) {
-    if (!value) return 'Unknown time';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Unknown time';
-    return date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
-  }
-
-  function renderIncidentEmpty(title, detail, icon = 'fa-circle-check') {
-    return `
-      <div class="app-incidents-empty">
-        <i class="fa-solid ${icon}"></i>
-        <strong>${escHtml(title)}</strong>
-        <span>${escHtml(detail)}</span>
-      </div>
-    `;
-  }
-
-  function saasSnapshotCard(title, value, subtitle, iconClass, filterAttr, isActive = false) {
-    const filterData = filterAttr ? `data-filter="${filterAttr}"` : '';
-    const activeClass = isActive ? 'active-filter' : '';
-    return `
-      <div class="saas-snapshot-card ${activeClass}" ${filterData}>
-        <div class="saas-snapshot-card-header">
-          <span class="saas-snapshot-card-title">${escHtml(title)}</span>
-          <i class="${iconClass}" style="color: #FF4F00; font-size: 14px;"></i>
-        </div>
-        <div>
-          <div class="saas-snapshot-card-value">${escHtml(value)}</div>
-          <div class="saas-snapshot-card-subtitle">${escHtml(subtitle)}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderPlatformSummary(tenants = []) {
-    const target = document.getElementById('saas-platform-summary');
-    if (!target) return;
-    const total = tenants.length;
-    const active = tenants.filter(t => t.status === 'approved' || t.status === 'active').length;
-    const pending = tenants.filter(t => t.status === 'pending').length;
-    const paidTier = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code)).length;
-    const risk = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status)).length;
-    const conversion = total ? Math.round((paidTier / total) * 100) : 0;
-    const totalMrr = tenants.reduce((sum, t) => sum + (Number(t.mrr) || 0), 0);
-    const mrrDisplay = totalMrr > 0 ? rs(totalMrr) : '₹0';
-    target.innerHTML = [
-      saasSnapshotCard('Workspaces', total, `${active} active outlets`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
-      saasSnapshotCard('Pending Approvals', pending, pending ? 'Requires review' : 'Queue is clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
-      saasSnapshotCard('Conversion Rate', `${conversion}%`, `${paidTier} paid / ${total} total`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
-      saasSnapshotCard('At-Risk Accounts', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk'),
-      saasSnapshotCard('Platform MRR', mrrDisplay, `${total} tenants tracked`, 'fa-solid fa-indian-rupee-sign', 'mrr', superAdminFilter === 'mrr')
-    ].join('');
-
-    target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
-      item.addEventListener('click', async () => {
-        const f = item.getAttribute('data-filter');
-        if (f === 'mrr') { openPlanPricingEditor(); return; } // MRR card opens plan pricing
-        superAdminFilter = f;
-        await renderSuper();
-      });
-    });
-  }
-
-  const tStatus={active:'t-active',approved:'t-active',trial:'t-trial',pending:'t-trial',suspended:'t-suspended',past_due:'t-suspended',canceled:'t-suspended'};
-
-  function getTenantRowId(tenant) {
-    return tenant && tenant.id != null ? String(tenant.id) : '';
-  }
-
-  function getSelectedTenants() {
-    return _cachedTenants.filter(t => selectedTenantIds.has(getTenantRowId(t)));
-  }
-
-  function pruneTenantSelection() {
-    const validIds = new Set(_cachedTenants.map(getTenantRowId).filter(Boolean));
-    selectedTenantIds = new Set([...selectedTenantIds].filter(id => validIds.has(id)));
-  }
-
-  function syncTenantSelectAll(visibleTenants = []) {
-    const all = document.getElementById('tenant-select-all');
-    if (!all) return;
-    const visibleIds = visibleTenants.map(getTenantRowId).filter(Boolean);
-    const selectedVisible = visibleIds.filter(id => selectedTenantIds.has(id)).length;
-    all.checked = visibleIds.length > 0 && selectedVisible === visibleIds.length;
-    all.indeterminate = selectedVisible > 0 && selectedVisible < visibleIds.length;
-    all.disabled = visibleIds.length === 0;
-  }
-
-  // Render tenant table from cached data (no network call)
-  function renderTenantTable() {
-    const tbody = $('#tenant-table-body');
-    if (!tbody) return;
-    pruneTenantSelection();
-
-    let filtered = _cachedTenants.slice();
-
-    // Status filter
-    if (superAdminFilter === 'pending') filtered = filtered.filter(t => t.status === 'pending');
-    else if (superAdminFilter === 'paid') filtered = filtered.filter(t => ['growth','enterprise'].includes(t.plan_code));
-    else if (superAdminFilter === 'risk') filtered = filtered.filter(t => ['past_due','canceled'].includes(t.subscription_status));
-
-    // Text search
-    const q = (superAdminSearch || '').toLowerCase().trim();
-    if (q) {
-      filtered = filtered.filter(t => {
-        const fields = [t.name, t.tenant_name, t.slug, t.email, t.phone, t.username, t.plan_code, t.status];
-        return fields.some(f => f && String(f).toLowerCase().includes(q));
-      });
-    }
-
-    // Sort
-    const { col, dir } = superAdminSort;
-    filtered.sort((a, b) => {
-      let va, vb;
-      if (col === 'outlet') { va = (a.name || a.tenant_name || '').toLowerCase(); vb = (b.name || b.tenant_name || '').toLowerCase(); }
-      else if (col === 'plan') { va = (a.plan_code || '').toLowerCase(); vb = (b.plan_code || '').toLowerCase(); }
-      else if (col === 'mrr') { va = Number(a.mrr) || 0; vb = Number(b.mrr) || 0; }
-      else if (col === 'outlets') { va = Number(a.outlet_count) || 1; vb = Number(b.outlet_count) || 1; }
-      else if (col === 'joined') { va = a.created_at || ''; vb = b.created_at || ''; }
-      else if (col === 'status') { va = (a.status || '').toLowerCase(); vb = (b.status || '').toLowerCase(); }
-      else if (col === 'renews') { va = a.subscription_current_period_end || ''; vb = b.subscription_current_period_end || ''; }
-      else { va = a.created_at || ''; vb = b.created_at || ''; }
-      if (va < vb) return dir === 'asc' ? -1 : 1;
-      if (va > vb) return dir === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    // Update count badge
-    const countEl = document.getElementById('tenant-count');
-    if (countEl) countEl.textContent = `${filtered.length} of ${_cachedTenants.length}`;
-
-    // Update sort headers
-    document.querySelectorAll('th[data-sort-col]').forEach(th => {
-      const c = th.getAttribute('data-sort-col');
-      const icon = th.querySelector('.sort-icon');
-      if (!icon) return;
-      if (c === col) {
-        icon.className = `sort-icon fa-solid ${dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`;
-        icon.style.color = 'var(--orange)';
-      } else {
-        icon.className = 'sort-icon fa-solid fa-sort';
-        icon.style.color = 'var(--text-mute)';
-        icon.style.opacity = '0.4';
-      }
-    });
-
-    if (filtered.length === 0) {
-      syncTenantSelectAll([]);
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-store-slash" style="display:block;margin-bottom:8px;font-size:20px"></i>${q ? `No tenants match "${_e(q)}"` : `No tenants found for filter "${_e(superAdminFilter)}".`}</td></tr>`;
-      updateBulkBar();
-      return;
-    }
-
-    tbody.innerHTML = filtered.map(t => {
-      const planLabel = t.plan_name || t.plan_code || 'Starter';
-      const isChain = ['chain','enterprise'].includes((t.plan_code||'').toLowerCase());
-      const isGrowth = (t.plan_code||'').toLowerCase() === 'growth';
-      const pillCls = isChain ? 'pill-violet' : isGrowth ? 'pill-orange' : '';
-      const statusKey = (t.status || 'active').toLowerCase();
-      const statusCls = tStatus[statusKey] || 't-active';
-      const statusText = t.status ? (t.status.charAt(0).toUpperCase() + t.status.slice(1).replace(/_/g,' ')) : 'Active';
-      const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '-';
-      const mrr = t.mrr || 0;
-      const name = t.name || t.tenant_name || t.slug || 'Unknown';
-      const slug = t.slug || t.tenant_slug || '';
-      const tenantId = getTenantRowId(t);
-      const selected = tenantId && selectedTenantIds.has(tenantId);
-      const isPending = statusKey === 'pending';
-      const isSuspended = statusKey === 'suspended';
-      const approveBtn = isPending
-        ? `<button class="btn btn-sm quick-approve-btn" style="background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Approve this workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-check"></i> Approve</button>`
-        : '';
-      const suspendBtn = !isPending
-        ? isSuspended
-          ? `<button class="btn btn-sm quick-reactivate-btn" style="background:rgba(34,197,94,0.08);color:#16a34a;border:1px solid rgba(34,197,94,0.2);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Reactivate workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-rotate-left"></i> Reactivate</button>`
-          : `<button class="btn btn-sm quick-suspend-btn" style="background:rgba(239,68,68,0.06);color:#dc2626;border:1px solid rgba(239,68,68,0.18);padding:3px 9px;font-size:11px;border-radius:6px;cursor:pointer" title="Suspend workspace" data-tid="${_e(t.id||'')}"><i class="fa-solid fa-ban"></i> Suspend</button>`
-        : '';
-      const dashboardBtn = !isPending && !isSuspended
-        ? `<button class="icon-act open-tenant-dashboard-btn" title="Open workspace dashboard" data-tid="${_e(t.id||'')}" style="font-size:13px;color:var(--orange)"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>`
-        : '';
-      // Renews-on (paid-until) cell with colour: red=expired, amber=<=7 days, green=fine.
-      const rawEnd = t.subscription_current_period_end;
-      let renewsCell;
-      if (!rawEnd) {
-        renewsCell = '<span style="color:var(--text-mute)">—</span>';
-      } else {
-        const end = new Date(rawEnd);
-        const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86400000);
-        const dateStr = isNaN(end.getTime()) ? '—' : end.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
-        const color = daysLeft < 0 ? '#dc2626' : (daysLeft <= 7 ? '#d97706' : '#16a34a');
-        const label = daysLeft < 0 ? (dateStr + ' (expired)') : (daysLeft <= 7 ? (dateStr + ' (' + daysLeft + 'd)') : dateStr);
-        renewsCell = `<span style="color:${color};font-weight:600;white-space:nowrap">${_e(label)}</span>`;
-      }
-      return `<tr class="${selected ? 'tenant-row-selected' : ''}">
-        <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
-        <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
-        <td class="td-strong">${mrr ? rs(mrr) : '--'}</td>
-        <td>${_e(t.outlet_count || 1)}</td>
-        <td>${_e(joined)}</td>
-        <td><span class="tenant-status ${_e(statusCls)}">${_e(statusText)}</span></td>
-        <td>${renewsCell}</td>
-        <td>
-          <div class="row-actions" style="gap:5px">
-            ${approveBtn}
-            ${suspendBtn}
-            ${dashboardBtn}
-            <button class="icon-act manage-tenant-btn" title="Manage workspace" data-tid="${_e(t.id||'')}" style="font-size:13px"><i class="fa-solid fa-gear"></i></button>
-          </div>
-        </td>
-      </tr>`;
-    }).join('');
-
-    syncTenantSelectAll(filtered);
-    updateBulkBar();
-
-    tbody.querySelectorAll('.tenant-row-checkbox').forEach(cb => {
-      cb.addEventListener('click', e => e.stopPropagation());
-      cb.addEventListener('change', () => {
-        const tid = cb.getAttribute('data-tid');
-        if (!tid) return;
-        if (cb.checked) selectedTenantIds.add(tid);
-        else selectedTenantIds.delete(tid);
-        renderTenantTable();
-      });
-    });
-
-    // Bind quick-approve buttons
-    tbody.querySelectorAll('.quick-approve-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const tid = btn.getAttribute('data-tid');
-        const t = _cachedTenants.find(x => String(x.id) === String(tid));
-        if (!t) return;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        try {
-          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'approved' });
-          t.status = 'approved';
-          toast(`${t.name || 'Workspace'} approved!`, 'fa-circle-check');
-          renderPlatformSummary(_cachedTenants);
-          renderTenantTable();
-        } catch (err) {
-          toast('Approval failed: ' + (err.message || err), 'fa-circle-exclamation');
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-check"></i> Approve';
-        }
-      });
-    });
-
-    // Bind suspend buttons
-    tbody.querySelectorAll('.quick-suspend-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const tid = btn.getAttribute('data-tid');
-        const t = _cachedTenants.find(x => String(x.id) === String(tid));
-        if (!t) return;
-        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        try {
-          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'suspended',
-            username: t.username, plan_code: t.plan_code || 'starter',
-            subscription_status: t.subscription_status || 'active',
-            allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
-          t.status = 'suspended';
-          toast(`${t.name || 'Workspace'} suspended.`, 'fa-ban');
-          renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
-        } catch (err) {
-          toast('Suspend failed: ' + (err.message || err), 'fa-circle-exclamation');
-          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-ban"></i> Suspend';
-        }
-      });
-    });
-
-    // Bind reactivate buttons
-    tbody.querySelectorAll('.quick-reactivate-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const tid = btn.getAttribute('data-tid');
-        const t = _cachedTenants.find(x => String(x.id) === String(tid));
-        if (!t) return;
-        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        try {
-          await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'approved',
-            username: t.username, plan_code: t.plan_code || 'starter',
-            subscription_status: t.subscription_status || 'active',
-            allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
-          t.status = 'approved';
-          toast(`${t.name || 'Workspace'} reactivated!`, 'fa-rotate-left');
-          renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
-        } catch (err) {
-          toast('Reactivate failed: ' + (err.message || err), 'fa-circle-exclamation');
-          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Reactivate';
-        }
-      });
-    });
-
-    // Bind manage buttons
-    tbody.querySelectorAll('.open-tenant-dashboard-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const tenantId = btn.getAttribute('data-tid');
-        const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
-        openTenantDashboard(tenant, btn);
-      });
-    });
-
-    tbody.querySelectorAll('.manage-tenant-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const tenantId = btn.getAttribute('data-tid');
-        const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
-        if (tenant) openTenantManageModal(tenant);
-        else toast('Tenant details not found.', 'fa-circle-exclamation');
-      });
-    });
-  }
-
-  let _superPollTimer = null;
-  async function pollSuperTenants() {
-    try {
-      if (!window.RS_API || !RS_API.configured) return;
-      const body = document.getElementById('tenant-table-body');
-      if (!body || body.offsetParent === null) return;
-      if (document.visibilityState !== 'visible') return;
-      const out = await RS_API.admin({ action: 'list_tenants' }).catch(() => null);
-      if (out && Array.isArray(out.tenants)) {
-        _cachedTenants = out.tenants;
-        renderPlatformSummary(_cachedTenants);
-        renderTenantTable();
-      }
-    } catch (e) { /* quiet */ }
-  }
-  function startSuperPolling() {
-    if (_superPollTimer) return;
-    _superPollTimer = setInterval(pollSuperTenants, 30000);
-  }
-
   const renderSuper = async () => {
-    const tbody = $('#tenant-table-body');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
-    renderPlatformSummary([]);
-    try {
-      if (window.RS_API) {
-        // ── Wait for Supabase config to load (async race condition fix) ──
-        // /api/config is fetched async at boot; renderSuper fires after 300ms
-        // which can be faster than the network round-trip. Poll up to 4s.
-        if (!RS_API.configured) {
-          await new Promise(resolve => {
-            let tries = 0;
-            const poll = setInterval(() => {
-              if (RS_API.configured || ++tries >= 40) { clearInterval(poll); resolve(); }
-            }, 100);
-          });
-        }
-        // If still not configured after waiting, session is genuinely missing
-        if (!RS_API.configured) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Supabase not reachable — check your internet connection and reload the page.</td></tr>';
-          return;
-        }
-        const out = await Promise.race([
-          RS_API.admin({ action: 'list_tenants' }).catch(err => ({ error: err && err.message ? err.message : String(err), tenants: [] })),
-          new Promise(resolve => setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 10000))
-        ]);
-        if (out && out.error) console.warn('Superadmin tenant registry unavailable:', out.error);
-        if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
-        // If we got an auth error, show a helpful message with retry
-        if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
-          return;
-        }
-      }
-      renderPlatformSummary(_cachedTenants);
-      renderTenantTable();
-      bindTenantBulkControls();
-      updateBulkBar();
-      startSuperPolling();
-
-      // Wire sort headers (only once)
-      document.querySelectorAll('th[data-sort-col]').forEach(th => {
-        if (th.dataset.sortBound) return;
-        th.dataset.sortBound = '1';
-        th.style.cursor = 'pointer';
-        th.addEventListener('click', () => {
-          const c = th.getAttribute('data-sort-col');
-          if (superAdminSort.col === c) superAdminSort.dir = superAdminSort.dir === 'asc' ? 'desc' : 'asc';
-          else { superAdminSort.col = c; superAdminSort.dir = 'asc'; }
-          renderTenantTable();
-        });
-      });
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
-    }
+    if (window.RSSuperAdmin && RSSuperAdmin.renderSuper) return RSSuperAdmin.renderSuper();
   };
 
-  // ── Bulk Actions ────────────────────────────────────────────────────────
-  function updateBulkBar() {
-    const bar = document.getElementById('sa-bulk-bar');
-    const label = document.getElementById('sa-bulk-label');
-    const icon = document.getElementById('sa-bulk-icon');
-    const selectionActions = document.getElementById('sa-selection-actions');
-    const approveBtn = document.getElementById('sa-bulk-approve-btn');
-    if (!bar || !label) return;
-    const selected = getSelectedTenants();
-    const pending = _cachedTenants.filter(t => t.status === 'pending');
-    if (selected.length > 0) {
-      bar.style.display = 'flex';
-      bar.style.background = 'rgba(239,68,68,0.07)';
-      bar.style.borderColor = 'rgba(239,68,68,0.22)';
-      label.style.color = '#dc2626';
-      label.textContent = `${selected.length} client${selected.length > 1 ? 's' : ''} selected`;
-      if (icon) {
-        icon.className = 'fa-solid fa-trash-can';
-        icon.style.color = '#dc2626';
-      }
-      if (selectionActions) selectionActions.style.display = 'flex';
-      if (approveBtn) approveBtn.style.display = 'none';
-    } else if (pending.length > 0) {
-      bar.style.display = 'flex';
-      bar.style.background = 'rgba(245,158,11,0.08)';
-      bar.style.borderColor = 'rgba(245,158,11,0.2)';
-      label.style.color = '#b45309';
-      label.textContent = `${pending.length} workspace${pending.length > 1 ? 's' : ''} waiting for approval`;
-      if (icon) {
-        icon.className = 'fa-solid fa-user-clock';
-        icon.style.color = '#b45309';
-      }
-      if (selectionActions) selectionActions.style.display = 'none';
-      if (approveBtn) approveBtn.style.display = 'inline-flex';
-    } else {
-      bar.style.display = 'none';
-      if (selectionActions) selectionActions.style.display = 'none';
-      if (approveBtn) approveBtn.style.display = 'inline-flex';
-    }
-  }
-
-  function bindTenantBulkControls() {
-    const selectHead = document.querySelector('.tenant-select-head');
-    if (selectHead && !selectHead.dataset.wired) {
-      selectHead.dataset.wired = '1';
-      selectHead.addEventListener('click', e => e.stopPropagation());
-    }
-    const selectAll = document.getElementById('tenant-select-all');
-    if (selectAll && !selectAll.dataset.wired) {
-      selectAll.dataset.wired = '1';
-      selectAll.addEventListener('click', e => e.stopPropagation());
-      selectAll.addEventListener('change', () => {
-        const visibleIds = Array.from(document.querySelectorAll('#tenant-table-body .tenant-row-checkbox'))
-          .map(cb => cb.getAttribute('data-tid'))
-          .filter(Boolean);
-        visibleIds.forEach(id => {
-          if (selectAll.checked) selectedTenantIds.add(id);
-          else selectedTenantIds.delete(id);
-        });
-        renderTenantTable();
-      });
-    }
-    const clearBtn = document.getElementById('sa-clear-selection-btn');
-    if (clearBtn && !clearBtn.dataset.wired) {
-      clearBtn.dataset.wired = '1';
-      clearBtn.addEventListener('click', () => {
-        selectedTenantIds.clear();
-        renderTenantTable();
-      });
-    }
-    const deleteBtn = document.getElementById('sa-bulk-delete-btn');
-    if (deleteBtn && !deleteBtn.dataset.wired) {
-      deleteBtn.dataset.wired = '1';
-      deleteBtn.addEventListener('click', () => bulkDeleteSelectedTenants());
-    }
-  }
-
-  async function bulkApproveAllPending() {
-    const pending = _cachedTenants.filter(t => t.status === 'pending');
-    if (!pending.length) return toast('No pending workspaces to approve.', 'fa-circle-info');
-    const btn = document.getElementById('sa-bulk-approve-btn');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving…'; }
-    let done = 0, failed = 0;
-    for (const t of pending) {
-      try {
-        await RS_API.admin({ action: 'update_tenant', tenant_id: t.id, status: 'approved',
-          username: t.username, plan_code: t.plan_code || 'starter',
-          subscription_status: t.subscription_status || 'active',
-          allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
-        t.status = 'approved';
-        done++;
-      } catch(e) { failed++; }
-    }
-    renderPlatformSummary(_cachedTenants);
-    renderTenantTable();
-    updateBulkBar();
-    toast(`${done} workspace${done !== 1 ? 's' : ''} approved${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Approve all pending'; }
-  }
-
-  async function bulkDeleteSelectedTenants() {
-    const selected = getSelectedTenants();
-    if (!selected.length) return toast('Select clients to delete first.', 'fa-circle-info');
-    const sampleNames = selected.slice(0, 4).map(t => t.name || t.tenant_name || t.slug || 'Unnamed client');
-    const more = selected.length > sampleNames.length ? ` and ${selected.length - sampleNames.length} more` : '';
-    confirmDangerAction(
-      `Delete ${selected.length} selected client${selected.length > 1 ? 's' : ''}?`,
-      `This will <strong>permanently erase</strong> the selected client workspace${selected.length > 1 ? 's' : ''} and all related data. This cannot be undone.<br><br><strong>${sampleNames.map(_e).join(', ')}${_e(more)}</strong>`,
-      async () => {
-        const btn = document.getElementById('sa-bulk-delete-btn');
-        if (btn) {
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
-        }
-        let done = 0, failed = 0;
-        const deletedIds = [];
-        for (const tenant of selected) {
-          const tenantId = getTenantRowId(tenant);
-          if (!tenantId) { failed++; continue; }
-          try {
-            await RS_API.admin({ action: 'delete_tenant', tenant_id: tenantId });
-            deletedIds.push(tenantId);
-            done++;
-          } catch (err) {
-            console.error('Bulk tenant delete failed', tenantId, err);
-            failed++;
-          }
-        }
-        if (deletedIds.length) {
-          const deleted = new Set(deletedIds);
-          _cachedTenants = _cachedTenants.filter(t => !deleted.has(getTenantRowId(t)));
-          selectedTenantIds = new Set([...selectedTenantIds].filter(id => !deleted.has(id)));
-        }
-        renderPlatformSummary(_cachedTenants);
-        renderTenantTable();
-        updateBulkBar();
-        toast(`${done} client${done !== 1 ? 's' : ''} deleted${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete selected';
-        }
-      }
-    );
-  }
-
-  // ── Create Tenant Modal ─────────────────────────────────────────────────
-  function openCreateTenantModal() {
-    const modal = document.getElementById('create-tenant-modal');
-    if (!modal) return;
-    // Clear form
-    ['ct-name','ct-slug','ct-username','ct-password','ct-email','ct-phone'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-    const errEl = document.getElementById('ct-error');
-    if (errEl) errEl.style.display = 'none';
-    const autoApprove = document.getElementById('ct-auto-approve');
-    if (autoApprove) autoApprove.checked = true;
-
-    // Auto-generate slug and username from name
-    const nameEl = document.getElementById('ct-name');
-    const slugEl = document.getElementById('ct-slug');
-    const userEl = document.getElementById('ct-username');
-    if (nameEl && !nameEl.dataset.slugWired) {
-      nameEl.dataset.slugWired = '1';
-      nameEl.addEventListener('input', () => {
-        const base = nameEl.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        if (slugEl) slugEl.value = base;
-        if (userEl) userEl.value = base ? base + '-admin' : '';
-      });
-    }
-
-    if (!modal.dataset.eventsBound) {
-      modal.dataset.eventsBound = '1';
-      document.getElementById('close-create-tenant-modal').addEventListener('click', () => modal.classList.remove('active'));
-      document.getElementById('ct-cancel-btn').addEventListener('click', () => modal.classList.remove('active'));
-      modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
-
-      document.getElementById('ct-submit-btn').addEventListener('click', async () => {
-        const name = document.getElementById('ct-name').value.trim();
-        const slug = document.getElementById('ct-slug').value.trim();
-        const outlet_type = document.getElementById('ct-outlet-type').value;
-        const plan_code = document.getElementById('ct-plan').value;
-        const username = document.getElementById('ct-username').value.trim();
-        const password = document.getElementById('ct-password').value;
-        const email = document.getElementById('ct-email').value.trim();
-        const phone = document.getElementById('ct-phone').value.trim();
-        const autoApproveChecked = document.getElementById('ct-auto-approve').checked;
-
-        const errEl = document.getElementById('ct-error');
-        const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
-        errEl.style.display = 'none';
-
-        if (!name) return showErr('Business name is required.');
-        if (!slug || !/^[a-z0-9-]+$/.test(slug)) return showErr('Slug must be lowercase letters, numbers and hyphens only.');
-        if (!username) return showErr('Admin username is required.');
-        if (!password || password.length < 6) return showErr('Password must be at least 6 characters.');
-
-        const btn = document.getElementById('ct-submit-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating…';
-
-        try {
-          await RS_API.register({ name, slug, outlet_type, email, phone, username, password });
-          // If auto-approve, immediately approve by finding and updating the new tenant
-          if (autoApproveChecked) {
-            try {
-              // Refresh tenant list to get the new tenant's ID
-              const out = await RS_API.admin({ action: 'list_tenants' }).catch(() => ({ tenants: [] }));
-              const allTenants = (out && out.tenants) || [];
-              const newTenant = allTenants.find(t => t.slug === slug || t.username === username);
-              if (newTenant && newTenant.id) {
-                await RS_API.admin({ action: 'update_tenant', tenant_id: newTenant.id, status: 'approved',
-                  username, plan_code, subscription_status: 'active',
-                  allowed_tabs: newTenant.allowed_tabs || [], phone, email });
-                newTenant.status = 'approved';
-                newTenant.plan_code = plan_code;
-              }
-              _cachedTenants = allTenants;
-            } catch(e) { /* approval failed silently — tenant still created */ }
-          }
-          modal.classList.remove('active');
-          toast(`Workspace "${name}" created${autoApproveChecked ? ' & approved' : ' (pending approval)'}!`, 'fa-store');
-          renderPlatformSummary(_cachedTenants);
-          renderTenantTable();
-          updateBulkBar();
-        } catch (err) {
-          showErr(err.message || 'Failed to create workspace. Check details and try again.');
-        } finally {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-plus"></i> Create Workspace';
-        }
-      });
-    }
-
-    modal.classList.add('active');
-  }
-
-  async function openPlanPricingEditor() {
-    document.getElementById('rs-pricing-modal')?.remove();
-    const m = document.createElement('div');
-    m.id = 'rs-pricing-modal';
-    m.className = 'modal-backdrop';
-    m.style.cssText = 'z-index:200010;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto';
-    m.innerHTML = `
-      <div style="background:var(--panel,#fff);border:1px solid var(--stroke);border-radius:16px;max-width:640px;width:100%;padding:22px 22px 18px;box-shadow:0 24px 80px rgba(0,0,0,.35)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <h3 style="margin:0;font-size:16px;font-weight:800">Plan pricing</h3>
-          <button id="rs-pricing-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-mute);line-height:1">×</button>
-        </div>
-        <p style="font-size:12px;color:var(--text-soft);margin:0 0 14px">Edit monthly price, currency, and the Razorpay plan id used for self-serve checkout. Changes apply immediately.</p>
-        <div id="rs-pricing-body" style="font-size:13px;color:var(--text-soft)"><i class="fa-solid fa-spinner fa-spin"></i> Loading plans…</div>
-      </div>`;
-    document.body.appendChild(m);
-    m.querySelector('#rs-pricing-close').onclick = () => m.remove();
-    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
-    const body = m.querySelector('#rs-pricing-body');
-    let plans = [];
-    try { const out = await RS_API.admin({ action: 'list_plans' }); plans = (out && out.plans) || []; }
-    catch (e) { body.innerHTML = '<span style="color:#dc2626">Could not load plans (' + _e(e.message || 'error') + ').</span>'; return; }
-    body.innerHTML = plans.map(p => `
-      <div data-plan="${_e(p.plan_code)}" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;margin-bottom:10px">
-        <div style="font-weight:800;font-size:13px;margin-bottom:8px">${_e(p.name)} <span style="color:var(--text-mute);font-weight:600">(${_e(p.plan_code)})</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <label style="font-size:11px;color:var(--text-mute)">Price / month
-            <input class="rs-pp-price" type="number" min="0" value="${Number(p.price_monthly)||0}" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px">
-          </label>
-          <label style="font-size:11px;color:var(--text-mute)">Currency
-            <input class="rs-pp-cur" type="text" value="${_e(p.currency||'INR')}" maxlength="8" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px">
-          </label>
-          <label style="font-size:11px;color:var(--text-mute);grid-column:1/3">Razorpay plan id (for self-serve checkout)
-            <input class="rs-pp-rzp" type="text" value="${_e(p.razorpay_plan_id||'')}" placeholder="plan_XXXXXXXX" style="width:100%;padding:7px 10px;border:1px solid var(--stroke);border-radius:7px;background:var(--panel);color:var(--text);margin-top:3px;font-family:monospace">
-          </label>
-          <label style="font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;grid-column:1/3">
-            <input class="rs-pp-pub" type="checkbox" ${p.is_public===false?'':'checked'}> Show to tenants in the in-app billing panel
-          </label>
-        </div>
-        <div style="text-align:right;margin-top:8px">
-          <button class="rs-pp-save btn btn-sm" style="background:var(--orange);color:#fff;border:none;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">Save</button>
-        </div>
-      </div>`).join('');
-    body.querySelectorAll('.rs-pp-save').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const row = btn.closest('[data-plan]');
-        const payload = {
-          action: 'update_plan',
-          plan_code: row.getAttribute('data-plan'),
-          price_monthly: Number(row.querySelector('.rs-pp-price').value) || 0,
-          currency: (row.querySelector('.rs-pp-cur').value || 'INR').trim().toUpperCase(),
-          razorpay_plan_id: row.querySelector('.rs-pp-rzp').value.trim(),
-          is_public: row.querySelector('.rs-pp-pub').checked,
-        };
-        btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Saving…';
-        try { await RS_API.admin(payload); toast('Plan pricing updated.', 'fa-circle-check'); }
-        catch (e) { toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
-        finally { btn.disabled = false; btn.textContent = orig; }
-      });
-    });
-  }
-
-  async function loadTenantDevices(tenantId) {
-    const box = document.getElementById('manage-devices-box');
-    if (!box) return;
-    if (!tenantId) { box.textContent = 'Save the workspace first to see licensed devices.'; return; }
-    box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading devices…';
-    let devices = [];
-    try { const out = await RS_API.admin({ action: 'list_devices', tenant_id: tenantId }); devices = (out && out.devices) || []; }
-    catch (e) { box.innerHTML = '<span style="color:#dc2626">Could not load devices (' + _e(e.message || 'error') + ').</span>'; return; }
-    if (!devices.length) { box.innerHTML = '<span style="color:var(--text-mute)">No devices have activated a licence yet.</span>'; return; }
-    const rel = (iso) => { if (!iso) return '—'; const ms = Date.now() - new Date(iso).getTime(); const d = Math.floor(ms/86400000); if (d>0) return d+'d ago'; const h=Math.floor(ms/3600000); if(h>0) return h+'h ago'; const mi=Math.floor(ms/60000); return mi>0?mi+'m ago':'just now'; };
-    box.innerHTML = devices.map(d => {
-      const shortId = _e(String(d.device_id || '').replace(/^dev_/, '').slice(0, 12));
-      const revoked = !!d.revoked;
-      const statusChip = revoked ? '<span style="color:#dc2626;font-weight:700">Revoked</span>' : '<span style="color:#16A34A;font-weight:700">Active</span>';
-      const btn = revoked
-        ? `<button class="rs-dev-btn" data-act="restore_device" data-dev="${_e(d.device_id)}" style="background:none;border:1px solid var(--stroke);border-radius:7px;padding:5px 10px;font-size:11px;color:var(--text);cursor:pointer">Restore</button>`
-        : `<button class="rs-dev-btn" data-act="revoke_device" data-dev="${_e(d.device_id)}" style="background:none;border:1px solid rgba(239,68,68,.35);border-radius:7px;padding:5px 10px;font-size:11px;color:#dc2626;cursor:pointer">Revoke</button>`;
-      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--stroke)">
-        <div style="min-width:0">
-          <div style="font-weight:700;color:var(--text);font-family:monospace;font-size:12px">${shortId} · ${statusChip}</div>
-          <div style="font-size:11px;color:var(--text-mute)">${_e(d.last_plan || '—')} · last seen ${rel(d.last_lease_at)} · ${_e(String(d.lease_count || 0))} renewals</div>
-        </div>${btn}
-      </div>`;
-    }).join('');
-    box.querySelectorAll('.rs-dev-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const act = btn.getAttribute('data-act'); const dev = btn.getAttribute('data-dev');
-        btn.disabled = true;
-        try {
-          await RS_API.admin({ action: act, tenant_id: tenantId, device_id: dev, reason: 'Toggled from admin console' });
-          toast(act === 'revoke_device' ? 'Device revoked — it will lock within the offline window.' : 'Device restored.', 'fa-circle-check');
-          loadTenantDevices(tenantId);
-        } catch (e) { btn.disabled = false; toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
-      });
-    });
-  }
-
-  function openTenantManageModal(tenant) {
-    try {
-      const modal = document.getElementById('tenant-manage-modal');
-      if (!modal) return;
-
-      initTenantManageModalEvents();
-
-      const tenantIdEl = document.getElementById('manage-tenant-id');
-      const tenantNameEl = document.getElementById('manage-tenant-name');
-      const avatarEl = document.getElementById('manage-tenant-avatar');
-      const statusBadge = document.getElementById('manage-status-badge');
-      const usernameEl = document.getElementById('manage-username');
-      const passwordEl = document.getElementById('manage-password');
-      const statusEl = document.getElementById('manage-status');
-      const planCodeEl = document.getElementById('manage-plan-code');
-      const subscriptionStatusEl = document.getElementById('manage-subscription-status');
-      const phoneEl = document.getElementById('manage-phone');
-      const emailEl = document.getElementById('manage-email');
-
-      if (tenantIdEl) {
-        tenantIdEl.value = tenant.id || '';
-        tenantIdEl.setAttribute('data-slug', tenant.slug || '');
-      }
-
-      const displayName = (tenant.name || 'Unknown') + ` (${(tenant.outlet_type || 'CAFE').toUpperCase()})`;
-      if (tenantNameEl) tenantNameEl.textContent = displayName;
-      if (avatarEl) avatarEl.textContent = (tenant.name || 'U').charAt(0).toUpperCase();
-
-      if (statusBadge) {
-        const s = tenant.status || 'pending';
-        const badgeMap = {
-          approved: { dot: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', label: 'Active' },
-          active: { dot: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', label: 'Active' },
-          pending: { dot: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', color: '#B45309', label: 'Pending' },
-          suspended: { dot: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', color: '#DC2626', label: 'Suspended' }
-        };
-        const b = badgeMap[s] || badgeMap.pending;
-        statusBadge.style.background = b.bg;
-        statusBadge.style.borderColor = b.border;
-        statusBadge.style.color = b.color;
-        statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${_e(b.dot)};display:inline-block;"></span>${_e(b.label)}`;
-      }
-
-      if (usernameEl) usernameEl.value = tenant.username || '';
-      if (passwordEl) passwordEl.value = '';
-      if (statusEl) {
-        statusEl.value = tenant.status === 'approved' ? 'approved' : (tenant.status || 'pending');
-      }
-      if (phoneEl) phoneEl.value = tenant.phone || '';
-      if (emailEl) emailEl.value = tenant.email || '';
-      if (planCodeEl) planCodeEl.value = tenant.plan_code || 'starter';
-      if (subscriptionStatusEl) subscriptionStatusEl.value = tenant.subscription_status || 'active';
-      const periodEndEl = document.getElementById('manage-period-end');
-      if (periodEndEl) {
-        try { periodEndEl.value = tenant.subscription_current_period_end ? new Date(tenant.subscription_current_period_end).toISOString().slice(0,10) : ''; }
-        catch (e) { periodEndEl.value = ''; }
-      }
-      loadTenantDevices(tenant.id);
-      if (window.__rsDeviceTimer) clearInterval(window.__rsDeviceTimer);
-      window.__rsDeviceTimer = setInterval(function () {
-        const box = document.getElementById('manage-devices-box');
-        if (!box || box.offsetParent === null) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; return; }
-        loadTenantDevices(tenant.id);
-      }, 15000);
-      // Notes field — stored in localStorage keyed by tenant ID (no backend needed)
-      const notesEl = document.getElementById('manage-notes');
-      if (notesEl) {
-        try { notesEl.value = localStorage.getItem(`sa-note-${tenant.id}`) || ''; } catch(e) { notesEl.value = ''; }
-      }
-
-      const allowed = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs : [];
-      const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
-
-      checkboxes.forEach(cb => {
-        cb.checked = allowed.includes(cb.value);
-        const card = cb.closest('label');
-        if (card) {
-          if (cb.checked) {
-            card.style.borderColor = 'rgba(252,128,25,0.45)';
-            card.style.background = 'rgba(252,128,25,0.06)';
-          } else {
-            card.style.borderColor = 'var(--stroke)';
-            card.style.background = 'var(--panel)';
-          }
-        }
-      });
-
-      // Reset to Account tab
-      document.querySelectorAll('.tmtab').forEach((tb, i) => {
-        tb.style.color = i === 0 ? 'var(--orange)' : 'var(--text-mute)';
-        tb.style.borderBottomColor = i === 0 ? 'var(--orange)' : 'transparent';
-      });
-      document.querySelectorAll('.tm-panel').forEach((p, i) => {
-        p.style.display = i === 0 ? 'flex' : 'none';
-      });
-
-      // Wire copy-login button in modal header
-      const copyLoginBtn = document.getElementById('manage-copy-login-btn');
-      if (copyLoginBtn) {
-        const slug = (tenant.slug || tenant.username || '').toLowerCase().replace(/\s+/g, '-');
-        copyLoginBtn.onclick = () => {
-          const origin = location.origin + location.pathname.replace(/\/[^\/]*$/, '');
-          const url = `${origin}/login?tenant=${encodeURIComponent(slug)}`;
-          navigator.clipboard.writeText(url)
-            .then(() => toast('Login URL copied!', 'fa-link'))
-            .catch(() => prompt('Copy tenant login URL:', url));
-        };
-      }
-
-      const openDashboardBtn = document.getElementById('manage-open-dashboard-btn');
-      if (openDashboardBtn) {
-        const canOpen = !['pending', 'suspended'].includes(String(tenant.status || '').toLowerCase());
-        openDashboardBtn.disabled = !canOpen;
-        openDashboardBtn.title = canOpen ? 'Open this workspace dashboard' : 'Only active workspaces can be opened';
-        openDashboardBtn.onclick = () => openTenantDashboard(tenant, openDashboardBtn);
-      }
-
-      modal.classList.add('active');
-    } catch (err) {
-      console.error(err);
-      toast('Failed to render management controls.', 'fa-circle-exclamation');
-    }
-  }
-
-  function closeTenantModal() {
-    const modal = document.getElementById('tenant-manage-modal');
-    if (modal) modal.classList.remove('active');
-    if (window.__rsDeviceTimer) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; }
-  }
-
-  // ── Super-Admin Settings Modal ──────────────────────────────────────────
-  function openSuperAdminSettingsModal() {
-    let m = document.getElementById('sa-settings-modal');
-    if (!m) {
-      m = document.createElement('div');
-      m.id = 'sa-settings-modal';
-      m.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px)';
-      const sess = window.RS_API ? RS_API.session() : null;
-      const uname = (sess && sess.username) || 'codearc-superadmin';
-      const tenantId = (sess && sess.tenant_id) || '';
-      m.innerHTML = `
-        <div style="background:var(--panel);border:1px solid var(--stroke);border-radius:16px;padding:28px 32px;width:min(480px,90vw);box-shadow:0 20px 60px rgba(0,0,0,0.35)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-            <h3 style="font-size:16px;margin:0;display:flex;align-items:center;gap:8px"><i class="fa-solid fa-shield-halved" style="color:var(--orange)"></i> Super-Admin Settings</h3>
-            <button id="close-sa-settings" style="background:none;border:none;cursor:pointer;color:var(--text-mute);font-size:18px;padding:4px"><i class="fa-solid fa-xmark"></i></button>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:16px">
-            <div style="background:rgba(252,128,25,0.06);border:1px solid rgba(252,128,25,0.15);border-radius:10px;padding:14px 16px">
-              <div style="font-size:12px;color:var(--text-mute);margin-bottom:4px">Logged in as</div>
-              <div style="font-weight:600;font-size:15px">${_e(uname)}</div>
-              <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Role: SaaS Super-Admin · Tenant ID: ${_e(tenantId || 'root')}</div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:10px">
-              <div style="font-size:12px;font-weight:600;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Platform</div>
-              <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px">
-                <span><i class="fa-solid fa-moon" style="width:16px;margin-right:6px;color:var(--text-mute)"></i>Dark mode</span>
-                <button id="sa-theme-toggle" class="btn btn-ghost btn-sm" style="min-width:80px">
-                  ${document.documentElement.classList.contains('dark') ? '<i class="fa-solid fa-sun"></i> Light' : '<i class="fa-solid fa-moon"></i> Dark'}
-                </button>
-              </label>
-              <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px">
-                <span><i class="fa-solid fa-sidebar" style="width:16px;margin-right:6px;color:var(--text-mute)"></i>Collapse sidebar</span>
-                <button id="sa-sidebar-toggle" class="btn btn-ghost btn-sm"><i class="fa-solid fa-arrow-left-to-line"></i> Toggle</button>
-              </label>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:10px">
-              <div style="font-size:12px;font-weight:600;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Data</div>
-              <label style="display:flex;align-items:center;justify-content:space-between;font-size:14px">
-                <span><i class="fa-solid fa-download" style="width:16px;margin-right:6px;color:var(--text-mute)"></i>Export all tenants</span>
-                <button id="sa-export-btn" class="btn btn-ghost btn-sm"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
-              </label>
-            </div>
-            <div style="border-top:1px solid var(--stroke);padding-top:14px;display:flex;gap:10px;justify-content:flex-end">
-              <button id="sa-settings-logout" class="btn btn-danger btn-sm"><i class="fa-solid fa-right-from-bracket"></i> Sign out</button>
-            </div>
-          </div>
-        </div>`;
-      document.body.appendChild(m);
-      document.getElementById('close-sa-settings').onclick = () => m.remove();
-      m.addEventListener('click', e => { if (e.target === m) m.remove(); });
-      const themeBtn = document.getElementById('sa-theme-toggle');
-      if (themeBtn) themeBtn.onclick = () => {
-        const tt = document.getElementById('theme-toggle');
-        if (tt) tt.click();
-        m.remove();
-      };
-      const sbBtn = document.getElementById('sa-sidebar-toggle');
-      if (sbBtn) sbBtn.onclick = () => {
-        const sb = document.getElementById('sb-collapse');
-        if (sb) sb.click();
-        m.remove();
-      };
-      const expBtn = document.getElementById('sa-export-btn');
-      if (expBtn) expBtn.onclick = () => {
-        m.remove();
-        const exportBtn2 = document.getElementById('btn-export-tenants');
-        if (exportBtn2) exportBtn2.click();
-      };
-      const logoutBtn = document.getElementById('sa-settings-logout');
-      if (logoutBtn) logoutBtn.onclick = () => {
-        m.remove();
-        if (window.RS_API) RS_API.logout();
-        location.href = 'login';
-      };
-    } else {
-      m.remove();
-    }
-  }
-
-  // ── Super-Admin Delete Confirmation Modal ───────────────────────────────
-  function confirmDangerAction(title, body, onConfirm) {
-    const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;z-index:11000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px)';
-    m.innerHTML = `
-      <div style="background:var(--panel);border:1px solid rgba(239,68,68,0.4);border-radius:14px;padding:24px 28px;width:min(420px,90vw);box-shadow:0 20px 60px rgba(0,0,0,0.4)">
-        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px">
-          <div style="flex-shrink:0;width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:18px"><i class="fa-solid fa-triangle-exclamation"></i></div>
-          <div><div style="font-weight:700;font-size:15px;margin-bottom:4px">${title}</div><div style="font-size:13px;color:var(--text-mute);line-height:1.5">${body}</div></div>
-        </div>
-        <div style="display:flex;gap:10px;justify-content:flex-end">
-          <button class="btn btn-ghost btn-sm" id="danger-cancel">Cancel</button>
-          <button class="btn btn-danger btn-sm" id="danger-confirm"><i class="fa-solid fa-trash-can"></i> Yes, proceed</button>
-        </div>
-      </div>`;
-    document.body.appendChild(m);
-    document.getElementById('danger-cancel').onclick = () => m.remove();
-    document.getElementById('danger-confirm').onclick = () => { m.remove(); onConfirm(); };
-    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
-  }
-
-  function initTenantManageModalEvents() {
-    const closeBtn = document.getElementById('close-tenant-modal');
-    const closeBtn2 = document.getElementById('close-tenant-modal-btn');
-    if (closeBtn && !closeBtn.dataset.listenerBound) {
-      closeBtn.dataset.listenerBound = 'true';
-      closeBtn.addEventListener('click', closeTenantModal);
-    }
-    if (closeBtn2 && !closeBtn2.dataset.listenerBound) {
-      closeBtn2.dataset.listenerBound = 'true';
-      closeBtn2.addEventListener('click', closeTenantModal);
-    }
-
-    // Bind checkboxes parent highlight
-    const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
-    checkboxes.forEach(cb => {
-      if (!cb.dataset.listenerBound) {
-        cb.dataset.listenerBound = 'true';
-        cb.addEventListener('change', () => {
-          const card = cb.closest('label');
-          if (card) {
-            card.style.borderColor = cb.checked ? 'rgba(252,128,25,0.45)' : 'var(--stroke)';
-            card.style.background = cb.checked ? 'rgba(252,128,25,0.06)' : 'var(--panel)';
-          }
-        });
-      }
-    });
-
-    const saveTenantBtn = document.getElementById('save-tenant-settings-btn');
-    if (saveTenantBtn && !saveTenantBtn.dataset.listenerBound) {
-      saveTenantBtn.dataset.listenerBound = 'true';
-      saveTenantBtn.addEventListener('click', async () => {
-        try {
-          const tenantIdEl = document.getElementById('manage-tenant-id');
-          const tenantId = tenantIdEl.value;
-          const username = document.getElementById('manage-username').value.trim();
-          const password = document.getElementById('manage-password').value.trim();
-          const status = document.getElementById('manage-status').value;
-          const phone = document.getElementById('manage-phone').value.trim();
-          const email = document.getElementById('manage-email').value.trim();
-          const plan_code = document.getElementById('manage-plan-code').value;
-          const subscription_status = document.getElementById('manage-subscription-status').value;
-          const periodEndRaw = (document.getElementById('manage-period-end') || {}).value || '';
-
-          const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-
-          const updates = {
-            tenant_id: tenantId,
-            username,
-            status,
-            plan_code,
-            subscription_status,
-            allowed_tabs,
-            phone,
-            email
-          };
-          updates.subscription_current_period_end = periodEndRaw ? new Date(periodEndRaw + 'T23:59:59Z').toISOString() : '';
-
-          if (password !== '') updates.password = password;
-
-          // Save notes locally
-          const notesVal = (document.getElementById('manage-notes') || {}).value || '';
-          try { localStorage.setItem(`sa-note-${tenantId}`, notesVal); } catch(e) {}
-
-          await RS_API.admin({ action: 'update_tenant', ...updates });
-          // Update cache so table reflects status/plan change immediately
-          const idx = _cachedTenants.findIndex(t => String(t.id) === String(tenantId));
-          if (idx !== -1) Object.assign(_cachedTenants[idx], { username, status, plan_code, subscription_status, phone, email, allowed_tabs });
-          closeTenantModal();
-          renderPlatformSummary(_cachedTenants);
-          renderTenantTable();
-          toast("Client configurations saved successfully!");
-        } catch (err) {
-          console.error(err);
-          toast("Error saving settings: " + err.message, "fa-circle-exclamation");
-        }
-      });
-    }
-
-    const deleteTenantBtn = document.getElementById('delete-tenant-btn');
-    if (deleteTenantBtn && !deleteTenantBtn.dataset.listenerBound) {
-      deleteTenantBtn.dataset.listenerBound = 'true';
-      deleteTenantBtn.addEventListener('click', () => {
-        const tenantId = document.getElementById('manage-tenant-id').value;
-        const tenantName = document.getElementById('manage-tenant-name').textContent;
-        confirmDangerAction(
-          'Delete workspace permanently?',
-          `This will <strong>permanently erase</strong> the account and all data for <strong>${_e(tenantName)}</strong>. This cannot be undone.`,
-          async () => {
-            try {
-              await RS_API.admin({ action: 'delete_tenant', tenant_id: tenantId });
-              closeTenantModal();
-              _cachedTenants = _cachedTenants.filter(t => String(t.id) !== String(tenantId));
-              renderPlatformSummary(_cachedTenants);
-              renderTenantTable();
-              toast('Client account permanently deleted.', 'fa-circle-check');
-            } catch (err) {
-              console.error(err);
-              toast('Error deleting client: ' + err.message, 'fa-circle-exclamation');
-            }
-          }
-        );
-      });
-    }
-
-    const resetTenantDataBtn = document.getElementById('reset-tenant-data-btn');
-    if (resetTenantDataBtn && !resetTenantDataBtn.dataset.listenerBound) {
-      resetTenantDataBtn.dataset.listenerBound = 'true';
-      resetTenantDataBtn.addEventListener('click', () => {
-        const tenantId = document.getElementById('manage-tenant-id').value;
-        const tenantName = document.getElementById('manage-tenant-name').textContent;
-        confirmDangerAction(
-          'Reset all operations data?',
-          `This will <strong>permanently delete</strong> all bills, menus, inventory, staff, CRM and recipes for <strong>${_e(tenantName)}</strong>. Account credentials and settings will be kept.`,
-          async () => {
-            resetTenantDataBtn.disabled = true;
-            resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-            try {
-              await RS_API.admin({ action: 'reset_tenant_data', tenant_id: tenantId });
-              closeTenantModal();
-              toast('Workspace reset to factory fresh!', 'fa-rotate-right');
-              await renderSuper();
-            } catch (err) {
-              console.error(err);
-              toast('System error resetting data: ' + err.message, 'fa-circle-exclamation');
-            } finally {
-              resetTenantDataBtn.disabled = false;
-              resetTenantDataBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left" style="font-size: 10px;"></i> Reset data';
-            }
-          }
-        );
-      });
-    }
-
-    const seedTenantDataBtn = document.getElementById('seed-tenant-data-btn');
-    if (seedTenantDataBtn && !seedTenantDataBtn.dataset.listenerBound) {
-      seedTenantDataBtn.dataset.listenerBound = 'true';
-      seedTenantDataBtn.addEventListener('click', () => {
-        const tenantId = document.getElementById('manage-tenant-id').value;
-        const tenantName = document.getElementById('manage-tenant-name').textContent;
-        confirmDangerAction(
-          'Load demo data into this workspace?',
-          `This will populate <strong>${_e(tenantName)}</strong>'s workspace with a realistic set of menu, inventory, recipes, staff and bill history. Existing operational data will be reset.`,
-          async () => {
-            seedTenantDataBtn.disabled = true;
-            seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
-            try {
-              await RS_API.admin({ action: 'seed_tenant_data', tenant_id: tenantId });
-              closeTenantModal();
-              toast('Demo records loaded successfully!', 'fa-seedling');
-              await renderSuper();
-            } catch (err) {
-              console.error(err);
-              toast('Error loading demo data: ' + err.message, 'fa-circle-exclamation');
-            } finally {
-              seedTenantDataBtn.disabled = false;
-              seedTenantDataBtn.innerHTML = '<i class="fa-solid fa-seedling" style="font-size: 10px;"></i> Load Demo Data';
-            }
-          }
-        );
-      });
-    }
-
-    const purgeTenantDataBtn = document.getElementById('purge-tenant-data-btn');
-    if (purgeTenantDataBtn && !purgeTenantDataBtn.dataset.listenerBound) {
-      purgeTenantDataBtn.dataset.listenerBound = 'true';
-      purgeTenantDataBtn.addEventListener('click', () => {
-        const tenantId = document.getElementById('manage-tenant-id').value;
-        const tenantName = document.getElementById('manage-tenant-name').textContent;
-        confirmDangerAction(
-          'Remove demo data?',
-          `This will safely delete <em>only</em> the demo data records from <strong>${_e(tenantName)}</strong>'s workspace. Client-added data will remain intact.`,
-          async () => {
-            purgeTenantDataBtn.disabled = true;
-            purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging...';
-            try {
-              await RS_API.admin({ action: 'purge_demo_data', tenant_id: tenantId });
-              closeTenantModal();
-              toast('Demo records removed successfully!', 'fa-trash-can');
-              await renderSuper();
-            } catch (err) {
-              console.error(err);
-              toast('Error purging demo data: ' + err.message, 'fa-circle-exclamation');
-            } finally {
-              purgeTenantDataBtn.disabled = false;
-              purgeTenantDataBtn.innerHTML = '<i class="fa-solid fa-trash-can" style="font-size: 10px;"></i> Remove Demo Data';
-            }
-          }
-        );
-      });
-    }
-
-    // ── Tab switching ──────────────────────────────────────────
-    document.querySelectorAll('.tmtab').forEach(tab => {
-      if (!tab.dataset.listenerBound) {
-        tab.dataset.listenerBound = 'true';
-        tab.addEventListener('click', () => {
-          const target = tab.getAttribute('data-tmtab');
-          document.querySelectorAll('.tmtab').forEach(t => {
-            const active = t.getAttribute('data-tmtab') === target;
-            t.style.color = active ? 'var(--orange)' : 'var(--text-mute)';
-            t.style.borderBottomColor = active ? 'var(--orange)' : 'transparent';
-          });
-          document.querySelectorAll('.tm-panel').forEach(p => {
-            p.style.display = p.id === `tm-panel-${target}` ? 'flex' : 'none';
-          });
-        });
-      }
-    });
-
-    // ── Select All / Clear All (Features tab) ─────────────────
-    const selAll = document.getElementById('manage-select-all-tabs');
-    const clrAll = document.getElementById('manage-deselect-all-tabs');
-    if (selAll && !selAll.dataset.listenerBound) {
-      selAll.dataset.listenerBound = 'true';
-      selAll.addEventListener('click', () => {
-        document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]').forEach(cb => {
-          cb.checked = true;
-          const card = cb.closest('label');
-          if (card) { card.style.borderColor = 'rgba(252,128,25,0.45)'; card.style.background = 'rgba(252,128,25,0.06)'; }
-        });
-      });
-    }
-    if (clrAll && !clrAll.dataset.listenerBound) {
-      clrAll.dataset.listenerBound = 'true';
-      clrAll.addEventListener('click', () => {
-        document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]').forEach(cb => {
-          cb.checked = false;
-          const card = cb.closest('label');
-          if (card) { card.style.borderColor = 'var(--stroke)'; card.style.background = 'var(--panel)'; }
-        });
-      });
-    }
-
-    // ── Save Features button ───────────────────────────────────
-    const saveFeaturesBtn = document.getElementById('save-tenant-features-btn');
-    if (saveFeaturesBtn && !saveFeaturesBtn.dataset.listenerBound) {
-      saveFeaturesBtn.dataset.listenerBound = 'true';
-      saveFeaturesBtn.addEventListener('click', async () => {
-        try {
-          const tenantId = document.getElementById('manage-tenant-id').value;
-          const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
-          const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-          const t = _cachedTenants.find(x => String(x.id) === String(tenantId));
-          if (!t) return;
-          saveFeaturesBtn.disabled = true; saveFeaturesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
-          await RS_API.admin({ action: 'update_tenant', tenant_id: tenantId,
-            username: t.username, status: t.status, plan_code: t.plan_code || 'starter',
-            subscription_status: t.subscription_status || 'active',
-            allowed_tabs, phone: t.phone || '', email: t.email || '' });
-          if (t) t.allowed_tabs = allowed_tabs;
-          toast('Feature access updated!', 'fa-toggle-on');
-          closeTenantModal();
-          renderTenantTable();
-        } catch (err) {
-          toast('Error saving features: ' + err.message, 'fa-circle-exclamation');
-        } finally {
-          saveFeaturesBtn.disabled = false;
-          saveFeaturesBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>Save features';
-        }
-      });
-    }
-  }
-
   /* ============================================================
-     GATEWAY MONITOR & INCIDENTS CONSOLE
+     GATEWAY MONITOR — Wave 8: assets/modules/gateway-monitor.js
      ============================================================ */
   async function pollSuperAdminGateway() {
-    const isZeroCost = RS_API.zeroCostLaunchMode;
-    const gatewayUrl = isZeroCost ? '' : 'https://kalpeshdeora1006-restrosuite-gateway.hf.space';
-
-    const statusBadge = document.getElementById('saas-gateway-status');
-    const phoneEl = document.getElementById('saas-gateway-phone');
-    const sessionEl = document.getElementById('saas-gateway-session-saved');
-    const qrContainer = document.getElementById('saas-gateway-qr-container');
-    const qrSpinner = document.getElementById('saas-gateway-qr-spinner');
-    const qrImg = document.getElementById('saas-gateway-qr-img');
-    const connectedView = document.getElementById('saas-gateway-connected-view');
-    const logsContainer = document.getElementById('saas-notification-logs-container');
-
-    if (isZeroCost || !gatewayUrl) {
-      if (statusBadge) {
-        statusBadge.textContent = 'ZERO-COST MODE';
-        statusBadge.className = 'pill';
-        statusBadge.style.background = 'rgba(107, 114, 128, 0.1)';
-        statusBadge.style.color = '#6B7280';
-      }
-      if (phoneEl) phoneEl.textContent = 'Disabled';
-      if (sessionEl) sessionEl.textContent = 'Upgrade add-on';
-      if (connectedView) connectedView.style.display = 'none';
-      if (qrContainer) qrContainer.style.display = 'flex';
-      if (qrSpinner) {
-        qrSpinner.innerHTML = `<i class="fa-solid fa-circle-info" style="margin-bottom: 6px; font-size: 16px; color: #6B7280;"></i><br>Gateway disabled for zero-cost launch<br><span style="font-size: 10px; color: #9CA3AF; margin-top: 4px; display: block;">Manual WhatsApp sharing remains available.</span>`;
-        qrSpinner.style.display = 'block';
-      }
-      if (logsContainer) {
-        logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #6B7280;">Gateway logs are disabled in zero-cost launch mode.</div>';
-      }
-      return;
-    }
-
-    // 1. Fetch Gateway Status
-    try {
-      const data = await RS_API.admin({ action: 'gateway_status' });
-      if (data && !data.error) {
-        if (statusBadge) {
-          statusBadge.textContent = data.status ? data.status.toUpperCase() : 'UNKNOWN';
-          if (data.status === 'ready') {
-            statusBadge.className = 'pill pill-green';
-            statusBadge.style.background = '';
-            statusBadge.style.color = '';
-            if (qrContainer) qrContainer.style.display = 'none';
-            if (connectedView) connectedView.style.display = 'flex';
-          } else if (data.status === 'qr') {
-            statusBadge.className = 'pill pill-amber';
-            statusBadge.style.background = '';
-            statusBadge.style.color = '';
-            if (connectedView) connectedView.style.display = 'none';
-            if (qrContainer) qrContainer.style.display = 'flex';
-            if (data.qr) {
-              if (qrSpinner) qrSpinner.style.display = 'none';
-              if (qrImg) {
-                qrImg.src = data.qr;
-                qrImg.style.display = 'block';
-              }
-            } else {
-              if (qrSpinner) qrSpinner.style.display = 'block';
-              if (qrImg) qrImg.style.display = 'none';
-            }
-          } else {
-            statusBadge.className = 'pill pill-red';
-            statusBadge.style.background = '';
-            statusBadge.style.color = '';
-            if (connectedView) connectedView.style.display = 'none';
-            if (qrContainer) qrContainer.style.display = 'flex';
-            if (qrSpinner) {
-              qrSpinner.style.display = 'block';
-              qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
-            }
-            if (qrImg) qrImg.style.display = 'none';
-          }
-        }
-        if (phoneEl) phoneEl.textContent = data.number ? `+${data.number}` : 'Not Linked';
-        if (sessionEl) {
-          if (data.sessionSavedAt) {
-            sessionEl.textContent = new Date(data.sessionSavedAt).toLocaleString('en-IN');
-          } else {
-            sessionEl.textContent = 'Never';
-          }
-        }
-      } else {
-        throw new Error(data?.error || 'Failed to fetch status');
-      }
-    } catch(err) {
-      if (statusBadge) {
-        statusBadge.textContent = 'OFFLINE';
-        statusBadge.className = 'pill pill-red';
-      }
-      if (phoneEl) phoneEl.textContent = 'Unknown';
-      if (sessionEl) sessionEl.textContent = 'Unknown';
-      if (connectedView) connectedView.style.display = 'none';
-      if (qrContainer) qrContainer.style.display = 'flex';
-      if (qrSpinner) {
-        qrSpinner.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="margin-bottom: 6px; font-size: 16px; color: #EF4444;"></i><br>Gateway Server Offline<br><span style="font-size: 10px; color: #9CA3AF; margin-top: 4px; display: block;">Check cloud space status</span>`;
-        qrSpinner.style.display = 'block';
-      }
-      if (qrImg) qrImg.style.display = 'none';
-    }
-
-    // 2. Fetch Gateway Debug-Logs
-    try {
-      const data = await RS_API.admin({ action: 'gateway_logs' });
-      if (data && !data.error) {
-        const logs = (data.logs || []).slice(0, 15);
-        if (logsContainer) {
-          if (logs.length === 0) {
-            logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent dispatch logs found.</div>';
-          } else {
-            logsContainer.innerHTML = logs.map(log => {
-              const logDate = log.created_at ? new Date(log.created_at) : new Date();
-              const timeStr = logDate.toTimeString().slice(0, 8);
-              const cls = log.status === 'ok' ? 'ti' : (log.status === 'warning' ? 'tw' : 'te');
-              return `<div class="tl"><span class="tt">${timeStr}</span><span class="${cls}">[${log.event.toUpperCase()}] ${escHtml(log.details?.message || log.details?.error || 'System event')}</span></div>`;
-            }).join('');
-            logsContainer.scrollTop = 0;
-          }
-        }
-      } else {
-        throw new Error(data?.error || 'Failed to fetch logs');
-      }
-    } catch(err) {
-      if (logsContainer) {
-        const msg = escHtml(err.message || 'Gateway request failed');
-        logsContainer.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--red);"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>Could not load gateway logs: ${msg}</div>`;
-      }
+    if (window.RSGatewayMonitor && RSGatewayMonitor.pollSuperAdminGateway) {
+      return RSGatewayMonitor.pollSuperAdminGateway();
     }
   }
-
   function startSaaSGatewayPolling() {
-    if (saasGatewayPollingInterval) clearInterval(saasGatewayPollingInterval);
-    pollSuperAdminGateway();
-    saasGatewayPollingInterval = setInterval(pollSuperAdminGateway, 5000);
+    if (window.RSGatewayMonitor && RSGatewayMonitor.startSaaSGatewayPolling) {
+      return RSGatewayMonitor.startSaaSGatewayPolling();
+    }
   }
-
   function stopSaaSGatewayPolling() {
-    if (saasGatewayPollingInterval) {
-      clearInterval(saasGatewayPollingInterval);
-      saasGatewayPollingInterval = null;
+    if (window.RSGatewayMonitor && RSGatewayMonitor.stopSaaSGatewayPolling) {
+      return RSGatewayMonitor.stopSaaSGatewayPolling();
     }
   }
-
   async function loadAppIncidents() {
-    const list = document.getElementById('app-incidents-list');
-    const filter = document.getElementById('app-incidents-status-filter');
-    if (!list) return;
-    list.innerHTML = renderIncidentEmpty('Loading incidents', 'Checking the latest platform error reports.', 'fa-spinner fa-spin');
-    try {
-      const status = filter ? filter.value : 'open';
-      const result = await RS_API.admin({ action: 'list_error_reports', status: status === 'all' ? null : status });
-      const reports = Array.isArray(result.reports) ? result.reports : [];
-      if (!reports.length) {
-        list.innerHTML = renderIncidentEmpty('No incidents found', 'This status queue is currently clear.');
-        return;
-      }
-      list.innerHTML = reports.map((report) => {
-        const severity = String(report.severity || 'error');
-        const statusLabel = String(report.status || 'open');
-        const stack = report.stack_trace ? `<code>${escHtml(report.stack_trace)}</code>` : '';
-        const resolveButton = statusLabel === 'open'
-          ? `<button type="button" class="staff-secondary-btn app-incident-resolve-btn" data-report-id="${escHtml(report.id)}">Resolve</button>`
-          : '';
-        return `
-          <article class="app-incident-card">
-            <div style="flex: 1; min-width: 0;">
-              <strong>${escHtml(report.error_message || 'Unknown application error')}</strong>
-              <span>${escHtml(report.tenant_slug || 'unknown workspace')} · ${escHtml(report.source || 'dashboard')} · ${escHtml(report.url_path || 'unknown path')}</span>
-              ${stack}
-              <div class="app-incident-meta">
-                <span class="app-incident-pill ${escHtml(severity)}">${escHtml(severity)}</span>
-                <span class="app-incident-pill">${escHtml(statusLabel)}</span>
-                <span class="app-incident-pill">${escHtml(report.app_version || 'v?')}</span>
-              </div>
-            </div>
-            <div class="app-incident-actions">
-              <time>${escHtml(formatIncidentTime(report.created_at))}</time>
-              ${resolveButton}
-            </div>
-          </article>
-        `;
-      }).join('');
-    } catch (error) {
-      list.innerHTML = renderIncidentEmpty('Incidents unavailable', error.message || 'Try refreshing this panel.', 'fa-triangle-exclamation');
+    if (window.RSGatewayMonitor && RSGatewayMonitor.loadAppIncidents) {
+      return RSGatewayMonitor.loadAppIncidents();
     }
   }
-
   const renderGateway = () => {
-    // Basic init of gateway monitor handlers
-    const resetBtn = document.getElementById('btn-saas-gateway-reset');
-    if (resetBtn && !resetBtn.dataset.listenerBound) {
-      resetBtn.dataset.listenerBound = 'true';
-      resetBtn.addEventListener('click', async () => {
-        if (confirm("Are you absolutely sure you want to RESET the WhatsApp Gateway?\n\nThis will completely purge the WhatsApp session files from the gateway storage. You will need to scan a new QR code to re-link your device!")) {
-          try {
-            resetBtn.disabled = true;
-            resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-
-            if (RS_API.zeroCostLaunchMode) {
-              alert("Gateway automation is disabled in zero-cost launch mode.");
-              return;
-            }
-
-            const data = await RS_API.admin({ action: 'gateway_reset' });
-
-            if (data && !data.error) {
-              toast("WhatsApp Gateway reset successfully. Scan QR code to re-authenticate.");
-              await pollSuperAdminGateway();
-            } else {
-              alert("Failed to reset gateway: " + (data?.error || data?.message || 'Unknown error'));
-            }
-          } catch (err) {
-            console.error(err);
-            alert("Error communicating with gateway: " + err.message);
-          } finally {
-            resetBtn.disabled = false;
-            resetBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Reset Gateway Connection';
-          }
-        }
-      });
+    if (window.RSGatewayMonitor && RSGatewayMonitor.renderGateway) {
+      return RSGatewayMonitor.renderGateway();
     }
-
-    const refreshLogsBtn = document.getElementById('btn-refresh-saas-logs');
-    if (refreshLogsBtn && !refreshLogsBtn.dataset.listenerBound) {
-      refreshLogsBtn.dataset.listenerBound = 'true';
-      refreshLogsBtn.addEventListener('click', async () => {
-        const icon = refreshLogsBtn.querySelector('i');
-        if (icon) icon.classList.add('fa-spin');
-        await pollSuperAdminGateway();
-        if (icon) {
-          setTimeout(() => {
-            icon.classList.remove('fa-spin');
-          }, 600);
-        }
-      });
-    }
-
-    const refreshIncidentsBtn = document.getElementById('btn-refresh-app-incidents');
-    if (refreshIncidentsBtn && !refreshIncidentsBtn.dataset.listenerBound) {
-      refreshIncidentsBtn.dataset.listenerBound = 'true';
-      refreshIncidentsBtn.addEventListener('click', loadAppIncidents);
-    }
-
-    const incidentFilter = document.getElementById('app-incidents-status-filter');
-    if (incidentFilter && !incidentFilter.dataset.listenerBound) {
-      incidentFilter.dataset.listenerBound = 'true';
-      incidentFilter.addEventListener('change', loadAppIncidents);
-    }
-
-    const incidentsList = document.getElementById('app-incidents-list');
-    if (incidentsList && !incidentsList.dataset.listenerBound) {
-      incidentsList.dataset.listenerBound = 'true';
-      incidentsList.addEventListener('click', async (event) => {
-        const target = event.target;
-        const button = target && typeof target.closest === 'function' ? target.closest('.app-incident-resolve-btn') : null;
-        if (!button) return;
-        button.disabled = true;
-        try {
-          await RS_API.admin({ action: 'resolve_error_report', report_id: Number(button.dataset.reportId) });
-          toast('Application incident resolved.');
-          await loadAppIncidents();
-        } catch (error) {
-          toast(error.message || 'Could not resolve incident.', 'fa-circle-exclamation');
-          button.disabled = false;
-        }
-      });
-    }
-
-    startSaaSGatewayPolling();
-    loadAppIncidents();
   };
 
   /* ---------- renderers map ---------- */
@@ -4876,21 +1416,26 @@
   const renderers = {
     'pos-tab':initPOS,'qr-orders-tab':renderQR,
     'bills-tab':()=>{
-      renderBills();
-      const search = $('#bills-search');
-      if (search && !search._rsListenerBound) {
-        search._rsListenerBound = true;
-        search.addEventListener('input', debounce(renderBillsFast, 60));
-      }
-      const payFil = $('#bills-pay-filter');
-      if (payFil && !payFil._rsListenerBound) {
-        payFil._rsListenerBound = true;
-        payFil.addEventListener('change', renderBills);
-      }
-      const statusFil = $('#bills-status-filter');
-      if (statusFil && !statusFil._rsListenerBound) {
-        statusFil._rsListenerBound = true;
-        statusFil.addEventListener('change', renderBills);
+      // Wave 6: filters + render live in RSBillsHistory
+      if (window.RSBillsHistory && RSBillsHistory.bindFilters) {
+        RSBillsHistory.bindFilters();
+      } else {
+        renderBills();
+        const search = $('#bills-search');
+        if (search && !search._rsListenerBound) {
+          search._rsListenerBound = true;
+          search.addEventListener('input', debounce(renderBillsFast, 60));
+        }
+        const payFil = $('#bills-pay-filter');
+        if (payFil && !payFil._rsListenerBound) {
+          payFil._rsListenerBound = true;
+          payFil.addEventListener('change', renderBills);
+        }
+        const statusFil = $('#bills-status-filter');
+        if (statusFil && !statusFil._rsListenerBound) {
+          statusFil._rsListenerBound = true;
+          statusFil.addEventListener('change', renderBills);
+        }
       }
     },
     'inventory-tab':renderInventory,'editor-tab':renderEditor,'reports-tab':renderReports,'kds-tab':renderKDS,
@@ -4903,10 +1448,10 @@
   function getModalRoot(){ if(!modalRoot){ modalRoot = document.getElementById('rs-modal-root') || (()=>{ const d=document.createElement('div'); d.id='rs-modal-root'; document.body.appendChild(d); return d; })(); } return modalRoot; }
   window.RS = {
     toast, activateTab, rs, initials, avatarColors, catColor,
-    nextBillNo, nextLogicalNo, formatDisplayOrderId, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
+    nextBillNo, allocateBillNo, newBillIdentity, nextLogicalNo, formatDisplayOrderId, fileDate, setOperationStatus, finishOperationStatus, runWithOperation, savePreUpdateSnapshot,
     MENU, CATS, stockLabel, stockCls,
-    getCart:()=>cart.map(c=>({...c})), getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
-    setCart:(items)=>{ cart = (items||[]).map(c=>({...c})); renderCart(); },
+    getCart:()=>{ if(window.RSPosUI&&RSPosUI.getCart) return RSPosUI.getCart(); return (cart||[]).map(c=>({...c})); }, getTotals, clearCart, getCustomer, addToCart, renderPOS, renderCart, renderEditor,
+    setCart:(items)=>{ if(window.RSPosUI&&RSPosUI.setCart) return RSPosUI.setCart(items); cart=(items||[]).map(c=>({...c})); renderCart(); },
     titles, addRenderer:(id,fn)=>{
       renderers[id]=fn;
       const active = document.querySelector('.tab-content.active')?.id;
@@ -4918,92 +1463,19 @@
     }, render:(id)=>{ if(renderers[id]){ renderers[id](); rendered[id]=true; } },
     getModalRoot,
     seedToken:()=> nextLogicalNo('KOT'),
-    BILLS, INVENTORY, EMPLOYEES, QR_ORDERS,
+    BILLS, INVENTORY, EMPLOYEES, QR_ORDERS, KDS,
 
-    // -- Inventory deduction/restoration helpers -------------------------------
-    // Called after bill is generated. Deducts recipe ingredients from stock.
-    deductInventoryForBill(billRow) {
-      const items = billRow._items || [];
-      if (!items.length) return;
-      let changed = false;
-      let deductedCount = 0;   // ingredient lines deducted
-      let noRecipeCount = 0;   // sold items with no recipe linked
-      const lowStock = [];     // ingredients that fell below their min level
-      const missingIngredients = [];
-      items.forEach(it => {
-        const menuItem = MENU.find(m => m.name === it.name);
-        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) { noRecipeCount++; return; }
-        const orderedQty = Number(it.qty) || 1;
-        menuItem.ingredients.forEach(ing => {
-          const invItem = INVENTORY.find(x => x.name === ing.name);
-          if (!invItem) {
-            if (ing.name && missingIngredients.indexOf(ing.name) === -1) missingIngredients.push(ing.name);
-            return;
-          }
-          invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(ing.qty) || 0) * orderedQty);
-          changed = true;
-          deductedCount++;
-          const minLevel = Number(invItem.min != null ? invItem.min : (invItem.minStock || 0));
-          if (minLevel && invItem.stock <= minLevel && lowStock.indexOf(invItem.name) === -1) lowStock.push(invItem.name);
-        });
-      });
-      if (changed) {
-        // Persist locally AND push to cloud so stock levels survive/sync.
-        // Local write is effectively instant, so the "stock updated" toast reflects that.
-        // Cloud sync is intentionally non-blocking here (keeps checkout fast) but its
-        // outcome is no longer swallowed silently -- a failure surfaces its own toast.
-        if (window.RS_DB && RS_DB.writeLocal) { try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {} }
-        try {
-          if (RS.save) {
-            const saveResult = RS.save('inventory');
-            if (saveResult && typeof saveResult.catch === 'function') {
-              saveResult.catch(err => {
-                console.warn('Inventory cloud sync failed', err);
-                toast('Inventory saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
-              });
-            }
-          }
-        } catch (e) { console.warn('Inventory save failed', e); }
-        const rendered = document.querySelector('#inventory-tab.active');
-        if (rendered && window.RS && RS.render) RS.render('inventory-tab');
-        // Make the deduction visible instead of silent
-        toast(`Stock updated: ${deductedCount} ingredient${deductedCount === 1 ? '' : 's'} deducted from inventory`, 'fa-boxes-stacked');
-        if (noRecipeCount) {
-          setTimeout(() => toast(`${noRecipeCount} sold item${noRecipeCount === 1 ? '' : 's'} skipped: no recipe linked`, 'fa-triangle-exclamation'), 1400);
-        }
-        if (missingIngredients.length) {
-          setTimeout(() => toast(`Recipe ingredient not in stock: ${missingIngredients.slice(0, 3).join(', ')}${missingIngredients.length > 3 ? '...' : ''}`, 'fa-triangle-exclamation'), noRecipeCount ? 2600 : 1400);
-        }
-        if (lowStock.length) {
-          setTimeout(() => toast(`Low stock: ${lowStock.slice(0, 3).join(', ')}${lowStock.length > 3 ? '...' : ''}`, 'fa-triangle-exclamation'), missingIngredients.length || noRecipeCount ? 3800 : 2600);
-        }
-      } else if (noRecipeCount === items.length) {
-        toast('No stock deducted: link recipes under Inventory > Recipes', 'fa-triangle-exclamation');
-      } else if (missingIngredients.length) {
-        toast(`No stock deducted: missing inventory item ${missingIngredients.slice(0, 2).join(', ')}`, 'fa-triangle-exclamation');
+    // Wave 5 remaining: inventory ledger lives in assets/modules/inventory-ledger.js
+    // Thin delegates keep call sites stable; module overrides after attach.
+    async deductInventoryForBill(billRow) {
+      if (window.RSInventoryLedger && RSInventoryLedger.deductInventoryForBill) {
+        return RSInventoryLedger.deductInventoryForBill(billRow);
       }
+      console.warn('[Inventory] ledger module not loaded');
     },
-
-    // Called ONLY when deleting a bill (not on refund). Adds stock back.
     restoreInventoryForBill(billRow) {
-      const items = billRow._items || [];
-      if (!items.length) return;
-      let changed = false;
-      items.forEach(it => {
-        const menuItem = MENU.find(m => m.name === it.name);
-        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
-        const orderedQty = Number(it.qty) || 1;
-        menuItem.ingredients.forEach(ing => {
-          const invItem = INVENTORY.find(x => x.name === ing.name);
-          if (!invItem) return;
-          invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
-          changed = true;
-        });
-      });
-      if (changed) {
-        if (window.RS_DB && RS_DB.writeLocal) { try { const _w = RS_DB.writeLocal('inventory', INVENTORY); if (_w && _w.catch) _w.catch(() => {}); } catch (e) {} }
-        const rendered = document.querySelector('#inventory-tab.active');
-        if (rendered && window.RS && RS.render) RS.render('inventory-tab');
+      if (window.RSInventoryLedger && RSInventoryLedger.restoreInventoryForBill) {
+        return RSInventoryLedger.restoreInventoryForBill(billRow);
       }
     },
 
@@ -5283,8 +1755,13 @@
       }
       
       if (cartToRestore && Array.isArray(cartToRestore) && cartToRestore.length > 0) {
-        cart = cartToRestore;
-        discountPct = discToRestore;
+        if (window.RSPosUI && RSPosUI.setCart) {
+          RSPosUI.setCart(cartToRestore);
+          if (RSPosUI.setDiscountPct) RSPosUI.setDiscountPct(discToRestore);
+        } else {
+          cart = cartToRestore;
+          discountPct = discToRestore;
+        }
         
         if (custToRestore) {
           const cn = document.getElementById('cust-input-name') || document.getElementById('cust-name');
@@ -5395,6 +1872,9 @@
     inventory: 'Inventory Manager',
   };
 
+  /** Role-first home tab — reduces cognitive load for staff logins */
+  const ROLE_HOME_TAB = ROLE_HOME_TAB_EARLY;
+
   // Resolve current staff role (session meta -> sessionStorage fallback)
   const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
     .toLowerCase().trim();
@@ -5484,23 +1964,21 @@
     setTimeout(() => {
       const openSet = document.getElementById('open-settings');
       if (openSet) openSet.style.display = 'none';
-      // 9. Wire topbar search to tenant text filter
+      // 9. Wire topbar search to tenant text filter (Wave 9: RSSuperAdmin)
       const tbSearchInput = document.querySelector('.tb-search input');
       if (tbSearchInput) {
         tbSearchInput.placeholder = 'Search tenants…';
         tbSearchInput.addEventListener('input', () => {
-          superAdminSearch = tbSearchInput.value;
-          renderTenantTable();
+          if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(tbSearchInput.value);
         });
       }
       // 10. Wire inline tenant search input (above table)
       const inlineSearch = document.getElementById('tenant-search-input');
       if (inlineSearch) {
         inlineSearch.addEventListener('input', () => {
-          superAdminSearch = inlineSearch.value;
           const tbSearchInput2 = document.querySelector('.tb-search input');
           if (tbSearchInput2) tbSearchInput2.value = inlineSearch.value;
-          renderTenantTable();
+          if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(inlineSearch.value);
         });
       }
       // 11. Cloud status pill — show informative popover on click
@@ -5525,24 +2003,31 @@
           const s = window.RS_API ? RS_API.session() : null;
           const uname = (s && s.username) || 'codearc-superadmin';
           const role = (s && s.role) || 'superadmin';
-          const tenantCount = _cachedTenants.length;
+          const tenantCount =
+            window.RSSuperAdmin && typeof RSSuperAdmin.getTenantCount === 'function'
+              ? RSSuperAdmin.getTenantCount()
+              : 0;
           toast(`Logged in as ${uname} · Role: ${role} · ${tenantCount} tenants loaded`, 'fa-user-shield');
         });
       }
       // 13. Hide Help & Setup button — irrelevant in super-admin context
       const helpBtn = document.getElementById('open-product-guide-btn');
       if (helpBtn) helpBtn.style.display = 'none';
-      // 16. Wire New Workspace button
+      // 16. Wire New Workspace button (Wave 9: RSSuperAdmin)
       const newTenantBtn = document.getElementById('btn-create-tenant');
       if (newTenantBtn && !newTenantBtn.dataset.wired) {
         newTenantBtn.dataset.wired = '1';
-        newTenantBtn.addEventListener('click', () => openCreateTenantModal());
+        newTenantBtn.addEventListener('click', () => {
+          if (window.RSSuperAdmin && RSSuperAdmin.openCreateTenantModal) RSSuperAdmin.openCreateTenantModal();
+        });
       }
       // 17. Wire bulk approve button
       const bulkBtn = document.getElementById('sa-bulk-approve-btn');
       if (bulkBtn && !bulkBtn.dataset.wired) {
         bulkBtn.dataset.wired = '1';
-        bulkBtn.addEventListener('click', () => bulkApproveAllPending());
+        bulkBtn.addEventListener('click', () => {
+          if (window.RSSuperAdmin && RSSuperAdmin.bulkApproveAllPending) RSSuperAdmin.bulkApproveAllPending();
+        });
       }
       // 18. Hide only the role-switch toggle button (not the whole sb-foot)
       const saToggle = document.getElementById('role-switch');
@@ -6014,20 +2499,38 @@
             
             const settings = window.RS_SETTINGS || {};
             const taxLabel = settings.set_tax_label || 'GST';
-            const headers = ['Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone', 'Subtotal', taxLabel, 'Total', 'Payment', 'Status'];
-            const rows = BILLS.map(b => [
-              b.no || b.orderId || b.id || '',
-              b.dateTime || b.time || '',
-              b.table || '',
-              b.items || '',
-              b.customerName || '',
-              b.customerPhone || '',
-              b.subtotal || '',
-              b.gst || '',
-              b.amount || b.total || '',
-              b.pay || b.paymentMethod || '',
-              b.status || ''
-            ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
+            const headers = [
+              'Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone',
+              'Subtotal', taxLabel, 'Discount', 'Total', 'Payment', 'Tenders',
+              'Status', 'Channel', 'Station', 'Shift', 'Cashier', 'Order Type',
+            ];
+            const rows = BILLS.map((b) => {
+              const tenders = Array.isArray(b.tenders)
+                ? b.tenders.map((t) => (t.method || '') + ':' + (t.amount || 0)).join('|')
+                : '';
+              return [
+                b.no || b.orderId || b.id || '',
+                b.dateTime || b.time || '',
+                b.table || '',
+                b.items || '',
+                b.customerName || '',
+                b.customerPhone || '',
+                b.subtotal != null ? b.subtotal : '',
+                b.gst != null ? b.gst : '',
+                b.discount != null ? b.discount : (b.disc != null ? b.disc : ''),
+                b.amount != null ? b.amount : b.total || '',
+                b.pay || b.paymentMethod || '',
+                tenders,
+                b.status || '',
+                b.channel || b.channelCode || '',
+                b.stationLabel || b.stationId || '',
+                b.shiftId || '',
+                b.cashier || b.refundedBy || '',
+                b.orderType || '',
+              ]
+                .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+                .join(',');
+            });
             const csv = [headers.join(','), ...rows].join('\n');
             RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
             
@@ -6083,9 +2586,9 @@
         const formattedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
         const html = `
-          <div style="font-family: 'Inter', monospace; max-width: 280px; margin: 0 auto; color: #111; font-size: 13px; line-height: 1.4;">
+          <div style="font-family: 'DM Sans', monospace; max-width: 280px; margin: 0 auto; color: #111; font-size: 13px; line-height: 1.4;">
             <div style="text-align: center; margin-bottom: 10px;">
-              <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 18px; margin: 0;">${outletName}</h2>
+              <h2 style="font-family: var(--font-body), system-ui, sans-serif; font-weight: 800; font-size: 18px; margin: 0;">${outletName}</h2>
               <p style="font-size: 11px; color: #555; margin-top: 2px;">DAILY SALES SUMMARY</p>
             </div>
             <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
@@ -6127,7 +2630,7 @@
                 <span>Total GST (5%):</span>
                 <span>${rs(gstCollected)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; border-top: 1px dashed #ccc; margin-top: 4px;">
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; font-weight: 800; font-family: var(--font-body), system-ui, sans-serif; border-top: 1px dashed #ccc; margin-top: 4px;">
                 <span>GROSS REVENUE:</span>
                 <span>${rs(totalRevenue)}</span>
               </div>
@@ -6223,8 +2726,12 @@
   window.setTimeout(() => checkForAppUpdate({ silent: true }), 5000);
   window.setInterval(() => checkForAppUpdate({ silent: true }), 2 * 60 * 1000);
 
-  // Set default landing tab
-  const defaultTab = isSuper ? 'super-admin-tab' : (isBrandAdmin ? 'chain-dashboard-tab' : 'pos-tab');
+  // Set default landing tab (role-first for staff)
+  const roleHome =
+    !isSuper && !isBrandAdmin && ROLE_HOME_TAB[staffRole]
+      ? ROLE_HOME_TAB[staffRole]
+      : 'pos-tab';
+  const defaultTab = isSuper ? 'super-admin-tab' : (isBrandAdmin ? 'chain-dashboard-tab' : roleHome);
   const start = (location.hash || '#' + defaultTab).slice(1);
   activateTab((titles[start] || document.getElementById(start)) ? start : defaultTab);
 

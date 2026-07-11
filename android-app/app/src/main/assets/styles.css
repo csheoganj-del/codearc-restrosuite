@@ -1,25 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Shadows+Into+Light&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
 
 :root {
-  --primary-dark: #111827;
-  --primary-brand: #111827;
+  --primary-dark: #1A1714;
+  --primary-brand: #1A1714;
   --accent-caramel: #FF4F00;
-  --accent-caramel-hover: #E05E00;
-  --accent-gold: #F59E0B; /* Amber gold — matches --warning-color and design intent */
-  --bg-cream-light: #F6F7F9;
-  --bg-tan-warm: #EEF2F7;
+  --accent-caramel-hover: #D94300;
+  --accent-gold: #C47B16;
+  --bg-cream-light: #F3EFE8;
+  --bg-tan-warm: #EDE7DD;
   --bg-card: #FFFFFF;
   --white: #FFFFFF;
-  --text-dark: #111827;
-  --text-light: #FDF8F4;
-  --text-muted: #6B7280;
-  --font-heading: 'Playfair Display', serif;
-  --font-body: 'Outfit', sans-serif;
-  --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.04);
-  --shadow-md: 0 8px 24px rgba(17, 24, 39, 0.07);
-  --shadow-lg: 0 18px 42px rgba(17, 24, 39, 0.12);
-  --border-radius: 8px;
+  --text-dark: #1A1714;
+  --text-light: #F5F1EA;
+  --text-muted: #6E675F;
+  --font-heading: 'Fraunces', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-sm: 0 1px 2px rgba(40, 30, 20, 0.06);
+  --shadow-md: 0 8px 24px rgba(40, 30, 20, 0.08);
+  --shadow-lg: 0 20px 48px rgba(40, 30, 20, 0.12);
+  --border-radius: 10px;
 }
 
 * {
@@ -1221,6 +1221,11 @@ footer {
 /* ==========================================
    CODEARC SAAS DESIGN REFINEMENT LAYER
    ========================================== */
+:root {
+  --primary-brand: #111827;
+  --border-radius: 8px;
+}
+
 body {
   background: #F6F7F9;
   color: #111827;

@@ -159,27 +159,72 @@
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
-      from: r => ({ id:r.id, no:r.order_id, time:r.date_time, table:(r.table_number||'--'), dateTime:r.created_at,
-                    _items:parseItems(r.items),
-                    items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
-                    subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
-                    amount:num(r.total), pay:r.payment_method, status:r.status || 'paid',
-                    refundReason:r.refund_reason || '',
-                    refundedAt:r.refunded_at || '',
-                    customerName:r.customer_name, customerPhone:r.customer_phone,
-                    tenders:parseTenders(r.tenders), change:num(r.change),
-                    taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
-                    channel: r.channel || 'dine_in',
-                    taxProfile: typeof r.tax_profile === 'string' ? JSON.parse(r.tax_profile) : (r.tax_profile || {}),
-                    liquorTaxAmount: num(r.liquor_tax_amount),
-                    serviceChargeAmount: num(r.service_charge_amount) }),
+      from: r => {
+        const taxProfile = typeof r.tax_profile === 'string' ? (()=>{ try { return JSON.parse(r.tax_profile); } catch(e){ return {}; } })() : (r.tax_profile || {});
+        // Competitive packs store tip/promo/covers/etc in tax_profile._ops (no new columns/tables).
+        const ops = (taxProfile && taxProfile._ops) || {};
+        return {
+          id:r.id, no:r.order_id, time:r.date_time, table:(r.table_number||'--'), dateTime:r.created_at,
+          _items:parseItems(r.items),
+          items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
+          subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
+          amount:num(r.total), pay:r.payment_method, status:r.status || 'paid',
+          refundReason:r.refund_reason || '',
+          refundedAt:r.refunded_at || '',
+          customerName:r.customer_name, customerPhone:r.customer_phone,
+          tenders:parseTenders(r.tenders), change:num(r.change),
+          taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
+          channel: r.channel || 'dine_in',
+          taxProfile,
+          liquorTaxAmount: num(r.liquor_tax_amount),
+          serviceChargeAmount: num(r.service_charge_amount),
+          tipAmount: num(ops.tipAmount),
+          deliveryCharge: num(ops.deliveryCharge),
+          promoCode: ops.promoCode || '',
+          promoAmount: num(ops.promoAmount),
+          promoTitle: ops.promoTitle || '',
+          promoOfferId: ops.promoOfferId || null,
+          covers: num(ops.covers),
+          pax: num(ops.covers),
+          loyaltyRedeemAmount: num(ops.loyaltyRedeemAmount),
+          loyaltyPointsUsed: num(ops.loyaltyPointsUsed),
+          stationId: ops.stationId || '',
+          stationLabel: ops.stationLabel || '',
+          cashier: ops.cashier || '',
+          shiftId: ops.shiftId || r.shift_id || '',
+          disc: num(ops.disc != null ? ops.disc : r.discount),
+        };
+      },
       to: o => {
         const statusRaw = String(o.status || 'paid').toLowerCase();
         const status = statusRaw === 'refunded' ? 'refunded' : 'paid';
         const orderType = o.orderType || o.channel || 'dine_in';
         const tableNum = o.table && o.table !== '--' ? String(o.table) : null;
-        return {
-          id: cleanIdForCollection('bills', o.id != null ? o.id : o.no),
+        let taxProfile = {};
+        try {
+          taxProfile = typeof o.taxProfile === 'object' && o.taxProfile
+            ? { ...o.taxProfile }
+            : (typeof o.taxProfile === 'string' ? JSON.parse(o.taxProfile || '{}') : {});
+        } catch (_) { taxProfile = {}; }
+        taxProfile._ops = {
+          tipAmount: num(o.tipAmount),
+          deliveryCharge: num(o.deliveryCharge),
+          promoCode: o.promoCode || '',
+          promoAmount: num(o.promoAmount),
+          promoTitle: o.promoTitle || '',
+          promoOfferId: o.promoOfferId || null,
+          covers: num(o.covers != null ? o.covers : o.pax),
+          loyaltyRedeemAmount: num(o.loyaltyRedeemAmount),
+          loyaltyPointsUsed: num(o.loyaltyPointsUsed),
+          stationId: o.stationId || '',
+          stationLabel: o.stationLabel || '',
+          cashier: o.cashier || '',
+          shiftId: o.shiftId || '',
+          disc: num(o.disc != null ? o.disc : o.discount),
+        };
+        const body = {
+          // Prefer natural key order_id for upsert; omit hashed client id when
+          // possible so Postgres identity can allocate a stable PK.
           order_id: String(o.no || o.orderId || o.id || ''),
           customer_name: o.customerName || 'Walk-in Guest',
           customer_phone: o.customerPhone || null,
@@ -197,7 +242,7 @@
           change: num(o.change || o.changeAmount || 0),
           tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
           channel: o.channel || 'dine_in',
-          tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
+          tax_profile: JSON.stringify(taxProfile),
           liquor_tax_amount: num(o.liquorTaxAmount),
           service_charge_amount: num(o.serviceChargeAmount),
           status,
@@ -206,6 +251,17 @@
           table_number: tableNum,
           order_type: String(orderType),
         };
+        if (o.idempotencyKey || o.idempotency_key) {
+          body.idempotency_key = String(o.idempotencyKey || o.idempotency_key);
+        }
+        // Only send id when it is already a real cloud bigint (not a hash of "RS-…")
+        if (o.id != null && Number.isFinite(Number(o.id)) && Number(o.id) < 9e15 && String(o.id).length < 16) {
+          // Keep id for updates of already-synced rows; upsert ignores it on conflict order_id
+          if (known.bills && known.bills.has(String(o.id))) {
+            body.id = Number(o.id);
+          }
+        }
+        return body;
       }
     },
     tax_rates: {
@@ -299,16 +355,53 @@
     },
     shifts: {
       table:'doppio_shifts', pk:'shift_id', clientId:true,
-      from: r => ({ shiftId:r.shift_id, cashierName:r.cashier_name, openedAt:r.opened_at, closedAt:r.closed_at,
-                    openingFloat:num(r.opening_float), expectedCash:num(r.expected_cash), actualCash:num(r.actual_cash),
-                    variance:num(r.variance), totalSalesCash:num(r.total_sales_cash), totalSalesUpi:num(r.total_sales_upi),
-                    totalSalesCard:num(r.total_sales_card), totalPayouts:num(r.total_payouts), totalSafeDrops:num(r.total_safe_drops),
-                    status:r.status, notes:r.notes }),
-      to: o => ({ shift_id:o.shiftId, cashier_name:o.cashierName||'', opened_at:o.openedAt, closed_at:o.closedAt||null,
-                  opening_float:num(o.openingFloat), expected_cash:num(o.expectedCash), actual_cash:num(o.actualCash),
-                  variance:num(o.variance), total_sales_cash:num(o.totalSalesCash), total_sales_upi:num(o.totalSalesUpi),
-                  total_sales_card:num(o.totalSalesCard), total_payouts:num(o.totalPayouts), total_safe_drops:num(o.totalSafeDrops),
-                  status:o.status||'OPEN', notes:o.notes||'' })
+      from: r => {
+        // Cash movements packed into notes as JSON (existing text column — no new table).
+        let notes = r.notes || '';
+        let cashMovements = [];
+        let totalPayIns = 0;
+        let stationId = '';
+        let stationLabel = '';
+        let zScope = '';
+        try {
+          const parsed = notes && String(notes).trim().startsWith('{') ? JSON.parse(notes) : null;
+          if (parsed && typeof parsed === 'object') {
+            cashMovements = Array.isArray(parsed.cashMovements) ? parsed.cashMovements : [];
+            totalPayIns = num(parsed.totalPayIns);
+            stationId = parsed.stationId || '';
+            stationLabel = parsed.stationLabel || '';
+            zScope = parsed.zScope || '';
+            notes = parsed.note || parsed.notes || '';
+          }
+        } catch (_) {}
+        return {
+          shiftId:r.shift_id, cashierName:r.cashier_name, openedAt:r.opened_at, closedAt:r.closed_at,
+          openingFloat:num(r.opening_float), expectedCash:num(r.expected_cash), actualCash:num(r.actual_cash),
+          variance:num(r.variance), totalSalesCash:num(r.total_sales_cash), totalSalesUpi:num(r.total_sales_upi),
+          totalSalesCard:num(r.total_sales_card), totalPayouts:num(r.total_payouts), totalSafeDrops:num(r.total_safe_drops),
+          totalPayIns, cashMovements, stationId, stationLabel, zScope,
+          status:r.status, notes,
+        };
+      },
+      to: o => {
+        const payIns = num(o.totalPayIns);
+        const moves = Array.isArray(o.cashMovements) ? o.cashMovements : [];
+        const notesPayload = {
+          note: o.notes || '',
+          cashMovements: moves,
+          totalPayIns: payIns,
+          stationId: o.stationId || '',
+          stationLabel: o.stationLabel || '',
+          zScope: o.zScope || '',
+        };
+        return {
+          shift_id:o.shiftId, cashier_name:o.cashierName||'', opened_at:o.openedAt, closed_at:o.closedAt||null,
+          opening_float:num(o.openingFloat), expected_cash:num(o.expectedCash), actual_cash:num(o.actualCash),
+          variance:num(o.variance), total_sales_cash:num(o.totalSalesCash), total_sales_upi:num(o.totalSalesUpi),
+          total_sales_card:num(o.totalSalesCard), total_payouts:num(o.totalPayouts), total_safe_drops:num(o.totalSafeDrops),
+          status:o.status||'OPEN', notes: JSON.stringify(notesPayload),
+        };
+      }
     },
     shift_events: {
       table:'doppio_shift_events', pk:'event_id', clientId:true,
@@ -332,8 +425,41 @@
     },
     offers: {
       table:'doppio_offers', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, code:r.code, description:r.title, usageCount:num(r.usage_count), status:r.status }),
-      to: o => ({ code:o.code||'', title:o.description||o.code||'Offer', usage_count:num(o.usageCount), status:o.status||'active' })
+      from: r => {
+        const dtype = String(r.discount_type || 'percent').toLowerCase();
+        const dval = num(r.discount_value);
+        const pct = dtype === 'amount' ? 0 : dval;
+        const fixed = dtype === 'amount' ? dval : 0;
+        return {
+          id: r.id,
+          code: r.code,
+          title: r.title,
+          description: r.title,
+          pct,
+          fixed,
+          discount_pct: pct,
+          amount: fixed,
+          usageCount: num(r.usage_count),
+          status: r.status,
+          expiresAt: r.ends_at || null,
+          expires_at: r.ends_at || null,
+          startsAt: r.starts_at || null,
+        };
+      },
+      to: o => {
+        const fixed = num(o.fixed != null ? o.fixed : o.amount);
+        const pct = num(o.pct != null ? o.pct : o.discount_pct);
+        return {
+          code: o.code || '',
+          title: o.title || o.description || o.code || 'Offer',
+          discount_type: fixed > 0 ? 'amount' : 'percent',
+          discount_value: fixed > 0 ? fixed : pct,
+          ends_at: o.expiresAt || o.expires_at || null,
+          starts_at: o.startsAt || o.starts_at || null,
+          usage_count: num(o.usageCount),
+          status: o.status || 'active',
+        };
+      }
     },
     vendors: {
       table:'doppio_vendors', pk:'id', clientId:false, uuidPK:true,
@@ -355,10 +481,12 @@
     businessProfile: { table: 'doppio_business_profile', onConflict: 'tenant_id' },
     menu: { table: 'doppio_menu', onConflict: 'tenant_id,name' },
     recipeCosting: { table: 'doppio_custom_recipes', onConflict: 'tenant_id,item_name' },
-    billSql: 'ON CONFLICT (tenant_id, "orderId") DO UPDATE SET'
+    bills: { table: 'doppio_bills', onConflict: 'tenant_id,order_id' },
+    billSql: 'ON CONFLICT (tenant_id, order_id) DO UPDATE SET'
   });
   const optionalCloudColumns = Object.freeze({
     menu: ['tax_category'],
+    bills: ['idempotency_key', 'cgst', 'sgst', 'igst', 'tax_summary', 'tax_profile', 'channel', 'liquor_tax_amount', 'service_charge_amount', 'transaction_type'],
     // These persist once migration 20260709160000_crm_customer_fields is
     // applied; until then a DB without the columns will drop them gracefully
     // instead of rejecting the whole customer upsert.
@@ -412,7 +540,7 @@
       }catch(e){ return []; }
     },
     write:(c,a)=>{ try{ localStorage.setItem(LS.key(c), JSON.stringify(a)); }catch(e){} },
-    async list(c){ return LS.read(c); },
+    async list(c, _opts){ return LS.read(c); },
     async put(c,id,obj){
       const cleanId = cleanIdForCollection(c, id);
       const a=LS.read(c);
@@ -483,9 +611,22 @@
   }
 
   const CLOUD = {
-    async list(c){
+    async list(c, opts){
       const m=MAP[c]; if(!m) return [];
-      const rows = await API.select(m.table, { order:m.order||{column:m.pk,ascending:true}, limit:500 });
+      const options = opts && typeof opts === 'object' ? opts : {};
+      // Higher default for money/CRM collections (Wave 2 pagination)
+      const defaultLimit = (c === 'bills' || c === 'customers') ? 1000 : 500;
+      const limit = Number.isFinite(Number(options.limit)) && Number(options.limit) > 0
+        ? Math.min(Number(options.limit), 2000)
+        : defaultLimit;
+      const offset = Number.isFinite(Number(options.offset)) && Number(options.offset) > 0
+        ? Number(options.offset)
+        : 0;
+      const rows = await API.select(m.table, {
+        order: options.order || m.order || { column: m.pk, ascending: true },
+        limit,
+        offset: offset || null,
+      });
       known[c] = new Set((rows||[]).map(r=>String(r[m.pk])));
       return (rows||[]).map(m.from);
     },
@@ -494,6 +635,31 @@
       const cleanId = cleanIdForCollection(c, id);
       const cleanObj = { ...obj, id: cleanId };
       const body = m.to(cleanObj);
+
+      // Bills: upsert on (tenant_id, order_id) — multi-device safe, no hash PK races
+      if (c === 'bills' && body.order_id) {
+        try {
+          const upsertBody = { ...body };
+          // Let identity allocate id when not a known cloud row
+          if (upsertBody.id == null) delete upsertBody.id;
+          let res;
+          try {
+            res = await API.upsert(m.table, upsertBody, 'tenant_id,order_id', { returning: true, columns: '*' });
+          } catch (err) {
+            if (!omitUnsupportedOptionalColumns(c, upsertBody, err)) throw err;
+            res = await API.upsert(m.table, upsertBody, 'tenant_id,order_id', { returning: true, columns: '*' });
+          }
+          const row = Array.isArray(res) ? res[0] : res;
+          const newId = row && row.id != null ? row.id : cleanId;
+          if (!known[c]) known[c] = new Set();
+          known[c].add(String(newId));
+          return { ...obj, id: newId, no: (row && (row.order_id || row.orderId)) || obj.no || body.order_id };
+        } catch (err) {
+          console.warn('[RS_DB] Bill upsert failed, falling back to insert/update:', err.message);
+          // fall through to generic path
+        }
+      }
+
       const isKnown = known[c] && known[c].has(String(cleanId));
       if(isKnown){
         try {
@@ -510,12 +676,28 @@
       // text id (e.g. "PO-123456") that can't live in a uuid column. Leave the id
       // off the insert so the database generates it; the human-readable code is
       // preserved in a dedicated column (po_number / ticket_number / etc.).
+      else if(!body[m.pk] && !m.uuidPK && c !== 'bills') { body[m.pk] = cleanId; }
+      else if (c === 'bills' && body.id == null) { /* leave id for identity */ }
       else if(!body[m.pk] && !m.uuidPK) { body[m.pk] = cleanId; }
       try {
         let res;
         try {
           res = await API.insert(m.table, body);
         } catch (err) {
+          // Unique on order_id → update that row instead of hashing client id
+          const msg = String(err && err.message || '');
+          if (c === 'bills' && body.order_id && /duplicate|unique|order_id/i.test(msg)) {
+            await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
+            const rows = await API.select(m.table, {
+              filters: [{ operator: 'eq', column: 'order_id', value: body.order_id }],
+              limit: 1,
+            }).catch(() => null);
+            const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+            const newId = row && row.id != null ? row.id : cleanId;
+            if (!known[c]) known[c] = new Set();
+            known[c].add(String(newId));
+            return { ...obj, id: newId };
+          }
           if (!omitUnsupportedOptionalColumns(c, body, err)) throw err;
           res = await API.insert(m.table, body);
         }
@@ -526,6 +708,10 @@
       } catch (err) {
         console.warn(`[RS_DB] Cloud insert failed for ${c}/${cleanId}, attempting update fallback:`, err.message);
         try {
+          if (c === 'bills' && body.order_id) {
+            await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
+            return { ...obj, id: cleanId };
+          }
           try {
             await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
           } catch (updateErr) {
@@ -724,17 +910,17 @@
         e.message.includes('column') ||
         e.message.includes('42703')
       );
-      if (!isSchemaCacheError) {
-        window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
-        window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
-        // Queue for retry when back online. bulkPut used to be silently
-        // dropped here (only put/del were queued) -- bulk menu/recipe
-        // imports done while offline would never actually reach the cloud.
-        if (method === 'put' || method === 'del' || method === 'bulkPut') {
+      // Always surface + queue money-critical collections. Schema errors still
+      // queue bills so nothing is silently lost; admin can fix migration later.
+      const isMoneyCritical = (c === 'bills' || c === 'inventory' || c === 'customers');
+      window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now(), schema: !!isSchemaCacheError };
+      window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
+      if (method === 'put' || method === 'del' || method === 'bulkPut') {
+        if (!isSchemaCacheError || isMoneyCritical) {
           addToSyncQueue(method, c, args);
         }
-      } else {
-        // Log silently -- user needs to run the DB migration
+      }
+      if (isSchemaCacheError) {
         console.warn(`[RS_DB] Schema mismatch on ${c}: "${e.message}". Run the missing DB migration to fix.`);
       }
       window.dispatchEvent(new CustomEvent('rs:sync-done', { detail: { method, collection: c, error: true } }));
@@ -742,23 +928,200 @@
     }
   }
 
-  /* ---------------- OFFLINE SYNC QUEUE (retry failed cloud writes on reconnect) ---------------- */
+  /* ---------------- OFFLINE SYNC QUEUE (IndexedDB primary, localStorage mirror) ---------------- */
   const SYNC_QUEUE_KEY = 'rs:sync_queue';
-  function getSyncQueue() { try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e){ return []; } }
-  function saveSyncQueue(q) { try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); } catch(e){} }
+  const SYNC_IDB_NAME = 'rs_sync_queue_v1';
+  const SYNC_IDB_STORE = 'queue';
+  const MONEY_COLLECTIONS = new Set(['bills', 'inventory', 'customers', 'drafts', 'pending_orders']);
+  let drainInFlight = false;
+  let _syncQueueMem = null; // in-memory cache (source of truth after boot)
+  let _idbReady = null;
+
+  function openSyncIdb() {
+    if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+    if (_idbReady) return _idbReady;
+    _idbReady = new Promise((resolve) => {
+      try {
+        const req = indexedDB.open(SYNC_IDB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(SYNC_IDB_STORE)) {
+            db.createObjectStore(SYNC_IDB_STORE, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    return _idbReady;
+  }
+
+  async function idbLoadAll() {
+    const db = await openSyncIdb();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(SYNC_IDB_STORE, 'readonly');
+        const store = tx.objectStore(SYNC_IDB_STORE);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
+  async function idbReplaceAll(entries) {
+    const db = await openSyncIdb();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(SYNC_IDB_STORE, 'readwrite');
+        const store = tx.objectStore(SYNC_IDB_STORE);
+        store.clear();
+        (entries || []).forEach((e) => {
+          if (e && e.id) store.put(e);
+        });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      } catch (_) {
+        resolve(false);
+      }
+    });
+  }
+
+  function loadSyncQueueSync() {
+    if (_syncQueueMem) return _syncQueueMem;
+    try {
+      _syncQueueMem = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+      if (!Array.isArray(_syncQueueMem)) _syncQueueMem = [];
+    } catch (e) {
+      _syncQueueMem = [];
+    }
+    return _syncQueueMem;
+  }
+
+  function getSyncQueue() {
+    return loadSyncQueueSync().slice();
+  }
+
+  function saveSyncQueue(q) {
+    _syncQueueMem = Array.isArray(q) ? q.slice() : [];
+    // Mirror to localStorage (small critical backup; may truncate non-critical if huge)
+    try {
+      const mirror = _syncQueueMem.length > 80
+        ? _syncQueueMem.filter((e) => e && e.critical).concat(_syncQueueMem.filter((e) => e && !e.critical).slice(-40))
+        : _syncQueueMem;
+      localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(mirror));
+    } catch (e) {
+      try {
+        // last resort: bills only
+        const billsOnly = _syncQueueMem.filter((e) => e && e.collection === 'bills');
+        localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(billsOnly.slice(-50)));
+      } catch (_) {}
+    }
+    // Durable primary store
+    idbReplaceAll(_syncQueueMem).catch(() => {});
+  }
+
+  // Boot: prefer IndexedDB contents if present, else migrate localStorage → IDB
+  (async function migrateSyncQueueToIdb() {
+    try {
+      const fromIdb = await idbLoadAll();
+      if (fromIdb && fromIdb.length) {
+        _syncQueueMem = fromIdb;
+        // refresh LS mirror
+        try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(fromIdb.slice(0, 80))); } catch (_) {}
+      } else {
+        const fromLs = loadSyncQueueSync();
+        if (fromLs.length) await idbReplaceAll(fromLs);
+      }
+      if (typeof window !== 'undefined' && window.RS_DB_NOTIFY_SYNC) {
+        try { window.RS_DB_NOTIFY_SYNC(); } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('[RS_DB] sync queue IDB migrate failed', e);
+    }
+  })();
+  function entryKey(method, collection, args) {
+    const id = args && args[0];
+    if (method === 'bulkPut' && Array.isArray(id)) {
+      return method + '|' + collection + '|' + id.map(r => r && r.id).join(',');
+    }
+    return method + '|' + collection + '|' + String(id);
+  }
+  function notifySyncQueue() {
+    const q = getSyncQueue();
+    const pending = q.filter(e => e && e.status !== 'acked');
+    const billPending = pending.filter(e => e.collection === 'bills').length;
+    window.__rsSyncQueueDepth = pending.length;
+    window.__rsSyncBillPending = billPending;
+    window.dispatchEvent(new CustomEvent('rs:sync-queue-changed', {
+      detail: { depth: pending.length, bills: billPending, entries: pending.slice(0, 20) }
+    }));
+    try {
+      let badge = document.getElementById('rs-sync-queue-badge');
+      if (!badge) {
+        const host = document.querySelector('.topbar-right, .topbar-actions, #topbar-right, .topbar');
+        if (host) {
+          badge = document.createElement('button');
+          badge.id = 'rs-sync-queue-badge';
+          badge.type = 'button';
+          badge.title = 'Pending cloud sync — click to retry';
+          badge.style.cssText = 'display:none;align-items:center;gap:6px;border:1px solid rgba(234,179,8,.4);background:rgba(234,179,8,.12);color:var(--text,#16151c);border-radius:999px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer';
+          host.insertBefore(badge, host.firstChild);
+          badge.onclick = () => {
+            drainSyncQueue().then(() => {
+              if (window.RS && RS.toast) RS.toast('Retrying pending sync…', 'fa-cloud-arrow-up');
+            }).catch(() => {});
+          };
+        }
+      }
+      if (badge) {
+        if (pending.length > 0) {
+          badge.style.display = 'inline-flex';
+          badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ' +
+            (billPending ? (billPending + ' bill' + (billPending === 1 ? '' : 's') + ' pending') : (pending.length + ' pending'));
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+    } catch (_) {}
+  }
   function addToSyncQueue(method, collection, args) {
     // 'settings' is a whole-object save (not a per-row collection in MAP),
     // so allow it through explicitly; everything else must be a known collection.
     if (!MAP[collection] && collection !== 'settings') return;
     const q = getSyncQueue();
-    // Deduplicate: if same collection+id already queued for put, replace it
-    const id = args[0];
-    const idx = q.findIndex(x => x.method === method && x.collection === collection && String(x.args[0]) === String(id));
-    const entry = { method, collection, args, queuedAt: Date.now() };
+    const key = entryKey(method, collection, args);
+    const idx = q.findIndex(x => entryKey(x.method, x.collection, x.args) === key);
+    const entry = {
+      id: (idx >= 0 && q[idx].id) ? q[idx].id : ('sq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+      method,
+      collection,
+      args,
+      queuedAt: Date.now(),
+      status: 'pending',
+      attempts: (idx >= 0 && q[idx].attempts) ? q[idx].attempts : 0,
+      critical: MONEY_COLLECTIONS.has(collection) || collection === 'settings',
+    };
     if (idx >= 0) q[idx] = entry; else q.push(entry);
-    // Cap queue at 200 entries to prevent localStorage bloat
-    if (q.length > 200) q.splice(0, q.length - 200);
+
+    // Cap non-critical at 180; NEVER drop bills/inventory/customers
+    if (q.length > 220) {
+      const dropIdx = q.findIndex(e => e && !e.critical && e.status !== 'in_progress');
+      if (dropIdx >= 0) q.splice(dropIdx, 1);
+      else {
+        // All critical — drop oldest non-bill non-in_progress if still over hard cap
+        const soft = q.findIndex(e => e && e.collection !== 'bills' && e.status !== 'in_progress');
+        if (soft >= 0 && q.length > 300) q.splice(soft, 1);
+      }
+    }
     saveSyncQueue(q);
+    notifySyncQueue();
   }
   function queuedWriteIdsForCollection(collection) {
     try {
@@ -786,29 +1149,69 @@
   }
   async function drainSyncQueue() {
     if (!signedIn()) return;
-    const q = getSyncQueue();
-    if (!q.length) return;
-    saveSyncQueue([]); // optimistic clear -- failures re-enqueue
-    let failed = 0;
-    for (const entry of q) {
-      try {
-        if (entry.method === 'setSettings') {
-          // Whole-object save -- CLOUD.setSettings(o) takes only the settings
-          // object, not a leading collection name like put/del/bulkPut do.
-          await CLOUD.setSettings(entry.args[0]);
-        } else {
-          await CLOUD[entry.method](entry.collection, ...entry.args);
+    if (drainInFlight) return;
+    drainInFlight = true;
+    try {
+      let q = getSyncQueue().filter(e => e && e.status !== 'acked');
+      if (!q.length) { notifySyncQueue(); return; }
+
+      // Mark all pending as in_progress and persist BEFORE attempting
+      // (crash mid-drain must not lose the queue — old code cleared first)
+      q = q.map(e => ({ ...e, status: e.status === 'in_progress' ? 'in_progress' : 'pending' }));
+      saveSyncQueue(q);
+      notifySyncQueue();
+
+      let ok = 0;
+      let failed = 0;
+      const remaining = [];
+      for (const entry of q) {
+        const working = { ...entry, status: 'in_progress', attempts: (entry.attempts || 0) + 1 };
+        // Persist in_progress state for this entry
+        const snap = getSyncQueue().map(e =>
+          (e.id === working.id || entryKey(e.method, e.collection, e.args) === entryKey(working.method, working.collection, working.args))
+            ? working : e
+        );
+        saveSyncQueue(snap);
+
+        try {
+          if (entry.method === 'setSettings') {
+            await CLOUD.setSettings(entry.args[0]);
+          } else {
+            await CLOUD[entry.method](entry.collection, ...entry.args);
+          }
+          ok++;
+          // Remove only this entry on success
+          const after = getSyncQueue().filter(e =>
+            !(e.id === working.id || entryKey(e.method, e.collection, e.args) === entryKey(working.method, working.collection, working.args))
+          );
+          saveSyncQueue(after);
+        } catch (e) {
+          console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
+          failed++;
+          remaining.push({
+            ...working,
+            status: 'pending',
+            lastError: e.message || String(e),
+            lastAttemptAt: Date.now(),
+          });
+          // Write failed entry back as pending
+          const cur = getSyncQueue();
+          const ix = cur.findIndex(x =>
+            x.id === working.id || entryKey(x.method, x.collection, x.args) === entryKey(working.method, working.collection, working.args)
+          );
+          if (ix >= 0) cur[ix] = remaining[remaining.length - 1];
+          else cur.push(remaining[remaining.length - 1]);
+          saveSyncQueue(cur);
         }
-      } catch(e) {
-        console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
-        addToSyncQueue(entry.method, entry.collection, entry.args);
-        failed++;
       }
-    }
-    if (failed === 0 && q.length > 0) {
-      // Invalidate list cache so UI refreshes with latest cloud data
-      for (const entry of q) { delete lastListFetchTime[entry.collection]; }
-      window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: q.length } }));
+
+      if (ok > 0) {
+        for (const entry of q) { delete lastListFetchTime[entry.collection]; }
+        window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: ok, failed } }));
+      }
+      notifySyncQueue();
+    } finally {
+      drainInFlight = false;
     }
   }
   // Retry on reconnect
@@ -818,13 +1221,20 @@
   });
   // Also expose for manual call
   window.RS_DB_DRAIN = drainSyncQueue;
+  window.RS_DB_SYNC_DEPTH = () => getSyncQueue().filter(e => e && e.status !== 'acked').length;
+  window.RS_DB_NOTIFY_SYNC = notifySyncQueue;
   // Drain at boot too, not just on the 'online' event. Without this, anything
   // queued from a previous tab/session (e.g. the browser was closed while
   // offline, or was left signed out) would just sit in localStorage forever
   // -- the 'online' listener only fires on a live offline->online transition,
   // which never happens if the page is loaded fresh while already online.
   if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-    setTimeout(() => { drainSyncQueue().catch(()=>{}); }, 2000);
+    setTimeout(() => { drainSyncQueue().catch(()=>{}); notifySyncQueue(); }, 2000);
+  }
+  // Paint badge after DOM ready
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(notifySyncQueue, 500));
+    else setTimeout(notifySyncQueue, 800);
   }
 
   /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */
@@ -860,27 +1270,41 @@
     async session(){ if(window.RS_API) { const s = window.RS_API.session(); if(s) return s; } try{ return JSON.parse(localStorage.getItem('rs:session'))||null; }catch(e){ return null; } }
   };
 
+  function cachePinHashFromSettings(settings) {
+    try {
+      if (settings && settings.admin_pin_hash) {
+        localStorage.setItem('rs:admin_pin_hash', String(settings.admin_pin_hash));
+      }
+    } catch (_) {}
+  }
+
   window.RS_DB = {
     get mode(){ return mode(); },
     get isCloud(){ return signedIn(); },
     get cloudConfigured(){ return isCloudConfigured(); },
-    list:(c)=>guard('list',c),
+    list:(c, opts)=>guard('list',c, opts),
     listLocal:(c)=>LS.list(c),
-    listCloud:(c)=>CLOUD.list(c),
+    listCloud:(c, opts)=>CLOUD.list(c, opts),
     writeLocal:(c,arr)=>LS.write(c,arr),
     put:(c,id,obj)=>guard('put',c,id,obj),
     bulkPut:(c,arr)=>guard('bulkPut',c,arr),
     del:(c,id)=>guard('del',c,id),
-    getSettings:()=>guard('getSettings','settings'),
+    getSettings: async ()=>{
+      const s = await guard('getSettings','settings');
+      cachePinHashFromSettings(s);
+      return s;
+    },
     setSettings: async (o)=> {
       const tenantId = getActiveTenantId();
       cachedSettingsMap[tenantId] = o;
+      cachePinHashFromSettings(o);
       await LS.setSettings(o);
       if (signedIn()) {
         try {
           const res = await CLOUD.setSettings(o);
           if (res) {
             cachedSettingsMap[tenantId] = res;
+            cachePinHashFromSettings(res);
             await LS.setSettings(res);
           }
           return res;

@@ -24,7 +24,358 @@
     const SUPPLIERS = [];
     const POS_ORDERS = [];
     const WASTE = [];
-    const poPill = {pending:'pill-amber',sent:'pill-violet',received:'pill-green'};
+    const poPill = {
+      pending: 'pill-amber',
+      sent: 'pill-violet',
+      partial: 'pill-orange',
+      received: 'pill-green',
+      cancelled: 'pill-red',
+      canceled: 'pill-red',
+    };
+    let poListFilter = 'open'; // open | all | received | cancelled
+
+    function parsePoLines(p) {
+      if (Array.isArray(p.lines) && p.lines.length) {
+        return p.lines.map((l) => ({
+          name: l.name || 'Item',
+          unit: l.unit || 'unit',
+          qty: Math.max(0, Number(l.qty) || 0),
+          cost: Number(l.cost) || 0,
+          value: Number(l.value) || 0,
+          invId: l.invId || l.id || null,
+        }));
+      }
+      return String(p.items || p.itemsText || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => {
+          const m = s.match(/^(\d+(?:\.\d+)?)\s+(\S+)\s+(.+)$/);
+          if (m) return { name: m[3].trim(), unit: m[2], qty: Number(m[1]) || 1, cost: 0, value: 0, invId: null };
+          return { name: s, unit: 'unit', qty: 1, cost: 0, value: 0, invId: null };
+        });
+    }
+
+    async function saveInventoryItem(item) {
+      if (window.RS_DB && RS_DB.put) await RS_DB.put('inventory', item.id, item);
+      else if (RS.saveOne) await RS.saveOne('inventory', item);
+    }
+
+    async function savePo(row) {
+      if (RS.saveOne) return RS.saveOne('purchase_orders', row);
+      if (window.RS_DB && RS_DB.put) return RS_DB.put('purchase_orders', row.id, row);
+    }
+
+    function staffName() {
+      try {
+        const s = window.RS_API && RS_API.session && RS_API.session();
+        return (s && (s.display_name || s.username)) || 'staff';
+      } catch (_) {
+        return 'staff';
+      }
+    }
+
+    function remainingPoLines(p) {
+      const ordered = parsePoLines(p);
+      const receivedMap = {};
+      (Array.isArray(p.receivedLines) ? p.receivedLines : []).forEach((r) => {
+        const k = String(r.name || '').toLowerCase();
+        receivedMap[k] = (receivedMap[k] || 0) + (Number(r.qty) || 0);
+      });
+      return ordered
+        .map((l) => {
+          const got = receivedMap[String(l.name).toLowerCase()] || 0;
+          const left = Math.max(0, (Number(l.qty) || 0) - got);
+          return { ...l, orderedQty: Number(l.qty) || 0, receivedQty: got, qty: left };
+        })
+        .filter((l) => l.qty > 0.0001);
+    }
+
+    async function applyStockForLines(lines, opts) {
+      const options = opts || {};
+      const inv = RS.INVENTORY || [];
+      let updated = 0;
+      let created = 0;
+      for (const line of lines) {
+        if (!line.name || !(Number(line.qty) > 0)) continue;
+        let item =
+          (line.invId && inv.find((i) => String(i.id) === String(line.invId))) ||
+          inv.find((i) => i.name && String(i.name).toLowerCase() === String(line.name).toLowerCase());
+        if (item) {
+          item.stock = Math.max(0, Number(item.stock) || 0) + Number(line.qty);
+          if (line.cost > 0 && !(Number(item.cost) > 0)) item.cost = line.cost;
+          await saveInventoryItem(item);
+          updated++;
+        } else if (options.createMissing !== false) {
+          const id =
+            'inv_' +
+            String(line.name)
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '_')
+              .replace(/^_|_$/g, '') +
+            '_' +
+            Date.now().toString(36);
+          const neo = {
+            id,
+            name: line.name,
+            cat: 'Received',
+            unit: line.unit || 'unit',
+            stock: Number(line.qty) || 0,
+            min: 10,
+            cost: Number(line.cost) || 0,
+          };
+          inv.push(neo);
+          await saveInventoryItem(neo);
+          created++;
+        }
+      }
+      return { updated, created };
+    }
+
+    async function receivePurchaseOrder(p, opts) {
+      const options = opts || {};
+      if (!p || p.status === 'received') {
+        RS.toast('PO already fully received', 'fa-circle-info');
+        return false;
+      }
+      if (p.status === 'cancelled' || p.status === 'canceled') {
+        RS.toast('PO is cancelled', 'fa-circle-exclamation');
+        return false;
+      }
+      // linesToReceive: optional override for partial; default all remaining
+      const remaining = remainingPoLines(p);
+      const lines = Array.isArray(options.linesToReceive)
+        ? options.linesToReceive.filter((l) => l && Number(l.qty) > 0)
+        : remaining;
+      if (!lines.length) {
+        RS.toast('Nothing left to receive on this PO', 'fa-circle-exclamation');
+        return false;
+      }
+      const { updated, created } = await applyStockForLines(lines, options);
+
+      // Track cumulative received quantities
+      if (!Array.isArray(p.receivedLines)) p.receivedLines = [];
+      lines.forEach((l) => {
+        p.receivedLines.push({
+          name: l.name,
+          unit: l.unit,
+          qty: Number(l.qty) || 0,
+          at: new Date().toISOString(),
+          by: staffName(),
+        });
+      });
+      if (!Array.isArray(p.receipts)) p.receipts = [];
+      p.receipts.push({
+        at: new Date().toISOString(),
+        by: staffName(),
+        lines: lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit })),
+      });
+
+      const stillLeft = remainingPoLines(p);
+      const full = stillLeft.length === 0;
+      p.status = full ? 'received' : 'partial';
+      p.receivedAt = new Date().toISOString();
+      p.receivedBy = staffName();
+      p.po = p.poNumber || p.po || p.id;
+      // Refresh items string for open remainder
+      if (!full) {
+        p.items = stillLeft.map((l) => `${l.qty} ${l.unit} ${l.name}`).join(', ');
+      }
+      await savePo(p);
+      try {
+        if (window.RSInventoryUI && RSInventoryUI.paintInventoryBadge) RSInventoryUI.paintInventoryBadge();
+        if (RS.renderInventory) RS.renderInventory();
+      } catch (_) {}
+      RS.toast(
+        `${full ? 'Fully received' : 'Partial receive'} ${p.poNumber || p.po || p.id}: +stock on ${updated} item(s)${created ? ', ' + created + ' new' : ''}`,
+        'fa-box-open'
+      );
+      return true;
+    }
+
+    async function cancelPurchaseOrder(p, reason) {
+      if (!p) return false;
+      if (p.status === 'received') {
+        RS.toast('Cannot cancel a fully received PO', 'fa-circle-exclamation');
+        return false;
+      }
+      if (p.status === 'cancelled' || p.status === 'canceled') {
+        RS.toast('PO already cancelled', 'fa-circle-info');
+        return false;
+      }
+      p.status = 'cancelled';
+      p.cancelledAt = new Date().toISOString();
+      p.cancelledBy = staffName();
+      p.cancelReason = reason || 'Cancelled';
+      p.po = p.poNumber || p.po || p.id;
+      await savePo(p);
+      RS.toast('PO ' + (p.poNumber || p.po) + ' cancelled', 'fa-ban');
+      return true;
+    }
+
+    function openReceiveModal(p) {
+      if (!window.RSModal) {
+        return receivePurchaseOrder(p);
+      }
+      const remaining = remainingPoLines(p);
+      if (!remaining.length) {
+        RS.toast('Nothing left to receive', 'fa-circle-check');
+        return Promise.resolve(false);
+      }
+      const rows = remaining
+        .map(
+          (l, i) => `
+        <tr>
+          <td style="font-weight:600">${esc(l.name)}</td>
+          <td style="color:var(--text-soft);font-size:12px">${esc(l.orderedQty)} ${esc(l.unit)}${l.receivedQty ? ' · got ' + l.receivedQty : ''}</td>
+          <td><input type="number" class="form-input" data-recv-i="${i}" min="0" step="any" max="${l.qty}" value="${l.qty}" style="width:90px;padding:6px 8px;font-size:13px"></td>
+        </tr>`
+        )
+        .join('');
+      return new Promise((resolve) => {
+        RSModal.open({
+          title: 'Receive stock · ' + (p.poNumber || p.po || p.id),
+          sub: 'Edit qty for partial delivery · leave 0 to skip a line',
+          icon: 'fa-box-open',
+          size: 'md',
+          body: `<table class="data-table"><thead><tr><th>Item</th><th>Ordered / prior</th><th>Receive now</th></tr></thead>
+            <tbody>${rows}</tbody></table>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn btn-ghost btn-sm" data-all>All remaining</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-zero>Clear all</button>
+            </div>`,
+          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+            <button class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-box-open"></i> Confirm receive</button>`,
+          onMount(modal, close) {
+            modal.querySelector('[data-x]').onclick = () => {
+              close();
+              resolve(false);
+            };
+            modal.querySelector('[data-all]').onclick = () => {
+              remaining.forEach((l, i) => {
+                const inp = modal.querySelector(`[data-recv-i="${i}"]`);
+                if (inp) inp.value = l.qty;
+              });
+            };
+            modal.querySelector('[data-zero]').onclick = () => {
+              modal.querySelectorAll('[data-recv-i]').forEach((inp) => {
+                inp.value = '0';
+              });
+            };
+            modal.querySelector('[data-ok]').onclick = async () => {
+              const toRecv = remaining
+                .map((l, i) => {
+                  const inp = modal.querySelector(`[data-recv-i="${i}"]`);
+                  let q = Math.max(0, Number(inp && inp.value) || 0);
+                  if (q > l.qty) q = l.qty;
+                  return { ...l, qty: q };
+                })
+                .filter((l) => l.qty > 0);
+              if (!toRecv.length) {
+                RS.toast('Enter at least one quantity', 'fa-circle-exclamation');
+                return;
+              }
+              close();
+              const ok = await receivePurchaseOrder(p, { linesToReceive: toRecv });
+              resolve(ok);
+            };
+          },
+        });
+      });
+    }
+
+    function printPoRow(p) {
+      if (window.RSInventoryUI && typeof RSInventoryUI.printPurchaseOrder === 'function') {
+        RSInventoryUI.printPurchaseOrder({
+          ...p,
+          poNumber: p.poNumber || p.po || p.id,
+          lines: parsePoLines(p),
+        });
+        return;
+      }
+      if (typeof window.RSPrint === 'function') {
+        const lines = parsePoLines(p)
+          .map((l) => `<div>${esc(l.qty)} ${esc(l.unit)} · ${esc(l.name)}</div>`)
+          .join('');
+        RSPrint(
+          `<div style="max-width:320px;margin:0 auto"><b>PO ${esc(p.poNumber || p.po)}</b><br>${esc(p.sup || p.supplier)}<br>${lines}<br>Total ${rs(p.value)}</div>`,
+          'PO'
+        );
+      }
+    }
+
+    function viewPoModal(p) {
+      if (!window.RSModal) return;
+      const lines = parsePoLines(p);
+      const remaining = remainingPoLines(p);
+      const bodyLines = lines.length
+        ? lines
+            .map((l) => {
+              const got = (Array.isArray(p.receivedLines) ? p.receivedLines : [])
+                .filter((r) => String(r.name).toLowerCase() === String(l.name).toLowerCase())
+                .reduce((a, r) => a + (Number(r.qty) || 0), 0);
+              const left = Math.max(0, (Number(l.qty) || 0) - got);
+              return `<tr><td>${esc(l.name)}</td><td>${esc(l.qty)} ${esc(l.unit)}${got ? ' <span style="color:var(--text-mute)">(got ' + got + (left ? ', left ' + left : '') + ')</span>' : ''}</td><td style="text-align:right">${rs(l.value || l.qty * (l.cost || 0))}</td></tr>`;
+            })
+            .join('')
+        : `<tr><td colspan="3">${esc(p.items || '—')}</td></tr>`;
+      const canReceive =
+        p.status !== 'received' &&
+        p.status !== 'cancelled' &&
+        p.status !== 'canceled' &&
+        remaining.length > 0;
+      const canCancel =
+        p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
+      RSModal.open({
+        title: 'PO ' + (p.poNumber || p.po || p.id),
+        sub: (p.sup || p.supplier || '') + ' · ' + (p.status || 'pending'),
+        icon: 'fa-file-invoice',
+        size: 'md',
+        body: `<div style="font-size:12.5px;color:var(--text-soft);margin-bottom:10px">
+          Date: <b style="color:var(--text)">${esc(p.dateRaw || p.date || '—')}</b>
+          ${p.receivedAt ? ' · Last receive: <b style="color:var(--text)">' + esc(new Date(p.receivedAt).toLocaleString()) + '</b>' : ''}
+          ${p.cancelReason ? ' · Cancel: ' + esc(p.cancelReason) : ''}
+        </div>
+        <table class="data-table"><thead><tr><th>Item</th><th>Qty</th><th style="text-align:right">Value</th></tr></thead>
+        <tbody>${bodyLines}</tbody></table>
+        <div style="margin-top:12px;font-weight:800;text-align:right">Total ${rs(p.value)}</div>`,
+        foot: `<button class="btn btn-ghost" style="flex:1" data-x>Close</button>
+          <button class="btn btn-ghost" style="flex:1" data-print><i class="fa-solid fa-print"></i> Print</button>
+          ${canCancel ? '<button class="btn btn-ghost" style="flex:1;color:var(--red)" data-cancel-po><i class="fa-solid fa-ban"></i> Cancel</button>' : ''}
+          ${canReceive ? '<button class="btn btn-primary" style="flex:1.2" data-recv><i class="fa-solid fa-box-open"></i> Receive…</button>' : ''}`,
+        onMount(modal, close) {
+          modal.querySelector('[data-x]').onclick = close;
+          modal.querySelector('[data-print]').onclick = () => printPoRow(p);
+          const cancelBtn = modal.querySelector('[data-cancel-po]');
+          if (cancelBtn)
+            cancelBtn.onclick = async () => {
+              const reason = window.prompt('Cancel reason (optional)', 'Not needed');
+              if (reason === null) return;
+              close();
+              const ok = await cancelPurchaseOrder(p, reason || 'Cancelled');
+              if (ok) drawPanes();
+            };
+          const recv = modal.querySelector('[data-recv]');
+          if (recv)
+            recv.onclick = async () => {
+              close();
+              const ok = await openReceiveModal(p);
+              if (ok) drawPanes();
+            };
+        },
+      });
+    }
+
+    function filteredPosOrders() {
+      return POS_ORDERS.filter((p) => {
+        const s = String(p.status || 'pending').toLowerCase();
+        if (poListFilter === 'all') return true;
+        if (poListFilter === 'received') return s === 'received';
+        if (poListFilter === 'cancelled') return s === 'cancelled' || s === 'canceled';
+        // open = pending, sent, partial
+        return s === 'pending' || s === 'sent' || s === 'partial';
+      });
+    }
 
     function enhanceInventory(){
       const sec = $('#inventory-tab'); if(!sec || sec.dataset.enhanced) return; sec.dataset.enhanced='1';
@@ -148,17 +499,170 @@
             <div class="crm-grid">${SUPPLIERS.map(s=>`<div class="crm-card"><div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[s.name.length%RS.avatarColors.length]}"><i class="fa-solid fa-truck-field" style="font-size:15px"></i></div><div><div class="crm-name">${s.name}</div><div class="crm-phone">${s.cat}</div></div></div><div style="font-size:12.5px;color:var(--text-soft);line-height:1.9"><div><i class="fa-solid fa-phone" style="width:16px;color:var(--text-mute)"></i> ${s.contact}</div><div><i class="fa-solid fa-file-contract" style="width:16px;color:var(--text-mute)"></i> ${s.terms} · ${s.items} items</div><div><i class="fa-solid fa-star" style="width:16px;color:var(--amber)"></i> ${s.rating} rating</div></div></div>`).join('')}</div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="pos">
-            <div class="panel-head"><h3>Purchase orders</h3><button class="btn btn-primary btn-sm" id="add-po"><i class="fa-solid fa-plus"></i> Raise PO</button></div>
+            <div class="panel-head" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <h3 style="margin:0">Purchase orders</h3>
+              <span class="pill pill-amber" style="padding:3px 9px">${POS_ORDERS.filter(p=>['pending','sent','partial'].includes(p.status)).length} open</span>
+              <div class="seg" id="po-filter-seg" style="margin-left:4px">
+                ${[['open','Open'],['received','Received'],['cancelled','Cancelled'],['all','All']].map(([k,lab])=>
+                  `<button type="button" data-po-filter="${k}" class="${poListFilter===k?'active':''}" style="font-size:11.5px;padding:4px 10px">${lab}</button>`
+                ).join('')}
+              </div>
+              <div class="grow"></div>
+              <button class="btn btn-ghost btn-sm" id="btn-po-refresh" title="Reload POs"><i class="fa-solid fa-rotate"></i></button>
+              <button class="btn btn-primary btn-sm" id="add-po"><i class="fa-solid fa-plus"></i> Raise PO</button>
+            </div>
             <div class="table-scroll"><table class="data-table"><thead><tr><th>PO No.</th><th>Supplier</th><th>Items</th><th>Value</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-            ${POS_ORDERS.map(p=>`<tr><td><b>${p.po}</b></td><td>${p.sup}</td><td>${p.items}</td><td class="td-strong">${rs(p.value)}</td><td>${p.date}</td><td><span class="pill ${poPill[p.status]}" style="padding:3px 9px;text-transform:capitalize">${p.status}</span></td><td><div class="row-actions"><button class="icon-act go" title="View"><i class="fa-solid fa-eye"></i></button><button class="icon-act" title="Print"><i class="fa-solid fa-print"></i></button></div></td></tr>`).join('')}
+            ${(() => {
+              const list = filteredPosOrders();
+              if (!list.length) {
+                return `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-soft)">${
+                  POS_ORDERS.length
+                    ? 'No POs in this filter.'
+                    : 'No purchase orders yet. Use <b>Auto-draft POs</b> on Stock when items are low, or Raise PO.'
+                }</td></tr>`;
+              }
+              return list
+                .map((p) => {
+                  const idx = POS_ORDERS.indexOf(p);
+                  const canRecv =
+                    p.status !== 'received' &&
+                    p.status !== 'cancelled' &&
+                    p.status !== 'canceled' &&
+                    remainingPoLines(p).length > 0;
+                  const canCancel =
+                    p.status !== 'received' && p.status !== 'cancelled' && p.status !== 'canceled';
+                  return `<tr data-po-idx="${idx}">
+              <td><b>${esc(p.po)}</b></td><td>${esc(p.sup)}</td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.items)}">${esc(p.items)}</td>
+              <td class="td-strong">${rs(p.value)}</td><td>${esc(p.date)}</td>
+              <td><span class="pill ${poPill[p.status] || 'pill-amber'}" style="padding:3px 9px;text-transform:capitalize">${esc(p.status || 'pending')}</span></td>
+              <td><div class="row-actions">
+                <button class="icon-act go" data-po-view="${idx}" title="View" aria-label="View PO"><i class="fa-solid fa-eye"></i></button>
+                <button class="icon-act" data-po-print="${idx}" title="Print" aria-label="Print PO"><i class="fa-solid fa-print"></i></button>
+                ${canRecv ? `<button class="icon-act" data-po-recv="${idx}" title="Receive stock (partial OK)" aria-label="Receive stock" style="color:var(--green)"><i class="fa-solid fa-box-open"></i></button>` : ''}
+                ${canCancel ? `<button class="icon-act" data-po-cancel="${idx}" title="Cancel PO" aria-label="Cancel PO" style="color:var(--red)"><i class="fa-solid fa-ban"></i></button>` : ''}
+              </div></td></tr>`;
+                })
+                .join('');
+            })()}
             </tbody></table></div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="waste">
-            <div class="panel-head"><h3>Waste log</h3><div class="row" style="gap:8px"><span class="pill pill-red" style="padding:4px 11px">${rs(WASTE.reduce((a,w)=>a+w.cost,0))} lost</span><button class="btn btn-primary btn-sm" id="add-waste"><i class="fa-solid fa-plus"></i> Log waste</button></div></div>
-            <div class="table-scroll"><table class="data-table"><thead><tr><th>Item</th><th>Quantity</th><th>Reason</th><th>Cost lost</th><th>When</th></tr></thead><tbody>
-            ${WASTE.map(w=>`<tr><td><b>${w.item}</b></td><td>${w.qty}</td><td><span class="pill" style="padding:3px 9px">${w.reason}</span></td><td class="td-strong" style="color:var(--red)">${rs(w.cost)}</td><td>${w.date}</td></tr>`).join('')}
+            <div class="panel-head" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <h3 style="margin:0">Waste log</h3>
+              <span class="pill pill-red" style="padding:4px 11px">${rs(WASTE.reduce((a,w)=>a+(Number(w.cost)||0),0))} lost</span>
+              <span class="pill" style="padding:4px 11px">${WASTE.length} entries</span>
+              <div class="grow"></div>
+              <button class="btn btn-ghost btn-sm" id="btn-export-waste"><i class="fa-solid fa-file-csv"></i> CSV</button>
+              <button class="btn btn-primary btn-sm" id="add-waste"><i class="fa-solid fa-plus"></i> Log waste</button>
+            </div>
+            <div class="table-scroll"><table class="data-table"><thead><tr><th>Item</th><th>Quantity</th><th>Reason</th><th>Cost lost</th><th>When</th><th>By</th></tr></thead><tbody>
+            ${WASTE.length ? WASTE.map(w=>`<tr>
+              <td><b>${esc(w.item)}</b></td>
+              <td>${esc(w.qtyLabel || (w.qty + ' ' + (w.unit||'')))}</td>
+              <td><span class="pill" style="padding:3px 9px">${esc(w.reason)}</span></td>
+              <td class="td-strong" style="color:var(--red)">${rs(w.cost)}</td>
+              <td>${esc(w.date)}</td>
+              <td style="font-size:12px;color:var(--text-soft)">${esc(w.by || '—')}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-soft)">No waste logged yet. Logging deducts stock from inventory.</td></tr>`}
             </tbody></table></div>
           </div>`;
+
+        // Purchase order row actions
+        $$('[data-po-view]', panes).forEach((b) => {
+          b.onclick = () => {
+            const p = POS_ORDERS[+b.dataset.poView];
+            if (p) viewPoModal(p);
+          };
+        });
+        $$('[data-po-print]', panes).forEach((b) => {
+          b.onclick = () => {
+            const p = POS_ORDERS[+b.dataset.poPrint];
+            if (p) printPoRow(p);
+          };
+        });
+        $$('[data-po-filter]', panes).forEach((b) => {
+          b.onclick = () => {
+            poListFilter = b.dataset.poFilter || 'open';
+            drawPanes();
+          };
+        });
+        $$('[data-po-recv]', panes).forEach((b) => {
+          b.onclick = async () => {
+            const p = POS_ORDERS[+b.dataset.poRecv];
+            if (!p) return;
+            const ok = await openReceiveModal(p);
+            if (ok) {
+              if (window.RS_DB) {
+                try {
+                  await reloadPosOrdersFromDb();
+                } catch (_) {}
+              }
+              drawPanes();
+              if (RS.render) RS.render('inventory-tab');
+            }
+          };
+        });
+        $$('[data-po-cancel]', panes).forEach((b) => {
+          b.onclick = async () => {
+            const p = POS_ORDERS[+b.dataset.poCancel];
+            if (!p) return;
+            if (!confirm('Cancel PO ' + (p.po || p.poNumber) + '?')) return;
+            const reason = window.prompt('Cancel reason (optional)', 'Not needed');
+            if (reason === null) return;
+            const ok = await cancelPurchaseOrder(p, reason.trim() || 'Cancelled');
+            if (ok) {
+              drawPanes();
+              if (RS.render) RS.render('inventory-tab');
+            }
+          };
+        });
+        const btnPoRefresh = $('#btn-po-refresh', panes);
+        async function reloadPosOrdersFromDb() {
+          if (!window.RS_DB) return;
+          const poRows = await RS_DB.list('purchase_orders');
+          POS_ORDERS.length = 0;
+          (poRows || []).forEach((r) => {
+            POS_ORDERS.push({
+              ...r,
+              id: r.id || r.poNumber,
+              po: r.poNumber || r.po || r.id,
+              poNumber: r.poNumber || r.po || r.id,
+              sup: r.supplier || '',
+              supplier: r.supplier || '',
+              items: r.items || '',
+              lines: r.lines || null,
+              receivedLines: r.receivedLines || null,
+              receipts: r.receipts || null,
+              value: Number(r.value) || 0,
+              status: String(r.status || 'pending').toLowerCase(),
+              dateRaw: r.date || '',
+              date: r.date
+                ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                : '--',
+              receivedAt: r.receivedAt || null,
+              cancelReason: r.cancelReason || null,
+            });
+          });
+          POS_ORDERS.sort((a, b) => {
+            const rank = (s) =>
+              s === 'pending' || s === 'sent' || s === 'partial' ? 0 : s === 'received' ? 1 : 2;
+            return rank(a.status) - rank(b.status);
+          });
+        }
+
+        if (btnPoRefresh) {
+          btnPoRefresh.onclick = async () => {
+            if (!window.RS_DB) return RS.toast('Database unavailable', 'fa-circle-exclamation');
+            try {
+              await reloadPosOrdersFromDb();
+              drawPanes();
+              RS.toast('Purchase orders refreshed', 'fa-rotate');
+            } catch (e) {
+              RS.toast('Could not refresh POs', 'fa-circle-exclamation');
+            }
+          };
+        }
 
         const recipeListBody = $('#recipe-list-body', panes);
         if (recipeListBody) {
@@ -373,15 +877,29 @@
                     poNumber: poNum,
                     supplier,
                     items,
+                    lines: parsePoLines({ items }),
                     value,
                     date: new Date().toISOString(),
-                    status: 'pending'
+                    status: 'pending',
                   };
                   close();
-                  if (RS.saveOne) {
-                    await RS.saveOne('purchase_orders', newPo);
+                  try {
+                    await savePo(newPo);
+                    POS_ORDERS.unshift({
+                      ...newPo,
+                      po: poNum,
+                      sup: supplier,
+                      dateRaw: newPo.date,
+                      date: new Date(newPo.date).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                      }),
+                    });
                     RS.toast('Purchase order raised successfully', 'fa-circle-check');
+                    drawPanes();
                     if (RS.render) RS.render('inventory-tab');
+                  } catch (e) {
+                    RS.toast('Could not save PO', 'fa-circle-exclamation');
                   }
                 };
               }
@@ -389,51 +907,184 @@
           };
         }
 
+        // Expose for inventory auto-draft refresh
+        window.RS_receivePurchaseOrder = receivePurchaseOrder;
+
+        async function logWasteEntry({ invId, itemName, qty, unit, reason, note }) {
+          const inv = RS.INVENTORY || [];
+          let item =
+            (invId && inv.find((i) => String(i.id) === String(invId))) ||
+            inv.find((i) => i.name && String(i.name).toLowerCase() === String(itemName).toLowerCase());
+          if (!item) {
+            RS.toast('Ingredient not found in inventory', 'fa-circle-exclamation');
+            return false;
+          }
+          const q = Math.max(0, Number(qty) || 0);
+          if (!(q > 0)) {
+            RS.toast('Enter a quantity greater than 0', 'fa-circle-exclamation');
+            return false;
+          }
+          const have = Math.max(0, Number(item.stock) || 0);
+          if (q > have) {
+            if (!confirm(`Only ${have} ${item.unit || unit || ''} in stock. Log ${q} and set stock to 0?`)) return false;
+          }
+          const deducted = Math.min(q, have);
+          item.stock = Math.max(0, have - q);
+          const cost = Math.round(deducted * (Number(item.cost) || 0) * 100) / 100;
+          await saveInventoryItem(item);
+
+          const now = new Date();
+          const entry = {
+            id: 'waste_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            invId: item.id,
+            item: item.name,
+            qty: deducted,
+            qtyLogged: q,
+            unit: item.unit || unit || 'unit',
+            qtyLabel: deducted + ' ' + (item.unit || unit || 'unit'),
+            reason: reason || 'Other',
+            note: note || '',
+            cost,
+            dateTime: now.toISOString(),
+            date: now.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+            by: staffName(),
+          };
+          try {
+            if (window.RS_DB && RS_DB.put) await RS_DB.put('waste_log', entry.id, entry);
+            else if (RS.saveOne) await RS.saveOne('waste_log', entry);
+          } catch (e) {
+            console.warn('waste_log save failed', e);
+          }
+          WASTE.unshift(entry);
+          try {
+            if (window.RSInventoryUI && RSInventoryUI.paintInventoryBadge) RSInventoryUI.paintInventoryBadge();
+            if (RS.renderInventory) RS.renderInventory();
+          } catch (_) {}
+          RS.toast(
+            `Waste logged: ${entry.qtyLabel} ${item.name} (−${rs(cost)})`,
+            'fa-trash-can'
+          );
+          return true;
+        }
+
+        function exportWasteCsv() {
+          if (!WASTE.length) return RS.toast('No waste entries to export', 'fa-circle-info');
+          const lines = [['item', 'qty', 'unit', 'reason', 'cost', 'when', 'by', 'note'].join(',')];
+          WASTE.forEach((w) => {
+            lines.push(
+              [w.item, w.qty, w.unit, w.reason, w.cost, w.dateTime || w.date, w.by, w.note || '']
+                .map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"')
+                .join(',')
+            );
+          });
+          const csv = lines.join('\n');
+          const name = 'waste-log-' + new Date().toISOString().slice(0, 10) + '.csv';
+          if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
+          else {
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = name;
+            a.click();
+          }
+          RS.toast('Waste CSV · ' + WASTE.length + ' rows', 'fa-file-csv');
+        }
+
+        const btnExportWaste = $('#btn-export-waste');
+        if (btnExportWaste) btnExportWaste.onclick = () => exportWasteCsv();
+
         const btnAddWaste = $('#add-waste');
         if (btnAddWaste) {
           btnAddWaste.onclick = () => {
             if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
+            const inv = RS.INVENTORY || [];
+            const opts = inv
+              .slice()
+              .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+              .map(
+                (i) =>
+                  `<option value="${esc(i.id)}" data-unit="${esc(i.unit || 'unit')}" data-name="${esc(i.name)}" data-stock="${Number(i.stock) || 0}" data-cost="${Number(i.cost) || 0}">${esc(i.name)} (${Number(i.stock) || 0} ${esc(i.unit || '')})</option>`
+              )
+              .join('');
+            if (!opts) return RS.toast('Add inventory ingredients first', 'fa-circle-exclamation');
             const body = `
               <div style="display:flex;flex-direction:column;gap:12px">
-                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                  <label class="fl">Ingredient</label>
+                  <select id="waste-item" class="form-input">${opts}</select>
+                  <div id="waste-stock-hint" style="font-size:12px;color:var(--text-soft);margin-top:4px"></div>
+                </div>
+                <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                   <div>
-                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Ingredient/Item</label>
-                    <input type="text" id="waste-item" class="form-control" placeholder="e.g. Tomato" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    <label class="fl">Quantity wasted</label>
+                    <input type="number" id="waste-qty" class="form-input" min="0" step="any" value="1" placeholder="Qty">
                   </div>
                   <div>
-                    <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Quantity Wasted</label>
-                    <input type="text" id="waste-qty" class="form-control" placeholder="e.g. 2 kg" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    <label class="fl">Unit</label>
+                    <input type="text" id="waste-unit" class="form-input" readonly>
                   </div>
                 </div>
                 <div>
-                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Reason for Waste</label>
-                  <select id="waste-reason" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  <label class="fl">Reason</label>
+                  <select id="waste-reason" class="form-input">
                     <option value="Spoiled">Spoiled / Expired</option>
                     <option value="Dropped">Dropped / Spilled</option>
                     <option value="Incorrect prep">Incorrect preparation</option>
+                    <option value="Overproduction">Overproduction</option>
                     <option value="Other">Other</option>
                   </select>
                 </div>
+                <div>
+                  <label class="fl">Note (optional)</label>
+                  <input type="text" id="waste-note" class="form-input" placeholder="e.g. fridge failure">
+                </div>
+                <div style="font-size:12.5px;color:var(--text-soft)">Est. cost lost: <b id="waste-cost-preview" style="color:var(--red)">${rs(0)}</b> · stock will be deducted</div>
               </div>
             `;
             RSModal.open({
-              title: 'Log Kitchen Waste',
-              sub: 'Track inventory loss and spoilage',
+              title: 'Log kitchen waste',
+              sub: 'Deducts from inventory stock',
               icon: 'fa-trash-can',
               size: 'sm',
               body,
-              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-circle-check"></i> Log Loss</button>`,
+              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm style="background:var(--red);border-color:var(--red)"><i class="fa-solid fa-trash-can"></i> Log &amp; deduct</button>`,
               onMount(modal, close) {
-                modal.querySelector('[data-cancel]').onclick = close;
-                modal.querySelector('[data-confirm]').onclick = () => {
-                  const item = modal.querySelector('#waste-item').value || '';
-                  if (!item) return RS.toast('Item name is required', 'fa-circle-exclamation');
-                  const qty = modal.querySelector('#waste-qty').value || '';
-                  const reason = modal.querySelector('#waste-reason').value || '';
-                  close();
-                  RS.toast(`Logged waste: ${qty} of ${item} (${reason})`, 'fa-circle-check');
+                const sel = modal.querySelector('#waste-item');
+                const qtyEl = modal.querySelector('#waste-qty');
+                const unitEl = modal.querySelector('#waste-unit');
+                const hint = modal.querySelector('#waste-stock-hint');
+                const costEl = modal.querySelector('#waste-cost-preview');
+                const sync = () => {
+                  const opt = sel.options[sel.selectedIndex];
+                  if (!opt) return;
+                  unitEl.value = opt.dataset.unit || 'unit';
+                  const stock = Number(opt.dataset.stock) || 0;
+                  const cost = Number(opt.dataset.cost) || 0;
+                  const q = Math.max(0, Number(qtyEl.value) || 0);
+                  hint.textContent = `On hand: ${stock} ${opt.dataset.unit || ''}`;
+                  costEl.textContent = rs(Math.round(Math.min(q, stock) * cost * 100) / 100);
                 };
-              }
+                sel.onchange = sync;
+                qtyEl.oninput = sync;
+                sync();
+                modal.querySelector('[data-cancel]').onclick = close;
+                modal.querySelector('[data-confirm]').onclick = async () => {
+                  const opt = sel.options[sel.selectedIndex];
+                  if (!opt) return;
+                  const ok = await logWasteEntry({
+                    invId: sel.value,
+                    itemName: opt.dataset.name || opt.textContent,
+                    qty: qtyEl.value,
+                    unit: unitEl.value,
+                    reason: modal.querySelector('#waste-reason').value,
+                    note: modal.querySelector('#waste-note').value.trim(),
+                  });
+                  if (ok) {
+                    close();
+                    drawPanes();
+                    if (RS.render) RS.render('inventory-tab');
+                  }
+                };
+              },
             });
           };
         }
@@ -449,7 +1100,11 @@
 
       // Load from DB
       if (window.RS_DB) {
-        Promise.all([RS_DB.list('vendors'), RS_DB.list('purchase_orders')]).then(([vRows, poRows]) => {
+        Promise.all([
+          RS_DB.list('vendors'),
+          RS_DB.list('purchase_orders'),
+          RS_DB.list('waste_log').catch(() => []),
+        ]).then(([vRows, poRows, wasteRows]) => {
           if (vRows && vRows.length) {
             SUPPLIERS.length = 0;
             vRows.forEach(r => {
@@ -466,20 +1121,67 @@
 
           if (poRows && poRows.length) {
             POS_ORDERS.length = 0;
-            poRows.forEach(r => {
-              POS_ORDERS.push({
-                po: r.poNumber,
-                sup: r.supplier,
-                items: r.items,
-                value: r.value,
-                status: r.status,
-                date: r.date ? new Date(r.date).toLocaleDateString('en-IN', {day:'numeric', month:'short'}) : '--'
+            const mapped = poRows.map((r) => ({
+              ...r,
+              id: r.id || r.poNumber,
+              po: r.poNumber || r.po || r.id,
+              poNumber: r.poNumber || r.po || r.id,
+              sup: r.supplier || r.sup || '',
+              supplier: r.supplier || r.sup || '',
+              items: r.items || (Array.isArray(r.lines) ? r.lines.map((l) => `${l.qty} ${l.unit || ''} ${l.name}`).join(', ') : ''),
+              lines: r.lines || null,
+              receivedLines: r.receivedLines || null,
+              receipts: r.receipts || null,
+              value: Number(r.value) || 0,
+              status: String(r.status || 'pending').toLowerCase(),
+              dateRaw: r.date || '',
+              date: r.date
+                ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                : '--',
+              receivedAt: r.receivedAt || null,
+              cancelReason: r.cancelReason || null,
+            }));
+            // Open first, then newest
+            mapped.sort((a, b) => {
+              const rank = (s) =>
+                s === 'pending' || s === 'sent' || s === 'partial' ? 0 : s === 'received' ? 1 : 2;
+              const d = rank(a.status) - rank(b.status);
+              if (d) return d;
+              return String(b.dateRaw || '').localeCompare(String(a.dateRaw || ''));
+            });
+            mapped.forEach((row) => POS_ORDERS.push(row));
+          }
+
+          WASTE.length = 0;
+          (wasteRows || [])
+            .slice()
+            .sort((a, b) => String(b.dateTime || b.date || '').localeCompare(String(a.dateTime || a.date || '')))
+            .forEach((w) => {
+              WASTE.push({
+                ...w,
+                item: w.item || w.name || 'Item',
+                qty: Number(w.qty) || 0,
+                unit: w.unit || '',
+                qtyLabel: w.qtyLabel || `${w.qty || 0} ${w.unit || ''}`.trim(),
+                reason: w.reason || 'Other',
+                cost: Number(w.cost) || 0,
+                date:
+                  w.date ||
+                  (w.dateTime
+                    ? new Date(w.dateTime).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—'),
+                by: w.by || w.loggedBy || '',
               });
             });
-          }
+
           drawPanes();
         }).catch(e => {
-          console.warn("Failed loading vendors/purchase orders from DB", e);
+          console.warn("Failed loading vendors/purchase orders/waste from DB", e);
           drawPanes();
         });
       } else {
@@ -487,6 +1189,44 @@
       }
 
       wireSeg('#inventory-tab', ['stock','recipes','suppliers','pos','waste']);
+
+      // Reload POs when inventory re-renders (after auto-draft)
+      if (!sec._poReloadBound) {
+        sec._poReloadBound = true;
+        document.addEventListener('rs:render-inventory', () => {
+          if (window.RS_DB) {
+            RS_DB.list('purchase_orders')
+              .then((poRows) => {
+                if (!poRows) return;
+                POS_ORDERS.length = 0;
+                poRows.forEach((r) => {
+                  POS_ORDERS.push({
+                    ...r,
+                    id: r.id || r.poNumber,
+                    po: r.poNumber || r.po || r.id,
+                    poNumber: r.poNumber || r.po || r.id,
+                    sup: r.supplier || '',
+                    supplier: r.supplier || '',
+                    items: r.items || '',
+                    lines: r.lines || null,
+                    value: Number(r.value) || 0,
+                    status: String(r.status || 'pending').toLowerCase(),
+                    dateRaw: r.date || '',
+                    date: r.date
+                      ? new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                      : '--',
+                    receivedAt: r.receivedAt || null,
+                  });
+                });
+                POS_ORDERS.sort((a, b) => {
+                  const rank = (s) => (s === 'pending' || s === 'sent' ? 0 : 1);
+                  return rank(a.status) - rank(b.status);
+                });
+              })
+              .catch(() => {});
+          }
+        });
+      }
     }
 
     /* ============== EMPLOYEES ============== */
