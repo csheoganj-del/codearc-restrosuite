@@ -1682,9 +1682,10 @@
           gst: cust.gst || '',
         };
 
-        // Wave 2: server sequence when online; local durable sequence offline
+        // Wave 2/3: server sequence + channel series (DI/TK/DL)
+        const channelHint = (totals.channel || orderType() || '').toString();
         const billNo = (RS.allocateBillNo
-          ? await RS.allocateBillNo(RS.BILLS || [])
+          ? await RS.allocateBillNo(RS.BILLS || [], channelHint)
           : (RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001')));
         const identity = (RS.newBillIdentity ? RS.newBillIdentity(billNo) : { id: Date.now(), idempotencyKey: 'idem-' + Date.now(), no: billNo });
 
@@ -1741,6 +1742,7 @@
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile,
           liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
         };
+        if (window.RSOps && RSOps.decorateBillMeta) RSOps.decorateBillMeta(billRow, bill);
 
         // 1) Memory + DURABLE local/cloud put BEFORE clearing cart (money integrity)
         RS.BILLS.unshift(billRow);
@@ -2100,16 +2102,23 @@
       const cust = RS.getCustomer();
       if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
       const tok = RS.seedToken();
-      const kotInner = `<div class="kot-h"><span class="kt">${esc(tok)}</span><span style="font-weight:700">${cust.table}</span></div>
-        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'})} · ${totals.count} items</div>
-        ${totals.items.map(i=>`<div class="kot-item"><span class="kq">${i.qty}×</span><span>${i.name}</span></div>`).join('')}`;
+      const station = (window.RSOps && RSOps.getStationLabel) ? RSOps.getStationLabel() : '';
+      const kotInner = `<div class="kot-h"><span class="kt">${esc(tok)}</span><span style="font-weight:700">${esc(cust.table)}</span></div>
+        <div style="font-size:11.5px;color:#6b6960;margin-bottom:8px">${new Date().toLocaleTimeString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{hour:'numeric',minute:'2-digit',timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'})} · ${totals.count} items${station ? ' · ' + esc(station) : ''}</div>
+        ${totals.items.map(i=>`<div class="kot-item"><span class="kq">${i.qty}×</span><span>${esc(i.name)}</span></div>`).join('')}`;
       RSModal.open({
         title:'Kitchen ticket', sub:tok, icon:'fa-fire', size:'sm',
         body:`<div class="kot-paper">${kotInner}</div>`,
         foot:`<button class="btn btn-ghost" id="kot-print" style="flex:1"><i class="fa-solid fa-print"></i> Print ticket</button>
               <button class="btn btn-primary" id="kot-send" style="flex:1"><i class="fa-solid fa-fire"></i> Send to kitchen</button>`,
         onMount(modal, close){
-          modal.querySelector('#kot-print').onclick = ()=> RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
+          modal.querySelector('#kot-print').onclick = ()=> {
+            if (window.RSOps && RSOps.printKotThermal) {
+              RSOps.printKotThermal(totals.items, { token: tok, table: cust.table, orderType: orderType() });
+            } else {
+              RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
+            }
+          };
           modal.querySelector('#kot-send').onclick = async ()=>{
             close();
             if(window.RS_DB){
@@ -2142,15 +2151,17 @@
             RS.toast(tok+' fired to kitchen','fa-fire');
 
             // Auto-print KOT if enabled in settings
-            if (window.RS && typeof window.RS.getSettings === 'function') {
-              try {
-                const settings = await window.RS.getSettings();
-                if (settings && settings.set_auto_print_kot) {
+            try {
+              const settings = window.RS_SETTINGS || (window.RS && RS.getSettings ? await RS.getSettings() : null);
+              if (settings && (settings.set_auto_print_kot === true || settings.set_auto_print_kot === 'true' || settings.set_auto_print_kot === 'on')) {
+                if (window.RSOps && RSOps.printKotThermal) {
+                  RSOps.printKotThermal(totals.items, { token: tok, table: cust.table, orderType: orderType() });
+                } else {
                   RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
                 }
-              } catch(e) {
-                console.error("Failed to read settings for auto-print KOT", e);
               }
+            } catch(e) {
+              console.error("Failed to read settings for auto-print KOT", e);
             }
           };
         }
