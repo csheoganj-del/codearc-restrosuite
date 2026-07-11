@@ -11,6 +11,8 @@
     "pretest": "node scripts/build-critical.cjs",
     "test": "node --test --experimental-test-isolation=none tests/*.test.cjs",
     "test:e2e": "node --test --experimental-test-isolation=none tests/e2e-smoke.test.cjs",
+    "test:e2e:browser": "npx playwright test",
+    "test:e2e:browser:install": "npx playwright install chromium",
     "check": "node scripts/check-project.cjs && node scripts/check-free-tier.cjs",
     "check:launch": "node scripts/check-launch.cjs",
     "check:pwa": "node scripts/ensure-pwa-assets.cjs",
@@ -43,6 +45,7 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "esbuild": "^0.28.1",
     "eslint": "^10.6.0",
     "jsdom": "^29.1.1"

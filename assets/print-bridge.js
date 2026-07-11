@@ -99,20 +99,63 @@
   }
 
   async function printEscPosText(text, opts) {
+    const options = opts || {};
     const desk = global.RS_DESKTOP || global.rsDesktop;
+    let deviceName = options.deviceName || null;
+    if (!deviceName && desk && typeof desk.getPreferredPrinter === 'function') {
+      try {
+        const pref = await desk.getPreferredPrinter();
+        deviceName = pref && pref.name;
+      } catch (_) {}
+    }
+    // Prefer binary ESC/POS when encoder is available
+    let base64 = null;
+    if (global.RSEscPos && RSEscPos.Encoder) {
+      try {
+        const enc = new RSEscPos.Encoder().init().text(String(text || '')).feed(3).cut();
+        base64 = enc.toBase64();
+      } catch (_) {}
+    }
     if (desk && typeof desk.printEscPos === 'function') {
       try {
-        const res = await desk.printEscPos({ text: toEscPosText(text) });
+        const res = await desk.printEscPos({
+          text: toEscPosText(text),
+          base64,
+          deviceName,
+        });
         if (res && res.ok) {
-          // Also HTML print for reliability when no raw USB bridge
-          await printHtml(`<pre class="escpos">${String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`, 'ESC/POS', opts);
-          return { ok: true, mode: 'escpos+html', spool: res.spool };
+          return { ok: true, mode: res.mode || 'escpos', spool: res.spool, deviceName };
         }
+        console.warn('[Print] escpos failed', res && res.error);
       } catch (e) {
         console.warn('[Print] escpos failed', e);
       }
     }
-    return printHtml(`<pre class="escpos">${String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`, 'Receipt', opts);
+    return printHtml(`<pre class="escpos">${String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`, 'Receipt', options);
+  }
+
+  async function printBillEscPos(bill, outlet, opts) {
+    if (global.RSEscPos && typeof RSEscPos.receiptFromBill === 'function') {
+      const enc = RSEscPos.receiptFromBill(bill, outlet);
+      const desk = global.RS_DESKTOP || global.rsDesktop;
+      if (desk && desk.printEscPos) {
+        const res = await desk.printEscPos({
+          base64: enc.toBase64(),
+          text: null,
+          deviceName: (opts && opts.deviceName) || null,
+        });
+        if (res && res.ok) return res;
+      }
+    }
+    // Fallback: text lines
+    const items = (bill && (bill.items || bill._items)) || [];
+    const lines = [
+      (outlet && outlet.name) || 'Outlet',
+      bill && bill.no,
+      'TOTAL ' + (bill && (bill.grand != null ? bill.grand : bill.amount)),
+      ...items.map((i) => (i.qty || 1) + 'x ' + (i.name || '')),
+    ];
+    return printEscPosText(lines.join('\n'), opts);
   }
 
   async function listPrinters() {
@@ -127,9 +170,31 @@
   global.RSPrintBridge = {
     printHtml,
     printEscPosText,
+    printBillEscPos,
     listPrinters,
     wrapHtml,
     toEscPosText,
+    async choosePreferredPrinter() {
+      const desk = global.RS_DESKTOP || global.rsDesktop;
+      if (!desk || !desk.listPrinters) {
+        if (global.RS && RS.toast) RS.toast('Printer picker needs desktop app', 'fa-print');
+        return null;
+      }
+      const printers = await desk.listPrinters();
+      const list = Array.isArray(printers) ? printers : [];
+      if (!list.length) {
+        if (global.RS && RS.toast) RS.toast('No printers found', 'fa-print');
+        return null;
+      }
+      const names = list.map((p) => p.name || p.displayName || String(p));
+      const pick = window.prompt('Preferred thermal printer:\n' + names.map((n, i) => (i + 1) + '. ' + n).join('\n'), names[0]);
+      if (!pick) return null;
+      const byNum = Number(pick);
+      const name = (Number.isFinite(byNum) && byNum >= 1 && byNum <= names.length) ? names[byNum - 1] : pick;
+      if (desk.setPreferredPrinter) await desk.setPreferredPrinter(name);
+      if (global.RS && RS.toast) RS.toast('Printer set: ' + name, 'fa-print');
+      return name;
+    },
   };
 
   // Override / enhance RSPrint when features-pos defines it later

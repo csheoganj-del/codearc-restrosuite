@@ -25,6 +25,8 @@ async function main() {
   // dashboard.js / features-pos remain separate (order + side-effect heavy).
   const entry = path.join(outDir, '_entry-critical.js');
   const sources = [
+    'assets/escpos-encoder.js',
+    'assets/modules/bill-identity.js',
     'assets/print-bridge.js',
     'assets/receipt.js',
     'assets/competitive-ops.js',

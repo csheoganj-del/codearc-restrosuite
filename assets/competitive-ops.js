@@ -70,6 +70,29 @@
       };
     }
     chip.innerHTML = '<i class="fa-solid fa-desktop"></i> ' + esc(getStationLabel());
+    // Desktop: printer chip next to station
+    if (global.RS_DESKTOP && global.RSPrintBridge) {
+      let pchip = document.getElementById('rs-printer-chip');
+      if (!pchip && host) {
+        pchip = document.createElement('button');
+        pchip.id = 'rs-printer-chip';
+        pchip.type = 'button';
+        pchip.title = 'Preferred thermal printer';
+        pchip.style.cssText = chip.style.cssText;
+        host.insertBefore(pchip, chip.nextSibling);
+        pchip.onclick = () => {
+          if (global.RSPrintBridge.choosePreferredPrinter) RSPrintBridge.choosePreferredPrinter();
+        };
+      }
+      if (pchip) {
+        pchip.innerHTML = '<i class="fa-solid fa-print"></i> Printer';
+        if (global.RS_DESKTOP.getPreferredPrinter) {
+          global.RS_DESKTOP.getPreferredPrinter().then((pref) => {
+            if (pref && pref.name) pchip.innerHTML = '<i class="fa-solid fa-print"></i> ' + esc(String(pref.name).slice(0, 18));
+          }).catch(() => {});
+        }
+      }
+    }
   }
 
   /* ---------------- Channel bill series ---------------- */

@@ -424,9 +424,12 @@
     }
     return raw;
   }
+  // Wave 5: prefer extracted module (assets/modules/bill-identity.js) when loaded
   function nextBillNo(existingBills = []) {
+    if (window.RSBillIdentity && typeof RSBillIdentity.nextBillNo === 'function') {
+      return RSBillIdentity.nextBillNo(existingBills);
+    }
     // Local fallback sequence (offline / server RPC unavailable).
-    // Prefer allocateBillNo() when online for multi-device safety.
     const key = shortDateKey();
     const prefix = `RS-${key}-`;
     const maxFromList = (existingBills || []).reduce((highest, bill) => {
@@ -448,10 +451,11 @@
     return `${prefix}${String(next).padStart(3, '0')}`;
   }
 
-  /** Server-allocated bill number (Wave 2). Falls back to nextBillNo locally. */
   async function allocateBillNo(existingBills = [], channel) {
+    if (window.RSBillIdentity && typeof RSBillIdentity.allocateBillNo === 'function') {
+      return RSBillIdentity.allocateBillNo(existingBills, channel);
+    }
     const day = shortDateKey();
-    // Wave 3: channel series prefix (DI/TK/DL) while keeping server sequence when possible
     const ch = String(channel || '').toLowerCase();
     const chCode = ch.includes('deliver') || ch.includes('online') ? 'DL'
       : (ch.includes('take') || ch.includes('parcel') ? 'TK' : 'DI');
@@ -463,7 +467,6 @@
         ]);
         let no = (res && (res.no || res.order_id || res.data)) || null;
         if (no && typeof no === 'string' && /^RS-\d{6}-\d+$/i.test(no)) {
-          // Keep local counter at least as high as server (avoid offline collisions later)
           try {
             const s = (RS_API.session && RS_API.session()) || {};
             const tenant = s.tenant_id || s.tenant_slug || sessionStorage.getItem('tenant_slug') || 'local';
@@ -474,7 +477,6 @@
               if (seq > stored) localStorage.setItem(seqKey, String(seq));
             }
           } catch (_) {}
-          // Optional channel-tagged human number: RS-DI-YYMMDD-001
           no = no.replace(/^RS-/, 'RS-' + chCode + '-');
           return no;
         }
@@ -486,12 +488,13 @@
     return String(local).replace(/^RS-/, 'RS-' + chCode + '-');
   }
 
-  /** Client idempotency key + temporary local id (cloud may replace with identity PK). */
   function newBillIdentity(billNo) {
+    if (window.RSBillIdentity && typeof RSBillIdentity.newBillIdentity === 'function') {
+      return RSBillIdentity.newBillIdentity(billNo);
+    }
     const idempotencyKey = (typeof crypto !== 'undefined' && crypto.randomUUID)
       ? crypto.randomUUID()
       : ('idem-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
-    // Temporary local id only — cloud upsert uses order_id and returns real bigint
     const id = Date.now() + Math.floor(Math.random() * 1000);
     return { id, idempotencyKey, no: billNo };
   }
