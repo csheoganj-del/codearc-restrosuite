@@ -12,6 +12,20 @@
     if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
+  function initials(value) {
+    if (global.RS && typeof RS.initials === 'function') return RS.initials(value);
+    return String(value || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part.charAt(0).toUpperCase())
+      .join('');
+  }
+  function getAvatarColors() {
+    if (global.RS && Array.isArray(RS.avatarColors) && RS.avatarColors.length) return RS.avatarColors;
+    return ['#FF4F00', '#5B6C8F', '#2A9B8F', '#1F8A5B', '#C47B16'];
+  }
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
@@ -137,6 +151,7 @@ function renderTenantTable() {
   const tbody = $('#tenant-table-body');
   if (!tbody) return;
   pruneTenantSelection();
+  const avatarColors = getAvatarColors();
 
   let filtered = _cachedTenants.slice();
 
