@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v82 (2026-07-11) — Super-admin tenant table fix
+
+- Fix **Tenant directory** crash: `avatarColors is not defined` after Wave 9 code-split
+- Super-admin module owns local avatar palette (fallback when `RS.avatarColors` missing)
+- Cloud pack fields (tip/promo/covers/cash movements) map into existing JSON columns — **no new Supabase tables**
+- Staff employees import list uses stable avatar color index
+
 ## v81 (2026-07-11) — UX / QR table CX 10× polish
 
 ### Guest (table QR)
