@@ -161,7 +161,7 @@ test('qr-orders-ui module extracted (wave 10)', () => {
   assert.ok(!dash.includes('qr-grid'), 'QR grid markup should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /qr-orders-ui\.js/);
-  assert.match(html, /v58-20260711/);
+  assert.match(html, /v5[0-9]-20260711/);
 });
 
 test('employees-ui module extracted (wave 10)', () => {
@@ -174,6 +174,22 @@ test('employees-ui module extracted (wave 10)', () => {
   assert.ok(!dash.includes('emp-card'), 'employee cards should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /employees-ui\.js/);
+});
+
+test('pos-ui module extracted (wave 11)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
+  assert.match(src, /RSPosUI/);
+  assert.match(src, /renderPOS|const renderPOS/);
+  assert.match(src, /getTotals/);
+  assert.match(src, /initPOS/);
+  assert.match(src, /function getCart|getCart\s*\(/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSPosUI/);
+  assert.ok(!dash.includes('pos-item'), 'POS menu tiles should leave dashboard');
+  assert.match(dash, /RS_resolveRate/); // tax helpers remain
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /pos-ui\.js/);
+  assert.match(html, /v59-20260711/);
 });
 
 test('USB and split docs exist', () => {

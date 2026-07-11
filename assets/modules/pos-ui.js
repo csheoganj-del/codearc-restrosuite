@@ -1,0 +1,828 @@
+/* ============================================================
+   RestroSuite — POS cart / menu grid / init (Wave 11 code-split)
+   Owns cart state; dashboard + features-pos use RS.* APIs.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  function toast(msg, icon) {
+    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+  }
+  function rs(n) {
+    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    return '₹' + (Number(n) || 0).toLocaleString('en-IN');
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  const _e = esc;
+  function $(sel, r) {
+    return (r || document).querySelector(sel);
+  }
+  function $$(sel, r) {
+    return Array.from((r || document).querySelectorAll(sel));
+  }
+  function getMenu() {
+    return (global.RS && Array.isArray(RS.MENU) ? RS.MENU : []) || [];
+  }
+  function catColor(c) {
+    if (global.RS && typeof RS.catColor === 'function') return RS.catColor(c);
+    return 'var(--orange)';
+  }
+  function stockLabelMap() {
+    return (global.RS && RS.stockLabel) || { ok: 'In stock', low: 'Low', out: 'Out' };
+  }
+  function stockClsMap() {
+    return (global.RS && RS.stockCls) || { ok: 'stock-ok', low: 'stock-low', out: 'stock-out' };
+  }
+  function activateTab(id) {
+    if (global.RS && typeof RS.activateTab === 'function') return RS.activateTab(id);
+  }
+
+let activeCat='All', cart=[], discountPct=0;
+const renderPOS = () => {
+  const grid = $('#pos-grid');
+  if (!grid) return;
+  const q = ($('#pos-search-input')?.value||'').toLowerCase();
+  const items = getMenu().filter(m=>{
+    const mc = ((m.cat || '').trim() || 'Uncategorized').toLowerCase();
+    return (activeCat==='All'||mc===String(activeCat).toLowerCase()) && (m.name||'').toLowerCase().includes(q);
+  });
+  grid.innerHTML = items.map(m=>{
+    const inCart = cart.find(c=>String(c.id)===String(m.id));
+    return `
+    <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
+      ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
+      <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat || 'Uncategorized')}</span></div>
+      <div class="pname">${_e(m.name)}</div>
+      <div class="prow"><span class="pprice">${rs(m.price)}</span><span class="stock-dot ${stockClsMap()[m.stock]}">${stockLabelMap()[m.stock]}</span></div>
+    </div>`;
+  }).join('');
+  $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
+};
+function refreshPosCats(){
+  const catsEl = $('#pos-cats');
+  if (!catsEl) return;
+  const liveCats = ['All'].concat(Array.from(new Set(
+    getMenu().map(m => (m.cat || '').trim() || 'Uncategorized')
+  )).sort((a, b) => a.localeCompare(b)));
+  if (!liveCats.some(c => c.toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
+  catsEl.innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${c.toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
+  $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
+    activeCat=b.dataset.cat;
+    $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
+    renderPOS();
+    const container = document.getElementById('pos-cats');
+    if (container) {
+      container.scrollTo({
+        left: (b.offsetLeft + b.clientWidth / 2) - container.clientWidth / 2,
+        behavior: 'smooth'
+      });
+    }
+  }));
+}
+window.refreshPosCats = refreshPosCats;
+let lastMobileCartOpenAt = 0;
+function updateMobileCartBar(countArg, totalsArg){
+  const barCount = $('#pos-m-cart-bar-count');
+  const barTotal = $('#pos-m-cart-bar-total');
+  const cartBar = $('#pos-m-cart-bar');
+  if (!barCount || !barTotal || !cartBar) return;
+  const count = countArg != null ? countArg : cart.reduce((a,c)=>a+c.qty,0);
+  const totals = totalsArg || getTotals();
+  barCount.textContent = count + (count === 1 ? ' item' : ' items');
+  barTotal.textContent = rs(totals.grand);
+  const posActive = !!document.querySelector('#pos-tab.active');
+  const cartViewOpen = !!document.querySelector('.pos-cart.active');
+  const shouldShow = count > 0 && window.innerWidth <= 1024 && posActive && !cartViewOpen;
+  cartBar.classList.toggle('hidden', !shouldShow);
+}
+function openMobilePOSCart(e){
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const now = Date.now();
+  if (now - lastMobileCartOpenAt < 250) return;
+  lastMobileCartOpenAt = now;
+  if (window.innerWidth > 1024 || !cart.length) return;
+  const posLeft = $('.pos-left');
+  const posCart = $('.pos-cart');
+  const cartBar = $('#pos-m-cart-bar');
+  if (!posLeft || !posCart || !cartBar) return;
+  posLeft.classList.add('hidden');
+  posCart.classList.add('active');
+  cartBar.classList.add('hidden');
+  const content = document.querySelector('.content');
+  if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function closeMobilePOSCart(showBar = true){
+  const posLeft = $('.pos-left');
+  const posCart = $('.pos-cart');
+  const cartBar = $('#pos-m-cart-bar');
+  if (!posLeft || !posCart || !cartBar) return;
+  posLeft.classList.remove('hidden');
+  posCart.classList.remove('active');
+  if (showBar) updateMobileCartBar();
+  else cartBar.classList.add('hidden');
+}
+function bindMobileCartBar(){
+  const cartBar = $('#pos-m-cart-bar');
+  if (!cartBar || cartBar.dataset.rsBound) return;
+  cartBar.dataset.rsBound = '1';
+  cartBar.addEventListener('click', openMobilePOSCart);
+  cartBar.addEventListener('pointerup', openMobilePOSCart);
+  cartBar.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') openMobilePOSCart(e);
+  });
+}
+function addToCart(id){
+  const m=getMenu().find(x=>String(x.id)===String(id));
+  if (!m) return;
+  // Wave 3: soft stock/recipe warning before add
+  try {
+    if (Array.isArray(m.ingredients) && m.ingredients.length && INVENTORY.length) {
+      const short = m.ingredients.filter(ing => {
+        const inv = INVENTORY.find(i => i.name === ing.name);
+        return inv && (Number(inv.stock) || 0) < (Number(ing.qty) || 0);
+      });
+      if (short.length) {
+        toast(`Low stock for ${short.map(s => s.name).slice(0,2).join(', ')}`, 'fa-triangle-exclamation');
+      }
+    } else if (!m.ingredients || !m.ingredients.length) {
+      // silent ΓÇö competitive-ops banner covers cart-level
+    }
+  } catch (_) {}
+  const line=cart.find(c=>String(c.id)===String(id));
+  if(line) line.qty++; else cart.push({...m,qty:1});
+  renderCart();
+  toast(`${m.name} added`,'fa-plus');
+}
+function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
+function renderCart(){
+  const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
+  $('#cart-count').textContent = count+(count===1?' item':' items');
+
+  const totals = getTotals();
+  const isIncl = totals.taxProfile.inclusive_pricing;
+  const taxLabel = totals.taxProfile.tax_system || 'GST';
+  const settings = window.RS_SETTINGS || {};
+  
+  let metaHTML = `<span>Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
+  if (totals.disc > 0) {
+    metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
+  }
+  if (totals.serviceCharge > 0) {
+    metaHTML += `<span>SC <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
+  }
+  
+  // Ireland handles composition differently (not applicable)
+  if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
+    metaHTML += `<span style="font-size:10px;color:var(--text-mute)">Composition Scheme</span>`;
+  } else {
+    metaHTML += `<span>${taxLabel}${isIncl ? ' (Incl.)' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
+  }
+  
+  if (totals.liquorTax > 0) {
+    metaHTML += `<span>Liquor VAT <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
+  }
+  
+  const metaDiv = document.querySelector('.totals-meta');
+  if (metaDiv) {
+    metaDiv.innerHTML = metaHTML;
+  }
+  
+  $('#t-grand').textContent=rs(totals.grand);
+
+  updateMobileCartBar(count, totals);
+
+  if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
+  else { wrap.innerHTML = cart.map(c=>`
+    <div class="cart-line">
+      <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
+      <div class="cinfo"><div class="cn">${_e(c.name)}</div><div class="cp">${rs(c.price)} each</div></div>
+      <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
+      <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
+    </div>`).join('');
+    $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
+  }
+
+  try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
+  wireCartActions();
+
+  // Refresh POS Grid to update card badges
+  try { renderPOS(); } catch (e) {}
+
+  // Auto-save active cart to localStorage (per order type)
+  try {
+    const activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+    const activeOrderType = activeOrderTypeBtn ? activeOrderTypeBtn.textContent.trim() : 'Takeaway';
+    // Helper function to get tab key (same as in initPOS)
+    const getTabKeyForOrderType = (orderTypeText) => {
+      const lowerText = orderTypeText.toLowerCase();
+      if (lowerText.includes('delivery')) return 'Delivery';
+      if (lowerText.includes('dine')) return 'Dine-in';
+      return 'Takeaway';
+    };
+    const tabKey = getTabKeyForOrderType(activeOrderType);
+    const da = document.getElementById('delivery-address');
+    const dc = document.getElementById('delivery-charge');
+    const dr = document.getElementById('delivery-rider');
+    // Save per-order-type cart
+    localStorage.setItem('rs_tab_cart_' + tabKey, JSON.stringify({
+      items: cart.map(c=>({...c})),
+      total: cart.reduce((a,c)=>a+c.price*c.qty,0),
+      deliveryAddress: da ? da.value : '',
+      deliveryCharge: dc ? dc.value : '',
+      deliveryRider: dr ? dr.value : ''
+    }));
+    // Also save to old key for backwards compatibility
+    localStorage.setItem('rs_active_cart', JSON.stringify(cart));
+    localStorage.setItem('rs_active_cart_discount', String(discountPct));
+    localStorage.setItem('rs_active_cart_customer', JSON.stringify(getCustomer()));
+    localStorage.setItem('rs_active_order_type', activeOrderType.toLowerCase());
+  } catch (e) {
+    console.warn('[Cart Persistence Warning] Failed to persist active cart:', e);
+  }
+}
+function getTotals(){
+  const settings = window.RS_SETTINGS || {};
+  const taxProfile = window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular', specified_premises: false };
+  const country = taxProfile.country;
+  
+  let channel = 'dine_in';
+  const activeTypeBtn = document.querySelector('.order-type-btn.active');
+  if (activeTypeBtn) {
+    const t = activeTypeBtn.textContent.trim().toLowerCase();
+    if (t.includes('dine')) channel = 'dine_in';
+    else if (t.includes('take') || t.includes('carry')) channel = 'takeaway';
+    else if (t.includes('deliv')) channel = 'delivery';
+  }
+  
+  const calculateTaxesEnabled = settings.set_calculate_taxes !== false;
+  const serviceChargeEnabled = settings.set_service_charge === true && channel === 'dine_in';
+  const roundOffEnabled = settings.set_round_off_totals !== false;
+  const inclusivePricing = settings.set_inclusive_pricing === true;
+  
+  const rawSubtotal = cart.reduce((a,c)=>a+c.price*c.qty,0);
+  const discAmount = Math.round(rawSubtotal * discountPct / 100);
+  const netAfterDiscount = rawSubtotal - discAmount;
+  
+  let serviceChargeAmount = 0;
+  if (serviceChargeEnabled) {
+    serviceChargeAmount = Math.round(netAfterDiscount * 0.05);
+  }
+  
+  const items = cart.map(c => {
+    const lineGross = c.price * c.qty;
+    const lineDisc = Math.round(lineGross * discountPct / 100);
+    const lineTaxableBase = lineGross - lineDisc;
+    
+    let lineServiceCharge = 0;
+    if (serviceChargeEnabled && rawSubtotal > 0) {
+      lineServiceCharge = Math.round(serviceChargeAmount * (lineTaxableBase / netAfterDiscount));
+    }
+    
+    let lineTaxableValue = lineTaxableBase;
+    if (serviceChargeEnabled && taxProfile.apply_gst_on_service_charge) {
+      lineTaxableValue += lineServiceCharge;
+    }
+    
+    let rateCode = c.taxCategory || c.tax_category;
+    if (!rateCode) {
+      if (country === 'IE') {
+        rateCode = 'IE_FOOD_9';
+      } else {
+        if (taxProfile.gst_scheme === 'composition') {
+          rateCode = 'IN_COMP_5';
+        } else if (taxProfile.specified_premises) {
+          rateCode = 'IN_REST_18';
+        } else {
+          rateCode = 'IN_REST_5';
+        }
+      }
+    }
+    
+    const resolved = window.RS_resolveRate(country, rateCode);
+    let taxPercent = resolved.percent;
+    let isAlcohol = (rateCode === 'IN_ALCOHOL_EXEMPT');
+    let liquorTax = 0;
+    let tax = 0;
+    
+    if (isAlcohol) {
+      const liquorRate = taxProfile.liquor_vat_rate || 20;
+      if (inclusivePricing) {
+        liquorTax = Number((lineTaxableValue - (lineTaxableValue / (1 + liquorRate/100))).toFixed(2));
+        lineTaxableValue = Number((lineTaxableValue - liquorTax).toFixed(2));
+      } else {
+        liquorTax = Number((lineTaxableValue * (liquorRate / 100)).toFixed(2));
+      }
+    } else {
+      if (calculateTaxesEnabled) {
+        if (inclusivePricing) {
+          tax = Number((lineTaxableValue - (lineTaxableValue / (1 + taxPercent/100))).toFixed(2));
+          lineTaxableValue = Number((lineTaxableValue - tax).toFixed(2));
+        } else {
+          tax = Number((lineTaxableValue * (taxPercent / 100)).toFixed(2));
+        }
+      }
+    }
+    
+    return {
+      ...c,
+      lineGross,
+      lineDisc,
+      lineTaxableValue,
+      taxPercent,
+      tax,
+      liquorTax,
+      rateCode,
+      serviceCharge: lineServiceCharge,
+      itcAllowed: resolved.itc_allowed,
+      label: resolved.label
+    };
+  });
+  
+  const bandMap = {};
+  let totalGst = 0;
+  let totalLiquorTax = 0;
+  let totalTaxableValue = 0;
+  
+  items.forEach(item => {
+    totalGst += item.tax;
+    totalLiquorTax += item.liquorTax;
+    totalTaxableValue += item.lineTaxableValue;
+    
+    if (item.tax > 0 || item.liquorTax > 0 || item.taxPercent >= 0) {
+      const key = item.rateCode;
+      if (!bandMap[key]) {
+        bandMap[key] = {
+          rateCode: key,
+          label: item.label,
+          percent: item.taxPercent,
+          net: 0,
+          tax: 0,
+          gross: 0,
+          itcAllowed: item.itcAllowed
+        };
+      }
+      bandMap[key].net += item.lineTaxableValue;
+      bandMap[key].tax += item.tax + item.liquorTax;
+      bandMap[key].gross += item.lineTaxableValue + item.tax + item.liquorTax;
+    }
+  });
+  
+  const taxSummary = Object.values(bandMap).map(b => ({
+    rateCode: b.rateCode,
+    label: b.label,
+    percent: Number(b.percent.toFixed(2)),
+    net: Number(b.net.toFixed(2)),
+    tax: Number(b.tax.toFixed(2)),
+    gross: Number(b.gross.toFixed(2)),
+    itcAllowed: b.itcAllowed
+  }));
+  
+  let cgst = 0;
+  let sgst = 0;
+  let igst = 0;
+  if (country === 'IN' && taxProfile.gst_scheme !== 'composition') {
+    cgst = Number((totalGst / 2).toFixed(2));
+    sgst = Number((totalGst - cgst).toFixed(2));
+  }
+  
+  let grand = netAfterDiscount + serviceChargeAmount;
+  if (!inclusivePricing) {
+    grand += totalGst + totalLiquorTax;
+  }
+  
+  if (roundOffEnabled) {
+    grand = Math.round(grand);
+  } else {
+    grand = Number(grand.toFixed(2));
+  }
+  
+  return {
+    sub: rawSubtotal,
+    disc: discAmount,
+    gst: totalGst,
+    cgst,
+    sgst,
+    igst,
+    liquorTax: totalLiquorTax,
+    serviceCharge: serviceChargeAmount,
+    grand,
+    count: cart.reduce((a,c)=>a+c.qty,0),
+    discountPct,
+    taxSummary,
+    taxProfile,
+    channel,
+    items
+  };
+}
+function clearCart(){
+  cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart();
+  if (window.innerWidth <= 1024) closeMobilePOSCart(false);
+}
+function getCustomer(){
+  const nameEl = $('#cust-input-name') || $('#cust-name');
+  const phoneEl = $('#cust-input-phone') || $('#cust-phone');
+  const gstEl = $('#cust-gst');
+  
+  let phoneVal = '';
+  if (phoneEl) {
+    phoneVal = window.RS_getFullPhoneNumber ? window.RS_getFullPhoneNumber(phoneEl) : phoneEl.value;
+  }
+  
+  const sel = $('#cart-customer-sel');
+  if (sel && sel.value) {
+    const opt = sel.options[sel.selectedIndex];
+    const selPhone = sel.value;
+    const finalPhone = (selPhone.startsWith('temp-') || !selPhone.startsWith('+')) ? phoneVal.trim() : selPhone.trim();
+    return {
+      name: opt.getAttribute('data-name') || '',
+      phone: finalPhone,
+      gst: opt.getAttribute('data-gst') || '',
+      table: ($('#cart-table')?.value || 'Walk-in / Takeaway')
+    };
+  }
+  return { name:(nameEl?.value||'').trim(), phone:phoneVal.trim(), gst:(gstEl?.value||'').trim(), table:($('#cart-table')?.value||'Walk-in / Takeaway') };
+}
+function runKotAction(){
+  if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+  try {
+    if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
+  } catch (err) {
+    console.error('[KOT Error]', err);
+    return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
+  }
+  toast('KOT sent to kitchen','fa-fire');
+}
+function runCheckoutAction(){
+  if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+  try {
+    if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
+  } catch (err) {
+    console.error('[Checkout Error]', err);
+    return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
+  }
+  // RSPOS module not loaded -- do not silently show false success
+  return toast('Checkout module not ready -- please refresh', 'fa-circle-exclamation');
+}
+let cartActionsDelegated = false;
+function ensureCartActionDelegation(){
+  if (cartActionsDelegated) return;
+  cartActionsDelegated = true;
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('#btn-kot, #btn-checkout');
+    if (!btn) return;
+    e.preventDefault();
+    if (btn.id === 'btn-kot') return runKotAction();
+    runCheckoutAction();
+  });
+}
+function wireCartActions(){
+  ensureCartActionDelegation();
+  const kotBtn = $('#btn-kot');
+  if (kotBtn) kotBtn.onclick = null;
+  const checkoutBtn = $('#btn-checkout');
+  if (checkoutBtn) checkoutBtn.onclick = null;
+}
+// POS init (static parts present in HTML, wire them)
+function initPOS(){
+  // Helper function to get tab key for an order type (fixed, not dependent on table number)
+  function getTabKeyForOrderType(orderTypeText) {
+    const lowerText = orderTypeText.toLowerCase();
+    if (lowerText.includes('delivery')) return 'Delivery';
+    if (lowerText.includes('dine')) return 'Dine-in';
+    return 'Takeaway';
+  }
+
+  // Load saved active order type and corresponding cart
+  try {
+    // Load saved active order type
+    let savedOrderType = localStorage.getItem('rs_active_order_type');
+    let activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
+    
+    // If we have a saved order type, activate that button first
+    if (savedOrderType) {
+      const btns = document.querySelectorAll('.order-type-btn');
+      let matched = false;
+      btns.forEach(b => {
+        const match = b.textContent.trim().toLowerCase() === savedOrderType.toLowerCase();
+        b.classList.toggle('active', match);
+        if (match) {
+          activeOrderTypeBtn = b;
+          matched = true;
+        }
+      });
+      // Fallback: activate first button if no match
+      if (!matched && btns.length) {
+        btns[0].classList.add('active');
+        activeOrderTypeBtn = btns[0];
+      }
+    } else if (!activeOrderTypeBtn) {
+      // No active button and no saved type, activate first button
+      const btns = document.querySelectorAll('.order-type-btn');
+      if (btns.length) {
+        btns[0].classList.add('active');
+        activeOrderTypeBtn = btns[0];
+      }
+    }
+
+    // Now load the cart for the active order type
+    const activeOrderType = activeOrderTypeBtn ? activeOrderTypeBtn.textContent.trim() : 'Takeaway';
+    const initialTabKey = getTabKeyForOrderType(activeOrderType);
+    const savedTabCart = localStorage.getItem('rs_tab_cart_' + initialTabKey);
+    if (savedTabCart) {
+      const tabData = JSON.parse(savedTabCart);
+      cart = tabData.items || [];
+      // Also load delivery-specific fields if applicable
+      const da = document.getElementById('delivery-address');
+      const dc = document.getElementById('delivery-charge');
+      const dr = document.getElementById('delivery-rider');
+      if (da) da.value = tabData.deliveryAddress || '';
+      if (dc) dc.value = tabData.deliveryCharge || '';
+      if (dr) dr.value = tabData.deliveryRider || '';
+    } else {
+      // Fall back to the old active cart key if no tab-specific cart exists
+      const savedCart = localStorage.getItem('rs_active_cart');
+      if (savedCart) {
+        cart = JSON.parse(savedCart);
+      }
+    }
+    const savedDiscount = localStorage.getItem('rs_active_cart_discount');
+    if (savedDiscount) {
+      discountPct = Number(savedDiscount) || 0;
+      const discInput = $('#disc-input');
+      if (discInput) discInput.value = discountPct;
+    }
+    const savedCustomer = localStorage.getItem('rs_active_cart_customer');
+    if (savedCustomer) {
+      const customer = JSON.parse(savedCustomer);
+      const cartTable = $('#cart-table');
+      if (cartTable && customer.table) cartTable.value = customer.table;
+      const custName = $('#cust-input-name') || $('#cust-name');
+      if (custName && customer.name) custName.value = customer.name;
+      const custPhone = $('#cust-input-phone') || $('#cust-phone');
+      if (custPhone && customer.phone) custPhone.value = customer.phone;
+      const custGst = $('#cust-gst');
+      if (custGst && customer.gst) custGst.value = customer.gst;
+    }
+  } catch (e) {
+    console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
+  }
+
+  // -- Mount country-code prefix picker on cart customer phone --
+  (function mountCartPhonePicker() {
+    const phoneEl = document.getElementById('cust-input-phone');
+    if (!phoneEl || phoneEl.dataset.phonePrefixBuilt) return;
+    const settings = window.RS_SETTINGS || {};
+    let countryCode = 'IN';
+    if (settings.set_country && window.RS_getCountryByName) {
+      const entry = window.RS_getCountryByName(settings.set_country);
+      if (entry) countryCode = entry.code;
+    }
+    if (window.RS_buildPhonePrefix) {
+      window.RS_buildPhonePrefix(phoneEl, countryCode);
+    }
+  })();
+
+  // Category chips are derived from the live menu, including custom categories.
+  refreshPosCats();
+  $('#pos-search-input').addEventListener('input', renderPOS);
+  $('#pos-sort-select').addEventListener('change', renderPOS);
+  $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
+    // Snapshot the outgoing tab's cart to localStorage before the active class changes,
+    // so the per-tab fallback always has the latest data even without RS_DB.
+    try {
+      const curActiveBtn = document.querySelector('.order-type-btn.active');
+      if (curActiveBtn && curActiveBtn !== b) {
+        const outType = curActiveBtn.textContent.trim().toLowerCase();
+        const tabKey = getTabKeyForOrderType(curActiveBtn.textContent.trim());
+        const da = document.getElementById('delivery-address');
+        const dc = document.getElementById('delivery-charge');
+        const dr = document.getElementById('delivery-rider');
+        localStorage.setItem('rs_tab_cart_' + tabKey, JSON.stringify({
+          items: cart.map(c=>({...c})),
+          total: cart.reduce((a,c)=>a+c.price*c.qty,0),
+          deliveryAddress: da ? da.value : '',
+          deliveryCharge: dc ? dc.value : '',
+          deliveryRider: dr ? dr.value : ''
+        }));
+        const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+        const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+        localStorage.setItem('rs_tab_cust_' + tabKey, JSON.stringify({
+          name: nameEl ? nameEl.value.trim() : '',
+          phone: phoneEl ? phoneEl.value.trim() : ''
+        }));
+
+        // Now load the new tab's cart!
+        const newTabKey = getTabKeyForOrderType(b.textContent.trim());
+        // Save new active order type
+        localStorage.setItem('rs_active_order_type', b.textContent.trim().toLowerCase());
+        const savedNewTabCart = localStorage.getItem('rs_tab_cart_' + newTabKey);
+        if (savedNewTabCart) {
+          const newTabData = JSON.parse(savedNewTabCart);
+          cart = newTabData.items || [];
+          // Load delivery fields if applicable
+          if (da) da.value = newTabData.deliveryAddress || '';
+          if (dc) dc.value = newTabData.deliveryCharge || '';
+          if (dr) dr.value = newTabData.deliveryRider || '';
+        } else {
+          cart = []; // If no saved cart for new tab, start fresh!
+          // Clear delivery fields too
+          if (da) da.value = '';
+          if (dc) dc.value = '';
+          if (dr) dr.value = '';
+        }
+
+        // Load the new tab's customer data
+        const savedNewTabCust = localStorage.getItem('rs_tab_cust_' + newTabKey);
+        if (savedNewTabCust) {
+          const newCustData = JSON.parse(savedNewTabCust);
+          const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
+          const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
+          if (nameEl) nameEl.value = newCustData.name || '';
+          if (phoneEl) phoneEl.value = newCustData.phone || '';
+        }
+
+        // Re-render the cart!
+        renderCart();
+      }
+    } catch(e) {
+      console.error('[Order Type Switch Error]', e);
+    }
+    $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  }));
+  let lastAuthorizedDiscount = 0;
+  $('#disc-input')?.addEventListener('input', e=>{
+    const val = Math.min(100,Math.max(0,+e.target.value||0));
+    if (val <= 10) {
+      discountPct = val;
+      renderCart();
+    }
+  });
+  $('#disc-input')?.addEventListener('change', async e=>{
+    const val = Math.min(100,Math.max(0,+e.target.value||0));
+    if (val > 10) {
+      if (val === lastAuthorizedDiscount) {
+        discountPct = val;
+        renderCart();
+        return;
+      }
+      if (window.RSPinModal) {
+        e.target.disabled = true;
+        const ok = await RSPinModal.request('Discount Override');
+        e.target.disabled = false;
+        if (ok) {
+          discountPct = val;
+          lastAuthorizedDiscount = val;
+          renderCart();
+          toast('Discount override approved', 'fa-percent');
+        } else {
+          e.target.value = discountPct > 0 ? discountPct : '';
+          toast('Discount override rejected', 'fa-circle-xmark');
+          renderCart();
+        }
+      } else {
+        discountPct = val;
+        renderCart();
+      }
+    } else {
+      discountPct = val;
+      lastAuthorizedDiscount = val;
+      renderCart();
+    }
+  });
+  $('#btn-kot').onclick = () => {
+    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+    try {
+      if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
+    } catch (err) {
+      console.error('[KOT Error]', err);
+      return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
+    }
+    toast('KOT sent to kitchen','fa-fire');
+  };
+  $('#btn-checkout').onclick = () => {
+    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+    try {
+      if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
+    } catch (err) {
+      console.error('[Checkout Error]', err);
+      return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
+    }
+    return toast('Checkout module not ready -- please refresh', 'fa-circle-exclamation');
+  };
+
+  // Grid size slider controls
+  const slider = $('#pos-grid-slider');
+  const grid = $('#pos-grid');
+  const decBtn = $('#btn-grid-dec');
+  const incBtn = $('#btn-grid-inc');
+  if (slider && grid && decBtn && incBtn) {
+    const updateGridSize = (val) => {
+      val = Math.min(250, Math.max(110, val));
+      slider.value = val;
+      grid.style.setProperty('--pos-grid-size', val + 'px');
+      try { localStorage.setItem('rs-pos-grid-size', val); } catch(e){}
+    };
+    slider.oninput = () => updateGridSize(parseInt(slider.value) || 158);
+    decBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) - 15);
+    incBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) + 15);
+    try {
+      const savedSize = localStorage.getItem('rs-pos-grid-size') || 158;
+      updateGridSize(parseInt(savedSize));
+    } catch(e) {
+      updateGridSize(158);
+    }
+  }
+
+  // Mobile view toggles
+  const cartBar = $('#pos-m-cart-bar');
+  const backBtn = $('#btn-pos-back-menu');
+  bindMobileCartBar();
+  if (backBtn && cartBar) backBtn.onclick = () => { if (window.innerWidth <= 1024) closeMobilePOSCart(true); };
+
+  renderPOS(); renderCart();
+
+  // Mobile "More" bottom nav sheet
+  const mnavMore = document.getElementById('mnav-more');
+  const moreSheet = document.getElementById('mobile-more-sheet');
+  if (mnavMore && moreSheet) {
+    mnavMore.addEventListener('click', () => {
+      moreSheet.style.display = moreSheet.style.display === 'none' ? 'block' : 'none';
+    });
+    moreSheet.querySelectorAll('.mnav-more-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        moreSheet.style.display = 'none';
+        if (window.RS_ROLE && Array.isArray(RS_ROLE.allowedTabs) && RS_ROLE.allowedTabs.length && !RS_ROLE.allowedTabs.includes(btn.dataset.tab)) {
+          activateTab(RS_ROLE.allowedTabs[0]);
+          return;
+        }
+        activateTab(btn.dataset.tab);
+      });
+    });
+  }
+}
+
+  function getCart() {
+    return cart.map((c) => ({ ...c }));
+  }
+  function setCart(items) {
+    cart = (items || []).map((c) => ({ ...c }));
+    renderCart();
+  }
+  function setDiscountPct(n) {
+    discountPct = Number(n) || 0;
+  }
+  function getDiscountPct() {
+    return discountPct;
+  }
+
+  global.RSPosUI = {
+    renderPOS,
+    renderCart,
+    addToCart,
+    changeQty,
+    getTotals,
+    clearCart,
+    getCustomer,
+    initPOS,
+    refreshPosCats,
+    getCart,
+    setCart,
+    setDiscountPct,
+    getDiscountPct,
+    updateMobileCartBar,
+    openMobilePOSCart,
+    closeMobilePOSCart,
+    bindMobileCartBar,
+    runKotAction,
+    runCheckoutAction,
+    ensureCartActionDelegation,
+    wireCartActions,
+  };
+
+  global.refreshPosCats = refreshPosCats;
+
+  function attachToRS() {
+    if (!global.RS) return;
+    const api = global.RSPosUI;
+    global.RS.renderPOS = api.renderPOS;
+    global.RS.renderCart = api.renderCart;
+    global.RS.addToCart = api.addToCart;
+    global.RS.getTotals = api.getTotals;
+    global.RS.clearCart = api.clearCart;
+    global.RS.getCustomer = api.getCustomer;
+    global.RS.getCart = api.getCart;
+    global.RS.setCart = api.setCart;
+    global.RS.initPOS = api.initPOS;
+  }
+  if (global.RS) attachToRS();
+  document.addEventListener('rs:ready', attachToRS);
+})(typeof window !== 'undefined' ? window : globalThis);

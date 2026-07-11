@@ -16,16 +16,18 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 | KDS board UI | `assets/modules/kds-ui.js` | ✅ Wave 9 |
 | QR orders UI | `assets/modules/qr-orders-ui.js` | ✅ Wave 10 |
 | Employees UI | `assets/modules/employees-ui.js` | ✅ Wave 10 |
+| POS cart / grid / init | `assets/modules/pos-ui.js` | ✅ Wave 11 |
 | ESC/POS encode | `assets/escpos-encoder.js` | ✅ |
 | Print routing | `assets/print-bridge.js` | ✅ |
 | Shifts / station / keys | `assets/competitive-ops.js` | ✅ |
 
-## Next extractions (safe order)
+## Remaining (small)
 
-| # | Domain | Approx lines | Notes |
-|---|--------|--------------|-------|
-| 1 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last big chunk |
-| 2 | Growth hub shell | ~50 | Thin; features-growth owns real UI |
+| # | Domain | Notes |
+|---|--------|-------|
+| 1 | Growth hub shell | Thin; features-growth owns real UI |
+| 2 | Tax helpers on dashboard | `RS_resolveRate` / profile — optional extract |
+| 3 | Boot / hydrate shell | Stay in dashboard.js (orchestration) |
 
 ## Rules
 

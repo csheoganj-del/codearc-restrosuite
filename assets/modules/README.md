@@ -14,6 +14,7 @@ Small IIFE modules loaded **before** `dashboard.js` so the god file can delegate
 | `kds-ui.js` | `RSKdsUI` | Kitchen display board + timers (Wave 9) |
 | `qr-orders-ui.js` | `RSQrOrdersUI` | QR order cards, merge, open-in-POS (Wave 10) |
 | `employees-ui.js` | `RSEmployeesUI` | Staff grid, roles, soft-link import (Wave 10) |
+| `pos-ui.js` | `RSPosUI` | POS menu grid, cart, totals, init (Wave 11) |
 | `../escpos-encoder.js` | `RSEscPos` | ESC/POS thermal encoding |
 | `../print-bridge.js` | `RSPrintBridge` | Desktop/web print routing |
 | `../competitive-ops.js` | `RSOps` | Shifts, station, keyboard, Z-report |
