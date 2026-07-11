@@ -513,13 +513,14 @@ serve(async (req) => {
     if (operation === "gateway_send") {
       const phone = String(payload.phone || "");
       const message = String(payload.message || "");
+      const caption = payload.caption != null ? String(payload.caption) : undefined;
       const orderId = String(payload.orderId || "");
       const pdfData = payload.pdfData ? String(payload.pdfData) : undefined;
       const filename = payload.filename ? String(payload.filename) : undefined;
-      if (!phone || (!message && !pdfData)) {
+      if (!phone || (!message && !pdfData && !caption)) {
         return jsonResponse({ error: "Missing phone or message/pdfData." }, 400, req);
       }
-      return await proxyGatewayRequest("/send", "POST", req, { phone, message, orderId, pdfData, filename }, verified.tenantId);
+      return await proxyGatewayRequest("/send", "POST", req, { phone, message, caption, orderId, pdfData, filename }, verified.tenantId);
     }
 
     if (operation === "verify_pin_reset_code") {

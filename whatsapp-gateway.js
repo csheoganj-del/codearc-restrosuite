@@ -2016,9 +2016,9 @@ app.post('/send', async (req, res) => {
         return res.status(400).json({ status: 'error', error: `WhatsApp gateway for tenant ${tenantId} is not connected.` });
     }
 
-    let { orderId, phone, message, pdfData, filename } = req.body;
+    let { orderId, phone, message, pdfData, filename, caption } = req.body;
     
-    if (!phone || (!message && !pdfData)) {
+    if (!phone || (!message && !pdfData && !caption)) {
         return res.status(400).json({ status: 'error', error: 'Missing phone or message' });
     }
 
@@ -2054,31 +2054,33 @@ app.post('/send', async (req, res) => {
 
             const hasPdf = pdfBase64.length > 64;
             let delivered = 'none';
+            // Optional short caption under the PDF (do NOT rewrite the bill layout).
+            // Full bill lives inside the PDF (same as on-screen preview).
+            // Full text message is only used when there is no PDF.
+            const shortCaption = (caption != null && String(caption).trim())
+                ? String(caption).trim().slice(0, 200)
+                : (orderId ? `Bill ${orderId}` : '');
 
-            // Prefer a single WhatsApp document message with the receipt caption.
-            // Text-then-PDF was unreliable: text succeeded and PDF often failed silently.
             if (hasPdf) {
                 const pdfBuffer = Buffer.from(pdfBase64, 'base64');
                 if (pdfBuffer.length < 100 || pdfBuffer.slice(0, 4).toString() !== '%PDF') {
                     throw new Error(`Invalid PDF payload (${pdfBuffer.length} bytes, header=${pdfBuffer.slice(0, 8).toString('hex')})`);
                 }
-                const caption = message
-                    ? String(message).slice(0, 900)
-                    : `Receipt ${orderId || ''}`.trim();
-                // Baileys document message format
+                // Baileys document = the same bill PDF the POS generated from preview
                 const media = {
                     document: pdfBuffer,
                     mimetype: 'application/pdf',
                     fileName: String(filename || `receipt-${orderId || 'bill'}.pdf`).replace(/[^\w.\-]+/g, '_'),
-                    caption: caption || undefined,
+                    caption: shortCaption || undefined,
                 };
                 await humanSend(tenantData.client, chatId, media, {}, tenantId);
                 delivered = 'pdf';
-                console.log(`[Background Sent] WhatsApp PDF receipt delivered for tenant ${tenantId} to: +${maskPhone(phone)} (${pdfBuffer.length} bytes)`);
+                console.log(`[Background Sent] WhatsApp PDF bill delivered for tenant ${tenantId} to: +${maskPhone(phone)} (${pdfBuffer.length} bytes)`);
             } else if (message) {
+                // Text-only fallback: POS sends receiptText() matching preview content
                 await humanSend(tenantData.client, chatId, message, {}, tenantId);
                 delivered = 'text';
-                console.log(`[Background Sent] WhatsApp text message delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
+                console.log(`[Background Sent] WhatsApp text bill delivered for tenant ${tenantId} to: +${maskPhone(phone)}`);
             } else {
                 throw new Error('Nothing to send: empty message and no valid pdfData');
             }
