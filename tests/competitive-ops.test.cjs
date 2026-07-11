@@ -156,6 +156,20 @@ test('waste log deducts inventory stock', () => {
   assert.match(html, /data-inv-tab="waste"|Waste log/);
 });
 
+test('kitchen line notes on cart KOT receipt', () => {
+  const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
+  const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const esc = fs.readFileSync(path.join(root, 'assets/escpos-encoder.js'), 'utf8');
+  const receipt = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
+  assert.match(posUi, /setLineNote|openLineNoteEditor|cart-line-note/);
+  assert.match(posUi, /No onion|Extra spicy/);
+  assert.match(pos, /notes:\s*i\.note|note:\s*i\.note/);
+  assert.match(ops, /i\.note \|\| i\.notes/);
+  assert.match(esc, /it\.note \|\| it\.notes/);
+  assert.match(receipt, /note:\s*i\.note \|\| i\.notes/);
+});
+
 test('cash drawer pay-in pay-out safe drop', () => {
   const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
   const shell = fs.readFileSync(path.join(root, 'assets/features-shell.js'), 'utf8');

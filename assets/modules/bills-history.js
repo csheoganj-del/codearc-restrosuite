@@ -55,6 +55,7 @@
             name: i.name || 'Item',
             qty: Number(i.qty || 1),
             price: Number(i.price || 0),
+            note: i.note || i.notes || '',
           }))
         : [{ name: 'Bill total', qty: 1, price: Number(b.amount || 0) }];
     const sub = Number(b.subtotal || items.reduce((sum, i) => sum + i.price * i.qty, 0));
@@ -102,6 +103,7 @@
             cat: i.cat || i.category || 'Rebill',
             stock: 'ok',
             taxCategory: i.taxCategory || i.tax_category,
+            note: i.note || i.notes || '',
           }))
         : [];
     if (!items.length) {
