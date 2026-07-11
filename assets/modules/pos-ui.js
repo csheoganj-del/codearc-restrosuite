@@ -43,7 +43,7 @@
     if (global.RS && typeof RS.activateTab === 'function') return RS.activateTab(id);
   }
 
-let activeCat='All', cart=[], discountPct=0;
+let activeCat='All', cart=[], discountPct=0, tipAmount=0;
 const renderPOS = () => {
   const grid = $('#pos-grid');
   if (!grid) return;
@@ -177,7 +177,10 @@ function renderCart(){
     metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
   }
   if (totals.serviceCharge > 0) {
-    metaHTML += `<span>SC <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
+    metaHTML += `<span>SC ${totals.serviceChargePct || 5}% <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
+  }
+  if (totals.tip > 0) {
+    metaHTML += `<span style="color:var(--green)">Tip <b id="t-tip">${rs(totals.tip)}</b></span>`;
   }
   
   // Ireland handles composition differently (not applicable)
@@ -243,6 +246,7 @@ function renderCart(){
     // Also save to old key for backwards compatibility
     localStorage.setItem('rs_active_cart', JSON.stringify(cart));
     localStorage.setItem('rs_active_cart_discount', String(discountPct));
+    localStorage.setItem('rs_active_cart_tip', String(tipAmount || 0));
     localStorage.setItem('rs_active_cart_customer', JSON.stringify(getCustomer()));
     localStorage.setItem('rs_active_order_type', activeOrderType.toLowerCase());
   } catch (e) {
@@ -265,6 +269,8 @@ function getTotals(){
   
   const calculateTaxesEnabled = settings.set_calculate_taxes !== false;
   const serviceChargeEnabled = settings.set_service_charge === true && channel === 'dine_in';
+  const scPctRaw = Number(settings.set_service_charge_pct);
+  const serviceChargePct = Number.isFinite(scPctRaw) && scPctRaw >= 0 ? scPctRaw : 5;
   const roundOffEnabled = settings.set_round_off_totals !== false;
   const inclusivePricing = settings.set_inclusive_pricing === true;
   
@@ -273,9 +279,10 @@ function getTotals(){
   const netAfterDiscount = rawSubtotal - discAmount;
   
   let serviceChargeAmount = 0;
-  if (serviceChargeEnabled) {
-    serviceChargeAmount = Math.round(netAfterDiscount * 0.05);
+  if (serviceChargeEnabled && serviceChargePct > 0) {
+    serviceChargeAmount = Math.round(netAfterDiscount * (serviceChargePct / 100));
   }
+  const tip = Math.max(0, Number(tipAmount) || 0);
   
   const items = cart.map(c => {
     const lineGross = c.price * c.qty;
@@ -394,7 +401,7 @@ function getTotals(){
     sgst = Number((totalGst - cgst).toFixed(2));
   }
   
-  let grand = netAfterDiscount + serviceChargeAmount;
+  let grand = netAfterDiscount + serviceChargeAmount + tip;
   if (!inclusivePricing) {
     grand += totalGst + totalLiquorTax;
   }
@@ -414,6 +421,8 @@ function getTotals(){
     igst,
     liquorTax: totalLiquorTax,
     serviceCharge: serviceChargeAmount,
+    serviceChargePct,
+    tip,
     grand,
     count: cart.reduce((a,c)=>a+c.qty,0),
     discountPct,
@@ -424,7 +433,10 @@ function getTotals(){
   };
 }
 function clearCart(){
-  cart=[]; discountPct=0; const d=$('#disc-input'); if(d) d.value=''; renderCart();
+  cart=[]; discountPct=0; tipAmount=0;
+  const d=$('#disc-input'); if(d) d.value='';
+  const tipEl=$('#tip-input'); if(tipEl) tipEl.value='';
+  renderCart();
   if (window.innerWidth <= 1024) closeMobilePOSCart(false);
 }
 function getCustomer(){
@@ -560,6 +572,12 @@ function initPOS(){
       const discInput = $('#disc-input');
       if (discInput) discInput.value = discountPct;
     }
+    const savedTip = localStorage.getItem('rs_active_cart_tip');
+    if (savedTip) {
+      tipAmount = Math.max(0, Number(savedTip) || 0);
+      const tipInput = $('#tip-input');
+      if (tipInput) tipInput.value = tipAmount > 0 ? tipAmount : '';
+    }
     const savedCustomer = localStorage.getItem('rs_active_cart_customer');
     if (savedCustomer) {
       const customer = JSON.parse(savedCustomer);
@@ -659,6 +677,31 @@ function initPOS(){
     $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
   }));
   let lastAuthorizedDiscount = 0;
+  function wireTipControls() {
+    const tipInput = $('#tip-input');
+    if (tipInput && !tipInput.dataset.bound) {
+      tipInput.dataset.bound = '1';
+      tipInput.addEventListener('input', () => {
+        tipAmount = Math.max(0, Number(tipInput.value) || 0);
+        renderCart();
+      });
+    }
+    document.querySelectorAll('[data-tip-pct]').forEach((btn) => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => {
+        const pct = Number(btn.dataset.tipPct) || 0;
+        const totals = getTotals();
+        // base for % tip = sub - disc (before tip)
+        const base = Math.max(0, (totals.sub || 0) - (totals.disc || 0));
+        tipAmount = pct <= 0 ? 0 : Math.round(base * (pct / 100));
+        if (tipInput) tipInput.value = tipAmount > 0 ? tipAmount : '';
+        renderCart();
+      });
+    });
+  }
+  wireTipControls();
+
   $('#disc-input')?.addEventListener('input', e=>{
     const val = Math.min(100,Math.max(0,+e.target.value||0));
     if (val <= 10) {
@@ -783,6 +826,14 @@ function initPOS(){
   function getDiscountPct() {
     return discountPct;
   }
+  function setTip(n) {
+    tipAmount = Math.max(0, Number(n) || 0);
+    const tipInput = document.getElementById('tip-input');
+    if (tipInput) tipInput.value = tipAmount > 0 ? tipAmount : '';
+  }
+  function getTip() {
+    return tipAmount;
+  }
 
   global.RSPosUI = {
     renderPOS,
@@ -798,6 +849,8 @@ function initPOS(){
     setCart,
     setDiscountPct,
     getDiscountPct,
+    setTip,
+    getTip,
     updateMobileCartBar,
     openMobilePOSCart,
     closeMobilePOSCart,
@@ -822,6 +875,8 @@ function initPOS(){
     global.RS.getCart = api.getCart;
     global.RS.setCart = api.setCart;
     global.RS.initPOS = api.initPOS;
+    global.RS.setTip = api.setTip;
+    global.RS.getTip = api.getTip;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);

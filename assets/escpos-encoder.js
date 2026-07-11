@@ -81,6 +81,12 @@
     return this._push([GS, 0x56, 0x00]);
   };
 
+  /** Pulse cash drawer (ESC p m t1 t2) — pin 0 = drawer 1, pin 1 = drawer 2 */
+  Encoder.prototype.cashDrawer = function (pin) {
+    const m = pin === 1 ? 1 : 0;
+    return this._push([ESC, 0x70, m, 0x19, 0xfa]);
+  };
+
   Encoder.prototype.hr = function (width) {
     const w = width || 32;
     return this.line('-'.repeat(w));
@@ -144,12 +150,23 @@
     return enc;
   }
 
+  function openDrawerEncoder(pin) {
+    return new Encoder().init().cashDrawer(pin || 0);
+  }
+
   global.RSEscPos = {
     Encoder,
     receiptFromBill,
     kotFromItems,
+    openDrawerEncoder,
     encodeText(text) {
       return new Encoder().init().text(String(text || '')).feed(3).cut().encode();
+    },
+    openDrawerBytes(pin) {
+      return openDrawerEncoder(pin).encode();
+    },
+    openDrawerBase64(pin) {
+      return openDrawerEncoder(pin).toBase64();
     },
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -207,18 +207,22 @@
           ${field('Tax label','GST','e.g. GST, VAT, Sales Tax')}
           ${field('Tax rate (%)','5','Tax rate percentage')}
         </div>
-        ${toggle('Service charge','Add 5% service charge on dine-in',false)}
+        ${toggle('Service charge','Add service charge on dine-in orders',false)}
+        <div class="set-section form-grid-2" style="margin-top:8px">
+          ${field('Service charge %','5','e.g. 5 or 10')}
+        </div>
         ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
         ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
         ${toggle('Inclusive pricing','Menu prices include GST',false)}`,
       printer:`<div class="set-section form-grid-2">${field('Receipt printer','EPSON TM-T82 (USB)')}${sel('Paper size',['58 mm','80 mm'],'80 mm')}</div>
         ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer)',false)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
+        ${toggle('Open cash drawer on cash','Pulse cash drawer (ESC/POS) after a cash or cash-split payment',true)}
         <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}</div>
         <div class="set-section form-grid-2" style="margin-top:12px">
           ${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}
         </div>
-        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices. Auto-print uses the same Thermal path as Bill settled.</p>
+        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices. Auto-print uses the same Thermal path as Bill settled. Cash drawer needs the desktop app or Android bridge.</p>
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
           ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or the waiter app. QR ordering still works, but every order lands only in your own POS/order dashboard, never the KDS or waiter screens. Manager/admin only.',false)}
         </div>`,

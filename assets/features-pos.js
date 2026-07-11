@@ -541,7 +541,11 @@
           { left: 'Subtotal', right: rs(bill.sub) }
         ];
         if (bill.disc) totalsRows.push({ left: 'Discount', right: '\u2013 ' + rs(bill.disc) });
-        if (bill.serviceChargeAmount) totalsRows.push({ left: 'Service Charge (5%)', right: rs(bill.serviceChargeAmount) });
+        if (bill.serviceChargeAmount) {
+          const scPct = bill.serviceChargePct != null ? bill.serviceChargePct : 5;
+          totalsRows.push({ left: 'Service Charge (' + scPct + '%)', right: rs(bill.serviceChargeAmount) });
+        }
+        if (bill.tipAmount) totalsRows.push({ left: 'Tip', right: rs(bill.tipAmount) });
         if (bill.liquorTaxAmount) totalsRows.push({ left: 'Liquor VAT', right: rs(bill.liquorTaxAmount) });
 
         totalsRows.forEach(row => {
@@ -1796,6 +1800,8 @@
           taxProfile: totals.taxProfile,
           liquorTaxAmount: totals.liquorTax,
           serviceChargeAmount: totals.serviceCharge,
+          serviceChargePct: totals.serviceChargePct,
+          tipAmount: totals.tip || 0,
           idempotencyKey: identity.idempotencyKey,
           syncStatus: 'saving',
         };
@@ -1825,7 +1831,10 @@
             cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category
           })),
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile,
-          liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
+          liquorTaxAmount: totals.liquorTax,
+          serviceChargeAmount: totals.serviceCharge,
+          serviceChargePct: totals.serviceChargePct,
+          tipAmount: totals.tip || 0,
         };
         if (window.RSOps && RSOps.decorateBillMeta) RSOps.decorateBillMeta(billRow, bill);
 

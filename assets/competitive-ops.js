@@ -901,6 +901,30 @@
     };
   }
 
+  function billHasCashTender(bill) {
+    if (!bill) return false;
+    const tenders = Array.isArray(bill.tenders) ? bill.tenders : [];
+    if (tenders.some((t) => /cash/i.test(String(t.method || '')) && Number(t.amount) > 0)) return true;
+    const pay = String(bill.pay || bill.paymentMethod || '').toLowerCase();
+    return pay === 'cash' || pay.includes('cash');
+  }
+
+  async function openCashDrawer() {
+    try {
+      if (global.RSPrintBridge && typeof RSPrintBridge.openCashDrawer === 'function') {
+        const res = await RSPrintBridge.openCashDrawer({});
+        if (res && res.ok) {
+          toast('Cash drawer opened', 'fa-cash-register');
+          return res;
+        }
+      }
+    } catch (e) {
+      console.warn('[Drawer] open failed', e);
+    }
+    // Soft fallback: still useful on web to confirm intent during demos
+    return { ok: false };
+  }
+
   async function printBillThermal(bill) {
     if (!bill) {
       toast('No bill to print', 'fa-circle-exclamation');
@@ -1119,21 +1143,28 @@
     });
     document.addEventListener('rs:bill-paid', (ev) => {
       setTimeout(refreshOpsUi, 200);
-      // Wire Settings → Auto-print receipt → thermal/ESC-POS after payment
+      const bill = ev && ev.detail && ev.detail.bill;
       try {
         const s = global.RS_SETTINGS || {};
+        // Wire Settings → Auto-print receipt → thermal/ESC-POS after payment
         const auto =
           s.set_auto_print_receipt === true ||
           s.set_auto_print_receipt === 'true' ||
           s.set_auto_print_receipt === 1;
-        if (!auto) return;
-        const bill = ev && ev.detail && ev.detail.bill;
-        if (!bill) return;
-        setTimeout(() => {
-          if (global.RSOps && typeof RSOps.printBillThermal === 'function') {
-            RSOps.printBillThermal(bill).catch(() => {});
-          }
-        }, 450);
+        if (auto && bill) {
+          setTimeout(() => {
+            if (global.RSOps && typeof RSOps.printBillThermal === 'function') {
+              RSOps.printBillThermal(bill).catch(() => {});
+            }
+          }, 450);
+        }
+        // Cash drawer pulse when cash was taken (or setting always on for any pay)
+        const drawerOn =
+          s.set_open_cash_drawer_on_cash !== false &&
+          s.set_open_cash_drawer_on_cash !== 'false';
+        if (drawerOn && bill && billHasCashTender(bill)) {
+          setTimeout(() => openCashDrawer(), 200);
+        }
       } catch (_) {}
     });
     window.addEventListener('rs:sync-queue-changed', () => {
@@ -1174,6 +1205,8 @@
       showZReportModal,
       printKotThermal,
       printBillThermal,
+      openCashDrawer,
+      billHasCashTender,
       checkNewPendingOrders,
       compilePreferredPdf,
       decorateBillMeta,

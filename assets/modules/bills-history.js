@@ -77,6 +77,10 @@
           ? b.tenders
           : [{ method: b.pay || b.paymentMethod || 'Cash', amount: grand }],
       change: Number(b.changeAmount || b.change || 0),
+      serviceChargeAmount: Number(b.serviceChargeAmount || 0),
+      serviceChargePct: b.serviceChargePct,
+      tipAmount: Number(b.tipAmount || b.tip || 0),
+      liquorTaxAmount: Number(b.liquorTaxAmount || 0),
     };
   }
 
