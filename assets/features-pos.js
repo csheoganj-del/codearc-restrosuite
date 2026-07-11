@@ -245,297 +245,69 @@
       }
     };
 
-    /* ---------------- receipt builder ---------------- */
-    function receiptHTML(bill, qrDataUri){
-      const profile = bill.taxProfile || (window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular' });
-      const country = profile.country || 'IN';
-      const taxSystem = profile.tax_system || 'GST';
-      const isIreland = (country === 'IE');
-      
-      const custName = bill.customer || 'Walk-in';
-      let custSection = '';
-      if(custName !== 'Walk-in' || bill.customerPhone || bill.customerGst) {
-        custSection = `
-          <div class="rcp-meta"><span>Customer:</span><span>${esc(custName)}</span></div>
-          ${bill.customerPhone ? `<div class="rcp-meta"><span>Phone:</span><span>${esc(bill.customerPhone)}</span></div>` : ''}
-          ${bill.customerGst ? `<div class="rcp-meta"><span>${taxSystem} Reg:</span><span>${esc(bill.customerGst)}</span></div>` : ''}
-        `;
-      } else {
-        custSection = `<div class="rcp-meta"><span>Customer:</span><span>Walk-in</span></div>`;
-      }
+    /* ---------------- receipt builder (delegates to RSReceiptEngine) ---------------- */
+    function engineOutlet() {
+      return {
+        name: receiptProfile.name || sessionOutletName(),
+        address: receiptProfile.address || '',
+        phone: receiptProfile.phone || '',
+        gstin: receiptProfile.gstin || '',
+      };
+    }
 
-      const profileLines = [
-        receiptProfile.address,
-        receiptProfile.phone ? `Phone ${receiptProfile.phone}` : '',
-        (country === 'IN' && profile.state_code) ? `State Code: ${profile.state_code}` : '',
-        profile.tax_registration_no ? `${taxSystem} No: ${profile.tax_registration_no}` : ''
-      ].filter(Boolean).map(line => `<div class="rcp-sub">${esc(line)}</div>`).join('');
-      
-      const itemsHTML = bill.items.map(i => {
-        const catLabel = i.taxCategory || i.tax_category;
-        const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
-        return `<div class="rcp-line"><span><span class="q">${i.qty}× </span>${esc(i.name)} ${isIreland ? `<small style="font-size:10px;color:var(--text-mute)">(${rateLabel})</small>` : ''}</span><span>${rs(i.price*i.qty)}</span></div>`;
-      }).join('');
-      
-      let taxBreakdownHTML = '';
-      if (profile.gst_scheme === 'composition' && country === 'IN') {
-        taxBreakdownHTML = `<div class="rcp-line" style="text-align:center;font-size:11px;color:var(--text-soft);margin-top:6px;font-style:italic;">Composition taxable person, not eligible to collect tax</div>`;
-      } else {
-        const summary = bill.taxSummary || [];
-        if (summary.length > 0) {
-          taxBreakdownHTML = `<div style="margin-top: 6px; border-top: 1px dashed var(--stroke-2); padding-top: 6px;">`;
-          if (country === 'IN') {
-            const halfGst = Math.round((bill.gst || 0) / 2);
-            taxBreakdownHTML += `
-              <div class="rcp-line"><span>CGST (2.5%)</span><span>${rs(halfGst)}</span></div>
-              <div class="rcp-line"><span>SGST (2.5%)</span><span>${rs(bill.gst - halfGst)}</span></div>
-              <div class="rcp-sub" style="font-size:10.5px;color:var(--text-mute);margin-top:2px;">SAC 9963</div>
-            `;
-          } else {
-            taxBreakdownHTML += `<div style="font-size:11px;color:var(--text-soft);margin-bottom:4px;font-weight:700;">VAT Breakout</div>`;
-            summary.forEach(band => {
-              taxBreakdownHTML += `
-                <div class="rcp-line" style="font-size:11.5px;color:var(--text-soft)">
-                  <span>Rate ${band.percent}%</span>
-                  <span>Net ${rs(band.net)} | VAT ${rs(band.tax)}</span>
-                </div>
-              `;
-            });
-          }
-          taxBreakdownHTML += `</div>`;
-        } else if (bill.gst > 0) {
-          const halfGst = Math.round((bill.gst || 0) / 2);
-          taxBreakdownHTML = country === 'IN'
-            ? `
-            <div class="rcp-line"><span>CGST (2.5%)</span><span>${rs(halfGst)}</span></div>
-            <div class="rcp-line"><span>SGST (2.5%)</span><span>${rs(bill.gst - halfGst)}</span></div>
-            <div class="rcp-sub" style="font-size:10.5px;color:#6b6960;margin-top:2px;">SAC 9963</div>
-          `
-            : `
-            <div class="rcp-line"><span>Tax</span><span>${rs(bill.gst)}</span></div>
-          `;
-        }
+    function receiptHTML(bill, qrDataUri) {
+      if (window.RSReceiptEngine && typeof RSReceiptEngine.toHTML === 'function') {
+        return RSReceiptEngine.toHTML(bill, qrDataUri, engineOutlet());
       }
-      
-      return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div>${profileLines || '<div class="rcp-sub">CodeArc RestroSuite</div>'}</div>
-        <hr class="rcp-hr">
-        <div class="rcp-meta"><span>${esc(bill.no)}</span><span>${esc(bill.time)}</span></div>
-        <div class="rcp-meta"><span>Table:</span><span>${esc(bill.table)}</span></div>
-        ${custSection}
-        <hr class="rcp-hr">
-        ${itemsHTML}
-        <hr class="rcp-hr">
-        <div class="rcp-line"><span>Subtotal</span><span>${rs(bill.sub)}</span></div>
-        ${bill.disc ? `<div class="rcp-line"><span>Discount</span><span>- ${rs(bill.disc)}</span></div>` : ''}
-        ${bill.serviceChargeAmount ? `<div class="rcp-line"><span>Service Charge (5%)</span><span>${rs(bill.serviceChargeAmount)}</span></div>` : ''}
-        ${bill.liquorTaxAmount ? `<div class="rcp-line"><span>Liquor VAT</span><span>${rs(bill.liquorTaxAmount)}</span></div>` : ''}
-        ${taxBreakdownHTML}
+      // Minimal fallback if engine failed to load
+      return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div></div>
+        <hr class="rcp-hr"><div class="rcp-meta"><span>${esc(bill.no)}</span><span>${esc(bill.time)}</span></div>
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
-        <hr class="rcp-hr">
-        ${(bill.tenders||[]).map(t=>`<div class="rcp-line"><span class="q">${esc(t.method)}</span><span>${rs(t.amount)}</span></div>`).join('')}
-        ${bill.change?`<div class="rcp-line"><span class="q">Change</span><span>${rs(bill.change)}</span></div>`:''}
-        ${qrDataUri ? `
-          <div class="rcp-center rcp-qr-wrap">
-            <div style="font-size:10px;color:#6b6960;margin-bottom:6px;text-align:center;">Scan to view digital bill</div>
-            <img src="${qrDataUri}" width="100" height="100" alt="Digital bill QR" style="width:100px;height:100px;display:block;" crossorigin="anonymous" />
-          </div>
-        ` : ''}
-        <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
+        <div class="rcp-foot">Thank you!<br><b>Powered by RestroSuite</b></div>`;
     }
 
-    function receiptText(bill){
-      const profile = bill.taxProfile || (window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular' });
-      const country = profile.country || 'IN';
-      const isIreland = (country === 'IE');
-      
-      const lines = [
-        receiptProfile.name || 'Outlet',
-        receiptProfile.address,
-        receiptProfile.phone ? `Phone: ${receiptProfile.phone}` : '',
-        profile.tax_registration_no ? `${profile.tax_system} No: ${profile.tax_registration_no}` : '',
-        `Bill: ${bill.no}`,
-        `${bill.table} | ${bill.time}`,
-        '',
-        ...bill.items.map(i => {
-          const catLabel = i.taxCategory || i.tax_category;
-          const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
-          return `${i.qty} x ${i.name} ${isIreland ? `(${rateLabel})` : ''} - ${rs(i.price * i.qty)}`;
-        }),
-        '',
-        `Subtotal: ${rs(bill.sub)}`,
-        bill.disc ? `Discount: - ${rs(bill.disc)}` : '',
-        bill.serviceChargeAmount ? `Service Charge (5%): ${rs(bill.serviceChargeAmount)}` : '',
-        bill.liquorTaxAmount ? `Liquor VAT: ${rs(bill.liquorTaxAmount)}` : ''
-      ];
-      
-      if (profile.gst_scheme === 'composition' && country === 'IN') {
-        lines.push('Composition taxable person, not eligible to collect tax');
-      } else {
-        const summary = bill.taxSummary || [];
-        if (summary.length > 0) {
-          if (country === 'IN') {
-            const halfGst = Math.round((bill.gst || 0) / 2);
-            lines.push(`CGST (2.5%): ${rs(halfGst)}`);
-            lines.push(`SGST (2.5%): ${rs(bill.gst - halfGst)}`);
-            lines.push('SAC: 9963');
-          } else {
-            lines.push('VAT Breakout:');
-            summary.forEach(band => {
-              lines.push(`  Rate ${band.percent}%: Net ${rs(band.net)} | VAT ${rs(band.tax)}`);
-            });
-          }
-        } else if (bill.gst > 0) {
-          const halfGst = Math.round((bill.gst || 0) / 2);
-          lines.push(`CGST (2.5%): ${rs(halfGst)}`);
-          lines.push(`SGST (2.5%): ${rs(bill.gst - halfGst)}`);
-        }
+    function receiptText(bill) {
+      if (window.RSReceiptEngine && typeof RSReceiptEngine.toText === 'function') {
+        return RSReceiptEngine.toText(bill, engineOutlet());
       }
-      
-      lines.push(
-        `Total: ${rs(bill.grand)}`,
-        `Paid by: ${(bill.tenders && bill.tenders[0] && bill.tenders[0].method) || 'Cash'}`,
-        '',
-        'Thank you for dining with us!'
-      );
-      
-      return lines.filter(Boolean).join('\n');
+      return `Bill ${bill.no}\nTotal ${rs(bill.grand)}\nThank you!`;
     }
 
-    function loadJsPDF() {
-      return new Promise((resolve, reject) => {
-        // jsPDF UMD sets window.jspdf = { jsPDF } in browsers
-        // Some builds also set window.jsPDF directly
-        function resolveJsPDF() {
-          if (window.jspdf && window.jspdf.jsPDF) return window.jspdf;
-          if (window.jsPDF) return { jsPDF: window.jsPDF };
-          return null;
-        }
-        const existing = resolveJsPDF();
-        if (existing) return resolve(existing);
-
-        function tryLoad(src, fallbackSrc) {
-          const script = document.createElement('script');
-          script.src = src;
-          script.onload = () => {
-            const mod = resolveJsPDF();
-            if (mod) { resolve(mod); return; }
-            if (fallbackSrc) { tryLoad(fallbackSrc, null); }
-            else reject(new Error('jsPDF loaded but class not found on window'));
-          };
-          script.onerror = () => {
-            if (fallbackSrc) {
-              console.warn('[jsPDF] Local bundle failed, trying CDN fallback...');
-              tryLoad(fallbackSrc, null);
-            } else {
-              reject(new Error('Failed to load jsPDF (local and CDN both failed)'));
-            }
-          };
-          document.head.appendChild(script);
-        }
-
-        // Try local bundle first (no CDN dependency), fall back to CDN
-        tryLoad('assets/lib/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-      });
-    }
-
-    function loadHtml2Canvas() {
-      return new Promise((resolve, reject) => {
-        if (typeof window.html2canvas === 'function') return resolve(window.html2canvas);
-        function tryLoad(src, fallbackSrc) {
-          const script = document.createElement('script');
-          script.src = src;
-          script.onload = () => {
-            if (typeof window.html2canvas === 'function') resolve(window.html2canvas);
-            else if (fallbackSrc) tryLoad(fallbackSrc, null);
-            else reject(new Error('html2canvas loaded but not available'));
-          };
-          script.onerror = () => {
-            if (fallbackSrc) tryLoad(fallbackSrc, null);
-            else reject(new Error('Failed to load html2canvas'));
-          };
-          document.head.appendChild(script);
-        }
-        tryLoad(
-          'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-          null
-        );
-      });
-    }
-
-    /** Inline styles so export PDF matches preview even if CSS vars/theme differ. */
-    const RECEIPT_EXPORT_CSS = `
-      .receipt-paper {
-        background: #fbfaf7; color: #16151c; border-radius: 10px;
-        padding: 22px 22px 26px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-        max-width: 320px; margin: 0 auto; position: relative; box-sizing: border-box;
-      }
-      .rcp-center { text-align: center; }
-      .rcp-logo { font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 20px; letter-spacing: -.02em; color: #16151c; }
-      .rcp-sub { font-size: 11px; color: #6b6960; margin-top: 2px; }
-      .rcp-hr { border: 0; border-top: 1px dashed #c9c6bd; margin: 13px 0; }
-      .rcp-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #4a4842; gap: 8px; }
-      .rcp-line { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; color: #16151c; gap: 8px; }
-      .rcp-line .q { color: #6b6960; }
-      .rcp-tot { display: flex; justify-content: space-between; font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 17px; margin-top: 6px; color: #16151c; }
-      .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
-      .rcp-foot b { color: #16151c; }
-      .rcp-qr-wrap { margin-top:10px;padding-top:10px;border-top:1px dashed #c9c6bd;display:flex;flex-direction:column;align-items:center; }
-      .rcp-qr-wrap img { width:100px;height:100px;display:block; }
-    `;
-
-    /**
-     * Build PDF from the EXACT same HTML used in the on-screen bill preview.
-     * Captures receiptHTML with the same receipt-paper styles (QR, SAC, totals).
-     */
     async function compilePreviewPDF(bill) {
-      const jspdfModule = await loadJsPDF();
-      const { jsPDF } = jspdfModule;
-      const html2canvas = await loadHtml2Canvas();
-      const qrDataUri = await generateReceiptQrDataUri(bill);
-
-      const host = document.createElement('div');
-      host.setAttribute('data-rs-receipt-export', '1');
-      host.style.cssText = 'position:fixed;left:-10000px;top:0;width:360px;padding:16px;margin:0;background:#efebe6;z-index:2147483000;pointer-events:none;';
-      // Inline CSS so capture is independent of theme / loaded stylesheets
-      host.innerHTML = `<style>${RECEIPT_EXPORT_CSS}</style>
-        <div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`;
-      document.body.appendChild(host);
-
-      try {
-        // Wait for QR image to decode so it appears in the capture
-        const qrImg = host.querySelector('img');
-        if (qrImg && !qrImg.complete) {
-          await new Promise((resolve) => {
-            qrImg.onload = resolve;
-            qrImg.onerror = resolve;
-            setTimeout(resolve, 1500);
-          });
-        }
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        const paper = host.querySelector('.receipt-paper') || host;
-        const canvas = await html2canvas(paper, {
-          scale: 3,
-          backgroundColor: '#fbfaf7',
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          imageTimeout: 4000,
-          width: Math.max(paper.scrollWidth || 320, 280),
-          windowWidth: 400,
-        });
-        const img = canvas.toDataURL('image/png');
-        // Page size follows receipt aspect (thermal-ish width)
-        const pageWmm = 80;
-        const pageHmm = Math.max(110, (canvas.height / canvas.width) * pageWmm + 2);
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
-        doc.setFillColor(251, 250, 247);
-        doc.rect(0, 0, pageWmm, pageHmm, 'F');
-        doc.addImage(img, 'PNG', 0, 0, pageWmm, pageHmm);
-        return doc.output('datauristring');
-      } finally {
-        if (host.parentNode) host.parentNode.removeChild(host);
+      if (window.RSReceiptEngine && typeof RSReceiptEngine.toPDF === 'function') {
+        return RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() });
       }
+      throw new Error('Receipt engine not loaded');
+    }
+
+    async function loadJsPDF() {
+      if (window.jspdf && window.jspdf.jsPDF) return window.jspdf;
+      if (window.jsPDF) return { jsPDF: window.jsPDF };
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'assets/lib/jspdf.umd.min.js';
+        s.onload = resolve;
+        s.onerror = () => {
+          const c = document.createElement('script');
+          c.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+          c.onload = resolve;
+          c.onerror = () => reject(new Error('jsPDF load failed'));
+          document.head.appendChild(c);
+        };
+        document.head.appendChild(s);
+      });
+      if (window.jspdf && window.jspdf.jsPDF) return window.jspdf;
+      if (window.jsPDF) return { jsPDF: window.jsPDF };
+      throw new Error('jsPDF not available');
+    }
+
+    // Preload PDF libs once UI is idle so first WhatsApp send is snappy
+    if (window.RSReceiptEngine && typeof RSReceiptEngine.preload === 'function') {
+      RSReceiptEngine.preload();
+    } else {
+      document.addEventListener('rs:hydrated', () => {
+        if (window.RSReceiptEngine && RSReceiptEngine.preload) RSReceiptEngine.preload();
+      }, { once: true });
     }
 
     async function compileThermalPDF(bill) {
@@ -920,16 +692,53 @@
     // Double-send guard: prevents auto-send + manual click from both firing for the same bill
     const _waSendingBills = new Set();
 
+    function openGatewayConnectCTA(reason) {
+      const msg = reason || 'WhatsApp is not connected on this outlet.';
+      if (!window.RSModal) {
+        if (confirm(msg + '\n\nOpen Settings → Gateway to connect?')) {
+          if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
+          setTimeout(() => {
+            const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+            if (gatewayBtn) gatewayBtn.click();
+          }, 200);
+        }
+        return;
+      }
+      RSModal.open({
+        title: 'Connect WhatsApp',
+        sub: 'Send bill PDFs instantly',
+        icon: 'fa-brands fa-whatsapp',
+        size: 'sm',
+        body: `<div style="padding:4px 2px 8px;line-height:1.55;font-size:13.5px;color:var(--text-soft)">
+          <p style="margin:0 0 12px;color:var(--text)">${esc(msg)}</p>
+          <p style="margin:0">Link a business WhatsApp number in <b>Settings → Gateway</b>, then bills send as the same PDF you see in Bill settled.</p>
+        </div>`,
+        foot: `<button class="btn btn-ghost" id="wa-cta-later">Later</button>
+               <button class="btn btn-primary" id="wa-cta-connect"><i class="fa-brands fa-whatsapp"></i> Connect now</button>`,
+        onMount(modal, close) {
+          modal.querySelector('#wa-cta-later').onclick = close;
+          modal.querySelector('#wa-cta-connect').onclick = () => {
+            close();
+            if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
+            setTimeout(() => {
+              const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+              if (gatewayBtn) gatewayBtn.click();
+            }, 180);
+          };
+        }
+      });
+    }
+
     async function shareReceiptViaWhatsApp(bill) {
-      if (_waSendingBills.has(bill.no)) return; // already sending this bill
-      _waSendingBills.add(bill.no);
-      try { await _doShareReceiptViaWhatsApp(bill); } finally { _waSendingBills.delete(bill.no); }
+      const key = bill && (bill.no || bill.orderId || bill.id);
+      if (key && _waSendingBills.has(key)) return;
+      if (key) _waSendingBills.add(key);
+      try { await _doShareReceiptViaWhatsApp(bill); } finally { if (key) _waSendingBills.delete(key); }
     }
 
     async function _doShareReceiptViaWhatsApp(bill) {
       let phone = bill.customerPhone;
       if (!phone || phone.trim() === '' || phone === 'null') {
-        // Use a proper modal dialog instead of the deprecated browser prompt()
         phone = await new Promise(resolve => {
           const ov = document.createElement('div');
           ov.className = 'rs-overlay';
@@ -954,7 +763,7 @@
           close.onclick  = () => finish(null);
           inp.onkeydown  = e => { if(e.key==='Enter') ok.click(); if(e.key==='Escape') finish(null); };
         });
-        if (phone === null) return; // User cancelled
+        if (phone === null) return;
         phone = phone.replace(/\D/g, '');
         if (phone) {
           bill.customerPhone = phone;
@@ -966,7 +775,7 @@
                 await RS_DB.put('bills', localBill.id, localBill);
               }
             }
-          } catch(dbErr) {
+          } catch (dbErr) {
             console.warn('Failed to save to local DB:', dbErr.message);
           }
         } else {
@@ -974,106 +783,114 @@
         }
       }
 
-      // Normalize bill shape so list reprints match POS preview fields
-      const normalized = {
-        ...bill,
-        no: bill.no || bill.orderId || bill.id,
-        grand: bill.grand != null ? bill.grand : bill.amount,
-        sub: bill.sub != null ? bill.sub : bill.subtotal,
-        items: Array.isArray(bill.items) ? bill.items : (bill._items || []),
-        customer: bill.customer || bill.customerName || 'Walk-in',
-        customerPhone: bill.customerPhone || phone,
-        table: bill.table || bill.tableNumber || '--',
-        time: bill.time || bill.dateTime || new Date().toLocaleString(),
-      };
-      // Text = same content as preview (for text-only fallback)
-      const text = receiptText(normalized);
-      const cleanPhone = phone.replace(/\D/g, '');
+      const normalized = (window.RSReceiptEngine && RSReceiptEngine.normalizeBill)
+        ? Object.assign({}, bill, RSReceiptEngine.normalizeBill(bill), { customerPhone: bill.customerPhone || phone })
+        : {
+            ...bill,
+            no: bill.no || bill.orderId || bill.id,
+            grand: bill.grand != null ? bill.grand : bill.amount,
+            sub: bill.sub != null ? bill.sub : bill.subtotal,
+            items: Array.isArray(bill.items) ? bill.items : (bill._items || []),
+            customer: bill.customer || bill.customerName || 'Walk-in',
+            customerPhone: bill.customerPhone || phone,
+            table: bill.table || bill.tableNumber || '--',
+            time: bill.time || bill.dateTime || new Date().toLocaleString(),
+          };
+
+      const cleanPhone = String(phone).replace(/\D/g, '');
       if (!cleanPhone || cleanPhone.length < 10) {
         RS.toast('Enter a valid WhatsApp number with country code', 'fa-circle-exclamation');
         return;
       }
 
-      // Short label only under the PDF — full bill is inside the PDF (same as preview).
-      const pdfCaption = [
-        receiptProfile.name || 'RestroSuite',
-        `Bill ${normalized.no || ''}`.trim(),
-        normalized.grand != null ? `Total ${rs(normalized.grand)}` : '',
-      ].filter(Boolean).join(' · ');
-
-      // Always prefer gateway PDF when cloud is configured.
-      // PDF is generated from the EXACT on-screen receipt HTML (preview).
-      if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
-        try {
-          RS.toast('Sending bill PDF…', 'fa-file-pdf');
-          try {
-            if (typeof window.updateTopbarWhatsAppStatus === 'function') {
-              await Promise.race([
-                window.updateTopbarWhatsAppStatus(),
-                new Promise((r) => setTimeout(r, 2500)),
-              ]);
-            }
-          } catch (_) {}
-
-          // ONLY the on-screen preview capture — same paper as "Bill settled"
-          const pdfDataUri = await compilePreviewPDF(normalized);
-          const base64 = String(pdfDataUri || '').includes(',')
-            ? String(pdfDataUri).split(',')[1]
-            : String(pdfDataUri || '');
-          if (!base64 || base64.length < 100) {
-            throw new Error('PDF generation produced an empty file');
-          }
-
-          const timeoutMs = 30000;
+      // Refresh gateway status (best-effort) so readiness badge is current
+      try {
+        if (typeof window.updateTopbarWhatsAppStatus === 'function') {
           await Promise.race([
-            RS_API.data({
-              operation: 'gateway_send',
-              phone: cleanPhone,
-              // caption shown under the document (short); full bill is the PDF itself
-              message: pdfCaption,
-              caption: pdfCaption,
-              pdfData: base64,
-              filename: `receipt-${normalized.no || 'bill'}.pdf`,
-              orderId: String(normalized.no || ''),
-            }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Gateway send timed out')), timeoutMs)),
+            window.updateTopbarWhatsAppStatus(),
+            new Promise((r) => setTimeout(r, 2000)),
           ]);
-          window.__rsGatewayReady = true;
-          RS.toast('WhatsApp bill PDF sent (same as preview)!', 'fa-file-pdf');
-          return;
-        } catch (gwErr) {
-          console.warn('Gateway PDF send failed:', gwErr && gwErr.message);
-          // Text fallback uses the same receiptText as the preview content
-          try {
-            await RS_API.data({
-              operation: 'gateway_send',
-              phone: cleanPhone,
-              message: text,
-              orderId: String(normalized.no || ''),
-            });
+        }
+      } catch (_) {}
+
+      const st = window.__rsGatewayLastStatus || '';
+      const ready = window.__rsGatewayReady === true || st === 'ready';
+
+      RS.toast('Sending bill PDF…', 'fa-file-pdf');
+
+      if (window.RSReceiptEngine && typeof RSReceiptEngine.sendWhatsApp === 'function') {
+        try {
+          const result = await RSReceiptEngine.sendWhatsApp(normalized, cleanPhone, { timeoutMs: 30000 });
+          if (result.mode === 'pdf') {
+            RS.toast('WhatsApp bill PDF sent (same as preview)!', 'fa-file-pdf');
+            return;
+          }
+          if (result.mode === 'text') {
             RS.toast('PDF failed — text bill sent (same content as preview)', 'fa-whatsapp');
             return;
-          } catch (textErr) {
-            console.warn('Gateway text fallback failed:', textErr && textErr.message);
           }
+          if (result.mode === 'wa.me') {
+            RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
+            // Only prompt connect when gateway is clearly not linked
+            if (!ready && (st === 'offline' || st === 'error' || st === 'qr' || st === 'auth_failure' || !st)) {
+              setTimeout(() => openGatewayConnectCTA(
+                st === 'qr'
+                  ? 'Scan the WhatsApp QR in Settings → Gateway for one-tap PDF bills.'
+                  : 'Connect WhatsApp in Settings → Gateway for automatic PDF bills.'
+              ), 400);
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn('[Receipt] engine send failed:', err && err.message);
         }
       }
 
-      // Last resort: open WhatsApp Web with the same receipt text
-      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
-      window.open(waUrl, '_blank', 'noopener,noreferrer');
-      RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
+      // Manual fallback (engine missing or failed hard)
+      try {
+        const text = receiptText(normalized);
+        if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
+          const pdfDataUri = await compilePreviewPDF(normalized);
+          const base64 = String(pdfDataUri || '').includes(',') ? String(pdfDataUri).split(',')[1] : String(pdfDataUri || '');
+          if (base64 && base64.length > 100) {
+            const cap = (window.RSReceiptEngine && RSReceiptEngine.caption)
+              ? RSReceiptEngine.caption(normalized, engineOutlet())
+              : `Bill ${normalized.no} · ${rs(normalized.grand)}`;
+            await RS_API.data({
+              operation: 'gateway_send',
+              phone: cleanPhone,
+              message: cap,
+              caption: cap,
+              pdfData: base64,
+              filename: `receipt-${normalized.no || 'bill'}.pdf`,
+              orderId: String(normalized.no || ''),
+            });
+            window.__rsGatewayReady = true;
+            RS.toast('WhatsApp bill PDF sent (same as preview)!', 'fa-file-pdf');
+            return;
+          }
+        }
+        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
+      } catch (e) {
+        console.warn(e);
+        RS.toast('Could not send WhatsApp receipt', 'fa-circle-exclamation');
+        if (!ready) openGatewayConnectCTA();
+      }
     }
 
     function generateReceiptQrDataUri(bill) {
+      if (window.RSReceiptEngine && typeof RSReceiptEngine.toPDF === 'function') {
+        // qr helper lives inside engine; keep local for preview markup
+      }
       return new Promise((resolve) => {
         if (!window.QRCode) {
           resolve(null);
           return;
         }
-        const tenantSlug = sessionStorage.getItem('tenant_slug') || 'bbb';
+        const tenantSlug = sessionStorage.getItem('tenant_slug') || 'outlet';
         const digitalUrl = `https://restrosuite.codearc.co.in/bill/${tenantSlug}/${bill.no}`;
-        QRCode.toDataURL(digitalUrl, { width: 120, margin: 1 }, (err, url) => {
+        QRCode.toDataURL(digitalUrl, { width: 200, margin: 1 }, (err, url) => {
           if (err) {
             console.error('[QR Generation Error]', err);
             resolve(null);
@@ -1084,28 +901,45 @@
       });
     }
 
-    async function showReceipt(bill){
+    async function showReceipt(bill) {
       const qrDataUri = await generateReceiptQrDataUri(bill);
       const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
-      const autoSendSettings = window.RS_SETTINGS || {};
-      const autoSendOn = autoSendSettings.set_auto_send_receipts === true
-                      || autoSendSettings.set_auto_send_receipts === 'true';
-      const hasPhone = bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null';
-      // Always show the WhatsApp button — sending is background so cashier can resend if needed.
-      const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>`;
+      const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
+      const waLabel = gwReady ? 'WhatsApp' : 'WhatsApp';
+      const connectBanner = !gwReady
+        ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
+            <div style="flex:1;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
+              <b style="color:var(--text)">Connect WhatsApp</b> to send this exact bill as a PDF in one tap.
+              <span style="color:var(--orange);font-weight:600"> Open Gateway →</span>
+            </div>
+          </div>`
+        : '';
+      const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> ${waLabel}</button>`;
       RSModal.open({
-        title:'Bill settled', sub:`${bill.no} \u00b7 ${rs(bill.grand)}`, icon:'fa-circle-check', size:'sm',
-        body:`<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
-        foot:`${waBtn}
+        title: 'Bill settled',
+        sub: `${bill.no} \u00b7 ${rs(bill.grand)}`,
+        icon: 'fa-circle-check',
+        size: 'sm',
+        body: `${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
+        foot: `${waBtn}
               <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
-        onMount(modal, close){
-          modal.querySelector('#rc-print').onclick = ()=> RSPrint(printHtml, 'Receipt '+bill.no);
+        onMount(modal, close) {
+          modal.querySelector('#rc-print').onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
           const waEl = modal.querySelector('#rc-wa');
           if (waEl && waEl.tagName === 'BUTTON') {
-            waEl.onclick = ()=> RSReceipt.share(bill);
+            waEl.onclick = () => RSReceipt.share(bill);
           }
+          const cta = modal.querySelector('#rc-wa-cta');
+          if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
           modal.querySelector('#rc-new').onclick = close;
+          // Warm PDF cache while cashier reads the bill (instant WhatsApp)
+          if (window.RSReceiptEngine && RSReceiptEngine.toPDF) {
+            const warm = () => RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() }).catch(() => {});
+            if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 });
+            else setTimeout(warm, 400);
+          }
         }
       });
     }
@@ -1113,18 +947,20 @@
     // PDF compilers: preview HTML capture (preferred for WhatsApp) + thermal jsPDF
     RS.compileThermalPDF = compileThermalPDF;
     RS.compilePreviewPDF = compilePreviewPDF;
+    RS.openGatewayConnectCTA = openGatewayConnectCTA;
 
     window.RSReceipt = {
       html: receiptHTML,
       text: receiptText,
       show: showReceipt,
-      async print(bill){
+      async print(bill) {
         const qrDataUri = await generateReceiptQrDataUri(bill);
-        RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`, 'Receipt '+bill.no);
+        RSPrint(`<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`, 'Receipt ' + bill.no);
       },
-      share(bill){
+      share(bill) {
         shareReceiptViaWhatsApp(bill);
-      }
+      },
+      pdf: compilePreviewPDF,
     };
 
     /* ---------------- inline cart payment ---------------- */
@@ -1803,135 +1639,162 @@
           dueAmount = totals.grand;
         }
 
-        const hasPhone = cust.phone && cust.phone.trim();
-        const hasName = cust.name && cust.name.trim() && cust.name.toLowerCase() !== 'walk-in guest' && cust.name.toLowerCase() !== 'walk-in';
-        if (hasPhone || hasName) {
-          try {
-            const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
-            let matched = null;
-            if (hasPhone) {
-              matched = customers.find(c => c.phone && String(c.phone).trim() === String(cust.phone).trim());
-            } else if (hasName) {
-              matched = customers.find(c => c.name && String(c.name).trim().toLowerCase() === String(cust.name).trim().toLowerCase());
-            }
-            if (matched) {
-              matched.visits = (matched.visits || 0) + 1;
-              matched.spend = (matched.spend || 0) + totals.grand;
-              matched.last = new Date().toLocaleDateString('en-CA');
-              if (dueAmount > 0) {
-                matched.dues = (matched.dues || 0) + dueAmount;
-              }
-              if (hasName && !matched.name) matched.name = cust.name.trim();
-              if (hasPhone && !matched.phone) matched.phone = cust.phone.trim();
-              await RS_DB.put('customers', matched.id, matched);
-              RS.toast('CRM customer details updated', 'fa-address-book');
-            } else {
-              const newCust = {
-                id: 'cust-' + Date.now(),
-                name: cust.name ? cust.name.trim() : 'Guest',
-                phone: cust.phone ? cust.phone.trim() : '',
-                email: '',
-                visits: 1,
-                spend: totals.grand,
-                last: new Date().toLocaleDateString('en-CA'),
-                dues: dueAmount,
-                tier: totals.grand > 25000 ? 'vip' : totals.grand > 12000 ? 'gold' : 'silver'
-              };
-              await RS_DB.put('customers', newCust.id, newCust);
-              RS.toast('New customer added to CRM', 'fa-address-book');
-            }
-            if (typeof loadCustomersForPos === 'function') {
-              await loadCustomersForPos();
-            }
-          } catch (e) {
-            console.warn("Failed to link customer to CRM on checkout", e);
-          }
-        }
+        // Snapshot cart + customer before clearing (optimistic UI)
+        const itemsSnap = (totals.items || []).map(i => ({ ...i }));
+        const countSnap = totals.count;
+        const custSnap = {
+          table: cust.table,
+          name: cust.name || '',
+          phone: cust.phone || '',
+          gst: cust.gst || '',
+        };
 
         const bill = {
-          no:(RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001')), time:new Date().toLocaleString(window.RS_getOutletLocale?RS_getOutletLocale():'en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true,timeZone:window.RS_getOutletTimezone?RS_getOutletTimezone():'Asia/Kolkata'}),
-          table: cust.table, customer: cust.name||'', customerPhone: cust.phone||'', customerGst: cust.gst||'', items: totals.items, sub: totals.sub, disc: totals.disc, gst: totals.gst, grand: totals.grand,
-          tenders: customTenders || [{ method: payMethod, amount: receivedVal }], change: changeVal || 0,
-          taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
+          no: (RS.nextBillNo ? RS.nextBillNo(RS.BILLS || []) : ('RS-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-001')),
+          time: new Date().toLocaleString(window.RS_getOutletLocale ? RS_getOutletLocale() : 'en-IN', {
+            day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true,
+            timeZone: window.RS_getOutletTimezone ? RS_getOutletTimezone() : 'Asia/Kolkata'
+          }),
+          table: custSnap.table,
+          customer: custSnap.name,
+          customerPhone: custSnap.phone,
+          customerGst: custSnap.gst,
+          items: itemsSnap,
+          sub: totals.sub,
+          disc: totals.disc,
+          gst: totals.gst,
+          grand: totals.grand,
+          tenders: customTenders || [{ method: payMethod, amount: receivedVal }],
+          change: changeVal || 0,
+          taxSummary: totals.taxSummary,
+          channel: totals.channel,
+          taxProfile: totals.taxProfile,
+          liquorTaxAmount: totals.liquorTax,
+          serviceChargeAmount: totals.serviceCharge
         };
-        try {
-          const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-          const gstHalf = Math.round((totals.gst||0)/2);
-          // Cloud PK is bigint; keep human bill no in order_id via MAP (no/orderId).
-          const billRow = { id: Date.now(), orderId:bill.no, no:bill.no, time:bill.time, dateTime:new Date().toISOString(), table:bill.table, items: totals.count,
-            amount: bill.grand, pay: payMethod, paymentMethod: payMethod, total: bill.grand, status:'paid',
-            orderType: (document.querySelector('.order-type-btn.active')?.textContent || '').trim() || bill.table || 'Dine-in',
-            receivedAmount: receivedVal, changeAmount: changeVal, change: changeVal,
-            customerName: cust.name||'Walk-in Guest', customerPhone: cust.phone||'',
-            subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst||0)-gstHalf,
-            _items: totals.items.map(i=>({ name:i.name, qty:i.qty, price:i.price, cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category })),
-            taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile, liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge };
-          RS.BILLS.unshift(billRow);
-          if (RS.saveOne) await RS.saveOne('bills',billRow);
-          // Deduct recipe ingredients from inventory (non-blocking)
-          if (RS.deductInventoryForBill) RS.deductInventoryForBill(billRow);
-          const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-          if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
-            RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
-          }
-          const refreshBills = () => RS.render && RS.render('bills-tab');
-          if (window.requestIdleCallback) window.requestIdleCallback(refreshBills, { timeout: 1200 });
-          else window.setTimeout(refreshBills, 350);
-        } catch(e){
-          console.warn('Bill save failed', e);
-          RS.toast('Bill saved locally. Cloud sync pending.','fa-cloud-arrow-up');
-        }
 
+        const gstHalf = Math.round((totals.gst || 0) / 2);
+        const billRow = {
+          id: Date.now(), orderId: bill.no, no: bill.no, time: bill.time, dateTime: new Date().toISOString(),
+          table: bill.table, items: countSnap, amount: bill.grand, pay: payMethod, paymentMethod: payMethod,
+          total: bill.grand, status: 'paid',
+          orderType: (document.querySelector('.order-type-btn.active')?.textContent || '').trim() || bill.table || 'Dine-in',
+          receivedAmount: receivedVal, changeAmount: changeVal, change: changeVal,
+          customerName: custSnap.name || 'Walk-in Guest', customerPhone: custSnap.phone || '',
+          subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst || 0) - gstHalf,
+          _items: itemsSnap.map(i => ({
+            name: i.name, qty: i.qty, price: i.price,
+            cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category
+          })),
+          taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile,
+          liquorTaxAmount: totals.liquorTax, serviceChargeAmount: totals.serviceCharge
+        };
+
+        // Instant feedback: memory bill + clear cart + show receipt (no await)
+        RS.BILLS.unshift(billRow);
         RS.clearCart();
         resetCustomerFields();
         resetPayment();
         showReceipt(bill);
-        // Android bridge: haptic + audio feedback on successful payment
         document.dispatchEvent(new CustomEvent('rs:bill-paid', { detail: { total: bill.grand || bill.amount || '' } }));
 
-        // Auto-send WhatsApp receipt if enabled in settings
-        try {
-          const autoSendSettings = window.RS_SETTINGS || {};
-          const autoSendEnabled = autoSendSettings.set_auto_send_receipts === true || autoSendSettings.set_auto_send_receipts === 'true';
-          if (autoSendEnabled && bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null') {
-            setTimeout(() => { shareReceiptViaWhatsApp(bill); }, 800);
-          }
-        } catch(autoSendErr) {
-          console.warn('Auto-send WhatsApp failed:', autoSendErr.message);
-        }
-
-        if (window.RS_DB) {
+        // Background: persist, CRM, drafts, inventory, auto-WhatsApp
+        (async () => {
           try {
-            const tableVal = cust.table || 'Walk-in / Takeaway';
-            let draftName = tableVal;
-            if (tableVal === 'Walk-in / Takeaway') {
-              draftName = 'Takeaway';
-            } else if (tableVal.startsWith('Delivery')) {
-              draftName = 'Delivery';
+            const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+            if (RS.saveOne) await RS.saveOne('bills', billRow);
+            if (RS.deductInventoryForBill) RS.deductInventoryForBill(billRow);
+            const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+            if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
+              RS.toast('Bill saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
             }
-            const draftsList = await RS_DB.list('drafts').catch(() => []);
-            const draftToDel = draftsList.find(d => d.draftName === draftName);
-            if (draftToDel) {
-              await RS_DB.del('drafts', draftToDel.id).catch(() => {});
-            }
-
-            const rows = await RS_DB.list('pending_orders').catch(() => []);
-            const matched = rows.find(r =>
-              (r.tableNumber === cust.table || r.tableNumber === cust.table.replace('Table ', '')) &&
-              (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
-            );
-            if (matched) {
-              await RS_DB.del('pending_orders', matched.id);
-              if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
-            }
-            
-            // Sync in-memory held orders and reload table grid
-            await loadHeldFromDB();
-            await renderPosTableGrid();
-          } catch(e) {
-            console.warn("Failed to clear pending order or draft on checkout", e);
+            const refreshBills = () => RS.render && RS.render('bills-tab');
+            if (window.requestIdleCallback) window.requestIdleCallback(refreshBills, { timeout: 1200 });
+            else window.setTimeout(refreshBills, 350);
+          } catch (e) {
+            console.warn('Bill save failed', e);
+            RS.toast('Bill saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
           }
-        }
+
+          const hasPhone = custSnap.phone && custSnap.phone.trim();
+          const hasName = custSnap.name && custSnap.name.trim()
+            && custSnap.name.toLowerCase() !== 'walk-in guest'
+            && custSnap.name.toLowerCase() !== 'walk-in';
+          if ((hasPhone || hasName) && window.RS_DB) {
+            try {
+              const customers = await RS_DB.list('customers').catch(() => []);
+              let matched = null;
+              if (hasPhone) {
+                matched = customers.find(c => c.phone && String(c.phone).trim() === String(custSnap.phone).trim());
+              } else if (hasName) {
+                matched = customers.find(c => c.name && String(c.name).trim().toLowerCase() === String(custSnap.name).trim().toLowerCase());
+              }
+              if (matched) {
+                matched.visits = (matched.visits || 0) + 1;
+                matched.spend = (matched.spend || 0) + bill.grand;
+                matched.last = new Date().toLocaleDateString('en-CA');
+                if (dueAmount > 0) matched.dues = (matched.dues || 0) + dueAmount;
+                if (hasName && !matched.name) matched.name = custSnap.name.trim();
+                if (hasPhone && !matched.phone) matched.phone = custSnap.phone.trim();
+                await RS_DB.put('customers', matched.id, matched);
+              } else {
+                const newCust = {
+                  id: 'cust-' + Date.now(),
+                  name: custSnap.name ? custSnap.name.trim() : 'Guest',
+                  phone: custSnap.phone ? custSnap.phone.trim() : '',
+                  email: '',
+                  visits: 1,
+                  spend: bill.grand,
+                  last: new Date().toLocaleDateString('en-CA'),
+                  dues: dueAmount,
+                  tier: bill.grand > 25000 ? 'vip' : bill.grand > 12000 ? 'gold' : 'silver'
+                };
+                await RS_DB.put('customers', newCust.id, newCust);
+              }
+              if (typeof loadCustomersForPos === 'function') loadCustomersForPos().catch(() => {});
+            } catch (e) {
+              console.warn('Failed to link customer to CRM on checkout', e);
+            }
+          }
+
+          try {
+            const autoSendSettings = window.RS_SETTINGS || {};
+            const autoSendEnabled = autoSendSettings.set_auto_send_receipts === true
+              || autoSendSettings.set_auto_send_receipts === 'true';
+            if (autoSendEnabled && bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null') {
+              setTimeout(() => { shareReceiptViaWhatsApp(bill); }, 600);
+            }
+          } catch (autoSendErr) {
+            console.warn('Auto-send WhatsApp failed:', autoSendErr.message);
+          }
+
+          if (window.RS_DB) {
+            try {
+              const tableVal = custSnap.table || 'Walk-in / Takeaway';
+              let draftName = tableVal;
+              if (tableVal === 'Walk-in / Takeaway') draftName = 'Takeaway';
+              else if (tableVal.startsWith('Delivery')) draftName = 'Delivery';
+              const draftsList = await RS_DB.list('drafts').catch(() => []);
+              const draftToDel = draftsList.find(d => d.draftName === draftName);
+              if (draftToDel) await RS_DB.del('drafts', draftToDel.id).catch(() => {});
+
+              const rows = await RS_DB.list('pending_orders').catch(() => []);
+              const matched = rows.find(r =>
+                (r.tableNumber === custSnap.table || r.tableNumber === String(custSnap.table || '').replace('Table ', '')) &&
+                (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing'
+                  || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
+              );
+              if (matched) {
+                await RS_DB.del('pending_orders', matched.id);
+                if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
+              }
+              await loadHeldFromDB();
+              await renderPosTableGrid();
+            } catch (e) {
+              console.warn('Failed to clear pending order or draft on checkout', e);
+            }
+          }
+        })();
       }
 
       if (payment.method === 'Due' && !cust.phone) {
