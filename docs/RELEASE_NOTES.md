@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v97 (2026-07-11) — Top bar 10/10 (calm cashier header)
+
+- **Hierarchy**: Counter + title | **shift cluster** | search · ⋯ · clock · bell · theme
+- **⋯ More** holds Support, WhatsApp status, cloud sync, app version (no icon parade)
+- Shorter POS subtitle; compact search; station chip locked to left brand cluster
+- Shift stays a clear pill group (bills · sales · drawer · Z · lock)
+
 ## v96 (2026-07-11) — Cart 10/10 polish
 
 - **Pay methods**: icon + short labels (Cash / UPI / Card / Due / Split)

@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v96-20260711-ten';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v97-20260711-topbar';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -415,39 +415,56 @@
 
   <!-- ===================== MAIN ===================== -->
   <main class="main">
-    <header class="topbar">
-      <div class="tb-title"><h1 id="page-title">Point of Sale</h1><p id="page-sub">Ring up takeaway & dine-in orders</p></div>
-      <div class="tb-spacer"></div>
-      <div class="tb-search"><i class="fa-solid fa-magnifying-glass"></i><input placeholder="Search anything…"></div>
-      <div class="tb-dropdown support-dropdown">
-        <button class="tb-pill dropdown-trigger" id="support-trigger" aria-label="Support Options" data-tooltip="Support Options">
-          <i class="fa-solid fa-headset"></i><span>Support</span>
-        </button>
-        <div class="dropdown-menu support-menu" id="support-menu">
-          <a href="tel:+919983721179" class="dropdown-item call">
-            <i class="fa-solid fa-phone"></i>
-            <div>
-              <strong>Call Support</strong>
-              <span>+91 99837 21179</span>
-            </div>
-          </a>
-          <a href="https://wa.me/919983721179" target="_blank" class="dropdown-item whatsapp">
-            <i class="fa-brands fa-whatsapp"></i>
-            <div>
-              <strong>WhatsApp Support</strong>
-              <span>Chat online with us</span>
-            </div>
-          </a>
+    <header class="topbar topbar-calm">
+      <!-- Left: Counter (injected) + screen title -->
+      <div class="tb-left" id="tb-left">
+        <div class="tb-title">
+          <h1 id="page-title">Point of Sale</h1>
+          <p id="page-sub" class="tb-sub">Takeaway &amp; dine-in</p>
         </div>
       </div>
-      <span class="tb-pill txt" id="topbar-whatsapp-status-pill">
-        <span id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin"></i><span>WhatsApp</span></span>
-      </span>
-      <span class="tb-pill txt" id="db-mode-pill"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading</span></span>
-      <span class="tb-pill txt" id="app-version-pill"></span>
-      <span class="tb-pill txt clock-pill"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
-      <button class="tb-icon-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
-      <button class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
+      <div class="tb-spacer"></div>
+      <!-- Center: shift host injected by competitive-ops (#rs-topbar-shift) -->
+      <!-- Right: search + more tray + clock + bell + theme -->
+      <div class="tb-right" id="tb-right">
+        <div class="tb-search tb-search-compact" title="Global search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="search" placeholder="Search…" aria-label="Search anything" autocomplete="off">
+        </div>
+        <div class="tb-more support-dropdown" id="tb-more">
+          <button type="button" class="tb-icon-btn dropdown-trigger" id="support-trigger" aria-label="More tools" aria-expanded="false" data-tooltip="More" title="Support, sync, version">
+            <i class="fa-solid fa-ellipsis"></i>
+          </button>
+          <div class="dropdown-menu support-menu tb-more-menu" id="support-menu">
+            <div class="tb-more-section">Support</div>
+            <a href="tel:+919983721179" class="dropdown-item call">
+              <i class="fa-solid fa-phone"></i>
+              <div>
+                <strong>Call support</strong>
+                <span>+91 99837 21179</span>
+              </div>
+            </a>
+            <a href="https://wa.me/919983721179" target="_blank" rel="noopener" class="dropdown-item whatsapp">
+              <i class="fa-brands fa-whatsapp"></i>
+              <div>
+                <strong>WhatsApp support</strong>
+                <span>Chat with us</span>
+              </div>
+            </a>
+            <div class="tb-more-section">Status</div>
+            <div class="dropdown-item tb-more-status" id="topbar-whatsapp-status-pill" role="status">
+              <span id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin"></i><span>WhatsApp</span></span>
+            </div>
+            <div class="dropdown-item tb-more-status" id="db-mode-pill" role="status" title="Cloud sync">
+              <i class="fa-solid fa-spinner fa-spin"></i><span>Loading</span>
+            </div>
+            <div class="dropdown-item tb-more-status" id="app-version-pill" role="status"></div>
+          </div>
+        </div>
+        <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
+        <button type="button" class="tb-icon-btn" aria-label="Notifications" title="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
+        <button type="button" class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme" title="Light / dark"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
+      </div>
     </header>
 
     <div class="content">

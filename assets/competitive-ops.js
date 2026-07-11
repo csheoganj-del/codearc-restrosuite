@@ -424,15 +424,20 @@
       if (document.documentElement.classList.contains('rs-role-superadmin')) return;
     } catch (_) {}
     let chip = document.getElementById('rs-station-chip');
-    const host = document.querySelector('.topbar-right, .topbar-actions, .topbar');
+    // Prefer left brand cluster so Counter sits next to page title (not lost in the tray)
+    const host =
+      document.getElementById('tb-left') ||
+      document.querySelector('.topbar-right, .topbar-actions, .topbar');
     if (!host) return;
     if (!chip) {
       chip = document.createElement('button');
       chip.id = 'rs-station-chip';
       chip.type = 'button';
+      chip.className = 'rs-station-chip';
       chip.title = 'This counter name (multi-terminal)';
-      chip.style.cssText = 'display:inline-flex;align-items:center;gap:6px;border:1px solid var(--stroke);background:var(--glass);border-radius:999px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;color:var(--text)';
-      host.insertBefore(chip, host.firstChild);
+      const title = host.querySelector('.tb-title');
+      if (title) host.insertBefore(chip, title);
+      else host.insertBefore(chip, host.firstChild);
       chip.onclick = () => {
         const next = window.prompt('Counter name (e.g. Counter 1, Bar, Takeaway)', getStationLabel());
         if (next != null && next.trim()) setStationLabel(next.trim());
@@ -1042,11 +1047,11 @@
       host.id = 'rs-topbar-shift';
       host.className = 'rs-topbar-shift';
       host.setAttribute('aria-label', 'Shift / register');
-      // After title/spacer so it sits with station + ops (left of search)
+      // Between brand and right tray — register ops are primary mid-header
+      const right = topbar.querySelector('.tb-right');
       const spacer = topbar.querySelector('.tb-spacer');
-      const search = topbar.querySelector('.tb-search');
-      if (spacer) spacer.insertAdjacentElement('afterend', host);
-      else if (search) topbar.insertBefore(host, search);
+      if (right) topbar.insertBefore(host, right);
+      else if (spacer) spacer.insertAdjacentElement('afterend', host);
       else topbar.appendChild(host);
     }
 

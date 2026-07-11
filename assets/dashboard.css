@@ -51,16 +51,90 @@
 
 /* ===================== MAIN ===================== */
 .main { display: flex; flex-direction: column; min-height: 100vh; min-width: 0; }
-.topbar { position: sticky; top: 0; display: flex; align-items: center; gap: 16px; padding: 14px clamp(16px,2.4vw,28px); border-bottom: 1px solid var(--stroke); background: var(--panel);  z-index: 20; }
-.tb-title { flex: none; }
-.tb-title h1 { font-size: 21px; letter-spacing: -0.02em; white-space: nowrap; }
-.tb-title p { font-size: 12.5px; color: var(--text-mute); }
-.tb-spacer { flex: 1; }
-.tb-search { display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-radius: var(--r-pill); background: var(--glass); border: 1px solid var(--stroke-2); width: 240px; transition: var(--t); }
-.tb-search:focus-within { border-color: var(--orange); width: 280px; }
-.tb-search i { color: var(--text-mute); font-size: 13px; }
-.tb-search input { border: none; background: none; outline: none; color: var(--text); font-family: var(--font-body); font-size: 13.5px; width: 100%; }
+.topbar,
+.topbar-calm {
+  position: sticky; top: 0; display: flex; align-items: center; gap: 10px;
+  padding: 10px clamp(12px, 2vw, 22px); border-bottom: 1px solid var(--stroke);
+  background: var(--panel); z-index: 20;
+}
+.tb-left {
+  display: flex; align-items: center; gap: 10px; flex: none; min-width: 0;
+}
+.tb-right {
+  display: flex; align-items: center; gap: 6px; flex: none;
+}
+.rs-station-chip,
+#rs-station-chip {
+  display: inline-flex !important; align-items: center; gap: 6px;
+  border: 1px solid var(--stroke) !important; background: var(--glass) !important;
+  border-radius: 999px !important; padding: 6px 11px !important;
+  font-size: 11.5px !important; font-weight: 700 !important; cursor: pointer;
+  color: var(--text) !important; flex: none; white-space: nowrap;
+}
+.tb-title { flex: none; min-width: 0; }
+.tb-title h1 {
+  font-size: 17px; letter-spacing: -0.02em; white-space: nowrap;
+  font-weight: 800; line-height: 1.15;
+}
+.tb-title p,
+.tb-sub {
+  font-size: 11px; color: var(--text-mute); margin: 1px 0 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;
+}
+.tb-spacer { flex: 1; min-width: 8px; }
+.tb-search,
+.tb-search-compact {
+  display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+  border-radius: var(--r-pill); background: var(--glass); border: 1px solid var(--stroke-2);
+  width: 148px; transition: var(--t); flex: none;
+}
+.tb-search:focus-within,
+.tb-search-compact:focus-within {
+  border-color: var(--orange); width: 200px;
+}
+.tb-search i { color: var(--text-mute); font-size: 12px; }
+.tb-search input {
+  border: none; background: none; outline: none; color: var(--text);
+  font-family: var(--font-body); font-size: 13px; width: 100%;
+}
 .tb-search input::placeholder { color: var(--text-faint); }
+
+/* More tray (support + sync + version) */
+.tb-more { position: relative; }
+.tb-more-menu {
+  right: 0; left: auto; top: calc(100% + 8px); width: min(280px, 92vw);
+  padding: 6px; z-index: 80;
+}
+.tb-more-section {
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-mute); padding: 8px 10px 4px;
+}
+.tb-more-status {
+  display: flex !important; align-items: center; gap: 10px;
+  padding: 10px 12px !important; cursor: default; font-size: 12.5px; font-weight: 600;
+  color: var(--text-soft); border-radius: var(--r-sm);
+}
+.tb-more-status i { width: 18px; text-align: center; }
+.tb-more.active .tb-more-menu,
+.support-dropdown.active .tb-more-menu { display: flex !important; flex-direction: column; }
+
+/* Shift cluster: primary register group in header */
+.rs-topbar-shift { margin: 0 4px; }
+.rs-shift-topbar,
+.topbar-calm .rs-shift-compact {
+  min-height: 34px; padding: 3px 5px 3px 9px;
+  border: 1px solid var(--stroke-2);
+  background: color-mix(in srgb, var(--glass) 80%, var(--panel));
+  box-shadow: 0 1px 0 rgba(0,0,0,.02);
+}
+.topbar-calm .rs-shift-compact.closed {
+  border-color: rgba(234,179,8,.45);
+  background: rgba(234,179,8,.1);
+}
+.topbar-calm .clock-pill {
+  padding: 6px 10px; font-size: 12px; min-height: 34px;
+}
+.topbar-calm .tb-icon-btn { width: 36px; height: 36px; }
 .tb-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px; border-radius: var(--r-pill); background: var(--glass); border: 1px solid var(--stroke-2); font-size: 12.5px; font-weight: 600; color: var(--text-soft); transition: var(--t); cursor: default; }
 .tb-pill.sync { color: var(--green); border-color: oklch(0.74 0.15 158 / 0.3); background: var(--green-tint); }
 /* Named pill states — real-time sync indicator */

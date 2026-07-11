@@ -323,11 +323,14 @@
     supportTrigger.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      supportDropdown.classList.toggle('active');
+      const open = !supportDropdown.classList.contains('active');
+      supportDropdown.classList.toggle('active', open);
+      supportTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
     document.addEventListener('click', (e) => {
       if (!supportDropdown.contains(e.target)) {
         supportDropdown.classList.remove('active');
+        supportTrigger.setAttribute('aria-expanded', 'false');
       }
     });
   }
