@@ -352,19 +352,22 @@ async function loadAppIncidents() {
     list.innerHTML = reports.map((report) => {
       const severity = String(report.severity || 'error').toLowerCase();
       const statusLabel = String(report.status || 'open').toLowerCase();
-      const msg = friendlyErrorMessage(report.error_message);
+      // DB columns are message/stack (app_error_reports); accept legacy aliases too
+      const rawMsg = report.message || report.error_message || '';
+      const rawStack = report.stack || report.stack_trace || '';
+      const msg = friendlyErrorMessage(rawMsg);
       const tenant = friendlyTenantLabel(report.tenant_slug);
       const path = shortPath(report.url_path || report.page_url || '');
       const source = report.source || 'dashboard';
       const metaLine = [tenant, source, path].filter(Boolean).join(' · ');
-      const stack = report.stack_trace
-        ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px;color:var(--text-mute)">Technical details</summary><code style="display:block;margin-top:6px;font-size:10px;white-space:pre-wrap;max-height:120px;overflow:auto">${escHtml(String(report.stack_trace).slice(0, 1200))}</code></details>`
+      const stack = rawStack
+        ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px;color:var(--text-mute)">Technical details</summary><code style="display:block;margin-top:6px;font-size:10px;white-space:pre-wrap;max-height:120px;overflow:auto">${escHtml(String(rawStack).slice(0, 1200))}</code></details>`
         : '';
       const resolveButton = statusLabel === 'open'
-        ? `<button type="button" class="staff-secondary-btn app-incident-resolve-btn" data-report-id="${escHtml(report.id)}">Resolve</button>`
+        ? `<button type="button" class="staff-secondary-btn app-incident-resolve-btn" data-report-id="${escHtml(report.id)}" title="Mark as reviewed / fixed (does not undo the original crash)">Resolve</button>`
         : '';
       return `
-        <article class="app-incident-card">
+        <article class="app-incident-card" title="Client-side error report stored in app_error_reports">
           <div style="flex: 1; min-width: 0;">
             <strong>${escHtml(msg)}</strong>
             <span>${escHtml(metaLine)}</span>
