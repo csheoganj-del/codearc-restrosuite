@@ -81,6 +81,10 @@
       serviceChargePct: b.serviceChargePct,
       tipAmount: Number(b.tipAmount || b.tip || 0),
       deliveryCharge: Number(b.deliveryCharge || 0),
+      loyaltyRedeemAmount: Number(b.loyaltyRedeemAmount || 0),
+      promoCode: b.promoCode || '',
+      promoAmount: Number(b.promoAmount || 0),
+      promoTitle: b.promoTitle || '',
       liquorTaxAmount: Number(b.liquorTaxAmount || 0),
     };
   }

@@ -110,6 +110,8 @@
   }
 
 let activeCat='All', cart=[], discountPct=0, tipAmount=0, loyaltyRedeem=0, loyaltyPointsUsed=0;
+/** @type {{ code: string, pct: number, fixed: number, title: string, offerId: string|null }} */
+let activePromo = { code: '', pct: 0, fixed: 0, title: '', offerId: null };
 const renderPOS = () => {
   paintHappyHourBanner();
   const grid = $('#pos-grid');
@@ -262,6 +264,9 @@ function renderCart(){
   if (totals.disc > 0) {
     metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
   }
+  if (totals.promo > 0) {
+    metaHTML += `<span style="color:var(--orange)">Promo${totals.promoCode ? ' ' + _e(totals.promoCode) : ''} <b id="t-promo">- ${rs(totals.promo)}</b></span>`;
+  }
   if (totals.serviceCharge > 0) {
     metaHTML += `<span>SC ${totals.serviceChargePct || 5}% <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
   }
@@ -385,6 +390,12 @@ function getTotals(){
   }
   const tip = Math.max(0, Number(tipAmount) || 0);
   const loyaltyOff = Math.max(0, Number(loyaltyRedeem) || 0);
+  let promoOff = 0;
+  if (activePromo.fixed > 0) {
+    promoOff = Math.min(activePromo.fixed, Math.max(0, netAfterDiscount));
+  } else if (activePromo.pct > 0) {
+    promoOff = Math.round(Math.max(0, netAfterDiscount) * (activePromo.pct / 100));
+  }
   
   const items = cart.map(c => {
     const lineGross = c.price * c.qty;
@@ -503,7 +514,7 @@ function getTotals(){
     sgst = Number((totalGst - cgst).toFixed(2));
   }
   
-  let grand = netAfterDiscount + serviceChargeAmount + tip + deliveryCharge - loyaltyOff;
+  let grand = netAfterDiscount - promoOff + serviceChargeAmount + tip + deliveryCharge - loyaltyOff;
   if (!inclusivePricing) {
     grand += totalGst + totalLiquorTax;
   }
@@ -518,6 +529,11 @@ function getTotals(){
   return {
     sub: rawSubtotal,
     disc: discAmount,
+    promo: promoOff,
+    promoCode: activePromo.code || '',
+    promoTitle: activePromo.title || '',
+    promoPct: activePromo.pct || 0,
+    promoOfferId: activePromo.offerId || null,
     gst: totalGst,
     cgst,
     sgst,
@@ -538,8 +554,50 @@ function getTotals(){
     items
   };
 }
+function clearPromo() {
+  activePromo = { code: '', pct: 0, fixed: 0, title: '', offerId: null };
+  const pe = document.getElementById('promo-input');
+  if (pe) pe.value = '';
+  const badge = document.getElementById('promo-applied-badge');
+  if (badge) {
+    badge.style.display = 'none';
+    badge.textContent = '';
+  }
+}
+function setPromo(p) {
+  activePromo = {
+    code: (p && p.code) || '',
+    pct: Math.max(0, Number(p && p.pct) || 0),
+    fixed: Math.max(0, Number(p && p.fixed) || 0),
+    title: (p && p.title) || '',
+    offerId: (p && p.offerId) || null,
+  };
+  const pe = document.getElementById('promo-input');
+  if (pe && activePromo.code) pe.value = activePromo.code;
+  const badge = document.getElementById('promo-applied-badge');
+  if (badge) {
+    if (activePromo.code) {
+      badge.style.display = '';
+      const off =
+        activePromo.fixed > 0
+          ? rs(activePromo.fixed)
+          : activePromo.pct + '%';
+      badge.textContent = activePromo.code + ' · ' + off;
+    } else {
+      badge.style.display = 'none';
+      badge.textContent = '';
+    }
+  }
+  try {
+    renderCart();
+  } catch (_) {}
+}
+function getPromo() {
+  return { ...activePromo };
+}
 function clearCart(){
   cart=[]; discountPct=0; tipAmount=0; loyaltyRedeem=0; loyaltyPointsUsed=0;
+  clearPromo();
   const d=$('#disc-input'); if(d) d.value='';
   const tipEl=$('#tip-input'); if(tipEl) tipEl.value='';
   renderCart();
@@ -997,6 +1055,9 @@ function initPOS(){
     setCart,
     setDiscountPct,
     getDiscountPct,
+    setPromo,
+    getPromo,
+    clearPromo,
     setTip,
     getTip,
     setLoyaltyRedeem,
@@ -1033,6 +1094,9 @@ function initPOS(){
     global.RS.getTip = api.getTip;
     global.RS.setLoyaltyRedeem = api.setLoyaltyRedeem;
     global.RS.getLoyaltyRedeem = api.getLoyaltyRedeem;
+    global.RS.setPromo = api.setPromo;
+    global.RS.getPromo = api.getPromo;
+    global.RS.clearPromo = api.clearPromo;
     global.RS.isHappyHourActive = api.isHappyHourActive;
     global.RS.effectiveMenuPrice = api.effectiveMenuPrice;
   }

@@ -233,6 +233,151 @@
     paintBanner: paintLoyaltyBanner,
   };
 
+  /* ---------------- POS promo / coupon codes ---------------- */
+  function promoEnabled() {
+    const s = global.RS_SETTINGS || {};
+    return s.set_pos_promo_codes !== false && s.set_pos_promo_codes !== 'false';
+  }
+  function parseOfferExpiry(o) {
+    if (!o) return null;
+    if (o.expiresAt) {
+      const t = Date.parse(o.expiresAt);
+      if (!Number.isNaN(t)) return t;
+      // en-IN style or "14 days" stored as display string — treat missing parse as open
+      return null;
+    }
+    if (o.expires_at) {
+      const t = Date.parse(o.expires_at);
+      return Number.isNaN(t) ? null : t;
+    }
+    return null;
+  }
+  function offerIsActive(o) {
+    if (!o) return false;
+    const st = String(o.status || 'sent').toLowerCase();
+    if (st === 'redeemed' || st === 'expired' || st === 'cancelled' || st === 'canceled') return false;
+    const exp = parseOfferExpiry(o);
+    if (exp && exp < Date.now()) return false;
+    return true;
+  }
+  async function findOfferByCode(code) {
+    const c = String(code || '')
+      .trim()
+      .toUpperCase();
+    if (!c) return null;
+    let rows = [];
+    try {
+      if (global.RS_DB && RS_DB.list) rows = (await RS_DB.list('offers')) || [];
+    } catch (_) {}
+    return (
+      rows.find((o) => String(o.code || '').trim().toUpperCase() === c && offerIsActive(o)) || null
+    );
+  }
+  async function applyPromoCode(rawCode) {
+    if (!promoEnabled()) {
+      toast('Promo codes disabled in settings', 'fa-circle-info');
+      return false;
+    }
+    const code = String(rawCode || '')
+      .trim()
+      .toUpperCase();
+    if (!code) {
+      toast('Enter a promo code', 'fa-circle-exclamation');
+      return false;
+    }
+    const offer = await findOfferByCode(code);
+    if (!offer) {
+      // Allow local quick promos from settings: set_promo_demo_code / pct
+      const s = global.RS_SETTINGS || {};
+      const demo = String(s.set_demo_promo_code || 'WELCOME10').toUpperCase();
+      const rawPct = s.set_demo_promo_pct;
+      const demoPct = Number(
+        rawPct != null && rawPct !== '' ? rawPct : 10
+      );
+      if (code === demo && Number.isFinite(demoPct) && demoPct > 0) {
+        if (global.RS && RS.setPromo) {
+          RS.setPromo({ code, pct: demoPct, fixed: 0, title: 'Outlet promo', offerId: null });
+        }
+        toast(`Promo ${code} applied · ${demoPct}% off`, 'fa-tags');
+        return true;
+      }
+      toast('Invalid or expired promo code', 'fa-circle-exclamation');
+      return false;
+    }
+    const pct = Math.max(0, Math.min(100, Number(offer.pct != null ? offer.pct : offer.discount_pct) || 0));
+    const fixed = Math.max(0, Number(offer.fixed != null ? offer.fixed : offer.amount) || 0);
+    if (!(pct > 0 || fixed > 0)) {
+      toast('Offer has no discount value', 'fa-circle-exclamation');
+      return false;
+    }
+    // Optional phone lock: offer.customerPhone
+    if (offer.customerPhone && global.RS && RS.getCustomer) {
+      const cust = RS.getCustomer() || {};
+      const want = String(offer.customerPhone).replace(/\D/g, '');
+      const got = String(cust.phone || '').replace(/\D/g, '');
+      if (want && got && !got.endsWith(want.slice(-10)) && want !== got) {
+        toast('This code is for another guest phone', 'fa-circle-exclamation');
+        return false;
+      }
+    }
+    if (global.RS && RS.setPromo) {
+      RS.setPromo({
+        code: String(offer.code || code).toUpperCase(),
+        pct,
+        fixed,
+        title: offer.title || offer.name || 'Promo',
+        offerId: offer.id || null,
+      });
+    }
+    toast(
+      `Promo ${code} · ${fixed > 0 ? rs(fixed) + ' off' : pct + '% off'}`,
+      'fa-tags'
+    );
+    return true;
+  }
+  function clearPromoCode() {
+    if (global.RS && RS.clearPromo) RS.clearPromo();
+    try {
+      if (global.RS && RS.renderCart) RS.renderCart();
+    } catch (_) {}
+    toast('Promo cleared', 'fa-tags');
+  }
+  function wirePromoUi() {
+    if (global.__rsPromoWired) return;
+    global.__rsPromoWired = true;
+    const apply = async () => {
+      const inp = document.getElementById('promo-input');
+      await applyPromoCode(inp && inp.value);
+    };
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (e.target.closest('#promo-apply')) {
+          e.preventDefault();
+          apply();
+        }
+        if (e.target.closest('#promo-clear')) {
+          e.preventDefault();
+          clearPromoCode();
+        }
+      },
+      true
+    );
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target && e.target.id === 'promo-input') {
+        e.preventDefault();
+        apply();
+      }
+    });
+  }
+  global.RSPromo = {
+    apply: applyPromoCode,
+    clear: clearPromoCode,
+    find: findOfferByCode,
+    enabled: promoEnabled,
+    wire: wirePromoUi,
+  };
+
   /* ---------------- Multi-station identity ---------------- */
   function getStationId() {
     try {
@@ -1391,6 +1536,9 @@
     enhanceDuesHint();
     installShiftNudge();
     installFloorOrderAlerts();
+    try {
+      wirePromoUi();
+    } catch (_) {}
     refreshOpsUi();
 
     document.addEventListener('rs:hydrated', () => {

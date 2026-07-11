@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v77 (2026-07-11) — POS promo / coupon codes
+
+- **Promo code** field on POS cart: Apply / Clear; badge shows code + % or fixed off
+- Discount applied in `getTotals` after line discount, before tip/SC/delivery/loyalty
+- Looks up active **offers** by code; optional phone lock on offer
+- **Demo fallback** `WELCOME10` (10% default) via Settings → Taxes
+- Bill, PDF, HTML/text receipt show Promo line; fields stored on bill row
+- Toggle: Settings → Taxes → POS promo codes
+
 ## v76 (2026-07-11) — Waste log deducts stock
 
 - **Log waste** picks inventory ingredient, numeric qty, reason/note
@@ -129,7 +138,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v76-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v77-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 
