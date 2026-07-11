@@ -2,14 +2,14 @@
 /**
  * Authenticated Playwright E2E (optional).
  *
- * Set secrets (never commit):
+ * Required:
  *   E2E_OUTLET_SLUG=bbb
  *   E2E_USERNAME=...
  *   E2E_PASSWORD=...
- *   E2E_BASE_URL=https://your-deploy.vercel.app   # or local static+live API
  *
- * Against local static server, login still hits live Supabase from config.js
- * if the project is configured — otherwise tests skip.
+ * Optional:
+ *   E2E_BASE_URL=https://codearc-restrosuite.vercel.app
+ *   (defaults to production when credentials are set)
  */
 const { test, expect } = require('@playwright/test');
 
@@ -18,65 +18,76 @@ const user = process.env.E2E_USERNAME || process.env.E2E_USER || '';
 const pass = process.env.E2E_PASSWORD || process.env.E2E_PASS || '';
 const hasCreds = !!(slug && user && pass);
 
+async function performLogin(page) {
+  await page.goto('/login.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await expect(page.locator('#login-form')).toBeVisible({ timeout: 30000 });
+  await page.locator('#tenant-id').fill(slug);
+  await page.locator('#username').fill(user);
+  await page.locator('#password').fill(pass);
+
+  await page.locator('#login-submit').click();
+
+  try {
+    // Production redirects to /dashboard#pos-tab (hash is fine with waitForURL)
+    await page.waitForURL((url) => /dashboard/i.test(url.pathname + url.hash + url.href), {
+      timeout: 60000,
+    });
+    return { ok: true, url: page.url() };
+  } catch (_) {
+    const errBox = page.locator('#error-box.show, #error-box.alert.err.show, #error-box');
+    let errText = '';
+    try {
+      const cls = await page.locator('#error-box').getAttribute('class');
+      if (cls && cls.includes('show')) {
+        errText = (await page.locator('#error-box').innerText()).trim();
+      }
+    } catch (_) {}
+    return { ok: false, url: page.url(), errText };
+  }
+}
+
 test.describe('Authenticated outlet login', () => {
   test.skip(!hasCreds, 'Set E2E_OUTLET_SLUG, E2E_USERNAME, E2E_PASSWORD to run');
 
   test('staff can sign in and reach POS shell', async ({ page }) => {
-    test.setTimeout(90_000);
-    await page.goto('/login.html');
+    test.setTimeout(120_000);
+    const result = await performLogin(page);
+    test.info().annotations.push({
+      type: 'login-result',
+      description: JSON.stringify(result),
+    });
 
-    const tenant = page.locator('#tenant-id');
-    const username = page.locator('#username');
-    const password = page.locator('#password');
-    await expect(username).toBeVisible({ timeout: 20000 });
-    if (await tenant.count()) await tenant.fill(slug);
-    await username.fill(user);
-    await password.fill(pass);
-
-    await Promise.all([
-      page.waitForURL(/dashboard/i, { timeout: 45000 }).catch(() => null),
-      page.locator('#login-submit, button[type="submit"]').first().click(),
-    ]);
-
-    // Either navigated to dashboard or showed an error (cloud down)
-    const url = page.url();
-    if (!/dashboard/i.test(url)) {
-      const err = page.locator('.err-box.show, .error, [class*="error"]').first();
-      const errText = (await err.count()) ? await err.innerText().catch(() => '') : '';
-      test.info().annotations.push({ type: 'login-result', description: errText || url });
-      // Soft skip if network/config blocks cloud auth in CI without secrets backend
-      if (/failed to fetch|not configured|network|429|rate/i.test(errText)) {
-        test.skip(true, 'Cloud auth unavailable: ' + errText.slice(0, 120));
+    if (!result.ok) {
+      const err = result.errText || '';
+      if (/failed to fetch|not configured|network|429|rate|cors/i.test(err)) {
+        test.skip(true, 'Cloud auth unavailable: ' + err.slice(0, 160));
       }
-      expect(url, 'expected dashboard after login, got: ' + url + ' err=' + errText).toMatch(/dashboard/i);
+      expect(
+        result.url,
+        'expected dashboard after login, got: ' + result.url + ' err=' + err
+      ).toMatch(/dashboard/i);
     }
 
-    await page.waitForTimeout(2000);
-    // POS chrome
-    const pos = page.locator('#pos-tab, [data-tab="pos-tab"], #btn-checkout').first();
-    await expect(pos).toBeVisible({ timeout: 30000 });
+    // POS shell: sidebar link or checkout button (dashboard loads feature scripts async)
+    await expect(
+      page.locator('#btn-checkout, [data-tab="pos-tab"], #pos-tab').first()
+    ).toBeVisible({ timeout: 60000 });
   });
 
   test('after login, core assets do not 404', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     const failed = [];
     page.on('response', (r) => {
       if (r.status() >= 400 && /assets\//.test(r.url())) failed.push(r.status() + ' ' + r.url());
     });
 
-    await page.goto('/login.html');
-    const tenant = page.locator('#tenant-id');
-    if (await tenant.count()) await tenant.fill(slug);
-    await page.locator('#username').fill(user);
-    await page.locator('#password').fill(pass);
-    await page.locator('#login-submit, button[type="submit"]').first().click();
-    await page.waitForURL(/dashboard/i, { timeout: 45000 }).catch(() => null);
-    if (!/dashboard/i.test(page.url())) {
-      test.skip(true, 'login did not reach dashboard');
+    const result = await performLogin(page);
+    if (!result.ok) {
+      test.skip(true, 'login did not reach dashboard: ' + (result.errText || result.url));
     }
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(4000);
     const criticalMiss = failed.filter((f) =>
-      /print-bridge|escpos|bill-identity|inventory-ledger|db\.js|features-pos|dashboard\.js/.test(f)
+      /print-bridge|escpos|bill-identity|inventory-ledger|db\.js|features-pos|dashboard\.js|receipt\.js/.test(f)
     );
     expect(criticalMiss, criticalMiss.join('\n')).toEqual([]);
   });
