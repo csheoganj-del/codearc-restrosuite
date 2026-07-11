@@ -35,8 +35,9 @@ async function main() {
     // super-admin is large + rarely needed on POS boot — keep out of critical bundle
     'assets/modules/kds-ui.js',
     'assets/modules/qr-orders-ui.js',
+    'assets/modules/tax-helpers.js',
     'assets/modules/pos-ui.js',
-    // employees-ui / super-admin stay out of critical POS bundle
+    // employees-ui / super-admin / growth-hub stay out of critical POS bundle
     'assets/print-bridge.js',
     'assets/receipt.js',
     'assets/competitive-ops.js',

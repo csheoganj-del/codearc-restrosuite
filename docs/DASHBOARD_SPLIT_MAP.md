@@ -1,6 +1,6 @@
-# dashboard.js split map (remaining work)
+# dashboard.js split map
 
-Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates**.
+Extraction strategy: **IIFE modules + thin delegates**. Major UI domains are split out (Waves 5–12).
 
 ## Done
 
@@ -8,7 +8,7 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 |--------|--------|--------|
 | Bill numbers / channel series | `assets/modules/bill-identity.js` | ✅ |
 | Inventory deduct/restore | `assets/modules/inventory-ledger.js` | ✅ |
-| Bills history UI (table, refund, delete) | `assets/modules/bills-history.js` | ✅ Wave 6 |
+| Bills history UI | `assets/modules/bills-history.js` | ✅ Wave 6 |
 | Inventory stock/recipes UI | `assets/modules/inventory-ui.js` | ✅ Wave 7 |
 | Reports UI | `assets/modules/reports-ui.js` | ✅ Wave 8 |
 | Gateway monitor + incidents | `assets/modules/gateway-monitor.js` | ✅ Wave 8 |
@@ -17,28 +17,31 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 | QR orders UI | `assets/modules/qr-orders-ui.js` | ✅ Wave 10 |
 | Employees UI | `assets/modules/employees-ui.js` | ✅ Wave 10 |
 | POS cart / grid / init | `assets/modules/pos-ui.js` | ✅ Wave 11 |
+| Tax rate helpers | `assets/modules/tax-helpers.js` | ✅ Wave 12 |
+| Growth Hub shell tiles | `assets/modules/growth-hub-shell.js` | ✅ Wave 12 |
 | ESC/POS encode | `assets/escpos-encoder.js` | ✅ |
 | Print routing | `assets/print-bridge.js` | ✅ |
 | Shifts / station / keys | `assets/competitive-ops.js` | ✅ |
 
-## Remaining (small)
+## Intentionally remaining in dashboard.js
 
-| # | Domain | Notes |
-|---|--------|-------|
-| 1 | Growth hub shell | Thin; features-growth owns real UI |
-| 2 | Tax helpers on dashboard | `RS_resolveRate` / profile — optional extract |
-| 3 | Boot / hydrate shell | Stay in dashboard.js (orchestration) |
+| Domain | Why |
+|--------|-----|
+| Boot / auth shell | Theme, tabs, toast, update check, role lockdown |
+| Collection hydrate | MENU / BILLS / INVENTORY arrays + IndexedDB/cloud sync |
+| QR/KDS pending_orders sync | Mutates shared arrays used by multiple modules |
+| Menu editor fallback | Tiny; real UI in `features-editor.js` |
 
 ## Rules
 
-1. New file = IIFE attaching `window.RS*` namespace.
-2. `dashboard.js` keeps a 3–10 line delegate until fully removed.
-3. Load order: deps before `dashboard.js` or attach-on-ready with `setTimeout` poll.
-4. Never break `window.RS` public API used by features-*.
+1. New file = IIFE attaching one `window.RS*` namespace.
+2. `dashboard.js` keeps 3–10 line delegates.
+3. Load modules before `dashboard.js`.
+4. Never break `window.RS` public API used by `features-*`.
 
-## Boot after remaining
+## Boot order
 
 ```
-doppio-api → db → print-bridge → escpos → modules… → super-admin → kds-ui
+doppio-api → db → print-bridge → escpos → modules (tax → pos → …)
 → saas-core → dashboard → features-pos → critical.bundle → shell
 ```

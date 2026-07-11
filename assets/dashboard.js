@@ -810,115 +810,18 @@
   const stockCls = {ok:'stock-ok',low:'stock-low',out:'stock-out'};
 
   /* ============================================================
-     POS
+     TAX — Wave 12: assets/modules/tax-helpers.js
+     Share the same array instance the module owns.
      ============================================================ */
-  const TAX_RATES = [];
+  const TAX_RATES =
+    (window.RSTax && Array.isArray(RSTax.TAX_RATES) && RSTax.TAX_RATES) ||
+    (Array.isArray(window.RS_TAX_RATES) && window.RS_TAX_RATES) ||
+    (window.RS_TAX_RATES = []);
   window.RS_TAX_RATES = TAX_RATES;
-
-  window.RS_resolveRate = function(country, rateCode, dateStr) {
-    const list = window.RS_TAX_RATES || [];
-    const date = dateStr ? new Date(dateStr) : new Date();
-    const matches = list.filter(r => 
-      String(r.country).toUpperCase() === String(country || 'IN').toUpperCase() && 
-      String(r.rateCode || r.rate_code).toUpperCase() === String(rateCode).toUpperCase()
-    );
-    const active = matches.find(r => {
-      const from = new Date(r.validFrom || r.valid_from);
-      const to = r.validTo || r.valid_to ? new Date(r.validTo || r.valid_to) : null;
-      return date >= from && (!to || date <= to);
-    });
-    if (active) {
-      return { 
-        percent: Number(active.percent), 
-        itc_allowed: !!(active.itcAllowed || active.itc_allowed),
-        label: active.label
-      };
-    }
-    if (String(country).toUpperCase() === 'IE') {
-      if (rateCode === 'IE_FOOD_9' || rateCode === 'IE_FOOD_135') {
-        const cutover = new Date('2026-07-01');
-        return { percent: date >= cutover ? 9.0 : 13.5, itc_allowed: true, label: 'VAT Hot Food' };
-      }
-      if (rateCode === 'IE_DRINK_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Drinks' };
-      if (rateCode === 'IE_COLD_0') return { percent: 0.0, itc_allowed: true, label: 'VAT Cold Takeaway' };
-      if (rateCode === 'IE_DELIVERY_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Delivery' };
-      if (rateCode === 'IE_ACCOM_135') return { percent: 13.5, itc_allowed: true, label: 'VAT Accommodation' };
-    }
-    if (String(country).toUpperCase() === 'IN') {
-      if (rateCode === 'IN_REST_5') return { percent: 5.0, itc_allowed: false, label: 'GST Standalone' };
-      if (rateCode === 'IN_REST_18') return { percent: 18.0, itc_allowed: true, label: 'GST Specified' };
-      if (rateCode === 'IN_CATER_18') return { percent: 18.0, itc_allowed: true, label: 'GST Catering' };
-      if (rateCode === 'IN_COMP_5') return { percent: 5.0, itc_allowed: false, label: 'GST Composition' };
-      if (rateCode === 'IN_GOODS_5') return { percent: 5.0, itc_allowed: false, label: 'GST Goods' };
-      if (rateCode === 'IN_GOODS_18') return { percent: 18.0, itc_allowed: true, label: 'GST Goods' };
-      if (rateCode === 'IN_NIL_0') return { percent: 0.0, itc_allowed: false, label: 'GST Nil Rated' };
-    }
-    const m = String(rateCode).match(/_(\d+)(?:5)?$/);
-    const pct = m ? Number(m[1]) : 5;
-    return { percent: pct, itc_allowed: false, label: rateCode };
-  };
-
-  window.RS_getTenantTaxProfile = function() {
-    const settings = window.RS_SETTINGS || {};
-
-    // Use RS_COUNTRIES lookup table for full world coverage
-    let country = 'IN';
-    if (settings.set_country) {
-      const entry = (window.RS_getCountryByName && window.RS_getCountryByName(settings.set_country)) || null;
-      if (entry) {
-        country = entry.code;
-      } else {
-        // Fallback map for common country names/aliases
-        const fallbackMap = {
-          'india': 'IN', 'ireland': 'IE', 'united kingdom': 'GB', 'uk': 'GB', 'great britain': 'GB',
-          'united states': 'US', 'usa': 'US', 'australia': 'AU', 'canada': 'CA',
-          'new zealand': 'NZ', 'singapore': 'SG', 'united arab emirates': 'AE', 'uae': 'AE',
-          'saudi arabia': 'SA', 'south africa': 'ZA', 'germany': 'DE', 'france': 'FR',
-          'netherlands': 'NL', 'spain': 'ES', 'italy': 'IT', 'portugal': 'PT', 'belgium': 'BE',
-          'austria': 'AT', 'sweden': 'SE', 'denmark': 'DK', 'norway': 'NO', 'finland': 'FI',
-          'greece': 'GR', 'malaysia': 'MY', 'thailand': 'TH', 'vietnam': 'VN', 'indonesia': 'ID',
-          'philippines': 'PH', 'kenya': 'KE', 'nigeria': 'NG', 'ghana': 'GH',
-          'pakistan': 'PK', 'bangladesh': 'BD', 'sri lanka': 'LK', 'nepal': 'NP'
-        };
-        country = fallbackMap[String(settings.set_country || '').toLowerCase()] || 'IN';
-      }
-    }
-
-    // Tax system by country code
-    const vatCountries  = ['IE', 'GB', 'DE', 'FR', 'NL', 'ES', 'IT', 'PT', 'BE', 'AT', 'FI', 'GR', 'DK', 'SE', 'NO', 'SA', 'AE', 'ZA', 'KE', 'NG', 'GH', 'PH', 'TH', 'ID'];
-    const salesTaxCodes = ['US'];
-    let taxSystem;
-    if (vatCountries.includes(country))  taxSystem = 'VAT';
-    else if (salesTaxCodes.includes(country)) taxSystem = 'Sales Tax';
-    else taxSystem = 'GST';
-
-    // Honor explicit override from settings
-    if (settings.set_tax_label) taxSystem = settings.set_tax_label;
-
-    let profile = {};
-    try {
-      if (settings.set_tax_profile) {
-        profile = typeof settings.set_tax_profile === 'string' ? JSON.parse(settings.set_tax_profile) : settings.set_tax_profile;
-      }
-    } catch(e) {}
-    return {
-      country: country,
-      tax_system: taxSystem,
-      inclusive_pricing: !!settings.set_inclusive_pricing,
-      tax_registration_no: settings.set_gstin || profile.tax_registration_no || '',
-      gst_scheme: profile.gst_scheme || (settings.set_gst_scheme) || 'regular',
-      state_code: settings.set_gst_state || profile.state_code || (country === 'IN' ? '07' : ''),
-      specified_premises: !!(profile.specified_premises || settings.set_specified_premises),
-      vat_filing_frequency: profile.vat_filing_frequency || 'bi_monthly',
-      accounting_year_end: profile.accounting_year_end || null,
-      apply_gst_on_service_charge: !!(profile.apply_gst_on_service_charge || settings.set_apply_gst_on_service_charge),
-      liquor_vat_rate: Number(settings.set_liquor_vat_rate || profile.liquor_vat_rate || 20)
-    };
-  };
 
   /* ============================================================
      POS UI — Wave 11: assets/modules/pos-ui.js
-     Tax helpers stay above; cart state lives in RSPosUI.
+     Cart state lives in RSPosUI; tax helpers in tax-helpers.js.
      ============================================================ */
   let activeCat = 'All';
   let cart = [];
@@ -1435,35 +1338,15 @@
   }
 
   /* ============================================================
-     GROWTH HUB
+     GROWTH HUB — Wave 12: assets/modules/growth-hub-shell.js
      ============================================================ */
-  const HUB = [
-    {ic:'fa-calendar-check',bg:'bg-o',t:'Reservations',d:'Manage table bookings & waitlist',m:'8 today'},
-    {ic:'fa-headset',bg:'bg-v',t:'Support Tickets',d:'Customer queries & complaints',m:'2 open'},
-    {ic:'fa-truck-ramp-box',bg:'bg-t',t:'Purchase Orders',d:'Raise & track supplier POs',m:'3 pending'},
-    {ic:'fa-flask-vial',bg:'bg-g',t:'Recipe Costing',d:'Plate cost & margin calculator',m:'68% margin'},
-    {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'4 live'},
-    {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'3.1k reach'},
-    {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'4.8 ★'},
-    {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'412 members'}
-  ];
   const renderHub = () => {
-    $('#hub-grid').innerHTML = HUB.map(h=>`
-      <div class="hub-card">
-        <div class="hub-ic ${h.bg}"><i class="fa-solid ${h.ic}"></i></div>
-        <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
-        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(h.m)}</span>
-      </div>`).join('');
-    $$('#hub-grid .hub-card').forEach(c=>c.addEventListener('click',()=>{
-      const screen = c.querySelector('h4')?.textContent || '';
-      if(window.RS && typeof RS.openGrowthHubScreen === 'function') {
-        RS.openGrowthHubScreen(screen);
-        return;
-      }
-      toast('Growth Hub module is still loading. Try again in a moment.','fa-arrow-up-right-from-square');
-    }));
+    if (window.RSGrowthHubShell && RSGrowthHubShell.renderHub) return RSGrowthHubShell.renderHub();
   };
-  function renderGrowthHub(){ return renderHub(); }
+  function renderGrowthHub() {
+    if (window.RSGrowthHubShell && RSGrowthHubShell.renderGrowthHub) return RSGrowthHubShell.renderGrowthHub();
+    return renderHub();
+  }
 
   /* ============================================================
      EMPLOYEES — Wave 10: assets/modules/employees-ui.js
