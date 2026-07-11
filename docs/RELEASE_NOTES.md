@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v98 (2026-07-11) — Sidebar 10/10
+
+- Calmer identity card (outlet + role, ellipsis overflow)
+- Tighter nav density, clearer section labels, stronger active rail
+- Shorter labels where useful (Kitchen, Analytics, Help) with full `title` tooltips
+- Reliable icons (chart-pie, motorcycle for online orders)
+- Footer: Settings / Help / Sign out with quieter logout treatment
+- Collapse mode stays icon-only
+
 ## v97 (2026-07-11) — Top bar 10/10 (calm cashier header)
 
 - **Hierarchy**: Counter + title | **shift cluster** | search · ⋯ · clock · bell · theme

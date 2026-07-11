@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v97-20260711-topbar';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v98-20260711-sidebar';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -354,62 +354,64 @@
     <i class="fa fa-bars"></i>
   </button>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
-  <aside class="sidebar">
-    <!-- Workspace Menu -->
+  <aside class="sidebar" aria-label="Main navigation">
     <div class="sb-top">
-      <a class="sb-brand brand" href="index.html">
-        <img class="brand-logo" src="assets/restrosuite-mark.png" alt="CodeArc RestroSuite">
+      <a class="sb-brand brand" href="index.html" title="RestroSuite home">
+        <img class="brand-logo" src="assets/restrosuite-mark.png" alt="">
         <span class="brand-name">
           <span class="codearc">CodeArc</span>
           Restro<b>Suite</b>
         </span>
       </a>
-      <button class="sb-collapse" id="sb-collapse" aria-label="Collapse sidebar"><i class="fa-solid fa-angles-left"></i></button>
+      <button class="sb-collapse" id="sb-collapse" type="button" aria-label="Collapse sidebar" title="Collapse"><i class="fa-solid fa-angles-left"></i></button>
     </div>
 
-    <div class="user-pill">
-      <div class="avatar">RS</div>
-      <div class="uinfo hide-collapsed"><div class="un">Outlet User</div><div class="ur">Outlet · Admin</div></div>
+    <div class="user-pill" title="Outlet &amp; role">
+      <div class="avatar" aria-hidden="true">RS</div>
+      <div class="uinfo hide-collapsed">
+        <div class="un">Outlet User</div>
+        <div class="ur">Outlet · Admin</div>
+      </div>
     </div>
 
     <nav class="sb-nav">
       <div class="sb-section">Operations</div>
-      <a class="sidebar-link" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i><span>Point of Sale</span></a>
-      <a class="sidebar-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count" style="display:none">0</span></a>
-      <a class="sidebar-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i><span>Kitchen Display</span><span class="badge-count" style="display:none">0</span></a>
-      <a class="sidebar-link" data-tab="tokens-tab" class="superadmin-only" style="display:none;"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
-      <a class="sidebar-link" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Floor &amp; Tables</span></a>
-      <a class="sidebar-link" data-tab="aggregator-tab"><i class="fa-solid fa-bowl-rice"></i><span>Online Orders</span><span class="badge-count" style="display:none">0</span></a>
-      <a class="sidebar-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
+      <a class="sidebar-link" data-tab="pos-tab" title="Point of Sale"><i class="fa-solid fa-cash-register"></i><span>Point of Sale</span></a>
+      <a class="sidebar-link" data-tab="qr-orders-tab" title="QR table orders"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count" style="display:none">0</span></a>
+      <a class="sidebar-link" data-tab="kds-tab" title="Kitchen Display System"><i class="fa-solid fa-fire-burner"></i><span>Kitchen</span><span class="badge-count" style="display:none">0</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="tokens-tab" style="display:none" title="Token display"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
+      <a class="sidebar-link" data-tab="floor-tab" title="Floor plan &amp; tables"><i class="fa-solid fa-chair"></i><span>Floor &amp; Tables</span></a>
+      <a class="sidebar-link" data-tab="aggregator-tab" title="Aggregator / online orders"><i class="fa-solid fa-motorcycle"></i><span>Online Orders</span><span class="badge-count" style="display:none">0</span></a>
+      <a class="sidebar-link" data-tab="bills-tab" title="Bills history"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
-      <a class="sidebar-link" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
-      <a class="sidebar-link" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i><span>Menu Editor</span></a>
-      <a class="sidebar-link" data-tab="employees-tab"><i class="fa-solid fa-users"></i><span>Employees</span></a>
-      <a class="sidebar-link" data-tab="customers-tab"><i class="fa-solid fa-address-book"></i><span>Customers</span></a>
-      <a class="sidebar-link" data-tab="tax-tab"><i class="fa-solid fa-file-invoice"></i><span>Tax &amp; GST</span></a>
+      <a class="sidebar-link" data-tab="inventory-tab" title="Inventory stock"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
+      <a class="sidebar-link" data-tab="editor-tab" title="Menu editor"><i class="fa-solid fa-utensils"></i><span>Menu Editor</span></a>
+      <a class="sidebar-link" data-tab="employees-tab" title="Staff"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
+      <a class="sidebar-link" data-tab="customers-tab" title="CRM customers"><i class="fa-solid fa-address-book"></i><span>Customers</span></a>
+      <a class="sidebar-link" data-tab="tax-tab" title="Tax &amp; GST profile"><i class="fa-solid fa-percent"></i><span>Tax &amp; GST</span></a>
 
       <div class="sb-section">Grow</div>
-      <a class="sidebar-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
-      <a class="sidebar-link" data-tab="analytics-tab"><i class="fa-solid fa-chart-mixed"></i><span>Advanced Analytics</span></a>
-      <a class="sidebar-link" id="sidebar-growth-hub-link" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
+      <a class="sidebar-link" data-tab="reports-tab" title="Sales reports"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
+      <a class="sidebar-link" data-tab="analytics-tab" title="Advanced analytics"><i class="fa-solid fa-chart-pie"></i><span>Analytics</span></a>
+      <a class="sidebar-link" id="sidebar-growth-hub-link" data-tab="growth-hub-tab" title="Growth Hub"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
 
-      <div class="sb-section brandadmin-only" style="display:none">Chain Management</div>
-      <a class="sidebar-link brandadmin-only" data-tab="chain-dashboard-tab" style="display:none"><i class="fa-solid fa-network-wired"></i><span>Chain Dashboard</span></a>
+      <div class="sb-section brandadmin-only" style="display:none">Chain</div>
+      <a class="sidebar-link brandadmin-only" data-tab="chain-dashboard-tab" style="display:none" title="Chain dashboard"><i class="fa-solid fa-network-wired"></i><span>Chain Dashboard</span></a>
 
       <div class="sb-section superadmin-only" style="display:none">Platform</div>
-      <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
-      <a class="sidebar-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none"><i class="fa-solid fa-server"></i><span>Gateway Monitor</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none" title="Super-Admin"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none" title="Gateway monitor"><i class="fa-solid fa-server"></i><span>Gateway</span></a>
     </nav>
 
     <div class="sb-foot">
-      <div class="sb-foot-btn" id="role-switch" title="Toggle Super-Admin view">
+      <div class="sb-foot-btn" id="role-switch" title="Toggle Super-Admin view" style="display:none">
         <span class="rs-track"></span>
-        <span class="hide-collapsed" id="role-switch-label" style="font-size:12.5px">Outlet Owner</span>
+        <span class="hide-collapsed" id="role-switch-label" style="font-size:12px">Owner view</span>
       </div>
-      <button class="sb-foot-btn" id="open-settings"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
-      <button class="sb-foot-btn" id="open-product-guide-btn" onclick="window.openProductGuide &amp;&amp; window.openProductGuide()"><i class="fa-solid fa-circle-question"></i><span>Help &amp; Setup</span></button>
-      <button class="sb-foot-btn logout" type="button"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
+      <button type="button" class="sb-foot-btn" id="open-settings" title="Settings"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
+      <button type="button" class="sb-foot-btn" id="open-product-guide-btn" title="Help &amp; setup" onclick="window.openProductGuide &amp;&amp; window.openProductGuide()"><i class="fa-solid fa-circle-question"></i><span>Help</span></button>
+      <button type="button" class="sb-foot-btn logout" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
     </div>
   </aside>
 
