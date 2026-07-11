@@ -136,7 +136,7 @@ test('super-admin module extracted (wave 9)', () => {
   assert.ok(!dash.includes('function openCreateTenantModal'), 'tenant create modal should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /super-admin\.js/);
-  assert.match(html, /v57-20260711/);
+  assert.match(html, /v5[0-9]-20260711/);
 });
 
 test('kds-ui module extracted (wave 9)', () => {
@@ -149,6 +149,31 @@ test('kds-ui module extracted (wave 9)', () => {
   assert.ok(!dash.includes('kds-timer'), 'KDS timer markup should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /kds-ui\.js/);
+});
+
+test('qr-orders-ui module extracted (wave 10)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/qr-orders-ui.js'), 'utf8');
+  assert.match(src, /RSQrOrdersUI/);
+  assert.match(src, /renderQR|function renderQR/);
+  assert.match(src, /openQrOrderInPos/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSQrOrdersUI/);
+  assert.ok(!dash.includes('qr-grid'), 'QR grid markup should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /qr-orders-ui\.js/);
+  assert.match(html, /v58-20260711/);
+});
+
+test('employees-ui module extracted (wave 10)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/employees-ui.js'), 'utf8');
+  assert.match(src, /RSEmployeesUI/);
+  assert.match(src, /renderEmployees/);
+  assert.match(src, /openEditRoleModal|ROLE_DEFS|emp-card/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSEmployeesUI/);
+  assert.ok(!dash.includes('emp-card'), 'employee cards should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /employees-ui\.js/);
 });
 
 test('USB and split docs exist', () => {

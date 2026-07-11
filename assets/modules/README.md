@@ -12,6 +12,8 @@ Small IIFE modules loaded **before** `dashboard.js` so the god file can delegate
 | `gateway-monitor.js` | `RSGatewayMonitor` | Super-admin WhatsApp gateway + app incidents |
 | `super-admin.js` | `RSSuperAdmin` | Tenant console, bulk ops, plan pricing (Wave 9) |
 | `kds-ui.js` | `RSKdsUI` | Kitchen display board + timers (Wave 9) |
+| `qr-orders-ui.js` | `RSQrOrdersUI` | QR order cards, merge, open-in-POS (Wave 10) |
+| `employees-ui.js` | `RSEmployeesUI` | Staff grid, roles, soft-link import (Wave 10) |
 | `../escpos-encoder.js` | `RSEscPos` | ESC/POS thermal encoding |
 | `../print-bridge.js` | `RSPrintBridge` | Desktop/web print routing |
 | `../competitive-ops.js` | `RSOps` | Shifts, station, keyboard, Z-report |

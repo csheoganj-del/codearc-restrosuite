@@ -14,6 +14,8 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 | Gateway monitor + incidents | `assets/modules/gateway-monitor.js` | ✅ Wave 8 |
 | Super-admin tenant console | `assets/modules/super-admin.js` | ✅ Wave 9 |
 | KDS board UI | `assets/modules/kds-ui.js` | ✅ Wave 9 |
+| QR orders UI | `assets/modules/qr-orders-ui.js` | ✅ Wave 10 |
+| Employees UI | `assets/modules/employees-ui.js` | ✅ Wave 10 |
 | ESC/POS encode | `assets/escpos-encoder.js` | ✅ |
 | Print routing | `assets/print-bridge.js` | ✅ |
 | Shifts / station / keys | `assets/competitive-ops.js` | ✅ |
@@ -22,9 +24,8 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 
 | # | Domain | Approx lines | Notes |
 |---|--------|--------------|-------|
-| 1 | QR orders UI | ~200 | Coupled to pending_orders / KDS hydrate |
-| 2 | Employees UI | ~250 | Medium isolation |
-| 3 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last |
+| 1 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last big chunk |
+| 2 | Growth hub shell | ~50 | Thin; features-growth owns real UI |
 
 ## Rules
 
