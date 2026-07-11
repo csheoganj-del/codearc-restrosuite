@@ -87,7 +87,9 @@ test.describe('Authenticated outlet login', () => {
     }
     await page.waitForTimeout(4000);
     const criticalMiss = failed.filter((f) =>
-      /print-bridge|escpos|bill-identity|inventory-ledger|bills-history|db\.js|features-pos|dashboard\.js|receipt\.js/.test(f)
+      /print-bridge|escpos|bill-identity|inventory-ledger|bills-history|pos-ui|tax-helpers|db\.js|features-pos|dashboard\.js|receipt\.js/.test(
+        f
+      )
     );
     expect(criticalMiss, criticalMiss.join('\n')).toEqual([]);
   });

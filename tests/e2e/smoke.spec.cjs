@@ -37,7 +37,9 @@ test.describe('RestroSuite smoke', () => {
     await page.waitForTimeout(1500);
     // Allow license/config noise; fail on missing core modules
     const criticalMiss = failed.filter((f) =>
-      /print-bridge|escpos|bill-identity|db\.js|doppio-api|saas-core|dashboard\.js/.test(f)
+      /print-bridge|escpos|bill-identity|inventory-ledger|pos-ui|tax-helpers|db\.js|doppio-api|saas-core|dashboard\.js/.test(
+        f
+      )
     );
     expect(criticalMiss, criticalMiss.join('\n')).toEqual([]);
   });
