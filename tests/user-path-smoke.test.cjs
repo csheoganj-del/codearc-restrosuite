@@ -11,11 +11,26 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-test('v84 asset version and SW cache present', () => {
+test('v85 asset version and SW cache present', () => {
   const html = read('dashboard.html');
   const sw = read('service-worker.js');
-  assert.match(html, /v84-20260711-open-workspace/);
+  assert.match(html, /v85-20260711-pos-calm/);
   assert.match(sw, /restrosuite-shell-v20260711/);
+});
+
+test('POS calm mode: customer collapse, pay zone, more tools, no bare demo on html', () => {
+  const html = read('dashboard.html');
+  const ops = read('assets/competitive-ops.js');
+  const posUi = read('assets/modules/pos-ui.js');
+  const css = read('assets/dashboard.css');
+  assert.match(html, /cart-cust-toggle|Add customer/);
+  assert.match(html, /cart-pay-zone|cart-empty-hint/);
+  assert.match(html, /pos-display-opts|pos-toolbar-secondary/);
+  assert.match(ops, /ensurePosQuickTools|rs-pos-more|canShowDemoTools/);
+  assert.match(ops, /Counter 1|rs_station_label_friendly/);
+  assert.match(ops, /rs-shift-bar-closed|Open shift/);
+  assert.match(posUi, /updatePosCartChrome|wireCartCustomerToggle/);
+  assert.match(css, /pos-cart-empty|rs-pos-more-menu|cart-cust-toggle/);
 });
 
 test('super-admin early shell stamped before paint', () => {

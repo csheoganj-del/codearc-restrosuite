@@ -1,5 +1,16 @@
 # RestroSuite release notes
 
+## v85 (2026-07-11) — POS calm mode (cashier 10/10 UX)
+
+- **Money path first**: search + order type on the toolbar; sort/display tucked under **Display**
+- **More** menu holds Day pack, keyboard shortcuts, Demo (Demo only when demo tools / superadmin / `?demo=1`)
+- **No open shift**: single primary **Open shift** (no competing Day pack on the bar)
+- **Empty cart**: pay methods, Hold, KOT, Print & Pay, and discount panel stay hidden until items exist
+- **Add customer** collapsed by default (walk-in is the default path)
+- Station chip shows **Counter 1** (not raw `ST-XXXX`); click still renames
+- Order-type active state is quieter so **Print & Pay** is the only loud orange CTA
+- Larger touch targets on pay methods and checkout
+
 ## v84 (2026-07-11) — Super-admin shell (no client flash)
 
 - Super-admin and restaurant POS still share `dashboard.html`, but the **platform shell is stamped before first paint** from `sessionStorage`

@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v84-20260711-open-workspace';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v85-20260711-pos-calm';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -536,7 +536,7 @@
             <div class="pos-toolbar">
               <div class="pos-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="pos-search-input" placeholder="Search menu…">
+                <input id="pos-search-input" placeholder="Search menu…" autocomplete="off" enterkeyhint="search">
                 <div class="mobile-only-inline pos-m-hold-buttons" id="pos-m-hold-buttons" style="display:none; align-items:center; gap:4px;">
                   <button class="hold-btn hold-btn-takeaway" id="btn-m-hold-takeaway" style="padding: 4px 8px; font-size: 11px;">
                     <i class="fa-solid fa-bag-shopping"></i> <span id="held-count-takeaway-m"></span>
@@ -549,27 +549,32 @@
                   </button>
                 </div>
               </div>
-              <div class="pos-sort">
-                <select id="pos-sort-select" class="pos-sort-select">
-                  <option value="popular">Most Ordered</option>
-                  <option value="default">Default Order</option>
-                  <option value="name-asc">Alphabetical: A-Z</option>
-                  <option value="name-desc">Alphabetical: Z-A</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="veg-first">Veg First</option>
-                  <option value="nonveg-first">Non-Veg First</option>
-                </select>
+              <div class="order-types" role="group" aria-label="Order type">
+                <button type="button" class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
+                <button type="button" class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
+                <button type="button" class="order-type-btn"><i class="fa-solid fa-motorcycle"></i> Delivery</button>
               </div>
-              <div class="pos-size-control">
-                <button id="btn-grid-dec" title="Decrease item size"><i class="fa-solid fa-minus"></i></button>
-                <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Adjust item size">
-                <button id="btn-grid-inc" title="Increase item size"><i class="fa-solid fa-plus"></i></button>
-              </div>
-              <div class="order-types">
-                <button class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
-                <button class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
-                <button class="order-type-btn"><i class="fa-solid fa-motorcycle"></i> Delivery</button>
+              <div class="pos-toolbar-secondary">
+                <div class="pos-sort">
+                  <select id="pos-sort-select" class="pos-sort-select" aria-label="Sort menu">
+                    <option value="popular">Most Ordered</option>
+                    <option value="default">Default Order</option>
+                    <option value="name-asc">A–Z</option>
+                    <option value="name-desc">Z–A</option>
+                    <option value="price-asc">Price ↑</option>
+                    <option value="price-desc">Price ↓</option>
+                    <option value="veg-first">Veg first</option>
+                    <option value="nonveg-first">Non-veg first</option>
+                  </select>
+                </div>
+                <details class="pos-display-opts" id="pos-display-opts">
+                  <summary title="Card size &amp; display"><i class="fa-solid fa-text-height"></i><span class="hide-sm"> Display</span></summary>
+                  <div class="pos-size-control pos-size-control-panel">
+                    <button type="button" id="btn-grid-dec" title="Smaller cards"><i class="fa-solid fa-minus"></i></button>
+                    <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Card size" aria-label="Menu card size">
+                    <button type="button" id="btn-grid-inc" title="Larger cards"><i class="fa-solid fa-plus"></i></button>
+                  </div>
+                </details>
               </div>
             </div>
             <!-- Active Table Status Banner (Dine-in Only) -->
@@ -615,8 +620,13 @@
                 <input type="number" id="cart-covers" class="form-input" min="0" max="99" step="1" placeholder="Pax" title="Guest covers (pax)" inputmode="numeric" style="height:44px;padding:0 8px;font-size:14px;border-radius:8px;box-sizing:border-box;text-align:center;font-weight:700" aria-label="Guest covers">
               </div>
               <div class="custom-customer-widget" id="custom-customer-widget">
-                <!-- Direct inputs visible in cart -->
-                <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                <button type="button" class="cart-cust-toggle" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs">
+                  <i class="fa-solid fa-user"></i>
+                  <span id="cart-cust-toggle-label">Add customer</span>
+                  <i class="fa-solid fa-chevron-down cart-cust-chevron"></i>
+                </button>
+                <!-- Collapsed by default — walk-in is the common path -->
+                <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden style="display: none; flex-direction: column; gap: 8px; width: 100%;">
                   <input type="text" id="cust-input-name" placeholder="Guest name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
                   <input type="tel" id="cust-input-phone" placeholder="Guest phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
                   <div id="cart-customer-dues-banner" style="display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.08);color:var(--text-soft);line-height:1.4"></div>
@@ -703,39 +713,42 @@
                   <span id="promo-applied-badge" style="display:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(255,79,0,.12);color:var(--orange)"></span>
                 </div>
               </details>
-              <div class="cart-payment" id="cart-payment" style="margin-top: 6px; padding: 6px; border: 1px solid var(--stroke-2); border-radius: var(--r-sm); background: var(--glass-1);">
-                <div class="cpay-methods" id="cart-pay-methods" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;">
-                  <button type="button" class="active" data-pay-method="Cash" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-money-bill-wave" style="font-size: 12px; color: #25d366;"></i>
-                    <span>Cash</span>
-                  </button>
-                  <button type="button" data-pay-method="UPI" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-qrcode" style="font-size: 12px; color: var(--orange);"></i>
-                    <span>UPI</span>
-                  </button>
-                  <button type="button" data-pay-method="Card" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-credit-card" style="font-size: 12px; color: #1e90ff;"></i>
-                    <span>Card</span>
-                  </button>
-                  <button type="button" data-pay-method="Due" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-clock-rotate-left" style="font-size: 12px; color: var(--red);"></i>
-                    <span>Due</span>
-                  </button>
-                  <button type="button" data-pay-method="Split" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-arrows-split-up-and-left" style="font-size: 12px; color: #9c27b0;"></i>
-                    <span>Split</span>
-                  </button>
+              <div class="cart-pay-zone" id="cart-pay-zone">
+                <div class="cart-payment" id="cart-payment" style="margin-top: 6px; padding: 6px; border: 1px solid var(--stroke-2); border-radius: var(--r-sm); background: var(--glass-1);">
+                  <div class="cpay-methods" id="cart-pay-methods" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;">
+                    <button type="button" class="active" data-pay-method="Cash" style="min-height: 42px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                      <i class="fa-solid fa-money-bill-wave" style="font-size: 12px; color: #25d366;"></i>
+                      <span>Cash</span>
+                    </button>
+                    <button type="button" data-pay-method="UPI" style="min-height: 42px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                      <i class="fa-solid fa-qrcode" style="font-size: 12px; color: var(--orange);"></i>
+                      <span>UPI</span>
+                    </button>
+                    <button type="button" data-pay-method="Card" style="min-height: 42px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                      <i class="fa-solid fa-credit-card" style="font-size: 12px; color: #1e90ff;"></i>
+                      <span>Card</span>
+                    </button>
+                    <button type="button" data-pay-method="Due" style="min-height: 42px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                      <i class="fa-solid fa-clock-rotate-left" style="font-size: 12px; color: var(--red);"></i>
+                      <span>Due</span>
+                    </button>
+                    <button type="button" data-pay-method="Split" style="min-height: 42px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                      <i class="fa-solid fa-arrows-split-up-and-left" style="font-size: 12px; color: #9c27b0;"></i>
+                      <span>Split</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="cart-actions">
+                  <div class="hold-buttons-group">
+                    <button class="hold-btn hold-btn-takeaway" id="btn-hold-takeaway"><i class="fa-solid fa-bag-shopping"></i> Hold <span id="held-count-takeaway"></span></button>
+                    <button class="hold-btn hold-btn-dinein" id="btn-hold-dinein"><i class="fa-solid fa-utensils"></i> Hold <span id="held-count-dinein"></span></button>
+                    <button class="hold-btn hold-btn-delivery" id="btn-hold-delivery"><i class="fa-solid fa-motorcycle"></i> Hold <span id="held-count-delivery"></span></button>
+                  </div>
+                  <button class="btn btn-ghost" id="btn-kot"><i class="fa-solid fa-fire"></i> Send KOT</button>
+                  <button class="btn btn-primary" id="btn-checkout" style="grid-column:1 / -1;min-height:48px;font-weight:800"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
                 </div>
               </div>
-              <div class="cart-actions">
-                <div class="hold-buttons-group">
-                  <button class="hold-btn hold-btn-takeaway" id="btn-hold-takeaway"><i class="fa-solid fa-bag-shopping"></i> Hold <span id="held-count-takeaway"></span></button>
-                  <button class="hold-btn hold-btn-dinein" id="btn-hold-dinein"><i class="fa-solid fa-utensils"></i> Hold <span id="held-count-dinein"></span></button>
-                  <button class="hold-btn hold-btn-delivery" id="btn-hold-delivery"><i class="fa-solid fa-motorcycle"></i> Hold <span id="held-count-delivery"></span></button>
-                </div>
-                <button class="btn btn-ghost" id="btn-kot"><i class="fa-solid fa-fire"></i> Send KOT</button>
-                <button class="btn btn-primary" id="btn-checkout" style="grid-column:1 / -1"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
-              </div>
+              <p class="cart-empty-hint" id="cart-empty-hint">Add items from the menu to enable pay &amp; KOT</p>
             </div>
           </aside>
         </div>

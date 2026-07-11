@@ -393,19 +393,40 @@
   }
   function getStationLabel() {
     try {
-      return localStorage.getItem('rs_station_label') || getStationId();
+      let label = localStorage.getItem('rs_station_label');
+      if (!label) {
+        label = 'Counter 1';
+        localStorage.setItem('rs_station_label', label);
+        return label;
+      }
+      // Old auto-ids like ST-ABC123 — show a friendly name instead
+      if (/^ST-[A-Z0-9]+$/i.test(String(label).trim())) {
+        let friendly = localStorage.getItem('rs_station_label_friendly');
+        if (!friendly) {
+          friendly = 'Counter 1';
+          localStorage.setItem('rs_station_label_friendly', friendly);
+        }
+        return friendly;
+      }
+      return label;
     } catch (_) {
-      return getStationId();
+      return 'Counter 1';
     }
   }
   function setStationLabel(label) {
     try {
-      localStorage.setItem('rs_station_label', String(label || '').slice(0, 32));
+      const v = String(label || '').trim().slice(0, 32) || 'Counter 1';
+      localStorage.setItem('rs_station_label', v);
+      localStorage.setItem('rs_station_label_friendly', v);
       paintStationChip();
     } catch (_) {}
   }
 
   function paintStationChip() {
+    // Super-admin platform shell never shows POS station chrome
+    try {
+      if (document.documentElement.classList.contains('rs-role-superadmin')) return;
+    } catch (_) {}
     let chip = document.getElementById('rs-station-chip');
     const host = document.querySelector('.topbar-right, .topbar-actions, .topbar');
     if (!host) return;
@@ -413,15 +434,18 @@
       chip = document.createElement('button');
       chip.id = 'rs-station-chip';
       chip.type = 'button';
-      chip.title = 'This counter / station name (multi-terminal)';
+      chip.title = 'This counter name (multi-terminal)';
       chip.style.cssText = 'display:inline-flex;align-items:center;gap:6px;border:1px solid var(--stroke);background:var(--glass);border-radius:999px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;color:var(--text)';
       host.insertBefore(chip, host.firstChild);
       chip.onclick = () => {
-        const next = window.prompt('Station / counter name (e.g. Counter 1, Bar, Takeaway)', getStationLabel());
+        const next = window.prompt('Counter name (e.g. Counter 1, Bar, Takeaway)', getStationLabel());
         if (next != null && next.trim()) setStationLabel(next.trim());
       };
     }
-    chip.innerHTML = '<i class="fa-solid fa-desktop"></i> ' + esc(getStationLabel());
+    const label = getStationLabel();
+    const display = /^ST-/i.test(label) ? 'Counter' : label;
+    chip.innerHTML = '<i class="fa-solid fa-desktop"></i> ' + esc(display);
+    chip.title = 'Counter: ' + label + ' · click to rename';
     // Desktop: printer chip next to station
     if (global.RS_DESKTOP && global.RSPrintBridge) {
       let pchip = document.getElementById('rs-printer-chip');
@@ -1049,21 +1073,20 @@
       const cl = bar.querySelector('#rs-shift-close');
       if (cl) cl.onclick = () => closeShift();
     } else {
+      // Cashier calm: single primary CTA — Day pack lives under More tools
+      bar.classList.add('rs-shift-bar-closed');
       bar.innerHTML = `<span style="font-weight:800;color:var(--text-soft)"><i class="fa-solid fa-circle" style="color:#eab308;font-size:9px;margin-right:6px"></i>No open shift</span>
-        <span style="color:var(--text-mute);font-size:12px">Open a shift for cash reconciliation &amp; Z-report</span>
-        <div style="flex:1"></div>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack-bar"><i class="fa-solid fa-file-export"></i> Day pack</button>
-        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open"><i class="fa-solid fa-unlock"></i> Open shift</button>`;
-      const dp = bar.querySelector('#rs-day-pack-bar');
-      if (dp) dp.onclick = () => exportDayPackCsv();
+        <span style="color:var(--text-mute);font-size:12px;flex:1">Open a shift for cash drawer &amp; Z-report</span>
+        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" style="min-height:40px;padding:0 16px;font-weight:800"><i class="fa-solid fa-unlock"></i> Open shift</button>`;
       const op = bar.querySelector('#rs-shift-open');
       if (op)
         op.onclick = async () => {
-          const f = window.prompt('Opening cash float', '0');
+          const f = window.prompt('Opening cash float (drawer start amount)', '0');
           if (f === null) return;
           await openShift(Number(f) || 0);
         };
     }
+    if (shift) bar.classList.remove('rs-shift-bar-closed');
   }
 
   /* ---------------- Keyboard-first POS ---------------- */
@@ -1399,6 +1422,18 @@
     });
   }
 
+  function canShowDemoTools() {
+    try {
+      if (global.RS_API && RS_API.enableDemoTools) return true;
+      const sess = global.RS_API && RS_API.session && RS_API.session();
+      if (sess && sess.role === 'superadmin') return true;
+      if (new URLSearchParams(location.search).get('demo') === '1') return true;
+      // Impersonation support account
+      if (sess && String(sess.username || '').indexOf('superadmin:') === 0) return true;
+    } catch (_) {}
+    return false;
+  }
+
   function ensurePosQuickTools() {
     const pos = document.getElementById('pos-tab');
     if (!pos) return;
@@ -1406,8 +1441,7 @@
     if (!tools) {
       tools = document.createElement('div');
       tools.id = 'rs-pos-quick-tools';
-      tools.style.cssText =
-        'display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px';
+      tools.className = 'rs-pos-more-tools';
       const strip = document.getElementById('rs-owner-strip');
       if (strip && strip.parentNode) strip.parentNode.insertBefore(tools, strip.nextSibling);
       else {
@@ -1417,19 +1451,56 @@
       }
     }
     const lowN = Number(global.__rsLowStockCount) || 0;
+    const showDemo = canShowDemoTools();
     tools.innerHTML = `
-      <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack" title="Export today's bills CSV"><i class="fa-solid fa-file-export"></i> Day pack</button>
-      <button type="button" class="btn btn-ghost btn-sm" id="rs-keys-help" title="Keyboard shortcuts (F1)"><i class="fa-solid fa-keyboard"></i> Keys</button>
-      <button type="button" class="btn btn-ghost btn-sm" id="rs-demo-btn" title="15-min demo checklist"><i class="fa-solid fa-clapperboard"></i> Demo</button>
-      ${lowN > 0 ? `<button type="button" class="btn btn-ghost btn-sm" id="rs-low-stock-btn" title="Open inventory · auto-draft POs" style="border-color:rgba(234,179,8,.4);color:var(--amber)"><i class="fa-solid fa-boxes-stacked"></i> Low stock (${lowN})</button>` : ''}
-      <span style="font-size:11px;color:var(--text-mute);margin-left:4px">F1 shortcuts · F8 pay</span>`;
+      <div class="rs-pos-more" id="rs-pos-more">
+        <button type="button" class="btn btn-ghost btn-sm rs-pos-more-btn" id="rs-pos-more-toggle" aria-expanded="false" aria-haspopup="true" title="Shift tools &amp; extras">
+          <i class="fa-solid fa-ellipsis"></i> More
+        </button>
+        <div class="rs-pos-more-menu" id="rs-pos-more-menu" hidden role="menu">
+          <button type="button" role="menuitem" id="rs-day-pack"><i class="fa-solid fa-file-export"></i> Day pack CSV</button>
+          <button type="button" role="menuitem" id="rs-keys-help"><i class="fa-solid fa-keyboard"></i> Keyboard shortcuts</button>
+          ${lowN > 0 ? `<button type="button" role="menuitem" id="rs-low-stock-btn" class="warn"><i class="fa-solid fa-boxes-stacked"></i> Low stock (${lowN})</button>` : ''}
+          ${showDemo ? `<button type="button" role="menuitem" id="rs-demo-btn"><i class="fa-solid fa-clapperboard"></i> Demo checklist</button>` : ''}
+          <div class="rs-pos-more-sep"></div>
+          <div class="rs-pos-more-hint">F2 search · F4 KOT · F8 pay</div>
+        </div>
+      </div>
+      ${lowN > 0 ? `<button type="button" class="btn btn-ghost btn-sm rs-pos-low-chip" id="rs-low-stock-chip" title="Open inventory"><i class="fa-solid fa-boxes-stacked"></i> ${lowN} low</button>` : ''}`;
+    const toggle = tools.querySelector('#rs-pos-more-toggle');
+    const menu = tools.querySelector('#rs-pos-more-menu');
+    if (toggle && menu && !toggle.dataset.bound) {
+      toggle.dataset.bound = '1';
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = menu.hasAttribute('hidden');
+        if (open) {
+          menu.removeAttribute('hidden');
+          toggle.setAttribute('aria-expanded', 'true');
+        } else {
+          menu.setAttribute('hidden', '');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('click', (e) => {
+        if (!tools.contains(e.target)) {
+          menu.setAttribute('hidden', '');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
     const day = tools.querySelector('#rs-day-pack');
-    if (day) day.onclick = () => exportDayPackCsv();
+    if (day) day.onclick = () => { exportDayPackCsv(); menu && menu.setAttribute('hidden', ''); };
     const keys = tools.querySelector('#rs-keys-help');
-    if (keys) keys.onclick = () => showShortcutsHelp();
+    if (keys) keys.onclick = () => { showShortcutsHelp(); menu && menu.setAttribute('hidden', ''); };
     const lowBtn = tools.querySelector('#rs-low-stock-btn');
     if (lowBtn)
       lowBtn.onclick = () => {
+        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
+      };
+    const lowChip = tools.querySelector('#rs-low-stock-chip');
+    if (lowChip)
+      lowChip.onclick = () => {
         if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
       };
     const demo = tools.querySelector('#rs-demo-btn');
@@ -1437,6 +1508,7 @@
       demo.onclick = () => {
         if (typeof global.openDemoScript === 'function') global.openDemoScript();
         else toast('Demo checklist loading…', 'fa-clapperboard');
+        menu && menu.setAttribute('hidden', '');
       };
   }
 

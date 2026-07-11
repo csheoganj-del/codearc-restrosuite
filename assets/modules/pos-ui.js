@@ -29,6 +29,79 @@
   function getMenu() {
     return (global.RS && Array.isArray(RS.MENU) ? RS.MENU : []) || [];
   }
+
+  /** Calm cart chrome: hide pay/KOT/hold until there is at least one line */
+  function updatePosCartChrome(isEmpty) {
+    const cartEl = document.querySelector('#pos-tab .pos-cart') || document.querySelector('.pos-cart');
+    const zone = document.getElementById('cart-pay-zone');
+    const hint = document.getElementById('cart-empty-hint');
+    const more = document.getElementById('cart-more-opts');
+    if (cartEl) cartEl.classList.toggle('pos-cart-empty', !!isEmpty);
+    if (zone) {
+      zone.hidden = !!isEmpty;
+      zone.setAttribute('aria-hidden', isEmpty ? 'true' : 'false');
+      zone.style.display = isEmpty ? 'none' : '';
+    }
+    if (hint) {
+      hint.hidden = !isEmpty;
+      hint.style.display = isEmpty ? 'block' : 'none';
+    }
+    if (more) {
+      // Keep discount/tip collapsed chrome quiet when empty
+      if (isEmpty) more.open = false;
+    }
+    document.getElementById('pos-tab')?.classList.toggle('pos-cart-is-empty', !!isEmpty);
+  }
+
+  function wireCartCustomerToggle() {
+    const btn = document.getElementById('cart-cust-toggle');
+    const panel = document.getElementById('cart-cust-direct-inputs');
+    const label = document.getElementById('cart-cust-toggle-label');
+    if (!btn || !panel || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    const syncLabel = () => {
+      const name = (document.getElementById('cust-input-name') || {}).value || '';
+      const phone = (document.getElementById('cust-input-phone') || {}).value || '';
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      if (label) {
+        if (name.trim() || phone.trim()) {
+          label.textContent = (name.trim() || 'Guest') + (phone.trim() ? ' · ' + phone.trim() : '');
+        } else {
+          label.textContent = open ? 'Customer details' : 'Add customer';
+        }
+      }
+    };
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        panel.hidden = false;
+        panel.style.display = 'flex';
+        panel.removeAttribute('hidden');
+        setTimeout(() => document.getElementById('cust-input-name')?.focus(), 40);
+      } else {
+        panel.hidden = true;
+        panel.style.display = 'none';
+        panel.setAttribute('hidden', '');
+      }
+      btn.classList.toggle('is-open', open);
+      syncLabel();
+    });
+    ['cust-input-name', 'cust-input-phone'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', syncLabel);
+    });
+    // Auto-expand if returning cart already has customer data
+    const name = (document.getElementById('cust-input-name') || {}).value || '';
+    const phone = (document.getElementById('cust-input-phone') || {}).value || '';
+    if (name.trim() || phone.trim()) {
+      btn.setAttribute('aria-expanded', 'true');
+      panel.hidden = false;
+      panel.style.display = 'flex';
+      panel.removeAttribute('hidden');
+      btn.classList.add('is-open');
+    }
+    syncLabel();
+  }
   function catColor(c) {
     if (global.RS && typeof RS.catColor === 'function') return RS.catColor(c);
     return 'var(--orange)';
@@ -399,6 +472,7 @@ function renderCart(){
 
   try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
   wireCartActions();
+  try { updatePosCartChrome(cart.length === 0); } catch (e) {}
 
   // Refresh POS Grid to update card badges
   try { renderPOS(); } catch (e) {}
@@ -781,6 +855,8 @@ function wireCartActions(){
 }
 // POS init (static parts present in HTML, wire them)
 function initPOS(){
+  try { wireCartCustomerToggle(); } catch (_) {}
+  try { updatePosCartChrome(!cart || cart.length === 0); } catch (_) {}
   // Refresh happy-hour banner periodically (window can start/end mid-shift)
   if (!global.__rsHappyHourTick) {
     global.__rsHappyHourTick = true;
@@ -1164,6 +1240,7 @@ function initPOS(){
     initPOS,
     refreshPosCats,
     getCart,
+    updatePosCartChrome,
     setCart,
     setDiscountPct,
     getDiscountPct,
