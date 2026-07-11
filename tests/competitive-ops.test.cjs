@@ -73,6 +73,22 @@ test('split pay has fill-remaining chips', () => {
   assert.match(pos, /fillSplitRemaining/);
 });
 
+test('tip, service charge pct, and cash drawer APIs', () => {
+  const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');
+  const esc = fs.readFileSync(path.join(root, 'assets/escpos-encoder.js'), 'utf8');
+  const bridge = fs.readFileSync(path.join(root, 'assets/print-bridge.js'), 'utf8');
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  const receipt = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
+  assert.match(posUi, /tipAmount|tip\b/);
+  assert.match(posUi, /set_service_charge_pct/);
+  assert.match(html, /tip-input|data-tip-pct/);
+  assert.match(esc, /cashDrawer|openDrawerBase64/);
+  assert.match(bridge, /openCashDrawer/);
+  assert.match(ops, /openCashDrawer|billHasCashTender/);
+  assert.match(receipt, /tipAmount/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);

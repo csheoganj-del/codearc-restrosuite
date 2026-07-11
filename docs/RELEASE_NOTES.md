@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v69 (2026-07-11) — Tips, service charge %, cash drawer
+
+- **Tip on cart**: amount input + No tip / 5% / 10% chips; included in total, bill, and receipt
+- **Service charge %**: Settings field (default 5%) when dine-in SC toggle is on
+- **Disc %** input restored on cart next to tip
+- **Cash drawer**: ESC/POS pulse after cash (or cash-split) payment; toggle in Printers settings
+- Desktop/Android print bridge exposes `openCashDrawer`
+
 ## v68 (2026-07-11) — Online orders + split pay chips
 
 - **Online Orders**: Accept + KOT, open in POS, demo seed order, phone/elapsed, new-order chime + toast
@@ -71,7 +79,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v68-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v69-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

@@ -105,6 +105,8 @@
       change: Number(b.change != null ? b.change : b.changeAmount) || 0,
       taxSummary: Array.isArray(b.taxSummary) ? b.taxSummary : (Array.isArray(b.tax_summary) ? b.tax_summary : []),
       serviceChargeAmount: Number(b.serviceChargeAmount || b.service_charge_amount) || 0,
+      serviceChargePct: b.serviceChargePct != null ? Number(b.serviceChargePct) : null,
+      tipAmount: Number(b.tipAmount || b.tip || b.tip_amount) || 0,
       liquorTaxAmount: Number(b.liquorTaxAmount || b.liquor_tax_amount) || 0,
       taxProfile: b.taxProfile || b.tax_profile || null,
       channel: b.channel || b.orderType || 'dine_in',
@@ -199,7 +201,8 @@
       <hr class="rcp-hr">
       <div class="rcp-line"><span>Subtotal</span><span>${$(m.sub)}</span></div>
       ${m.disc ? `<div class="rcp-line"><span>Discount</span><span>- ${$(m.disc)}</span></div>` : ''}
-      ${m.serviceChargeAmount ? `<div class="rcp-line"><span>Service Charge (5%)</span><span>${$(m.serviceChargeAmount)}</span></div>` : ''}
+      ${m.serviceChargeAmount ? `<div class="rcp-line"><span>Service Charge (${m.serviceChargePct != null ? m.serviceChargePct : 5}%)</span><span>${$(m.serviceChargeAmount)}</span></div>` : ''}
+      ${m.tipAmount ? `<div class="rcp-line"><span>Tip</span><span>${$(m.tipAmount)}</span></div>` : ''}
       ${m.liquorTaxAmount ? `<div class="rcp-line"><span>Liquor VAT</span><span>${$(m.liquorTaxAmount)}</span></div>` : ''}
       ${taxBreakdownHTML}
       <div class="rcp-tot"><span>TOTAL</span><span>${$(m.grand)}</span></div>
@@ -237,7 +240,8 @@
       '',
       `Subtotal: ${$(m.sub)}`,
       m.disc ? `Discount: - ${$(m.disc)}` : '',
-      m.serviceChargeAmount ? `Service Charge (5%): ${$(m.serviceChargeAmount)}` : '',
+      m.serviceChargeAmount ? `Service Charge (${m.serviceChargePct != null ? m.serviceChargePct : 5}%): ${$(m.serviceChargeAmount)}` : '',
+      m.tipAmount ? `Tip: ${$(m.tipAmount)}` : '',
       m.liquorTaxAmount ? `Liquor VAT: ${$(m.liquorTaxAmount)}` : '',
     ];
     if (tax.gst_scheme === 'composition' && country === 'IN') {

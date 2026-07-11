@@ -166,11 +166,58 @@
     return [];
   }
 
+  /** Pulse cash drawer via preferred thermal printer (desktop ESC/POS). */
+  async function openCashDrawer(opts) {
+    const options = opts || {};
+    const desk = global.RS_DESKTOP || global.rsDesktop;
+    let deviceName = options.deviceName || null;
+    if (!deviceName && desk && typeof desk.getPreferredPrinter === 'function') {
+      try {
+        const pref = await desk.getPreferredPrinter();
+        deviceName = pref && pref.name;
+      } catch (_) {}
+    }
+    let base64 = null;
+    if (global.RSEscPos && typeof RSEscPos.openDrawerBase64 === 'function') {
+      try {
+        base64 = RSEscPos.openDrawerBase64(options.pin || 0);
+      } catch (_) {}
+    } else if (global.RSEscPos && RSEscPos.Encoder) {
+      try {
+        base64 = new RSEscPos.Encoder().init().cashDrawer(options.pin || 0).toBase64();
+      } catch (_) {}
+    }
+    if (desk && typeof desk.printEscPos === 'function' && base64) {
+      try {
+        const res = await desk.printEscPos({
+          base64,
+          text: null,
+          deviceName,
+        });
+        if (res && res.ok) return { ok: true, mode: 'escpos', ...res };
+        console.warn('[Print] cash drawer failed', res && res.error);
+      } catch (e) {
+        console.warn('[Print] cash drawer error', e);
+      }
+    }
+    // Android WebView hook if present
+    if (global.AndroidInterface && typeof global.AndroidInterface.openCashDrawer === 'function') {
+      try {
+        global.AndroidInterface.openCashDrawer();
+        return { ok: true, mode: 'android' };
+      } catch (e) {
+        console.warn('[Print] Android cash drawer failed', e);
+      }
+    }
+    return { ok: false, error: 'no_drawer_bridge' };
+  }
+
   // Global API
   global.RSPrintBridge = {
     printHtml,
     printEscPosText,
     printBillEscPos,
+    openCashDrawer,
     listPrinters,
     wrapHtml,
     toEscPosText,
