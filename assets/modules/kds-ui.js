@@ -48,14 +48,38 @@
     }
   }
 
+  // Sidebar / mnav badge for active kitchen tickets
+  document.querySelectorAll('.sidebar-link[data-tab="kds-tab"], .mnav-link[data-tab="kds-tab"]').forEach((link) => {
+    let badge = link.querySelector('.badge-count');
+    if (!badge && KDS.length > 0) {
+      badge = document.createElement('span');
+      badge.className = 'badge-count';
+      link.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = String(KDS.length);
+      badge.style.display = KDS.length > 0 ? '' : 'none';
+      badge.title = KDS.length ? KDS.length + ' kitchen tickets' : '';
+      const late = KDS.some((o) => (Date.now() - (o.start || 0)) / 60000 > 10);
+      badge.classList.toggle('badge-urgent', late);
+    }
+  });
+
   const _ksEl = document.getElementById('kds-search');
   if (_ksEl && !_ksEl.dataset.bound) { _ksEl.dataset.bound='1'; _ksEl.addEventListener('input', ()=>{ try{ renderKDS(); }catch(e){} }); }
   const _kq = ((_ksEl && _ksEl.value) || '').trim().toLowerCase();
   const _kmatch = (o) => !_kq || String(o.tok||'').toLowerCase().includes(_kq) || String(o.type||'').toLowerCase().includes(_kq) || (o.items||[]).some(it => String(it[1]||'').toLowerCase().includes(_kq));
-  $('#kds-grid').innerHTML = (KDS.length && !KDS.some(_kmatch))
+  // Oldest first (kitchen priority) when not searching
+  const ordered = KDS.map((o, i) => ({ o, i }))
+    .filter(({ o }) => _kmatch(o))
+    .sort((a, b) => (a.o.start || 0) - (b.o.start || 0));
+  $('#kds-grid').innerHTML = (KDS.length && !ordered.length)
     ? `<div class="sr-empty" style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-soft)">No orders match your search.</div>`
-    : KDS.map((o,i)=> _kmatch(o) ? `
-    <div class="kds-card" data-k="${i}">
+    : ordered.map(({ o, i }) => {
+      const ageMin = (Date.now() - (o.start || Date.now())) / 60000;
+      const urgentCls = ageMin > 10 ? ' urgent' : ageMin > 5 ? ' aging' : '';
+      return `
+    <div class="kds-card${urgentCls}" data-k="${i}">
       <div class="kds-h"><div><div class="ktok">${_e(o.tok)}</div><div class="ktype">${_e(o.type)}</div></div><span class="kds-timer" data-start="${_e(o.start)}">0:00</span></div>
       <div class="kds-items">${o.items.map((it,j)=>`<div class="kds-item" data-i="${j}"><span class="kq">${_e(it[0])}×</span><div><span class="kn">${_e(it[1])}</span>${it[2]?`<div class="knote"><i class="fa-solid fa-circle-info"></i> ${_e(it[2])}</div>`:''}</div></div>`).join('')}</div>
       <div class="kds-eta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 0 2px;border-top:1px dashed var(--stroke);margin-top:6px">
@@ -64,7 +88,8 @@
         <button class="kds-eta-btn" data-eta="${i}" data-mins="custom" style="font-size:11px;padding:3px 8px;border:1px solid var(--stroke);border-radius:5px;background:var(--panel);color:var(--text);cursor:pointer">…</button>
       </div>
       <div class="kds-foot"><button class="btn btn-primary btn-block" data-done="${i}"><i class="fa-solid fa-check"></i> Mark ready</button></div>
-    </div>` : '').join('');
+    </div>`;
+    }).join('');
   $$('#kds-grid .kds-item').forEach(it=> it.addEventListener('click',()=>it.classList.toggle('done')));
   $$('#kds-grid [data-done]').forEach(b=> b.addEventListener('click',async ()=>{
     const item = KDS[+b.dataset.done];

@@ -958,10 +958,23 @@
         size: 'sm',
         body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
         foot: `${waBtn}
+              <button class="btn btn-ghost" id="rc-thermal" style="flex:1" title="ESC/POS thermal printer"><i class="fa-solid fa-receipt"></i> Thermal</button>
               <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
               <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
         onMount(modal, close) {
           modal.querySelector('#rc-print').onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
+          const thEl = modal.querySelector('#rc-thermal');
+          if (thEl) {
+            thEl.onclick = () => {
+              if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
+                RSOps.printBillThermal(bill);
+              } else if (window.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
+                RSPrintBridge.printBillEscPos(bill, engineOutlet(), {}).catch(() => RSPrint(printHtml, 'Receipt ' + bill.no));
+              } else {
+                RSPrint(printHtml, 'Receipt ' + bill.no);
+              }
+            };
+          }
           const waEl = modal.querySelector('#rc-wa');
           if (waEl && waEl.tagName === 'BUTTON') {
             waEl.onclick = () => RSReceipt.share(bill);
