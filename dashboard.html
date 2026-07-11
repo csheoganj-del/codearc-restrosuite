@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v93-20260711-symbols';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v94-20260711-shift-top';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -541,9 +541,9 @@
                 <button class="btn btn-ghost cart-clear-btn" id="btn-clear-cart" title="Clear cart" aria-label="Clear cart"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <!-- Shift (icons) + customer (icon chip) -->
-            <div class="cart-meta-row" id="cart-meta-row">
-              <div id="pos-shift-slot" class="pos-shift-slot" aria-live="polite"></div>
+            <!-- Customer only (shift tools live in top bar — Petpooja order cart) -->
+            <div class="cart-meta-row cart-meta-customer-only" id="cart-meta-row">
+              <div id="pos-shift-slot" class="pos-shift-slot" hidden aria-hidden="true"></div>
               <div class="cart-table-sel" id="cart-table-sel">
                 <div class="cart-table-pax-row" id="cart-table-pax-row">
                   <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>

@@ -1022,24 +1022,65 @@
   }
 
   function paintShiftBar() {
-    const pos = document.getElementById('pos-tab') || document.querySelector('#pos-tab, .pos-layout');
-    if (!pos) return;
-    // Prefer cart-side slot (Petpooja: menu stays clean)
-    let host = document.getElementById('pos-shift-slot');
+    // Petpooja-style: shift/register tools live in the TOP BAR (station-level),
+    // never permanently inside the order cart (items-first).
+    try {
+      if (document.documentElement.classList.contains('rs-role-superadmin')) {
+        const existing = document.getElementById('rs-shift-bar');
+        if (existing) existing.style.display = 'none';
+        const cartSlot = document.getElementById('pos-shift-slot');
+        if (cartSlot) cartSlot.innerHTML = '';
+        return;
+      }
+    } catch (_) {}
+
+    let host = document.getElementById('rs-topbar-shift');
+    if (!host) {
+      const topbar = document.querySelector('.topbar');
+      if (!topbar) return;
+      host = document.createElement('div');
+      host.id = 'rs-topbar-shift';
+      host.className = 'rs-topbar-shift';
+      host.setAttribute('aria-label', 'Shift / register');
+      // After title/spacer so it sits with station + ops (left of search)
+      const spacer = topbar.querySelector('.tb-spacer');
+      const search = topbar.querySelector('.tb-search');
+      if (spacer) spacer.insertAdjacentElement('afterend', host);
+      else if (search) topbar.insertBefore(host, search);
+      else topbar.appendChild(host);
+    }
+
+    // Clear legacy cart-side mount (v91–93 put shift on cart)
+    const cartSlot = document.getElementById('pos-shift-slot');
+    if (cartSlot) {
+      cartSlot.innerHTML = '';
+      cartSlot.style.display = 'none';
+    }
+
     let bar = document.getElementById('rs-shift-bar');
     const shift = getOpenShift();
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'rs-shift-bar';
-      bar.className = 'rs-shift-bar';
+      bar.className = 'rs-shift-bar rs-shift-bar-top';
     }
-    if (host) {
-      if (bar.parentNode !== host) host.appendChild(bar);
-    } else if (!bar.parentNode) {
-      const anchor = pos.querySelector('.pos-cats, .pos-grid') || pos.firstChild;
-      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(bar, anchor);
-      else pos.insertBefore(bar, pos.firstChild);
+    bar.style.display = '';
+    if (bar.parentNode !== host) host.appendChild(bar);
+
+    // Tiny cart status only when shift is closed (don't steal item space when open)
+    let cartHint = document.getElementById('rs-cart-shift-hint');
+    const cartEl = document.querySelector('.pos-cart');
+    if (cartEl && !cartHint) {
+      cartHint = document.createElement('button');
+      cartHint.type = 'button';
+      cartHint.id = 'rs-cart-shift-hint';
+      cartHint.className = 'rs-cart-shift-hint';
+      cartHint.hidden = true;
+      const head = cartEl.querySelector('.cart-head');
+      if (head && head.parentNode) head.insertAdjacentElement('afterend', cartHint);
+      else cartEl.insertBefore(cartHint, cartEl.firstChild);
     }
+
     if (shift) {
       const sum = summarizeShift(shift);
       const movHint =
@@ -1048,10 +1089,10 @@
           : '';
       bar.classList.remove('rs-shift-bar-closed');
       bar.classList.add('rs-shift-bar-open');
-      bar.innerHTML = `<div class="rs-shift-compact rs-shift-icons" title="Shift open · ${esc(sum.bills)} bills · ${esc(rs(sum.gross))}${esc(movHint)}">
+      bar.innerHTML = `<div class="rs-shift-compact rs-shift-icons rs-shift-topbar" title="Shift open · ${esc(sum.bills)} bills · ${esc(rs(sum.gross))}${esc(movHint)}">
         <span class="rs-shift-dot open" title="Shift open"></span>
         <span class="rs-shift-text"><b>${esc(sum.bills)}</b><span class="rs-shift-amt">${esc(rs(sum.gross))}</span></span>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Cash drawer movements"><i class="fa-solid fa-money-bill-wave"></i></button>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-cash-move" title="Cash drawer (pay-in / pay-out)"><i class="fa-solid fa-cash-register"></i></button>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z" title="Z-report">Z</button>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close" title="Close shift"><i class="fa-solid fa-lock"></i></button>
       </div>`;
@@ -1064,13 +1105,17 @@
         };
       const cl = bar.querySelector('#rs-shift-close');
       if (cl) cl.onclick = () => closeShift();
+      if (cartHint) {
+        cartHint.hidden = true;
+        cartHint.onclick = null;
+      }
+      document.getElementById('pos-tab')?.classList.remove('rs-shift-is-closed');
     } else {
       bar.classList.add('rs-shift-bar-closed');
       bar.classList.remove('rs-shift-bar-open');
-      bar.innerHTML = `<div class="rs-shift-compact closed rs-shift-icons" title="No shift open — tap unlock">
+      bar.innerHTML = `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="No shift open — tap to open">
         <span class="rs-shift-dot closed"></span>
-        <span class="rs-shift-text sr-only">No shift</span>
-        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" title="Open shift"><i class="fa-solid fa-unlock"></i></button>
+        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" title="Open shift"><i class="fa-solid fa-unlock"></i><span class="rs-shift-open-lbl">Shift</span></button>
       </div>`;
       const op = bar.querySelector('#rs-shift-open');
       if (op)
@@ -1079,6 +1124,18 @@
           if (f === null) return;
           await openShift(Number(f) || 0);
         };
+      // Cart only shows a one-line open prompt when closed (not the full control strip)
+      if (cartHint) {
+        cartHint.hidden = false;
+        cartHint.innerHTML =
+          '<i class="fa-solid fa-unlock"></i> <span>Open shift to bill</span>';
+        cartHint.onclick = () => {
+          const btn = document.getElementById('rs-shift-open');
+          if (btn) btn.click();
+          else op && op.click();
+        };
+      }
+      document.getElementById('pos-tab')?.classList.add('rs-shift-is-closed');
     }
   }
 

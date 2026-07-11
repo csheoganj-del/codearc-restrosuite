@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v94 (2026-07-11) — Shift off cart (Petpooja-style order panel)
+
+- **Shift / cash drawer / Z / lock** moved to the **top bar** (register-level, next to station)
+- **Cart is order-only**: type · guest · items · total · pay · Hold/KOT · Pay
+- When shift is closed, cart shows a single **Open shift to bill** hint (not the full control strip)
+- Super-admin shell still hides shift chrome
+
 ## v93 (2026-07-11) — Symbol chrome: cart items first
 
 Rethought every cart control for space vs necessity:
