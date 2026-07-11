@@ -1035,7 +1035,7 @@
       
     const hasLowStock = (typeof INVENTORY !== 'undefined' && Array.isArray(INVENTORY))
       ? INVENTORY.some(i => Number(i.stock) < Number(i.min))
-      : false;
+      : Number(window.__rsLowStockCount || 0) > 0;
 
     const hasNewOnline = Number(window.__rsOnlineNewCount || 0) > 0;
       

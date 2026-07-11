@@ -56,12 +56,224 @@
     return root;
   }
 
+  function isLowStock(i) {
+    return Number(i.stock) < Number(i.min);
+  }
+  function reorderQty(i) {
+    const min = Math.max(0, Number(i.min) || 0);
+    const stock = Math.max(0, Number(i.stock) || 0);
+    return Math.max(1, Math.ceil(min * 2 - stock));
+  }
+  function lineValue(i, qty) {
+    return Math.round(Math.max(0, Number(qty) || 0) * Math.max(0, Number(i.cost) || 0));
+  }
+  function lowStockItems() {
+    return getInventory().filter(isLowStock);
+  }
+  function paintInventoryBadge() {
+    const n = lowStockItems().length;
+    global.__rsLowStockCount = n;
+    document
+      .querySelectorAll('.sidebar-link[data-tab="inventory-tab"], .mnav-link[data-tab="inventory-tab"]')
+      .forEach((link) => {
+        let badge = link.querySelector('.badge-count');
+        if (!badge && n > 0) {
+          badge = document.createElement('span');
+          badge.className = 'badge-count';
+          link.appendChild(badge);
+        }
+        if (badge) {
+          badge.textContent = String(n);
+          badge.style.display = n > 0 ? '' : 'none';
+          badge.classList.toggle('badge-urgent', n > 0);
+          badge.title = n ? n + ' below min stock' : '';
+        }
+      });
+    try {
+      if (global.RS && typeof RS.updateTabAttentionBlinking === 'function') RS.updateTabAttentionBlinking();
+    } catch (_) {}
+  }
+  function buildPoRowsFromLow(items) {
+    const bySup = {};
+    (items || []).forEach((i) => {
+      const sup = (i.supplier || i.vendor || i.cat || 'General') + '';
+      if (!bySup[sup]) bySup[sup] = [];
+      bySup[sup].push(i);
+    });
+    const rows = [];
+    Object.entries(bySup).forEach(([sup, list]) => {
+      const lines = list.map((i) => {
+        const qty = reorderQty(i);
+        return {
+          name: i.name,
+          unit: i.unit || 'unit',
+          qty,
+          cost: Number(i.cost) || 0,
+          value: lineValue(i, qty),
+          stock: Number(i.stock) || 0,
+          min: Number(i.min) || 0,
+          invId: i.id,
+        };
+      });
+      const value = lines.reduce((a, l) => a + l.value, 0);
+      const slug = String(sup)
+        .replace(/[^a-z0-9]+/gi, '')
+        .slice(0, 4)
+        .toUpperCase() || 'GEN';
+      const poNum = nextLogicalNo('PO') + '-' + slug;
+      rows.push({
+        id: poNum,
+        poNumber: poNum,
+        supplier: /supplier/i.test(sup) ? sup : sup + ' Supplier',
+        lines,
+        items: lines.map((l) => `${l.qty} ${l.unit} ${l.name}`).join(', '),
+        value,
+        date: new Date().toISOString(),
+        status: 'pending',
+        channel: 'auto_reorder',
+      });
+    });
+    return rows;
+  }
+  async function savePurchaseOrder(poRow) {
+    if (global.RS && typeof RS.saveOne === 'function') {
+      return RS.saveOne('purchase_orders', poRow);
+    }
+    if (global.RS_DB && RS_DB.put) {
+      return RS_DB.put('purchase_orders', poRow.id, poRow);
+    }
+    throw new Error('No save path for purchase orders');
+  }
+  function printPurchaseOrder(po) {
+    const lines = (po.lines || [])
+      .map(
+        (l) =>
+          `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed #ddd"><span>${esc(l.qty)} ${esc(l.unit)} · ${esc(l.name)}</span><span>${rs(l.value)}</span></div>`
+      )
+      .join('');
+    const html = `<div style="max-width:360px;margin:0 auto;font-family:system-ui,sans-serif">
+      <div style="text-align:center;font-weight:800;font-size:18px">PURCHASE ORDER</div>
+      <div style="text-align:center;font-size:12px;color:#666;margin:4px 0 12px">${esc(po.poNumber || po.id)}</div>
+      <div style="font-size:12px;margin-bottom:8px"><b>Supplier:</b> ${esc(po.supplier)}</div>
+      <div style="font-size:12px;margin-bottom:10px"><b>Date:</b> ${esc(new Date(po.date || Date.now()).toLocaleString())}</div>
+      ${lines || `<div style="font-size:13px">${esc(po.items || '')}</div>`}
+      <div style="display:flex;justify-content:space-between;font-weight:800;margin-top:12px;font-size:15px"><span>Total</span><span>${rs(po.value)}</span></div>
+      <div style="text-align:center;font-size:11px;color:#888;margin-top:14px">RestroSuite · ${esc(po.status || 'pending')}</div>
+    </div>`;
+    if (typeof global.RSPrint === 'function') global.RSPrint(html, 'PO ' + (po.poNumber || po.id));
+    else if (global.RSPrintBridge && RSPrintBridge.printHtml) RSPrintBridge.printHtml(html, 'PO');
+  }
+  function exportLowStockCsv() {
+    const low = lowStockItems();
+    if (!low.length) {
+      toast('No low-stock items to export', 'fa-circle-check');
+      return;
+    }
+    const lines = [
+      ['name', 'category', 'stock', 'min', 'unit', 'unit_cost', 'reorder_qty', 'est_value', 'supplier'].join(','),
+    ];
+    low.forEach((i) => {
+      const qty = reorderQty(i);
+      const row = [
+        i.name,
+        i.cat || '',
+        i.stock,
+        i.min,
+        i.unit || '',
+        i.cost || 0,
+        qty,
+        lineValue(i, qty),
+        i.supplier || i.vendor || (i.cat ? i.cat + ' Supplier' : ''),
+      ].map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"');
+      lines.push(row.join(','));
+    });
+    const csv = lines.join('\n');
+    const name = 'low-stock-' + new Date().toISOString().slice(0, 10) + '.csv';
+    if (global.RS && typeof RS.downloadFile === 'function') {
+      RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
+    } else {
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+      a.download = name;
+      a.click();
+    }
+    toast('Low-stock CSV · ' + low.length + ' items', 'fa-file-csv');
+  }
+  async function confirmAndDraftPos() {
+    const lowItems = lowStockItems();
+    if (!lowItems.length) return toast('All inventory levels are healthy', 'fa-circle-check');
+    const drafts = buildPoRowsFromLow(lowItems);
+    const totalVal = drafts.reduce((a, p) => a + (p.value || 0), 0);
+    const preview = drafts
+      .map(
+        (p) =>
+          `<div style="padding:10px 0;border-bottom:1px solid var(--stroke)">
+            <div style="font-weight:800;font-size:13px">${esc(p.poNumber)} · ${esc(p.supplier)}</div>
+            <div style="font-size:12px;color:var(--text-soft);margin-top:4px;line-height:1.45">${esc(p.items)}</div>
+            <div style="font-size:12.5px;font-weight:700;color:var(--orange);margin-top:4px">${rs(p.value)}</div>
+          </div>`
+      )
+      .join('');
+    if (!global.RSModal) {
+      // Fallback: draft without preview
+      return executeDraftPos(drafts);
+    }
+    RSModal.open({
+      title: 'Auto-draft purchase orders',
+      sub: lowItems.length + ' low items · ' + drafts.length + ' PO(s) · ' + rs(totalVal),
+      icon: 'fa-truck',
+      size: 'md',
+      body: `<div style="font-size:13px;color:var(--text-soft);margin-bottom:10px">Qty targets ~2× min level. Review and confirm to create pending POs.</div>
+        <div style="max-height:320px;overflow:auto">${preview}</div>`,
+      foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+        <button class="btn btn-ghost" style="flex:1" data-csv><i class="fa-solid fa-file-csv"></i> CSV only</button>
+        <button class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-truck"></i> Create ${drafts.length} PO(s)</button>`,
+      onMount(modal, close) {
+        modal.querySelector('[data-x]').onclick = close;
+        modal.querySelector('[data-csv]').onclick = () => {
+          exportLowStockCsv();
+        };
+        modal.querySelector('[data-ok]').onclick = async () => {
+          close();
+          await executeDraftPos(drafts);
+        };
+      },
+    });
+  }
+  async function executeDraftPos(drafts) {
+    setOperationStatus('Creating purchase orders...');
+    try {
+      let n = 0;
+      for (const po of drafts) {
+        await savePurchaseOrder(po);
+        n++;
+      }
+      finishOperationStatus('Drafted ' + n + ' PO(s)');
+      toast(`Created ${n} purchase order${n === 1 ? '' : 's'}`, 'fa-truck');
+      // Offer print of first PO
+      if (drafts[0] && global.RSModal) {
+        setTimeout(() => {
+          if (typeof global.__toast === 'function') {
+            global.__toast('Tap to print first PO', 'fa-print', () => printPurchaseOrder(drafts[0]));
+          }
+        }, 400);
+      }
+      renderInventory();
+      if (global.RS && RS.render) RS.render('inventory-tab');
+    } catch (e) {
+      console.warn('Auto-draft POs failed', e);
+      finishOperationStatus('Auto-draft failed', 'error');
+      toast('Could not create all POs', 'fa-circle-exclamation');
+    }
+  }
+
   function renderInventory() {
     const INVENTORY = getInventory();
     const MENU = getMenu();
     const cls = stockCls();
 
-    const low = INVENTORY.filter((i) => i.stock < i.min);
+    const low = INVENTORY.filter(isLowStock);
+    paintInventoryBadge();
     const banner = $('#inv-banner');
     if (banner) banner.style.display = low.length ? 'flex' : 'none';
     const lowCount = $('#inv-low-count');
@@ -69,43 +281,15 @@
 
     const btnAutoDraft = $('#btn-auto-draft-pos');
     if (btnAutoDraft) {
-      btnAutoDraft.onclick = async () => {
-        const lowItems = INVENTORY.filter((i) => i.stock < i.min);
-        if (!lowItems.length) return toast('All inventory levels are healthy', 'fa-circle-check');
-
-        setOperationStatus('Auto-drafting POs...');
-        try {
-          const byCat = {};
-          lowItems.forEach((i) => {
-            if (!byCat[i.cat]) byCat[i.cat] = [];
-            byCat[i.cat].push(i);
-          });
-
-          let draftedCount = 0;
-          for (const [cat, items] of Object.entries(byCat)) {
-            const poNum = nextLogicalNo('PO') + '-' + String(cat).substring(0, 3).toUpperCase();
-            const value = items.reduce((sum, i) => sum + (i.min * 2 - i.stock) * i.cost, 0);
-            const poRow = {
-              id: poNum,
-              poNumber: poNum,
-              supplier: cat + ' Supplier Ltd.',
-              items: items.map((i) => `${Math.round(i.min * 2 - i.stock)} ${i.unit} ${i.name}`).join(', '),
-              value: Math.round(value),
-              date: new Date().toISOString(),
-              status: 'pending',
-            };
-            if (global.RS && RS.saveOne) await RS.saveOne('purchase_orders', poRow);
-            draftedCount++;
-          }
-          finishOperationStatus(`Drafted ${draftedCount} POs`);
-          toast(`Auto-drafted ${draftedCount} POs successfully`, 'fa-truck');
-          renderInventory();
-          if (global.RS && RS.render) RS.render('inventory-tab');
-        } catch (e) {
-          console.warn('Auto-draft POs failed', e);
-          finishOperationStatus('Auto-draft failed', 'error');
-        }
-      };
+      btnAutoDraft.onclick = () => confirmAndDraftPos();
+    }
+    const btnCsv = $('#btn-export-low-stock');
+    if (btnCsv) {
+      btnCsv.onclick = () => exportLowStockCsv();
+    }
+    const btnCsv2 = $('#btn-export-low-stock-toolbar');
+    if (btnCsv2) {
+      btnCsv2.onclick = () => exportLowStockCsv();
     }
 
     const invBody = $('#inv-table-body');
@@ -521,11 +705,21 @@
     } catch (e) {}
   }
 
-  global.RSInventoryUI = { renderInventory };
+  global.RSInventoryUI = {
+    renderInventory,
+    lowStockItems,
+    exportLowStockCsv,
+    confirmAndDraftPos,
+    printPurchaseOrder,
+    reorderQty,
+    paintInventoryBadge,
+  };
 
   function attachToRS() {
     if (!global.RS) return;
     global.RS.renderInventory = renderInventory;
+    global.RS.exportLowStockCsv = exportLowStockCsv;
+    global.RS.autoDraftPurchaseOrders = confirmAndDraftPos;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);
