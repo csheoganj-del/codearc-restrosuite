@@ -110,7 +110,7 @@ test('reports-ui module extracted (wave 8)', () => {
   assert.ok(!dash.includes('GSTR_report_'), 'GSTR export should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /reports-ui\.js/);
-  assert.match(html, /v56-20260711/);
+  assert.match(html, /v5[0-9]-20260711/);
 });
 
 test('gateway-monitor module extracted (wave 8)', () => {
@@ -123,6 +123,32 @@ test('gateway-monitor module extracted (wave 8)', () => {
   assert.ok(!dash.includes('saas-notification-logs-container'), 'gateway logs UI should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /gateway-monitor\.js/);
+});
+
+test('super-admin module extracted (wave 9)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/super-admin.js'), 'utf8');
+  assert.match(src, /RSSuperAdmin/);
+  assert.match(src, /renderSuper|async function renderSuper/);
+  assert.match(src, /openCreateTenantModal/);
+  assert.match(src, /renderTenantTable/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSSuperAdmin/);
+  assert.ok(!dash.includes('function openCreateTenantModal'), 'tenant create modal should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /super-admin\.js/);
+  assert.match(html, /v57-20260711/);
+});
+
+test('kds-ui module extracted (wave 9)', () => {
+  const src = fs.readFileSync(path.join(root, 'assets/modules/kds-ui.js'), 'utf8');
+  assert.match(src, /RSKdsUI/);
+  assert.match(src, /renderKDS/);
+  assert.match(src, /kds-grid/);
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  assert.match(dash, /RSKdsUI/);
+  assert.ok(!dash.includes('kds-timer'), 'KDS timer markup should leave dashboard');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /kds-ui\.js/);
 });
 
 test('USB and split docs exist', () => {
