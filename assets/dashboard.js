@@ -2707,7 +2707,21 @@
           const csv = [
             headers.join(','),
             ...tenants.map(t => {
-              return `"${t.id || ''}","${(t.name || t.tenant_name || '').replace(/"/g, '""')}","${t.slug || ''}","${t.outlet_type || ''}","${t.email || ''}","${t.phone || ''}","${t.username || ''}","${t.status || ''}","${t.plan_code || ''}",tus || ''}",${t.mrr || 0},"${t.created_at || ''}"`;
+              const escCsv = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+              return [
+                escCsv(t.id),
+                escCsv(t.name || t.tenant_name),
+                escCsv(t.slug),
+                escCsv(t.outlet_type),
+                escCsv(t.email),
+                escCsv(t.phone),
+                escCsv(t.username),
+                escCsv(t.status),
+                escCsv(t.plan_code),
+                escCsv(t.subscription_status),
+                Number(t.mrr) || 0,
+                escCsv(t.created_at),
+              ].join(',');
             })
           ].join('\n');
           RS.downloadFile(csv, 'text/csv;charset=utf-8;', `tenants-export-${fileDate()}.csv`);
