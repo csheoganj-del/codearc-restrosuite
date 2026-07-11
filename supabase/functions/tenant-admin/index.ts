@@ -661,9 +661,17 @@ async function createImpersonationSession(payload: Record<string, unknown>, req:
     return jsonResponse({ error: "Failed to load workspace." }, 500, req);
   }
   if (!tenant) return jsonResponse({ error: "Client workspace was not found." }, 404, req);
-  if (tenant.status !== "approved") return jsonResponse({ error: "Only active workspaces can be opened." }, 403, req);
-  if (!["active", "trialing"].includes(String(tenant.subscription_status || "active"))) {
-    return jsonResponse({ error: "Workspace subscription is not active." }, 402, req);
+  const statusNorm = String(tenant.status || "").toLowerCase();
+  // UI shows "Active" for both approved and active; accept either for open-workspace
+  if (statusNorm !== "approved" && statusNorm !== "active") {
+    return jsonResponse({ error: "Only active workspaces can be opened." }, 403, req);
+  }
+  const subNorm = String(tenant.subscription_status || "active").toLowerCase();
+  // Treat empty/legacy values as active; case-insensitive match
+  if (subNorm && !["active", "trialing", "trial", ""].includes(subNorm)) {
+    return jsonResponse({
+      error: "Workspace subscription is not active (" + subNorm + "). Set Billing to Active in Manage → Account.",
+    }, 402, req);
   }
 
   const actor = String(verifiedPayload.username || "superadmin");

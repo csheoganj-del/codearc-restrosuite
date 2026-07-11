@@ -480,7 +480,12 @@ function renderTenantTable() {
       e.stopPropagation();
       const tenantId = btn.getAttribute('data-tid');
       const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
-      openTenantDashboard(tenant, btn);
+      const openDash = global.openTenantDashboard || (typeof window !== 'undefined' && window.openTenantDashboard);
+      if (typeof openDash !== 'function') {
+        toast('Open workspace is not loaded. Hard-refresh the page (Ctrl+Shift+R).', 'fa-circle-exclamation');
+        return;
+      }
+      openDash(tenant, btn);
     });
   });
 
@@ -1043,7 +1048,14 @@ function openTenantManageModal(tenant) {
       const canOpen = !['pending', 'suspended'].includes(String(tenant.status || '').toLowerCase());
       openDashboardBtn.disabled = !canOpen;
       openDashboardBtn.title = canOpen ? 'Open this workspace dashboard' : 'Only active workspaces can be opened';
-      openDashboardBtn.onclick = () => openTenantDashboard(tenant, openDashboardBtn);
+      openDashboardBtn.onclick = () => {
+        const openDash = global.openTenantDashboard || (typeof window !== 'undefined' && window.openTenantDashboard);
+        if (typeof openDash !== 'function') {
+          toast('Open workspace is not loaded. Hard-refresh the page (Ctrl+Shift+R).', 'fa-circle-exclamation');
+          return;
+        }
+        openDash(tenant, openDashboardBtn);
+      };
     }
 
     modal.classList.add('active');

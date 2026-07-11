@@ -475,11 +475,20 @@
 
     async impersonateTenant(tenant){
       const current = api.session();
-      if (!current || current.role !== 'superadmin') throw new Error('Superadmin session required.');
+      if (!current || current.role !== 'superadmin') throw new Error('Superadmin session required. Sign in again as super-admin.');
       if (!tenant || !tenant.id) throw new Error('Tenant details not found.');
+      // Snapshot uses flat sessionStorage keys (tenant_session_token, superadmin_admin_token, …)
       const origin = readSessionSnapshot();
+      const hasOriginTok = !!(origin && (
+        (origin[K.token] && origin[K.token].value) ||
+        (origin.superadmin_admin_token && origin.superadmin_admin_token.value)
+      ));
+      if (!hasOriginTok) throw new Error('Could not snapshot super-admin session. Sign out and sign back in.');
       const out = await api.admin({ action:'create_impersonation_session', tenant_id: tenant.id });
-      if (!out || !out.session || !out.session.session_token) throw new Error('Could not open tenant dashboard.');
+      if (out && out.error) throw new Error(out.error);
+      if (!out || !out.session || !out.session.session_token) {
+        throw new Error((out && out.error) || 'Could not open tenant dashboard (no session returned).');
+      }
       clearActiveSession();
       storeSession(out.session, false);
       SS.setItem(IMP_ORIGIN_KEY, JSON.stringify(origin));
@@ -489,7 +498,11 @@
         name: out.session.tenant_name || tenant.name || tenant.tenant_name || 'Client Workspace',
         started_at: new Date().toISOString()
       }));
-      try { localStorage.setItem('rs_active_tab', 'pos-tab'); } catch(e) {}
+      try {
+        localStorage.setItem('rs_active_tab', 'pos-tab');
+        // Ensure early shell does not keep platform mode after reload
+        sessionStorage.setItem('logged_in_role', out.session.role || 'admin');
+      } catch(e) {}
       return out.session;
     },
 

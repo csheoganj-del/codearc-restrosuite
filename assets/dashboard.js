@@ -186,11 +186,16 @@
     }
     try {
       if (!window.RS_API || !RS_API.impersonateTenant) throw new Error('Impersonation is not available.');
+      const status = String(tenant.status || '').toLowerCase();
+      if (status && status !== 'approved' && status !== 'active') {
+        throw new Error('Only active workspaces can be opened. Current status: ' + status);
+      }
       await RS_API.impersonateTenant(tenant);
       toast(`Opening ${tenant.name || tenant.tenant_name || tenant.slug || 'workspace'} dashboard...`, 'fa-arrow-right-to-bracket');
-      location.href = 'dashboard.html#pos-tab';
-      location.reload();
+      // Full navigation (not href+reload race) so the client shell loads cleanly
+      location.assign('dashboard.html?appv=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || '') + '#pos-tab');
     } catch (err) {
+      console.error('[openTenantDashboard]', err);
       toast('Could not open workspace: ' + (err.message || err), 'fa-circle-exclamation');
       if (button) {
         button.disabled = false;
@@ -198,6 +203,8 @@
       }
     }
   }
+  // Super-admin module (separate IIFE) calls this — must be global
+  window.openTenantDashboard = openTenantDashboard;
 
   const titles = {
     'pos-tab':['Point of Sale','Ring up takeaway & dine-in orders'],
