@@ -63,7 +63,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v45-20260711-exact-preview';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v46-20260711-receipt-engine';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -1537,6 +1537,7 @@
     var srcs = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
+      'assets/receipt.js',
       'assets/features-pos.js',
       'assets/features-editor.js',
       'assets/features-manage.js',
