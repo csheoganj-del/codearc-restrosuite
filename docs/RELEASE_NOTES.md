@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v84 (2026-07-11) — Super-admin shell (no client flash)
+
+- Super-admin and restaurant POS still share `dashboard.html`, but the **platform shell is stamped before first paint** from `sessionStorage`
+- Client sidebar (POS, KDS, Bills…), mobile nav, and client tabs are **CSS-hidden** for `rs-role-superadmin` so reload never flashes the outlet dashboard
+- Boot loader says “Loading platform console…” for super-admin
+- Removed 300ms delayed lockdown that caused the split-second client UI flash
+
 ## v83 (2026-07-11) — Super-Admin & Gateway polish
 
 - **Status labels**: table shows Active (not “Approved”) matching the manage modal

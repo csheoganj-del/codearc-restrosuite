@@ -11,11 +11,20 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-test('v83 asset version and SW cache present', () => {
+test('v84 asset version and SW cache present', () => {
   const html = read('dashboard.html');
   const sw = read('service-worker.js');
-  assert.match(html, /v83-20260711-resolve-fix/);
+  assert.match(html, /v84-20260711-sa-shell/);
   assert.match(sw, /restrosuite-shell-v20260711/);
+});
+
+test('super-admin early shell stamped before paint', () => {
+  const html = read('dashboard.html');
+  assert.match(html, /earlyRoleShell|logged_in_role/);
+  assert.match(html, /rs-role-superadmin/);
+  assert.match(html, /data-rs-shell/);
+  assert.match(html, /tab-content:not\(#super-admin-tab\):not\(#gateway-monitor-tab\)/);
+  assert.match(html, /Loading platform console/);
 });
 
 test('super-admin defines avatar colors locally (no bare avatarColors)', () => {

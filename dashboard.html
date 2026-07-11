@@ -77,7 +77,35 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v83-20260711-resolve-fix';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v84-20260711-sa-shell';
+  // Role shell BEFORE first paint: super-admin and client share dashboard.html,
+  // so we stamp html/body classes from sessionStorage immediately. Without this,
+  // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
+  (function earlyRoleShell() {
+    try {
+      var role = sessionStorage.getItem('logged_in_role') || '';
+      var hasAdminTok = !!sessionStorage.getItem('superadmin_admin_token');
+      var isSuper = role === 'superadmin' || hasAdminTok;
+      var isBrand = role === 'brand_admin';
+      var html = document.documentElement;
+      html.classList.remove('rs-role-superadmin', 'rs-role-brandadmin', 'rs-role-client');
+      if (isSuper) {
+        html.classList.add('rs-role-superadmin');
+        html.setAttribute('data-rs-shell', 'superadmin');
+      } else if (isBrand) {
+        html.classList.add('rs-role-brandadmin');
+        html.setAttribute('data-rs-shell', 'brandadmin');
+      } else if (role) {
+        html.classList.add('rs-role-client');
+        html.setAttribute('data-rs-shell', 'client');
+      } else {
+        html.setAttribute('data-rs-shell', 'unknown');
+      }
+      window.__RS_EARLY_SHELL__ = html.getAttribute('data-rs-shell') || 'unknown';
+    } catch (e) {
+      try { document.documentElement.setAttribute('data-rs-shell', 'unknown'); } catch (_) {}
+    }
+  })();
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -98,6 +126,14 @@
       revealed = true;
       pending = 0;
       document.documentElement.classList.add('rs-styles-ready');
+      // Mirror html role classes onto body if body already exists
+      try {
+        if (document.body) {
+          ['rs-role-superadmin', 'rs-role-brandadmin', 'rs-role-client'].forEach(function(c) {
+            document.body.classList.toggle(c, document.documentElement.classList.contains(c));
+          });
+        }
+      } catch (e) {}
     }
     hrefs.forEach(function(href) {
       var link = document.createElement('link');
@@ -126,6 +162,9 @@
     flex-direction: column; gap: 14px;
   }
   html.rs-styles-ready #rs-boot-loader { display: none; }
+  html.rs-role-superadmin #rs-boot-loader .rs-boot-label::after {
+    content: none;
+  }
   #rs-boot-loader .rs-boot-spinner {
     width: 34px; height: 34px; border-radius: 50%;
     border: 3px solid rgba(255,255,255,0.18); border-top-color: #FF4F00;
@@ -219,22 +258,67 @@
     color: var(--hold-color);
     background: color-mix(in srgb, var(--hold-color) 10%, var(--glass-2));
   }
+  /* Role shells (html + body): applied in <head> from sessionStorage so first
+     paint never shows the wrong chrome. html.* works before body exists. */
+  html:not(.rs-role-superadmin) .superadmin-only,
   body:not(.rs-role-superadmin) .superadmin-only {
     display: none !important;
   }
+  html:not(.rs-role-brandadmin) .brandadmin-only,
   body:not(.rs-role-brandadmin) .brandadmin-only {
     display: none !important;
   }
+  html.rs-role-superadmin .superadmin-only.sidebar-link,
+  html.rs-role-superadmin .superadmin-only.mnav-link,
   body.rs-role-superadmin .superadmin-only.sidebar-link,
   body.rs-role-superadmin .superadmin-only.mnav-link {
     display: flex !important;
   }
+  html.rs-role-superadmin .sb-section.superadmin-only,
   body.rs-role-superadmin .sb-section.superadmin-only {
     display: block !important;
   }
+  html.rs-role-brandadmin .brandadmin-only.sidebar-link,
+  html.rs-role-brandadmin .brandadmin-only.mnav-link,
   body.rs-role-brandadmin .brandadmin-only.sidebar-link,
   body.rs-role-brandadmin .brandadmin-only.mnav-link {
     display: flex !important;
+  }
+
+  /* ── Super-admin platform shell: hide entire client POS surface ── */
+  html.rs-role-superadmin .sidebar-link:not(.superadmin-only),
+  html.rs-role-superadmin .sb-section:not(.superadmin-only):not(.brandadmin-only),
+  html.rs-role-superadmin .superadmin-hide,
+  html.rs-role-superadmin #role-switch,
+  html.rs-role-superadmin .support-dropdown,
+  html.rs-role-superadmin #open-settings,
+  html.rs-role-superadmin #open-product-guide-btn,
+  html.rs-role-superadmin .tb-search,
+  html.rs-role-superadmin #rs-station-chip,
+  html.rs-role-superadmin #rs-printer-chip,
+  html.rs-role-superadmin #app-version-pill,
+  html.rs-role-superadmin #cash-drawer,
+  html.rs-role-superadmin #cpay-drawer-backdrop,
+  html.rs-role-superadmin .cpay-side-drawer,
+  body.rs-role-superadmin .sidebar-link:not(.superadmin-only),
+  body.rs-role-superadmin .sb-section:not(.superadmin-only):not(.brandadmin-only),
+  body.rs-role-superadmin .superadmin-hide,
+  body.rs-role-superadmin #role-switch,
+  body.rs-role-superadmin .support-dropdown,
+  body.rs-role-superadmin #open-settings,
+  body.rs-role-superadmin #open-product-guide-btn,
+  body.rs-role-superadmin .tb-search,
+  body.rs-role-superadmin #rs-station-chip,
+  body.rs-role-superadmin #rs-printer-chip,
+  body.rs-role-superadmin #app-version-pill {
+    display: none !important;
+  }
+  html.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#gateway-monitor-tab),
+  body.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#gateway-monitor-tab) {
+    display: none !important;
+  }
+  html.rs-role-superadmin .user-pill .ur::before {
+    content: none;
   }
   @keyframes holdBtnBlink {
     0%, 100% {
@@ -247,8 +331,25 @@
 </style>
 </head>
 <body>
-
-<div id="rs-boot-loader"><div class="rs-boot-spinner"></div><span>Loading RestroSuite&hellip;</span></div>
+<div id="rs-boot-loader"><div class="rs-boot-spinner"></div><span id="rs-boot-label" class="rs-boot-label">Loading RestroSuite&hellip;</span></div>
+<script>
+/* Stamp body role classes before any deferred scripts paint the wrong shell */
+(function() {
+  try {
+    var h = document.documentElement;
+    var b = document.body;
+    ['rs-role-superadmin', 'rs-role-brandadmin', 'rs-role-client'].forEach(function(c) {
+      b.classList.toggle(c, h.classList.contains(c));
+    });
+    var label = document.getElementById('rs-boot-label');
+    if (label) {
+      if (h.classList.contains('rs-role-superadmin')) label.textContent = 'Loading platform console\u2026';
+      else if (h.classList.contains('rs-role-brandadmin')) label.textContent = 'Loading chain console\u2026';
+      else label.textContent = 'Loading RestroSuite\u2026';
+    }
+  } catch (e) {}
+})();
+</script>
 
 <!-- ======= CASH CALCULATOR SIDE DRAWER (slides in from LEFT of cart) ======= -->
 <div id="cpay-drawer-backdrop" style="display:none; position:fixed; inset:0; z-index:299;"></div>

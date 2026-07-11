@@ -1841,9 +1841,21 @@
   const sess = window.RS_API ? RS_API.session() : null;
   const isSuper = sess && sess.role === 'superadmin';
   const isBrandAdmin = sess && sess.role === 'brand_admin';
+  // Keep html + body in sync (html is stamped early in dashboard.html <head>)
+  document.documentElement.classList.toggle('rs-role-superadmin', !!isSuper);
+  document.documentElement.classList.toggle('rs-role-brandadmin', !!isBrandAdmin);
+  document.documentElement.classList.toggle('rs-role-client', !isSuper && !isBrandAdmin);
+  document.documentElement.setAttribute('data-rs-shell', isSuper ? 'superadmin' : (isBrandAdmin ? 'brandadmin' : 'client'));
   document.body.classList.toggle('rs-role-superadmin', !!isSuper);
   document.body.classList.toggle('rs-role-brandadmin', !!isBrandAdmin);
   document.body.classList.toggle('rs-role-client', !isSuper && !isBrandAdmin);
+  if (isSuper) {
+    try {
+      document.title = 'RestroSuite Platform · Super-Admin';
+      const brandName = document.querySelector('.brand-name');
+      // Soft brand cue only — full lockdown is CSS shell + later block
+    } catch (_) {}
+  }
   renderImpersonationBanner();
 
   // -- Role-based tab access map ----------------------------------------------
@@ -1919,7 +1931,7 @@
     $$('.brandadmin-only').forEach(el => el.style.display = 'none');
   }
 
-  // ── Apply superadmin-specific UI lockdown before first render ──
+  // ── Super-admin platform shell (CSS already hides client chrome from first paint) ──
   if (isSuper) {
     // 1. Show superadmin-only elements (sidebar links, mobile nav, section labels)
     $$('.superadmin-only').forEach(el => {
@@ -1953,98 +1965,82 @@
     // 6. Hide non-superadmin header elements
     const headerCenter = document.querySelector('.header-center-metrics');
     if (headerCenter) headerCenter.style.display = 'none';
-    // 7. Turn on the role switch toggle
+    // 7. Role switch is client-only demo control
     const rsSwitch = $('#role-switch');
-    if (rsSwitch) {
-      rsSwitch.classList.add('on');
-      const label = $('#role-switch-label');
-      if (label) label.textContent = 'Super-Admin';
-    }
-    // 8. Hide Settings button — not relevant in super-admin mode
-    setTimeout(() => {
-      const openSet = document.getElementById('open-settings');
-      if (openSet) openSet.style.display = 'none';
-      // 9. Wire topbar search to tenant text filter (Wave 9: RSSuperAdmin)
-      const tbSearchInput = document.querySelector('.tb-search input');
-      if (tbSearchInput) {
-        tbSearchInput.placeholder = 'Search tenants…';
+    if (rsSwitch) rsSwitch.style.display = 'none';
+    // Wire platform controls ASAP (no 300ms delay — that window caused client flash)
+    const openSet = document.getElementById('open-settings');
+    if (openSet) openSet.style.display = 'none';
+    const tbSearchInput = document.querySelector('.tb-search input');
+    if (tbSearchInput) {
+      tbSearchInput.placeholder = 'Search tenants…';
+      if (!tbSearchInput.dataset.saWired) {
+        tbSearchInput.dataset.saWired = '1';
         tbSearchInput.addEventListener('input', () => {
           if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(tbSearchInput.value);
         });
       }
-      // 10. Wire inline tenant search input (above table)
-      const inlineSearch = document.getElementById('tenant-search-input');
-      if (inlineSearch) {
-        inlineSearch.addEventListener('input', () => {
-          const tbSearchInput2 = document.querySelector('.tb-search input');
-          if (tbSearchInput2) tbSearchInput2.value = inlineSearch.value;
-          if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(inlineSearch.value);
-        });
-      }
-      // 11. Cloud status pill — show informative popover on click
-      const cloudPill = document.getElementById('db-mode-pill');
-      if (cloudPill && !cloudPill.dataset.saasClick) {
-        cloudPill.dataset.saasClick = '1';
-        cloudPill.style.cursor = 'pointer';
-        cloudPill.title = 'Click to check cloud sync status';
-        cloudPill.addEventListener('click', () => {
-          const mode = cloudPill.textContent.trim();
-          const detail = window.RS_LAST_CLOUD_ERROR ? `⚠️ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : '✅ No recent sync errors.';
-          toast(`Cloud status: ${mode} — ${detail}`, 'fa-cloud');
-        });
-      }
-      // 12. Profile card click — show superadmin info
-      const userPill = document.querySelector('.user-pill');
-      if (userPill && !userPill.dataset.saasClick) {
-        userPill.dataset.saasClick = '1';
-        userPill.style.cursor = 'pointer';
-        userPill.title = 'View session info';
-        userPill.addEventListener('click', () => {
-          const s = window.RS_API ? RS_API.session() : null;
-          const uname = (s && s.username) || 'codearc-superadmin';
-          const role = (s && s.role) || 'superadmin';
-          const tenantCount =
-            window.RSSuperAdmin && typeof RSSuperAdmin.getTenantCount === 'function'
-              ? RSSuperAdmin.getTenantCount()
-              : 0;
-          toast(`Logged in as ${uname} · Role: ${role} · ${tenantCount} tenants loaded`, 'fa-user-shield');
-        });
-      }
-      // 13. Hide Help & Setup button — irrelevant in super-admin context
-      const helpBtn = document.getElementById('open-product-guide-btn');
-      if (helpBtn) helpBtn.style.display = 'none';
-      // 16. Wire New Workspace button (Wave 9: RSSuperAdmin)
-      const newTenantBtn = document.getElementById('btn-create-tenant');
-      if (newTenantBtn && !newTenantBtn.dataset.wired) {
-        newTenantBtn.dataset.wired = '1';
-        newTenantBtn.addEventListener('click', () => {
-          if (window.RSSuperAdmin && RSSuperAdmin.openCreateTenantModal) RSSuperAdmin.openCreateTenantModal();
-        });
-      }
-      // 17. Wire bulk approve button
-      const bulkBtn = document.getElementById('sa-bulk-approve-btn');
-      if (bulkBtn && !bulkBtn.dataset.wired) {
-        bulkBtn.dataset.wired = '1';
-        bulkBtn.addEventListener('click', () => {
-          if (window.RSSuperAdmin && RSSuperAdmin.bulkApproveAllPending) RSSuperAdmin.bulkApproveAllPending();
-        });
-      }
-      // 18. Hide only the role-switch toggle button (not the whole sb-foot)
-      const saToggle = document.getElementById('role-switch');
-      if (saToggle) saToggle.style.display = 'none';
-      // 14. Hide version number pill — developer noise, not useful for super-admin
-      const versionPill = document.getElementById('app-version-pill');
-      if (versionPill) versionPill.style.display = 'none';
-      // 15. Hide Support dropdown — super-admin doesn't need client support links
-      const supportDrop = document.querySelector('.support-dropdown');
-      if (supportDrop) supportDrop.style.display = 'none';
-      // 19. Hide POS station chip (ST-xxxx) — irrelevant on platform console
-      const stationChip = document.getElementById('rs-station-chip');
-      if (stationChip) stationChip.style.display = 'none';
-      // 20. Prefer one search: hide global topbar search; table search is enough
-      const tbSearch = document.querySelector('.tb-search');
-      if (tbSearch) tbSearch.style.display = 'none';
-    }, 300);
+    }
+    const inlineSearch = document.getElementById('tenant-search-input');
+    if (inlineSearch && !inlineSearch.dataset.saWired) {
+      inlineSearch.dataset.saWired = '1';
+      inlineSearch.addEventListener('input', () => {
+        const tbSearchInput2 = document.querySelector('.tb-search input');
+        if (tbSearchInput2) tbSearchInput2.value = inlineSearch.value;
+        if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(inlineSearch.value);
+      });
+    }
+    const cloudPill = document.getElementById('db-mode-pill');
+    if (cloudPill && !cloudPill.dataset.saasClick) {
+      cloudPill.dataset.saasClick = '1';
+      cloudPill.style.cursor = 'pointer';
+      cloudPill.title = 'Click to check cloud sync status';
+      cloudPill.addEventListener('click', () => {
+        const mode = cloudPill.textContent.trim();
+        const detail = window.RS_LAST_CLOUD_ERROR ? `⚠️ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : '✅ No recent sync errors.';
+        toast(`Cloud status: ${mode} — ${detail}`, 'fa-cloud');
+      });
+    }
+    const userPill = document.querySelector('.user-pill');
+    if (userPill && !userPill.dataset.saasClick) {
+      userPill.dataset.saasClick = '1';
+      userPill.style.cursor = 'pointer';
+      userPill.title = 'View session info';
+      userPill.addEventListener('click', () => {
+        const s = window.RS_API ? RS_API.session() : null;
+        const uname = (s && s.username) || 'codearc-superadmin';
+        const role = (s && s.role) || 'superadmin';
+        const tenantCount =
+          window.RSSuperAdmin && typeof RSSuperAdmin.getTenantCount === 'function'
+            ? RSSuperAdmin.getTenantCount()
+            : 0;
+        toast(`Logged in as ${uname} · Role: ${role} · ${tenantCount} tenants loaded`, 'fa-user-shield');
+      });
+    }
+    const helpBtn = document.getElementById('open-product-guide-btn');
+    if (helpBtn) helpBtn.style.display = 'none';
+    const newTenantBtn = document.getElementById('btn-create-tenant');
+    if (newTenantBtn && !newTenantBtn.dataset.wired) {
+      newTenantBtn.dataset.wired = '1';
+      newTenantBtn.addEventListener('click', () => {
+        if (window.RSSuperAdmin && RSSuperAdmin.openCreateTenantModal) RSSuperAdmin.openCreateTenantModal();
+      });
+    }
+    const bulkBtn = document.getElementById('sa-bulk-approve-btn');
+    if (bulkBtn && !bulkBtn.dataset.wired) {
+      bulkBtn.dataset.wired = '1';
+      bulkBtn.addEventListener('click', () => {
+        if (window.RSSuperAdmin && RSSuperAdmin.bulkApproveAllPending) RSSuperAdmin.bulkApproveAllPending();
+      });
+    }
+    const versionPill = document.getElementById('app-version-pill');
+    if (versionPill) versionPill.style.display = 'none';
+    const supportDrop = document.querySelector('.support-dropdown');
+    if (supportDrop) supportDrop.style.display = 'none';
+    const stationChip = document.getElementById('rs-station-chip');
+    if (stationChip) stationChip.style.display = 'none';
+    const tbSearch = document.querySelector('.tb-search');
+    if (tbSearch) tbSearch.style.display = 'none';
   } else {
     // Hide superadmin-only elements
     $$('.superadmin-only').forEach(el => {
