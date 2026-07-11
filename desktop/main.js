@@ -304,32 +304,107 @@ app.whenReady().then(async () => {
         try { printWin.destroy(); } catch (_) {}
       }
     });
-    // ESC/POS raw bytes: write to a simple spool file for bridge tools / future USB
+    // Wave 5 — ESC/POS raw: spool file + Windows RAW share copy when possible
+    const { execFile } = require('child_process');
+    function buildEscPosFromText(text) {
+      const ESC = Buffer.from([0x1b, 0x40]);
+      const body = Buffer.from(String(text || ''), 'utf8');
+      const cut = Buffer.from([0x1d, 0x56, 0x00]);
+      return Buffer.concat([ESC, body, Buffer.from('\n\n\n'), cut]);
+    }
+    function resolvePrinterShare(printerName) {
+      if (!printerName) return null;
+      const n = String(printerName).trim();
+      if (!n) return null;
+      if (n.startsWith('\\\\')) return n;
+      // Local share path used by copy /b
+      return '\\\\localhost\\' + n;
+    }
+    function rawPrintWindows(filePath, printerName) {
+      return new Promise((resolve) => {
+        if (process.platform !== 'win32') {
+          return resolve({ ok: false, error: 'raw print only on Windows' });
+        }
+        const share = resolvePrinterShare(printerName);
+        if (!share) return resolve({ ok: false, error: 'no printer name' });
+        // copy /b sends RAW bytes to the printer share (works for many thermal USB/shared printers)
+        execFile(
+          'cmd.exe',
+          ['/c', 'copy', '/b', filePath, share],
+          { windowsHide: true, timeout: 15000 },
+          (err, stdout, stderr) => {
+            if (err) {
+              // Fallback: PowerShell Out-Printer only works for text, not raw — report error
+              return resolve({
+                ok: false,
+                error: String(err.message || err),
+                stderr: String(stderr || ''),
+                share,
+              });
+            }
+            resolve({ ok: true, mode: 'copy-raw', share, stdout: String(stdout || '') });
+          }
+        );
+      });
+    }
     ipcMain.handle('rs-print-escpos', async (_evt, payload) => {
       try {
         const bytesB64 = payload && payload.base64;
         const text = payload && payload.text;
+        let deviceName = (payload && payload.deviceName) || null;
+        if (!deviceName) {
+          try {
+            const pref = JSON.parse(fs.readFileSync(preferredPrinterPath(), 'utf8'));
+            deviceName = pref && pref.name;
+          } catch (_) {}
+        }
         const spoolDir = path.join(app.getPath('userData'), 'print-spool');
         if (!fs.existsSync(spoolDir)) fs.mkdirSync(spoolDir, { recursive: true });
         const file = path.join(spoolDir, 'job-' + Date.now() + '.bin');
+        let raw;
         if (bytesB64) {
-          fs.writeFileSync(file, Buffer.from(String(bytesB64), 'base64'));
+          raw = Buffer.from(String(bytesB64), 'base64');
         } else if (text) {
-          // Minimal ESC/POS: init + text + feed + cut
-          const ESC = Buffer.from([0x1b, 0x40]);
-          const body = Buffer.from(String(text), 'utf8');
-          const cut = Buffer.from([0x1d, 0x56, 0x00]);
-          fs.writeFileSync(file, Buffer.concat([ESC, body, Buffer.from('\n\n\n'), cut]));
+          raw = buildEscPosFromText(text);
         } else {
           return { ok: false, error: 'no payload' };
         }
-        // Also try HTML silent print of preformatted text as fallback
-        if (text && mainWindow) {
-          const html = `<!doctype html><pre style="font:12px/1.3 monospace;width:280px;white-space:pre-wrap">${String(text)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`;
-          // fire-and-forget via same handler path
+        fs.writeFileSync(file, raw);
+
+        // Prefer RAW to Windows printer share
+        if (deviceName) {
+          const rawRes = await rawPrintWindows(file, deviceName);
+          if (rawRes.ok) {
+            return { ok: true, spool: file, ...rawRes, deviceName };
+          }
+          // fall through to silent HTML
+          console.warn('[print] raw copy failed, HTML silent fallback:', rawRes.error);
         }
-        return { ok: true, spool: file };
+
+        // Silent HTML monospace fallback (always available)
+        const previewText = text || (bytesB64 ? '[binary ESC/POS job]' : '');
+        const html = `<!doctype html><pre style="font:12px/1.3 monospace;width:280px;white-space:pre-wrap;margin:8px">${String(previewText)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`;
+        const printWin = new BrowserWindow({
+          show: false,
+          webPreferences: { offscreen: true, sandbox: true },
+        });
+        try {
+          await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+          await new Promise((r) => setTimeout(r, 200));
+          await new Promise((resolve, reject) => {
+            printWin.webContents.print(
+              { silent: true, printBackground: false, deviceName: deviceName || undefined, margins: { marginType: 'none' } },
+              (success, failureReason) => {
+                if (!success) reject(new Error(failureReason || 'print failed'));
+                else resolve();
+              }
+            );
+          });
+          return { ok: true, spool: file, mode: 'html-silent', deviceName: deviceName || null };
+        } finally {
+          try { printWin.destroy(); } catch (_) {}
+        }
       } catch (e) {
         return { ok: false, error: String(e && e.message || e) };
       }

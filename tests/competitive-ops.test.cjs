@@ -24,7 +24,7 @@ test('competitive-ops.js exists and exposes core APIs', () => {
 test('dashboard loads competitive-ops in critical path', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /competitive-ops\.js|critical\.bundle\.js/);
-  assert.match(html, /v5[01]-20260711-wave/);
+  assert.match(html, /v5[0-9]-20260711-wave/);
 });
 
 test('receipt engine supports thermal preference', () => {
@@ -41,7 +41,7 @@ test('allocateBillNo supports channel series', () => {
 test('service worker caches competitive-ops', () => {
   const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
   assert.match(sw, /competitive-ops\.js/);
-  assert.match(sw, /wave[34]/i);
+  assert.match(sw, /wave[3-5]/i);
 });
 
 test('features-shell has WhatsApp PDF mode setting', () => {
