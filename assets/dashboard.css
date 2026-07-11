@@ -2288,6 +2288,15 @@ body.rs-drawer-dragging {
 /* ============================================================
    SUPER-ADMIN / GATEWAY MONITOR — SAAS SNAPSHOT CARDS
    ============================================================ */
+#super-admin-tab #saas-platform-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+#super-admin-tab .data-table tr.tenant-row:hover td {
+  background: rgba(252, 128, 25, 0.03);
+}
 .saas-snapshot-card {
   background: var(--panel);
   border: 1px solid var(--stroke);
@@ -2298,6 +2307,7 @@ body.rs-drawer-dragging {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 .saas-snapshot-card:hover, .saas-snapshot-card.active-filter {
   border-color: rgba(252,128,25,0.45);

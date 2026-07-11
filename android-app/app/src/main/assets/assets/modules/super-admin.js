@@ -40,6 +40,62 @@
   function $$(sel, r) {
     return Array.from((r || document).querySelectorAll(sel));
   }
+  /** Title-case words for display (keeps short tokens like "BB" alone). */
+  function titleCaseWords(value) {
+    return String(value == null ? '' : value)
+      .trim()
+      .replace(/\s+/g, ' ')
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => {
+        if (w.length <= 2 && w === w.toUpperCase()) return w;
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      })
+      .join(' ');
+  }
+  function formatPlanLabel(code, name) {
+    const PLAN = { starter: 'Starter', growth: 'Growth', enterprise: 'Enterprise', chain: 'Chain' };
+    const c = String(code || '').toLowerCase();
+    if (name && String(name).toLowerCase() !== c) return titleCaseWords(name);
+    return PLAN[c] || titleCaseWords(code || 'Starter') || 'Starter';
+  }
+  /** Account status for staff: approved ≡ Active (one vocabulary with modal). */
+  function formatAccountStatus(status) {
+    const s = String(status || 'active').toLowerCase();
+    const map = {
+      approved: 'Active',
+      active: 'Active',
+      pending: 'Pending',
+      suspended: 'Suspended',
+      trial: 'Trial',
+      past_due: 'Past due',
+      canceled: 'Canceled',
+      cancelled: 'Canceled',
+    };
+    return map[s] || titleCaseWords(s.replace(/_/g, ' '));
+  }
+  function formatDisplayName(name) {
+    return titleCaseWords(name || 'Unknown') || 'Unknown';
+  }
+  function formatOutletType(type) {
+    return titleCaseWords(String(type || 'restaurant').replace(/_/g, ' ')) || 'Restaurant';
+  }
+  function formatDateIN(value) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function formatDateTimeIN(value) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function platformSummaryEl() {
+    return document.querySelector('#super-admin-tab #saas-platform-summary')
+      || document.getElementById('saas-platform-summary');
+  }
 
 let superAdminFilter = 'all';
 let superAdminSearch = '';
@@ -112,22 +168,23 @@ function saasSnapshotCard(title, value, subtitle, iconClass, filterAttr, isActiv
 }
 
 function renderPlatformSummary(tenants = []) {
-  const target = document.getElementById('saas-platform-summary');
+  const target = platformSummaryEl();
   if (!target) return;
   const total = tenants.length;
   const active = tenants.filter(t => t.status === 'approved' || t.status === 'active').length;
   const pending = tenants.filter(t => t.status === 'pending').length;
-  const paidTier = tenants.filter(t => ['growth', 'enterprise'].includes(t.plan_code)).length;
+  const paidTier = tenants.filter(t => ['growth', 'enterprise'].includes(String(t.plan_code || '').toLowerCase())).length;
   const risk = tenants.filter(t => ['past_due', 'canceled'].includes(t.subscription_status)).length;
   const conversion = total ? Math.round((paidTier / total) * 100) : 0;
   const totalMrr = tenants.reduce((sum, t) => sum + (Number(t.mrr) || 0), 0);
   const mrrDisplay = totalMrr > 0 ? rs(totalMrr) : '₹0';
+  const mrrSub = totalMrr > 0 ? `${total} tenants tracked` : 'No billings yet';
   target.innerHTML = [
-    saasSnapshotCard('Workspaces', total, `${active} active outlets`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
-    saasSnapshotCard('Pending Approvals', pending, pending ? 'Requires review' : 'Queue is clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
-    saasSnapshotCard('Conversion Rate', `${conversion}%`, `${paidTier} paid / ${total} total`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
-    saasSnapshotCard('At-Risk Accounts', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk'),
-    saasSnapshotCard('Platform MRR', mrrDisplay, `${total} tenants tracked`, 'fa-solid fa-indian-rupee-sign', 'mrr', superAdminFilter === 'mrr')
+    saasSnapshotCard('Workspaces', total, `${active} active · ${pending} pending`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
+    saasSnapshotCard('Pending', pending, pending ? 'Needs review' : 'Queue clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
+    saasSnapshotCard('Paid plans', `${conversion}%`, `${paidTier} of ${total} on Growth+`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
+    saasSnapshotCard('At risk', risk, 'Past-due or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk'),
+    saasSnapshotCard('Platform MRR', mrrDisplay, mrrSub, 'fa-solid fa-indian-rupee-sign', 'mrr', superAdminFilter === 'mrr')
   ].join('');
 
   target.querySelectorAll('.saas-snapshot-card[data-filter]').forEach(item => {
@@ -239,16 +296,17 @@ function renderTenantTable() {
   }
 
   tbody.innerHTML = filtered.map(t => {
-    const planLabel = t.plan_name || t.plan_code || 'Starter';
+    const planLabel = formatPlanLabel(t.plan_code, t.plan_name);
     const isChain = ['chain','enterprise'].includes((t.plan_code||'').toLowerCase());
     const isGrowth = (t.plan_code||'').toLowerCase() === 'growth';
     const pillCls = isChain ? 'pill-violet' : isGrowth ? 'pill-orange' : '';
     const statusKey = (t.status || 'active').toLowerCase();
     const statusCls = tStatus[statusKey] || 't-active';
-    const statusText = t.status ? (t.status.charAt(0).toUpperCase() + t.status.slice(1).replace(/_/g,' ')) : 'Active';
-    const joined = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '-';
-    const mrr = t.mrr || 0;
-    const name = t.name || t.tenant_name || t.slug || 'Unknown';
+    const statusText = formatAccountStatus(t.status || 'active');
+    const joined = formatDateIN(t.created_at);
+    const mrr = Number(t.mrr) || 0;
+    const rawName = t.name || t.tenant_name || t.slug || 'Unknown';
+    const name = formatDisplayName(rawName);
     const slug = t.slug || t.tenant_slug || '';
     const tenantId = getTenantRowId(t);
     const selected = tenantId && selectedTenantIds.has(tenantId);
@@ -266,36 +324,40 @@ function renderTenantTable() {
       ? `<button class="icon-act open-tenant-dashboard-btn" title="Open workspace dashboard" data-tid="${_e(t.id||'')}" style="font-size:13px;color:var(--orange)"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>`
       : '';
     const seedBtn = !isPending && !isSuspended
-      ? `<button class="icon-act quick-seed-btn" title="Load demo data (one click)" data-tid="${_e(t.id||'')}" data-tname="${_e(name)}" style="font-size:13px;color:#16a34a"><i class="fa-solid fa-seedling"></i></button>`
+      ? `<button class="icon-act quick-seed-btn" title="Load demo data (one click)" data-tid="${_e(t.id||'')}" data-tname="${_e(rawName)}" style="font-size:13px;color:#16a34a"><i class="fa-solid fa-seedling"></i></button>`
       : '';
     // Renews-on (paid-until) cell with colour: red=expired, amber=<=7 days, green=fine.
     const rawEnd = t.subscription_current_period_end;
     let renewsCell;
     if (!rawEnd) {
-      renewsCell = '<span style="color:var(--text-mute)">—</span>';
+      renewsCell = '<span style="color:var(--text-mute)" title="No renewal date set">—</span>';
     } else {
       const end = new Date(rawEnd);
       const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86400000);
-      const dateStr = isNaN(end.getTime()) ? '—' : end.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+      const dateStr = formatDateIN(rawEnd);
       const color = daysLeft < 0 ? '#dc2626' : (daysLeft <= 7 ? '#d97706' : '#16a34a');
       const label = daysLeft < 0 ? (dateStr + ' (expired)') : (daysLeft <= 7 ? (dateStr + ' (' + daysLeft + 'd)') : dateStr);
       renewsCell = `<span style="color:${color};font-weight:600;white-space:nowrap">${_e(label)}</span>`;
     }
-    return `<tr class="${selected ? 'tenant-row-selected' : ''}">
-      <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${colorAt(name.length)}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
-      <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
-      <td class="td-strong">${mrr ? rs(mrr) : '--'}</td>
+    const mrrCell = mrr > 0
+      ? rs(mrr)
+      : '<span style="color:var(--text-mute)" title="No recurring revenue recorded">₹0</span>';
+    // Actions order: Manage · Open · Seed · Suspend (primary first)
+    return `<tr class="tenant-row ${selected ? 'tenant-row-selected' : ''}" data-tid="${_e(tenantId)}" style="cursor:pointer">
+      <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${colorAt(rawName.length)}">${_e(initials(rawName))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
+      <td><span class="pill ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
+      <td class="td-strong">${mrrCell}</td>
       <td>${_e(t.outlet_count || 1)}</td>
       <td>${_e(joined)}</td>
       <td><span class="tenant-status ${_e(statusCls)}">${_e(statusText)}</span></td>
       <td>${renewsCell}</td>
       <td>
-        <div class="row-actions" style="gap:5px">
+        <div class="row-actions" style="gap:5px" onclick="event.stopPropagation()">
           ${approveBtn}
-          ${suspendBtn}
-          ${seedBtn}
-          ${dashboardBtn}
           <button class="icon-act manage-tenant-btn" title="Manage workspace" data-tid="${_e(t.id||'')}" style="font-size:13px"><i class="fa-solid fa-gear"></i></button>
+          ${dashboardBtn}
+          ${seedBtn}
+          ${suspendBtn}
         </div>
       </td>
     </tr>`;
@@ -425,10 +487,21 @@ function renderTenantTable() {
   tbody.querySelectorAll('.manage-tenant-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const tenantId = btn.getAttribute('data-tid');
       const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
       if (tenant) openTenantManageModal(tenant);
       else toast('Tenant details not found.', 'fa-circle-exclamation');
+    });
+  });
+
+  // Click row (outside actions) to open manage modal
+  tbody.querySelectorAll('tr.tenant-row[data-tid]').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('input, button, a, .row-actions')) return;
+      const tenantId = row.getAttribute('data-tid');
+      const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
+      if (tenant) openTenantManageModal(tenant);
     });
   });
 }
@@ -874,12 +947,18 @@ function openTenantManageModal(tenant) {
       tenantIdEl.setAttribute('data-slug', tenant.slug || '');
     }
 
-    const displayName = (tenant.name || 'Unknown') + ` (${(tenant.outlet_type || 'CAFE').toUpperCase()})`;
+    const rawName = tenant.name || tenant.tenant_name || 'Unknown';
+    const displayName = formatDisplayName(rawName);
     if (tenantNameEl) tenantNameEl.textContent = displayName;
-    if (avatarEl) avatarEl.textContent = (tenant.name || 'U').charAt(0).toUpperCase();
+    const typeChip = document.getElementById('manage-outlet-type');
+    if (typeChip) {
+      typeChip.textContent = formatOutletType(tenant.outlet_type || tenant.business_type || 'restaurant');
+      typeChip.style.display = '';
+    }
+    if (avatarEl) avatarEl.textContent = initials(rawName) || 'U';
 
     if (statusBadge) {
-      const s = tenant.status || 'pending';
+      const s = String(tenant.status || 'pending').toLowerCase();
       const badgeMap = {
         approved: { dot: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', label: 'Active' },
         active: { dot: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', label: 'Active' },

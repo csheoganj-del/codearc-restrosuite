@@ -90,7 +90,7 @@ test.describe('Guest QR UX (public)', () => {
         failed.push(r.status() + ' ' + r.url());
       }
     });
-    await page.goto('/dashboard.html?appv=v82-20260711-super-admin');
+    await page.goto('/dashboard.html?appv=v83-20260711-sa-polish');
     await page.waitForTimeout(2000);
     expect(failed, failed.join('\n')).toEqual([]);
   });

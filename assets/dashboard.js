@@ -2038,6 +2038,12 @@
       // 15. Hide Support dropdown — super-admin doesn't need client support links
       const supportDrop = document.querySelector('.support-dropdown');
       if (supportDrop) supportDrop.style.display = 'none';
+      // 19. Hide POS station chip (ST-xxxx) — irrelevant on platform console
+      const stationChip = document.getElementById('rs-station-chip');
+      if (stationChip) stationChip.style.display = 'none';
+      // 20. Prefer one search: hide global topbar search; table search is enough
+      const tbSearch = document.querySelector('.tb-search');
+      if (tbSearch) tbSearch.style.display = 'none';
     }, 300);
   } else {
     // Hide superadmin-only elements

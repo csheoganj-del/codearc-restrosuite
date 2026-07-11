@@ -11,10 +11,10 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-test('v82 asset version and SW cache present', () => {
+test('v83 asset version and SW cache present', () => {
   const html = read('dashboard.html');
   const sw = read('service-worker.js');
-  assert.match(html, /v82-20260711-super-admin/);
+  assert.match(html, /v83-20260711-sa-polish/);
   assert.match(sw, /restrosuite-shell-v20260711/);
 });
 
@@ -24,6 +24,23 @@ test('super-admin defines avatar colors locally (no bare avatarColors)', () => {
   assert.match(sa, /const avatarColors = getAvatarColors/);
   // Must not reference undeclared free variable from old dashboard closure
   assert.doesNotMatch(sa, /\$\{avatarColors\[name\.length%avatarColors\.length\]\}/);
+});
+
+test('super-admin polish: Active status, plan title case, platform summary selector', () => {
+  const sa = read('assets/modules/super-admin.js');
+  const html = read('dashboard.html');
+  const gw = read('assets/modules/gateway-monitor.js');
+  assert.match(sa, /function formatAccountStatus/);
+  assert.match(sa, /approved:\s*'Active'/);
+  assert.match(sa, /function formatPlanLabel/);
+  assert.match(sa, /platformSummaryEl|super-admin-tab #saas-platform-summary/);
+  assert.match(sa, /formatDisplayName|titleCaseWords/);
+  assert.match(html, /id="manage-outlet-type"/);
+  // Only one live platform summary host (no hidden growth-hub duplicate)
+  const summaryIds = (html.match(/id="saas-platform-summary"/g) || []).length;
+  assert.equal(summaryIds, 1);
+  assert.match(gw, /humanizeGatewayEvent/);
+  assert.match(gw, /friendlyErrorMessage/);
 });
 
 test('cashier path: tip promo covers notes cash drawer', () => {

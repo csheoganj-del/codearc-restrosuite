@@ -1,5 +1,16 @@
 # RestroSuite release notes
 
+## v83 (2026-07-11) — Super-Admin & Gateway polish
+
+- **Status labels**: table shows Active (not “Approved”) matching the manage modal
+- **Plan labels**: Starter / Growth / Enterprise title case
+- **Display names**: title-case outlet names; outlet type as a soft chip (not `(RESTAURANT)`)
+- **Platform summary strip** fixed (was rendering into a hidden Growth Hub node)
+- **MRR empty state**: `₹0` instead of `--`
+- **Actions**: Manage · Open · Seed · Suspend; click row to manage
+- Hide POS **station chip** + duplicate topbar search on super-admin
+- **Gateway**: human-readable live log, friendlier incidents, consistent dates, KPI n/a empty states
+
 ## v82 (2026-07-11) — Super-admin tenant table fix
 
 - Fix **Tenant directory** crash: `avatarColors is not defined` after Wave 9 code-split

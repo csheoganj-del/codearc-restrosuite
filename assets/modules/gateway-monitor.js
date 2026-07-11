@@ -24,7 +24,125 @@
     if (!value) return 'Unknown time';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'Unknown time';
-    return date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function formatDateTimeIN(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function stripUuid(text) {
+    return String(text || '').replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      'workspace'
+    );
+  }
+
+  function humanizeGatewayEvent(event, details) {
+    const ev = String(event || '').toUpperCase();
+    const raw = stripUuid(details?.message || details?.error || details?.reason || '');
+    const titles = {
+      CONNECTED: 'WhatsApp connected',
+      DISCONNECTED: 'Connection closed',
+      SESSION_SAVED: 'Session backup saved',
+      ALERT_SENT: 'Alert sent',
+      APPROVAL_WHATSAPP_SENT: 'Approval sent via WhatsApp',
+      APPROVAL_EMAIL_SKIPPED: 'Approval email skipped',
+      APPROVAL_RECEIVED: 'Approval received',
+      GATEWAY_SEND: 'Message sent',
+      MESSAGE_SENT: 'Message sent',
+      QR: 'Waiting for QR scan',
+      READY: 'Gateway ready',
+    };
+    let title = titles[ev] || ev.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+    let detail = raw;
+    // Soften noisy stream errors
+    if (/stream errored/i.test(detail)) {
+      title = 'Connection interrupted';
+      detail = 'WhatsApp stream dropped — reconnecting automatically when possible.';
+    } else if (/session backup/i.test(detail) || /session saved/i.test(detail)) {
+      const kb = detail.match(/([\d.]+)\s*KB/i);
+      detail = kb ? `Backup size ${kb[1]} KB` : 'Session snapshot stored';
+    } else if (detail.length > 90) {
+      detail = detail.slice(0, 87) + '…';
+    }
+    const technical = `[${ev}] ${raw || 'System event'}`;
+    return { title, detail, technical };
+  }
+
+  function friendlyErrorMessage(msg) {
+    const m = String(msg || '').trim();
+    if (!m || /^unknown/i.test(m)) return 'Application error (no message captured)';
+    if (m.length > 140) return m.slice(0, 137) + '…';
+    return m;
+  }
+
+  function shortPath(urlPath) {
+    if (!urlPath) return '';
+    const s = String(urlPath);
+    if (s.includes('#')) return '#' + s.split('#').pop();
+    try {
+      const u = new URL(s, typeof location !== 'undefined' ? location.origin : 'https://local');
+      return (u.pathname + u.hash) || s;
+    } catch (_) {
+      return s.length > 48 ? s.slice(0, 45) + '…' : s;
+    }
+  }
+
+  function friendlyTenantLabel(slug) {
+    if (!slug) return 'Unknown workspace';
+    return String(slug)
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function updateGatewayKpis(logs, statusData) {
+    const sentEl = document.getElementById('gw-sent-count');
+    const rateEl = document.getElementById('gw-delivery-rate');
+    const latEl = document.getElementById('gw-latency');
+    const qEl = document.getElementById('gw-queued');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const list = Array.isArray(logs) ? logs : [];
+    const sendLike = list.filter((log) => {
+      const ev = String(log.event || '').toUpperCase();
+      const t = log.created_at ? new Date(log.created_at) : null;
+      if (!t || Number.isNaN(t.getTime()) || t < today) return false;
+      return /SEND|SENT|ALERT|APPROVAL_WHATSAPP|DISPATCH|MESSAGE/.test(ev);
+    });
+    const ok = sendLike.filter((l) => String(l.status || '').toLowerCase() === 'ok' || !l.status).length;
+    const fail = sendLike.filter((l) => /err|fail|warn/i.test(String(l.status || ''))).length;
+    if (sentEl) sentEl.textContent = String(sendLike.length);
+    if (rateEl) {
+      if (sendLike.length === 0) rateEl.textContent = 'n/a';
+      else {
+        const pct = Math.round((ok / Math.max(1, ok + fail)) * 100);
+        rateEl.textContent = pct + '%';
+      }
+    }
+    if (latEl) {
+      const lat = statusData && (statusData.avgLatencyMs != null ? statusData.avgLatencyMs : statusData.latency_ms);
+      latEl.textContent = lat != null && Number(lat) >= 0 ? Math.round(Number(lat)) + ' ms' : 'n/a';
+    }
+    if (qEl) {
+      const q = statusData && (statusData.queued != null ? statusData.queued : statusData.queue_length);
+      qEl.textContent = q != null ? String(q) : '0';
+    }
   }
 
   function renderIncidentEmpty(title, detail, icon) {
@@ -84,8 +202,14 @@ async function pollSuperAdminGateway() {
   try {
     const data = await RS_API.admin({ action: 'gateway_status' });
     if (data && !data.error) {
+      const statusLabelEl = document.getElementById('saas-gateway-status-label');
       if (statusBadge) {
-        statusBadge.textContent = data.status ? data.status.toUpperCase() : 'UNKNOWN';
+        const st = String(data.status || 'unknown').toLowerCase();
+        const pretty = st === 'ready' ? 'Ready' : st === 'qr' ? 'Scan QR' : st === 'connecting' ? 'Connecting' : (st.charAt(0).toUpperCase() + st.slice(1));
+        statusBadge.textContent = pretty;
+        if (statusLabelEl) {
+          statusLabelEl.textContent = st === 'ready' ? 'Online' : pretty;
+        }
         if (data.status === 'ready') {
           statusBadge.className = 'pill pill-green';
           statusBadge.style.background = '';
@@ -116,7 +240,7 @@ async function pollSuperAdminGateway() {
           if (qrContainer) qrContainer.style.display = 'flex';
           if (qrSpinner) {
             qrSpinner.style.display = 'block';
-            qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>Connecting (Status: ${data.status.toUpperCase()})`;
+            qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>Connecting (${escHtml(pretty)})`;
           }
           if (qrImg) qrImg.style.display = 'none';
         }
@@ -124,19 +248,23 @@ async function pollSuperAdminGateway() {
       if (phoneEl) phoneEl.textContent = data.number ? `+${data.number}` : 'Not Linked';
       if (sessionEl) {
         if (data.sessionSavedAt) {
-          sessionEl.textContent = new Date(data.sessionSavedAt).toLocaleString('en-IN');
+          sessionEl.textContent = formatDateTimeIN(data.sessionSavedAt);
         } else {
           sessionEl.textContent = 'Never';
         }
       }
+      // stash for KPI use after logs load
+      global.__rsGwLastStatus = data;
     } else {
       throw new Error(data?.error || 'Failed to fetch status');
     }
   } catch(err) {
     if (statusBadge) {
-      statusBadge.textContent = 'OFFLINE';
+      statusBadge.textContent = 'Offline';
       statusBadge.className = 'pill pill-red';
     }
+    const statusLabelEl = document.getElementById('saas-gateway-status-label');
+    if (statusLabelEl) statusLabelEl.textContent = 'Offline';
     if (phoneEl) phoneEl.textContent = 'Unknown';
     if (sessionEl) sessionEl.textContent = 'Unknown';
     if (connectedView) connectedView.style.display = 'none';
@@ -148,20 +276,32 @@ async function pollSuperAdminGateway() {
     if (qrImg) qrImg.style.display = 'none';
   }
 
-  // 2. Fetch Gateway Debug-Logs
+  // 2. Fetch Gateway Debug-Logs (human-readable primary, technical in title)
   try {
     const data = await RS_API.admin({ action: 'gateway_logs' });
     if (data && !data.error) {
-      const logs = (data.logs || []).slice(0, 15);
+      const logs = (data.logs || []).slice(0, 20);
+      updateGatewayKpis(logs, global.__rsGwLastStatus || null);
       if (logsContainer) {
         if (logs.length === 0) {
-          logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent dispatch logs found.</div>';
+          logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #9CA3AF;">No recent gateway activity.</div>';
         } else {
           logsContainer.innerHTML = logs.map(log => {
             const logDate = log.created_at ? new Date(log.created_at) : new Date();
-            const timeStr = logDate.toTimeString().slice(0, 8);
-            const cls = log.status === 'ok' ? 'ti' : (log.status === 'warning' ? 'tw' : 'te');
-            return `<div class="tl"><span class="tt">${timeStr}</span><span class="${cls}">[${log.event.toUpperCase()}] ${escHtml(log.details?.message || log.details?.error || 'System event')}</span></div>`;
+            const timeStr = Number.isNaN(logDate.getTime())
+              ? '--:--:--'
+              : logDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const st = String(log.status || '').toLowerCase();
+            const hum = humanizeGatewayEvent(log.event, log.details || {});
+            const cls = st === 'ok' || st === 'success' || !st
+              ? 'ti'
+              : (st === 'warning' || st === 'warn' ? 'tw' : 'te');
+            // Soften disconnect noise to warning tone when humanized
+            const tone = /interrupt|closed|disconnect/i.test(hum.title) ? 'tw' : cls;
+            const detailHtml = hum.detail
+              ? ` <span style="opacity:.75">${escHtml(hum.detail)}</span>`
+              : '';
+            return `<div class="tl" title="${escHtml(hum.technical)}"><span class="tt">${escHtml(timeStr)}</span><span class="${tone}"><strong>${escHtml(hum.title)}</strong>${detailHtml}</span></div>`;
           }).join('');
           logsContainer.scrollTop = 0;
         }
@@ -174,6 +314,7 @@ async function pollSuperAdminGateway() {
       const msg = escHtml(err.message || 'Gateway request failed');
       logsContainer.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--red);"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>Could not load gateway logs: ${msg}</div>`;
     }
+    updateGatewayKpis([], global.__rsGwLastStatus || null);
   }
 }
 
@@ -209,17 +350,24 @@ async function loadAppIncidents() {
       return;
     }
     list.innerHTML = reports.map((report) => {
-      const severity = String(report.severity || 'error');
-      const statusLabel = String(report.status || 'open');
-      const stack = report.stack_trace ? `<code>${escHtml(report.stack_trace)}</code>` : '';
+      const severity = String(report.severity || 'error').toLowerCase();
+      const statusLabel = String(report.status || 'open').toLowerCase();
+      const msg = friendlyErrorMessage(report.error_message);
+      const tenant = friendlyTenantLabel(report.tenant_slug);
+      const path = shortPath(report.url_path || report.page_url || '');
+      const source = report.source || 'dashboard';
+      const metaLine = [tenant, source, path].filter(Boolean).join(' · ');
+      const stack = report.stack_trace
+        ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px;color:var(--text-mute)">Technical details</summary><code style="display:block;margin-top:6px;font-size:10px;white-space:pre-wrap;max-height:120px;overflow:auto">${escHtml(String(report.stack_trace).slice(0, 1200))}</code></details>`
+        : '';
       const resolveButton = statusLabel === 'open'
         ? `<button type="button" class="staff-secondary-btn app-incident-resolve-btn" data-report-id="${escHtml(report.id)}">Resolve</button>`
         : '';
       return `
         <article class="app-incident-card">
           <div style="flex: 1; min-width: 0;">
-            <strong>${escHtml(report.error_message || 'Unknown application error')}</strong>
-            <span>${escHtml(report.tenant_slug || 'unknown workspace')} · ${escHtml(report.source || 'dashboard')} · ${escHtml(report.url_path || 'unknown path')}</span>
+            <strong>${escHtml(msg)}</strong>
+            <span>${escHtml(metaLine)}</span>
             ${stack}
             <div class="app-incident-meta">
               <span class="app-incident-pill ${escHtml(severity)}">${escHtml(severity)}</span>
