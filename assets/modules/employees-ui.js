@@ -222,7 +222,7 @@
               const name = u.display_name || u.username || 'Staff';
               const role = u.role || 'staff';
               return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--stroke);border-radius:10px;background:var(--glass)">
-                <div class="emp-av" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:${avatarColors_[i % avatarColors.length]}">${_e(initials(name))}</div>
+                <div class="emp-av" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:${avatarColors_[i % avatarColors_.length]}">${_e(initials(name))}</div>
                 <div style="flex:1;min-width:0">
                   <div style="font-weight:700;font-size:13.5px">${_e(name)}</div>
                   <div style="font-size:11.5px;color:var(--text-mute)">${_e(u.username || '')} · ${_e(role)}</div>

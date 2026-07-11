@@ -170,7 +170,12 @@ function renderTenantTable() {
   const tbody = $('#tenant-table-body');
   if (!tbody) return;
   pruneTenantSelection();
+  // Local colors only — never rely on dashboard closure (module is strict IIFE).
   const avatarColors = getAvatarColors();
+  const colorAt = (seed) => {
+    const n = avatarColors.length || 1;
+    return avatarColors[Math.abs(Number(seed) || 0) % n];
+  };
   superAdminSearch = readVisibleTenantSearch();
   syncTenantSearchInputs(superAdminSearch);
 
@@ -277,7 +282,7 @@ function renderTenantTable() {
       renewsCell = `<span style="color:${color};font-weight:600;white-space:nowrap">${_e(label)}</span>`;
     }
     return `<tr class="${selected ? 'tenant-row-selected' : ''}">
-      <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
+      <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${colorAt(name.length)}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
       <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
       <td class="td-strong">${mrr ? rs(mrr) : '--'}</td>
       <td>${_e(t.outlet_count || 1)}</td>

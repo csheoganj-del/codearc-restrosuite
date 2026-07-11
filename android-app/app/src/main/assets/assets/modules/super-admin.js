@@ -48,6 +48,25 @@ let _cachedTenants = [];
 let selectedTenantIds = new Set();
 let saasGatewayPollingInterval = null;
 
+function tenantSearchInputs() {
+  return [
+    document.querySelector('.tb-search input'),
+    document.getElementById('tenant-search-input'),
+  ].filter(Boolean);
+}
+
+function syncTenantSearchInputs(value) {
+  tenantSearchInputs().forEach(input => {
+    if (input.value !== value) input.value = value;
+  });
+}
+
+function readVisibleTenantSearch() {
+  const inline = document.getElementById('tenant-search-input');
+  const topbar = document.querySelector('.tb-search input');
+  return String((inline && inline.value) || (topbar && topbar.value) || '');
+}
+
 function escHtml(str) {
   if (!str) return '';
   return String(str)
@@ -151,7 +170,14 @@ function renderTenantTable() {
   const tbody = $('#tenant-table-body');
   if (!tbody) return;
   pruneTenantSelection();
+  // Local colors only — never rely on dashboard closure (module is strict IIFE).
   const avatarColors = getAvatarColors();
+  const colorAt = (seed) => {
+    const n = avatarColors.length || 1;
+    return avatarColors[Math.abs(Number(seed) || 0) % n];
+  };
+  superAdminSearch = readVisibleTenantSearch();
+  syncTenantSearchInputs(superAdminSearch);
 
   let filtered = _cachedTenants.slice();
 
@@ -256,7 +282,7 @@ function renderTenantTable() {
       renewsCell = `<span style="color:${color};font-weight:600;white-space:nowrap">${_e(label)}</span>`;
     }
     return `<tr class="${selected ? 'tenant-row-selected' : ''}">
-      <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${avatarColors[name.length%avatarColors.length]}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
+      <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${colorAt(name.length)}">${_e(initials(name))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
       <td><span class="pill ${_e(planLabel.toLowerCase())} ${_e(pillCls)}" style="padding:3px 9px">${_e(planLabel)}</span></td>
       <td class="td-strong">${mrr ? rs(mrr) : '--'}</td>
       <td>${_e(t.outlet_count || 1)}</td>
@@ -430,6 +456,8 @@ function startSuperPolling() {
 async function renderSuper() {
   const tbody = $('#tenant-table-body');
   if (!tbody) return;
+  superAdminSearch = readVisibleTenantSearch();
+  syncTenantSearchInputs(superAdminSearch);
   tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
   renderPlatformSummary([]);
   try {
@@ -1326,6 +1354,7 @@ function initTenantManageModalEvents() {
     openPlanPricingEditor,
     setSearch(q) {
       superAdminSearch = String(q || '');
+      syncTenantSearchInputs(superAdminSearch);
       if (typeof renderTenantTable === 'function') renderTenantTable();
     },
     getSearch() {
