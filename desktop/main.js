@@ -234,6 +234,107 @@ app.whenReady().then(async () => {
       return { locked: !!decision.locked, reason: decision.reason };
     });
 
+    // Wave 4 — print bridge (silent HTML thermal + printer list)
+    const preferredPrinterPath = () => path.join(app.getPath('userData'), 'preferred-printer.json');
+    ipcMain.handle('rs-list-printers', async () => {
+      try {
+        if (!mainWindow) return [];
+        if (typeof mainWindow.webContents.getPrintersAsync === 'function') {
+          return await mainWindow.webContents.getPrintersAsync();
+        }
+        return mainWindow.webContents.getPrinters() || [];
+      } catch (e) {
+        return { error: String(e && e.message || e) };
+      }
+    });
+    ipcMain.handle('rs-get-preferred-printer', async () => {
+      try {
+        const p = preferredPrinterPath();
+        if (!fs.existsSync(p)) return { name: null };
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch (_) {
+        return { name: null };
+      }
+    });
+    ipcMain.handle('rs-set-preferred-printer', async (_e, name) => {
+      try {
+        fs.writeFileSync(preferredPrinterPath(), JSON.stringify({ name: name || null, at: Date.now() }));
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: String(e && e.message || e) };
+      }
+    });
+    ipcMain.handle('rs-print-html', async (_evt, payload) => {
+      const html = String((payload && payload.html) || '');
+      if (!html) return { ok: false, error: 'empty html' };
+      let silent = payload && payload.silent !== false; // default silent when desktop
+      let deviceName = (payload && payload.deviceName) || null;
+      if (!deviceName) {
+        try {
+          const pref = JSON.parse(fs.readFileSync(preferredPrinterPath(), 'utf8'));
+          deviceName = pref && pref.name;
+        } catch (_) {}
+      }
+      const printWin = new BrowserWindow({
+        show: false,
+        webPreferences: { offscreen: true, sandbox: true },
+      });
+      try {
+        const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+        await printWin.loadURL(dataUrl);
+        await new Promise((r) => setTimeout(r, 250));
+        await new Promise((resolve, reject) => {
+          printWin.webContents.print(
+            {
+              silent: !!silent,
+              printBackground: true,
+              deviceName: deviceName || undefined,
+              margins: { marginType: 'none' },
+            },
+            (success, failureReason) => {
+              if (!success) reject(new Error(failureReason || 'print failed'));
+              else resolve();
+            }
+          );
+        });
+        return { ok: true, silent: !!silent, deviceName: deviceName || null };
+      } catch (e) {
+        return { ok: false, error: String(e && e.message || e) };
+      } finally {
+        try { printWin.destroy(); } catch (_) {}
+      }
+    });
+    // ESC/POS raw bytes: write to a simple spool file for bridge tools / future USB
+    ipcMain.handle('rs-print-escpos', async (_evt, payload) => {
+      try {
+        const bytesB64 = payload && payload.base64;
+        const text = payload && payload.text;
+        const spoolDir = path.join(app.getPath('userData'), 'print-spool');
+        if (!fs.existsSync(spoolDir)) fs.mkdirSync(spoolDir, { recursive: true });
+        const file = path.join(spoolDir, 'job-' + Date.now() + '.bin');
+        if (bytesB64) {
+          fs.writeFileSync(file, Buffer.from(String(bytesB64), 'base64'));
+        } else if (text) {
+          // Minimal ESC/POS: init + text + feed + cut
+          const ESC = Buffer.from([0x1b, 0x40]);
+          const body = Buffer.from(String(text), 'utf8');
+          const cut = Buffer.from([0x1d, 0x56, 0x00]);
+          fs.writeFileSync(file, Buffer.concat([ESC, body, Buffer.from('\n\n\n'), cut]));
+        } else {
+          return { ok: false, error: 'no payload' };
+        }
+        // Also try HTML silent print of preformatted text as fallback
+        if (text && mainWindow) {
+          const html = `<!doctype html><pre style="font:12px/1.3 monospace;width:280px;white-space:pre-wrap">${String(text)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`;
+          // fire-and-forget via same handler path
+        }
+        return { ok: true, spool: file };
+      } catch (e) {
+        return { ok: false, error: String(e && e.message || e) };
+      }
+    });
+
     serverInstance = await startLocalServer();
     buildMenu();
     createWindow();

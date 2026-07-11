@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('RS_DESKTOP', {
   },
   // Convenience mirror of navigator.onLine for any UI that wants it.
   isOnline: () => (typeof navigator !== 'undefined' ? navigator.onLine : true),
+  // Wave 4 — silent / thermal print bridge
+  listPrinters: () => ipcRenderer.invoke('rs-list-printers'),
+  printHtml: (html, opts) => ipcRenderer.invoke('rs-print-html', { html, ...(opts || {}) }),
+  printEscPos: (payload) => ipcRenderer.invoke('rs-print-escpos', payload || {}),
+  getPreferredPrinter: () => ipcRenderer.invoke('rs-get-preferred-printer'),
+  setPreferredPrinter: (name) => ipcRenderer.invoke('rs-set-preferred-printer', name),
 });
 
 // License bridge: the renderer's license-guard.js calls window.rsDesktop.storeLease
@@ -29,4 +35,6 @@ contextBridge.exposeInMainWorld('RS_DESKTOP', {
 contextBridge.exposeInMainWorld('rsDesktop', {
   storeLease: (leaseToken, serverTimeMs) => ipcRenderer.invoke('rs-license-store', leaseToken, serverTimeMs),
   recheckLicense: () => ipcRenderer.invoke('rs-license-recheck'),
+  listPrinters: () => ipcRenderer.invoke('rs-list-printers'),
+  printHtml: (html, opts) => ipcRenderer.invoke('rs-print-html', { html, ...(opts || {}) }),
 });

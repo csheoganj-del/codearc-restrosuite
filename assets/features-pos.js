@@ -214,6 +214,16 @@
         }
       }
 
+      // Wave 4: desktop silent print / shared print bridge
+      if (window.RSPrintBridge && typeof window.RSPrintBridge.printHtml === 'function') {
+        window.RSPrintBridge.printHtml(innerHTML, title || 'Print').catch(function () {});
+        return;
+      }
+      if (window.RS_DESKTOP && typeof window.RS_DESKTOP.printHtml === 'function') {
+        window.RS_DESKTOP.printHtml(fullHtml, { silent: true }).catch(function () {});
+        return;
+      }
+
       const f = document.createElement('iframe');
       f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
       document.body.appendChild(f);
