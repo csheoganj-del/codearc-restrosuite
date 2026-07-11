@@ -156,6 +156,20 @@ test('waste log deducts inventory stock', () => {
   assert.match(html, /data-inv-tab="waste"|Waste log/);
 });
 
+test('guest QR UX: one-tap menu filters notes service lang', () => {
+  const order = fs.readFileSync(path.join(root, 'order.html'), 'utf8');
+  const portal = fs.readFileSync(path.join(root, 'qr-order.html'), 'utf8');
+  const growth = fs.readFileSync(path.join(root, 'assets/features-growth.js'), 'utf8');
+  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(order, /dietF|data-diet|sold-out|editLineNote|svc-dock|lang-toggle/);
+  assert.match(order, /notes:\s*c\.note|note:\s*c\.note/);
+  assert.match(portal, /forceHub|goMenu|menuUrl/);
+  assert.match(growth, /order\.html\?tenant=/);
+  assert.match(dash, /ROLE_HOME_TAB/);
+  assert.match(html, /cart-more-opts|Discount · Tip · Promo/);
+});
+
 test('guest covers pax on cart bill KOT Z', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   const posUi = fs.readFileSync(path.join(root, 'assets/modules/pos-ui.js'), 'utf8');

@@ -77,12 +77,13 @@
     }
 
     .brand-logo {
-      font-family: 'Shadows Into Light', cursive;
-      font-size: 26px;
-      font-weight: 800;
-      color: var(--brand);
-      letter-spacing: 1px;
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.02em;
       margin-bottom: 4px;
+      line-height: 1.25;
     }
 
     .outlet-name {
@@ -834,8 +835,9 @@
         apiCall('list_menu')
           .then(res => {
             if (res.tenantName) {
-              document.getElementById('brand-logo').textContent = res.tenantName.toUpperCase();
-              document.title = `${res.tenantName} - Dining Portal`;
+              document.getElementById('brand-logo').textContent = res.tenantName;
+              document.getElementById('outlet-name').textContent = 'Table service';
+              document.title = res.tenantName + ' · Table';
             }
             if (res.upiVpa) {
               upiVpaAddress = res.upiVpa;
@@ -849,6 +851,23 @@
           .catch(err => console.error("Branding failed to fetch:", err));
       }
       
+      // One-tap CX: table QR lands on menu unless guest explicitly opens the hub
+      // (?hub=1) for track / pay / service. Staff waiter mode always stays optional.
+      const forceHub = params.get('hub') === '1' || params.get('track') === '1' || params.get('pay') === '1';
+      function menuUrl(token) {
+        const q = new URLSearchParams();
+        q.set('tenant', slug);
+        if (table) q.set('table', table);
+        if (token) q.set('token', token);
+        if (waiterMode) q.set('mode', 'waiter');
+        return 'order.html?' + q.toString();
+      }
+      function goMenu(token) {
+        if (forceHub || waiterMode) return false;
+        window.location.replace(menuUrl(token));
+        return true;
+      }
+
       configPromise.then(() => {
         initBranding();
         
@@ -857,7 +876,7 @@
           if (!staffToken) {
             showStaffLoginOverlay();
           } else {
-            document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}&mode=waiter`;
+            document.getElementById('menu-btn').href = menuUrl();
           }
         } else {
           // Verify active table session
@@ -873,8 +892,15 @@
                     params.set('token', res.session_token);
                     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
                   }
-                  document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}&token=${res.session_token}`;
+                  document.getElementById('menu-btn').href = menuUrl(res.session_token);
+                  if (goMenu(res.session_token)) return;
                   showSessionStatusOverlay('active');
+                  if (params.get('track') === '1') {
+                    setTimeout(function(){ try { openModal('tracker-modal'); } catch(e){} }, 200);
+                  }
+                  if (params.get('pay') === '1') {
+                    setTimeout(function(){ try { openModal('checkout-modal'); } catch(e){} }, 200);
+                  }
                 }
               } else {
                 showSessionStatusOverlay('closed');
@@ -885,6 +911,9 @@
               // In local dev/fallback, let it go if Supabase URL is not present, otherwise block
               if (SU) {
                 showSessionStatusOverlay('closed');
+              } else {
+                document.getElementById('menu-btn').href = menuUrl();
+                goMenu();
               }
             });
         }
