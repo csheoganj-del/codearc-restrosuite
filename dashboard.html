@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v72-20260711-pin-hh';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v73-20260711-reorder';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -699,6 +699,7 @@
         <div class="banner warn" id="inv-banner">
           <i class="fa-solid fa-triangle-exclamation"></i>
           <div><b><span id="inv-low-count">0</span> ingredients</b> are below their minimum stock level and need reordering.</div>
+          <button class="btn btn-ghost btn-sm banner-cta" id="btn-export-low-stock" style="margin-right:6px"><i class="fa-solid fa-file-csv"></i> Low-stock CSV</button>
           <button class="btn btn-primary btn-sm banner-cta" id="btn-auto-draft-pos"><i class="fa-solid fa-truck"></i> Auto-draft POs</button>
         </div>
         <div class="toolbar-row">
@@ -708,6 +709,7 @@
             <button data-inv-tab="suppliers">Suppliers</button>
           </div>
           <div class="grow"></div>
+          <button class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
           <button class="btn btn-ghost btn-sm" id="btn-download-inventory-template"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
           <button class="btn btn-ghost btn-sm" id="btn-import-inventory"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
           <button class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>

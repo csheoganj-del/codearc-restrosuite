@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v73 (2026-07-11) — Low-stock reorder pack
+
+- **Auto-draft POs**: preview modal (by supplier/category), structured lines, pending POs
+- **Low-stock CSV** export from inventory banner/toolbar
+- **Print first PO** prompt after draft; PO print layout
+- **Owner strip**: Low stock tile → Inventory; POS quick tool when low
+- **Sidebar badge** + attention blink for below-min ingredients
+
 ## v72 (2026-07-11) — Manager PIN gates + Happy Hour
 
 - **Happy Hour**: time window + % off (or per-item `happyHourPrice`); POS banner, HH badge, cart labels
@@ -100,7 +108,7 @@
 
 | Channel | Notes |
 |---------|--------|
-| **Web (Vercel)** | Hard-refresh or `?appv=v72-…` after deploy; SW cache bumps force update |
+| **Web (Vercel)** | Hard-refresh or `?appv=v73-…` after deploy; SW cache bumps force update |
 | **Desktop (Electron)** | Rebuild with latest `assets/`; print bridge uses `print-bridge.js` + ESC/POS |
 | **Android WebView** | Run `npm run sync:android` / build script after asset bump so modules ship in the shell |
 

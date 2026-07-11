@@ -961,24 +961,47 @@
     const shift = getOpenShift();
     const shiftSum = shift ? summarizeShift(shift) : null;
     const holds = Number(global.__rsHeldOrderCount) || 0;
+    let lowStock = Number(global.__rsLowStockCount);
+    if (!Number.isFinite(lowStock)) {
+      try {
+        const inv = (global.RS && RS.INVENTORY) || [];
+        lowStock = inv.filter((i) => Number(i.stock) < Number(i.min)).length;
+        global.__rsLowStockCount = lowStock;
+      } catch (_) {
+        lowStock = 0;
+      }
+    }
+    strip.style.gridTemplateColumns = 'repeat(6,minmax(0,1fr))';
     strip.innerHTML = [
-      ['Today sales', rs(sales), 'fa-indian-rupee-sign'],
-      ['Orders', String(today.length) + (holds ? ' · H' + holds : ''), 'fa-receipt'],
-      ['AOV', rs(aov), 'fa-chart-line'],
+      ['Today sales', rs(sales), 'fa-indian-rupee-sign', null],
+      ['Orders', String(today.length) + (holds ? ' · H' + holds : ''), 'fa-receipt', null],
+      ['AOV', rs(aov), 'fa-chart-line', null],
       [
         'Shift',
         shift ? rs(shiftSum.gross) + ' · ' + shiftSum.bills : 'Closed',
         shift ? 'fa-cash-register' : 'fa-lock',
+        null,
       ],
-      ['Ops', opsLabel, opsIcon],
+      [
+        'Low stock',
+        lowStock > 0 ? String(lowStock) + ' items' : 'OK',
+        lowStock > 0 ? 'fa-boxes-stacked' : 'fa-circle-check',
+        'inventory-tab',
+      ],
+      ['Ops', opsLabel, opsIcon, null],
     ]
       .map(
-        ([l, v, ic]) => `<div style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:var(--panel)">
-      <div style="font-size:11px;color:var(--text-mute);font-weight:700"><i class="fa-solid ${ic}" style="margin-right:4px;opacity:.7"></i>${esc(l)}</div>
-      <div style="font-size:15px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v)}</div>
+        ([l, v, ic, tab]) => `<div class="rs-owner-tile" data-tab="${esc(tab || '')}" style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:var(--panel);${tab ? 'cursor:pointer;' : ''}${l === 'Low stock' && lowStock > 0 ? 'border-color:rgba(234,179,8,.45);' : ''}">
+      <div style="font-size:11px;color:var(--text-mute);font-weight:700"><i class="fa-solid ${ic}" style="margin-right:4px;opacity:.7;${l === 'Low stock' && lowStock > 0 ? 'color:var(--amber)' : ''}"></i>${esc(l)}</div>
+      <div style="font-size:15px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${l === 'Low stock' && lowStock > 0 ? 'color:var(--amber)' : ''}">${esc(v)}</div>
     </div>`
       )
       .join('');
+    strip.querySelectorAll('.rs-owner-tile[data-tab="inventory-tab"]').forEach((el) => {
+      el.onclick = () => {
+        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
+      };
+    });
   }
 
   function ensurePosQuickTools() {
@@ -998,15 +1021,22 @@
         else pos.insertBefore(tools, pos.firstChild);
       }
     }
+    const lowN = Number(global.__rsLowStockCount) || 0;
     tools.innerHTML = `
       <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack" title="Export today's bills CSV"><i class="fa-solid fa-file-export"></i> Day pack</button>
       <button type="button" class="btn btn-ghost btn-sm" id="rs-keys-help" title="Keyboard shortcuts (F1)"><i class="fa-solid fa-keyboard"></i> Keys</button>
       <button type="button" class="btn btn-ghost btn-sm" id="rs-demo-btn" title="15-min demo checklist"><i class="fa-solid fa-clapperboard"></i> Demo</button>
+      ${lowN > 0 ? `<button type="button" class="btn btn-ghost btn-sm" id="rs-low-stock-btn" title="Open inventory · auto-draft POs" style="border-color:rgba(234,179,8,.4);color:var(--amber)"><i class="fa-solid fa-boxes-stacked"></i> Low stock (${lowN})</button>` : ''}
       <span style="font-size:11px;color:var(--text-mute);margin-left:4px">F1 shortcuts · F8 pay</span>`;
     const day = tools.querySelector('#rs-day-pack');
     if (day) day.onclick = () => exportDayPackCsv();
     const keys = tools.querySelector('#rs-keys-help');
     if (keys) keys.onclick = () => showShortcutsHelp();
+    const lowBtn = tools.querySelector('#rs-low-stock-btn');
+    if (lowBtn)
+      lowBtn.onclick = () => {
+        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('inventory-tab');
+      };
     const demo = tools.querySelector('#rs-demo-btn');
     if (demo)
       demo.onclick = () => {

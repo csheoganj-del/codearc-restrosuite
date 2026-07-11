@@ -123,6 +123,16 @@ test('happy hour and manager PIN require()', () => {
   assert.match(shell, /Happy hour|Pin gate due|Optional manager gates/);
 });
 
+test('low-stock auto PO and CSV export', () => {
+  const inv = fs.readFileSync(path.join(root, 'assets/modules/inventory-ui.js'), 'utf8');
+  const ops = fs.readFileSync(path.join(root, 'assets/competitive-ops.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(inv, /confirmAndDraftPos|exportLowStockCsv|buildPoRowsFromLow/);
+  assert.match(inv, /printPurchaseOrder|auto_reorder/);
+  assert.match(ops, /Low stock|__rsLowStockCount/);
+  assert.match(html, /btn-export-low-stock|btn-auto-draft-pos/);
+});
+
 test('receipt engine supports thermal preference', () => {
   const src = fs.readFileSync(path.join(root, 'assets/receipt.js'), 'utf8');
   assert.match(src, /preferThermal|thermal|compileThermalPDF/);
