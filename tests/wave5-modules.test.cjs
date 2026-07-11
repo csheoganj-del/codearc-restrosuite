@@ -250,6 +250,20 @@ test('product pack: Z-report scope, WA retry, demo script (wave product)', () =>
   assert.match(html, /v6[0-9]-20260711/);
 });
 
+test('cashier pack: dues banner, hold polish, release notes', () => {
+  const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
+  assert.match(html, /cart-customer-dues-banner/);
+  assert.match(html, /insight-dues/);
+  assert.match(html, /v63-20260711/);
+  const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
+  assert.match(pos, /paintDuesBanner|Outstanding dues/);
+  assert.match(pos, /Replace current cart with this held order/);
+  assert.match(pos, /total holds/);
+  assert.ok(fs.existsSync(path.join(root, 'docs/RELEASE_NOTES.md')));
+  const rn = fs.readFileSync(path.join(root, 'docs/RELEASE_NOTES.md'), 'utf8');
+  assert.match(rn, /Day pack|dues|Desktop \/ Android/i);
+});
+
 test('USB and split docs exist', () => {
   assert.ok(fs.existsSync(path.join(root, 'docs/USB_THERMAL_PRINTING.md')));
   assert.ok(fs.existsSync(path.join(root, 'docs/DASHBOARD_SPLIT_MAP.md')));

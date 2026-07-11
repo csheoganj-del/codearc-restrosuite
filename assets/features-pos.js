@@ -2397,7 +2397,12 @@
       if (dr) dr.value = '';
       
       updateHeldCount();
-      RS.toast('Order held · ' + heldOrders[orderTypeKey].length + ' parked','fa-pause');
+      const typeLabel =
+        orderTypeKey === 'dinein' ? 'Dine-in' : orderTypeKey === 'delivery' ? 'Delivery' : 'Takeaway';
+      RS.toast(
+        typeLabel + ' held · ' + heldOrders[orderTypeKey].length + ' parked · tap Hold again to resume',
+        'fa-pause'
+      );
       // Update table grid to reflect occupied status
       await renderPosTableGrid();
     }
@@ -2406,17 +2411,27 @@
       if (!orderTypeKey) orderTypeKey = getCurrentOrderTypeKey();
       const orders = heldOrders[orderTypeKey];
       const displayName = getOrderTypeDisplayName(orderTypeKey);
+      const totalHeld = Object.values(heldOrders).reduce((a, arr) => a + arr.length, 0);
       
       RSModal.open({ 
         title: displayName, 
-        sub: orders.length + ' parked bills', 
+        sub: orders.length + ' parked · ' + totalHeld + ' total holds', 
         icon: orderTypeKey === 'dinein' ? 'fa-utensils' : orderTypeKey === 'delivery' ? 'fa-motorcycle' : 'fa-bag-shopping', 
         size: 'sm',
-        body: orders.length ? `<div style="display:flex;flex-direction:column;gap:10px">${orders.map(h=>`
-          <div class="tender-row" data-h="${h.id}" data-type="${orderTypeKey}" style="cursor:pointer">
-            <div><div style="font-weight:700;font-size:14px">${h.table}${h.name?' · '+h.name:''}</div><div style="font-size:12px;color:var(--text-mute)">${h.count} items · held ${h.time}</div></div>
-            <div style="display:flex;align-items:center;gap:10px"><b>${rs(h.total)}</b><span class="tx" data-del="${h.id}" data-type="${orderTypeKey}" title="Discard"><i class="fa-solid fa-trash"></i></span></div>
-          </div>`).join('')}</div>`
+        body: orders.length ? `<div style="display:flex;flex-direction:column;gap:10px">${orders.map(h=>{
+          const phoneLine = h.phone ? esc(h.phone) : '';
+          const draftLabel = h.draftId ? esc(h.draftId) : '';
+          return `
+          <div class="tender-row" data-h="${h.id}" data-type="${orderTypeKey}" style="cursor:pointer;align-items:flex-start">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:14px">${esc(h.table)}${h.name?' · '+esc(h.name):''}</div>
+              <div style="font-size:12px;color:var(--text-mute)">${h.count} items · held ${esc(h.time || '')}${draftLabel ? ' · ' + draftLabel : ''}</div>
+              ${phoneLine ? `<div style="font-size:11px;color:var(--text-soft);margin-top:2px"><i class="fa-solid fa-phone" style="opacity:.6"></i> ${phoneLine}</div>` : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0"><b>${rs(h.total)}</b><span class="tx" data-del="${h.id}" data-type="${orderTypeKey}" title="Discard"><i class="fa-solid fa-trash"></i></span></div>
+          </div>`;
+        }).join('')}</div>
+          <p style="font-size:11px;color:var(--text-mute);margin:12px 0 0">Tap a row to resume · trash to discard. Right-click Hold buttons to open this list anytime.</p>`
           : '<div class="sr-empty">No held orders for this type. Use Hold to park a bill and start another.</div>',
         onMount(modal, close){
           modal.querySelectorAll('[data-h]').forEach(row=> row.addEventListener('click', async e=>{
@@ -2425,6 +2440,15 @@
             const type = row.dataset.type;
             const idx = heldOrders[type].findIndex(x => x.id === id); 
             if(idx < 0) return;
+
+            // Warn if current cart would be replaced
+            try {
+              const cur = RS.getCart && RS.getCart();
+              if (cur && cur.length) {
+                const ok = window.confirm('Replace current cart with this held order?');
+                if (!ok) return;
+              }
+            } catch (_) {}
             
             // Clear current cart first
             RS.clearCart();
@@ -2666,17 +2690,44 @@
           return;
         }
         
+        const duesBanner = document.getElementById('cart-customer-dues-banner');
+        function paintDuesBanner(c) {
+          if (!duesBanner) return;
+          const due = Number(c && c.dues) || 0;
+          if (due > 0) {
+            duesBanner.style.display = 'block';
+            duesBanner.innerHTML =
+              '<i class="fa-solid fa-triangle-exclamation" style="color:var(--orange);margin-right:6px"></i>' +
+              '<b style="color:var(--text)">Outstanding dues ' +
+              rs(due) +
+              '</b> · ' +
+              esc(c.name || 'Customer') +
+              (c.tier ? ' · ' + esc(c.tier) : '') +
+              ' <span style="opacity:.8">(settle in CRM or take Due payment)</span>';
+          } else {
+            duesBanner.style.display = 'none';
+            duesBanner.innerHTML = '';
+          }
+        }
+
         if (!currentPhone) {
           nameInput.value = '';
           phoneInput.value = '';
           triggerText.innerText = 'Walk-in';
           insightsPanel.style.display = 'none';
           if (actionRow) actionRow.style.display = 'none';
+          paintDuesBanner(null);
           return;
         }
         
         const customers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
-        const c = customers.find(x => x.phone === currentPhone);
+        const digits = String(currentPhone).replace(/\D/g, '');
+        const c = customers.find(
+          (x) =>
+            x.phone === currentPhone ||
+            String(x.phone || '').replace(/\D/g, '') === digits ||
+            (digits.length >= 10 && String(x.phone || '').replace(/\D/g, '').endsWith(digits.slice(-10)))
+        );
         if (c) {
           nameInput.value = c.name || '';
           phoneInput.value = c.phone || '';
@@ -2684,13 +2735,20 @@
           
           const visits = c.visits || 0;
           const spend = c.spend || 0;
+          const dues = Number(c.dues) || 0;
           const favorite = await getFavoriteItem(c);
           
           document.getElementById('insight-visits').innerText = visits;
           document.getElementById('insight-spend').innerText = '₹' + spend;
+          const duesEl = document.getElementById('insight-dues');
+          if (duesEl) {
+            duesEl.innerText = '₹' + dues;
+            duesEl.style.color = dues > 0 ? 'var(--orange)' : '';
+          }
           document.getElementById('insight-favorite').innerText = favorite;
           insightsPanel.style.display = 'grid';
           if (actionRow) actionRow.style.display = 'none';
+          paintDuesBanner(c);
         } else {
           // Check if temp option exists
           const opt = sel.options[sel.selectedIndex];
@@ -2699,6 +2757,7 @@
           phoneInput.value = currentPhone.startsWith('temp-') ? '' : currentPhone;
           triggerText.innerText = name || currentPhone;
           insightsPanel.style.display = 'none';
+          paintDuesBanner(null);
           
           if (name && currentPhone && !currentPhone.startsWith('temp-')) {
             if (actionRow) actionRow.style.display = 'block';
