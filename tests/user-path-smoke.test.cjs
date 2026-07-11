@@ -94,3 +94,12 @@ test('role-first home for staff', () => {
   assert.match(dash, /waiter:\s*['"]floor-tab['"]/);
   assert.match(dash, /kitchen:\s*['"]kds-tab['"]/);
 });
+
+test('cloud map packs bill ops + shift cash + offer discount without new tables', () => {
+  const db = read('assets/db.js');
+  assert.match(db, /taxProfile\._ops|_ops/);
+  assert.match(db, /cashMovements/);
+  assert.match(db, /discount_type|discount_value/);
+  // waste_log intentionally not in MAP (local device only)
+  assert.doesNotMatch(db, /waste_log:\s*\{/);
+});

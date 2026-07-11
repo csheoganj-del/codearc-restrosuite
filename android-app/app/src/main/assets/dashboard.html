@@ -16,12 +16,24 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="RestroSuite">
 <link rel="apple-touch-icon" href="assets/restrosuite-mark.png">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#FF4F00">
 <title>RestroSuite Console</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/restrosuite.css?v=v34-20260628">
 <script>
+  // Production: log only. Visual banner only on localhost / ?debug=1 / superadmin flag.
+  window.__RS_DEBUG_UI__ = (function() {
+    try {
+      var h = location.hostname || '';
+      if (h === 'localhost' || h === '127.0.0.1') return true;
+      if (new URLSearchParams(location.search).get('debug') === '1') return true;
+      if (sessionStorage.getItem('rs_debug_ui') === '1') return true;
+    } catch (e) {}
+    return false;
+  })();
   window.onerror = function(msg, url, line, col, error) {
+    try { console.error('[RS]', msg, url, line, col, error); } catch (e) {}
+    if (!window.__RS_DEBUG_UI__) return;
     var div = document.getElementById('debug-error-banner');
     if (!div) {
       div = document.createElement('div');
@@ -33,6 +45,8 @@
     div.innerHTML += '<div><b>JavaScript Error:</b> ' + _e(msg) + ' at <small>' + _e(url) + ':' + _e(line) + ':' + _e(col) + '</small></div>';
   };
   window.onunhandledrejection = function(event) {
+    try { console.error('[RS] unhandledrejection', event && event.reason); } catch (e) {}
+    if (!window.__RS_DEBUG_UI__) return;
     var div = document.getElementById('debug-error-banner');
     if (!div) {
       div = document.createElement('div');
@@ -63,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v39-20260709-pill-icon';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v81-20260711-ux-cx';
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -131,7 +145,7 @@
   #role-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
   #role-switch .rs-track { width: 38px; height: 22px; border-radius: 99px; background: var(--glass-3); border: 1px solid var(--stroke-2); position: relative; transition: var(--t); }
   #role-switch .rs-track::before { content:""; position:absolute; width:16px;height:16px;border-radius:50%;left:3px;top:2px;background:var(--text-mute);transition:var(--t); }
-  #role-switch.on .rs-track { background: var(--violet-tint); border-color: oklch(0.66 0.17 285 / 0.4); }
+  #role-switch.on .rs-track { background: var(--violet-tint); border-color: rgba(91,108,143,0.35); }
   #role-switch.on .rs-track::before { transform: translateX(15px); background: var(--violet-soft); }
 
   /* Support Dropdown Styling */
@@ -294,9 +308,17 @@
         <input type="number" id="split-due" placeholder="0" class="form-input csd-input">
       </div>
     </div>
+    <div id="split-quick-fill" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px">
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Put remaining on Cash">Rest → Cash</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Put remaining on UPI">Rest → UPI</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Put remaining on Card">Rest → Card</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Put remaining on Due">Rest → Due</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half" title="50/50 Cash + UPI">½ Cash · ½ UPI</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear all tenders">Clear</button>
+    </div>
     <div class="csd-split-status">
-      <span id="split-status-text" class="csd-split-remaining">Remaining: ₹0</span>
-      <strong id="split-total-text" class="csd-split-paid">Paid: ₹0</strong>
+      <span id="split-status-text" class="csd-split-remaining">Remaining: —</span>
+      <strong id="split-total-text" class="csd-split-paid">Paid: —</strong>
     </div>
   </div>
 </div>
@@ -330,7 +352,7 @@
       <div class="sb-section">Operations</div>
       <a class="sidebar-link" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i><span>Point of Sale</span></a>
       <a class="sidebar-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count" style="display:none">0</span></a>
-      <a class="sidebar-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i><span>Kitchen Display</span></a>
+      <a class="sidebar-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i><span>Kitchen Display</span><span class="badge-count" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="tokens-tab" class="superadmin-only" style="display:none;"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
       <a class="sidebar-link" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Floor &amp; Tables</span></a>
       <a class="sidebar-link" data-tab="aggregator-tab"><i class="fa-solid fa-bowl-rice"></i><span>Online Orders</span><span class="badge-count" style="display:none">0</span></a>
@@ -487,12 +509,16 @@
               </div>
             </div>
             <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr; gap: 8px; position: relative; align-items: start;">
-              <select class="form-input" id="cart-table" style="height: 44px; padding: 0 32px 0 12px; font-size: 14px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+              <div style="display:grid;grid-template-columns:1fr 88px;gap:8px;align-items:stretch">
+                <select class="form-input" id="cart-table" style="height: 44px; padding: 0 32px 0 12px; font-size: 14px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+                <input type="number" id="cart-covers" class="form-input" min="0" max="99" step="1" placeholder="Pax" title="Guest covers (pax)" inputmode="numeric" style="height:44px;padding:0 8px;font-size:14px;border-radius:8px;box-sizing:border-box;text-align:center;font-weight:700" aria-label="Guest covers">
+              </div>
               <div class="custom-customer-widget" id="custom-customer-widget">
                 <!-- Direct inputs visible in cart -->
                 <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
                   <input type="text" id="cust-input-name" placeholder="Guest name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
                   <input type="tel" id="cust-input-phone" placeholder="Guest phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
+                  <div id="cart-customer-dues-banner" style="display:none;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.08);color:var(--text-soft);line-height:1.4"></div>
                 </div>
                 
                 <!-- Hidden trigger for backwards compatibility -->
@@ -517,6 +543,10 @@
                       <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
                         <span class="insight-label">Spent</span>
                         <span class="insight-val" id="insight-spend">₹0</span>
+                      </div>
+                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
+                        <span class="insight-label">Dues</span>
+                        <span class="insight-val" id="insight-dues" style="color:var(--orange)">₹0</span>
                       </div>
                       <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
                         <span class="insight-label">Favorite</span>
@@ -553,6 +583,25 @@
                   <span class="amt" id="t-grand">₹0</span>
                 </div>
               </div>
+              <details class="cart-more-opts" id="cart-more-opts" style="margin-top:6px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass-1);padding:0 8px">
+                <summary style="cursor:pointer;list-style:none;font-size:11.5px;font-weight:800;color:var(--text-soft);padding:8px 2px;display:flex;align-items:center;gap:6px;user-select:none">
+                  <i class="fa-solid fa-sliders" style="color:var(--orange);font-size:11px"></i> Discount · Tip · Promo
+                  <span style="margin-left:auto;font-size:10px;opacity:.7">tap to expand</span>
+                </summary>
+                <div class="cart-tip-row" id="cart-tip-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 8px">
+                  <input type="number" id="disc-input" min="0" max="100" step="1" placeholder="Disc %" title="Discount percent" class="form-input" style="width:68px;height:36px;font-size:12px;padding:4px 6px">
+                  <input type="number" id="tip-input" min="0" step="1" placeholder="Tip" title="Tip amount" class="form-input" style="width:72px;height:36px;font-size:12px;padding:4px 6px">
+                  <button type="button" class="btn btn-ghost btn-sm" data-tip-pct="0" style="min-height:36px;padding:0 10px;font-size:11px">No tip</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-tip-pct="5" style="min-height:36px;padding:0 10px;font-size:11px">5%</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-tip-pct="10" style="min-height:36px;padding:0 10px;font-size:11px">10%</button>
+                </div>
+                <div class="cart-promo-row" id="cart-promo-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 10px">
+                  <input type="text" id="promo-input" placeholder="Promo code" title="Offer / coupon code" class="form-input" style="flex:1;min-width:100px;height:36px;font-size:12px;padding:4px 8px;text-transform:uppercase" autocomplete="off">
+                  <button type="button" class="btn btn-ghost btn-sm" id="promo-apply" style="min-height:36px;padding:0 12px;font-size:11px"><i class="fa-solid fa-tags"></i> Apply</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="promo-clear" style="min-height:36px;padding:0 10px;font-size:11px" title="Clear promo">×</button>
+                  <span id="promo-applied-badge" style="display:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(255,79,0,.12);color:var(--orange)"></span>
+                </div>
+              </details>
               <div class="cart-payment" id="cart-payment" style="margin-top: 6px; padding: 6px; border: 1px solid var(--stroke-2); border-radius: var(--r-sm); background: var(--glass-1);">
                 <div class="cpay-methods" id="cart-pay-methods" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;">
                   <button type="button" class="active" data-pay-method="Cash" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
@@ -622,7 +671,7 @@
         </div>
         <div class="panel panel-pad">
           <div class="toolbar-row">
-            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill no. or table…"></div>
+            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…"></div>
             <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-filter"></i> Filter</button>
             <button class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
             <button class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print day report</button>
@@ -665,6 +714,7 @@
         <div class="banner warn" id="inv-banner">
           <i class="fa-solid fa-triangle-exclamation"></i>
           <div><b><span id="inv-low-count">0</span> ingredients</b> are below their minimum stock level and need reordering.</div>
+          <button class="btn btn-ghost btn-sm banner-cta" id="btn-export-low-stock" style="margin-right:6px"><i class="fa-solid fa-file-csv"></i> Low-stock CSV</button>
           <button class="btn btn-primary btn-sm banner-cta" id="btn-auto-draft-pos"><i class="fa-solid fa-truck"></i> Auto-draft POs</button>
         </div>
         <div class="toolbar-row">
@@ -672,8 +722,11 @@
             <button class="active" data-inv-tab="stock">Stock levels</button>
             <button data-inv-tab="recipes">Recipes</button>
             <button data-inv-tab="suppliers">Suppliers</button>
+            <button data-inv-tab="pos">Purchase orders</button>
+            <button data-inv-tab="waste">Waste log</button>
           </div>
           <div class="grow"></div>
+          <button class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
           <button class="btn btn-ghost btn-sm" id="btn-download-inventory-template"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
           <button class="btn btn-ghost btn-sm" id="btn-import-inventory"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
           <button class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>
@@ -1186,7 +1239,7 @@
 
     <!-- Header -->
     <div style="padding:18px 24px 16px;border-bottom:1px solid var(--stroke);display:flex;align-items:center;gap:12px">
-      <div style="width:42px;height:42px;background:linear-gradient(135deg,#FF4F00,#FD9139);border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;color:#fff;font-weight:800" id="manage-tenant-avatar">D</div>
+      <div style="width:42px;height:42px;background:var(--orange,#FF4F00);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:#fff;font-weight:700" id="manage-tenant-avatar">D</div>
       <div style="min-width:0;flex:1">
         <div id="manage-tenant-name" style="font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Outlet Name</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
@@ -1447,6 +1500,22 @@
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js?v=20260618-realdata"></script>
+<script src="assets/print-bridge.js"></script>
+<script src="assets/escpos-encoder.js"></script>
+<script src="assets/modules/bill-identity.js"></script>
+<script src="assets/modules/inventory-ledger.js"></script>
+<script src="assets/modules/bills-history.js"></script>
+<script src="assets/modules/inventory-ui.js"></script>
+<script src="assets/modules/reports-ui.js"></script>
+<script src="assets/modules/gateway-monitor.js"></script>
+<script src="assets/modules/super-admin.js"></script>
+<script src="assets/modules/kds-ui.js"></script>
+<script src="assets/modules/qr-orders-ui.js"></script>
+<script src="assets/modules/employees-ui.js"></script>
+<script src="assets/modules/tax-helpers.js"></script>
+<script src="assets/modules/pos-ui.js"></script>
+<script src="assets/modules/growth-hub-shell.js"></script>
+<script src="assets/modules/demo-script.js"></script>
 <script src="assets/saas-core.js"></script>
 <script src="assets/license-config.js"></script>
 <script src="assets/license-guard.js"></script>
@@ -1471,57 +1540,80 @@
 <script src="src/dashboard/chain.js"></script>
 <script>
   (function() {
-    var lockMessage = 'Logout is disabled while offline to prevent lock-out.';
+    var lockMessage = 'You may have unsynced data. Confirm logout only if you understand bills may still be pending upload.';
+
+    function queueDepth() {
+      try {
+        if (typeof window.RS_DB_SYNC_DEPTH === 'function') return window.RS_DB_SYNC_DEPTH() || 0;
+        return Number(window.__rsSyncQueueDepth || 0) || 0;
+      } catch (e) { return 0; }
+    }
 
     function hasRecentCloudFailure() {
       var last = window.RS_LAST_CLOUD_ERROR;
-      return !!(last && last.time && (Date.now() - last.time < 120000));
+      // Only treat as soft warning (not hard lock) — 60s window
+      return !!(last && last.time && (Date.now() - last.time < 60000));
     }
 
-    function pillShowsOfflineMode() {
-      var pill = document.getElementById('db-mode-pill');
-      var text = ((pill && pill.textContent) || '').toLowerCase();
-      return text.indexOf('local only') !== -1 ||
-        text.indexOf('app offline') !== -1 ||
-        text.indexOf('offline') !== -1 ||
-        text.indexOf('sync error') !== -1;
+    function trulyOffline() {
+      try {
+        return navigator.onLine === false || window.__OFFLINE_CONFIG__ === true;
+      } catch (e) {
+        return false;
+      }
     }
 
+    // Soft lock: warn when offline or queue has money rows; allow force logout with confirm
     window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE = function() {
       try {
-        return navigator.onLine === false ||
-          window.__OFFLINE_CONFIG__ === true ||
-          hasRecentCloudFailure() ||
-          pillShowsOfflineMode() ||
-          document.body.classList.contains('rs-offline-lock');
+        if (document.body.classList.contains('rs-offline-lock') && trulyOffline()) return true;
+        if (trulyOffline()) return true;
+        if (queueDepth() > 0) return true;
+        return false;
       } catch (e) {
         return navigator.onLine === false;
       }
     };
 
     window.RS_SHOW_OFFLINE_LOGOUT_LOCK = function() {
-      if (window.RS && typeof window.RS.toast === 'function') {
-        window.RS.toast(lockMessage, 'fa-circle-xmark');
+      var depth = queueDepth();
+      var msg = depth > 0
+        ? (depth + ' change(s) still pending cloud sync. Logout anyway? Unsynced bills stay on this device until you sign in again.')
+        : 'You appear offline. Logout anyway? Prefer staying signed in until connection returns.';
+      var ok = false;
+      try { ok = window.confirm(msg); } catch (e) { ok = false; }
+      if (!ok) {
+        if (window.RS && typeof window.RS.toast === 'function') {
+          window.RS.toast(lockMessage, 'fa-cloud-arrow-up');
+        }
         return;
       }
-      if (typeof window.toast === 'function') {
-        window.toast(lockMessage, 'fa-circle-xmark');
-        return;
-      }
-      var toast = document.getElementById('toast');
-      if (toast) {
-        toast.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + lockMessage;
-        toast.classList.add('show');
-        clearTimeout(window.__rsOfflineLogoutToastTimer);
-        window.__rsOfflineLogoutToastTimer = setTimeout(function() {
-          toast.classList.remove('show');
-        }, 2400);
-      }
+      // Force logout path — clear soft lock and re-click after releasing guard
+      window.__RS_FORCE_LOGOUT__ = true;
+      try {
+        if (window.RS_API && typeof RS_API.signOut === 'function') {
+          RS_API.signOut();
+          return;
+        }
+      } catch (e) {}
+      try {
+        sessionStorage.clear();
+      } catch (e2) {}
+      location.href = 'login.html';
     };
 
     document.addEventListener('click', function(e) {
       var target = e.target && e.target.closest && e.target.closest('.logout, [data-go="logout"], #sa-settings-logout');
-      if (!target || !window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
+      if (!target) return;
+      if (window.__RS_FORCE_LOGOUT__) {
+        window.__RS_FORCE_LOGOUT__ = false;
+        return;
+      }
+      if (!window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
+      // Soft warn on recent cloud errors only
+      if (!trulyOffline() && queueDepth() === 0 && hasRecentCloudFailure()) {
+        return; // allow logout after brief cloud blip
+      }
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -1530,29 +1622,95 @@
   })();
 </script>
 <script>
-  // Load versioned feature scripts in order without document.write.
-  // document.write blocks the HTML parser; this approach does not.
+  // Wave 2: critical path first (POS-ready), lazy-load secondary modules per tab.
   (function() {
-    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v39-20260709-pill-icon');
-    var srcs = [
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v49');
+    var parent = document.currentScript.parentNode;
+    var loaded = {};
+    var loading = {};
+
+    function loadScript(src) {
+      if (loaded[src]) return Promise.resolve();
+      if (loading[src]) return loading[src];
+      loading[src] = new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ver;
+        s.async = true;
+        s.onload = function() { loaded[src] = true; resolve(); };
+        s.onerror = function() { reject(new Error('Failed to load ' + src)); };
+        parent.appendChild(s);
+      });
+      return loading[src];
+    }
+
+    function loadSeq(srcs) {
+      return srcs.reduce(function(p, src) {
+        return p.then(function() { return loadScript(src); });
+      }, Promise.resolve());
+    }
+
+    // Wave 4: load order matters — dashboard/pos first, then receipt+ops bundle, then shell.
+    var pre = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
-      'assets/features-pos.js',
-      'assets/features-editor.js',
-      'assets/features-manage.js',
-      'assets/features-growth.js',
-      'assets/features-extra.js',
-      'src/dashboard/onboarding.js',
+      'assets/features-pos.js'
+    ];
+    var post = [
       'assets/features-shell.js'
     ];
-    // Load sequentially (async=false on a runtime-created script preserves order
-    // only for same-origin scripts — here they are all same-origin).
-    srcs.forEach(function(src) {
-      var s = document.createElement('script');
-      s.src = src + '?v=' + ver;
-      s.async = false;
-      document.currentScript.parentNode.appendChild(s);
-    });
+    var unbundledMid = [
+      'assets/receipt.js',
+      'assets/competitive-ops.js'
+    ];
+
+    // Secondary modules — loaded on first tab that needs them (or idle preload)
+    var TAB_MODULES = {
+      'editor-tab': ['assets/features-editor.js'],
+      'inventory-tab': ['assets/features-manage.js'],
+      'employees-tab': ['assets/features-manage.js'],
+      'aggregator-tab': ['assets/features-growth.js'],
+      'floor-tab': ['assets/features-growth.js'],
+      'customers-tab': ['assets/features-growth.js'],
+      'growth-hub-tab': ['assets/features-growth.js'],
+      'analytics-tab': ['assets/features-extra.js'],
+      'tax-tab': ['assets/features-extra.js'],
+      'reports-tab': ['assets/features-extra.js'],
+      'tokens-tab': ['assets/features-extra.js']
+    };
+
+    window.RS_ensureTabModules = function(tabId) {
+      var mods = TAB_MODULES[tabId] || [];
+      if (!mods.length) return Promise.resolve();
+      return loadSeq(mods);
+    };
+
+    function preloadRest() {
+      var rest = [
+        'assets/features-editor.js',
+        'assets/features-manage.js',
+        'assets/features-growth.js',
+        'assets/features-extra.js',
+        'src/dashboard/onboarding.js'
+      ];
+      rest.forEach(function(src, i) {
+        setTimeout(function() { loadScript(src).catch(function(){}); }, 800 + i * 400);
+      });
+    }
+
+    loadSeq(pre)
+      .then(function() {
+        return loadScript('assets/dist/critical.bundle.js').catch(function() {
+          return loadSeq(unbundledMid);
+        });
+      })
+      .then(function() { return loadSeq(post); })
+      .then(function() {
+        if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 5000 });
+        else setTimeout(preloadRest, 2500);
+      })
+      .catch(function(e) {
+        console.error('[boot] critical scripts failed', e);
+      });
   })();
 </script>
 

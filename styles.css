@@ -1221,6 +1221,11 @@ footer {
 /* ==========================================
    CODEARC SAAS DESIGN REFINEMENT LAYER
    ========================================== */
+:root {
+  --primary-brand: #111827;
+  --border-radius: 8px;
+}
+
 body {
   background: #F6F7F9;
   color: #111827;

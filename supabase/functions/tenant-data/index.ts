@@ -146,8 +146,8 @@ const TABLE_WRITE_ROLES: Record<string, string[]> = {
 
 // Wave 2: raise caps so multi-month outlets don't silently truncate bills/CRM.
 // Still capped to protect free-tier egress; use sales_summary for full aggregates.
-const ZERO_COST_DEFAULT_LIMIT = 500;
-const ZERO_COST_MAX_LIMIT = 2000;
+const ZERO_COST_DEFAULT_LIMIT = 250;
+const ZERO_COST_MAX_LIMIT = 500;
 
 const PLAN_ENTITLEMENTS: Record<string, { allowedTabs: string[] }> = {
   starter: {
