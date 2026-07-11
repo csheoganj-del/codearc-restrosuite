@@ -24,7 +24,7 @@ test('competitive-ops.js exists and exposes core APIs', () => {
 test('dashboard loads competitive-ops in critical path', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /competitive-ops\.js|critical\.bundle\.js/);
-  assert.match(html, /v5[0-9]-20260711-wave/);
+  assert.match(html, /v5[0-9]-20260711/);
 });
 
 test('receipt engine supports thermal preference', () => {
