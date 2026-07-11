@@ -406,6 +406,7 @@
         <span style="color:var(--text-soft)">${sum.bills} bills · ${rs(sum.gross)}</span>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-z-scope" title="Z-report includes ${scope === 'all' ? 'all stations' : 'this station only'}">${scope === 'all' ? 'All stations' : 'This station'}</button>
         <div style="flex:1"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack-bar" title="Export today bills"><i class="fa-solid fa-file-export"></i> Day pack</button>
         <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-z"><i class="fa-solid fa-file-invoice"></i> Preview Z</button>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-close"><i class="fa-solid fa-lock"></i> Close shift</button>`;
       const sc = bar.querySelector('#rs-z-scope');
@@ -420,13 +421,18 @@
         z.onclick = () => {
           showZReportModal(shift, summarizeShift(shift), 'Z-Report (open shift)');
         };
+      const dp = bar.querySelector('#rs-day-pack-bar');
+      if (dp) dp.onclick = () => exportDayPackCsv();
       const cl = bar.querySelector('#rs-shift-close');
       if (cl) cl.onclick = () => closeShift();
     } else {
       bar.innerHTML = `<span style="font-weight:800;color:var(--text-soft)"><i class="fa-solid fa-circle" style="color:#eab308;font-size:9px;margin-right:6px"></i>No open shift</span>
         <span style="color:var(--text-mute);font-size:12px">Open a shift for cash reconciliation &amp; Z-report</span>
         <div style="flex:1"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack-bar"><i class="fa-solid fa-file-export"></i> Day pack</button>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open"><i class="fa-solid fa-unlock"></i> Open shift</button>`;
+      const dp = bar.querySelector('#rs-day-pack-bar');
+      if (dp) dp.onclick = () => exportDayPackCsv();
       const op = bar.querySelector('#rs-shift-open');
       if (op)
         op.onclick = async () => {
@@ -479,10 +485,27 @@
       <div><b style="color:var(--text)">F8</b> / <b>Ctrl+Enter</b> — Checkout</div>
       <div><b style="color:var(--text)">F9</b> — Clear cart</div>
       <div style="margin-top:10px;font-size:12px">Station: <b>${esc(getStationLabel())}</b> · Shift: <b>${getOpenShift() ? 'OPEN' : 'closed'}</b></div>
+      <div style="margin-top:8px;font-size:12px">Use <b>Day pack</b> for today's sales CSV · <b>Demo</b> for the 15-min checklist</div>
     </div>`;
     if (global.RSModal) {
-      RSModal.open({ title: 'POS keyboard', icon: 'fa-keyboard', size: 'sm', body, foot: '<button class="btn btn-primary" id="kh-ok">Got it</button>',
-        onMount(m, c) { m.querySelector('#kh-ok').onclick = c; } });
+      RSModal.open({
+        title: 'POS keyboard',
+        icon: 'fa-keyboard',
+        size: 'sm',
+        body,
+        foot:
+          '<button class="btn btn-ghost" id="kh-demo">Demo</button><button class="btn btn-primary" id="kh-ok">Got it</button>',
+        onMount(m, c) {
+          const ok = m.querySelector('#kh-ok');
+          if (ok) ok.onclick = c;
+          const d = m.querySelector('#kh-demo');
+          if (d)
+            d.onclick = () => {
+              c();
+              if (typeof global.openDemoScript === 'function') global.openDemoScript();
+            };
+        },
+      });
     } else toast('F2 search · F4 KOT · F8 pay · F9 clear', 'fa-keyboard');
   }
 
@@ -599,6 +622,83 @@
     apply();
   }
 
+  function todayBills(stationOnly) {
+    const bills = (global.RS && RS.BILLS) || [];
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const sid = getStationId();
+    return bills.filter((b) => {
+      if (String(b.status || 'paid').toLowerCase() === 'refunded') return false;
+      if (stationOnly) {
+        const bid = b.stationId || b.station_id || '';
+        if (bid && bid !== sid) return false;
+      }
+      const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+      return t >= start.getTime();
+    });
+  }
+
+  function exportDayPackCsv() {
+    const stationOnly = getZScope() !== 'all';
+    const rows = todayBills(stationOnly);
+    if (!rows.length) return toast('No sales today to export', 'fa-circle-exclamation');
+    const headers = [
+      'Bill No',
+      'DateTime',
+      'Total',
+      'Payment',
+      'Station',
+      'Shift',
+      'Cashier',
+      'Customer',
+      'Phone',
+      'Status',
+    ];
+    const lines = [headers.join(',')];
+    rows.forEach((b) => {
+      lines.push(
+        [
+          b.no || b.orderId || '',
+          b.dateTime || b.time || '',
+          b.amount != null ? b.amount : b.total || 0,
+          b.pay || b.paymentMethod || '',
+          b.stationLabel || b.stationId || '',
+          b.shiftId || '',
+          b.cashier || '',
+          b.customerName || '',
+          b.customerPhone || '',
+          b.status || 'paid',
+        ]
+          .map((v) => '"' + String(v).replace(/"/g, '""') + '"')
+          .join(',')
+      );
+    });
+    const shift = getOpenShift();
+    if (shift) {
+      const sum = summarizeShift(shift);
+      lines.push('');
+      lines.push('"Z summary (open shift)"');
+      lines.push('"Gross","' + sum.gross + '"');
+      lines.push('"Cash sales","' + sum.cashSales + '"');
+      lines.push('"Expected cash","' + sum.expectedCash + '"');
+      lines.push('"Bills","' + sum.bills + '"');
+    }
+    const name =
+      'day-pack-' +
+      new Date().toISOString().slice(0, 10) +
+      (stationOnly ? '-station' : '-all') +
+      '.csv';
+    if (global.RS && typeof RS.downloadFile === 'function') {
+      RS.downloadFile(lines.join('\n'), 'text/csv;charset=utf-8;', name);
+    } else {
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
+      a.download = name;
+      a.click();
+    }
+    toast('Day pack CSV · ' + rows.length + ' bills', 'fa-file-csv');
+  }
+
   /* ---------------- Owner strip on POS ---------------- */
   function paintOwnerStrip() {
     const pos = document.getElementById('pos-tab');
@@ -607,31 +707,112 @@
     if (!strip) {
       strip = document.createElement('div');
       strip.id = 'rs-owner-strip';
-      strip.style.cssText = 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 12px';
+      strip.style.cssText =
+        'display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0 0 12px';
       const shiftBar = document.getElementById('rs-shift-bar');
       if (shiftBar && shiftBar.parentNode) shiftBar.parentNode.insertBefore(strip, shiftBar.nextSibling);
       else pos.insertBefore(strip, pos.firstChild);
     }
-    const bills = (global.RS && RS.BILLS) || [];
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    const today = bills.filter((b) => {
-      if (String(b.status || 'paid').toLowerCase() === 'refunded') return false;
-      const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
-      return t >= start.getTime();
-    });
+    const today = todayBills(false);
     const sales = today.reduce((a, b) => a + (Number(b.amount != null ? b.amount : b.total) || 0), 0);
     const aov = today.length ? Math.round(sales / today.length) : 0;
-    const pending = (global.__rsSyncBillPending || 0);
-    const gw = global.__rsGatewayReady ? 'WA linked' : 'WA ' + (global.__rsGatewayLastStatus || '—');
+    const pending =
+      global.__rsSyncBillPending ||
+      (typeof global.RS_DB_SYNC_DEPTH === 'function' ? global.RS_DB_SYNC_DEPTH() : 0) ||
+      0;
+    const gw = global.__rsGatewayReady
+      ? 'WA linked'
+      : 'WA ' + (global.__rsGatewayLastStatus || '—');
+    const shift = getOpenShift();
+    const shiftSum = shift ? summarizeShift(shift) : null;
     strip.innerHTML = [
       ['Today sales', rs(sales), 'fa-indian-rupee-sign'],
       ['Orders', String(today.length), 'fa-receipt'],
       ['AOV', rs(aov), 'fa-chart-line'],
-      ['Ops', pending ? pending + ' pending sync' : gw, pending ? 'fa-cloud-arrow-up' : 'fa-signal'],
-    ].map(([l, v, ic]) => `<div style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:var(--panel)">
+      [
+        'Shift',
+        shift ? rs(shiftSum.gross) + ' · ' + shiftSum.bills : 'Closed',
+        shift ? 'fa-cash-register' : 'fa-lock',
+      ],
+      ['Ops', pending ? pending + ' sync' : gw, pending ? 'fa-cloud-arrow-up' : 'fa-signal'],
+    ]
+      .map(
+        ([l, v, ic]) => `<div style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:var(--panel)">
       <div style="font-size:11px;color:var(--text-mute);font-weight:700"><i class="fa-solid ${ic}" style="margin-right:4px;opacity:.7"></i>${esc(l)}</div>
-      <div style="font-size:16px;font-weight:800;margin-top:2px">${esc(v)}</div>
-    </div>`).join('');
+      <div style="font-size:15px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v)}</div>
+    </div>`
+      )
+      .join('');
+  }
+
+  function ensurePosQuickTools() {
+    const pos = document.getElementById('pos-tab');
+    if (!pos) return;
+    let tools = document.getElementById('rs-pos-quick-tools');
+    if (!tools) {
+      tools = document.createElement('div');
+      tools.id = 'rs-pos-quick-tools';
+      tools.style.cssText =
+        'display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px';
+      const strip = document.getElementById('rs-owner-strip');
+      if (strip && strip.parentNode) strip.parentNode.insertBefore(tools, strip.nextSibling);
+      else {
+        const shiftBar = document.getElementById('rs-shift-bar');
+        if (shiftBar && shiftBar.parentNode) shiftBar.parentNode.insertBefore(tools, shiftBar.nextSibling);
+        else pos.insertBefore(tools, pos.firstChild);
+      }
+    }
+    tools.innerHTML = `
+      <button type="button" class="btn btn-ghost btn-sm" id="rs-day-pack" title="Export today's bills CSV"><i class="fa-solid fa-file-export"></i> Day pack</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="rs-keys-help" title="Keyboard shortcuts (F1)"><i class="fa-solid fa-keyboard"></i> Keys</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="rs-demo-btn" title="15-min demo checklist"><i class="fa-solid fa-clapperboard"></i> Demo</button>
+      <span style="font-size:11px;color:var(--text-mute);margin-left:4px">F1 shortcuts · F8 pay</span>`;
+    const day = tools.querySelector('#rs-day-pack');
+    if (day) day.onclick = () => exportDayPackCsv();
+    const keys = tools.querySelector('#rs-keys-help');
+    if (keys) keys.onclick = () => showShortcutsHelp();
+    const demo = tools.querySelector('#rs-demo-btn');
+    if (demo)
+      demo.onclick = () => {
+        if (typeof global.openDemoScript === 'function') global.openDemoScript();
+        else toast('Demo checklist loading…', 'fa-clapperboard');
+      };
+  }
+
+  /** Soft nudge: open shift before first checkout of the session */
+  function installShiftNudge() {
+    if (document.documentElement.dataset.rsShiftNudge === '1') return;
+    document.documentElement.dataset.rsShiftNudge = '1';
+    document.addEventListener(
+      'click',
+      (e) => {
+        const btn = e.target && e.target.closest && e.target.closest('#btn-checkout');
+        if (!btn) return;
+        if (getOpenShift()) return;
+        try {
+          if (sessionStorage.getItem('rs_shift_nudge_done') === '1') return;
+          sessionStorage.setItem('rs_shift_nudge_done', '1');
+        } catch (_) {}
+        toast('Tip: open a shift for cash Z-report · use Day pack anytime', 'fa-cash-register');
+      },
+      true
+    );
+  }
+
+  function maybePromptOpenShift() {
+    try {
+      if (sessionStorage.getItem('rs_shift_prompted') === '1') return;
+      if (getOpenShift()) return;
+      const pos = document.getElementById('pos-tab');
+      if (!pos || !pos.classList.contains('active')) return;
+      sessionStorage.setItem('rs_shift_prompted', '1');
+      // Non-blocking: only toast, not a hard modal
+      setTimeout(() => {
+        if (!getOpenShift()) {
+          toast('Open a shift to track cash float & Z-report', 'fa-unlock');
+        }
+      }, 1200);
+    } catch (_) {}
   }
 
   /* ---------------- Dues quick strip on customers (soft) ---------------- */
@@ -703,11 +884,27 @@
 
   /* ---------------- Boot ---------------- */
   function refreshOpsUi() {
-    paintStationChip();
-    paintShiftBar();
-    paintOwnerStrip();
-    paintStockBanner();
-    enhanceBillsPaging();
+    try {
+      paintStationChip();
+    } catch (_) {}
+    try {
+      paintShiftBar();
+    } catch (_) {}
+    try {
+      paintOwnerStrip();
+    } catch (_) {}
+    try {
+      ensurePosQuickTools();
+    } catch (_) {}
+    try {
+      paintStockBanner();
+    } catch (_) {}
+    try {
+      enhanceBillsPaging();
+    } catch (_) {}
+    try {
+      maybePromptOpenShift();
+    } catch (_) {}
   }
 
   function boot() {
@@ -715,6 +912,7 @@
     installCheckoutHooks();
     installPdfPreference();
     enhanceDuesHint();
+    installShiftNudge();
     refreshOpsUi();
 
     document.addEventListener('rs:hydrated', () => {
@@ -752,6 +950,7 @@
       zReportHtml,
       zReportCsv,
       downloadZCsv,
+      exportDayPackCsv,
       getZScope,
       setZScope,
       showZReportModal,
