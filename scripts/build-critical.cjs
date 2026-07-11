@@ -32,6 +32,8 @@ async function main() {
     'assets/modules/inventory-ui.js',
     'assets/modules/reports-ui.js',
     'assets/modules/gateway-monitor.js',
+    // super-admin is large + rarely needed on POS boot — keep out of critical bundle
+    'assets/modules/kds-ui.js',
     'assets/print-bridge.js',
     'assets/receipt.js',
     'assets/competitive-ops.js',

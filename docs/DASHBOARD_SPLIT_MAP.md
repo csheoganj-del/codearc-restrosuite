@@ -12,6 +12,8 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 | Inventory stock/recipes UI | `assets/modules/inventory-ui.js` | ✅ Wave 7 |
 | Reports UI | `assets/modules/reports-ui.js` | ✅ Wave 8 |
 | Gateway monitor + incidents | `assets/modules/gateway-monitor.js` | ✅ Wave 8 |
+| Super-admin tenant console | `assets/modules/super-admin.js` | ✅ Wave 9 |
+| KDS board UI | `assets/modules/kds-ui.js` | ✅ Wave 9 |
 | ESC/POS encode | `assets/escpos-encoder.js` | ✅ |
 | Print routing | `assets/print-bridge.js` | ✅ |
 | Shifts / station / keys | `assets/competitive-ops.js` | ✅ |
@@ -20,8 +22,8 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 
 | # | Domain | Approx lines | Notes |
 |---|--------|--------------|-------|
-| 1 | Super-admin table | ~1200 | High isolation; own file + `RS.addRenderer` |
-| 2 | KDS / QR orders | ~200 | Medium coupling to pending_orders |
+| 1 | QR orders UI | ~200 | Coupled to pending_orders / KDS hydrate |
+| 2 | Employees UI | ~250 | Medium isolation |
 | 3 | POS cart/render | ~700 | Tight coupling to `MENU`/`cart` — last |
 
 ## Rules
@@ -34,6 +36,6 @@ Current size: ~6.7k lines. Extraction strategy: **IIFE modules + thin delegates*
 ## Boot after remaining
 
 ```
-doppio-api → db → print-bridge → escpos → bill-identity → inventory-ledger → bills-history → inventory-ui
-→ reports-ui → gateway-monitor → saas-core → dashboard → features-pos → critical.bundle → shell
+doppio-api → db → print-bridge → escpos → modules… → super-admin → kds-ui
+→ saas-core → dashboard → features-pos → critical.bundle → shell
 ```
