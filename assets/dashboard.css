@@ -587,12 +587,38 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .cart-cust-direct-inputs.is-open {
   display: flex !important;
 }
-/* Side-by-side name + phone when open to stay short */
+/* Name shorter · phone wider — 10-digit national numbers must fit with +91 chip */
 .cart-cust-direct-inputs .cart-cust-fields {
-  display: grid; grid-template-columns: 1.2fr 1fr; gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  gap: 6px;
+  align-items: stretch;
 }
-.cart-cust-direct-inputs .form-input { min-width: 0; width: 100%; height: 38px !important; padding: 8px 10px !important; font-size: 13px !important; }
-.cart-cust-direct-inputs .phone-combo { width: 100% !important; box-sizing: border-box; }
+.cart-cust-direct-inputs .cart-cust-fields > #cust-input-name {
+  min-width: 0;
+}
+.cart-cust-direct-inputs .form-input {
+  min-width: 0; width: 100%; height: 38px !important;
+  padding: 8px 8px !important; font-size: 13px !important;
+}
+.cart-cust-direct-inputs .phone-combo {
+  width: 100% !important; box-sizing: border-box; min-width: 0;
+  height: 38px;
+}
+.cart-cust-direct-inputs .phone-combo .phone-flag-btn {
+  min-width: 0; width: auto; padding: 0 6px; height: 36px; gap: 3px;
+  font-size: 11px;
+}
+.cart-cust-direct-inputs .phone-combo .phone-flag-btn .flag-emoji { font-size: 13px; }
+.cart-cust-direct-inputs .phone-combo .phone-flag-btn .dial-code { font-size: 11px; font-weight: 700; }
+/* Hide flag emoji in narrow cart so dial + 10 digits fit */
+.cart-cust-direct-inputs .phone-combo .phone-flag-btn .flag-emoji { display: none; }
+.cart-cust-direct-inputs .phone-combo input[type="tel"],
+.cart-cust-direct-inputs .phone-combo input[type="text"] {
+  height: 36px; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+  padding: 0 8px; min-width: 7.5ch; /* room for 10 digits */
+}
 .cust-search-popover {
   display: none; flex-direction: column; gap: 4px;
   max-height: 140px; overflow-y: auto;

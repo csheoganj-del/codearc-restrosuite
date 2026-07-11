@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v94-20260711-shift-top';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v95-20260711-phone-fit';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -559,8 +559,8 @@
                   </div>
                   <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden>
                     <div class="cart-cust-fields">
-                      <input type="text" id="cust-input-name" placeholder="Name / search…" class="form-input" autocomplete="off">
-                      <input type="tel" id="cust-input-phone" placeholder="Phone" class="form-input" autocomplete="tel">
+                      <input type="text" id="cust-input-name" placeholder="Name" class="form-input" autocomplete="off" title="Guest name or search">
+                      <input type="tel" id="cust-input-phone" placeholder="10-digit mobile" class="form-input" autocomplete="tel" inputmode="numeric" maxlength="15" title="Mobile number">
                     </div>
                     <div id="cust-search-popover" class="cust-search-popover" style="display:none" role="listbox" aria-label="Matching customers"></div>
                   </div>
