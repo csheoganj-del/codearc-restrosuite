@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v129 (2026-07-13) — QR print live preview follows options
+
+- Changing **card size** or any toggle (Order/Waiter, Wi‑Fi, steps, Powered by…) **rebuilds the preview instantly**
+- Preview uses the selected size (not a hard-coded small card)
+- Sticky preview strip + caption “Live preview · Medium · updates as you toggle”
+
 ## v128 (2026-07-13) — QR tent cards redesign (10/10)
 
 - **Fully inline-styled cards** — modal preview matches the print sheet (no broken unstyled preview)

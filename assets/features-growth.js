@@ -2391,7 +2391,7 @@
         outletName: meta.name,
         tableLabel,
         qrCodeUrl,
-        sizeId: sizeId || 'small',
+        sizeId: sizeId || 'medium',
         phone: meta.phone,
         wifi: meta.wifi,
         wifiPass: meta.wifiPass,
@@ -2399,11 +2399,15 @@
         printOpts: opts || savedOpts,
       });
 
+      // Preview uses the real size id; container scales so large/full still fit the modal
+      const previewMax = { mini: 200, small: 240, medium: 280, large: 300, full: 320 };
+
       const body = `
         <div style="text-align:center;padding:4px 0 2px">
           <div style="background:linear-gradient(180deg,#eef1ef 0%,#e4e8e6 100%);border-radius:14px;padding:12px;margin-bottom:12px;border:1px solid var(--stroke-2)">
-            <div id="qr-single-preview" style="max-width:260px;margin:0 auto;filter:drop-shadow(0 8px 20px rgba(12,31,26,.14));text-align:left">
-            ${buildGuestQrCardHtml(cardProps('small', savedOpts))}
+            <div id="qr-preview-caption" style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);margin-bottom:8px">Live preview · ${(QR_PRINT_SIZES[savedSize] || {}).label || 'Medium'}</div>
+            <div id="qr-single-preview" style="max-width:${previewMax[savedSize] || 280}px;margin:0 auto;filter:drop-shadow(0 8px 20px rgba(12,31,26,.14));text-align:left">
+            ${buildGuestQrCardHtml(cardProps(savedSize, savedOpts))}
             </div>
           </div>
           <div style="font-size:12px;font-weight:700;text-align:left;margin:4px 0 6px;color:var(--text)">Print size</div>
@@ -2423,31 +2427,42 @@
         onMount(modal, close) {
           modal.querySelector('[data-x]').onclick = close;
           const refreshPreview = () => {
+            const sizeId =
+              (modal.querySelector('input[name="qr-size-one"]:checked') || {}).value || 'medium';
             const opts = readQrPrintOptsFromModal(modal);
+            // Wi‑Fi password only if name is on
+            if (!opts.showWifi) opts.showWifiPass = false;
             const box = modal.querySelector('#qr-single-preview');
-            if (box) box.innerHTML = buildGuestQrCardHtml(cardProps('small', opts));
+            if (box) {
+              box.style.maxWidth = (previewMax[sizeId] || 280) + 'px';
+              box.innerHTML = buildGuestQrCardHtml(cardProps(sizeId, opts));
+            }
+            const cap = modal.querySelector('#qr-preview-caption');
+            if (cap) {
+              const lab = (QR_PRINT_SIZES[sizeId] || {}).label || sizeId;
+              cap.textContent = 'Live preview · ' + lab + ' · updates as you toggle';
+            }
           };
-          modal.querySelectorAll('input[type="checkbox"][id^="qr-opt-"]').forEach((el) => {
-            el.addEventListener('change', refreshPreview);
-          });
-          // Password only meaningful when Wi‑Fi name is on
-          const wifiCb = modal.querySelector('#qr-opt-wifi');
-          const passCb = modal.querySelector('#qr-opt-wifi-pass');
-          if (wifiCb && passCb && !passCb.disabled) {
-            const syncPass = () => {
-              if (!wifiCb.checked) {
-                passCb.checked = false;
+          // Any size radio or content toggle → rebuild preview instantly
+          modal.addEventListener('change', (e) => {
+            const t = e.target;
+            if (!t || !t.matches) return;
+            if (
+              t.matches('input[name="qr-size-one"]') ||
+              t.matches('input[id^="qr-opt-"]')
+            ) {
+              if (t.id === 'qr-opt-wifi' && !t.checked) {
+                const pass = modal.querySelector('#qr-opt-wifi-pass');
+                if (pass && !pass.disabled) pass.checked = false;
               }
-            };
-            wifiCb.addEventListener('change', () => {
-              syncPass();
               refreshPreview();
-            });
-          }
+            }
+          });
           modal.querySelector('#btn-print-single-qr').onclick = () => {
             const picked =
               (modal.querySelector('input[name="qr-size-one"]:checked') || {}).value || 'medium';
             const opts = readQrPrintOptsFromModal(modal);
+            if (!opts.showWifi) opts.showWifiPass = false;
             saveQrPrintSizeId(picked);
             saveQrPrintOpts(opts);
             const card = buildGuestQrCardHtml(cardProps(picked, opts));
@@ -2505,15 +2520,16 @@
         .join('');
 
       const sample = tableQrs[0];
+      const previewMax = { mini: 200, small: 240, medium: 280, large: 300, full: 320 };
       const livePreview = sample
-        ? `<div style="background:linear-gradient(180deg,#eef1ef 0%,#e4e8e6 100%);border-radius:14px;padding:14px 12px 12px;margin:0 0 14px;border:1px solid var(--stroke-2)">
-            <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);text-align:center;margin-bottom:8px">Live preview · matches print</div>
-            <div id="qr-live-preview" style="max-width:280px;margin:0 auto;filter:drop-shadow(0 10px 22px rgba(12,31,26,.16))">
+        ? `<div style="background:linear-gradient(180deg,#eef1ef 0%,#e4e8e6 100%);border-radius:14px;padding:14px 12px 12px;margin:0 0 14px;border:1px solid var(--stroke-2);position:sticky;top:0;z-index:2">
+            <div id="qr-preview-caption" style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);text-align:center;margin-bottom:8px">Live preview · ${(QR_PRINT_SIZES[savedSize] || {}).label || 'Medium'} · updates as you toggle</div>
+            <div id="qr-live-preview" style="max-width:${previewMax[savedSize] || 280}px;margin:0 auto;filter:drop-shadow(0 10px 22px rgba(12,31,26,.16))">
             ${buildGuestQrCardHtml({
               outletName: meta.name,
               tableLabel: sample.tableLabel,
               qrCodeUrl: sample.qrCodeUrl,
-              sizeId: 'small',
+              sizeId: savedSize,
               phone: meta.phone,
               wifi: meta.wifi,
               wifiPass: meta.wifiPass,
@@ -2541,7 +2557,7 @@
         size: 'md',
         body: `
           <p style="margin:0 0 12px;font-size:13px;color:var(--text-soft);line-height:1.5">
-            Each card: <b>Table #</b> · <b>Order food</b> · <b>Call waiter</b> · QR · <b>Powered by RestroSuite</b>.
+            Preview above updates when you change <b>size</b> or any toggle below.
           </p>
           ${livePreview}
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:8px">Card size</div>
@@ -2561,44 +2577,63 @@
               lab.style.boxShadow = on ? '0 0 0 1px #c4a35a' : 'none';
             });
           };
-          modal.querySelectorAll('input[name="qr-print-size"]').forEach((r) => {
-            r.addEventListener('change', syncSel);
-          });
-          syncSel();
           const refreshPreview = () => {
             if (!sample) return;
+            const sizeId =
+              (modal.querySelector('input[name="qr-print-size"]:checked') || {}).value || 'medium';
             const opts = readQrPrintOptsFromModal(modal);
+            if (!opts.showWifi) opts.showWifiPass = false;
             const box = modal.querySelector('#qr-live-preview');
-            if (box)
+            if (box) {
+              box.style.maxWidth = (previewMax[sizeId] || 280) + 'px';
               box.innerHTML = buildGuestQrCardHtml({
                 outletName: meta.name,
                 tableLabel: sample.tableLabel,
                 qrCodeUrl: sample.qrCodeUrl,
-                sizeId: 'small',
+                sizeId: sizeId,
                 phone: meta.phone,
                 wifi: meta.wifi,
                 wifiPass: meta.wifiPass,
                 tagline: meta.tagline,
                 printOpts: opts,
               });
+            }
+            const cap = modal.querySelector('#qr-preview-caption');
+            if (cap) {
+              const lab = (QR_PRINT_SIZES[sizeId] || {}).label || sizeId;
+              cap.textContent = 'Live preview · ' + lab + ' · updates as you toggle';
+            }
+            syncSel();
           };
-          modal.querySelectorAll('input[type="checkbox"][id^="qr-opt-"]').forEach((el) => {
-            el.addEventListener('change', refreshPreview);
-          });
-          const wifiCb = modal.querySelector('#qr-opt-wifi');
-          const passCb = modal.querySelector('#qr-opt-wifi-pass');
-          if (wifiCb && passCb && !passCb.disabled) {
-            wifiCb.addEventListener('change', () => {
-              if (!wifiCb.checked) passCb.checked = false;
+          // One listener for all size radios + content checkboxes
+          modal.addEventListener('change', (e) => {
+            const t = e.target;
+            if (!t || !t.matches) return;
+            if (
+              t.matches('input[name="qr-print-size"]') ||
+              t.matches('input[id^="qr-opt-"]')
+            ) {
+              if (t.id === 'qr-opt-wifi' && !t.checked) {
+                const pass = modal.querySelector('#qr-opt-wifi-pass');
+                if (pass && !pass.disabled) pass.checked = false;
+              }
               refreshPreview();
+            }
+          });
+          // Also react when user clicks the size card label (some browsers delay radio change)
+          modal.querySelectorAll('.qr-size-opt').forEach((lab) => {
+            lab.addEventListener('click', () => {
+              setTimeout(refreshPreview, 0);
             });
-          }
+          });
+          syncSel();
           const go = modal.querySelector('#btn-print-all-qrs-go');
           if (go)
             go.onclick = () => {
               const sizeId =
                 (modal.querySelector('input[name="qr-print-size"]:checked') || {}).value || 'medium';
               const opts = readQrPrintOptsFromModal(modal);
+              if (!opts.showWifi) opts.showWifiPass = false;
               saveQrPrintSizeId(sizeId);
               saveQrPrintOpts(opts);
               openQrPrintWindow(
