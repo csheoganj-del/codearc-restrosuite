@@ -1,13 +1,15 @@
 {
-  "version": "v158-20260713-fefo-expiry",
+  "version": "v162-20260713-naive-smooth",
   "date": "2026-07-13",
-  "title": "FEFO batch expiry — use first",
-  "summary": "Inventory now tracks expiry on batches. Near-expiry banner and per-item Use first labels show what to cook first. Receiving stock and restock capture expiry; POS sales and waste deduct soonest-expiring batches first (FEFO).",
+  "title": "Menu · Recipe · Stock — smooth for everyone",
+  "summary": "Plain-language kitchen setup so any staff can connect Menu, Recipe, and Stock. 3-step checklist, progress bar, helper on every unlinked dish, tips on Menu Editor and POS.",
   "highlights": [
-    "Receive PO / Restock: enter batch expiry date.",
-    "Stock row: click name for batches; Use first / Expired labels.",
-    "Banner: N batches near expiry with View list.",
-    "FEFO: sales and waste consume oldest-expiring batch first.",
-    "Sidebar badge counts low stock + near-expiry batches."
+    "3-step setup checklist: Stock → Menu → Link recipes",
+    "Help me wizard with Save & link next dish",
+    "Progress bar: X% of dishes linked",
+    "Help me button on every unlinked recipe row",
+    "Menu Editor banner + Need help linking stock?",
+    "POS soft tip when dish has no recipe (stock won't move)",
+    "Plain words instead of FEFO/deduction jargon"
   ]
 }

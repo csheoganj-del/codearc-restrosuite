@@ -1,17 +1,16 @@
 /* ============================================================
    Kitchen Link Coach — plain-language Menu ↔ Recipe ↔ Stock
-   For any staff, no technical words required.
+   Designed so any staff member (no tech background) can finish setup.
    ============================================================ */
 (function (global) {
   'use strict';
 
+  var LS_FIRST = 'rs_klc_first_visit_v1';
+  var LS_HINT = 'rs_klc_pos_hint_v1';
+
   function toast(msg, icon) {
     if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
     else if (typeof global.__toast === 'function') global.__toast(msg, icon);
-  }
-  function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
-    return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -43,6 +42,18 @@
     const linked = linkedCount();
     return { linked, total: t, pct: Math.round((linked / t) * 100), missing: t - linked };
   }
+  function setupStatus() {
+    const invN = inventory().length;
+    const c = coverage();
+    return {
+      hasStock: invN > 0,
+      hasMenu: c.total > 0,
+      hasLinks: c.linked > 0,
+      allLinked: c.total > 0 && c.missing === 0 && invN > 0,
+      invN,
+      ...c,
+    };
+  }
 
   function goInventoryTab(sub) {
     if (global.RS && typeof RS.activateTab === 'function') {
@@ -62,6 +73,18 @@
       const btns = sec.querySelectorAll('.seg button');
       if (btns[idx]) btns[idx].click();
     }, 120);
+  }
+
+  function goMenuEditor() {
+    if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('editor-tab');
+  }
+
+  function progressBarHtml(pct) {
+    const p = Math.max(0, Math.min(100, Number(pct) || 0));
+    return `<div class="klc-progress" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100">
+      <div class="klc-progress-fill" style="width:${p}%"></div>
+    </div>
+    <div class="klc-progress-lab">${p}% of dishes linked to stock</div>`;
   }
 
   /**
@@ -106,7 +129,7 @@
           <div class="klc-example">
             <div class="klc-ex-title">Example</div>
             <p>Customer buys <b>1× Basmati Rice</b> → Recipe says “uses 150 g rice” → Stock of rice goes down by 150 g automatically.</p>
-            <p class="klc-warn"><i class="fa-solid fa-triangle-exclamation"></i> If a dish has <b>no recipe</b>, selling it does <b>not</b> change stock. That is why the list showed “No ingredients linked”.</p>
+            <p class="klc-warn"><i class="fa-solid fa-triangle-exclamation"></i> If a dish has <b>no recipe</b>, selling it does <b>not</b> change stock. That is why the list showed “Not linked to stock yet”.</p>
           </div>
           <ol class="klc-steps">
             <li><b>Stock</b> — add kitchen items (rice, chicken, rolls…)</li>
@@ -123,6 +146,123 @@
           close();
           openLinkWizard();
         };
+      },
+    });
+  }
+
+  /**
+   * One-screen setup checklist — the main entry for naive users.
+   */
+  function openSetupChecklist() {
+    if (!global.RSModal) {
+      toast('Open Inventory → Recipes', 'fa-circle-info');
+      return;
+    }
+    const s = setupStatus();
+    function stepRow(n, title, ok, detail, actionLabel, actionKey) {
+      return `<div class="klc-check-row ${ok ? 'is-done' : ''}">
+        <div class="klc-check-num">${ok ? '<i class="fa-solid fa-check"></i>' : n}</div>
+        <div class="klc-check-body">
+          <div class="klc-check-title">${title}</div>
+          <div class="klc-check-detail">${detail}</div>
+        </div>
+        ${
+          ok
+            ? '<span class="klc-check-badge">Done</span>'
+            : `<button type="button" class="btn btn-primary btn-sm" data-act="${actionKey}">${actionLabel}</button>`
+        }
+      </div>`;
+    }
+    global.RSModal.open({
+      title: 'Kitchen setup in 3 easy steps',
+      sub: 'Do these once — then sales update stock by themselves',
+      icon: 'fa-list-check',
+      size: 'md',
+      body: `
+        <div class="klc-check">
+          ${stepRow(
+            1,
+            'Add your store room (Stock)',
+            s.hasStock,
+            s.hasStock
+              ? `<b>${s.invN}</b> items in stock — rice, oil, chicken…`
+              : 'List what you keep in the kitchen. Without this, recipes have nothing to use.',
+            'Add stock',
+            'stock'
+          )}
+          ${stepRow(
+            2,
+            'Add dishes to sell (Menu)',
+            s.hasMenu,
+            s.hasMenu
+              ? `<b>${s.total}</b> dishes on the menu`
+              : 'Add the dishes customers order (Paneer Tikka, Biryani…).',
+            'Open Menu',
+            'menu'
+          )}
+          ${stepRow(
+            3,
+            'Link each dish to stock (Recipe)',
+            s.allLinked,
+            s.hasMenu
+              ? s.missing
+                ? `<b>${s.linked}</b> of <b>${s.total}</b> linked · <b>${s.missing}</b> still open`
+                : 'All dishes are linked — stock will move when you sell.'
+              : 'After you have dishes, say what each one uses from the store room.',
+            s.missing ? 'Help me link' : 'Open helper',
+            'link'
+          )}
+          <div class="klc-check-foot">
+            ${progressBarHtml(s.pct)}
+            <p class="klc-p" style="margin:10px 0 0">You can leave and come back anytime. Progress is saved.</p>
+          </div>
+        </div>`,
+      foot: `
+        <button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>
+        <button type="button" class="btn btn-ghost" style="flex:1" data-how>Show simply</button>
+        <button type="button" class="btn btn-primary" style="flex:1.3" data-start><i class="fa-solid fa-wand-magic-sparkles"></i> ${
+          !s.hasStock ? 'Start with stock' : !s.hasMenu ? 'Add a dish' : s.missing ? 'Link next dish' : 'All set'
+        }</button>`,
+      onMount(m, close) {
+        m.querySelector('[data-x]').onclick = close;
+        m.querySelector('[data-how]').onclick = () => {
+          close();
+          openHowItWorks();
+        };
+        const start = () => {
+          close();
+          if (!s.hasStock) {
+            goInventoryTab('stock');
+            setTimeout(() => {
+              const b = document.getElementById('btn-add-ingredient');
+              if (b) b.click();
+            }, 220);
+          } else if (!s.hasMenu) {
+            goMenuEditor();
+          } else if (s.missing) {
+            openLinkWizard();
+          } else {
+            goInventoryTab('recipes');
+          }
+        };
+        m.querySelector('[data-start]').onclick = start;
+        m.querySelectorAll('[data-act]').forEach((btn) => {
+          btn.onclick = () => {
+            const k = btn.getAttribute('data-act');
+            close();
+            if (k === 'stock') {
+              goInventoryTab('stock');
+              setTimeout(() => {
+                const b = document.getElementById('btn-add-ingredient');
+                if (b) b.click();
+              }, 220);
+            } else if (k === 'menu') {
+              goMenuEditor();
+            } else {
+              openLinkWizard();
+            }
+          };
+        });
       },
     });
   }
@@ -177,7 +317,7 @@
           m.querySelector('[data-x]').onclick = close;
           m.querySelector('[data-menu]').onclick = () => {
             close();
-            if (global.RS && RS.activateTab) RS.activateTab('editor-tab');
+            goMenuEditor();
           };
         },
       });
@@ -256,7 +396,6 @@
             </button>
           </div>`;
       }
-      // step 3 confirm
       const lines = draft
         .filter((g) => Number(g.qty) > 0)
         .map((g) => `• ${pretty(g.name)} — ${g.qty} ${g.unit || ''}`)
@@ -331,7 +470,6 @@
     }
 
     function remount() {
-      // RSModal doesn't remount easily — use one modal with live inner update via reopen
       global.RSModal.open({
         title: step === 1 ? 'Link a dish to stock' : step === 2 ? 'What does this dish use?' : 'Save recipe',
         sub: 'Simple setup · no technical words',
@@ -383,7 +521,6 @@
               document.dispatchEvent(new CustomEvent('rs:render-inventory'));
               if (global.RS && RS.render) RS.render('inventory-tab');
               goInventoryTab('recipes');
-              // Offer next
               setTimeout(() => {
                 const still = unlinkedDishes();
                 if (still.length && global.RSModal) {
@@ -457,10 +594,6 @@
               addBtn.onclick = () => {
                 openPicker((item) => {
                   if (!draft.find((g) => g.name === item.name)) draft.push(item);
-                  // reopen step 2 to refresh — close parent was not closed
-                  // parent modal still open; need to refresh draft in place
-                  // openPicker closes only sub - parent still there but draftEl may be stale if nested
-                  // remount parent
                   close();
                   remount();
                 });
@@ -477,16 +610,14 @@
    * Sticky coach card HTML for Recipes header area.
    */
   function coachCardHtml() {
-    const c = coverage();
-    const invN = inventory().length;
-    const done = c.total > 0 && c.missing === 0 && invN > 0;
-    if (done) {
+    const s = setupStatus();
+    if (s.allLinked) {
       return `<div class="klc-card klc-card-ok" id="klc-coach-card">
         <div class="klc-card-top">
           <i class="fa-solid fa-circle-check"></i>
-          <div>
+          <div style="flex:1;min-width:0">
             <div class="klc-card-title">Kitchen link is ready</div>
-            <div class="klc-card-sub">All ${c.total} dishes have recipes · stock will move when you sell</div>
+            <div class="klc-card-sub">All ${s.total} dishes have recipes · stock will move when you sell</div>
           </div>
           <button type="button" class="btn btn-ghost btn-sm" id="klc-how">How it works</button>
         </div>
@@ -496,14 +627,15 @@
       <div class="klc-card-top">
         <i class="fa-solid fa-link"></i>
         <div style="flex:1;min-width:0">
-          <div class="klc-card-title">Connect Menu + Stock (for everyone)</div>
+          <div class="klc-card-title">Make stock update itself when you sell</div>
           <div class="klc-card-sub">
-            <b>${c.linked}</b> of <b>${c.total}</b> dishes linked
-            ${invN ? '' : ' · <span style="color:var(--amber)">add stock first</span>'}
-            ${c.missing ? ' · <b>' + c.missing + '</b> still need a recipe' : ''}
+            <b>${s.linked}</b> of <b>${s.total}</b> dishes linked
+            ${s.invN ? '' : ' · <span style="color:var(--amber)">add stock first</span>'}
+            ${s.missing ? ' · <b>' + s.missing + '</b> still need a recipe' : ''}
           </div>
         </div>
       </div>
+      ${progressBarHtml(s.pct)}
       <div class="klc-mini-flow">
         <span><i class="fa-solid fa-utensils"></i> Menu = sell</span>
         <i class="fa-solid fa-arrow-right"></i>
@@ -513,8 +645,37 @@
       </div>
       <div class="klc-card-actions">
         <button type="button" class="btn btn-primary btn-sm" id="klc-start"><i class="fa-solid fa-wand-magic-sparkles"></i> Help me link a dish</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="klc-check"><i class="fa-solid fa-list-check"></i> 3-step setup</button>
         <button type="button" class="btn btn-ghost btn-sm" id="klc-how">Show me simply</button>
-        ${!invN ? '<button type="button" class="btn btn-ghost btn-sm" id="klc-stock"><i class="fa-solid fa-plus"></i> Add stock first</button>' : ''}
+        ${!s.invN ? '<button type="button" class="btn btn-ghost btn-sm" id="klc-stock"><i class="fa-solid fa-plus"></i> Add stock first</button>' : ''}
+      </div>
+    </div>`;
+  }
+
+  /**
+   * Compact banner for Menu Editor / POS / anywhere.
+   */
+  function miniBannerHtml(opts) {
+    opts = opts || {};
+    const s = setupStatus();
+    if (s.allLinked && !opts.force) return '';
+    const place = opts.place || 'here';
+    let msg;
+    if (!s.hasStock) msg = 'First add store-room items (Stock), then link recipes so sales reduce stock.';
+    else if (!s.hasMenu) msg = 'Add dishes on the menu, then link each one to stock.';
+    else if (s.missing)
+      msg = `<b>${s.missing}</b> dish${s.missing === 1 ? '' : 'es'} not linked yet — selling them will not reduce stock.`;
+    else msg = 'Kitchen link is ready.';
+    return `<div class="klc-mini-banner" id="${esc(opts.id || 'klc-mini-banner')}">
+      <i class="fa-solid fa-link"></i>
+      <div class="klc-mini-banner-body">
+        <div class="klc-mini-banner-title">Menu · Recipe · Stock</div>
+        <div class="klc-mini-banner-msg">${msg}</div>
+      </div>
+      <div class="klc-mini-banner-actions">
+        ${s.missing || !s.hasStock ? `<button type="button" class="btn btn-primary btn-sm" data-klc="start">Help me</button>` : ''}
+        <button type="button" class="btn btn-ghost btn-sm" data-klc="check">3 steps</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-klc="how" title="Explain">?</button>
       </div>
     </div>`;
   }
@@ -524,8 +685,10 @@
     const start = host.querySelector('#klc-start');
     const how = host.querySelector('#klc-how');
     const stock = host.querySelector('#klc-stock');
+    const check = host.querySelector('#klc-check');
     if (start) start.onclick = () => openLinkWizard();
     if (how) how.onclick = () => openHowItWorks();
+    if (check) check.onclick = () => openSetupChecklist();
     if (stock)
       stock.onclick = () => {
         goInventoryTab('stock');
@@ -536,12 +699,111 @@
       };
   }
 
+  function wireMiniBanner(root) {
+    const host = root || document;
+    host.querySelectorAll('[data-klc]').forEach((btn) => {
+      if (btn._klcWired) return;
+      btn._klcWired = true;
+      btn.onclick = (e) => {
+        e.preventDefault();
+        const k = btn.getAttribute('data-klc');
+        if (k === 'start') openLinkWizard();
+        else if (k === 'check') openSetupChecklist();
+        else if (k === 'how') openHowItWorks();
+        else if (k === 'stock') {
+          goInventoryTab('stock');
+          setTimeout(() => {
+            const b = document.getElementById('btn-add-ingredient');
+            if (b) b.click();
+          }, 200);
+        }
+      };
+    });
+  }
+
+  /**
+   * Soft first-visit offer — once per browser when setup incomplete.
+   */
+  function maybeOfferFirstVisit() {
+    try {
+      if (global.localStorage && localStorage.getItem(LS_FIRST) === '1') return;
+      const s = setupStatus();
+      if (s.allLinked) return;
+      if (!s.hasMenu && !s.hasStock) {
+        // brand new — still offer checklist once
+      } else if (!s.missing && s.hasStock) {
+        return;
+      }
+      if (!global.RSModal) return;
+      if (global.localStorage) localStorage.setItem(LS_FIRST, '1');
+      setTimeout(() => {
+        if (!global.RSModal) return;
+        global.RSModal.open({
+          title: 'Quick tip: connect kitchen stock',
+          sub: 'Takes a few minutes · works for any staff',
+          icon: 'fa-lightbulb',
+          size: 'sm',
+          body: `<p style="margin:0;font-size:14px;line-height:1.55;color:var(--text-soft)">
+            When a customer buys a dish, stock can go down <b>automatically</b> — but only if each dish has a simple <b>recipe</b> (what it uses from the store room).
+            <br><br>
+            We will walk you through it in plain language. You can skip and come back anytime.
+          </p>`,
+          foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Not now</button>
+            <button type="button" class="btn btn-primary" style="flex:1.3" data-go><i class="fa-solid fa-list-check"></i> Show me the 3 steps</button>`,
+          onMount(m, close) {
+            m.querySelector('[data-x]').onclick = close;
+            m.querySelector('[data-go]').onclick = () => {
+              close();
+              openSetupChecklist();
+            };
+          },
+        });
+      }, 900);
+    } catch (_) {}
+  }
+
+  /**
+   * POS: soft one-time toast when adding an unlinked dish.
+   */
+  function posUnlinkedHint(dishName) {
+    try {
+      const key = LS_HINT;
+      let n = 0;
+      if (global.sessionStorage) {
+        n = Number(sessionStorage.getItem(key) || 0) || 0;
+        if (n >= 2) return; // max 2 soft hints per session
+        sessionStorage.setItem(key, String(n + 1));
+      }
+      toast(
+        (dishName ? '“' + dishName + '”' : 'This dish') + ' has no recipe — sale will not reduce stock',
+        'fa-link'
+      );
+    } catch (_) {}
+  }
+
   global.RSKitchenLinkCoach = {
     openHowItWorks,
     openLinkWizard,
+    openSetupChecklist,
     coachCardHtml,
+    miniBannerHtml,
     wireCoachCard,
+    wireMiniBanner,
     coverage,
+    setupStatus,
     goInventoryTab,
+    maybeOfferFirstVisit,
+    posUnlinkedHint,
   };
+
+  // Soft first visit after app shell is ready
+  if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        try {
+          maybeOfferFirstVisit();
+        } catch (_) {}
+      }, 1800);
+    });
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

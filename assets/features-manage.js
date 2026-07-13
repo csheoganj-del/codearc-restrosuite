@@ -594,10 +594,10 @@
             </div>
             <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
               <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-top:2px"></i>
-              <div><strong style="color:var(--text)">How deduction works:</strong> when a bill is paid, each linked ingredient is deducted (recipe qty × sold). Stock uses <b>FEFO</b> — soonest-expiring batch first. Items with no recipe skip deduction.</div>
+              <div><strong style="color:var(--text)">In plain words:</strong> when a bill is paid, stock goes down by the recipe amounts (× how many sold). Near-expiry packs are used first. Dishes with no recipe do not change stock.</div>
             </div>
             <div class="table-scroll"><table class="data-table recipe-table">
-              <thead><tr><th>Menu Item</th><th>Category</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Linked ingredients</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Menu Item</th><th>Category</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Uses from stock</th><th>Actions</th></tr></thead>
               <tbody id="recipe-list-body"></tbody>
             </table></div>
           </div>
@@ -856,8 +856,8 @@
               <span class="pill" style="padding:4px 10px">${menu.length} menu items</span>
               ${
                 missingN
-                  ? `<span style="font-size:12.5px;color:var(--text-soft);align-self:center">Link recipes so POS sales deduct stock automatically.</span>`
-                  : `<span style="font-size:12.5px;color:var(--green);align-self:center;font-weight:600">All menu items have recipes.</span>`
+                  ? `<span style="font-size:12.5px;color:var(--text-soft);align-self:center">Link recipes so selling a dish reduces store-room stock.</span>`
+                  : `<span style="font-size:12.5px;color:var(--green);align-self:center;font-weight:600">All dishes are linked to stock.</span>`
               }`;
           }
 
@@ -973,7 +973,7 @@
                         }">${esc(prettyInvName(g.name))} (${esc(g.qty)} ${esc(g.unit || '')})</span>`;
                       })
                       .join('')}</div>`
-                  : `<span class="recipe-missing-label">No ingredients linked</span>`;
+                  : `<span class="recipe-missing-label">Not linked to stock yet</span>`;
                 return `
               <tr data-id="${esc(m.id)}" class="${ings.length ? 'recipe-row-linked' : 'recipe-row-missing'}">
                 <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg ? '' : 'nonveg'}"></span><b>${esc(m.name)}</b></div></td>
@@ -991,9 +991,18 @@
                 <td>${marginHtml}</td>
                 <td style="max-width:280px">${ingsHtml}</td>
                 <td>
-                  <button type="button" class="btn ${ings.length ? 'btn-ghost' : 'btn-primary'} btn-sm" data-edit-rec="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;">
-                    <i class="fa-solid fa-flask"></i> ${ings.length ? 'Edit recipe' : 'Add recipe'}
-                  </button>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    ${
+                      !ings.length
+                        ? `<button type="button" class="btn btn-primary btn-sm" data-help-link="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;" title="Simple step-by-step">
+                      <i class="fa-solid fa-wand-magic-sparkles"></i> Help me
+                    </button>`
+                        : ''
+                    }
+                    <button type="button" class="btn ${ings.length ? 'btn-ghost' : 'btn-ghost'} btn-sm" data-edit-rec="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;">
+                      <i class="fa-solid fa-flask"></i> ${ings.length ? 'Edit' : 'Manual'}
+                    </button>
+                  </div>
                 </td>
               </tr>`;
               })
@@ -1004,6 +1013,16 @@
             b.onclick = () => {
               const m = (RS.MENU || []).find((x) => String(x.id) === String(b.dataset.editRec));
               if (m) openRecipeEditModal(m);
+            };
+          });
+          recipeListBody.querySelectorAll('[data-help-link]').forEach((b) => {
+            b.onclick = () => {
+              if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.openLinkWizard) {
+                RSKitchenLinkCoach.openLinkWizard(b.getAttribute('data-help-link'));
+              } else {
+                const m = (RS.MENU || []).find((x) => String(x.id) === String(b.getAttribute('data-help-link')));
+                if (m) openRecipeEditModal(m);
+              }
             };
           });
 

@@ -520,13 +520,20 @@
           tip.style.display = 'flex';
           tip.innerHTML = `<i class="fa-solid fa-link"></i>
             <div style="flex:1"><b>Next:</b> ${missing} dish${missing === 1 ? '' : 'es'} still need a recipe so sales reduce stock.
-            <button type="button" class="btn btn-ghost btn-sm" id="inv-tip-link" style="margin-left:8px">Help me link</button>
+            <button type="button" class="btn btn-primary btn-sm" id="inv-tip-link" style="margin-left:8px">Help me link</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="inv-tip-check">3-step setup</button>
             <button type="button" class="btn btn-ghost btn-sm" id="inv-tip-recipes">Open Recipes</button></div>`;
           const a = tip.querySelector('#inv-tip-link');
           const b = tip.querySelector('#inv-tip-recipes');
+          const c = tip.querySelector('#inv-tip-check');
           if (a)
             a.onclick = () => {
               if (global.RSKitchenLinkCoach) RSKitchenLinkCoach.openLinkWizard();
+            };
+          if (c)
+            c.onclick = () => {
+              if (global.RSKitchenLinkCoach && RSKitchenLinkCoach.openSetupChecklist)
+                RSKitchenLinkCoach.openSetupChecklist();
             };
           if (b)
             b.onclick = () => {

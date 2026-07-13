@@ -68,9 +68,10 @@
               <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
               <div><label class="fl">${taxLabel} slab</label><select class="form-input" id="ed-gst">${slabs.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
             </div>
-            <div><label class="fl">Linked ingredients (recipe)</label><div class="ing-chips" id="ed-ings"></div></div>
+            <div><label class="fl">Uses from store room (recipe) <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">optional · links stock</span></label><div class="ing-chips" id="ed-ings"></div></div>
             <div id="ed-costline" style="font-size:12.5px;color:var(--text-mute)"></div>
             <button class="btn btn-primary btn-block" id="ed-save"><i class="fa-solid fa-circle-check"></i> Save item</button>
+            <button type="button" class="btn btn-ghost btn-block" id="ed-help-link" style="margin-top:2px"><i class="fa-solid fa-wand-magic-sparkles"></i> Need help linking stock?</button>
           </div>`;
       } else {
         const edGst = $('#ed-gst');
@@ -99,6 +100,20 @@
         costEl.innerHTML = cost? `Plate cost <b style="color:var(--text)">${rs(cost)}</b>${price?` · margin <b style="color:var(--green)">${Math.round((1-cost/price)*100)}%</b>`:''}` : '';
       }
       $('#ed-price').addEventListener('input', renderIngs);
+      const helpLinkBtn = $('#ed-help-link');
+      if (helpLinkBtn && !helpLinkBtn._rsWired) {
+        helpLinkBtn._rsWired = true;
+        helpLinkBtn.onclick = () => {
+          if (window.RSKitchenLinkCoach) {
+            if (editingId) RSKitchenLinkCoach.openLinkWizard(editingId);
+            else RSKitchenLinkCoach.openSetupChecklist
+              ? RSKitchenLinkCoach.openSetupChecklist()
+              : RSKitchenLinkCoach.openHowItWorks();
+          } else {
+            RS.toast('Open Inventory → Recipes for the simple helper', 'fa-circle-info');
+          }
+        };
+      }
       function openIngPicker(){
         const list = RS.INVENTORY||[];
         RSModal.open({ title:'Add ingredient', sub:'Link a raw material to this recipe', icon:'fa-flask', size:'sm',
@@ -265,6 +280,29 @@
     /* ---------------- right list ---------------- */
     function renderList(){
       const body = $('#editor-list'); if(!body) return;
+
+      // Naive-user banner above menu list (Menu · Recipe · Stock)
+      try {
+        const edTab = $('#editor-tab');
+        if (edTab && window.RSKitchenLinkCoach && RSKitchenLinkCoach.miniBannerHtml) {
+          let host = document.getElementById('klc-editor-banner');
+          if (!host) {
+            host = document.createElement('div');
+            host.id = 'klc-editor-banner';
+            host.style.margin = '0 0 12px';
+            const listPanel = body.closest('.panel') || body.parentElement;
+            if (listPanel && listPanel.parentElement) {
+              listPanel.parentElement.insertBefore(host, listPanel);
+            } else if (edTab.querySelector('.page-head')) {
+              edTab.querySelector('.page-head').after(host);
+            } else {
+              edTab.prepend(host);
+            }
+          }
+          host.innerHTML = RSKitchenLinkCoach.miniBannerHtml({ id: 'klc-ed-mini', place: 'menu' });
+          RSKitchenLinkCoach.wireMiniBanner(host);
+        }
+      } catch (_) {}
 
       const catFil = $('#editor-cat-filter');
       if (catFil && !catFil._rsListenerBound) {

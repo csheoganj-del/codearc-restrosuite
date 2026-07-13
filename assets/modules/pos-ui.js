@@ -412,7 +412,10 @@ function addToCart(id){
         toast(`Low stock for ${short.map(s => s.name).slice(0,2).join(', ')}`, 'fa-triangle-exclamation');
       }
     } else if (!m.ingredients || !m.ingredients.length) {
-      // silent — competitive-ops banner covers cart-level
+      // Soft plain-language hint (max 2 per session) so staff know stock won't move
+      if (global.RSKitchenLinkCoach && typeof RSKitchenLinkCoach.posUnlinkedHint === 'function') {
+        RSKitchenLinkCoach.posUnlinkedHint(m.name);
+      }
     }
   } catch (_) {}
   const basePrice = Number(m.price) || 0;
