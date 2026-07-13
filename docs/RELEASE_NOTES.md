@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v141 (2026-07-13) — Print sheet matches live preview proportions
+
+- **Full page** no longer stretches edge-to-edge (max ~108mm centered tent card)
+- Removed forced min-height stretch (was leaving huge empty space)
+- Page-breaks restored (Large = 2/page, Full = 1/page, etc.)
+- Card height follows content like the modal preview
+
+## v140 (2026-07-13) — Powered by CODEARC RestroSuite
+
 ## v139 (2026-07-13) — Powered by text only (no logo)
 
 - Footer is a single line: **Powered by RestroSuite** (no logo mark / image)
