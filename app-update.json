@@ -1,12 +1,12 @@
 {
-  "version": "v150-20260713-version-label",
+  "version": "v151-20260713-version-10",
   "date": "2026-07-13",
-  "title": "WhatsApp resilience, notifications & version label",
-  "summary": "Local WhatsApp gateway reconnects more reliably, the notification panel is fully clickable, and the top-bar version chip always shows the real build tag instead of Systempatch.",
+  "title": "Clean version label & URL hygiene",
+  "summary": "The top-bar build chip always shows the real RestroSuite version (e.g. v151). Legacy ?appv=Systempatch URLs are rewritten automatically, and updates never write marketing labels into the address bar.",
   "highlights": [
-    "WhatsApp gateway: infinite recoverable reconnect, stability probes, and a Windows stay-awake launcher for long-running local servers.",
-    "Top bar: bell, settings, and WhatsApp icons wire reliably again after shell syntax fixes.",
-    "Notifications: Mark all read always works; viewing an item dismisses and removes it from the list.",
-    "Version pill: rejects bogus ?appv=Systempatch values and never writes marketing labels into the cache-bust query."
+    "Address bar auto-cleans ?appv=Systempatch to the real short build tag without a hard reload.",
+    "Version chip shows v151 with a live indicator; click copies the full build id.",
+    "Save & Update only writes clean tags like v151 — never Systempatch.",
+    "WhatsApp reconnect, notification panel, and top-bar click fixes from v147–v149 remain included."
   ]
 }

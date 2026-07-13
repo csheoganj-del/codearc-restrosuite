@@ -77,16 +77,37 @@
     }
   }
 
-  // Cache-bust query (?appv=) must look like a real build tag (vNNN-...). Reject
-  // marketing labels such as "Systempatch" left over from the old update dialog.
+  // Canonical build tag. ?appv= is cache-bust only and must look like vNNN…
+  // (never marketing labels like "Systempatch"). Dirty URLs are rewritten so
+  // the address bar always matches the version chip.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v150-20260713-version-label';
+    var builtin = 'v151-20260713-version-10';
+    function isReal(v) {
+      v = String(v || '').trim();
+      if (!v) return false;
+      if (/system\s*patch/i.test(v)) return false;
+      return /^v\d+/i.test(v);
+    }
     var q = '';
     try { q = String(new URLSearchParams(location.search).get('appv') || '').trim(); } catch (_) {}
-    if (!q) return builtin;
-    if (/system\s*patch/i.test(q)) return builtin;
-    if (!/^v\d+/i.test(q)) return builtin;
-    return q;
+    // Bogus / legacy labels → current build. Valid short tag matching this
+    // major (v151) or full builtin → current build. Other valid tags kept for
+    // intentional cache-bust during staged deploys.
+    var shortBuiltin = builtin.split('-')[0];
+    var resolved = builtin;
+    if (isReal(q)) {
+      if (q === shortBuiltin || q === builtin) resolved = builtin;
+      else resolved = q;
+    }
+    try {
+      var url = new URL(location.href);
+      var cur = String(url.searchParams.get('appv') || '').trim();
+      if (cur && !isReal(cur)) {
+        url.searchParams.set('appv', shortBuiltin);
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+      }
+    } catch (_) {}
+    return resolved;
   })();
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,

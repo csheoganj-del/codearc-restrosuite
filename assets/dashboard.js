@@ -402,18 +402,65 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v150-20260713-version-label';
+    return 'v151-20260713-version-10';
   })();
-  // Quiet version chip on the top bar
-  (function(){
+  const appVersionShort = String(appVersion).split('-')[0] || appVersion;
+
+  // Quiet, trustworthy version chip — never show Systempatch; click copies build tag
+  (function wireVersionPill() {
     const el = document.getElementById('app-version-pill');
-    if(el) {
-      const short = appVersion.split('-')[0];
-      el.textContent = short;
-      el.classList.add('tb-version');
-      el.setAttribute('data-tooltip', 'App version: ' + appVersion);
-      el.title = 'App version: ' + appVersion;
-    }
+    if (!el) return;
+    const tip = 'RestroSuite ' + appVersionShort + ' · full build ' + appVersion + ' · click to copy';
+    el.textContent = appVersionShort;
+    el.classList.add('tb-version', 'tb-version-live');
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', 'App version ' + appVersionShort + '. Click to copy full build id.');
+    el.setAttribute('data-tooltip', tip);
+    el.title = tip;
+    el.dataset.fullVersion = appVersion;
+
+    const copyVersion = async () => {
+      const text = appVersion;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+        if (typeof toast === 'function') toast('Copied ' + appVersionShort, 'fa-copy');
+      } catch (_) {
+        if (typeof toast === 'function') toast(appVersionShort, 'fa-circle-info');
+      }
+    };
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      copyVersion();
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        copyVersion();
+      }
+    });
+
+    // Second-pass URL hygiene after JS loads (covers late navigations / hash routes)
+    try {
+      const url = new URL(location.href);
+      const cur = String(url.searchParams.get('appv') || '').trim();
+      if (cur && (!/^v\d+/i.test(cur) || /system\s*patch/i.test(cur))) {
+        url.searchParams.set('appv', appVersionShort);
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+      }
+    } catch (_) {}
   })();
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
@@ -696,14 +743,13 @@
   }
 
   function resolveAppvForReload(preferred) {
-    // Never write marketing labels (e.g. "System patch" → "Systempatch") into ?appv=
-    if (isRealAppVersionTag(preferred)) {
-      return String(preferred).trim().replace(/[^a-zA-Z0-9._-]/g, '');
-    }
-    if (isRealAppVersionTag(appVersion)) {
-      return String(appVersion).trim().replace(/[^a-zA-Z0-9._-]/g, '');
-    }
-    return 'v' + Date.now();
+    // Short clean tag only (v151) — never "Systempatch", never long marketing labels.
+    const toShort = (v) => {
+      const raw = String(v || '').trim().replace(/[^a-zA-Z0-9._-]/g, '');
+      if (!isRealAppVersionTag(raw)) return '';
+      return raw.split('-')[0] || raw;
+    };
+    return toShort(preferred) || toShort(appVersion) || toShort(appVersionShort) || ('v' + Date.now());
   }
 
   function showUpdateDialog(releaseInfo, signature) {
