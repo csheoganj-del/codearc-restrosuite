@@ -187,31 +187,23 @@
     /* ---------------- print helper ---------------- */
     window.RSPrint = function(innerHTML, title){
       const paperSize = (window.RS_SETTINGS && window.RS_SETTINGS.set_paper_size) || '80 mm';
-      const maxW = paperSize === '58 mm' ? '220px' : '320px';
+      const maxW = paperSize === '58 mm' ? '200px' : '300px';
       const style = `
         <style>
-          @page { size: auto; margin: 8mm; }
-          *{margin:0;padding:0;box-sizing:border-box;}
-          html,body{background:#fff!important;color:#111!important;
-            font-family:'Segoe UI',system-ui,-apple-system,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-          body{padding:12px;}
-          .rs-print-root{max-width:${maxW};width:100%;margin:0 auto;color:#111!important;background:#fff!important;}
-          .rs-print-root *{color:inherit;visibility:visible!important;}
-          .rcp-center{text-align:center}.rcp-logo{font-weight:700;font-size:18px;color:#111}
-          .rcp-sub{font-size:11px;color:#444;margin-top:2px}.rcp-hr{border:0;border-top:1px dashed #888;margin:10px 0}
-          .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:#111}
-          .rcp-line .q{color:#444}.rcp-tot{display:flex;justify-content:space-between;font-weight:700;font-size:15px;margin-top:6px;color:#111}
-          .rcp-foot{text-align:center;font-size:11px;color:#444;margin-top:12px}
-          img{max-width:100%;height:auto;display:block;margin:8px auto}
-          table{width:100%;border-collapse:collapse;font-size:12px;color:#111}
-          td,th{color:#111;padding:2px 0}
-          @media print {
-            body{padding:0}
-            .rs-print-root{max-width:100%}
-          }
+          *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif;}
+          body{padding:10px;color:#111;}
+          body > div { max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important; }
+          .rcp-center{text-align:center}.rcp-logo{font-weight:700;font-size:20px}
+          .rcp-sub{font-size:11px;color:#666;margin-top:2px}.rcp-hr{border:0;border-top:1px dashed #aaa;margin:10px 0}
+          .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
+          .rcp-line .q{color:#666}.rcp-tot{display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:6px}
+          .rcp-foot{text-align:center;font-size:11px;color:#666;margin-top:12px}
+          .kot-h{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
+          .kot-h .kt{font-weight:700;font-size:18px}
+          .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}
+          .kot-item .kq{font-weight:700;min-width:28px}.kot-item .kno{font-size:11px;color:#8a4b00}
         </style>`;
-      const bodyInner = `<div class="rs-print-root">${innerHTML || ''}</div>`;
-      const fullHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${title||'Receipt'}</title>${style}</head><body>${bodyInner}</body></html>`;
+      const fullHtml = `<!doctype html><html><head><title>${title||'Print'}</title>${style}</head><body>${innerHTML}</body></html>`;
 
       if (window.AndroidInterface && typeof window.AndroidInterface.printReceipt === 'function') {
         try {
@@ -224,17 +216,16 @@
 
       // Wave 4: desktop silent print / shared print bridge
       if (window.RSPrintBridge && typeof window.RSPrintBridge.printHtml === 'function') {
-        window.RSPrintBridge.printHtml(bodyInner, title || 'Receipt').catch(function () {});
+        window.RSPrintBridge.printHtml(innerHTML, title || 'Print').catch(function () {});
         return;
       }
       if (window.RS_DESKTOP && typeof window.RS_DESKTOP.printHtml === 'function') {
-        window.RS_DESKTOP.printHtml(fullHtml, { silent: false }).catch(function () {});
+        window.RS_DESKTOP.printHtml(fullHtml, { silent: true }).catch(function () {});
         return;
       }
 
       const f = document.createElement('iframe');
-      f.setAttribute('title', title || 'Print');
-      f.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;border:0;pointer-events:none;';
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
       document.body.appendChild(f);
       const d = f.contentWindow.document;
       d.open();
@@ -242,37 +233,30 @@
       d.close();
 
       const performPrint = () => {
-        try {
-          f.contentWindow.focus();
-          f.contentWindow.print();
-        } catch (e) {
-          console.warn('print failed', e);
-        }
-        setTimeout(() => {
-          try {
-            f.remove();
-          } catch (_) {}
-        }, 2000);
+        f.contentWindow.focus();
+        f.contentWindow.print();
+        setTimeout(() => f.remove(), 1000);
       };
 
       const imgs = Array.from(f.contentWindow.document.getElementsByTagName('img'));
       if (imgs.length === 0) {
-        setTimeout(performPrint, 120);
+        performPrint();
       } else {
         let loaded = 0;
         const checkDone = () => {
           loaded++;
-          if (loaded >= imgs.length) setTimeout(performPrint, 200);
+          if (loaded === imgs.length) {
+            setTimeout(performPrint, 300);
+          }
         };
-        imgs.forEach((img) => {
-          if (img.complete) checkDone();
-          else {
+        imgs.forEach(img => {
+          if (img.complete) {
+            checkDone();
+          } else {
             img.onload = checkDone;
             img.onerror = checkDone;
           }
         });
-        // Safety: never hang forever on broken QR
-        setTimeout(performPrint, 2500);
       }
     };
 
@@ -894,112 +878,46 @@
 
     async function shareReceiptViaWhatsApp(bill) {
       const key = bill && (bill.no || bill.orderId || bill.id);
-      if (key && _waSendingBills.has(key)) {
-        RS.toast('WhatsApp send already in progress…', 'fa-spinner');
-        return;
-      }
+      if (key && _waSendingBills.has(key)) return;
       if (key) _waSendingBills.add(key);
-      try {
-        await _doShareReceiptViaWhatsApp(bill);
-      } catch (e) {
-        console.warn('WhatsApp share failed', e);
-        RS.toast('WhatsApp failed — try again or use Open chat', 'fa-circle-exclamation');
-      } finally {
-        if (key) _waSendingBills.delete(key);
-      }
-    }
-
-    /** Ask for phone — must use .show on overlay or button looks "dead" */
-    function promptWhatsAppPhone(defaultVal) {
-      return new Promise((resolve) => {
-        // Prefer RSModal (always visible, stacked above Bill settled)
-        if (window.RSModal && RSModal.open) {
-          RSModal.open({
-            title: 'Customer WhatsApp',
-            sub: 'Include country code (e.g. 91 for India)',
-            icon: 'fa-brands fa-whatsapp',
-            size: 'sm',
-            body: `
-              <label class="fl">WhatsApp number</label>
-              <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric"
-                placeholder="919876543210" value="${esc(defaultVal || '')}" autocomplete="tel" style="margin-top:6px;font-size:16px;letter-spacing:.02em">
-              <p style="font-size:12px;color:var(--text-mute);margin:10px 0 0;line-height:1.45">No + needed. Example India: <b>9198xxxxxxxx</b></p>`,
-            foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-wa-cancel>Cancel</button>
-              <button type="button" class="btn btn-primary" style="flex:1.3" data-wa-ok><i class="fa-brands fa-whatsapp"></i> Continue</button>`,
-            onMount(m, close) {
-              const inp = m.querySelector('#wa-phone-input');
-              const finish = (v) => {
-                close();
-                resolve(v);
-              };
-              m.querySelector('[data-wa-cancel]').onclick = () => finish(null);
-              m.querySelector('[data-wa-ok]').onclick = () => finish((inp.value || '').trim() || null);
-              if (inp) {
-                setTimeout(() => {
-                  inp.focus();
-                  inp.select();
-                }, 80);
-                inp.onkeydown = (e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    finish((inp.value || '').trim() || null);
-                  }
-                };
-              }
-            },
-          });
-          return;
-        }
-        // Fallback raw overlay — MUST add .show (was the bug: invisible modal)
-        const ov = document.createElement('div');
-        ov.className = 'rs-overlay show';
-        ov.style.zIndex = '100050';
-        ov.innerHTML = `<div class="rs-modal sm">
-          <div class="rs-mhead"><span class="rs-mtitle"><i class="fa-brands fa-whatsapp"></i> WhatsApp number</span>
-            <button type="button" class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
-          <div class="rs-mbody" style="padding:18px 20px 8px">
-            <label class="field-label">Customer WhatsApp (country code)</label>
-            <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric" placeholder="919876543210" value="${esc(defaultVal || '')}" style="margin-top:6px">
-            <p style="font-size:12px;color:var(--text-mute);margin-top:8px">Example India: 91… without +</p>
-          </div>
-          <div class="rs-mfoot">
-            <button type="button" class="rs-mcancel btn btn-ghost">Cancel</button>
-            <button type="button" class="rs-mok btn btn-primary"><i class="fa-brands fa-whatsapp"></i> Continue</button>
-          </div>
-        </div>`;
-        document.body.appendChild(ov);
-        requestAnimationFrame(() => ov.classList.add('show'));
-        const inp = ov.querySelector('#wa-phone-input');
-        const finish = (val) => {
-          try {
-            ov.remove();
-          } catch (_) {}
-          resolve(val);
-        };
-        ov.querySelector('.rs-mok').onclick = () => finish((inp.value || '').trim() || null);
-        ov.querySelector('.rs-mcancel').onclick = () => finish(null);
-        ov.querySelector('.rs-mclose').onclick = () => finish(null);
-        if (inp) {
-          inp.focus();
-          inp.onkeydown = (e) => {
-            if (e.key === 'Enter') finish((inp.value || '').trim() || null);
-            if (e.key === 'Escape') finish(null);
-          };
-        }
-      });
+      try { await _doShareReceiptViaWhatsApp(bill); } finally { if (key) _waSendingBills.delete(key); }
     }
 
     async function _doShareReceiptViaWhatsApp(bill) {
       let phone = bill.customerPhone;
-      if (!phone || String(phone).trim() === '' || phone === 'null' || phone === 'undefined') {
-        phone = await promptWhatsAppPhone('');
+      if (!phone || phone.trim() === '' || phone === 'null') {
+        phone = await new Promise(resolve => {
+          const ov = document.createElement('div');
+          ov.className = 'rs-overlay show';
+          ov.innerHTML = `<div class="rs-modal sm">
+            <div class="rs-mhead"><span class="rs-mtitle"><i class="fa-brands fa-whatsapp"></i> WhatsApp Number</span><button class="rs-mclose icon-btn"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="rs-mbody" style="padding:18px 20px 8px">
+              <label class="field-label">Customer WhatsApp (with country code)</label>
+              <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric" placeholder="e.g. 919876543210" style="margin-top:6px" autocomplete="tel">
+              <p style="font-size:12px;color:var(--text-mute);margin-top:8px">Include country code without +. Example: 91 for India.</p>
+            </div>
+            <div class="rs-mfoot"><button class="rs-mcancel btn-ghost">Cancel</button><button class="rs-mok btn-primary"><i class="fa-brands fa-whatsapp"></i> Send</button></div>
+          </div>`;
+          document.body.appendChild(ov);
+          requestAnimationFrame(function () { ov.classList.add('show'); });
+          const inp = ov.querySelector('#wa-phone-input');
+          const ok  = ov.querySelector('.rs-mok');
+          const cancel = ov.querySelector('.rs-mcancel');
+          const close  = ov.querySelector('.rs-mclose');
+          inp.focus();
+          const finish = val => { document.body.removeChild(ov); resolve(val); };
+          ok.onclick     = () => finish(inp.value.trim() || null);
+          cancel.onclick = () => finish(null);
+          close.onclick  = () => finish(null);
+          inp.onkeydown  = e => { if(e.key==='Enter') ok.click(); if(e.key==='Escape') finish(null); };
+        });
         if (phone === null) return;
-        phone = String(phone).replace(/\D/g, '');
+        phone = phone.replace(/\D/g, '');
         if (phone) {
           bill.customerPhone = phone;
           try {
             if (window.RS_DB) {
-              const localBill = await RS_DB.list('bills').then((arr) => arr.find((b) => b.no === bill.no));
+              const localBill = await RS_DB.list('bills').then(arr => arr.find(b => b.no === bill.no));
               if (localBill) {
                 localBill.customerPhone = phone;
                 await RS_DB.put('bills', localBill.id, localBill);
@@ -1009,7 +927,6 @@
             console.warn('Failed to save to local DB:', dbErr.message);
           }
         } else {
-          RS.toast('Enter a WhatsApp number to send the bill', 'fa-circle-exclamation');
           return;
         }
       }
@@ -1138,196 +1055,67 @@
 
     async function showReceipt(bill) {
       const qrDataUri = await generateReceiptQrDataUri(bill);
-      const receiptInner = receiptHTML(bill, qrDataUri);
-      const printHtml = receiptInner;
+      const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
       const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
+      const waLabel = gwReady ? 'WhatsApp' : 'WhatsApp';
       const st = bill.syncStatus || 'synced';
-      const pay = bill.pay || bill.paymentMethod || '—';
-      // bill.items is sometimes a count number, sometimes an array of lines
-      let itemN = 0;
-      if (Array.isArray(bill._items) && bill._items.length) {
-        itemN = bill._items.reduce((a, i) => a + (Number(i && i.qty) || 1), 0);
-      } else if (Array.isArray(bill.items)) {
-        itemN = bill.items.reduce((a, i) => a + (Number(i && i.qty) || 1), 0);
-      } else if (typeof bill.items === 'number' && isFinite(bill.items)) {
-        itemN = bill.items;
-      }
-
-      const syncBanner =
-        st === 'pending' || st === 'local' || st === 'saving'
-          ? `<div class="rc-banner rc-banner-warn">
-            <i class="fa-solid fa-cloud-arrow-up"></i>
-            <span><b>Saved on this device</b> — cloud sync ${st === 'saving' ? 'in progress' : 'pending'}. Bill is safe.</span>
+      const syncBanner = st === 'pending' || st === 'local' || st === 'saving'
+        ? `<div style="margin:0 0 10px;padding:8px 11px;border-radius:10px;border:1px solid rgba(234,179,8,.35);background:rgba(234,179,8,.1);font-size:12px;line-height:1.45;color:var(--text-soft);display:flex;gap:8px;align-items:center">
+            <i class="fa-solid fa-cloud-arrow-up" style="color:#ca8a04"></i>
+            <span><b style="color:var(--text)">Saved on this device</b> ΓÇö cloud sync ${st === 'saving' ? 'in progress' : 'pending'}. Bill is safe; will upload when online.</span>
           </div>`
-          : `<div class="rc-banner rc-banner-ok">
-            <i class="fa-solid fa-circle-check"></i>
-            <span>Bill saved · <b>${esc(bill.no || '')}</b> · ${esc(String(pay))}</span>
+        : `<div style="margin:0 0 10px;padding:6px 10px;border-radius:10px;border:1px solid rgba(34,197,94,.28);background:rgba(34,197,94,.08);font-size:11.5px;color:var(--text-soft);display:flex;gap:8px;align-items:center">
+            <i class="fa-solid fa-circle-check" style="color:#16a34a"></i>
+            <span>Bill synced ┬╖ ${esc(bill.no || '')}</span>
           </div>`;
-
       const connectBanner = !gwReady
-        ? `<button type="button" class="rc-banner rc-banner-wa" id="rc-wa-cta">
-            <i class="fa-brands fa-whatsapp"></i>
-            <span style="flex:1;text-align:left"><b>WhatsApp not linked</b> — you can still send via chat, or connect Gateway for 1-tap PDF.
-            <span style="color:var(--orange);font-weight:700"> Connect →</span></span>
-          </button>`
-        : `<div class="rc-banner rc-banner-wa-ok">
-            <i class="fa-brands fa-whatsapp"></i>
-            <span>WhatsApp ready — send this bill as PDF in one tap</span>
-          </div>`;
-
+        ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
+            <div style="flex:1;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
+              <b style="color:var(--text)">Connect WhatsApp</b> to send this exact bill as a PDF in one tap.
+              <span style="color:var(--orange);font-weight:600"> Open Gateway ΓåÆ</span>
+            </div>
+          </div>`
+        : '';
+      const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> ${waLabel}</button>`;
       RSModal.open({
-        title: '',
-        bare: false,
-        size: 'sm rc-settled-modal',
-        bodyClass: 'rc-settled-body',
-        body: `
-          <div class="rc-settled-slim rc-anim-root">
-            <button type="button" class="rc-settled-x" id="rc-close-x" aria-label="Close">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-
-            <!-- Payment-success style hero (Pinterest-style check animation) -->
-            <div class="rc-success-hero" aria-hidden="true">
-              <div class="rc-success-ring"></div>
-              <div class="rc-success-ring rc-success-ring-2"></div>
-              <div class="rc-success-check">
-                <svg class="rc-check-svg" viewBox="0 0 52 52" width="52" height="52" aria-hidden="true">
-                  <circle class="rc-check-circle" cx="26" cy="26" r="24" fill="none"/>
-                  <path class="rc-check-mark" fill="none" d="M14.5 27.2l7.2 7.2 15.8-15.8"/>
-                </svg>
-              </div>
-            </div>
-            <div class="rc-success-copy">
-              <h2 class="rc-success-title">Payment successful</h2>
-              <p class="rc-success-sub">Thank you! Payment of <b>${rs(bill.grand)}</b> received.</p>
-              <div class="rc-success-meta">
-                <span>${esc(bill.no || '')}</span>
-                <span class="rc-dot">·</span>
-                <span>${esc(String(pay))}</span>
-              </div>
-            </div>
-
-            ${st === 'pending' || st === 'local' || st === 'saving' ? syncBanner : ''}
-            ${connectBanner}
-
-            <div class="rc-icon-bar rc-anim-bar" role="toolbar" aria-label="Bill actions">
-              <button type="button" class="rc-ico rc-ico-wa" id="rc-wa" title="WhatsApp">
-                <i class="fa-brands fa-whatsapp"></i>
-                <span class="rc-ico-lab">WhatsApp</span>
-              </button>
-              <button type="button" class="rc-ico" id="rc-print" title="Print">
-                <i class="fa-solid fa-print"></i>
-                <span class="rc-ico-lab">Print</span>
-              </button>
-              <button type="button" class="rc-ico" id="rc-thermal" title="Thermal">
-                <i class="fa-solid fa-receipt"></i>
-                <span class="rc-ico-lab">Thermal</span>
-              </button>
-              <button type="button" class="rc-ico" id="rc-copy" title="Copy text">
-                <i class="fa-solid fa-copy"></i>
-                <span class="rc-ico-lab">Copy</span>
-              </button>
-              <button type="button" class="rc-ico rc-ico-new" id="rc-new" title="New order">
-                <i class="fa-solid fa-plus"></i>
-                <span class="rc-ico-lab">New</span>
-              </button>
-            </div>
-
-            <!-- Bill preview — slides up like a printed ticket -->
-            <div class="rc-settled-preview-wrap rc-anim-ticket">
-              <div class="rc-ticket-shine" aria-hidden="true"></div>
-              <div class="receipt-paper rc-receipt-preview" id="rc-preview">${receiptInner}</div>
-            </div>
-          </div>`,
-        foot: '',
+        title: 'Bill settled',
+        sub: `${bill.no} \u00b7 ${rs(bill.grand)}`,
+        icon: 'fa-circle-check',
+        size: 'sm',
+        body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
+        foot: `${waBtn}
+              <button class="btn btn-ghost" id="rc-thermal" style="flex:1" title="ESC/POS thermal printer"><i class="fa-solid fa-receipt"></i> Thermal</button>
+              <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
+              <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
         onMount(modal, close) {
-          try {
-            modal.classList.add('rc-settled-modal');
-            // Hide empty default header if title is blank
-            const head = modal.querySelector('.rs-mhead');
-            if (head) {
-              const h3 = head.querySelector('h3');
-              if (h3 && !String(h3.textContent || '').trim()) {
-                head.style.display = 'none';
+          modal.querySelector('#rc-print').onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
+          const thEl = modal.querySelector('#rc-thermal');
+          if (thEl) {
+            thEl.onclick = () => {
+              if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
+                RSOps.printBillThermal(bill);
+              } else if (window.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
+                RSPrintBridge.printBillEscPos(bill, engineOutlet(), {}).catch(() => RSPrint(printHtml, 'Receipt ' + bill.no));
+              } else {
+                RSPrint(printHtml, 'Receipt ' + bill.no);
               }
-            }
-            const body = modal.querySelector('.rs-mbody');
-            if (body) {
-              body.classList.add('rc-settled-body');
-              body.style.overflowY = 'auto';
-              body.style.WebkitOverflowScrolling = 'touch';
-            }
-            const prev = modal.querySelector('#rc-preview');
-            if (prev) {
-              prev.style.maxHeight = 'none';
-              prev.style.overflow = 'visible';
-            }
-            // Restart CSS animations reliably after mount
-            const root = modal.querySelector('.rc-anim-root');
-            if (root) {
-              root.classList.remove('rc-anim-play');
-              // force reflow
-              void root.offsetWidth;
-              root.classList.add('rc-anim-play');
-            }
-          } catch (_) {}
-
-          const bind = (sel, fn) => {
-            const el = modal.querySelector(sel);
-            if (!el) return;
-            el.addEventListener(
-              'click',
-              (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                try {
-                  fn(e);
-                } catch (err) {
-                  console.warn(sel, err);
-                  RS.toast('Action failed — try again', 'fa-circle-exclamation');
-                }
-              },
-              { passive: false }
-            );
-          };
-
-          bind('#rc-close-x', () => close());
-          bind('#rc-print', () => {
-            RS.toast('Opening print…', 'fa-print');
-            setTimeout(() => RSPrint(printHtml, 'Receipt ' + (bill.no || '')), 50);
-          });
-          bind('#rc-thermal', () => {
-            if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
-              RSOps.printBillThermal(bill);
-            } else if (window.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
-              RSPrintBridge.printBillEscPos(bill, engineOutlet(), {}).catch(() =>
-                RSPrint(printHtml, 'Receipt ' + (bill.no || ''))
-              );
-            } else {
-              RS.toast('No thermal bridge — using print dialog', 'fa-receipt');
-              RSPrint(printHtml, 'Receipt ' + (bill.no || ''));
-            }
-          });
-          bind('#rc-wa', () => {
-            if (window.RSReceipt && typeof RSReceipt.share === 'function') RSReceipt.share(bill);
-            else shareReceiptViaWhatsApp(bill);
-          });
-          bind('#rc-wa-cta', () => {
-            openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
-          });
-          bind('#rc-copy', async () => {
-            const text = receiptText(bill);
-            try {
-              if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(text);
-                RS.toast('Bill text copied', 'fa-copy');
-              } else throw new Error('no clipboard');
-            } catch (_) {
-              RS.toast('Could not copy — use Print or WhatsApp', 'fa-circle-exclamation');
-            }
-          });
-          bind('#rc-new', () => close());
-        },
+            };
+          }
+          const waEl = modal.querySelector('#rc-wa');
+          if (waEl && waEl.tagName === 'BUTTON') {
+            waEl.onclick = () => RSReceipt.share(bill);
+          }
+          const cta = modal.querySelector('#rc-wa-cta');
+          if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
+          modal.querySelector('#rc-new').onclick = close;
+          // Warm PDF cache while cashier reads the bill (instant WhatsApp)
+          if (window.RSReceiptEngine && RSReceiptEngine.toPDF) {
+            const warm = () => RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() }).catch(() => {});
+            if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 });
+            else setTimeout(warm, 400);
+          }
+        }
       });
     }
 

@@ -1,12 +1,11 @@
 {
-  "version": "v177-20260713-success-anim",
+  "version": "v178-20260713-settled-restore",
   "date": "2026-07-13",
-  "title": "Bill settled payment-success animation",
-  "summary": "Bill settled uses a payment-success style sequence: green check draws in, title/amount fade up, icon bar appears, then the bill preview slides up like a printed ticket with a light shine — inspired by modern payment success UI.",
+  "title": "Restore original Bill settled UI",
+  "summary": "Bill settled modal restored to the original layout: title Bill settled, receipt paper preview, footer WhatsApp / Thermal / Print / New order. Experimental slim layout, icon bar, and payment-success animations removed.",
   "highlights": [
-    "Animated green success check (draw + pop)",
-    "Payment successful + amount hero copy",
-    "Bill preview ticket slide-up animation",
-    "Respects prefers-reduced-motion"
+    "Original Bill settled modal layout",
+    "Original print helper",
+    "WhatsApp phone prompt still gets .show so it remains visible"
   ]
 }
