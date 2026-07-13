@@ -1,11 +1,12 @@
 {
-  "version": "v166-20260713-menu-layout",
+  "version": "v167-20260713-export-menu-inv-rec",
   "date": "2026-07-13",
-  "title": "Fix Menu Editor list layout",
-  "summary": "Kitchen coach banner was inserted inside the Menu Editor two-column grid, which pushed the menu list off-screen. Banner now sits above the grid so the full menu shows on the right again.",
+  "title": "Export Menu, Inventory & Recipes CSV",
+  "summary": "Full CSV export for Menu Editor, Inventory stock, and Recipes — not only templates and import.",
   "highlights": [
-    "Menu items list restored to the right column",
-    "Coach banner above the form+list grid",
-    "Auto-repair if an old banner was stuck inside the grid"
+    "Menu Editor → Export (full catalog CSV)",
+    "Inventory → Export (all stock items, re-importable columns)",
+    "Recipes → Export (one row per ingredient; matches bulk import shape)",
+    "Low-stock export still available separately"
   ]
 }

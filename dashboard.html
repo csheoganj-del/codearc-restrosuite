@@ -81,7 +81,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v166-20260713-menu-layout';
+    var builtin = 'v167-20260713-export-menu-inv-rec';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -910,6 +910,7 @@
             <i class="fa-solid fa-magnifying-glass"></i>
             <input id="inv-stock-search" placeholder="Search food, boxes, bags…" autocomplete="off" aria-label="Search inventory">
           </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-inventory" title="Export all stock items to CSV"><i class="fa-solid fa-file-export"></i> Export</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-download-inventory-template" title="CSV template for bulk import"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-import-inventory" title="Import stock from CSV"><i class="fa-solid fa-file-import"></i> Import</button>
@@ -975,9 +976,10 @@
           <div class="panel panel-pad">
             <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
               <h3>Menu items</h3>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <button class="btn btn-ghost btn-sm" id="btn-download-menu-template" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
-                <button class="btn btn-ghost btn-sm" id="btn-import-menu" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" id="btn-export-menu" style="padding: 5px 10px; font-size: 11px;" title="Export full menu to CSV"><i class="fa-solid fa-file-export"></i> Export</button>
+                <button class="btn btn-ghost btn-sm" id="btn-download-menu-template" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                <button class="btn btn-ghost btn-sm" id="btn-import-menu" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-file-import"></i> Import</button>
               </div>
             </div>
                         <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; background:rgba(0,0,0,0.02); padding:8px 12px; border-radius:6px; border:1px solid var(--stroke-2);">

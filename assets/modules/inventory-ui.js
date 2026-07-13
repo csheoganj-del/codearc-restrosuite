@@ -1137,6 +1137,7 @@
             'btn-add-ingredient',
             'btn-import-inventory',
             'btn-download-inventory-template',
+            'btn-export-inventory',
             'btn-export-low-stock-toolbar',
             'inv-stock-search',
           ];

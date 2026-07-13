@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v166-20260713-menu-layout';
+    return 'v167-20260713-export-menu-inv-rec';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -2338,6 +2338,55 @@
       }
     }
 
+    function csvEscapeCell(v) {
+      return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    }
+    function buildCsv(headers, rows) {
+      return (
+        '\uFEFF' +
+        [headers.map(csvEscapeCell).join(','), ...rows.map((row) => row.map(csvEscapeCell).join(','))].join('\r\n')
+      );
+    }
+
+    // 1a. Menu Export (live catalog)
+    const btnExportMenu = document.getElementById('btn-export-menu');
+    if (btnExportMenu && !btnExportMenu.dataset.rsExportBound) {
+      btnExportMenu.dataset.rsExportBound = '1';
+      btnExportMenu.onclick = () => {
+        const list = Array.isArray(MENU) ? MENU : [];
+        if (!list.length) {
+          toast('No menu items to export', 'fa-circle-info');
+          return;
+        }
+        setOperationStatus('Exporting menu CSV...');
+        const headers = [
+          'Name',
+          'Category',
+          'Price',
+          'Description',
+          'Type',
+          'Available',
+          'Stock',
+          'GST',
+          'Id',
+        ];
+        const rows = list.map((m) => [
+          m.name || '',
+          m.cat || m.category || '',
+          m.price != null ? m.price : '',
+          m.description || m.desc || '',
+          m.veg === false || m.type === 'nonveg' ? 'Non-veg' : 'Veg',
+          m.stock === 'out' ? 'NO' : 'YES',
+          m.stock || 'ok',
+          m.gst || m.tax || m.taxSlab || '',
+          m.id || '',
+        ]);
+        RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `menu-export-${fileDate()}.csv`);
+        finishOperationStatus('Menu exported');
+        toast('Menu CSV · ' + list.length + ' items', 'fa-file-export');
+      };
+    }
+
     // 1. Menu Download Template
     const btnDownloadMenu = document.getElementById('btn-download-menu-template');
     if (btnDownloadMenu) {
@@ -2481,6 +2530,48 @@
       };
     }
 
+    // 3a. Inventory Export (full stock list — re-importable columns)
+    const btnExportInventory = document.getElementById('btn-export-inventory');
+    if (btnExportInventory && !btnExportInventory.dataset.rsExportBound) {
+      btnExportInventory.dataset.rsExportBound = '1';
+      btnExportInventory.onclick = () => {
+        const list = Array.isArray(INVENTORY) ? INVENTORY : [];
+        if (!list.length) {
+          toast('No stock items to export', 'fa-circle-info');
+          return;
+        }
+        setOperationStatus('Exporting inventory CSV...');
+        const headers = [
+          'IngredientName',
+          'Category',
+          'CurrentStock',
+          'MinLevel',
+          'Unit',
+          'UnitCost',
+          'Supplier',
+          'IngredientKey',
+          'Id',
+        ];
+        const rows = list.map((i) => [
+          i.name || i.label || '',
+          i.cat || i.category || '',
+          i.stock != null ? i.stock : '',
+          i.min != null ? i.min : '',
+          i.unit || 'unit',
+          i.cost != null ? i.cost : '',
+          i.supplier || i.vendor || '',
+          i.key ||
+            String(i.name || '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '_'),
+          i.id || '',
+        ]);
+        RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `inventory-export-${fileDate()}.csv`);
+        finishOperationStatus('Inventory exported');
+        toast('Stock CSV · ' + list.length + ' items', 'fa-file-export');
+      };
+    }
+
     // 3. Inventory Download Template (matches import field names)
     const btnDownloadInventory = document.getElementById('btn-download-inventory-template');
     if (btnDownloadInventory) {
@@ -2500,6 +2591,7 @@
           ['Espresso Shot', 'drinks', '3000', '600', 'ml', '0.8', 'Bean Bros', 'espresso_shot'],
           ['Milk', 'dairy', '6000', '1000', 'ml', '0.06', 'Local Dairy', 'milk'],
           ['Hoagie Roll', 'food', '50', '25', 'pcs', '8', 'Bakery Co', 'hoagie_roll'],
+          ['Takeaway box', 'Packaging', '200', '50', 'pcs', '3', 'Pack Co', 'takeaway_box'],
         ];
         const csv =
           '\uFEFF' +

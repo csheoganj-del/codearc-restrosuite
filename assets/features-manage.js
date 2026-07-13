@@ -582,6 +582,7 @@
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-all">All</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-linked">Linked</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-missing">Needs recipe</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-export-recipes" title="Export recipes to CSV (re-importable)"><i class="fa-solid fa-file-export"></i> Export</button>
                 <button type="button" class="btn btn-primary btn-sm" id="bulk-recipe-import" title="For advanced users"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
               </div>
             </div>
@@ -1088,6 +1089,57 @@
           if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.wireCoachCard) {
             RSKitchenLinkCoach.wireCoachCard(panes);
           }
+        }
+
+        // ── Export recipes CSV (same shape as bulk import) ──
+        const exportRecBtn = $('#btn-export-recipes', panes);
+        if (exportRecBtn && !exportRecBtn._rsWired) {
+          exportRecBtn._rsWired = true;
+          exportRecBtn.onclick = () => {
+            const menu = RS.MENU || [];
+            const rows = [];
+            menu.forEach((m) => {
+              const ings = Array.isArray(m.ingredients) ? m.ingredients : [];
+              if (!ings.length) {
+                // Include unlinked dishes so export shows coverage gaps
+                rows.push([m.name || '', '', '', '', m.cat || '', m.price != null ? m.price : '']);
+                return;
+              }
+              ings.forEach((g) => {
+                rows.push([
+                  m.name || '',
+                  g.name || '',
+                  g.qty != null ? g.qty : '',
+                  g.unit || '',
+                  m.cat || '',
+                  m.price != null ? m.price : '',
+                ]);
+              });
+            });
+            if (!menu.length) {
+              RS.toast('No menu items to export recipes for', 'fa-circle-info');
+              return;
+            }
+            const escCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+            const headers = ['Menu Item', 'Ingredient', 'Qty', 'Unit', 'Category', 'Sell Price'];
+            const csv =
+              '\uFEFF' +
+              [headers.map(escCell).join(','), ...rows.map((r) => r.map(escCell).join(','))].join('\r\n');
+            const stamp = new Date().toISOString().slice(0, 10);
+            const name = 'recipes-export-' + stamp + '.csv';
+            if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
+            else {
+              const a = document.createElement('a');
+              a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+              a.download = name;
+              a.click();
+            }
+            const linked = menu.filter((m) => Array.isArray(m.ingredients) && m.ingredients.length).length;
+            RS.toast(
+              'Recipes CSV · ' + linked + ' linked dish' + (linked === 1 ? '' : 'es') + ' · ' + rows.length + ' rows',
+              'fa-file-export'
+            );
+          };
         }
 
         // ── Bulk recipe import: paste CSV lines, link many recipes at once ──
@@ -1629,6 +1681,7 @@
           'btn-add-ingredient',
           'btn-import-inventory',
           'btn-download-inventory-template',
+          'btn-export-inventory',
           'btn-export-low-stock-toolbar',
           'inv-stock-search',
         ];
