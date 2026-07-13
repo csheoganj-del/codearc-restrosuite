@@ -26,14 +26,23 @@
 .rs-mbody { padding: 22px 24px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .rs-mfoot { padding: 12px 20px; border-top: 1px solid var(--stroke); display: flex; gap: 12px; align-items: center; justify-content: center; flex: none; flex-wrap: wrap; min-width: 0; }
 
-/* Bill settled — slim icon-only toolbar (no heavy color blocks) */
+/* Bill settled — slim icon-only toolbar, ALWAYS one horizontal row */
+.rs-mfoot:has(.rc-foot-actions) {
+  flex-wrap: nowrap;
+  justify-content: center;
+}
 .rc-foot-actions {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   min-width: 0;
+  /* kill any leftover 2-column grid from older CSS */
+  grid-template-columns: none !important;
 }
 .rc-icon-btn {
   width: 42px;
@@ -42,13 +51,16 @@
   border: 1px solid var(--stroke-2);
   background: var(--glass-2, var(--glass));
   color: var(--text-soft);
-  display: grid;
+  display: inline-grid;
   place-items: center;
   cursor: pointer;
   font-size: 17px;
   padding: 0;
+  margin: 0;
   transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
-  flex: none;
+  flex: 0 0 42px;
+  grid-column: auto !important;
+  grid-row: auto !important;
 }
 .rc-icon-btn:hover {
   color: var(--text);
@@ -176,8 +188,13 @@
   .rs-mbody { padding: 16px; }
   .rs-mfoot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); gap: 8px; }
   .rs-mfoot .btn { min-width: 0; padding: 11px 8px; font-size: 12.5px; }
-  .rc-foot-actions { gap: 8px; }
-  .rc-icon-btn { width: 44px; height: 44px; font-size: 18px; }
+  .rc-foot-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px;
+  }
+  .rc-icon-btn { width: 44px; height: 44px; font-size: 18px; flex: 0 0 44px; }
   .receipt-paper { max-width: min(300px, calc(100vw - 64px)); padding: 20px 20px 24px; box-shadow: 0 12px 34px rgba(0,0,0,.28); }
   .rcp-logo { font-size: 18px; }
   .rcp-line { font-size: 12px; }

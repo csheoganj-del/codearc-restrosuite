@@ -1,12 +1,9 @@
 {
-  "version": "v183-20260713-icon-toolbar",
+  "version": "v184-20260713-icons-one-row",
   "date": "2026-07-13",
-  "title": "Bill settled: slim icon toolbar",
-  "summary": "Replaced heavy colored text buttons with a quiet icon-only row. WhatsApp icon is green, thermal uses a ticket/roll icon, print is neutral, plus starts a new order.",
+  "title": "Bill settled icons stay in one row",
+  "summary": "Force icon toolbar to a single horizontal row (no 2x2 wrap).",
   "highlights": [
-    "Icon-only footer (no big color blocks)",
-    "WhatsApp icon green, others quiet",
-    "Thermal = ticket icon (distinct from print)",
-    "Plus button for new order (replaces Done)"
+    "WhatsApp, Thermal, Print, New order icons in one line"
   ]
 }
