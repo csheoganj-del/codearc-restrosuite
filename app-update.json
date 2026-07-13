@@ -1,13 +1,12 @@
 {
-  "version": "v174-20260713-bill-settled",
+  "version": "v175-20260713-settled-scroll",
   "date": "2026-07-13",
-  "title": "Bill settled modal 10/10 — WhatsApp + print",
-  "summary": "WhatsApp on Bill settled was effectively dead for walk-in (phone prompt overlay never got .show). Fixed phone prompt via RSModal, green Send WhatsApp primary, clearer actions, improved browser print CSS so receipts are not blank/sparse.",
+  "title": "Bill settled: fix scroll freeze + full receipt",
+  "summary": "Receipt no longer uses nested max-height scroll (which trapped/froze the modal). Side-by-side layout shows full receipt; only the modal body scrolls if needed. PDF warm on open removed (was freezing UI).",
   "highlights": [
-    "WhatsApp always clickable — asks for number if walk-in",
-    "Phone prompt uses visible RSModal (not invisible overlay)",
-    "Send WhatsApp primary green button above receipt",
-    "Print: better CSS, wait for QR, black text on white",
-    "Copy bill text + Thermal + New order"
+    "No nested scroll on receipt paper",
+    "Desktop: actions left · full receipt right",
+    "Mobile: actions then full receipt, one finger scroll",
+    "Removed PDF warm-up that hung the UI after pay"
   ]
 }

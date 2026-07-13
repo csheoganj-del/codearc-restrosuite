@@ -23,8 +23,11 @@
 .rs-mclose { margin-left: auto; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--stroke-2); background: var(--glass-2); color: var(--text-soft); display: grid; place-items: center; transition: var(--t); flex: none; }
 .rs-mclose:hover { color: var(--text); background: var(--glass-3); }
 /* flex:1 + min-height:0 is required so long modal bodies scroll instead of clipping under overflow:hidden */
-.rs-mbody { padding: 22px 24px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; -webkit-overflow-scrolling: touch; }
+.rs-mbody { padding: 22px 24px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .rs-mfoot { padding: 16px 24px; border-top: 1px solid var(--stroke); display: flex; gap: 12px; align-items: center; flex: none; }
+/* Settled bill: never trap scroll on nested nodes */
+.rs-modal.rc-settled-modal { overflow: hidden; }
+.rs-modal.rc-settled-modal .rs-mbody { overflow-y: auto !important; touch-action: pan-y; }
 
 /* ---------------- PAYMENT MODAL ---------------- */
 .pay-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0; flex: 1; min-height: 0; overflow-y: auto; }

@@ -1173,51 +1173,79 @@
         title: 'Bill settled',
         sub: `${esc(bill.no || '')} · ${rs(bill.grand)} · ${itemN || '—'} item(s)`,
         icon: 'fa-circle-check',
-        size: 'md',
+        // Class rc-settled-modal: full receipt visible, one scroll surface only
+        size: 'md rc-settled-modal',
         bodyClass: 'rc-settled-body',
         body: `
-          ${syncBanner}
-          ${connectBanner}
-          <div class="rc-actions-top">
-            <button type="button" class="btn btn-wa" id="rc-wa" style="flex:1.4">
-              <i class="fa-brands fa-whatsapp"></i> Send WhatsApp
-            </button>
-            <button type="button" class="btn btn-ghost" id="rc-print" style="flex:1" title="Browser / A4 print">
-              <i class="fa-solid fa-print"></i> Print
-            </button>
-            <button type="button" class="btn btn-ghost" id="rc-thermal" style="flex:1" title="Thermal / ESC-POS">
-              <i class="fa-solid fa-receipt"></i> Thermal
-            </button>
-          </div>
-          <div class="receipt-paper rc-receipt-preview" id="rc-preview">${receiptInner}</div>
-          <p class="rc-hint">Preview matches print &amp; WhatsApp PDF. Walk-in? WhatsApp will ask for the number.</p>`,
-        foot: `
-          <button type="button" class="btn btn-ghost" id="rc-copy" style="flex:0.9" title="Copy bill text">
-            <i class="fa-solid fa-copy"></i> Copy
-          </button>
-          <button type="button" class="btn btn-primary" id="rc-new" style="flex:1.4">
-            <i class="fa-solid fa-plus"></i> New order
-          </button>`,
+          <div class="rc-settled-layout">
+            <div class="rc-settled-side">
+              ${syncBanner}
+              ${connectBanner}
+              <div class="rc-actions-stack">
+                <button type="button" class="btn btn-wa btn-block" id="rc-wa">
+                  <i class="fa-brands fa-whatsapp"></i> Send WhatsApp
+                </button>
+                <div class="rc-actions-row">
+                  <button type="button" class="btn btn-ghost" id="rc-print" title="Browser print">
+                    <i class="fa-solid fa-print"></i> Print
+                  </button>
+                  <button type="button" class="btn btn-ghost" id="rc-thermal" title="Thermal printer">
+                    <i class="fa-solid fa-receipt"></i> Thermal
+                  </button>
+                  <button type="button" class="btn btn-ghost" id="rc-copy" title="Copy text">
+                    <i class="fa-solid fa-copy"></i> Copy
+                  </button>
+                </div>
+                <button type="button" class="btn btn-primary btn-block" id="rc-new">
+                  <i class="fa-solid fa-plus"></i> New order
+                </button>
+              </div>
+              <p class="rc-hint">Full receipt on the right. WhatsApp asks for number if walk-in.</p>
+            </div>
+            <div class="rc-settled-preview-wrap">
+              <div class="receipt-paper rc-receipt-preview" id="rc-preview">${receiptInner}</div>
+            </div>
+          </div>`,
+        foot: '',
         onMount(modal, close) {
+          // Ensure body is the only scroll container (never nest scroll on receipt)
+          try {
+            modal.classList.add('rc-settled-modal');
+            const body = modal.querySelector('.rs-mbody');
+            if (body) {
+              body.classList.add('rc-settled-body');
+              body.style.overflowY = 'auto';
+              body.style.WebkitOverflowScrolling = 'touch';
+            }
+            const prev = modal.querySelector('#rc-preview');
+            if (prev) {
+              prev.style.maxHeight = 'none';
+              prev.style.overflow = 'visible';
+            }
+          } catch (_) {}
+
           const bind = (sel, fn) => {
             const el = modal.querySelector(sel);
             if (!el) return;
-            el.type = el.type || 'button';
-            el.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              try {
-                fn(e);
-              } catch (err) {
-                console.warn(sel, err);
-                RS.toast('Action failed — try again', 'fa-circle-exclamation');
-              }
-            });
+            el.addEventListener(
+              'click',
+              (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                  fn(e);
+                } catch (err) {
+                  console.warn(sel, err);
+                  RS.toast('Action failed — try again', 'fa-circle-exclamation');
+                }
+              },
+              { passive: false }
+            );
           };
 
           bind('#rc-print', () => {
             RS.toast('Opening print…', 'fa-print');
-            RSPrint(printHtml, 'Receipt ' + (bill.no || ''));
+            setTimeout(() => RSPrint(printHtml, 'Receipt ' + (bill.no || '')), 50);
           });
 
           bind('#rc-thermal', () => {
@@ -1234,12 +1262,8 @@
           });
 
           bind('#rc-wa', () => {
-            // Always clickable — share handles offline + phone prompt
-            if (window.RSReceipt && typeof RSReceipt.share === 'function') {
-              RSReceipt.share(bill);
-            } else {
-              shareReceiptViaWhatsApp(bill);
-            }
+            if (window.RSReceipt && typeof RSReceipt.share === 'function') RSReceipt.share(bill);
+            else shareReceiptViaWhatsApp(bill);
           });
 
           bind('#rc-wa-cta', () => {
@@ -1252,9 +1276,7 @@
               if (navigator.clipboard && navigator.clipboard.writeText) {
                 await navigator.clipboard.writeText(text);
                 RS.toast('Bill text copied', 'fa-copy');
-              } else {
-                throw new Error('no clipboard');
-              }
+              } else throw new Error('no clipboard');
             } catch (_) {
               RS.toast('Could not copy — use Print or WhatsApp', 'fa-circle-exclamation');
             }
@@ -1262,22 +1284,7 @@
 
           bind('#rc-new', () => close());
 
-          // Event delegation fallback (if foot re-renders or IDs clash)
-          modal.addEventListener(
-            'click',
-            (e) => {
-              const t = e.target && e.target.closest && e.target.closest('#rc-wa, #rc-print, #rc-thermal, #rc-new, #rc-copy, #rc-wa-cta');
-              if (!t) return;
-              // already handled by bind if same target — skip double only when defaultPrevented
-            },
-            true
-          );
-
-          if (window.RSReceiptEngine && RSReceiptEngine.toPDF) {
-            const warm = () => RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() }).catch(() => {});
-            if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 });
-            else setTimeout(warm, 400);
-          }
+          // Do NOT warm PDF on open — html2canvas freezes the modal / kills scroll
         },
       });
     }
