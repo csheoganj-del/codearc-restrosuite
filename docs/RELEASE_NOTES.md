@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v143 (2026-07-13) — Professional clean QR tent (redesign)
+
+What guests need, nothing extra:
+- **Outlet name** (quiet) → **TABLE ##** (hero) → **QR** → **Order food · Call waiter**
+- Optional: Wi‑Fi / phone / tiny “Powered by CODEARC RestroSuite”
+- Removed clutter: dual boxes, 1·2·3 steps, gold frames, “Scan me” badge noise
+- Print size = fixed tent width (not fill A4); preview uses the same card HTML
+- Settings modal simplified to essentials
+
 ## v142 (2026-07-13) — Print cards keep preview height×width proportions
 
 - Every size uses a **fixed tent width** (mini 44mm → full 95mm); height = content only

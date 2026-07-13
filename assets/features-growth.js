@@ -1691,137 +1691,97 @@
     }
 
     /**
-     * Print sizes — same portrait proportions as live preview.
-     * Cards never stretch to fill the page; width is capped (cardMaxW) and height = content.
-     * perPage enforces page-breaks only (not “fill the sheet”).
+     * Professional table tent sizes (fixed width · height from content · never fill A4).
+     * Same proportions in modal preview and print sheet.
      */
     const QR_PRINT_SIZES = {
       mini: {
         id: 'mini',
-        label: 'Mini sticker',
-        hint: '16 per A4 (4×4)',
+        label: 'Sticker',
+        hint: '16 / A4 · coasters',
         cols: 4,
         perPage: 16,
-        qrCss: 72,
-        titlePx: 13,
+        qrCss: 70,
+        titlePx: 16,
         scanPx: 8,
-        outletPx: 9,
+        outletPx: 8,
         metaPx: 7,
-        logoPx: 12,
-        brandPx: 8,
         poweredPx: 6,
         gap: '3mm',
         margin: '8mm',
-        // Fixed tent width — not 1fr stretch
-        cardMaxW: '44mm',
-        showSteps: false,
+        cardMaxW: '45mm',
         showMeta: false,
       },
       small: {
         id: 'small',
-        label: 'Small',
-        hint: '9 per A4 (3×3)',
+        label: 'Compact',
+        hint: '9 / A4 · small tents',
         cols: 3,
         perPage: 9,
         qrCss: 100,
-        titlePx: 17,
+        titlePx: 20,
         scanPx: 10,
-        outletPx: 11,
-        metaPx: 9,
-        logoPx: 16,
-        brandPx: 10,
-        poweredPx: 7,
+        outletPx: 9,
+        metaPx: 8,
+        poweredPx: 6,
         gap: '4mm',
         margin: '10mm',
         cardMaxW: '58mm',
-        showSteps: true,
         showMeta: true,
       },
       medium: {
         id: 'medium',
-        label: 'Medium',
-        hint: '4 per A4 (2×2)',
+        label: 'Standard',
+        hint: '4 / A4 · recommended',
         cols: 2,
         perPage: 4,
-        qrCss: 132,
-        titlePx: 22,
-        scanPx: 12,
-        outletPx: 12,
-        metaPx: 10,
-        logoPx: 18,
-        brandPx: 11,
-        poweredPx: 8,
+        qrCss: 140,
+        titlePx: 28,
+        scanPx: 11,
+        outletPx: 10,
+        metaPx: 9,
+        poweredPx: 7,
         gap: '6mm',
         margin: '12mm',
-        cardMaxW: '82mm',
-        showSteps: true,
+        cardMaxW: '85mm',
         showMeta: true,
       },
       large: {
         id: 'large',
         label: 'Large',
-        hint: '2 per A4 only',
+        hint: '2 / A4 · easy scan',
         cols: 2,
         perPage: 2,
-        qrCss: 150,
-        titlePx: 24,
+        qrCss: 156,
+        titlePx: 30,
         scanPx: 12,
-        outletPx: 13,
+        outletPx: 11,
         metaPx: 10,
-        logoPx: 20,
-        brandPx: 12,
-        poweredPx: 8,
+        poweredPx: 7,
         gap: '8mm',
         margin: '12mm',
-        cardMaxW: '88mm',
-        showSteps: true,
+        cardMaxW: '90mm',
         showMeta: true,
       },
       full: {
         id: 'full',
-        label: 'Full page',
-        hint: '1 card per A4 (preview size, not fill page)',
+        label: 'Host stand',
+        hint: '1 / A4 · same shape, larger',
         cols: 1,
         perPage: 1,
-        // Same proportions as modal preview — just printed larger, not stretched
-        qrCss: 168,
-        titlePx: 26,
+        qrCss: 180,
+        titlePx: 34,
         scanPx: 13,
-        outletPx: 13,
+        outletPx: 12,
         metaPx: 11,
-        logoPx: 20,
-        brandPx: 12,
         poweredPx: 8,
         gap: '0',
         margin: '14mm',
-        cardMaxW: '95mm',
+        cardMaxW: '100mm',
         pageCenter: true,
-        showSteps: true,
         showMeta: true,
       },
     };
-
-    /**
-     * Simple text-only Powered by footer (no logo image).
-     * Single line: Powered by CODEARC RestroSuite
-     */
-    function restroSuitePoweredByFooterHtml(sizeId) {
-      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
-      const isMini = sizeId === 'mini';
-      const B = QR_BRAND;
-      const labelPx = isMini ? 7 : Math.max(8, sz.poweredPx || 8);
-      const namePx = isMini ? 9 : Math.max(11, (sz.brandPx || 13) - 1);
-      return (
-        `<div class="qr-powered" style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;gap:${
-          isMini ? '4px 6px' : '5px 8px'
-        };padding:${
-          isMini ? '6px 8px' : '8px 12px'
-        };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);box-sizing:border-box;border-top:1px solid rgba(196,163,90,.35)" aria-label="Powered by CODEARC RestroSuite">` +
-        `<span style="font-size:${labelPx}px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);line-height:1;white-space:nowrap">Powered by</span>` +
-        `<span style="font-size:${namePx}px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1;white-space:nowrap"><span style="color:rgba(255,255,255,.85);font-weight:700;letter-spacing:.04em">CODEARC</span> Restro<span style="color:${B.goldSoft};font-weight:700">Suite</span></span>` +
-        `</div>`
-      );
-    }
 
     function getSavedQrPrintSizeId() {
       try {
@@ -1836,15 +1796,12 @@
       } catch (_) {}
     }
 
-    /** Per-print content toggles (remembered). Table number is always on the card. */
+    /** Minimal print options — table # + QR always on. */
     const QR_PRINT_OPTS_DEFAULT = {
       showWifi: true,
       showWifiPass: true,
-      showPhone: true,
-      showSteps: true,
-      showTagline: true,
-      showUses: true, // Order food + Call waiter (always recommended)
-      showPoweredBy: true, // RestroSuite ad strip
+      showPhone: false,
+      showPoweredBy: true,
     };
     function getQrPrintOpts() {
       try {
@@ -1854,11 +1811,12 @@
         return {
           showWifi: o.showWifi !== false,
           showWifiPass: o.showWifiPass !== false,
-          showPhone: o.showPhone !== false,
-          showSteps: o.showSteps !== false,
-          showTagline: o.showTagline !== false,
-          showUses: o.showUses !== false,
+          showPhone: !!o.showPhone,
           showPoweredBy: o.showPoweredBy !== false,
+          // legacy keys ignored for clean cards
+          showSteps: false,
+          showTagline: false,
+          showUses: true,
         };
       } catch (_) {
         return { ...QR_PRINT_OPTS_DEFAULT };
@@ -1881,60 +1839,42 @@
         showWifi: chk('qr-opt-wifi', cur.showWifi),
         showWifiPass: chk('qr-opt-wifi-pass', cur.showWifiPass),
         showPhone: chk('qr-opt-phone', cur.showPhone),
-        showSteps: chk('qr-opt-steps', cur.showSteps),
-        showTagline: chk('qr-opt-tagline', cur.showTagline),
-        showUses: chk('qr-opt-uses', cur.showUses),
         showPoweredBy: chk('qr-opt-powered', cur.showPoweredBy),
+        showSteps: false,
+        showTagline: false,
+        showUses: true,
       };
     }
-    function buildQrPrintOptsHtml(meta, opts, compact) {
+    function buildQrPrintOptsHtml(meta, opts) {
       const o = opts || getQrPrintOpts();
       const m = meta || {};
       const hasWifi = !!(m.wifi && String(m.wifi).trim());
       const hasPass = !!(m.wifiPass && String(m.wifiPass).trim());
       const hasPhone = !!(m.phone && String(m.phone).trim());
-      const pad = compact ? '7px 9px' : '9px 11px';
       const row = (id, label, checked, hint, disabled) =>
-        `<label style="display:flex;align-items:center;gap:8px;padding:${pad};border:1px solid var(--stroke-2);border-radius:9px;cursor:${
+        `<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--stroke-2);border-radius:9px;cursor:${
           disabled ? 'not-allowed' : 'pointer'
-        };background:var(--panel);opacity:${disabled ? '0.55' : '1'};min-width:0">
+        };background:var(--panel);opacity:${disabled ? '0.55' : '1'}">
           <input type="checkbox" id="${id}" ${checked && !disabled ? 'checked' : ''} ${
             disabled ? 'disabled' : ''
-          } style="margin:0;flex-shrink:0;accent-color:#c4a35a">
-          <span style="min-width:0;text-align:left">
-            <b style="font-size:${compact ? 12 : 12.5}px;color:var(--text);font-weight:700">${label}</b>
-            ${
-              hint && !compact
-                ? `<div style="font-size:11px;color:var(--text-soft);margin-top:2px;line-height:1.3">${hint}</div>`
-                : hint && compact
-                  ? `<div style="font-size:10px;color:var(--text-soft);margin-top:1px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${hint}</div>`
-                  : ''
-            }
-          </span>
+          } style="margin:0;accent-color:#FF4F00">
+          <span style="min-width:0"><b style="font-size:12.5px;color:var(--text)">${label}</b>
+          ${hint ? `<div style="font-size:10.5px;color:var(--text-soft);margin-top:1px">${hint}</div>` : ''}</span>
         </label>`;
       return `
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:0 0 6px">On each card</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:2px">
-          ${row('qr-opt-table', 'Table number', true, compact ? 'Always on' : 'Always shown', true)}
-          ${row('qr-opt-uses', 'Order + Call waiter', o.showUses, compact ? 'Main uses' : 'Two guest actions', false)}
-          ${row('qr-opt-tagline', 'Welcome line', o.showTagline, compact ? '' : m.tagline || 'Settings → Guest welcome', false)}
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:0 0 6px">Optional on card</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           ${row('qr-opt-wifi', 'Wi‑Fi name', o.showWifi && hasWifi, hasWifi ? esc(m.wifi) : 'Set in Settings', !hasWifi)}
           ${row('qr-opt-wifi-pass', 'Wi‑Fi password', o.showWifiPass && hasPass, hasPass ? '••••' : 'Optional', !hasPass)}
-          ${row('qr-opt-phone', 'Outlet phone', o.showPhone && hasPhone, hasPhone ? esc(m.phone) : 'Set in Settings', !hasPhone)}
-          ${row('qr-opt-steps', 'Scan steps', o.showSteps, compact ? '1·2·3' : 'Camera → Scan → Use', false)}
-          ${row('qr-opt-powered', 'Powered by RS', o.showPoweredBy, compact ? 'Logo + name' : 'RestroSuite ad strip', false)}
+          ${row('qr-opt-phone', 'Phone', o.showPhone && hasPhone, hasPhone ? esc(m.phone) : 'Set in Settings', !hasPhone)}
+          ${row('qr-opt-powered', 'Powered by line', o.showPoweredBy, 'CODEARC RestroSuite', false)}
         </div>
-        ${
-          compact
-            ? `<p style="font-size:10.5px;color:var(--text-soft);margin:8px 0 0;line-height:1.35">Wi‑Fi / phone: <b>Settings → Outlet profile</b></p>`
-            : `<p style="font-size:11px;color:var(--text-soft);margin:8px 0 0;line-height:1.4">Tip: edit Wi‑Fi / phone under <b>Settings → Outlet profile → Guest QR cards</b>.</p>`
-        }`;
+        <p style="font-size:10.5px;color:var(--text-soft);margin:8px 0 0;line-height:1.35">Always printed: outlet name · table # · QR · Order &amp; call waiter</p>`;
     }
 
     /**
-     * Premium tent card — FULLY INLINE STYLES so modal preview === print sheet.
-     * Guests see two jobs clearly: Order food + Call waiter + Powered by RestroSuite.
-     * @param {object} p
+     * Professional table tent — same HTML/CSS in preview and print.
+     * Hierarchy: outlet → TABLE → QR (hero) → Order · Call waiter → optional meta → tiny powered by
      */
     function buildGuestQrCardHtml(p) {
       const B = QR_BRAND;
@@ -1949,118 +1889,47 @@
       const phone = esc(phoneRaw);
       const wifi = esc(wifiRaw);
       const wifiPass = esc(wifiPassRaw);
-      const taglineRaw = String((p && p.tagline) || 'Scan to order food or call your waiter').trim();
-      const tagline = esc(taglineRaw);
       const opts = (p && p.printOpts) || getQrPrintOpts();
 
-      const showSteps = sz.showSteps !== false && opts.showSteps !== false;
-      const showTagline = opts.showTagline !== false;
-      const showUses = opts.showUses !== false;
       const showPoweredBy = opts.showPoweredBy !== false;
-      const wantWifi = opts.showWifi !== false && !!wifiRaw;
+      const wantWifi = opts.showWifi !== false && !!wifiRaw && sz.showMeta !== false;
       const wantPass = opts.showWifiPass !== false && !!wifiPassRaw && wantWifi;
-      const wantPhone = opts.showPhone !== false && !!phoneRaw;
-      const showMeta = sz.showMeta !== false && (wantWifi || wantPhone);
+      const wantPhone = opts.showPhone !== false && !!phoneRaw && sz.showMeta !== false;
 
       const titlePx = sz.titlePx;
-      const scanPx = sz.scanPx;
+      const ctaPx = Math.max(9, sz.scanPx);
       const metaPx = sz.metaPx;
-      const outletPx = Math.max(9, sz.outletPx - 1);
-      const badgePx = Math.max(8, metaPx);
-      const usePx = Math.max(10, metaPx + 2);
+      const outletPx = Math.max(8, sz.outletPx);
       const qr = sz.qrCss;
-      const logoPx = sz.logoPx || 22;
-      const brandPx = sz.brandPx || 13;
-      const poweredPx = sz.poweredPx || 8;
       const isMini = sizeId === 'mini';
-      const padX = isMini ? 8 : 14;
-      const padY = isMini ? 8 : 12;
+      const padX = isMini ? 10 : 16;
+      const padY = isMini ? 10 : 14;
+      const maxW = sz.cardMaxW || '85mm';
 
-      // —— Dual purpose strip (hero message) ——
-      let usesHtml = '';
-      if (showUses) {
-        const cell = (num, label, gold) =>
-          `<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:${
-            isMini ? '5px 4px' : '8px 6px'
-          };background:${gold ? 'linear-gradient(180deg,#fff9ec 0%,#fff 100%)' : '#fff'};border:1.5px solid ${
-            gold ? B.gold : B.ink
-          };border-radius:10px">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:${
-              isMini ? 14 : 18
-            }px;height:${isMini ? 14 : 18}px;border-radius:50%;font-size:${
-              isMini ? 8 : 10
-            }px;font-weight:900;background:${gold ? 'linear-gradient(135deg,' + B.gold + ',' + B.goldSoft + ')' : B.ink};color:${
-              gold ? B.ink : B.goldSoft
-            }">${num}</span>
-            <span style="font-size:${usePx}px;font-weight:800;color:${B.ink};line-height:1.15;letter-spacing:-.01em">${label}</span>
-          </div>`;
-        usesHtml = `<div style="display:flex;align-items:stretch;gap:6px;margin:0 0 ${
-          isMini ? 6 : 10
-        }px;width:100%;box-sizing:border-box" aria-label="Order food or call waiter">
-          ${cell('1', isMini ? 'Order' : 'Order food', false)}
-          ${cell('2', isMini ? 'Waiter' : 'Call waiter', true)}
-        </div>`;
+      // Optional footer meta (wifi / phone) — one quiet line
+      let metaLine = '';
+      const bits = [];
+      if (wantWifi) bits.push('Wi‑Fi ' + wifi + (wantPass ? ' · ' + wifiPass : ''));
+      if (wantPhone) bits.push(phone);
+      if (bits.length) {
+        metaLine = `<div style="font-size:${metaPx}px;font-weight:600;color:${B.mute};margin-top:8px;line-height:1.35">${bits
+          .map((b) => esc(b))
+          .join(' · ')}</div>`;
       }
 
-      // —— Steps ——
-      let stepsHtml = '';
-      if (showSteps) {
-        const step = (n, t) =>
-          `<span style="display:inline-flex;align-items:center;gap:4px;font-size:${Math.max(
-            8,
-            metaPx
-          )}px;font-weight:700;color:${B.mute}">
-            <i style="font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:${B.ink};color:${B.goldSoft};font-size:9px;font-weight:800">${n}</i>${t}
-          </span>`;
-        stepsHtml = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 10px;margin:0 0 2px">
-          ${step(1, 'Camera')}
-          ${step(2, 'Scan')}
-          ${step(3, 'Order / Waiter')}
-        </div>`;
-      }
-
-      // —— Meta wifi/phone ——
-      let metaHtml = '';
-      if (showMeta) {
-        const bits = [];
-        if (wantWifi) {
-          bits.push(
-            `<span style="font-size:${metaPx}px;font-weight:600;color:${B.inkSoft}"><span style="font-size:${Math.max(
-              7,
-              metaPx - 1
-            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.gold};margin-right:3px">Wi‑Fi</span>${wifi}${
-              wantPass ? ' · ' + wifiPass : ''
-            }</span>`
-          );
-        }
-        if (wantPhone) {
-          bits.push(
-            `<span style="font-size:${metaPx}px;font-weight:600;color:${B.inkSoft}"><span style="font-size:${Math.max(
-              7,
-              metaPx - 1
-            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.gold};margin-right:3px">Phone</span>${phone}</span>`
-          );
-        }
-        if (bits.length) {
-          metaHtml = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 12px;margin-bottom:6px">${bits.join(
-            ''
-          )}</div>`;
-        }
-      }
-
-      // —— Powered by: single-line professional footer (official mark art) ——
+      // Tiny powered-by (text only)
       let poweredHtml = '';
-      if (showPoweredBy) {
-        poweredHtml = restroSuitePoweredByFooterHtml(sz.id);
+      if (showPoweredBy && !isMini) {
+        poweredHtml = `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #eceae6;font-size:${
+          sz.poweredPx || 7
+        }px;font-weight:600;letter-spacing:.04em;color:#9a9890;text-align:center">Powered by CODEARC RestroSuite</div>`;
       }
 
-      // Fixed width + content height = same look as live preview (never fill A4)
-      const maxW = sz.cardMaxW || '90mm';
       const cardStyle = [
         'box-sizing:border-box',
-        'background:linear-gradient(165deg,' + B.cream + ' 0%,#fff 45%,' + B.creamDeep + ' 100%)',
-        'border:2px solid ' + B.ink,
-        'border-radius:14px',
+        'background:#ffffff',
+        'border:1px solid #d9d6d0',
+        'border-radius:12px',
         'overflow:hidden',
         'page-break-inside:avoid',
         'break-inside:avoid',
@@ -2068,47 +1937,36 @@
         'width:' + maxW,
         'max-width:100%',
         'height:auto',
-        'min-height:0',
         'margin:0 auto',
         'font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif',
         'color:' + B.ink,
         '-webkit-print-color-adjust:exact',
         'print-color-adjust:exact',
-        'box-shadow:0 2px 0 rgba(12,31,26,.06)',
       ].join(';');
 
       return `
         <div class="qr-print-card" data-size="${esc(sz.id)}" style="${cardStyle}">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:${
-            isMini ? '7px 8px' : '10px 12px'
-          };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);color:#fff">
-            <div style="font-size:${outletPx}px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.96">${outletName}</div>
-            <div style="flex-shrink:0;font-size:${badgePx}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.ink};background:linear-gradient(135deg,${B.goldSoft},${B.gold});padding:3px 9px;border-radius:999px;white-space:nowrap">Scan me</div>
-          </div>
-          <div style="padding:${padY}px ${padX}px ${padY}px;text-align:center;box-sizing:border-box">
-            <div style="font-weight:900;font-size:${titlePx}px;letter-spacing:-.03em;color:${B.ink};line-height:1.05;margin:0 0 2px">Table ${tbl}</div>
-            ${
-              showTagline
-                ? `<div style="font-size:${scanPx}px;font-weight:600;color:${B.mute};margin:0 0 ${
-                    isMini ? 4 : 8
-                  }px;line-height:1.3">${tagline}</div>`
-                : ''
-            }
-            ${usesHtml}
-            <div style="display:inline-block;padding:3px;border-radius:14px;background:linear-gradient(145deg,${B.gold},${B.inkSoft} 55%,${B.goldSoft});margin:0 0 ${
-              isMini ? 6 : 8
-            }px;box-shadow:0 4px 14px rgba(12,31,26,.12)">
-              <div style="padding:${isMini ? 5 : 8}px;background:#fff;border-radius:11px">
-                <img src="${qrCodeUrl}" alt="Table ${tbl} — order or call waiter" width="${qr}" height="${qr}" style="display:block;width:${qr}px;height:${qr}px;max-width:100%" />
-              </div>
+          <div style="padding:${padY}px ${padX}px ${isMini ? 10 : 12}px;text-align:center">
+            <div style="font-size:${outletPx}px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${B.mute};margin:0 0 ${
+              isMini ? 4 : 6
+            }px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${outletName}</div>
+            <div style="font-weight:900;font-size:${titlePx}px;letter-spacing:-.04em;color:${B.ink};line-height:1;margin:0 0 ${
+              isMini ? 8 : 12
+            }px">Table ${tbl}</div>
+            <div style="display:inline-block;padding:8px;background:#fff;border:1px solid #e8e6e1;border-radius:10px;margin:0 0 ${
+              isMini ? 8 : 12
+            }px">
+              <img src="${qrCodeUrl}" alt="Table ${tbl} QR" width="${qr}" height="${qr}" style="display:block;width:${qr}px;height:${qr}px;max-width:100%" />
             </div>
-            <div style="font-size:${scanPx}px;font-weight:700;color:${B.inkSoft};margin:0 0 ${
-              showSteps ? 6 : 2
-            }px">Point camera at the code</div>
-            ${stepsHtml}
-            ${metaHtml}
+            <div style="font-size:${ctaPx}px;font-weight:700;color:${B.ink};line-height:1.35;letter-spacing:-.01em">
+              Order food · Call waiter
+            </div>
+            <div style="font-size:${Math.max(8, ctaPx - 1)}px;font-weight:500;color:${B.mute};margin-top:3px;line-height:1.3">
+              Scan with your phone camera
+            </div>
+            ${metaLine}
+            ${poweredHtml}
           </div>
-          ${poweredHtml}
         </div>`;
     }
 
@@ -2116,12 +1974,13 @@
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
       const B = QR_BRAND;
       const perPage = Math.max(1, Number(sz.perPage) || 4);
-      const maxW = sz.cardMaxW || '';
-      const pageCenter = !!sz.pageCenter;
+      const maxW = sz.cardMaxW || '90mm';
+      const pageCenter = !!sz.pageCenter || sz.cols === 1;
       return `
         <style>
           @page { margin: ${sz.margin}; size: A4; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
+          html, body { height: auto; }
           body {
             font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
             color: ${B.ink}; background: #fff;
@@ -2147,23 +2006,29 @@
             background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.35);
           }
           .qr-print-note {
-            max-width: 980px; margin: 0 auto 14px; padding: 10px 14px;
+            max-width: 720px; margin: 0 auto 14px; padding: 10px 14px;
             background: ${B.creamDeep}; border: 1px solid ${B.goldSoft};
             border-radius: 10px; font-size: 12px; color: ${B.mute}; line-height: 1.45;
           }
+          /* Grid places fixed-size cards; cells do not stretch the card */
           .qr-print-grid {
             display: grid;
-            grid-template-columns: repeat(${sz.cols}, 1fr);
+            grid-template-columns: repeat(${sz.cols}, ${maxW});
             gap: ${sz.gap};
-            max-width: ${pageCenter ? maxW || '120mm' : '980px'};
-            margin: 0 auto;
-            padding: ${pageCenter ? '12mm 0' : '0 4mm 12mm'};
+            justify-content: center;
+            align-content: start;
             align-items: start;
-            justify-items: ${pageCenter ? 'center' : 'stretch'};
+            justify-items: center;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: ${pageCenter ? '8mm 0 0' : '0 0 8mm'};
           }
           .qr-print-card {
-            width: 100%;
-            ${maxW ? 'max-width:' + maxW + ';' : ''}
+            width: ${maxW} !important;
+            max-width: ${maxW} !important;
+            height: auto !important;
+            min-height: 0 !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
@@ -2176,21 +2041,20 @@
             break-after: auto !important;
           }
           .qr-print-single {
-            max-width: ${maxW || '120mm'};
-            margin: 24px auto;
+            width: ${maxW};
+            max-width: ${maxW};
+            margin: 16px auto;
           }
           .qr-print-single .qr-print-grid {
-            grid-template-columns: 1fr;
-            max-width: ${maxW || '120mm'};
+            grid-template-columns: ${maxW};
             padding: 0;
           }
           @media print {
             .qr-print-toolbar, .qr-print-note, .no-print { display: none !important; }
             body { background: #fff; }
             .qr-print-grid {
-              max-width: ${pageCenter ? maxW || '108mm' : 'none'};
-              padding: ${pageCenter ? '0' : '0'};
-              width: ${pageCenter ? maxW || '108mm' : '100%'};
+              grid-template-columns: repeat(${sz.cols}, ${maxW});
+              justify-content: center;
             }
           }
           @media screen {
@@ -2337,17 +2201,17 @@
       const sz = QR_PRINT_SIZES[sid] || QR_PRINT_SIZES.medium;
       // Inline grid styles so print sheet always matches selected size
       // (even if stylesheet sizeId is wrong / cached)
-      const maxW = sz.cardMaxW || '';
-      const pageCenter = !!sz.pageCenter;
+      const maxW = sz.cardMaxW || '90mm';
       const gridStyle = [
         'display:grid',
-        'grid-template-columns:repeat(' + sz.cols + ',1fr)',
+        'grid-template-columns:repeat(' + sz.cols + ',' + maxW + ')',
         'gap:' + sz.gap,
-        'max-width:' + (pageCenter && maxW ? maxW : '980px'),
-        'margin:0 auto',
-        'padding:' + (pageCenter ? '12mm 0' : '0 4mm 12mm'),
+        'justify-content:center',
+        'align-content:start',
         'align-items:start',
-        'justify-items:' + (pageCenter ? 'center' : 'stretch'),
+        'justify-items:center',
+        'margin:0 auto',
+        'padding:8mm 0 0',
         'box-sizing:border-box',
         'width:100%',
       ].join(';');
@@ -2514,7 +2378,7 @@
         return;
       }
 
-      RS.toast('Preparing premium QR cards…', 'fa-qrcode');
+      RS.toast('Preparing QR cards…', 'fa-qrcode');
 
       let tableQrs;
       let meta;
