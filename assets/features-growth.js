@@ -1647,26 +1647,112 @@
         encodeURIComponent(orderUrl)
       );
     }
-    /** Clean tent card for print — simple hierarchy, no clutter */
-    function buildGuestQrCardHtml({ outletName, tableLabel, qrCodeUrl, large }) {
+    /**
+     * Print size presets — different tables need different physical card sizes.
+     * cols = per row on A4; qrCss = display size on paper.
+     */
+    const QR_PRINT_SIZES = {
+      mini: {
+        id: 'mini',
+        label: 'Mini sticker',
+        hint: '4×4 per A4 · tiny spaces / coasters',
+        cols: 4,
+        qrCss: 72,
+        titlePx: 13,
+        scanPx: 9,
+        outletPx: 9,
+        pad: '8px 6px',
+        gap: '6px',
+        margin: '8mm',
+      },
+      small: {
+        id: 'small',
+        label: 'Small',
+        hint: '3×3 per A4 · compact table tents',
+        cols: 3,
+        qrCss: 100,
+        titlePx: 16,
+        scanPx: 10,
+        outletPx: 11,
+        pad: '12px 8px',
+        gap: '8px',
+        margin: '10mm',
+      },
+      medium: {
+        id: 'medium',
+        label: 'Medium',
+        hint: '2×2 per A4 · standard (recommended)',
+        cols: 2,
+        qrCss: 140,
+        titlePx: 22,
+        scanPx: 12,
+        outletPx: 13,
+        pad: '16px 12px',
+        gap: '12px',
+        margin: '12mm',
+      },
+      large: {
+        id: 'large',
+        label: 'Large',
+        hint: '2 per A4 · easy to scan from far',
+        cols: 2,
+        qrCss: 180,
+        titlePx: 26,
+        scanPx: 13,
+        outletPx: 14,
+        pad: '20px 14px',
+        gap: '14px',
+        margin: '12mm',
+      },
+      full: {
+        id: 'full',
+        label: 'Full page',
+        hint: '1 per A4 · counter / entrance sign',
+        cols: 1,
+        qrCss: 260,
+        titlePx: 36,
+        scanPx: 16,
+        outletPx: 18,
+        pad: '32px 24px',
+        gap: '0',
+        margin: '15mm',
+      },
+    };
+
+    function getSavedQrPrintSizeId() {
+      try {
+        const v = localStorage.getItem('rs:qr_print_size');
+        if (v && QR_PRINT_SIZES[v]) return v;
+      } catch (_) {}
+      return 'medium';
+    }
+    function saveQrPrintSizeId(id) {
+      try {
+        localStorage.setItem('rs:qr_print_size', id);
+      } catch (_) {}
+    }
+
+    function buildGuestQrCardHtml({ outletName, tableLabel, qrCodeUrl, sizeId }) {
       const name = esc(formatOutletTitle(outletName));
       const tbl = esc(tableLabel);
-      const qrSize = large ? 200 : 140;
+      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
+      // High-res source image; CSS sizes for print
       return `
-        <div class="qr-print-card${large ? ' large' : ''}">
+        <div class="qr-print-card" data-size="${esc(sz.id)}">
           <div class="qr-card-table">Table ${tbl}</div>
           <div class="qr-card-frame">
-            <img src="${qrCodeUrl}" width="${qrSize}" height="${qrSize}" alt="Table ${tbl} QR" />
+            <img src="${qrCodeUrl}" alt="Table ${tbl} QR" />
           </div>
           <div class="qr-card-scan">Scan to order</div>
           <div class="qr-card-outlet">${name}</div>
         </div>`;
     }
 
-    function qrPrintDocumentStyles() {
+    function qrPrintDocumentStyles(sizeId) {
+      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
       return `
         <style>
-          @page { margin: 12mm; size: A4; }
+          @page { margin: ${sz.margin}; size: A4; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -1681,9 +1767,7 @@
             background: #1a1a1a; color: #fff;
             position: sticky; top: 0; z-index: 10;
           }
-          .qr-print-toolbar h1 {
-            font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
-          }
+          .qr-print-toolbar h1 { font-size: 15px; font-weight: 700; }
           .qr-print-toolbar p { font-size: 12px; opacity: 0.75; margin-top: 2px; }
           .qr-print-toolbar button {
             border: none; border-radius: 8px; padding: 10px 18px;
@@ -1694,22 +1778,22 @@
             background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.35);
           }
           .qr-print-note {
-            max-width: 920px; margin: 0 auto 14px; padding: 10px 14px;
+            max-width: 960px; margin: 0 auto 14px; padding: 10px 14px;
             background: #f6f7f9; border: 1px solid #e5e7eb; border-radius: 10px;
             font-size: 12px; color: #444; line-height: 1.45;
           }
           .qr-print-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-            max-width: 920px;
+            grid-template-columns: repeat(${sz.cols}, 1fr);
+            gap: ${sz.gap};
+            max-width: 960px;
             margin: 0 auto;
             padding: 0 8px 24px;
           }
           .qr-print-card {
             border: 1.5px solid #222;
             border-radius: 12px;
-            padding: 18px 14px 16px;
+            padding: ${sz.pad};
             text-align: center;
             background: #fff;
             page-break-inside: avoid;
@@ -1717,40 +1801,44 @@
           }
           .qr-card-table {
             font-weight: 800;
-            font-size: 22px;
+            font-size: ${sz.titlePx}px;
             letter-spacing: -0.02em;
             color: #111;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
           }
           .qr-card-frame {
             display: inline-block;
-            padding: 8px;
+            padding: 6px;
             border: 1px solid #e8e8e8;
             border-radius: 10px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             background: #fff;
           }
-          .qr-card-frame img { display: block; width: 140px; height: 140px; }
-          .qr-print-card.large .qr-card-frame img { width: 200px; height: 200px; }
+          .qr-card-frame img {
+            display: block;
+            width: ${sz.qrCss}px;
+            height: ${sz.qrCss}px;
+          }
           .qr-card-scan {
-            font-size: 12px;
+            font-size: ${sz.scanPx}px;
             font-weight: 600;
             color: #333;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
           }
           .qr-card-outlet {
-            font-size: 13px;
+            font-size: ${sz.outletPx}px;
             font-weight: 600;
             color: #666;
           }
           .qr-print-single {
-            max-width: 320px;
+            max-width: 420px;
             margin: 24px auto;
           }
+          .qr-print-single .qr-print-grid { grid-template-columns: 1fr; }
           @media print {
             .qr-print-toolbar, .qr-print-note, .no-print { display: none !important; }
             body { background: #fff; }
-            .qr-print-grid { max-width: none; padding: 0; gap: 10mm; }
+            .qr-print-grid { max-width: none; padding: 0; }
             .qr-print-card { border-color: #000; }
           }
           @media screen {
@@ -1759,17 +1847,19 @@
         </style>`;
     }
 
-    /** Dedicated browser print window — NEVER thermal RSPrint (that looked awful). */
+    /** Dedicated browser print window — NEVER thermal RSPrint. */
     function openQrPrintWindow(title, cardsHtml, meta) {
       const outlet = (meta && meta.outlet) || 'Restaurant';
       const count = (meta && meta.count) || 0;
+      const sizeId = (meta && meta.sizeId) || getSavedQrPrintSizeId();
+      const sizeLabel = (QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium).label;
       const autoPrint = !!(meta && meta.autoPrint);
       const toolbar = autoPrint
         ? ''
         : `<div class="qr-print-toolbar no-print">
             <div>
               <h1>${esc(title)}</h1>
-              <p>${esc(formatOutletTitle(outlet))}${count ? ' · ' + count + ' table cards' : ''}</p>
+              <p>${esc(formatOutletTitle(outlet))}${count ? ' · ' + count + ' cards' : ''} · ${esc(sizeLabel)}</p>
             </div>
             <div style="display:flex;gap:8px">
               <button type="button" class="secondary" onclick="window.close()">Close</button>
@@ -1777,14 +1867,15 @@
             </div>
           </div>
           <div class="qr-print-note no-print">
-            Tip: Print on A4, cut each card, place one per table face-up. Use <b>Open all QR</b> on Floor before service so scans work.
+            Size: <b>${esc(sizeLabel)}</b>. Print on A4 (or choose paper in the print dialog), cut cards, place face-up.
+            Before service: <b>Open all QR</b> so guest scans work.
           </div>`;
 
       const doc =
         '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
         esc(title) +
         '</title>' +
-        qrPrintDocumentStyles() +
+        qrPrintDocumentStyles(sizeId) +
         '</head><body>' +
         toolbar +
         cardsHtml +
@@ -1807,31 +1898,57 @@
       return win;
     }
 
+    function buildCardsHtml(tableQrs, tenantName, sizeId) {
+      return (
+        '<div class="qr-print-grid">' +
+        tableQrs
+          .map((t) =>
+            buildGuestQrCardHtml({
+              outletName: tenantName,
+              tableLabel: t.tableLabel,
+              qrCodeUrl: t.qrCodeUrl,
+              sizeId: sizeId,
+            })
+          )
+          .join('') +
+        '</div>'
+      );
+    }
+
     async function showSingleTableQR(t) {
       if (!window.RSModal) return;
       const tenantName = sessionStorage.getItem('tenant_name') || 'Restaurant';
       const tenantSlug = sessionStorage.getItem('tenant_slug') || 'outlet';
       const tableLabel = padTableLabel(t.n);
       const orderUrl = guestOrderUrl(tenantSlug, t.n);
-      const qrCodeUrl = await makeTableQrDataUrl(orderUrl, 280);
+      const qrCodeUrl = await makeTableQrDataUrl(orderUrl, 320);
+      const savedSize = getSavedQrPrintSizeId();
+
+      const sizeOptions = Object.keys(QR_PRINT_SIZES)
+        .map((id) => {
+          const s = QR_PRINT_SIZES[id];
+          return `<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--stroke-2);border-radius:10px;cursor:pointer;margin-bottom:6px;text-align:left">
+            <input type="radio" name="qr-size-one" value="${esc(id)}" ${id === savedSize ? 'checked' : ''} style="margin-top:3px">
+            <span><b style="font-size:13px">${esc(s.label)}</b><br><span style="font-size:11px;color:var(--text-soft)">${esc(s.hint)}</span></span>
+          </label>`;
+        })
+        .join('');
 
       const body = `
         <div style="text-align:center;padding:4px 0 2px">
           <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;margin-bottom:6px">Table ${esc(tableLabel)}</div>
-          <div style="font-size:13px;color:var(--text-soft);margin-bottom:14px">${esc(formatOutletTitle(tenantName))}</div>
+          <div style="font-size:13px;color:var(--text-soft);margin-bottom:12px">${esc(formatOutletTitle(tenantName))}</div>
           <div style="display:inline-block;padding:12px;border:1px solid var(--stroke-2);border-radius:14px;background:#fff;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,.06)">
-            <img src="${qrCodeUrl}" style="width:200px;height:200px;display:block" alt="Table ${esc(tableLabel)} QR">
+            <img src="${qrCodeUrl}" style="width:180px;height:180px;display:block" alt="Table ${esc(tableLabel)} QR">
           </div>
-          <div style="font-size:13px;color:var(--text-soft);margin-bottom:8px">Guest scans → opens menu → orders at table</div>
-          <div style="font-size:11px;color:var(--text-mute);line-height:1.45;max-width:280px;margin:0 auto">
-            Before service: use <b>Open all QR</b> (or Open Session below) so scans work.
-          </div>
+          <div style="font-size:12px;font-weight:700;text-align:left;margin:8px 0 6px;color:var(--text)">Print size</div>
+          <div id="qr-size-one-list" style="text-align:left">${sizeOptions}</div>
         </div>
       `;
 
       RSModal.open({
         title: 'Table QR',
-        sub: 'Print and place on the table',
+        sub: 'Choose size for your table space',
         icon: 'fa-qrcode',
         size: 'sm',
         body,
@@ -1840,17 +1957,20 @@
         onMount(modal, close) {
           modal.querySelector('[data-x]').onclick = close;
           modal.querySelector('#btn-print-single-qr').onclick = () => {
+            const picked =
+              (modal.querySelector('input[name="qr-size-one"]:checked') || {}).value || 'medium';
+            saveQrPrintSizeId(picked);
             const card = buildGuestQrCardHtml({
               outletName: tenantName,
               tableLabel,
               qrCodeUrl,
-              large: true,
+              sizeId: picked,
             });
-            openQrPrintWindow('Table ' + tableLabel + ' QR', '<div class="qr-print-single">' + card + '</div>', {
-              outlet: tenantName,
-              count: 1,
-              autoPrint: false,
-            });
+            openQrPrintWindow(
+              'Table ' + tableLabel + ' QR',
+              '<div class="qr-print-single"><div class="qr-print-grid">' + card + '</div></div>',
+              { outlet: tenantName, count: 1, sizeId: picked, autoPrint: false }
+            );
           };
         },
       });
@@ -1865,19 +1985,15 @@
         return;
       }
 
-      if (!window.RSModal) {
-        // Fallback: open print window directly
-        RS.toast('Preparing QR cards…', 'fa-qrcode');
-      } else {
-        RS.toast('Preparing ' + TABLES.length + ' QR cards…', 'fa-qrcode');
-      }
+      RS.toast('Preparing ' + TABLES.length + ' QR cards…', 'fa-qrcode');
 
       let tableQrs;
       try {
+        // High-res QR once; CSS scales for each size
         tableQrs = await Promise.all(
           TABLES.map(async (t) => {
             const orderUrl = guestOrderUrl(tenantSlug, t.n);
-            const qrCodeUrl = await makeTableQrDataUrl(orderUrl, 240);
+            const qrCodeUrl = await makeTableQrDataUrl(orderUrl, 320);
             return { tableNum: t.n, tableLabel: padTableLabel(t.n), qrCodeUrl, orderUrl };
           })
         );
@@ -1887,74 +2003,102 @@
         return;
       }
 
-      const cardsHtml =
-        '<div class="qr-print-grid">' +
-        tableQrs
-          .map((t) =>
-            buildGuestQrCardHtml({
-              outletName: tenantName,
-              tableLabel: t.tableLabel,
-              qrCodeUrl: t.qrCodeUrl,
-              large: false,
-            })
-          )
-          .join('') +
-        '</div>';
+      const savedSize = getSavedQrPrintSizeId();
+      const sizeRadios = Object.keys(QR_PRINT_SIZES)
+        .map((id) => {
+          const s = QR_PRINT_SIZES[id];
+          const checked = id === savedSize ? 'checked' : '';
+          return `<label class="qr-size-opt" data-size="${esc(id)}" style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid var(--stroke-2);border-radius:12px;cursor:pointer;background:var(--panel)">
+            <input type="radio" name="qr-print-size" value="${esc(id)}" ${checked} style="margin-top:3px;accent-color:var(--orange,#ff4f00)">
+            <span style="min-width:0">
+              <b style="font-size:13px;color:var(--text)">${esc(s.label)}</b>
+              <div style="font-size:11.5px;color:var(--text-soft);margin-top:2px;line-height:1.35">${esc(s.hint)}</div>
+            </span>
+          </label>`;
+        })
+        .join('');
 
-      // Preview in-app first (clean), then Print opens the print window — never thermal RSPrint
-      if (window.RSModal) {
-        const previewGrid = tableQrs
-          .slice(0, 6)
-          .map(
-            (t) => `
-          <div style="border:1px solid var(--stroke-2);border-radius:12px;padding:12px;text-align:center;background:var(--panel)">
-            <div style="font-weight:800;font-size:14px;margin-bottom:8px">Table ${esc(t.tableLabel)}</div>
-            <img src="${t.qrCodeUrl}" alt="" style="width:96px;height:96px;display:block;margin:0 auto 6px;border-radius:6px">
-            <div style="font-size:11px;color:var(--text-soft)">Scan to order</div>
+      const previewGrid = tableQrs
+        .slice(0, 4)
+        .map(
+          (t) => `
+          <div style="border:1px solid var(--stroke-2);border-radius:12px;padding:10px;text-align:center;background:var(--panel)">
+            <div style="font-weight:800;font-size:13px;margin-bottom:6px">Table ${esc(t.tableLabel)}</div>
+            <img src="${t.qrCodeUrl}" alt="" style="width:72px;height:72px;display:block;margin:0 auto 4px;border-radius:6px">
           </div>`
-          )
-          .join('');
-        const more =
-          tableQrs.length > 6
-            ? `<div style="grid-column:1/-1;text-align:center;font-size:12px;color:var(--text-soft);padding:6px">+ ${tableQrs.length - 6} more on the print sheet</div>`
-            : '';
+        )
+        .join('');
 
-        RSModal.open({
-          title: 'Print table QR cards',
-          sub: formatOutletTitle(tenantName) + ' · ' + tableQrs.length + ' tables',
-          icon: 'fa-print',
-          size: 'md',
-          body: `
-            <p style="margin:0 0 12px;font-size:13px;color:var(--text-soft);line-height:1.5">
-              Clean tent cards for each table. Print on A4, cut, and place face-up.
-              Before service, tap <b>Open all QR</b> so guest scans work.
-            </p>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-height:340px;overflow:auto;padding:2px">
-              ${previewGrid}${more}
-            </div>`,
-          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
-                 <button class="btn btn-primary" style="flex:1" id="btn-print-all-qrs-go"><i class="fa-solid fa-print"></i> Print ${tableQrs.length} cards</button>`,
-          onMount(modal, close) {
-            modal.querySelector('[data-x]').onclick = close;
-            const go = modal.querySelector('#btn-print-all-qrs-go');
-            if (go)
-              go.onclick = () => {
-                openQrPrintWindow('Table QR cards', cardsHtml, {
-                  outlet: tenantName,
-                  count: tableQrs.length,
-                  autoPrint: false,
-                });
-                close();
-              };
-          },
-        });
-      } else {
-        openQrPrintWindow('Table QR cards', cardsHtml, {
+      if (!window.RSModal) {
+        openQrPrintWindow('Table QR cards', buildCardsHtml(tableQrs, tenantName, savedSize), {
           outlet: tenantName,
           count: tableQrs.length,
+          sizeId: savedSize,
           autoPrint: false,
         });
+        return;
       }
+
+      RSModal.open({
+        title: 'Print table QR cards',
+        sub: formatOutletTitle(tenantName) + ' · ' + tableQrs.length + ' tables',
+        icon: 'fa-print',
+        size: 'md',
+        body: `
+          <p style="margin:0 0 10px;font-size:13px;color:var(--text-soft);line-height:1.5">
+            Pick a size for your table space. Print on A4, cut, and place face-up.
+            Before service: <b>Open all QR</b>.
+          </p>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:8px">Card size</div>
+          <div id="qr-size-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+            ${sizeRadios}
+          </div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:8px">Preview</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            ${previewGrid}
+          </div>
+          ${
+            tableQrs.length > 4
+              ? `<div style="text-align:center;font-size:12px;color:var(--text-soft);margin-top:8px">+ ${tableQrs.length - 4} more on the print sheet</div>`
+              : ''
+          }`,
+        foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+               <button class="btn btn-primary" style="flex:1" id="btn-print-all-qrs-go"><i class="fa-solid fa-print"></i> Print ${tableQrs.length} cards</button>`,
+        onMount(modal, close) {
+          modal.querySelector('[data-x]').onclick = close;
+          // Highlight selected size card
+          const syncSel = () => {
+            const v = (modal.querySelector('input[name="qr-print-size"]:checked') || {}).value || 'medium';
+            modal.querySelectorAll('.qr-size-opt').forEach((lab) => {
+              const on = lab.getAttribute('data-size') === v;
+              lab.style.borderColor = on ? 'var(--orange, #ff4f00)' : 'var(--stroke-2)';
+              lab.style.boxShadow = on ? '0 0 0 1px var(--orange, #ff4f00)' : 'none';
+            });
+          };
+          modal.querySelectorAll('input[name="qr-print-size"]').forEach((r) => {
+            r.addEventListener('change', syncSel);
+          });
+          syncSel();
+          const go = modal.querySelector('#btn-print-all-qrs-go');
+          if (go)
+            go.onclick = () => {
+              const sizeId =
+                (modal.querySelector('input[name="qr-print-size"]:checked') || {}).value || 'medium';
+              saveQrPrintSizeId(sizeId);
+              openQrPrintWindow(
+                'Table QR cards',
+                buildCardsHtml(tableQrs, tenantName, sizeId),
+                {
+                  outlet: tenantName,
+                  count: tableQrs.length,
+                  sizeId,
+                  autoPrint: false,
+                }
+              );
+              close();
+            };
+        },
+      });
     }
 
     RS.titles['floor-tab'] = ['Floor & Tables', 'Live table status & seating'];

@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v122 (2026-07-13) — QR print sizes (mini → full page)
+
+- Print Table QRs / single table QR: choose **Mini sticker · Small · Medium · Large · Full page**
+- Different grids per A4 (4×4 / 3×3 / 2×2 / 2-up / 1 per page) for different table spaces
+- Remembers last size in localStorage
+
 ## v121 (2026-07-13) — Print Table QRs redesigned (10/10)
 
 - No longer routes through thermal **RSPrint** (was broken / awful layout)
