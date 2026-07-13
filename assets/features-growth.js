@@ -54,7 +54,13 @@
       try {
         const settings = window.RS_DB ? await window.RS_DB.getSettings().catch(() => null) : null;
         if (settings && Array.isArray(settings.custom_tables)) {
-          return settings.custom_tables.map(t => ({ ...t, state: t.state || 'free' }));
+          // Empty array is intentional (user deleted all tables) — do not fall back to defaults
+          return settings.custom_tables.map((t) => ({
+            n: t.n != null ? t.n : t.name,
+            name: t.name != null ? t.name : t.n,
+            cap: Number(t.cap) > 0 ? Number(t.cap) : 4,
+            state: t.state || 'free',
+          }));
         }
       } catch(e) {
         console.warn("Failed to load custom tables from settings", e);
@@ -977,6 +983,23 @@
           RS.toast('QR open on ' + n + ' table' + (n === 1 ? '' : 's'), 'fa-qrcode');
           renderFloor();
         };
+      const btnClearAll = $('#btn-clear-all-tables', sec);
+      if (btnClearAll) {
+        const openN = TABLES.filter((t) => t && t.state && t.state !== 'free').length;
+        if (!openN) {
+          btnClearAll.disabled = true;
+          btnClearAll.title = 'No open tables to clear';
+          btnClearAll.style.opacity = '0.55';
+        }
+        btnClearAll.onclick = async () => {
+          btnClearAll.disabled = true;
+          try {
+            await clearAllOpenTables();
+          } finally {
+            // re-enabled after renderFloor rebuilds toolbar
+          }
+        };
+      }
       // Expose live table count for QR stats (active / total)
       try {
         if (window.RS) window.RS.TABLES = TABLES.slice();
@@ -1055,22 +1078,30 @@
               );
               if (live && live.state && live.state !== 'free') {
                 RS.toast(
-                  'Table ' + name + ' is ' + (stateTxt[live.state] || live.state) + ' — free it before deleting',
+                  'Table ' +
+                    name +
+                    ' is ' +
+                    (stateTxt[live.state] || live.state) +
+                    ' — free it first (or Clear all open), then delete and Save Layout',
                   'fa-circle-exclamation'
                 );
                 return;
               }
-              if (row) row.remove();
+              if (row) {
+                row.remove();
+                RS.toast('Removed from list — click Save Layout to keep the change', 'fa-trash');
+              }
             }
           });
           
           modal.querySelector('#btn-add-manage-table').onclick = () => {
             const count = list.children.length + 1;
+            const nextNum = String(count).padStart(2, '0');
             const newRowHtml = `
               <div class="seating-manage-row" style="display:flex; align-items:center; gap:8px; background:var(--glass); border:1px solid var(--stroke-2); padding:8px; border-radius:var(--r-sm);">
                 <div style="flex:2; display:flex; flex-direction:column; gap:2px;">
                   <label style="font-size:10px; font-weight:700; color:var(--text-soft)">Table Name/No</label>
-                  <input type="text" class="form-input table-manage-name" value="${count < 10 ? '0' + count : count}" style="height:32px; font-size:12px; padding:4px 8px;">
+                  <input type="text" class="form-input table-manage-name" value="${nextNum}" style="height:32px; font-size:12px; padding:4px 8px;">
                 </div>
                 <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
                   <label style="font-size:10px; font-weight:700; color:var(--text-soft)">Seats</label>
@@ -1088,37 +1119,73 @@
           modal.querySelector('#btn-save-seating').onclick = async () => {
             const rows = list.querySelectorAll('.seating-manage-row');
             const newTables = [];
-            rows.forEach(row => {
+            const seen = new Set();
+            rows.forEach((row) => {
               const nameInput = row.querySelector('.table-manage-name');
               const capInput = row.querySelector('.table-manage-cap');
               if (nameInput && capInput) {
                 const name = nameInput.value.trim();
-                const cap = Number(capInput.value) || 4;
+                const cap = Math.max(1, Number(capInput.value) || 4);
                 if (name) {
+                  const key = name.toLowerCase();
+                  if (seen.has(key)) return;
+                  seen.add(key);
                   newTables.push({
                     n: name,
                     name: name,
                     cap: cap,
-                    state: 'free'
+                    state: 'free',
                   });
                 }
               }
             });
-            
-            if (window.RS_DB) {
-              try {
-                const settings = await window.RS_DB.getSettings().catch(() => ({})) || {};
-                settings.custom_tables = newTables;
-                await window.RS_DB.setSettings(settings);
-                
-                RS.toast('Seating layout updated', 'fa-circle-check');
-                close();
-                
-                renderFloor();
-                document.dispatchEvent(new Event('rs:tables-updated'));
-              } catch(e) {
-                console.warn("Failed saving seating settings", e);
-                RS.toast('Save failed', 'fa-circle-exclamation');
+
+            if (!newTables.length) {
+              RS.toast('Add at least one table before saving', 'fa-circle-exclamation');
+              return;
+            }
+
+            if (!window.RS_DB) {
+              RS.toast('Database not ready — try again in a moment', 'fa-circle-exclamation');
+              return;
+            }
+
+            const saveBtn = modal.querySelector('#btn-save-seating');
+            if (saveBtn) {
+              saveBtn.disabled = true;
+              saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+            }
+
+            try {
+              const settings = (await window.RS_DB.getSettings().catch(() => null)) || {};
+              // Never re-save nested cloud row into ui_settings
+              const clean = { ...settings };
+              delete clean._raw;
+              clean.custom_tables = newTables;
+              await window.RS_DB.setSettings(clean);
+
+              // Verify read-back (cache + local)
+              const verify = await window.RS_DB.getSettings().catch(() => null);
+              const saved = verify && Array.isArray(verify.custom_tables) ? verify.custom_tables : null;
+              if (!saved || saved.length !== newTables.length) {
+                console.warn('[Floor] seating verify mismatch', saved, newTables);
+                // Still apply optimistically — local write may have succeeded
+              }
+
+              TABLES = newTables.map((t) => ({ ...t, state: 'free' }));
+              RS.toast(
+                'Saved ' + newTables.length + ' table' + (newTables.length === 1 ? '' : 's'),
+                'fa-circle-check'
+              );
+              close();
+              document.dispatchEvent(new Event('rs:tables-updated'));
+              await renderFloor();
+            } catch (e) {
+              console.warn('Failed saving seating settings', e);
+              RS.toast('Save failed: ' + ((e && e.message) || 'try again'), 'fa-circle-exclamation');
+              if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Save Layout';
               }
             }
           };
@@ -1693,6 +1760,7 @@
     RS.openTableInPos = openTableInPos;
     RS.transferTable = transferTable;
     RS.clearTable = clearTable;
+    RS.clearAllOpenTables = clearAllOpenTables;
     RS.ensureSeatedPendingOrder = ensureSeatedPendingOrder;
     RS.ensureTableQrSession = ensureTableQrSession;
     RS.normTableKey = normTableKey;

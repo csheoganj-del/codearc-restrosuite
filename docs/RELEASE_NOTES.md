@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v118 (2026-07-13) — Edit Tables save to database (fixed)
+
+- Settings save no longer embeds `_raw` business profile into `feature_flags` (broke cloud upserts)
+- **Save Layout** verifies write, updates floor immediately, clear toasts if DB missing
+- Delete/add remind staff to click **Save Layout**; busy-table delete message improved
+
 ## v117 (2026-07-13) — Floor “Clear all open” tables
 
 - Toolbar: **Clear all open** (broom) frees every dining / seated / held / billed / QR-pending table

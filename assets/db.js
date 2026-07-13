@@ -762,9 +762,22 @@
         } catch(e) {}
       }
       
-      // Store all UI settings in feature_flags.ui_settings
-      flags.ui_settings = { ...o };
-      // Delete duplicate columns
+      // Store UI settings in feature_flags.ui_settings — never embed _raw or functions
+      // (spreading getSettings() used to nest the full business profile and break upserts)
+      const ui = {};
+      if (o && typeof o === 'object') {
+        Object.keys(o).forEach((k) => {
+          if (k === '_raw' || k === 'feature_flags') return;
+          if (typeof o[k] === 'function') return;
+          try {
+            // Ensure JSON-serializable (custom_tables, etc.)
+            JSON.stringify(o[k]);
+            ui[k] = o[k];
+          } catch (_) {}
+        });
+      }
+      flags.ui_settings = ui;
+      // Delete duplicate columns that live on the profile row itself
       for (const k in SETTINGS_MAP) {
         delete flags.ui_settings[k];
       }
