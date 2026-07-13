@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v124 (2026-07-13) — Premium QR tent cards
+
+- Brand-tinted scannable QR (deep forest ink, cream card, gold accents)
+- Each card: outlet name, “Order here”, table #, tagline, scan steps, Wi‑Fi / phone when set
+- Size presets still apply (mini → full page); live premium preview in modal
+
 ## v123 (2026-07-13) — Fix empty QR print tab
 
 - Print sheet uses **Blob URL** (not `document.write` into a noopener blank tab)
