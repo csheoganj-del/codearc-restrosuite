@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v133 (2026-07-13) — Large = 2 cards per A4 page (not 4)
+
+- Size presets now have a hard **`perPage`** limit with CSS page-break
+- **Large** = 2 per A4 (was 2 columns × 2 rows = 4 by mistake)
+- **Full** = 1 per A4; Medium = 4; Small = 9; Mini = 16
+- Toolbar shows “N per A4 page · ~pages”
+
 ## v132 (2026-07-13) — QR print size actually applied on print sheet
 
 - Selected size is tracked in state and **rebuilt into every card** when Print is clicked
