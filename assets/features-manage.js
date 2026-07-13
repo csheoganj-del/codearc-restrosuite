@@ -1847,6 +1847,8 @@
           'btn-download-inventory-template',
           'btn-export-inventory',
           'btn-export-low-stock-toolbar',
+          'btn-inv-variance',
+          'btn-inv-prep',
           'inv-stock-search',
         ];
         const segBtns = $$('.seg button', sec);
