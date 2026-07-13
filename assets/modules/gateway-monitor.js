@@ -371,7 +371,7 @@ async function resolveIncidentById(reportId, button) {
     notifyIncident(msg, 'fa-circle-exclamation');
     // Surface hard failures so a missing toast still informs the user
     if (/session expired|not ready|Valid report|Failed to resolve|401|403/i.test(msg)) {
-      try { alert('Resolve failed: ' + msg); } catch (_) {}
+      try { toast('Resolve failed: ' + msg, 'fa-circle-exclamation'); } catch (_) {}
     }
     if (button) {
       button.disabled = false;
@@ -515,21 +515,21 @@ function renderGateway() {
           resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
 
           if (!RS_API || RS_API.zeroCostLaunchMode) {
-            alert("Gateway automation is disabled in zero-cost launch mode.");
+            toast('Gateway automation is disabled in zero-cost launch mode.', 'fa-circle-exclamation');
             return;
           }
 
           const data = await RS_API.admin({ action: 'gateway_reset' });
 
           if (data && !data.error) {
-            toast("WhatsApp Gateway reset successfully. Scan QR code to re-authenticate.");
+            toast('WhatsApp Gateway reset successfully. Scan QR code to re-authenticate.', 'fa-circle-check');
             await pollSuperAdminGateway();
           } else {
-            alert("Failed to reset gateway: " + (data?.error || data?.message || 'Unknown error'));
+            toast('Failed to reset gateway: ' + (data?.error || data?.message || 'Unknown error'), 'fa-circle-exclamation');
           }
         } catch (err) {
           console.error(err);
-          alert("Error communicating with gateway: " + err.message);
+          toast('Error communicating with gateway: ' + (err.message || err), 'fa-circle-exclamation');
         } finally {
           resetBtn.disabled = false;
           resetBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Reset Gateway Connection';
