@@ -320,10 +320,50 @@
         });
       }
 
+      if (!filtered.length) {
+        const hasFilters = catFilter !== 'all' || statusFilter !== 'all';
+        invBody.innerHTML = `<tr class="inv-empty-row"><td colspan="7" style="padding:0;border:none">
+          <div class="sr-empty" style="padding:40px 20px">
+            <i class="fa-solid fa-boxes-stacked" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i>
+            <div style="font-weight:700;color:var(--text);margin-bottom:4px">${
+              hasFilters ? 'No ingredients match filters' : 'No stock items yet'
+            }</div>
+            <div style="color:var(--text-soft);font-size:13px;max-width:360px;margin:0 auto 14px;line-height:1.45">${
+              hasFilters
+                ? 'Clear category / status filters to see full stock.'
+                : 'Add ingredients to track min levels, reorders, and plate costing.'
+            }</div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+              ${
+                hasFilters
+                  ? '<button type="button" class="btn btn-ghost btn-sm" id="inv-clear-filters"><i class="fa-solid fa-filter-circle-xmark"></i> Clear filters</button>'
+                  : ''
+              }
+              <button type="button" class="btn btn-primary btn-sm" id="inv-empty-add"><i class="fa-solid fa-plus"></i> Add ingredient</button>
+            </div>
+          </div>
+        </td></tr>`;
+        const clear = document.getElementById('inv-clear-filters');
+        if (clear)
+          clear.onclick = () => {
+            const c = document.getElementById('inv-cat-filter');
+            const s = document.getElementById('inv-status-filter');
+            if (c) c.value = 'All';
+            if (s) s.value = 'All';
+            renderInventory();
+          };
+        const add = document.getElementById('inv-empty-add');
+        if (add)
+          add.onclick = () => {
+            const btn = document.getElementById('btn-add-ingredient');
+            if (btn) btn.click();
+            else toast('Use Add ingredient in the toolbar', 'fa-plus');
+          };
+      } else {
       invBody.innerHTML = filtered
         .map((i) => {
           const st = i.stock < i.min ? 'out' : i.stock < i.min * 1.4 ? 'low' : 'ok';
-          const pct = Math.min(100, Math.round((i.stock / (i.min * 2)) * 100));
+          const pct = Math.min(100, Math.round((i.stock / (i.min * 2 || 1)) * 100));
           return `<tr>
           <td><b>${_e(i.name)}</b></td><td>${_e(i.cat)}</td>
           <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${_e(i.unit)}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st === 'out' ? 'var(--red)' : st === 'low' ? 'var(--amber)' : 'var(--green)'}"></span></div></div></td>
@@ -333,6 +373,7 @@
         </tr>`;
         })
         .join('');
+      }
 
       $$('#inv-table-body .icon-act.go').forEach((b) => {
         b.addEventListener('click', () => {

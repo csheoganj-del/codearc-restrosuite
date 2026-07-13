@@ -188,11 +188,20 @@
     </div>
 
     <div class="stat-row">
-      <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(totalRevenue)}</div><div class="sl">Revenue</div><div class="sd">${period}</div></div></div>
+      <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-chart-line"></i></div><div><div class="sv">${rs(totalRevenue)}</div><div class="sl">Revenue</div><div class="sd">${_e(period)}</div></div></div>
       <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">${totalOrders}</div><div class="sl">Orders</div><div class="sd">bills generated</div></div></div>
       <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">${rs(aov)}</div><div class="sl">Avg order value</div></div></div>
-      <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">${rs(totalGST)}</div><div class="sl">GST collected</div></div></div>
+      <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">${rs(totalGST)}</div><div class="sl">${_e((global.RS_SETTINGS && RS_SETTINGS.set_tax_label) || 'Tax')} collected</div></div></div>
     </div>
+    ${
+      !totalOrders
+        ? `<div class="sr-empty" style="margin:8px 0 16px;padding:28px;border:1px dashed var(--stroke);border-radius:var(--r-md)">
+            <i class="fa-solid fa-chart-pie" style="font-size:22px;opacity:.4;display:block;margin-bottom:8px"></i>
+            <div style="font-weight:700;margin-bottom:4px">No sales in this period</div>
+            <div style="font-size:13px;color:var(--text-soft);max-width:360px;margin:0 auto">Ring a sale on POS or widen the date range to see revenue, tax, and top items.</div>
+          </div>`
+        : ''
+    }
 
     <div class="report-grid">
       <div class="panel panel-pad">

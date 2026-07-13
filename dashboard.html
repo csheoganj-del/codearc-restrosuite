@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v102-20260711-guest10';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v103-20260713-full10';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -1041,7 +1041,7 @@
         <div class="toolbar-row">
           <div class="seg"><button class="active">Directory</button><button>Shift roster</button><button>Attendance</button><button>Payroll</button><button>Logins</button></div>
           <div class="grow"></div>
-          <button class="btn btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Add team member</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-employee"><i class="fa-solid fa-user-plus"></i> Add team member</button>
         </div>
         <div class="emp-grid" id="emp-grid"></div>
         <div class="panel panel-pad subtab-pane" data-pane="logins" style="margin-top:16px"></div>

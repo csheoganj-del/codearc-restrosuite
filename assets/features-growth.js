@@ -480,7 +480,7 @@
           <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
           <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill" title="Live seating map"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
+        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open QR ordering on every table for this service"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill" title="Live seating map"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
         <div class="floor-grid">${TABLES.length ? TABLES.map(
           (t) => `
           <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}">
@@ -515,10 +515,50 @@
             if (window.RS && typeof RS.toast === 'function') RS.toast('Floor refreshed', 'fa-rotate');
           } catch (e) {}
         };
+      const btnOpenAll = $('#btn-open-all-qr', sec);
+      if (btnOpenAll)
+        btnOpenAll.onclick = async () => {
+          if (!TABLES.length) {
+            RS.toast('Add tables first', 'fa-chair');
+            return;
+          }
+          if (!window.confirm('Open QR ordering on all ' + TABLES.length + ' tables for this service?')) return;
+          btnOpenAll.disabled = true;
+          let n = 0;
+          for (const t of TABLES) {
+            const ok = await ensureTableQrSession(t.n, { toast: false });
+            if (ok) n++;
+          }
+          btnOpenAll.disabled = false;
+          RS.toast('QR open on ' + n + ' table' + (n === 1 ? '' : 's'), 'fa-qrcode');
+          renderFloor();
+        };
       // Expose live table count for QR stats (active / total)
       try {
         if (window.RS) window.RS.TABLES = TABLES.slice();
       } catch (e) {}
+    }
+
+    /** Close QR session when a table bill is settled (keeps guest portal honest). */
+    async function closeTableQrSessionOnSettle(tableLabel) {
+      if (!window.RS_DB || !tableLabel) return;
+      try {
+        const key = normTableKey(tableLabel);
+        if (!key) return;
+        const sessions = await RS_DB.list('table_sessions').catch(() => []);
+        const sess = (sessions || []).find(
+          (s) => normTableKey(s.tableNumber) === key && s.status !== 'closed'
+        );
+        if (!sess) return;
+        await RS_DB.put('table_sessions', sess.id, {
+          ...sess,
+          status: 'closed',
+          closedAt: new Date().toISOString(),
+        });
+        document.dispatchEvent(new Event('rs:tables-updated'));
+      } catch (e) {
+        console.warn('closeTableQrSessionOnSettle', e);
+      }
     }
 
     function openManageSeatingModal() {
@@ -1179,12 +1219,17 @@
           } catch (e) {}
         }
       });
-      document.addEventListener('rs:bill-paid', () => {
+      document.addEventListener('rs:bill-paid', (ev) => {
         setTimeout(() => {
           try {
             renderFloor();
           } catch (e) {}
         }, 400);
+        try {
+          const bill = ev && ev.detail;
+          const tbl = bill && (bill.table || bill.tableNumber);
+          if (tbl) closeTableQrSessionOnSettle(tbl);
+        } catch (e) {}
       });
       // Keep seated durations fresh while floor is visible
       setInterval(() => {
@@ -1494,36 +1539,41 @@
       const newN = ONLINE.filter((o) => o.status === 'new').length;
       const prepN = ONLINE.filter((o) => o.status === 'preparing').length;
       const readyN = ONLINE.filter((o) => o.status === 'ready').length;
+      const showDemo =
+        !!(window.RS_API && RS_API.enableDemoTools) ||
+        localStorage.getItem('rs_demo_tools') === '1' ||
+        /owner|manager|admin/i.test(sessionStorage.getItem('logged_in_role') || '');
+      const feedLive = ONLINE.length > 0 || navigator.onLine !== false;
       sec.innerHTML = `
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-bowl-rice"></i></div><div><div class="sv">${newN}</div><div class="sl">New orders</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-motorcycle"></i></div><div><div class="sv">${newN}</div><div class="sl">New orders</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-fire-burner"></i></div><div><div class="sv">${prepN}</div><div class="sl">Preparing</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-bell-concierge"></i></div><div><div class="sv">${readyN}</div><div class="sl">Ready for pickup</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">${rs(ONLINE.reduce((a, o) => a + o.total, 0))}</div><div class="sl">Online sales (open)</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-coins"></i></div><div><div class="sv">${rs(ONLINE.reduce((a, o) => a + o.total, 0))}</div><div class="sl">Open online value</div></div></div>
         </div>
         <div class="toolbar-row" style="flex-wrap:wrap;gap:8px">
-          <span class="eyebrow">Live aggregator feed</span>
+          <span class="eyebrow">Zomato · Swiggy · ONDC</span>
           <div class="grow"></div>
-          <button type="button" class="btn btn-ghost btn-sm" id="agg-seed" title="Seed a demo online order"><i class="fa-solid fa-seedling"></i> Demo order</button>
+          ${showDemo ? '<button type="button" class="btn btn-ghost btn-sm" id="agg-seed" title="Seed a demo online order"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
           <button type="button" class="btn btn-ghost btn-sm" id="agg-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
           <button type="button" class="btn btn-ghost btn-sm" id="agg-webhook-info" title="Webhook setup"><i class="fa-solid fa-link"></i> Webhook</button>
-          <span class="pill pill-green"><span class="dot dot-live"></span> Live</span>
+          <span class="pill ${feedLive ? 'pill-green' : 'pill-amber'}"><span class="dot ${feedLive ? 'dot-live' : ''}"></span>${feedLive ? 'Online' : 'Offline'}</span>
         </div>
         <div class="agg-grid">${ONLINE.map(
           (o, i) => `
           <div class="agg-card${o.status === 'new' ? ' needs-attention' : ''}" data-i="${i}">
-            <div class="agg-top ${o.plat}"><i class="fa-solid ${o.plat === 'ondc' ? 'fa-network-wired' : 'fa-bowl-food'}"></i><span class="plat">${platName[o.plat]}</span><span class="oid">${esc(o.oid)}</span></div>
+            <div class="agg-top ${o.plat}"><i class="fa-solid ${o.plat === 'ondc' ? 'fa-network-wired' : o.plat === 'swiggy' ? 'fa-motorcycle' : 'fa-bowl-food'}"></i><span class="plat">${platName[o.plat]}</span><span class="oid">${esc(o.oid)}</span></div>
             <div class="agg-body">
               <div class="agg-cust"><div><div class="cn">${esc(o.cust)}</div><div class="ct">${esc(o.area)}${o.phone ? ' · ' + esc(o.phone) : ''}${o.since ? ' · ' + esc(o.since) : ''}</div></div><span class="pill ${o.status === 'new' ? 'pill-amber' : o.status === 'preparing' ? 'pill-orange' : 'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(o.status)}</span></div>
               <div class="agg-items">${o.items.map(esc).join('<br>')}</div>
               <div class="agg-foot"><span class="at">${rs(o.total)}</span>
-                <button class="btn btn-ghost btn-sm" data-pos="${i}" title="Open in POS"><i class="fa-solid fa-cash-register"></i></button>
+                <button type="button" class="btn btn-ghost btn-sm" data-pos="${i}" title="Open in POS"><i class="fa-solid fa-cash-register"></i></button>
                 ${
                   o.status === 'new'
-                    ? `<button class="btn btn-ghost btn-sm" data-rej="${i}">Reject</button><button class="btn btn-primary btn-sm" data-acc="${i}"><i class="fa-solid fa-check"></i> Accept + KOT</button>`
+                    ? `<button type="button" class="btn btn-ghost btn-sm" data-rej="${i}">Reject</button><button type="button" class="btn btn-primary btn-sm" data-acc="${i}"><i class="fa-solid fa-check"></i> Accept + KOT</button>`
                     : o.status === 'preparing'
-                      ? `<span class="agg-prep"><i class="fa-solid fa-clock"></i> ${esc(o.prep)}m</span><button class="btn btn-primary btn-sm" data-ready="${i}">Mark ready</button>`
-                      : `<button class="btn btn-ghost btn-sm" data-rider="${i}"><i class="fa-solid fa-motorcycle"></i> Rider out</button>`
+                      ? `<span class="agg-prep"><i class="fa-solid fa-clock"></i> ${esc(o.prep)}m</span><button type="button" class="btn btn-primary btn-sm" data-ready="${i}">Mark ready</button>`
+                      : `<button type="button" class="btn btn-ghost btn-sm" data-rider="${i}"><i class="fa-solid fa-motorcycle"></i> Rider out</button>`
                 }
               </div>
             </div>
@@ -1532,10 +1582,16 @@
       if (!ONLINE.length) {
         const grid = $('.agg-grid', sec);
         if (grid)
-          grid.innerHTML = `<div class="sr-empty" style="padding:28px 16px">
-          <div style="font-weight:700;margin-bottom:6px">No online orders right now</div>
-          <div style="font-size:12.5px;color:var(--text-soft);max-width:420px;margin:0 auto;line-height:1.5">
-            Connect Zomato / Swiggy / ONDC via the Webhook button, or tap <b>Demo order</b> to practice accept → KOT → POS checkout.
+          grid.innerHTML = `<div class="sr-empty" style="padding:40px 20px;grid-column:1/-1">
+          <i class="fa-solid fa-motorcycle" style="font-size:28px;opacity:.4;display:block;margin-bottom:10px"></i>
+          <div style="font-weight:700;margin-bottom:6px;font-size:15px">Kitchen is clear for delivery</div>
+          <div style="font-size:13px;color:var(--text-soft);max-width:400px;margin:0 auto 14px;line-height:1.5">
+            New Zomato / Swiggy / ONDC orders appear here for <b>Accept + KOT</b>, then settle in POS.
+            ${showDemo ? ' Use <b>Demo order</b> to practice the full flow.' : ' Connect webhooks under Webhook when your aggregator is ready.'}
+          </div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button type="button" class="btn btn-ghost btn-sm" id="agg-empty-webhook"><i class="fa-solid fa-link"></i> Webhook setup</button>
+            ${showDemo ? '<button type="button" class="btn btn-primary btn-sm" id="agg-empty-demo"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
           </div>
         </div>`;
       }
@@ -1556,7 +1612,61 @@
         b.onclick = () => persistOnlineStatus(+b.dataset.ready, 'Ready', 'Marked ready for pickup', 'fa-bell-concierge')
       );
       $$('[data-rej]', sec).forEach((b) =>
-        b.onclick = () => persistOnlineStatus(+b.dataset.rej, 'Rejected', 'Order rejected', 'fa-xmark')
+        b.onclick = async () => {
+          const i = +b.dataset.rej;
+          const order = ONLINE[i];
+          if (!order) return;
+          let reason = 'Rejected by outlet';
+          if (window.RSModal) {
+            await new Promise((resolve) => {
+              RSModal.open({
+                title: 'Reject online order',
+                sub: (platName[order.plat] || 'Online') + ' · ' + order.oid,
+                icon: 'fa-xmark',
+                size: 'sm',
+                body: `<label class="fl">Reason (shared internally)</label>
+                  <select class="form-input" id="agg-rej-reason">
+                    <option>Item unavailable</option>
+                    <option>Outlet closed / too busy</option>
+                    <option>Delivery area issue</option>
+                    <option>Duplicate order</option>
+                    <option value="other">Other…</option>
+                  </select>
+                  <input class="form-input" id="agg-rej-other" placeholder="Details (optional)" style="margin-top:8px;display:none">`,
+                foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+                       <button type="button" class="btn btn-primary" style="flex:1" data-ok>Reject order</button>`,
+                onMount(m, close) {
+                  const sel = m.querySelector('#agg-rej-reason');
+                  const other = m.querySelector('#agg-rej-other');
+                  sel.onchange = () => {
+                    other.style.display = sel.value === 'other' ? '' : 'none';
+                  };
+                  m.querySelector('[data-x]').onclick = () => {
+                    close();
+                    resolve(false);
+                  };
+                  m.querySelector('[data-ok]').onclick = () => {
+                    reason =
+                      sel.value === 'other'
+                        ? (other.value || '').trim() || 'Rejected by outlet'
+                        : sel.value;
+                    close();
+                    resolve(true);
+                  };
+                },
+              });
+            }).then(async (ok) => {
+              if (!ok) return;
+              order.row.rejectReason = reason;
+              await persistOnlineStatus(i, 'Rejected', 'Rejected · ' + reason.slice(0, 40), 'fa-xmark');
+            });
+          } else {
+            const r = window.prompt('Reject reason?', reason);
+            if (r == null) return;
+            order.row.rejectReason = r || reason;
+            await persistOnlineStatus(i, 'Rejected', 'Order rejected', 'fa-xmark');
+          }
+        }
       );
       $$('[data-rider]', sec).forEach((b) =>
         b.onclick = () => persistOnlineStatus(+b.dataset.rider, 'Picked Up', 'Rider pickup recorded', 'fa-motorcycle')
@@ -1564,13 +1674,21 @@
 
       const refreshBtn = sec.querySelector('#agg-refresh');
       if (refreshBtn) refreshBtn.onclick = () => renderAgg();
+      const seedDemo = () => {
+        const plats = ['swiggy', 'zomato', 'ondc'];
+        const pick = plats[Math.floor(Math.random() * plats.length)];
+        seedDemoOnlineOrder(pick);
+      };
       const seedBtn = sec.querySelector('#agg-seed');
-      if (seedBtn)
-        seedBtn.onclick = () => {
-          const plats = ['swiggy', 'zomato', 'ondc'];
-          const pick = plats[Math.floor(Math.random() * plats.length)];
-          seedDemoOnlineOrder(pick);
-        };
+      if (seedBtn) seedBtn.onclick = seedDemo;
+      const emptyDemo = sec.querySelector('#agg-empty-demo');
+      if (emptyDemo) emptyDemo.onclick = seedDemo;
+      const openWebhook = () => {
+        const wh = sec.querySelector('#agg-webhook-info');
+        if (wh) wh.click();
+      };
+      const emptyWh = sec.querySelector('#agg-empty-webhook');
+      if (emptyWh) emptyWh.onclick = openWebhook;
       const whBtn = sec.querySelector('#agg-webhook-info');
       if (whBtn)
         whBtn.onclick = () => {
@@ -2351,21 +2469,30 @@
               } else if (name === 'Offers & Coupons') {
                 const formBody = `
                   <div style="display:flex;flex-direction:column;gap:12px">
-                    <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Coupon code</label>
+                      <input type="text" id="off-code" class="form-control" placeholder="e.g. FESTIVE20" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);text-transform:uppercase">
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Title / description</label>
+                      <input type="text" id="off-desc" class="form-control" placeholder="e.g. Festival 20% off" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    </div>
+                    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                       <div>
-                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Coupon Code</label>
-                        <input type="text" id="off-code" class="form-control" placeholder="e.g. WELCOME100" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Percent off (%)</label>
+                        <input type="number" id="off-pct" class="form-control" min="0" max="100" step="1" placeholder="e.g. 20" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                       </div>
                       <div>
-                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Description</label>
-                        <input type="text" id="off-desc" class="form-control" placeholder="e.g. ₹100 discount" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Or fixed amount off</label>
+                        <input type="number" id="off-fixed" class="form-control" min="0" step="1" placeholder="e.g. 100" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                       </div>
                     </div>
+                    <p style="font-size:11.5px;color:var(--text-soft);margin:0;line-height:1.4">POS promo needs <b>% or fixed</b> — description alone will not discount the cart.</p>
                   </div>
                 `;
                 RSModal.open({
                   title: 'New Offer Coupon',
-                  sub: 'Create a discount code',
+                  sub: 'Works with POS promo codes',
                   icon: 'fa-tags',
                   size: 'sm',
                   body: formBody,
@@ -2373,20 +2500,45 @@
                   onMount(offModal, offClose) {
                     offModal.querySelector('[data-cancel]').onclick = offClose;
                     offModal.querySelector('[data-confirm]').onclick = async () => {
-                      const code = offModal.querySelector('#off-code').value || '';
+                      const code = String(offModal.querySelector('#off-code').value || '')
+                        .trim()
+                        .toUpperCase();
                       if (!code) return RS.toast('Coupon code is required', 'fa-circle-exclamation');
                       const description = offModal.querySelector('#off-desc').value || 'Discount Coupon';
-
-                      const id = RS.nextLogicalNo('OFF');
-                      const offRow = { id, code, description, usageCount: 0, status: 'active' };
+                      const pct = Math.max(0, Math.min(100, Number(offModal.querySelector('#off-pct').value) || 0));
+                      const fixed = Math.max(0, Number(offModal.querySelector('#off-fixed').value) || 0);
+                      if (!(pct > 0 || fixed > 0)) {
+                        return RS.toast('Enter percent off or a fixed amount', 'fa-circle-exclamation');
+                      }
+                      const id = RS.nextLogicalNo ? RS.nextLogicalNo('OFF') : 'OFF-' + Date.now();
+                      const offRow = {
+                        id,
+                        code,
+                        description,
+                        title: description,
+                        pct,
+                        discount_pct: pct,
+                        fixed,
+                        amount: fixed,
+                        usageCount: 0,
+                        status: 'active',
+                      };
                       offClose();
-                      if (RS.saveOne) {
-                        await RS.saveOne('offers', offRow);
-                        RS.toast('Offer coupon created successfully', 'fa-circle-check');
+                      try {
+                        if (RS.saveOne) await RS.saveOne('offers', offRow);
+                        else if (window.RS_DB) await RS_DB.put('offers', id, offRow);
+                        if (Array.isArray(RS.OFFERS)) RS.OFFERS.push(offRow);
+                        RS.toast(
+                          'Offer ' + code + ' · ' + (fixed > 0 ? rs(fixed) + ' off' : pct + '% off'),
+                          'fa-circle-check'
+                        );
                         hubScreen('Offers & Coupons');
+                      } catch (e) {
+                        console.warn(e);
+                        RS.toast('Could not save offer', 'fa-circle-exclamation');
                       }
                     };
-                  }
+                  },
                 });
               }
             };

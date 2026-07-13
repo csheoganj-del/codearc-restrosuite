@@ -32,9 +32,14 @@
       'Veg Biryani':[['Basmati Rice',0.15,'kg'],['Onion',0.05,'kg'],['Cooking Oil',0.02,'L']],
       'Garlic Naan':[['Wheat Flour',0.12,'kg'],['Butter',0.01,'kg']]
     };
-    function recipeOf(m){ if(!m.ingredients){ m.ingredients = (SEED[m.name]||[]).map(x=>({name:x[0],qty:x[1],unit:x[2]})); } return m.ingredients; }
+    // Only use real recipe data — never invent ingredients for named dishes
+    function recipeOf(m){
+      if (Array.isArray(m.ingredients) && m.ingredients.length) return m.ingredients;
+      return [];
+    }
     function invCost(name){ const i=(RS.INVENTORY||[]).find(x=>x.name===name); return i?i.cost:0; }
     function plateCost(m){ return recipeOf(m).reduce((a,g)=>a+g.qty*invCost(g.name),0); }
+    function escEd(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
     /* ---------------- left form ---------------- */
     function buildForm(){
@@ -286,14 +291,33 @@
         });
       }
 
+      if (!filtered.length) {
+        const hasF = catFilter !== 'all' || stockFilter !== 'all';
+        body.innerHTML = `<tr><td colspan="6" style="padding:0;border:none">
+          <div class="sr-empty" style="padding:36px 16px">
+            <i class="fa-solid fa-utensils" style="font-size:22px;opacity:.4;display:block;margin-bottom:8px"></i>
+            <div style="font-weight:700;margin-bottom:4px">${hasF ? 'No items match filters' : 'No menu items yet'}</div>
+            <div style="font-size:13px;color:var(--text-soft);margin-bottom:12px">${hasF ? 'Clear filters to see the full menu.' : 'Add your first dish on the left form to start selling.'}</div>
+            ${hasF ? '<button type="button" class="btn btn-ghost btn-sm" id="ed-clear-filters">Clear filters</button>' : ''}
+          </div></td></tr>`;
+        const cf = document.getElementById('ed-clear-filters');
+        if (cf) cf.onclick = () => {
+          const c = document.getElementById('editor-cat-filter');
+          const s = document.getElementById('editor-stock-filter');
+          if (c) c.value = 'All';
+          if (s) s.value = 'All';
+          renderList();
+        };
+      } else {
       body.innerHTML = filtered.map(m=>`
-        <tr data-id="${m.id}">
-          <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${m.name}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${m.cat}</div></div></div></td>
-          <td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td>
-          <td><span class="stock-dot ${RS.stockCls[m.stock]}">${RS.stockLabel[m.stock]}</span></td>
-          <td><label class="switch-mini"><input type="checkbox" data-av="${m.id}" ${m.stock!=='out'?'checked':''}><span></span></label></td>
-          <td><div class="row-actions"><button class="icon-act go" data-edit="${m.id}" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" data-recipe="${m.id}" title="Recipe & cost"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" data-del="${m.id}" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
+        <tr data-id="${escEd(m.id)}">
+          <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${escEd(m.name)}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${escEd(m.cat)}</div></div></div></td>
+          <td>${escEd(m.cat)}</td><td class="td-strong">${rs(m.price)}</td>
+          <td><span class="stock-dot ${(RS.stockCls&&RS.stockCls[m.stock])||''}">${(RS.stockLabel&&RS.stockLabel[m.stock])||m.stock||'—'}</span></td>
+          <td><label class="switch-mini"><input type="checkbox" data-av="${escEd(m.id)}" ${m.stock!=='out'?'checked':''}><span></span></label></td>
+          <td><div class="row-actions"><button class="icon-act go" data-edit="${escEd(m.id)}" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" data-recipe="${escEd(m.id)}" title="Recipe & cost"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" data-del="${escEd(m.id)}" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
         </tr>`).join('');
+      }
       const count = filtered.length, cats=[...new Set(filtered.map(m=>m.cat))].length;
       const sub = $('#editor-tab .ph-sub'); if(sub) sub.textContent = `${count} items · ${cats} categories`;
       body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>{ buildForm(); buildForm._load(RS.MENU.find(x=>String(x.id)===String(b.dataset.edit))); $('#editor-tab').scrollIntoView({block:'start'}); });

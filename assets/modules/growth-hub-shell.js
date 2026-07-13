@@ -23,38 +23,61 @@
     return Array.from(document.querySelectorAll(sel));
   }
 
+  // Neutral meta — no vanity fake counts. Live modules open via openGrowthHubScreen.
   const HUB = [
-    { ic: 'fa-calendar-check', bg: 'bg-o', t: 'Reservations', d: 'Manage table bookings & waitlist', m: '8 today' },
-    { ic: 'fa-headset', bg: 'bg-v', t: 'Support Tickets', d: 'Customer queries & complaints', m: '2 open' },
-    { ic: 'fa-truck-ramp-box', bg: 'bg-t', t: 'Purchase Orders', d: 'Raise & track supplier POs', m: '3 pending' },
-    { ic: 'fa-flask-vial', bg: 'bg-g', t: 'Recipe Costing', d: 'Plate cost & margin calculator', m: '68% margin' },
-    { ic: 'fa-tags', bg: 'bg-a', t: 'Offers & Coupons', d: 'Build promos & festival deals', m: '4 live' },
-    { ic: 'fa-bullhorn', bg: 'bg-o', t: 'WhatsApp Campaigns', d: 'Broadcast to your customer list', m: '3.1k reach' },
-    { ic: 'fa-star', bg: 'bg-v', t: 'Feedback & Reviews', d: 'Collect & respond to ratings', m: '4.8 ★' },
-    { ic: 'fa-gift', bg: 'bg-g', t: 'Loyalty Program', d: 'Points, tiers & rewards', m: '412 members' },
+    { ic: 'fa-calendar-check', bg: 'bg-o', t: 'Reservations', d: 'Manage table bookings & waitlist', m: 'Open' },
+    { ic: 'fa-headset', bg: 'bg-v', t: 'Support Tickets', d: 'Customer queries & complaints', m: 'Open' },
+    { ic: 'fa-truck-ramp-box', bg: 'bg-t', t: 'Purchase Orders', d: 'Raise & track supplier POs', m: 'Open' },
+    { ic: 'fa-flask-vial', bg: 'bg-g', t: 'Recipe Costing', d: 'Plate cost & margin calculator', m: 'Open' },
+    { ic: 'fa-tags', bg: 'bg-a', t: 'Offers & Coupons', d: 'Build promos & festival deals', m: 'Open' },
+    { ic: 'fa-bullhorn', bg: 'bg-o', t: 'WhatsApp Campaigns', d: 'Broadcast to your customer list', m: 'Open' },
+    { ic: 'fa-star', bg: 'bg-v', t: 'Feedback & Reviews', d: 'Collect & respond to ratings', m: 'Open' },
+    { ic: 'fa-gift', bg: 'bg-g', t: 'Loyalty Program', d: 'Points, tiers & rewards', m: 'Open' },
   ];
+
+  function liveMeta(title) {
+    try {
+      if (title === 'Reservations' && global.RS_DB) return null; // async paint later
+      if (title === 'Offers & Coupons' && global.RS && Array.isArray(RS.OFFERS)) {
+        const n = RS.OFFERS.filter((o) => !o.status || o.status === 'active').length;
+        return n ? n + ' live' : 'Open';
+      }
+      if (title === 'Loyalty Program' && global.RS && Array.isArray(RS.CUSTOMERS)) {
+        return RS.CUSTOMERS.length ? RS.CUSTOMERS.length + ' members' : 'Open';
+      }
+    } catch (_) {}
+    return null;
+  }
 
   function renderHub() {
     const grid = $('#hub-grid');
     if (!grid) return;
-    grid.innerHTML = HUB.map(
-      (h) => `
-      <div class="hub-card">
+    grid.innerHTML = HUB.map((h) => {
+      const meta = liveMeta(h.t) || h.m;
+      return `
+      <div class="hub-card" role="button" tabindex="0" data-hub="${_e(h.t)}">
         <div class="hub-ic ${h.bg}"><i class="fa-solid ${h.ic}"></i></div>
         <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
-        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(h.m)}</span>
-      </div>`
-    ).join('');
-    $$('#hub-grid .hub-card').forEach((c) =>
-      c.addEventListener('click', () => {
-        const screen = c.querySelector('h4')?.textContent || '';
+        <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(meta)}</span>
+      </div>`;
+    }).join('');
+    $$('#hub-grid .hub-card').forEach((c) => {
+      const open = () => {
+        const screen = c.dataset.hub || c.querySelector('h4')?.textContent || '';
         if (global.RS && typeof RS.openGrowthHubScreen === 'function') {
           RS.openGrowthHubScreen(screen);
           return;
         }
         toast('Growth Hub module is still loading. Try again in a moment.', 'fa-arrow-up-right-from-square');
-      })
-    );
+      };
+      c.addEventListener('click', open);
+      c.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      });
+    });
   }
 
   function renderGrowthHub() {

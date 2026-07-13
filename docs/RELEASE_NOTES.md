@@ -1,5 +1,15 @@
 # RestroSuite release notes
 
+## v103 (2026-07-13) — Full product pass (remaining surfaces)
+
+- **Employees**: real Add team member modal, Reset PIN, Remove, honest attendance %, empty CTA wired
+- **Online Orders**: delivery-first empty state, reject reasons, Demo gated, Online/Offline pill
+- **Inventory**: empty stock state + clear filters / add ingredient
+- **Menu Editor**: empty list, escaped names, no invented seed recipes
+- **Reports**: empty period state, tax label from settings, neutral revenue icon
+- **Growth Hub tiles**: no vanity metrics; Offers require % or fixed (POS-compatible)
+- **Floor**: Open all QR sessions; close QR session when bill is paid
+
 ## v102 (2026-07-11) — Guest QR 10/10 end-to-end
 
 - **Seat & order auto-opens QR session** so guests don’t hit “session closed” after staff seats them

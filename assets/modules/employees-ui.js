@@ -57,11 +57,13 @@
   const empTab = document.getElementById('employees-tab');
   if (empTab) {
     const svElements = empTab.querySelectorAll('.stat-row .stat-card .sv');
+    // Attendance % = on shift / total (honest, not fake 100%)
+    const attendancePct = totalStaff > 0 ? Math.round((onShift / totalStaff) * 100) : 0;
     if (svElements.length >= 4) {
       svElements[0].textContent = totalStaff;
       svElements[1].textContent = onShift;
       svElements[2].textContent = payrollSum > 0 ? rs(payrollSum) : '₹0';
-      svElements[3].textContent = totalStaff > 0 ? '100%' : '0%';
+      svElements[3].textContent = attendancePct + '%';
     }
   }
 
@@ -161,6 +163,117 @@
     });
   }
 
+  async function openAddEmployeeModal() {
+    if (!window.RSModal) {
+      toast('Modal unavailable — try again', 'fa-circle-exclamation');
+      return;
+    }
+    const roleOpts = ROLE_DEFS.map(
+      (r) => `<option value="${r.key}">${_e(r.label)}</option>`
+    ).join('');
+    RSModal.open({
+      title: 'Add team member',
+      sub: 'Directory entry for roster · payroll · roles',
+      icon: 'fa-user-plus',
+      size: 'sm',
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label class="fl">Full name</label>
+            <input class="form-input" id="emp-new-name" placeholder="e.g. Priya Sharma" autocomplete="name">
+          </div>
+          <div>
+            <label class="fl">Email / login hint</label>
+            <input class="form-input" id="emp-new-email" type="email" placeholder="optional">
+          </div>
+          <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label class="fl">Role</label>
+              <select class="form-input" id="emp-new-role">${roleOpts}</select>
+            </div>
+            <div>
+              <label class="fl">Shift</label>
+              <select class="form-input" id="emp-new-shift">
+                <option value="Day">Day</option>
+                <option value="Evening">Evening</option>
+                <option value="Night">Night</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="fl">Monthly payroll (optional)</label>
+            <input class="form-input" id="emp-new-pay" type="number" min="0" step="100" placeholder="e.g. 18000">
+          </div>
+          <p style="font-size:12px;color:var(--text-soft);margin:0;line-height:1.4">
+            This adds them to the <b>employee directory</b>. Create a <b>Staff login</b> separately if they need dashboard access.
+          </p>
+        </div>`,
+      foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+             <button type="button" class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-user-plus"></i> Add member</button>`,
+      onMount(modal, close) {
+        modal.querySelector('[data-x]').onclick = close;
+        modal.querySelector('[data-ok]').onclick = async () => {
+          const name = (modal.querySelector('#emp-new-name').value || '').trim();
+          if (!name) {
+            toast('Enter a name', 'fa-circle-exclamation');
+            modal.querySelector('#emp-new-name').focus();
+            return;
+          }
+          const roleKey = modal.querySelector('#emp-new-role').value || 'waiter';
+          const chosen = ROLE_DEFS.find((r) => r.key === roleKey) || ROLE_DEFS[3];
+          const shift = modal.querySelector('#emp-new-shift').value || 'Day';
+          const email = (modal.querySelector('#emp-new-email').value || '').trim();
+          const payRaw = modal.querySelector('#emp-new-pay').value;
+          const emp = {
+            id: 'emp-' + Date.now(),
+            name,
+            email: email || '',
+            role: chosen.label,
+            roleKey: chosen.key,
+            rc: 'r-' + chosen.key,
+            shift,
+            sales: '—',
+            orders: '—',
+            payroll: payRaw ? String(payRaw) : '',
+          };
+          EMPLOYEES.push(emp);
+          try {
+            if (window.RS && typeof RS.save === 'function') await RS.save('employees');
+            else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
+            if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+          } catch (e) {
+            console.warn('Add employee save failed', e);
+            toast('Saved locally — cloud sync may retry', 'fa-cloud');
+          }
+          close();
+          toast(name + ' added to team', 'fa-user-check');
+          renderEmployees();
+        };
+      },
+    });
+  }
+
+  global.openAddEmployeeModal = openAddEmployeeModal;
+
+  // Wire header Add button (dashboard.html)
+  (function wireHeaderAdd() {
+    const tab = document.getElementById('employees-tab');
+    if (!tab) return;
+    let btn = document.getElementById('btn-add-employee');
+    if (!btn) {
+      btn = tab.querySelector('.toolbar-row .btn-primary, .btn.btn-primary.btn-sm');
+      if (btn && !btn.id) btn.id = 'btn-add-employee';
+    }
+    if (btn && btn.dataset.rsEmpAddBound !== '1') {
+      btn.dataset.rsEmpAddBound = '1';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAddEmployeeModal();
+      });
+    }
+  })();
+
   const grid = $('#emp-grid');
   if (!grid) return;
 
@@ -183,12 +296,7 @@
 
     const addBtn = grid.querySelector('#emp-add-from-empty');
     if (addBtn) {
-      addBtn.onclick = () => {
-        const headerAdd = document.querySelector('#employees-tab .btn-primary, #employees-tab [data-action="add-employee"], #btn-add-employee');
-        if (headerAdd) headerAdd.click();
-        else if (typeof window.openAddEmployeeModal === 'function') window.openAddEmployeeModal();
-        else toast('Use the Add employee button in the Employees header', 'fa-user-plus');
-      };
+      addBtn.onclick = () => openAddEmployeeModal();
     }
     const loginBtn = grid.querySelector('#emp-goto-logins');
     if (loginBtn) {
@@ -297,18 +405,67 @@
 
   grid.innerHTML = EMPLOYEES.map((e,i)=>`
     <div class="emp-card">
-      <div class="emp-top"><div class="emp-av" style="background:${avatarColors_[i%avatarColors_.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email)}</div></div></div>
-      <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc)}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift)}</span></div>
-      <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales)}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders)}</div><div class="esl">Orders</div></div></div>
-      <div class="emp-actions"><button class="btn btn-ghost btn-sm edit-role-btn" data-idx="${i}" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button><button class="icon-act" title="Reset PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button><button class="icon-act danger" title="Remove" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button></div>
+      <div class="emp-top"><div class="emp-av" style="background:${avatarColors_[i%avatarColors_.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email || '—')}</div></div></div>
+      <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc || '')}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift || '—')}</span></div>
+      <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales || '—')}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders || '—')}</div><div class="esl">Orders</div></div></div>
+      <div class="emp-actions">
+        <button type="button" class="btn btn-ghost btn-sm edit-role-btn" data-idx="${i}" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button>
+        <button type="button" class="icon-act emp-reset-pin" data-idx="${i}" title="Set / reset staff PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button>
+        <button type="button" class="icon-act danger emp-remove" data-idx="${i}" title="Remove from directory" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button>
+      </div>
     </div>`).join('');
-  $$('#emp-grid .edit-role-btn').forEach(b=>b.addEventListener('click', () => openEditRoleModal(+b.dataset.idx)));
+  $$('#emp-grid .edit-role-btn').forEach((b) =>
+    b.addEventListener('click', () => openEditRoleModal(+b.dataset.idx))
+  );
+  $$('#emp-grid .emp-reset-pin').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const emp = EMPLOYEES[+b.dataset.idx];
+      if (!emp) return;
+      const pin = window.prompt('Set a 4–6 digit PIN for ' + emp.name + ' (used at POS if enabled):', emp.pin || '');
+      if (pin == null) return;
+      const cleaned = String(pin).replace(/\D/g, '').slice(0, 6);
+      if (cleaned && (cleaned.length < 4 || cleaned.length > 6)) {
+        toast('PIN must be 4–6 digits', 'fa-circle-exclamation');
+        return;
+      }
+      emp.pin = cleaned || '';
+      try {
+        if (window.RS && typeof RS.save === 'function') await RS.save('employees');
+        else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
+      } catch (e) {
+        console.warn('PIN save failed', e);
+      }
+      toast(cleaned ? 'PIN updated for ' + emp.name : 'PIN cleared for ' + emp.name, 'fa-key');
+    })
+  );
+  $$('#emp-grid .emp-remove').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const idx = +b.dataset.idx;
+      const emp = EMPLOYEES[idx];
+      if (!emp) return;
+      const ok = window.confirm('Remove ' + emp.name + ' from the employee directory?\n(Does not delete their staff login.)');
+      if (!ok) return;
+      const id = emp.id;
+      EMPLOYEES.splice(idx, 1);
+      try {
+        if (window.RS && typeof RS.removeOne === 'function') await RS.removeOne('employees', id);
+        else if (window.RS_DB && RS_DB.del) await RS_DB.del('employees', id);
+        else if (window.RS && typeof RS.save === 'function') await RS.save('employees');
+        if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+      } catch (e) {
+        console.warn('Remove employee failed', e);
+      }
+      toast(emp.name + ' removed', 'fa-user-minus');
+      renderEmployees();
+    })
+  );
   }
 
-  global.RSEmployeesUI = { renderEmployees };
+  global.RSEmployeesUI = { renderEmployees, openAddEmployeeModal };
   function attach() {
     if (!global.RS) return;
     global.RS.renderEmployees = renderEmployees;
+    global.RS.openAddEmployeeModal = openAddEmployeeModal;
   }
   if (global.RS) attach();
   document.addEventListener('rs:ready', attach);
