@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v105 (2026-07-13) — Settings printer honesty + toast errors
+
+- Printer settings no longer pretend an EPSON/Tandoor is connected; free-text preferred printer + station label
+- Round-off copy: “nearest currency unit” (not rupee-only)
+- WhatsApp gateway disconnect/reset failures use **toast** (not `alert`)
+- Staff login create/update errors use toast in Employees manage
+
 ## v104 (2026-07-13) — Employees honesty + CRM edit/delete
 
 - **Roster**: built from each member’s real Day/Evening/Night/Off shift (no random fake week)

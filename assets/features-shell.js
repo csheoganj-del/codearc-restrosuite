@@ -211,7 +211,7 @@
         <div class="set-section form-grid-2" style="margin-top:8px">
           ${field('Service charge %','5','e.g. 5 or 10')}
         </div>
-        ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
+        ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
         ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
         ${toggle('Inclusive pricing','Menu prices include GST',false)}
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
@@ -241,15 +241,19 @@
           </div>
           <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Looks up active <code>offers</code> by code first; falls back to the demo code. Optional phone-locked offers check cart guest phone.</p>
         </div>`,
-      printer:`<div class="set-section form-grid-2">${field('Receipt printer','EPSON TM-T82 (USB)')}${sel('Paper size',['58 mm','80 mm'],'80 mm')}</div>
-        ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer)',false)}
+      printer:`<div class="set-section form-grid-2">
+          ${field('Preferred printer name','','Optional label e.g. Counter 80mm — leave blank to use system default')}
+          ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
+        </div>
+        <p style="font-size:11.5px;color:var(--text-soft);margin:0 0 10px">Printers are detected by the <b>desktop app</b> or <b>Android bridge</b>. Browser-only mode prints via the system dialog — no fake device is assumed.</p>
+        ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer when bridge is connected)',false)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
         ${toggle('Open cash drawer on cash','Pulse cash drawer (ESC/POS) after a cash or cash-split payment',true)}
-        <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}</div>
+        <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${field('Kitchen station label','Main kitchen','Optional name for kitchen routing notes')}</div>
         <div class="set-section form-grid-2" style="margin-top:12px">
           ${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}
         </div>
-        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices. Auto-print uses the same Thermal path as Bill settled. Cash drawer needs the desktop app or Android bridge.</p>
+        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices. Cash drawer needs the desktop app or Android bridge.</p>
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
           ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or the waiter app. QR ordering still works, but every order lands only in your own POS/order dashboard, never the KDS or waiter screens. Manager/admin only.',false)}
         </div>`,
@@ -900,7 +904,7 @@
                   if (typeof window.updateTopbarWhatsAppStatus === 'function') window.updateTopbarWhatsAppStatus();
                 } catch (err) {
                   console.error(err);
-                  alert("Failed to disconnect: " + err.message);
+                  RS.toast('Failed to disconnect: ' + (err.message || err), 'fa-circle-exclamation');
                   logoutBtn.disabled = false;
                   logoutBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Disconnect';
                 }
@@ -1071,7 +1075,7 @@
               toast('Gateway reset command sent', 'fa-circle-check');
             } catch (err) {
               console.error(err);
-              alert("Reset failed: " + err.message);
+              RS.toast('Reset failed: ' + (err.message || err), 'fa-circle-exclamation');
             } finally {
               setTimeout(() => {
                 troubleshootBtn.disabled = false;

@@ -1698,7 +1698,7 @@
           const pwd = prompt('Temporary password (min 10 chars)?'); if (!pwd || pwd.length < 10) return;
           RS_API.staffUsers({ action:'create_user', display_name:name, username:uname, role, password:pwd })
             .then(() => { RS.toast(`${name} added`,'fa-user-plus'); loadStaffUsers(); })
-            .catch(e => alert(e.message));
+            .catch(e => { console.warn(e); RS.toast(String(e.message || e), 'fa-circle-exclamation'); });
           return;
         }
 
@@ -1770,7 +1770,7 @@
           const role = STAFF_ROLES[parseInt(newRole,10)-1]?.key; if (!role) return;
           RS_API.staffUsers({ action:'update_user', user_id:u.id, role })
             .then(() => { RS.toast('Role updated','fa-user-check'); loadStaffUsers(); })
-            .catch(e => alert(e.message));
+            .catch(e => { console.warn(e); RS.toast(String(e.message || e), 'fa-circle-exclamation'); });
           return;
         }
 
@@ -1818,7 +1818,7 @@
           const pwd = prompt('New password (min 10 chars)?'); if (!pwd || pwd.length < 10) return;
           RS_API.staffUsers({ action:'reset_password', user_id:u.id, password:pwd })
             .then(() => RS.toast('Password reset','fa-key'))
-            .catch(e => alert(e.message));
+            .catch(e => { console.warn(e); RS.toast(String(e.message || e), 'fa-circle-exclamation'); });
           return;
         }
 
