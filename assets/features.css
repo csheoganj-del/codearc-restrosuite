@@ -22,7 +22,8 @@
 .rs-mhead .mh-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; font-size: 16px; background: var(--orange-tint); color: var(--orange); flex: none; }
 .rs-mclose { margin-left: auto; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--stroke-2); background: var(--glass-2); color: var(--text-soft); display: grid; place-items: center; transition: var(--t); flex: none; }
 .rs-mclose:hover { color: var(--text); background: var(--glass-3); }
-.rs-mbody { padding: 22px 24px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+/* flex:1 + min-height:0 is required so long modal bodies scroll instead of clipping under overflow:hidden */
+.rs-mbody { padding: 22px 24px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; -webkit-overflow-scrolling: touch; }
 .rs-mfoot { padding: 16px 24px; border-top: 1px solid var(--stroke); display: flex; gap: 12px; align-items: center; flex: none; }
 
 /* ---------------- PAYMENT MODAL ---------------- */

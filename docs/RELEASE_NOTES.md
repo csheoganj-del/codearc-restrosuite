@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v130 (2026-07-13) — QR print options visible under preview
+
+- Modal body now **scrolls** (flex min-height fix) so size + toggles are not clipped
+- Compact live preview (~220px) so **Card size** and toggles show without hunting
+- Sticky preview removed (it covered options)
+
 ## v129 (2026-07-13) — QR print live preview follows options
 
 - Changing **card size** or any toggle (Order/Waiter, Wi‑Fi, steps, Powered by…) **rebuilds the preview instantly**
