@@ -1,12 +1,13 @@
 {
-  "version": "v167-20260713-export-menu-inv-rec",
+  "version": "v168-20260713-inv-cost-link",
   "date": "2026-07-13",
-  "title": "Export Menu, Inventory & Recipes CSV",
-  "summary": "Full CSV export for Menu Editor, Inventory stock, and Recipes — not only templates and import.",
+  "title": "Every inventory item links to unit cost",
+  "summary": "Unit cost is first-class on stock: click any cost cell to set it, banner for ₹0 items, restock updates cost, plate cost/margin use the linked value, stock value shown per row.",
   "highlights": [
-    "Menu Editor → Export (full catalog CSV)",
-    "Inventory → Export (all stock items, re-importable columns)",
-    "Recipes → Export (one row per ingredient; matches bulk import shape)",
-    "Low-stock export still available separately"
+    "Click Unit cost on any stock row to set/edit",
+    "Banner: N items missing cost + Set costs wizard",
+    "Add/Edit stock requires unit cost",
+    "Restock: enter paid unit cost — saved on the item",
+    "Shows stock value (qty × unit cost) under each cost"
   ]
 }

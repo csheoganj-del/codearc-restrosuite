@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v167-20260713-export-menu-inv-rec';
+    return 'v168-20260713-inv-cost-link';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

@@ -384,6 +384,173 @@
     if (typeof global.RSPrint === 'function') global.RSPrint(html, 'PO ' + (po.poNumber || po.id));
     else if (global.RSPrintBridge && RSPrintBridge.printHtml) RSPrintBridge.printHtml(html, 'PO');
   }
+  function unitCostOf(i) {
+    return Math.max(0, Number(i && (i.cost != null ? i.cost : i.unit_cost)) || 0);
+  }
+  function stockValueOf(i) {
+    return Math.round(unitCostOf(i) * Math.max(0, Number(i && i.stock) || 0) * 100) / 100;
+  }
+  function missingCostItems() {
+    return getInventory().filter((i) => !(unitCostOf(i) > 0));
+  }
+  async function persistInvCost(inv, newCost) {
+    inv.cost = Math.max(0, Number(newCost) || 0);
+    // Keep alias for older payloads / exports
+    inv.unit_cost = inv.cost;
+    if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
+    else if (global.RS && RS.saveOne) await RS.saveOne('inventory', inv);
+  }
+
+  /**
+   * Quick set unit cost — links this stock item to plate cost / margin / PO value.
+   */
+  function openSetCostModal(inv, opts) {
+    opts = opts || {};
+    if (!inv || !global.RSModal) return;
+    const unit = inv.unit || 'unit';
+    const cur = unitCostOf(inv);
+    const stock = Math.max(0, Number(inv.stock) || 0);
+    RSModal.open({
+      title: 'Unit cost · ' + displayInvName(inv.name),
+      sub: 'Every stock item should have a cost — used for plate cost, margin & stock value',
+      icon: 'fa-indian-rupee-sign',
+      size: 'sm',
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <p style="margin:0;font-size:13.5px;line-height:1.5;color:var(--text-soft)">
+            What do you pay for <b>1 ${esc(unit)}</b> of <b>${esc(displayInvName(inv.name))}</b>?
+            Recipes use this to show plate cost when a dish is sold.
+          </p>
+          <div>
+            <label class="fl">Cost per ${esc(unit)} (₹)</label>
+            <input class="form-input" id="set-cost-val" type="number" min="0" step="any" value="${cur || ''}" placeholder="e.g. 80">
+          </div>
+          <div class="inv-cost-preview" id="set-cost-preview">
+            Stock value now: <b>${rs(stockValueOf(inv))}</b>
+            ${stock ? ` · ${stock} ${esc(unit)} × unit cost` : ''}
+          </div>
+          ${
+            opts.showNext
+              ? '<p style="margin:0;font-size:12px;color:var(--text-mute)">After save we can open the next item still missing cost.</p>'
+              : ''
+          }
+        </div>`,
+      foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+        <button type="button" class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-link"></i> Save cost</button>`,
+      onMount(modal, close) {
+        const inp = modal.querySelector('#set-cost-val');
+        const prev = modal.querySelector('#set-cost-preview');
+        const refresh = () => {
+          const c = Math.max(0, Number(inp.value) || 0);
+          const val = Math.round(c * stock * 100) / 100;
+          prev.innerHTML =
+            'Stock value: <b>' +
+            rs(val) +
+            '</b>' +
+            (stock ? ' · ' + stock + ' ' + esc(unit) + ' × ' + rs(c) : '');
+        };
+        inp.addEventListener('input', refresh);
+        modal.querySelector('[data-x]').onclick = close;
+        modal.querySelector('[data-ok]').onclick = async () => {
+          const c = Math.max(0, Number(inp.value) || 0);
+          if (!(c > 0)) {
+            toast('Enter a unit cost greater than 0', 'fa-circle-exclamation');
+            inp.focus();
+            return;
+          }
+          try {
+            await persistInvCost(inv, c);
+            toast(displayInvName(inv.name) + ' · cost ' + rs(c) + '/' + unit + ' linked', 'fa-link');
+            close();
+            renderInventory();
+            if (opts.showNext) {
+              const next = missingCostItems().find((x) => String(x.id) !== String(inv.id));
+              if (next) setTimeout(() => openSetCostModal(next, { showNext: true }), 280);
+            }
+          } catch (e) {
+            console.warn(e);
+            toast('Could not save cost', 'fa-circle-exclamation');
+          }
+        };
+        setTimeout(() => {
+          inp.focus();
+          inp.select();
+        }, 80);
+      },
+    });
+  }
+
+  function openMissingCostsWizard() {
+    const list = missingCostItems();
+    if (!list.length) {
+      toast('All stock items already have a unit cost', 'fa-circle-check');
+      return;
+    }
+    openSetCostModal(list[0], { showNext: true });
+  }
+
+  function paintCostBanner() {
+    let bar = document.getElementById('inv-cost-tip');
+    const missing = missingCostItems();
+    const totalVal = getInventory().reduce((a, i) => a + stockValueOf(i), 0);
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'inv-cost-tip';
+      bar.className = 'banner warn inv-cost-banner';
+      bar.style.display = 'none';
+      bar.setAttribute('role', 'status');
+      const stockPanel = document.getElementById('inv-panel-stock');
+      const host = stockPanel && stockPanel.parentElement;
+      if (host) {
+        const linkTip = document.getElementById('inv-link-tip');
+        if (linkTip && linkTip.parentElement === host) host.insertBefore(bar, linkTip.nextSibling);
+        else if (stockPanel) host.insertBefore(bar, stockPanel);
+        else host.appendChild(bar);
+      }
+    }
+    if (!getInventory().length) {
+      bar.style.display = 'none';
+      return;
+    }
+    if (missing.length) {
+      bar.style.display = 'flex';
+      bar.className = 'banner warn inv-cost-banner';
+      bar.innerHTML = `<i class="fa-solid fa-indian-rupee-sign"></i>
+        <div style="flex:1"><b>${missing.length} stock item${missing.length === 1 ? '' : 's'}</b> have no unit cost (₹0).
+        Link a cost so recipes can show plate cost &amp; margin. Stock value so far: <b>${rs(totalVal)}</b>.
+        <button type="button" class="btn btn-primary btn-sm" id="inv-cost-set-all" style="margin-left:8px">Set costs</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="inv-cost-filter">Show ₹0 only</button></div>`;
+      const a = bar.querySelector('#inv-cost-set-all');
+      const b = bar.querySelector('#inv-cost-filter');
+      if (a) a.onclick = () => openMissingCostsWizard();
+      if (b)
+        b.onclick = () => {
+          toast('Amber rows = missing cost — click ₹0 · set cost on each row', 'fa-circle-info');
+          const row = document.querySelector('#inv-table-body .inv-cost-btn.is-zero');
+          if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        };
+    } else {
+      bar.style.display = 'flex';
+      bar.className = 'banner inv-cost-banner inv-cost-banner-ok';
+      bar.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--green)"></i>
+        <div style="flex:1">All stock items have unit cost linked · total stock value <b>${rs(totalVal)}</b></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="inv-cost-dismiss">OK</button>`;
+      const d = bar.querySelector('#inv-cost-dismiss');
+      if (d)
+        d.onclick = () => {
+          bar.style.display = 'none';
+          try {
+            if (global.sessionStorage) sessionStorage.setItem('rs_inv_cost_ok_hide', '1');
+          } catch (_) {}
+        };
+      try {
+        if (global.sessionStorage && sessionStorage.getItem('rs_inv_cost_ok_hide') === '1') {
+          bar.style.display = 'none';
+        }
+      } catch (_) {}
+    }
+  }
+
   function exportLowStockCsv() {
     const low = lowStockItems();
     if (!low.length) {
@@ -510,6 +677,9 @@
     const low = INVENTORY.filter(isLowStock);
     paintInventoryBadge();
     paintExpiryBanner();
+    try {
+      paintCostBanner();
+    } catch (_) {}
     // Naive-user tip on stock: recipes still missing
     try {
       const tip = document.getElementById('inv-link-tip');
@@ -666,12 +836,19 @@
           const st = i.stock < i.min ? 'out' : i.stock < i.min * 1.4 ? 'low' : 'ok';
           const pct = Math.min(100, Math.round((i.stock / (i.min * 2 || 1)) * 100));
           const pretty = displayInvName(i.name);
-          const costN = Number(i.cost) || 0;
+          const costN = unitCostOf(i);
+          const valN = stockValueOf(i);
+          const idAttr = esc(invMatchKey(i));
           const costHtml =
             costN > 0
-              ? `${rs(costN)}<span class="inv-unit-suffix">/${_e(i.unit || 'unit')}</span>`
-              : `<span class="inv-cost-zero" title="Set unit cost for plate costing &amp; POs">₹0 · set cost</span>`;
-          const idAttr = esc(invMatchKey(i));
+              ? `<button type="button" class="inv-cost-btn" data-set-cost title="Edit unit cost (links to plate cost)">
+                  <span class="inv-cost-amt">${rs(costN)}</span><span class="inv-unit-suffix">/${_e(i.unit || 'unit')}</span>
+                  <span class="inv-stock-val">value ${rs(valN)}</span>
+                </button>`
+              : `<button type="button" class="inv-cost-btn is-zero" data-set-cost title="Set unit cost — required for plate cost">
+                  <span class="inv-cost-zero">₹0 · set cost</span>
+                  <span class="inv-stock-val">not linked</span>
+                </button>`;
           const sum =
             Batches && typeof Batches.summarizeItem === 'function'
               ? Batches.summarizeItem(i)
@@ -688,7 +865,7 @@
           const fefoLine = sum && sum.useFirstLabel
             ? `<div class="inv-fefo-line inv-fefo-${esc(sum.status || 'ok')}" title="First expiry first out">${_e(sum.useFirstLabel)}</div>`
             : '';
-          return `<tr data-inv-id="${idAttr}">
+          return `<tr data-inv-id="${idAttr}" class="${costN > 0 ? '' : 'inv-row-no-cost'}">
           <td>
             <button type="button" class="inv-name-btn" data-batches="${idAttr}" title="View batches / expiry">
               <b class="inv-name">${_e(pretty)}</b>
@@ -712,6 +889,15 @@
           const row = btn.closest('tr');
           const inv = findInvByRow(row);
           if (inv) openBatchesModal(inv);
+        };
+      });
+      $$('#inv-table-body [data-set-cost]').forEach((btn) => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const row = btn.closest('tr');
+          const inv = findInvByRow(row);
+          if (inv) openSetCostModal(inv, { showNext: !(unitCostOf(inv) > 0) });
         };
       });
 

@@ -1549,8 +1549,36 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 }
 .inv-unit-suffix { color: var(--text-mute); font-weight: 500; font-size: 12px; }
 .inv-cost-zero {
-  color: var(--amber); font-weight: 700; font-size: 12px; cursor: default;
+  color: var(--amber); font-weight: 700; font-size: 12px;
 }
+.inv-cost-btn {
+  appearance: none; border: 1px solid transparent; background: transparent;
+  padding: 4px 8px; margin: -4px -8px; border-radius: 8px;
+  text-align: left; cursor: pointer; font: inherit; color: inherit;
+  display: inline-flex; flex-direction: column; gap: 2px; max-width: 160px;
+}
+.inv-cost-btn:hover {
+  border-color: var(--stroke-2); background: var(--glass);
+}
+.inv-cost-btn.is-zero {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--stroke));
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+}
+.inv-cost-amt { font-weight: 800; }
+.inv-stock-val {
+  font-size: 11px; font-weight: 600; color: var(--text-mute);
+}
+.inv-row-no-cost td:nth-child(5) { vertical-align: middle; }
+.inv-cost-preview {
+  font-size: 13px; color: var(--text-soft);
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--glass); border: 1px solid var(--stroke);
+}
+.inv-cost-banner-ok {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--stroke)) !important;
+  background: color-mix(in srgb, var(--green) 8%, var(--panel)) !important;
+}
+.inv-cost-banner { margin-bottom: 12px; }
 .inv-name-btn {
   appearance: none; border: 0; background: transparent; padding: 0;
   text-align: left; cursor: pointer; font: inherit; color: inherit;
