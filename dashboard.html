@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v105-20260713-settings';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v106-20260713-wa-ux';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -454,15 +454,19 @@
               </div>
             </a>
             <div class="tb-more-section">Status</div>
-            <div class="dropdown-item tb-more-status" id="topbar-whatsapp-status-pill" role="status">
-              <span id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin"></i><span>WhatsApp</span></span>
-            </div>
+            <button type="button" class="dropdown-item tb-more-status js-wa-status-pill" id="topbar-whatsapp-status-pill" role="status">
+              <span class="js-wa-status-text" id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin"></i><span class="tb-badge-label">WhatsApp</span></span>
+            </button>
             <div class="dropdown-item tb-more-status" id="db-mode-pill" role="status" title="Cloud sync">
               <i class="fa-solid fa-spinner fa-spin"></i><span>Loading</span>
             </div>
             <div class="dropdown-item tb-more-status" id="app-version-pill" role="status"></div>
           </div>
         </div>
+        <!-- Always-visible WhatsApp outlet status (also mirrored under ⋯ More) -->
+        <button type="button" class="tb-pill txt tb-wa-pill js-wa-status-pill" id="tb-wa-status-btn" role="status" aria-label="WhatsApp status" title="Your outlet WhatsApp" data-tooltip="WhatsApp status">
+          <span class="js-wa-status-text" id="tb-wa-status-text"><i class="fa-brands fa-whatsapp"></i><span class="tb-badge-label">WA</span></span>
+        </button>
         <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
         <button type="button" class="tb-icon-btn" aria-label="Notifications" title="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
         <button type="button" class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme" title="Light / dark"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>

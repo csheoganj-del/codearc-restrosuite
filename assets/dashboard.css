@@ -3842,6 +3842,44 @@ textarea:focus-visible,
   border-color: oklch(0.74 0.15 158 / 0.45) !important;
 }
 
+/* Visible top-bar WA pill + shared status classes */
+.tb-wa-pill {
+  cursor: pointer !important;
+  max-width: 112px;
+}
+.tb-wa-pill .tb-badge-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 4.2rem;
+}
+.js-wa-status-pill.wa-linked,
+.tb-wa-pill.wa-linked {
+  color: var(--green) !important;
+  background: var(--green-tint) !important;
+  border-color: oklch(0.74 0.15 158 / 0.3) !important;
+}
+.js-wa-status-pill.wa-offline,
+.js-wa-status-pill.wa-auth-failure,
+.tb-wa-pill.wa-offline,
+.tb-wa-pill.wa-auth-failure {
+  color: var(--red) !important;
+  background: var(--red-tint) !important;
+  border-color: color-mix(in srgb, var(--red) 28%, transparent) !important;
+}
+.js-wa-status-pill.wa-qr,
+.js-wa-status-pill.wa-syncing,
+.js-wa-status-pill.wa-starting,
+.tb-wa-pill.wa-qr,
+.tb-wa-pill.wa-syncing,
+.tb-wa-pill.wa-starting {
+  color: #d97706 !important;
+  background: var(--amber-tint) !important;
+}
+@media (max-width: 720px) {
+  .tb-wa-pill .tb-badge-label { max-width: 0; opacity: 0; width: 0; overflow: hidden; }
+}
+
 #topbar-whatsapp-status-pill.wa-starting,
 #topbar-whatsapp-status-pill.wa-starting i,
 #topbar-whatsapp-status-pill.wa-starting span,

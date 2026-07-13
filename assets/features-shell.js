@@ -257,11 +257,20 @@
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
           ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or the waiter app. QR ordering still works, but every order lands only in your own POS/order dashboard, never the KDS or waiter screens. Manager/admin only.',false)}
         </div>`,
-      gateway:`<div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Configure your WhatsApp gateway for this outlet</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</span></div></div>
+      gateway:`
+        <div class="set-section" style="margin-bottom:14px;padding:14px 16px;border-radius:12px;border:1px solid color-mix(in srgb, #25d366 35%, var(--stroke));background:color-mix(in srgb, #25d366 8%, var(--panel))">
+          <div style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:6px"><i class="fa-brands fa-whatsapp" style="color:#25d366"></i> Your outlet WhatsApp</div>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--text-soft)">Each restaurant links <b>its own</b> number. Bills go only to customers of this outlet — not a shared central line. Keep the gateway PC awake during service. Prefer bills &amp; order updates only (marketing blasts raise ban risk).</p>
+        </div>
+        <div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">Connection status</div><div class="sd">Link your business WhatsApp via QR (Linked devices)</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</span></div></div>
+        <div class="set-section" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-test-send" title="Send a short test to your own number"><i class="fa-solid fa-vial"></i> Send test message</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-refresh-status"><i class="fa-solid fa-rotate"></i> Refresh status</button>
+        </div>
         ${toggle('Auto-send receipts','WhatsApp the bill to customer after payment',true)}
         ${sel('WhatsApp bill format',['Text receipt','Thermal PDF receipt'],'Thermal PDF receipt')}
         ${toggle('Order updates','Notify customer when order is ready',true)}
-        ${toggle('Marketing broadcasts','Allow promotional campaigns',true)}
+        ${toggle('Marketing broadcasts','Allow promotional campaigns (use carefully — higher ban risk)',false)}
         <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining with us. Your bill is attached.</textarea></div>
         <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
           <label class="fl" style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:8px;">
@@ -1061,6 +1070,69 @@
           };
         }
 
+        // 3b. Test send + status refresh (cockpit)
+        const waRefresh = body.querySelector('#btn-wa-refresh-status');
+        if (waRefresh && !waRefresh.dataset.listenerBound) {
+          waRefresh.dataset.listenerBound = 'true';
+          waRefresh.onclick = async () => {
+            waRefresh.disabled = true;
+            try {
+              await pollOutletGateway();
+              if (window.updateTopbarWhatsAppStatus) await window.updateTopbarWhatsAppStatus();
+              RS.toast('WhatsApp status refreshed', 'fa-rotate');
+            } catch (e) {
+              RS.toast('Refresh failed', 'fa-circle-exclamation');
+            } finally {
+              waRefresh.disabled = false;
+            }
+          };
+        }
+        const waTest = body.querySelector('#btn-wa-test-send');
+        if (waTest && !waTest.dataset.listenerBound) {
+          waTest.dataset.listenerBound = 'true';
+          waTest.onclick = async () => {
+            const linked = window.__rsGatewayNumber || '';
+            const phone = window.prompt(
+              'Send a short test to this WhatsApp number (with country code, e.g. 9198…):',
+              linked || ''
+            );
+            if (phone == null) return;
+            const digits = String(phone).replace(/\D/g, '');
+            if (digits.length < 10) {
+              RS.toast('Enter a valid number with country code', 'fa-circle-exclamation');
+              return;
+            }
+            waTest.disabled = true;
+            waTest.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…';
+            try {
+              const outlet =
+                sessionStorage.getItem('tenant_name') ||
+                sessionMeta.tenant_name ||
+                'your outlet';
+              await RS_API.data({
+                operation: 'gateway_send',
+                phone: digits,
+                message:
+                  'RestroSuite test from ' +
+                  outlet +
+                  ' · ' +
+                  new Date().toLocaleTimeString() +
+                  '. If you got this, bill WhatsApp is working.',
+                tenantId: tenantId,
+              });
+              window.__rsGatewayReady = true;
+              RS.toast('Test message sent', 'fa-circle-check');
+              if (window.updateTopbarWhatsAppStatus) window.updateTopbarWhatsAppStatus();
+            } catch (err) {
+              console.error(err);
+              RS.toast('Test failed: ' + (err.message || err) + ' — check connection / QR', 'fa-circle-exclamation');
+            } finally {
+              waTest.disabled = false;
+              waTest.innerHTML = '<i class="fa-solid fa-vial"></i> Send test message';
+            }
+          };
+        }
+
         // 4. Wire Troubleshoot Force Reset Button Click
         const troubleshootBtn = body.querySelector('#btn-gateway-troubleshoot-reset');
         if (troubleshootBtn && !troubleshootBtn.dataset.listenerBound) {
@@ -1072,7 +1144,7 @@
             troubleshootBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
             try {
               await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-              toast('Gateway reset command sent', 'fa-circle-check');
+              RS.toast('Gateway reset command sent', 'fa-circle-check');
             } catch (err) {
               console.error(err);
               RS.toast('Reset failed: ' + (err.message || err), 'fa-circle-exclamation');
@@ -1511,16 +1583,98 @@
     
     const WA_BADGE_STATES = ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
     function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
-      const textEl = document.getElementById('topbar-whatsapp-status-text');
-      const pillEl = document.getElementById('topbar-whatsapp-status-pill');
-      if (!textEl || !pillEl) return;
-      WA_BADGE_STATES.forEach(cls => pillEl.classList.remove(cls));
-      pillEl.classList.add(state);
-      pillEl.style.cssText = '';
-      textEl.innerHTML = `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i><span class="tb-badge-label">${safe(label)}</span>`;
-      pillEl.setAttribute('data-tooltip', tooltip);
-      pillEl.title = '';
+      const pills = document.querySelectorAll('.js-wa-status-pill, #topbar-whatsapp-status-pill, #tb-wa-status-btn');
+      const texts = document.querySelectorAll('.js-wa-status-text, #topbar-whatsapp-status-text, #tb-wa-status-text');
+      if (!pills.length && !texts.length) return;
+      const html = `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i><span class="tb-badge-label">${safe(label)}</span>`;
+      texts.forEach((textEl) => {
+        textEl.innerHTML = html;
+      });
+      pills.forEach((pillEl) => {
+        WA_BADGE_STATES.forEach((cls) => pillEl.classList.remove(cls));
+        pillEl.classList.add(state);
+        pillEl.style.cssText = '';
+        pillEl.setAttribute('data-tooltip', tooltip || '');
+        pillEl.title = tooltip || label || 'WhatsApp';
+        pillEl.setAttribute('aria-label', 'WhatsApp: ' + (label || state));
+      });
+      window.__rsWaBadge = { state, label, tooltip };
     }
+
+    function openWhatsAppStatusPanel() {
+      const st = window.__rsGatewayLastStatus || 'unknown';
+      const ready = window.__rsGatewayReady === true;
+      const num = window.__rsGatewayNumber || '';
+      const tip = (window.__rsWaBadge && window.__rsWaBadge.tooltip) || '';
+      const statusLine = ready
+        ? `<span style="color:var(--green);font-weight:800">Ready</span>${num ? ' · +' + safe(num) : ''}`
+        : st === 'qr'
+          ? `<span style="color:var(--amber);font-weight:800">Scan QR to connect</span>`
+          : `<span style="color:var(--red);font-weight:800">${safe(String(st || 'Offline'))}</span>`;
+      const body = `
+        <div style="display:flex;flex-direction:column;gap:12px;font-size:13.5px;line-height:1.5;color:var(--text-soft)">
+          <div style="padding:12px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke-2)">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:4px">Your outlet WhatsApp</div>
+            <div style="color:var(--text);font-size:15px">${statusLine}</div>
+            ${tip ? `<div style="margin-top:6px;font-size:12.5px">${safe(tip)}</div>` : ''}
+          </div>
+          <p style="margin:0;font-size:12.5px">Only <b>your</b> linked number sends bills to <b>your</b> customers. Keep the gateway PC awake during service.</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft)">
+            <li>Bills &amp; order updates only (avoid marketing blasts)</li>
+            <li>Phone online · WhatsApp → Linked devices</li>
+            <li>If Offline: open Settings → Gateway and scan QR</li>
+          </ul>
+        </div>`;
+      if (!window.RSModal) {
+        if (confirm((tip || 'WhatsApp status: ' + st) + '\n\nOpen Settings → Gateway?')) {
+          if (RS.activateTab) RS.activateTab('settings-tab');
+          setTimeout(() => {
+            const b = document.querySelector('.set-nav button[data-s="gateway"]');
+            if (b) b.click();
+          }, 200);
+        }
+        return;
+      }
+      RSModal.open({
+        title: 'WhatsApp',
+        sub: 'Outlet bill delivery',
+        icon: 'fa-brands fa-whatsapp',
+        size: 'sm',
+        body,
+        foot: `<button type="button" class="btn btn-ghost" id="wa-panel-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+               <button type="button" class="btn btn-primary" id="wa-panel-settings" style="flex:1"><i class="fa-solid fa-gear"></i> Open Gateway</button>`,
+        onMount(modal, close) {
+          modal.querySelector('#wa-panel-refresh').onclick = async () => {
+            if (window.updateTopbarWhatsAppStatus) await window.updateTopbarWhatsAppStatus();
+            close();
+            setTimeout(openWhatsAppStatusPanel, 120);
+          };
+          modal.querySelector('#wa-panel-settings').onclick = () => {
+            close();
+            if (RS.activateTab) RS.activateTab('settings-tab');
+            setTimeout(() => {
+              const b = document.querySelector('.set-nav button[data-s="gateway"]');
+              if (b) b.click();
+            }, 180);
+          };
+        },
+      });
+    }
+
+    function wireWhatsAppStatusClicks() {
+      document.querySelectorAll('.js-wa-status-pill, #tb-wa-status-btn, #topbar-whatsapp-status-pill').forEach((el) => {
+        if (el.dataset.waClickBound === '1') return;
+        el.dataset.waClickBound = '1';
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openWhatsAppStatusPanel();
+        });
+      });
+    }
+    wireWhatsAppStatusClicks();
+    document.addEventListener('DOMContentLoaded', wireWhatsAppStatusClicks);
     function gatewayReason(res, fallback) {
       const raw = (res && (res.error || res.reason || res.message || (res.details && res.details.reason))) || fallback || '';
       return humanizeGatewayReason(raw);
@@ -1560,27 +1714,36 @@
           : await RS_API.data({ operation: 'gateway_status' });
         window.__rsGatewayLastStatus = (res && res.status) || 'offline';
         window.__rsGatewayReady = false; // default -- only the 'ready' branch below flips this on
+        window.__rsGatewayNumber = (res && (res.number || res.phone || res.wa_number)) || window.__rsGatewayNumber || '';
+        window.__rsGatewayStatusRaw = res || null;
         if (res && res.status === 'ready') {
-          // Cached signal (refreshed every 15s) used by the checkout/receipt
-          // flow to decide, without an extra network round-trip, whether it's
-          // worth attempting a real PDF-attachment WhatsApp send via the
-          // gateway vs. going straight to the plain-text wa.me link.
+          // Cached signal used by checkout/receipt for PDF vs wa.me
           window.__rsGatewayReady = true;
-          setTopbarWhatsAppBadge('wa-linked', 'Linked', 'WhatsApp gateway linked', false);
+          const n = window.__rsGatewayNumber;
+          const short = n ? ('+' + String(n).slice(-4)) : 'Ready';
+          setTopbarWhatsAppBadge(
+            'wa-linked',
+            short,
+            n ? 'WhatsApp ready · +' + n + ' · bills send from your number' : 'WhatsApp ready · your outlet number',
+            false
+          );
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
-          setTopbarWhatsAppBadge('wa-syncing', 'Syncing', 'WhatsApp gateway syncing', true);
+          setTopbarWhatsAppBadge('wa-syncing', 'Sync…', 'WhatsApp syncing — almost ready', true);
         } else if (res && res.status === 'qr') {
-          setTopbarWhatsAppBadge('wa-qr', 'QR', 'Scan the WhatsApp QR code to connect', false);
+          setTopbarWhatsAppBadge('wa-qr', 'Scan QR', 'Scan WhatsApp QR in Settings → Gateway', false);
         } else if (res && res.status === 'auth_failure') {
           setTopbarWhatsAppBadge('wa-auth-failure', 'Auth', 'WhatsApp auth failed: ' + gatewayReason(res, 'session needs reconnect'), false);
         } else if (res && (res.status === 'connecting' || res.status === 'starting')) {
-          setTopbarWhatsAppBadge('wa-starting', 'Starting', 'WhatsApp gateway starting', true);
+          setTopbarWhatsAppBadge('wa-starting', '…', 'WhatsApp connecting', true);
         } else {
-          setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + gatewayReason(res, 'not connected'), false);
+          setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp offline: ' + gatewayReason(res, 'not connected'), false);
         }
+        wireWhatsAppStatusClicks();
       } catch(err) {
         window.__rsGatewayLastStatus = 'error';
-        setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + (err && err.message ? err.message : 'status check failed'), false);
+        window.__rsGatewayReady = false;
+        setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp offline: ' + (err && err.message ? err.message : 'status check failed'), false);
+        wireWhatsAppStatusClicks();
       }
     };
 

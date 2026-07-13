@@ -749,12 +749,13 @@
       }
       RSModal.open({
         title: 'Connect WhatsApp',
-        sub: 'Send bill PDFs instantly',
+        sub: 'Your outlet number · bills only',
         icon: 'fa-brands fa-whatsapp',
         size: 'sm',
         body: `<div style="padding:4px 2px 8px;line-height:1.55;font-size:13.5px;color:var(--text-soft)">
           <p style="margin:0 0 12px;color:var(--text)">${esc(msg)}</p>
-          <p style="margin:0">Link a business WhatsApp number in <b>Settings → Gateway</b>, then bills send as the same PDF you see in Bill settled.</p>
+          <p style="margin:0 0 10px">Link <b>this outlet’s</b> WhatsApp in <b>Settings → Gateway</b> (Linked devices → scan QR). Bills still save if WhatsApp is offline.</p>
+          <p style="margin:0;font-size:12.5px">Meanwhile: share PDF from Bill settled, or open WhatsApp Web with the text bill.</p>
         </div>`,
         foot: `<button class="btn btn-ghost" id="wa-cta-later">Later</button>
                <button class="btn btn-primary" id="wa-cta-connect"><i class="fa-brands fa-whatsapp"></i> Connect now</button>`,
@@ -769,6 +770,82 @@
             }, 180);
           };
         }
+      });
+    }
+
+    /** When gateway send fails: retry / wa.me / download PDF / connect */
+    function openWaOfflineFallback(bill, phone, errMsg) {
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      const why = String(errMsg || window.__rsLastWaError || 'Gateway unavailable').slice(0, 100);
+      const goSettings = () => {
+        if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
+        setTimeout(() => {
+          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+          if (gatewayBtn) gatewayBtn.click();
+        }, 180);
+      };
+      if (!window.RSModal) {
+        RS.toast('WhatsApp offline — opening chat link', 'fa-whatsapp');
+        try {
+          const text = receiptText(bill);
+          window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        } catch (_) {}
+        return;
+      }
+      RSModal.open({
+        title: 'WhatsApp unavailable',
+        sub: 'Bill is saved — customer can still get it',
+        icon: 'fa-brands fa-whatsapp',
+        size: 'sm',
+        body: `<div style="font-size:13.5px;line-height:1.5;color:var(--text-soft)">
+          <p style="margin:0 0 10px;color:var(--text)">Could not send via your linked WhatsApp.</p>
+          <p style="margin:0 0 8px;font-size:12.5px;padding:8px 10px;background:var(--glass);border-radius:8px">${esc(why)}</p>
+          <p style="margin:0;font-size:12.5px">Choose a fallback. Fix the link in Settings when free (PC awake · QR if needed).</p>
+        </div>`,
+        foot: `<button type="button" class="btn btn-ghost btn-sm" id="wa-fb-retry"><i class="fa-solid fa-rotate"></i> Retry</button>
+               <button type="button" class="btn btn-ghost btn-sm" id="wa-fb-web"><i class="fa-brands fa-whatsapp"></i> Open chat</button>
+               <button type="button" class="btn btn-ghost btn-sm" id="wa-fb-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+               <button type="button" class="btn btn-primary btn-sm" id="wa-fb-connect">Connect</button>`,
+        onMount(modal, close) {
+          modal.querySelector('#wa-fb-retry').onclick = () => {
+            close();
+            shareReceiptViaWhatsApp(bill);
+          };
+          modal.querySelector('#wa-fb-web').onclick = () => {
+            try {
+              const text = receiptText(bill);
+              window.open(
+                `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`,
+                '_blank',
+                'noopener,noreferrer'
+              );
+              RS.toast('WhatsApp Web opened — tap Send', 'fa-whatsapp');
+            } catch (e) {
+              RS.toast('Could not open WhatsApp Web', 'fa-circle-exclamation');
+            }
+            close();
+          };
+          modal.querySelector('#wa-fb-pdf').onclick = async () => {
+            try {
+              const dataUri =
+                window.RSReceiptEngine && RSReceiptEngine.toPDF
+                  ? await RSReceiptEngine.toPDF(bill)
+                  : await compilePreviewPDF(bill);
+              const a = document.createElement('a');
+              a.href = dataUri;
+              a.download = 'bill-' + (bill.no || bill.orderId || 'receipt') + '.pdf';
+              a.click();
+              RS.toast('PDF downloaded — share from phone files', 'fa-file-pdf');
+            } catch (e) {
+              RS.toast('PDF download failed', 'fa-circle-exclamation');
+            }
+            close();
+          };
+          modal.querySelector('#wa-fb-connect').onclick = () => {
+            close();
+            goSettings();
+          };
+        },
       });
     }
 
@@ -874,35 +951,30 @@
             return;
           }
           if (result.mode === 'wa.me') {
-            RS.toast(
-              result.warning
-                ? 'Opened WhatsApp Web (gateway: ' + String(result.warning).slice(0, 50) + ')'
-                : 'Opened WhatsApp Web — paste/send the message',
-              'fa-whatsapp'
+            // Gateway path failed — offer structured fallback (don't only toast)
+            openWaOfflineFallback(
+              normalized,
+              cleanPhone,
+              result.warning ||
+                (!ready
+                  ? st === 'qr'
+                    ? 'Scan QR in Settings → Gateway'
+                    : 'WhatsApp not linked / offline'
+                  : 'Gateway send failed')
             );
-            return;
-          }
-          if (result.mode === 'wa.me') {
-            RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
-            // Only prompt connect when gateway is clearly not linked
-            if (!ready && (st === 'offline' || st === 'error' || st === 'qr' || st === 'auth_failure' || !st)) {
-              setTimeout(() => openGatewayConnectCTA(
-                st === 'qr'
-                  ? 'Scan the WhatsApp QR in Settings → Gateway for one-tap PDF bills.'
-                  : 'Connect WhatsApp in Settings → Gateway for automatic PDF bills.'
-              ), 400);
-            }
             return;
           }
         } catch (err) {
           console.warn('[Receipt] engine send failed:', err && err.message);
+          openWaOfflineFallback(normalized, cleanPhone, err && err.message);
+          return;
         }
       }
 
       // Manual fallback (engine missing or failed hard)
       try {
         const text = receiptText(normalized);
-        if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
+        if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function' && ready) {
           const pdfDataUri = await compilePreviewPDF(normalized);
           const base64 = String(pdfDataUri || '').includes(',') ? String(pdfDataUri).split(',')[1] : String(pdfDataUri || '');
           if (base64 && base64.length > 100) {
@@ -923,12 +995,10 @@
             return;
           }
         }
-        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-        RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
+        openWaOfflineFallback(normalized, cleanPhone, !ready ? 'WhatsApp offline' : 'PDF unavailable');
       } catch (e) {
         console.warn(e);
-        RS.toast('Could not send WhatsApp receipt', 'fa-circle-exclamation');
-        if (!ready) openGatewayConnectCTA();
+        openWaOfflineFallback(normalized, cleanPhone, e && e.message);
       }
     }
 

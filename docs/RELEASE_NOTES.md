@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v106 (2026-07-13) — WhatsApp UX P0 (status · cockpit · offline fallback)
+
+- **Top bar**: always-visible WA status pill (Ready last-4 / Offline / Scan QR); click opens status panel
+- Status mirrored under ⋯ More; stores linked number for tooltips
+- **Settings → Gateway**: “Your outlet WhatsApp” copy, **Send test message**, Refresh status
+- **POS bill send offline**: Retry · Open chat · Download PDF · Connect (no silent fail)
+
 ## v105 (2026-07-13) — Settings printer honesty + toast errors
 
 - Printer settings no longer pretend an EPSON/Tandoor is connected; free-text preferred printer + station label
