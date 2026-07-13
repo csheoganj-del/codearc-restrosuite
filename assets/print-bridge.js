@@ -12,16 +12,50 @@
 
   function wrapHtml(innerHTML, title) {
     const maxW = paperMaxW();
+    // Match Bill settled preview / receipt.js EXPORT_CSS so thermal looks formatted
     const style = `
       <style>
-        *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif;}
-        body{padding:10px;color:#111;}
-        body > div { max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important; }
-        .rcp-center{text-align:center}.rcp-logo{font-weight:700;font-size:20px}
-        .rcp-sub{font-size:11px;color:#666;margin-top:2px}.rcp-hr{border:0;border-top:1px dashed #aaa;margin:10px 0}
-        .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
-        .rcp-line .q{color:#666}.rcp-tot{display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:6px}
-        .rcp-foot{text-align:center;font-size:11px;color:#666;margin-top:12px}
+        @page { margin: 0; size: auto; }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        html,body{background:#fff;color:#16151c;}
+        body{
+          padding:6px 4px 10px;
+          font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        body > div, .receipt-paper {
+          max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important;
+        }
+        .receipt-paper {
+          background: #fbfaf7; color: #16151c; border-radius: 0;
+          padding: 10px 8px 14px; box-shadow: none; position: relative;
+        }
+        .rcp-center { text-align: center; }
+        .rcp-logo {
+          font-family: Georgia, 'Times New Roman', Times, serif;
+          font-weight: 800; font-size: 18px; letter-spacing: -.02em; color: #16151c;
+        }
+        .rcp-sub { font-size: 10.5px; color: #4a4842; margin-top: 2px; }
+        .rcp-hr { border: 0; border-top: 1px dashed #8a877c; margin: 10px 0; }
+        .rcp-meta {
+          display: flex; justify-content: space-between; font-size: 11px;
+          color: #4a4842; gap: 6px; padding: 1px 0;
+        }
+        .rcp-line {
+          display: flex; justify-content: space-between; font-size: 12px;
+          padding: 2px 0; color: #16151c; gap: 6px;
+        }
+        .rcp-line .q { color: #6b6960; }
+        .rcp-tot {
+          display: flex; justify-content: space-between;
+          font-family: Georgia, 'Times New Roman', Times, serif;
+          font-weight: 800; font-size: 15px; margin-top: 6px; color: #16151c;
+        }
+        .rcp-foot { text-align: center; font-size: 10.5px; color: #6b6960; margin-top: 12px; }
+        .rcp-foot b { color: #16151c; }
+        .rcp-qr-wrap { margin-top:8px;padding-top:8px;border-top:1px dashed #8a877c;display:flex;flex-direction:column;align-items:center; }
+        .rcp-qr-wrap img { width:90px;height:90px;display:block; }
         .kot-h{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
         .kot-h .kt{font-weight:700;font-size:18px}
         .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}
@@ -134,7 +168,55 @@
     return printHtml(`<pre class="escpos">${String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`, 'Receipt', options);
   }
 
+  function forceRawThermal(opts) {
+    const o = opts || {};
+    if (o.raw === true || o.mode === 'raw' || o.mode === 'escpos') return true;
+    try {
+      const s = global.RS_SETTINGS || {};
+      const mode = String(s.set_thermal_mode || s.set_receipt_thermal_mode || '').toLowerCase();
+      return mode === 'raw' || mode === 'escpos' || s.set_thermal_raw === true || s.set_thermal_raw === 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /** Same HTML body as Bill settled preview (formatted), sized for roll paper. */
+  function formattedBillHtml(bill, outlet) {
+    const out = outlet || {};
+    let body = '';
+    if (global.RSReceiptEngine && typeof RSReceiptEngine.toHTML === 'function') {
+      body = RSReceiptEngine.toHTML(bill, null, out);
+    } else if (global.RSReceipt && typeof RSReceipt.html === 'function') {
+      body = RSReceipt.html(bill, null);
+    } else {
+      const items = (bill && (bill.items || bill._items)) || [];
+      const name = out.name || 'Outlet';
+      const total = bill && (bill.grand != null ? bill.grand : bill.amount);
+      body = `<div class="rcp-center"><div class="rcp-logo">${String(name).replace(/</g, '&lt;')}</div></div>
+        <hr class="rcp-hr">
+        <div class="rcp-meta"><span>${String((bill && bill.no) || '')}</span><span></span></div>
+        ${items.map((i) => `<div class="rcp-line"><span><span class="q">${i.qty || 1}x </span>${String(i.name || '').replace(/</g, '&lt;')}</span><span></span></div>`).join('')}
+        <div class="rcp-tot"><span>TOTAL</span><span>${total != null ? total : ''}</span></div>`;
+    }
+    const maxW = paperMaxW();
+    return `<div class="receipt-paper" style="max-width:${maxW};margin:0 auto;box-shadow:none">${body}</div>`;
+  }
+
   async function printBillEscPos(bill, outlet, opts) {
+    const options = opts || {};
+    // Default: print the SAME formatted receipt as the on-screen preview.
+    // Plain ESC/POS text only when settings/opts force raw mode.
+    if (!forceRawThermal(options)) {
+      try {
+        const html = formattedBillHtml(bill, outlet);
+        const title = 'Receipt ' + ((bill && (bill.no || bill.orderId)) || '');
+        const res = await printHtml(html, title, options);
+        if (res && res.ok) return { ...res, mode: res.mode || 'html-thermal' };
+      } catch (e) {
+        console.warn('[Print] formatted thermal failed, trying raw', e);
+      }
+    }
+
     if (global.RSEscPos && typeof RSEscPos.receiptFromBill === 'function') {
       const enc = RSEscPos.receiptFromBill(bill, outlet);
       const desk = global.RS_DESKTOP || global.rsDesktop;
@@ -142,12 +224,12 @@
         const res = await desk.printEscPos({
           base64: enc.toBase64(),
           text: null,
-          deviceName: (opts && opts.deviceName) || null,
+          deviceName: options.deviceName || null,
         });
         if (res && res.ok) return res;
       }
     }
-    // Fallback: text lines
+    // Last resort: plain text lines
     const items = (bill && (bill.items || bill._items)) || [];
     const lines = [
       (outlet && outlet.name) || 'Outlet',
@@ -155,7 +237,7 @@
       'TOTAL ' + (bill && (bill.grand != null ? bill.grand : bill.amount)),
       ...items.map((i) => (i.qty || 1) + 'x ' + (i.name || '')),
     ];
-    return printEscPosText(lines.join('\n'), opts);
+    return printEscPosText(lines.join('\n'), options);
   }
 
   async function listPrinters() {

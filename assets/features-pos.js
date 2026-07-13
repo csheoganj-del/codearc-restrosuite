@@ -186,24 +186,37 @@
 
     /* ---------------- print helper ---------------- */
     window.RSPrint = function(innerHTML, title){
+      // Prefer shared bridge (same formatted CSS as Bill settled / thermal)
+      if (window.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
+        RSPrintBridge.printHtml(innerHTML, title || 'Print').catch(function () {});
+        return;
+      }
       const paperSize = (window.RS_SETTINGS && window.RS_SETTINGS.set_paper_size) || '80 mm';
-      const maxW = paperSize === '58 mm' ? '200px' : '300px';
+      const maxW = paperSize === '58 mm' ? '220px' : '300px';
       const style = `
         <style>
-          *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif;}
-          body{padding:10px;color:#111;}
-          body > div { max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important; }
-          .rcp-center{text-align:center}.rcp-logo{font-weight:700;font-size:20px}
-          .rcp-sub{font-size:11px;color:#666;margin-top:2px}.rcp-hr{border:0;border-top:1px dashed #aaa;margin:10px 0}
-          .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
-          .rcp-line .q{color:#666}.rcp-tot{display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:6px}
-          .rcp-foot{text-align:center;font-size:11px;color:#666;margin-top:12px}
+          @page{margin:0;size:auto}
+          *{margin:0;padding:0;box-sizing:border-box}
+          body{padding:6px 4px 10px;color:#16151c;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          body > div,.receipt-paper{max-width:${maxW}!important;width:100%!important;margin:0 auto!important}
+          .receipt-paper{background:#fbfaf7;padding:10px 8px 14px}
+          .rcp-center{text-align:center}
+          .rcp-logo{font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:18px;letter-spacing:-.02em;color:#16151c}
+          .rcp-sub{font-size:10.5px;color:#4a4842;margin-top:2px}
+          .rcp-hr{border:0;border-top:1px dashed #8a877c;margin:10px 0}
+          .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;gap:6px;color:#16151c}
+          .rcp-meta{color:#4a4842;font-size:11px}
+          .rcp-line .q{color:#6b6960}
+          .rcp-tot{display:flex;justify-content:space-between;font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:15px;margin-top:6px}
+          .rcp-foot{text-align:center;font-size:10.5px;color:#6b6960;margin-top:12px}
+          .rcp-foot b{color:#16151c}
+          .rcp-qr-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #8a877c;display:flex;flex-direction:column;align-items:center}
           .kot-h{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
           .kot-h .kt{font-weight:700;font-size:18px}
           .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}
           .kot-item .kq{font-weight:700;min-width:28px}.kot-item .kno{font-size:11px;color:#8a4b00}
         </style>`;
-      const fullHtml = `<!doctype html><html><head><title>${title||'Print'}</title>${style}</head><body>${innerHTML}</body></html>`;
+      const fullHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${title||'Print'}</title>${style}</head><body>${innerHTML}</body></html>`;
 
       if (window.AndroidInterface && typeof window.AndroidInterface.printReceipt === 'function') {
         try {
@@ -1147,10 +1160,10 @@
               <button type="button" class="btn rc-btn-wa" id="rc-wa" title="Open WhatsApp to send this bill manually (backup if auto-send fails)">
                 <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span>
               </button>
-              <button type="button" class="btn rc-btn-thermal" id="rc-thermal" title="Thermal = kitchen/counter roll printer (58mm or 80mm ESC/POS). Prints a fast text receipt for the guest or kitchen.">
+              <button type="button" class="btn rc-btn-thermal" id="rc-thermal" title="Print this same receipt layout on the thermal roll printer (58/80mm). Matches the preview above.">
                 <i class="fa-solid fa-receipt"></i><span>Thermal</span>
               </button>
-              <button type="button" class="btn rc-btn-print" id="rc-print" title="Print A4 / browser print preview of this bill">
+              <button type="button" class="btn rc-btn-print" id="rc-print" title="Browser / A4 print of this bill">
                 <i class="fa-solid fa-print"></i><span>Print</span>
               </button>
               <button type="button" class="btn rc-btn-done" id="rc-new" title="Close and start a new order">
@@ -1163,13 +1176,11 @@
           const thEl = modal.querySelector('#rc-thermal');
           if (thEl) {
             thEl.onclick = () => {
+              // Always same formatted preview as on screen (not plain ESC/POS text)
               if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
                 RSOps.printBillThermal(bill);
-              } else if (window.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
-                RSPrintBridge.printBillEscPos(bill, engineOutlet(), {}).catch(() => RSPrint(printHtml, 'Receipt ' + bill.no));
               } else {
                 RSPrint(printHtml, 'Receipt ' + bill.no);
-                RS.toast('No thermal printer linked - opened browser print', 'fa-receipt');
               }
             };
           }

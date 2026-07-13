@@ -1646,37 +1646,93 @@
     return { ok: false };
   }
 
+  /** Thermal must match Bill settled preview (same HTML). Raw ESC/POS is opt-in only. */
+  function preferRawEscPosThermal() {
+    try {
+      const s = global.RS_SETTINGS || {};
+      const mode = String(s.set_thermal_mode || s.set_receipt_thermal_mode || '').toLowerCase();
+      return mode === 'raw' || mode === 'escpos' || s.set_thermal_raw === true || s.set_thermal_raw === 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function billReceiptPreviewHtml(bill, outlet) {
+    let qr = null;
+    // Sync path only — QR is optional on thermal paper
+    const engine = global.RSReceiptEngine;
+    let body = '';
+    if (engine && typeof engine.toHTML === 'function') {
+      body = engine.toHTML(bill, qr, outlet || outletForPrint());
+    } else if (global.RSReceipt && typeof RSReceipt.html === 'function') {
+      body = RSReceipt.html(bill, qr);
+    } else {
+      body = `<div class="rcp-center"><div class="rcp-logo">${esc((outlet && outlet.name) || 'Outlet')}</div></div>
+        <hr class="rcp-hr"><div class="rcp-tot"><span>TOTAL</span><span>${esc(String((bill && (bill.grand != null ? bill.grand : bill.amount)) || 0))}</span></div>`;
+    }
+    const paperSize = (global.RS_SETTINGS && global.RS_SETTINGS.set_paper_size) || '80 mm';
+    const maxW = paperSize === '58 mm' ? '220px' : '300px';
+    return `<div class="receipt-paper" style="max-width:${maxW};margin:0 auto;box-shadow:none">${body}</div>`;
+  }
+
   async function printBillThermal(bill) {
     if (!bill) {
       toast('No bill to print', 'fa-circle-exclamation');
       return { ok: false };
     }
     const outlet = outletForPrint();
+
+    // Optional: pure raw ESC/POS (plain text) only when settings force it
+    if (preferRawEscPosThermal()) {
+      try {
+        if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
+          const res = await RSPrintBridge.printBillEscPos(bill, outlet, {});
+          if (res && res.ok) {
+            toast('Thermal receipt sent (raw)', 'fa-print');
+            return res;
+          }
+        }
+      } catch (e) {
+        console.warn('[Thermal] raw escpos failed', e);
+      }
+    }
+
+    // Default: same formatted preview as Bill settled (HTML at roll width)
+    try {
+      const html = billReceiptPreviewHtml(bill, outlet);
+      const title = 'Receipt ' + (bill.no || bill.orderId || '');
+      if (global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
+        const res = await RSPrintBridge.printHtml(html, title, { silent: true });
+        if (res && res.ok) {
+          toast('Thermal print — same as preview', 'fa-receipt');
+          return { ok: true, mode: res.mode || 'html-thermal', ...res };
+        }
+      }
+      if (global.RSPrint) {
+        RSPrint(html, title);
+        toast('Print opened — same format as preview', 'fa-print');
+        return { ok: true, mode: 'html' };
+      }
+      if (global.RSReceipt && typeof RSReceipt.print === 'function') {
+        await RSReceipt.print(bill);
+        toast('Print opened — same format as preview', 'fa-print');
+        return { ok: true, mode: 'html' };
+      }
+    } catch (e) {
+      console.warn('[Thermal] formatted html print failed', e);
+    }
+
+    // Last resort: raw ESC/POS text (unformatted) if HTML path unavailable
     try {
       if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
         const res = await RSPrintBridge.printBillEscPos(bill, outlet, {});
         if (res && res.ok) {
-          toast('Thermal receipt sent', 'fa-print');
+          toast('Thermal sent as plain text (fallback)', 'fa-print');
           return res;
         }
       }
     } catch (e) {
-      console.warn('[Thermal] escpos failed', e);
-    }
-    try {
-      if (global.RSReceipt && typeof RSReceipt.print === 'function') {
-        await RSReceipt.print(bill);
-        toast('Print dialog opened', 'fa-print');
-        return { ok: true, mode: 'html' };
-      }
-      if (global.RSPrint && global.RSReceiptEngine && RSReceiptEngine.toHTML) {
-        const html = RSReceiptEngine.toHTML(bill, null, outlet);
-        RSPrint(`<div style="max-width:300px;margin:0 auto">${html}</div>`, 'Receipt ' + (bill.no || ''));
-        toast('Print dialog opened', 'fa-print');
-        return { ok: true, mode: 'html' };
-      }
-    } catch (e) {
-      console.warn('[Thermal] html print failed', e);
+      console.warn('[Thermal] escpos fallback failed', e);
     }
     toast('Could not print receipt', 'fa-circle-exclamation');
     return { ok: false };
@@ -1847,7 +1903,46 @@
     } catch (_) {}
   }
 
+  function publishRsOps() {
+    global.RSOps = {
+      getStationId,
+      getStationLabel,
+      setStationLabel,
+      openShift,
+      closeShift,
+      getOpenShift,
+      summarizeShift,
+      addCashMovement,
+      openCashMovementModal,
+      sumCashMovements,
+      zReportHtml,
+      zReportCsv,
+      downloadZCsv,
+      exportDayPackCsv,
+      getZScope,
+      setZScope,
+      showZReportModal,
+      printKotThermal,
+      printBillThermal,
+      openCashDrawer,
+      billHasCashTender,
+      checkNewPendingOrders,
+      compilePreferredPdf,
+      decorateBillMeta,
+      estimateCartStockIssues,
+      refresh: refreshOpsUi,
+    };
+  }
+
   function boot() {
+    // Always refresh API surface (so reloading after critical.bundle picks up thermal fixes)
+    publishRsOps();
+    if (global.__rsCompetitiveOpsBooted) {
+      try { refreshOpsUi(); } catch (_) {}
+      return;
+    }
+    global.__rsCompetitiveOpsBooted = true;
+
     installKeyboard();
     installCheckoutHooks();
     installPdfPreference();
@@ -1870,7 +1965,7 @@
       const bill = ev && ev.detail && ev.detail.bill;
       try {
         const s = global.RS_SETTINGS || {};
-        // Wire Settings → Auto-print receipt → thermal/ESC-POS after payment
+        // Wire Settings → Auto-print receipt → thermal (formatted preview)
         const auto =
           s.set_auto_print_receipt === true ||
           s.set_auto_print_receipt === 'true' ||
@@ -1911,35 +2006,6 @@
       };
       RS.__competitiveActivate = true;
     }
-
-    global.RSOps = {
-      getStationId,
-      getStationLabel,
-      setStationLabel,
-      openShift,
-      closeShift,
-      getOpenShift,
-      summarizeShift,
-      addCashMovement,
-      openCashMovementModal,
-      sumCashMovements,
-      zReportHtml,
-      zReportCsv,
-      downloadZCsv,
-      exportDayPackCsv,
-      getZScope,
-      setZScope,
-      showZReportModal,
-      printKotThermal,
-      printBillThermal,
-      openCashDrawer,
-      billHasCashTender,
-      checkNewPendingOrders,
-      compilePreferredPdf,
-      decorateBillMeta,
-      estimateCartStockIssues,
-      refresh: refreshOpsUi,
-    };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 600));

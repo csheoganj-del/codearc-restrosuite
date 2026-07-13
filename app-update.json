@@ -1,12 +1,12 @@
 {
-  "version": "v181-20260713-bill-actions",
+  "version": "v182-20260713-thermal-preview",
   "date": "2026-07-13",
-  "title": "Bill settled: green WhatsApp + colored actions",
-  "summary": "WhatsApp is green and opens a manual chat backup. Thermal/Print/Done each have their own color in a 2x2 grid so Done is never cut off. Stale receipt bundle no longer overrides latest receipt.js.",
+  "title": "Thermal prints the same layout as Bill settled preview",
+  "summary": "Thermal used to send plain ESC/POS text (no formatting). It now prints the same HTML receipt layout you see on screen (logo, dashed lines, TOTAL, etc.) at 58/80mm roll width. Raw plain-text mode is opt-in only.",
   "highlights": [
-    "Green WhatsApp button opens wa.me to send the bill manually",
-    "Thermal (slate), Print (blue), Done (orange) — clear colors",
-    "2x2 footer so buttons never clip",
-    "receipt.js always loads after critical.bundle (fixes CodeArc subtitle / ISO time)"
+    "Thermal = formatted preview on roll printer (not plain monospace)",
+    "Print CSS matches Bill settled receipt paper",
+    "Raw ESC/POS only if Settings force thermal raw mode",
+    "competitive-ops reloads after bundle so fix always applies"
   ]
 }
