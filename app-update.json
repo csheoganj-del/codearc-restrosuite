@@ -1,12 +1,12 @@
 {
-  "version": "v176-20260713-settled-slim",
+  "version": "v177-20260713-success-anim",
   "date": "2026-07-13",
-  "title": "Bill settled slim ticket UI",
-  "summary": "Bill settled modal is narrow (ticket width ~380px) with a compact icon toolbar (WhatsApp, Print, Thermal, Copy, New) and full receipt below — no wide two-column layout.",
+  "title": "Bill settled payment-success animation",
+  "summary": "Bill settled uses a payment-success style sequence: green check draws in, title/amount fade up, icon bar appears, then the bill preview slides up like a printed ticket with a light shine — inspired by modern payment success UI.",
   "highlights": [
-    "Slim modal max-width ~380px",
-    "Icon action bar with tiny labels",
-    "Receipt fills the ticket width",
-    "Single-column, clean post-pay UX"
+    "Animated green success check (draw + pop)",
+    "Payment successful + amount hero copy",
+    "Bill preview ticket slide-up animation",
+    "Respects prefers-reduced-motion"
   ]
 }

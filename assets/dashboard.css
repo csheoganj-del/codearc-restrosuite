@@ -1597,25 +1597,24 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .recipe-next-urgent > i { color: var(--amber); }
 .recipe-plain-tip { font-size: 12.5px; }
 
-/* Bill settled — slim ticket (≈ thermal width), icon toolbar, one scroll */
+/* Bill settled — slim + payment-success animation (check → ticket rises) */
 .rs-modal.rc-settled-modal,
 .rs-modal.sm.rc-settled-modal {
   max-width: min(380px, calc(100vw - 20px)) !important;
   width: 100% !important;
   max-height: min(92dvh, 860px) !important;
+  border-radius: 22px !important;
+  overflow: hidden;
+  animation: rcModalPop .42s cubic-bezier(.22, 1.15, .36, 1) both;
 }
-.rs-modal.rc-settled-modal .rs-mhead {
-  padding: 12px 14px !important;
-  gap: 10px !important;
+@keyframes rcModalPop {
+  from { opacity: 0; transform: scale(.92) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-.rs-modal.rc-settled-modal .rs-mhead h3 { font-size: 16px !important; }
-.rs-modal.rc-settled-modal .rs-mhead .sub { font-size: 12px !important; }
-.rs-modal.rc-settled-modal .mh-ic {
-  width: 34px !important; height: 34px !important; font-size: 14px !important;
-}
+.rs-modal.rc-settled-modal .rs-mhead { display: none !important; }
 .rs-modal.rc-settled-modal .rs-mbody.rc-settled-body,
 .rs-mbody.rc-settled-body {
-  padding: 10px 12px 14px !important;
+  padding: 8px 12px 16px !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
@@ -1634,6 +1633,202 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
   gap: 10px;
   align-items: stretch;
   max-width: 100%;
+  position: relative;
+  padding-top: 4px;
+}
+.rc-settled-x {
+  position: absolute; top: 0; right: 0; z-index: 3;
+  width: 32px; height: 32px; border-radius: 10px;
+  border: 1px solid var(--stroke-2); background: var(--glass-2);
+  color: var(--text-soft); display: grid; place-items: center;
+  cursor: pointer; font: inherit; padding: 0;
+}
+.rc-settled-x:hover { color: var(--text); background: var(--glass-3); }
+
+/* —— Success hero (green check like payment success pin) —— */
+.rc-success-hero {
+  position: relative;
+  width: 88px; height: 88px;
+  margin: 8px auto 4px;
+  display: grid; place-items: center;
+}
+.rc-success-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6ee7a8, #22c55e 55%, #16a34a 100%);
+  box-shadow: 0 10px 28px rgba(34, 197, 94, .35);
+  opacity: 0;
+  transform: scale(.4);
+}
+.rc-success-ring-2 {
+  background: transparent;
+  border: 2px solid rgba(34, 197, 94, .45);
+  box-shadow: none;
+  inset: -6px;
+}
+.rc-success-check {
+  position: relative; z-index: 1;
+  width: 52px; height: 52px;
+  display: grid; place-items: center;
+}
+.rc-check-svg { display: block; overflow: visible; }
+.rc-check-circle {
+  stroke: rgba(255,255,255,.35);
+  stroke-width: 2;
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+}
+.rc-check-mark {
+  stroke: #fff;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+}
+.rc-success-copy {
+  text-align: center;
+  padding: 0 8px 2px;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.rc-success-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--text);
+  line-height: 1.2;
+}
+.rc-success-sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+.rc-success-sub b { color: var(--text); font-weight: 800; }
+.rc-success-meta {
+  margin-top: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-mute);
+  display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.rc-success-meta .rc-dot { opacity: .5; }
+
+/* Play sequence when .rc-anim-play is set */
+.rc-anim-play .rc-success-ring {
+  animation: rcRingPop .55s cubic-bezier(.22, 1.2, .36, 1) .05s both;
+}
+.rc-anim-play .rc-success-ring-2 {
+  animation: rcRingPulse 1.1s ease-out .2s both;
+}
+.rc-anim-play .rc-check-circle {
+  animation: rcCircleDraw .55s ease-out .12s both;
+}
+.rc-anim-play .rc-check-mark {
+  animation: rcMarkDraw .4s ease-out .45s both;
+}
+.rc-anim-play .rc-success-copy {
+  animation: rcFadeUp .45s cubic-bezier(.22, 1, .36, 1) .55s both;
+}
+.rc-anim-play .rc-anim-bar {
+  animation: rcFadeUp .4s cubic-bezier(.22, 1, .36, 1) .72s both;
+}
+.rc-anim-play .rc-anim-ticket {
+  animation: rcTicketIn .65s cubic-bezier(.22, 1.15, .36, 1) .85s both;
+}
+.rc-anim-play .rc-ticket-shine {
+  animation: rcShine 1.1s ease-out 1.15s both;
+}
+
+@keyframes rcRingPop {
+  0%   { opacity: 0; transform: scale(.35); }
+  70%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes rcRingPulse {
+  0%   { opacity: .9; transform: scale(.85); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+@keyframes rcCircleDraw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes rcMarkDraw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes rcFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Bill preview “prints” in — like a ticket sliding up under the success mark */
+@keyframes rcTicketIn {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(.94);
+    filter: blur(2px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+@keyframes rcShine {
+  0%   { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  20%  { opacity: .35; }
+  100% { transform: translateX(180%) skewX(-18deg); opacity: 0; }
+}
+@keyframes rcModalPop {
+  from { opacity: 0; transform: scale(.94) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rc-settled-preview-wrap {
+  position: relative;
+  overflow: visible;
+  width: 100%;
+  transform-origin: center top;
+}
+.rc-ticket-shine {
+  pointer-events: none;
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 40%;
+  z-index: 2;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,.55),
+    transparent
+  );
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-modal.rc-settled-modal,
+  .rc-anim-play .rc-success-ring,
+  .rc-anim-play .rc-success-ring-2,
+  .rc-anim-play .rc-check-circle,
+  .rc-anim-play .rc-check-mark,
+  .rc-anim-play .rc-success-copy,
+  .rc-anim-play .rc-anim-bar,
+  .rc-anim-play .rc-anim-ticket,
+  .rc-anim-play .rc-ticket-shine {
+    animation: none !important;
+  }
+  .rc-success-ring,
+  .rc-success-copy,
+  .rc-anim-bar,
+  .rc-anim-ticket {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .rc-check-circle,
+  .rc-check-mark { stroke-dashoffset: 0 !important; }
 }
 
 /* Compact status chips */

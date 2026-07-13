@@ -1176,17 +1176,41 @@
           </div>`;
 
       RSModal.open({
-        title: 'Bill settled',
-        sub: `${esc(bill.no || '')} · ${rs(bill.grand)}`,
-        icon: 'fa-circle-check',
-        // Slim ticket-width modal
+        title: '',
+        bare: false,
         size: 'sm rc-settled-modal',
         bodyClass: 'rc-settled-body',
         body: `
-          <div class="rc-settled-slim">
-            ${syncBanner}
+          <div class="rc-settled-slim rc-anim-root">
+            <button type="button" class="rc-settled-x" id="rc-close-x" aria-label="Close">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <!-- Payment-success style hero (Pinterest-style check animation) -->
+            <div class="rc-success-hero" aria-hidden="true">
+              <div class="rc-success-ring"></div>
+              <div class="rc-success-ring rc-success-ring-2"></div>
+              <div class="rc-success-check">
+                <svg class="rc-check-svg" viewBox="0 0 52 52" width="52" height="52" aria-hidden="true">
+                  <circle class="rc-check-circle" cx="26" cy="26" r="24" fill="none"/>
+                  <path class="rc-check-mark" fill="none" d="M14.5 27.2l7.2 7.2 15.8-15.8"/>
+                </svg>
+              </div>
+            </div>
+            <div class="rc-success-copy">
+              <h2 class="rc-success-title">Payment successful</h2>
+              <p class="rc-success-sub">Thank you! Payment of <b>${rs(bill.grand)}</b> received.</p>
+              <div class="rc-success-meta">
+                <span>${esc(bill.no || '')}</span>
+                <span class="rc-dot">·</span>
+                <span>${esc(String(pay))}</span>
+              </div>
+            </div>
+
+            ${st === 'pending' || st === 'local' || st === 'saving' ? syncBanner : ''}
             ${connectBanner}
-            <div class="rc-icon-bar" role="toolbar" aria-label="Bill actions">
+
+            <div class="rc-icon-bar rc-anim-bar" role="toolbar" aria-label="Bill actions">
               <button type="button" class="rc-ico rc-ico-wa" id="rc-wa" title="WhatsApp">
                 <i class="fa-brands fa-whatsapp"></i>
                 <span class="rc-ico-lab">WhatsApp</span>
@@ -1208,7 +1232,10 @@
                 <span class="rc-ico-lab">New</span>
               </button>
             </div>
-            <div class="rc-settled-preview-wrap">
+
+            <!-- Bill preview — slides up like a printed ticket -->
+            <div class="rc-settled-preview-wrap rc-anim-ticket">
+              <div class="rc-ticket-shine" aria-hidden="true"></div>
               <div class="receipt-paper rc-receipt-preview" id="rc-preview">${receiptInner}</div>
             </div>
           </div>`,
@@ -1216,6 +1243,14 @@
         onMount(modal, close) {
           try {
             modal.classList.add('rc-settled-modal');
+            // Hide empty default header if title is blank
+            const head = modal.querySelector('.rs-mhead');
+            if (head) {
+              const h3 = head.querySelector('h3');
+              if (h3 && !String(h3.textContent || '').trim()) {
+                head.style.display = 'none';
+              }
+            }
             const body = modal.querySelector('.rs-mbody');
             if (body) {
               body.classList.add('rc-settled-body');
@@ -1226,6 +1261,14 @@
             if (prev) {
               prev.style.maxHeight = 'none';
               prev.style.overflow = 'visible';
+            }
+            // Restart CSS animations reliably after mount
+            const root = modal.querySelector('.rc-anim-root');
+            if (root) {
+              root.classList.remove('rc-anim-play');
+              // force reflow
+              void root.offsetWidth;
+              root.classList.add('rc-anim-play');
             }
           } catch (_) {}
 
@@ -1248,11 +1291,11 @@
             );
           };
 
+          bind('#rc-close-x', () => close());
           bind('#rc-print', () => {
             RS.toast('Opening print…', 'fa-print');
             setTimeout(() => RSPrint(printHtml, 'Receipt ' + (bill.no || '')), 50);
           });
-
           bind('#rc-thermal', () => {
             if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
               RSOps.printBillThermal(bill);
@@ -1265,16 +1308,13 @@
               RSPrint(printHtml, 'Receipt ' + (bill.no || ''));
             }
           });
-
           bind('#rc-wa', () => {
             if (window.RSReceipt && typeof RSReceipt.share === 'function') RSReceipt.share(bill);
             else shareReceiptViaWhatsApp(bill);
           });
-
           bind('#rc-wa-cta', () => {
             openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
           });
-
           bind('#rc-copy', async () => {
             const text = receiptText(bill);
             try {
@@ -1286,7 +1326,6 @@
               RS.toast('Could not copy — use Print or WhatsApp', 'fa-circle-exclamation');
             }
           });
-
           bind('#rc-new', () => close());
         },
       });
