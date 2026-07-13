@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v112 (2026-07-13) — Always-visible WhatsApp top-bar icon
+
+- Top bar always shows WhatsApp brand icon (never blank circle)
+- **Green** when connected · **Red** when off · **Amber + spin** when connecting / scanning QR
+- Hover expands short label (On / Off / Scan); status colors stay on hover
+
 ## v111 (2026-07-13) — Top bar ⋯ Status menu (readable)
 
 - WhatsApp row in More menu no longer icon-only (label was CSS-hidden by compact-pill rules)

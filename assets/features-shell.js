@@ -1572,23 +1572,36 @@
       const pills = document.querySelectorAll('.js-wa-status-pill, #topbar-whatsapp-status-pill, #tb-wa-status-btn');
       if (!pills.length) return;
 
-      // Compact always-visible pill: icon + short label (label expands on hover via CSS)
-      const compact = document.getElementById('tb-wa-status-text');
-      if (compact) {
-        compact.innerHTML =
-          `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i>` +
-          `<span class="tb-badge-label">${safe(label)}</span>`;
+      const spinning = !!(pulse || state === 'wa-starting' || state === 'wa-syncing' || state === 'wa-qr');
+
+      // Always-visible top-bar icon (never remove the icon node)
+      const icon = document.getElementById('tb-wa-icon');
+      const lab = document.getElementById('tb-wa-label');
+      if (icon) {
+        icon.className =
+          'fa-brands fa-whatsapp tb-wa-icon' + (spinning ? ' fa-spin' : '');
+        icon.style.display = 'inline-block';
+        icon.setAttribute('aria-hidden', 'true');
+      }
+      if (lab) {
+        // Short hover label: On / Off / … / Scan
+        const short =
+          state === 'wa-linked' ? (label && String(label).indexOf('+') === 0 ? label : 'On')
+          : state === 'wa-offline' || state === 'wa-auth-failure' ? 'Off'
+          : state === 'wa-qr' ? 'Scan'
+          : '…';
+        lab.textContent = short;
       }
 
-      // ⋯ More menu: always show full title + detail (never icon-only)
+      // ⋯ More menu: title + detail + matching icon spin
       const moreTitle = document.getElementById('topbar-wa-title');
       const moreDetail = document.getElementById('topbar-wa-detail');
-      const moreIcon = document.querySelector('#topbar-whatsapp-status-pill > i.fa-whatsapp, #topbar-whatsapp-status-pill > i.fa-brands');
+      const moreIcon = document.querySelector('#topbar-whatsapp-status-pill > i.fa-brands, #topbar-whatsapp-status-pill > i.fa-whatsapp');
       if (moreIcon) {
-        moreIcon.className = `fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}`;
+        moreIcon.className = 'fa-brands fa-whatsapp' + (spinning ? ' fa-spin' : '');
       }
       const detailMap = {
-        'wa-linked': (window.__rsGatewayNumber ? ('+' + window.__rsGatewayNumber) : 'Ready to send bills'),
+        'wa-linked': window.__rsGatewayNumber ? ('+' + window.__rsGatewayNumber) : 'Ready to send bills',
         'wa-syncing': 'Finishing setup…',
         'wa-qr': 'Tap to open WhatsApp settings',
         'wa-offline': 'Not connected',

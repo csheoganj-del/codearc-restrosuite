@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v111-20260713-topbar-status';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v112-20260713-wa-icon';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -471,9 +471,10 @@
             <div class="dropdown-item tb-more-status tb-more-version" id="app-version-pill" role="status"></div>
           </div>
         </div>
-        <!-- Always-visible WhatsApp outlet status (also mirrored under ⋯ More) -->
-        <button type="button" class="tb-pill txt tb-wa-pill js-wa-status-pill" id="tb-wa-status-btn" role="status" aria-label="WhatsApp status" title="Your outlet WhatsApp" data-tooltip="WhatsApp status">
-          <span class="js-wa-status-text" id="tb-wa-status-text"><i class="fa-brands fa-whatsapp"></i><span class="tb-badge-label">WA</span></span>
+        <!-- Always-visible WhatsApp status: green icon = connected, red = off, spin = connecting -->
+        <button type="button" class="tb-pill tb-wa-pill js-wa-status-pill wa-starting" id="tb-wa-status-btn" role="status" aria-label="WhatsApp status" title="WhatsApp status" data-tooltip="WhatsApp status">
+          <i class="fa-brands fa-whatsapp tb-wa-icon" id="tb-wa-icon" aria-hidden="true"></i>
+          <span class="tb-badge-label" id="tb-wa-label">…</span>
         </button>
         <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
         <button type="button" class="tb-icon-btn" aria-label="Notifications" title="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>

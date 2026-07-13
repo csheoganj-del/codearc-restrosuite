@@ -1122,7 +1122,8 @@
     const pillEl = document.getElementById('topbar-whatsapp-status-pill');
     const moreTitle = document.getElementById('topbar-wa-title');
     const moreDetail = document.getElementById('topbar-wa-detail');
-    const compact = document.getElementById('tb-wa-status-text');
+    const tbIcon = document.getElementById('tb-wa-icon');
+    const tbLabel = document.getElementById('tb-wa-label');
     const friendly = (function (raw) {
       const s = String(raw || '').toLowerCase();
       if (!s) return 'WhatsApp is not connected. Open Settings → WhatsApp to link.';
@@ -1136,9 +1137,11 @@
     })(reason);
     if (moreTitle) moreTitle.textContent = 'WhatsApp · Off';
     if (moreDetail) moreDetail.textContent = 'Not connected';
-    if (compact) {
-      compact.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span class="tb-badge-label">Off</span>';
+    if (tbIcon) {
+      tbIcon.className = 'fa-brands fa-whatsapp tb-wa-icon';
+      tbIcon.style.display = 'inline-block';
     }
+    if (tbLabel) tbLabel.textContent = 'Off';
     if (pillEl) {
       pillEl.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
       pillEl.classList.add('wa-offline');
