@@ -1136,23 +1136,9 @@
           } catch (e) {}
         };
       const btnOpenAll = $('#btn-open-all-qr', sec);
-      if (btnOpenAll)
-        btnOpenAll.onclick = async () => {
-          if (!TABLES.length) {
-            RS.toast('Add tables first', 'fa-chair');
-            return;
-          }
-          if (!window.confirm('Open QR ordering on all ' + TABLES.length + ' tables for this service?')) return;
-          btnOpenAll.disabled = true;
-          let n = 0;
-          for (const t of TABLES) {
-            const ok = await ensureTableQrSession(t.n, { toast: false });
-            if (ok) n++;
-          }
-          btnOpenAll.disabled = false;
-          RS.toast('QR open on ' + n + ' table' + (n === 1 ? '' : 's'), 'fa-qrcode');
-          renderFloor();
-        };
+      if (btnOpenAll) btnOpenAll.onclick = () => bulkTableQrSessions('open', btnOpenAll);
+      const btnCloseAll = $('#btn-close-all-qr', sec);
+      if (btnCloseAll) btnCloseAll.onclick = () => bulkTableQrSessions('close', btnCloseAll);
       const btnClearAll = $('#btn-clear-all-tables', sec);
       if (btnClearAll) {
         const openN = TABLES.filter((t) => t && t.state && t.state !== 'free').length;
@@ -1661,173 +1647,164 @@
         encodeURIComponent(orderUrl)
       );
     }
-    /** One tent/sticker card — guest-facing hierarchy */
+    /** Clean tent card for print — simple hierarchy, no clutter */
     function buildGuestQrCardHtml({ outletName, tableLabel, qrCodeUrl, large }) {
       const name = esc(formatOutletTitle(outletName));
       const tbl = esc(tableLabel);
-      const qrSize = large ? 210 : 168;
+      const qrSize = large ? 200 : 140;
       return `
-        <div class="qr-print-card">
-          <div class="qr-card-table">TABLE ${tbl}</div>
-          <div class="qr-card-scan">Scan with your phone camera</div>
+        <div class="qr-print-card${large ? ' large' : ''}">
+          <div class="qr-card-table">Table ${tbl}</div>
           <div class="qr-card-frame">
-            <img src="${qrCodeUrl}" width="${qrSize}" height="${qrSize}" alt="Table ${tbl} menu QR" />
+            <img src="${qrCodeUrl}" width="${qrSize}" height="${qrSize}" alt="Table ${tbl} QR" />
           </div>
+          <div class="qr-card-scan">Scan to order</div>
           <div class="qr-card-outlet">${name}</div>
-          <div class="qr-card-steps">
-            <span>1 · Open camera</span>
-            <span>2 · Point at QR</span>
-            <span>3 · Order at table</span>
-          </div>
-          <div class="qr-card-hint">Wi‑Fi on · free to scan · no app needed</div>
         </div>`;
     }
+
     function qrPrintDocumentStyles() {
       return `
         <style>
-          @page { margin: 10mm; size: A4; }
-          * { box-sizing: border-box; }
+          @page { margin: 12mm; size: A4; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
-            margin: 0; padding: 0;
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
             color: #111; background: #fff;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
-          .qr-staff-tip {
-            border: 1.5px dashed #FF4F00;
-            background: #FFF7F2;
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin: 0 0 14px;
-            font-size: 12px;
-            line-height: 1.45;
-            page-break-inside: avoid;
+          .qr-print-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap;
+            padding: 14px 18px; margin-bottom: 16px;
+            background: #1a1a1a; color: #fff;
+            position: sticky; top: 0; z-index: 10;
           }
-          .qr-staff-tip b { color: #FF4F00; }
-          .qr-staff-tip ul { margin: 6px 0 0 16px; padding: 0; }
+          .qr-print-toolbar h1 {
+            font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+          }
+          .qr-print-toolbar p { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+          .qr-print-toolbar button {
+            border: none; border-radius: 8px; padding: 10px 18px;
+            font-size: 13px; font-weight: 700; cursor: pointer;
+            background: #25d366; color: #fff;
+          }
+          .qr-print-toolbar button.secondary {
+            background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.35);
+          }
+          .qr-print-note {
+            max-width: 920px; margin: 0 auto 14px; padding: 10px 14px;
+            background: #f6f7f9; border: 1px solid #e5e7eb; border-radius: 10px;
+            font-size: 12px; color: #444; line-height: 1.45;
+          }
           .qr-print-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            align-items: stretch;
+            gap: 14px;
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 0 8px 24px;
           }
           .qr-print-card {
-            border: 2px solid #1a1714;
-            border-radius: 14px;
-            padding: 16px 12px 14px;
+            border: 1.5px solid #222;
+            border-radius: 12px;
+            padding: 18px 14px 16px;
             text-align: center;
             background: #fff;
             page-break-inside: avoid;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            min-height: 118mm;
-            position: relative;
-          }
-          .qr-print-card::after {
-            content: '';
-            position: absolute;
-            inset: 6px;
-            border: 1px dashed #ddd;
-            border-radius: 10px;
-            pointer-events: none;
+            break-inside: avoid;
           }
           .qr-card-table {
-            font-weight: 900;
-            font-size: 28px;
-            letter-spacing: 0.06em;
-            color: #FF4F00;
-            line-height: 1.1;
-            margin-bottom: 4px;
-            position: relative;
-            z-index: 1;
-          }
-          .qr-card-scan {
-            font-size: 12px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
+            font-weight: 800;
+            font-size: 22px;
+            letter-spacing: -0.02em;
+            color: #111;
+            margin-bottom: 12px;
           }
           .qr-card-frame {
-            padding: 10px;
-            background: #fff;
-            border: 1px solid #e5e5e5;
-            border-radius: 12px;
+            display: inline-block;
+            padding: 8px;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
             margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-            box-shadow: 0 2px 0 rgba(0,0,0,0.04);
+            background: #fff;
           }
-          .qr-card-frame img { display: block; width: 168px; height: 168px; }
-          .qr-print-card.large .qr-card-frame img { width: 210px; height: 210px; }
+          .qr-card-frame img { display: block; width: 140px; height: 140px; }
+          .qr-print-card.large .qr-card-frame img { width: 200px; height: 200px; }
+          .qr-card-scan {
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+          }
           .qr-card-outlet {
-            font-weight: 800;
-            font-size: 15px;
-            color: #1a1714;
-            line-height: 1.25;
-            max-width: 92%;
-            position: relative;
-            z-index: 1;
-            margin-bottom: 8px;
-          }
-          .qr-card-steps {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 4px 8px;
-            font-size: 10px;
-            font-weight: 700;
-            color: #555;
-            margin-bottom: 6px;
-            position: relative;
-            z-index: 1;
-          }
-          .qr-card-hint {
-            font-size: 10px;
-            color: #777;
-            position: relative;
-            z-index: 1;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
           }
           .qr-print-single {
-            max-width: 360px;
-            margin: 16px auto;
+            max-width: 320px;
+            margin: 24px auto;
           }
-          .qr-print-single .qr-print-card { min-height: auto; padding: 28px 20px 22px; }
           @media print {
-            .qr-staff-tip { break-after: avoid; }
-            .qr-print-card { break-inside: avoid; }
+            .qr-print-toolbar, .qr-print-note, .no-print { display: none !important; }
+            body { background: #fff; }
+            .qr-print-grid { max-width: none; padding: 0; gap: 10mm; }
+            .qr-print-card { border-color: #000; }
           }
           @media screen {
-            body { padding: 16px; background: #f3efe8; }
-            .qr-print-grid { max-width: 800px; margin: 0 auto; }
+            body { background: #eceff3; padding-bottom: 32px; }
           }
         </style>`;
     }
-    function openQrPrintWindow(title, htmlBody) {
+
+    /** Dedicated browser print window — NEVER thermal RSPrint (that looked awful). */
+    function openQrPrintWindow(title, cardsHtml, meta) {
+      const outlet = (meta && meta.outlet) || 'Restaurant';
+      const count = (meta && meta.count) || 0;
+      const autoPrint = !!(meta && meta.autoPrint);
+      const toolbar = autoPrint
+        ? ''
+        : `<div class="qr-print-toolbar no-print">
+            <div>
+              <h1>${esc(title)}</h1>
+              <p>${esc(formatOutletTitle(outlet))}${count ? ' · ' + count + ' table cards' : ''}</p>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="secondary" onclick="window.close()">Close</button>
+              <button type="button" onclick="window.print()">Print</button>
+            </div>
+          </div>
+          <div class="qr-print-note no-print">
+            Tip: Print on A4, cut each card, place one per table face-up. Use <b>Open all QR</b> on Floor before service so scans work.
+          </div>`;
+
       const doc =
-        '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
         esc(title) +
         '</title>' +
         qrPrintDocumentStyles() +
         '</head><body>' +
-        htmlBody +
-        '<script>(function(){function go(){setTimeout(function(){window.print();},280);}var imgs=[].slice.call(document.images||[]);if(!imgs.length){go();return;}var n=0;function d(){n++;if(n>=imgs.length)go();}imgs.forEach(function(i){if(i.complete)d();else{i.onload=d;i.onerror=d;}});})();<\/script></body></html>';
-      if (typeof window.RSPrint === 'function') {
-        window.RSPrint(htmlBody, title);
-        return;
-      }
-      const win = window.open('', '_blank');
+        toolbar +
+        cardsHtml +
+        (autoPrint
+          ? '<script>(function(){function go(){setTimeout(function(){window.print();},400);}var imgs=[].slice.call(document.images||[]);if(!imgs.length){go();return;}var n=0;function d(){n++;if(n>=imgs.length)go();}imgs.forEach(function(i){if(i.complete)d();else{i.onload=d;i.onerror=d;}});})();<\/script>'
+          : '') +
+        '</body></html>';
+
+      const win = window.open('', '_blank', 'noopener,noreferrer,width=920,height=720');
       if (!win) {
         if (window.RS && RS.toast) RS.toast('Allow pop-ups to print QR cards', 'fa-print');
-        return;
+        return null;
       }
       win.document.open();
       win.document.write(doc);
       win.document.close();
+      try {
+        win.focus();
+      } catch (_) {}
+      return win;
     }
 
     async function showSingleTableQR(t) {
@@ -1839,31 +1816,27 @@
       const qrCodeUrl = await makeTableQrDataUrl(orderUrl, 280);
 
       const body = `
-        <div style="text-align:center;padding:6px 0 2px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-soft);margin-bottom:4px">Guest-facing card</div>
-          <div style="font-size:28px;font-weight:900;color:#FF4F00;letter-spacing:.04em;margin-bottom:4px">TABLE ${esc(tableLabel)}</div>
+        <div style="text-align:center;padding:4px 0 2px">
+          <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;margin-bottom:6px">Table ${esc(tableLabel)}</div>
           <div style="font-size:13px;color:var(--text-soft);margin-bottom:14px">${esc(formatOutletTitle(tenantName))}</div>
-          <div style="display:inline-block;padding:12px;border:1px solid var(--stroke-2);border-radius:14px;background:#fff;margin-bottom:12px">
+          <div style="display:inline-block;padding:12px;border:1px solid var(--stroke-2);border-radius:14px;background:#fff;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,.06)">
             <img src="${qrCodeUrl}" style="width:200px;height:200px;display:block" alt="Table ${esc(tableLabel)} QR">
           </div>
-          <div style="font-size:12px;color:var(--text-soft);margin-bottom:10px;line-height:1.4">
-            Camera → QR → menu at the table. No app.
-          </div>
-          <div style="font-size:10px;word-break:break-all;color:var(--text-mute);background:var(--bg-soft);padding:8px 10px;border-radius:8px;font-family:ui-monospace,monospace;border:1px solid var(--stroke-2);text-align:left">${esc(orderUrl)}</div>
-          <div style="margin-top:12px;font-size:11.5px;color:var(--text-soft);line-height:1.45;text-align:left;background:color-mix(in srgb,var(--orange) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--orange) 22%,var(--stroke));border-radius:8px;padding:10px 12px">
-            <b style="color:var(--orange)">Staff:</b> Open this table’s QR session on Floor before guests arrive — otherwise they see “session closed”.
+          <div style="font-size:13px;color:var(--text-soft);margin-bottom:8px">Guest scans → opens menu → orders at table</div>
+          <div style="font-size:11px;color:var(--text-mute);line-height:1.45;max-width:280px;margin:0 auto">
+            Before service: use <b>Open all QR</b> (or Open Session below) so scans work.
           </div>
         </div>
       `;
 
       RSModal.open({
         title: 'Table QR',
-        sub: 'First thing your guest sees — print & place on table',
+        sub: 'Print and place on the table',
         icon: 'fa-qrcode',
         size: 'sm',
         body,
         foot: `<button class="btn btn-ghost" style="flex:1" data-x>Close</button>
-               <button class="btn btn-primary" style="flex:1" id="btn-print-single-qr"><i class="fa-solid fa-print"></i> Print tent card</button>`,
+               <button class="btn btn-primary" style="flex:1" id="btn-print-single-qr"><i class="fa-solid fa-print"></i> Print card</button>`,
         onMount(modal, close) {
           modal.querySelector('[data-x]').onclick = close;
           modal.querySelector('#btn-print-single-qr').onclick = () => {
@@ -1872,8 +1845,12 @@
               tableLabel,
               qrCodeUrl,
               large: true,
-            }).replace('class="qr-print-card"', 'class="qr-print-card large"');
-            openQrPrintWindow('Table ' + tableLabel + ' QR', '<div class="qr-print-single">' + card + '</div>');
+            });
+            openQrPrintWindow('Table ' + tableLabel + ' QR', '<div class="qr-print-single">' + card + '</div>', {
+              outlet: tenantName,
+              count: 1,
+              autoPrint: false,
+            });
           };
         },
       });
@@ -1887,42 +1864,97 @@
         if (window.RS && RS.toast) RS.toast('Add tables first (Edit Tables)', 'fa-chair');
         return;
       }
-      if (window.RS && RS.toast) RS.toast('Preparing ' + TABLES.length + ' guest QR cards…', 'fa-qrcode');
 
-      const tableQrs = await Promise.all(
-        TABLES.map(async (t) => {
-          const orderUrl = guestOrderUrl(tenantSlug, t.n);
-          const qrCodeUrl = await makeTableQrDataUrl(orderUrl, 260);
-          return { tableNum: t.n, tableLabel: padTableLabel(t.n), qrCodeUrl, orderUrl };
-        })
-      );
+      if (!window.RSModal) {
+        // Fallback: open print window directly
+        RS.toast('Preparing QR cards…', 'fa-qrcode');
+      } else {
+        RS.toast('Preparing ' + TABLES.length + ' QR cards…', 'fa-qrcode');
+      }
 
-      const staffTip = `
-        <div class="qr-staff-tip">
-          <b>Staff checklist before seating guests</b>
-          <ul>
-            <li>Print → cut on dashed lines → place one card per table (QR face-up, well lit).</li>
-            <li>On Floor: open QR session for occupied tables — closed sessions block guest orders.</li>
-            <li>Guest path: Camera scan → menu → Place order (no app, no login).</li>
-            <li>If scan fails: wipe glare, increase light, or reprint (codes use high error-correction).</li>
-          </ul>
-        </div>`;
-
-      const cardsHtml = tableQrs
-        .map((t) =>
-          buildGuestQrCardHtml({
-            outletName: tenantName,
-            tableLabel: t.tableLabel,
-            qrCodeUrl: t.qrCodeUrl,
-            large: false,
+      let tableQrs;
+      try {
+        tableQrs = await Promise.all(
+          TABLES.map(async (t) => {
+            const orderUrl = guestOrderUrl(tenantSlug, t.n);
+            const qrCodeUrl = await makeTableQrDataUrl(orderUrl, 240);
+            return { tableNum: t.n, tableLabel: padTableLabel(t.n), qrCodeUrl, orderUrl };
           })
-        )
-        .join('');
+        );
+      } catch (e) {
+        console.warn(e);
+        if (window.RS && RS.toast) RS.toast('Could not build QR cards', 'fa-circle-exclamation');
+        return;
+      }
 
-      openQrPrintWindow(
-        'Table QR cards · ' + formatOutletTitle(tenantName),
-        staffTip + '<div class="qr-print-grid">' + cardsHtml + '</div>'
-      );
+      const cardsHtml =
+        '<div class="qr-print-grid">' +
+        tableQrs
+          .map((t) =>
+            buildGuestQrCardHtml({
+              outletName: tenantName,
+              tableLabel: t.tableLabel,
+              qrCodeUrl: t.qrCodeUrl,
+              large: false,
+            })
+          )
+          .join('') +
+        '</div>';
+
+      // Preview in-app first (clean), then Print opens the print window — never thermal RSPrint
+      if (window.RSModal) {
+        const previewGrid = tableQrs
+          .slice(0, 6)
+          .map(
+            (t) => `
+          <div style="border:1px solid var(--stroke-2);border-radius:12px;padding:12px;text-align:center;background:var(--panel)">
+            <div style="font-weight:800;font-size:14px;margin-bottom:8px">Table ${esc(t.tableLabel)}</div>
+            <img src="${t.qrCodeUrl}" alt="" style="width:96px;height:96px;display:block;margin:0 auto 6px;border-radius:6px">
+            <div style="font-size:11px;color:var(--text-soft)">Scan to order</div>
+          </div>`
+          )
+          .join('');
+        const more =
+          tableQrs.length > 6
+            ? `<div style="grid-column:1/-1;text-align:center;font-size:12px;color:var(--text-soft);padding:6px">+ ${tableQrs.length - 6} more on the print sheet</div>`
+            : '';
+
+        RSModal.open({
+          title: 'Print table QR cards',
+          sub: formatOutletTitle(tenantName) + ' · ' + tableQrs.length + ' tables',
+          icon: 'fa-print',
+          size: 'md',
+          body: `
+            <p style="margin:0 0 12px;font-size:13px;color:var(--text-soft);line-height:1.5">
+              Clean tent cards for each table. Print on A4, cut, and place face-up.
+              Before service, tap <b>Open all QR</b> so guest scans work.
+            </p>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-height:340px;overflow:auto;padding:2px">
+              ${previewGrid}${more}
+            </div>`,
+          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+                 <button class="btn btn-primary" style="flex:1" id="btn-print-all-qrs-go"><i class="fa-solid fa-print"></i> Print ${tableQrs.length} cards</button>`,
+          onMount(modal, close) {
+            modal.querySelector('[data-x]').onclick = close;
+            const go = modal.querySelector('#btn-print-all-qrs-go');
+            if (go)
+              go.onclick = () => {
+                openQrPrintWindow('Table QR cards', cardsHtml, {
+                  outlet: tenantName,
+                  count: tableQrs.length,
+                  autoPrint: false,
+                });
+                close();
+              };
+          },
+        });
+      } else {
+        openQrPrintWindow('Table QR cards', cardsHtml, {
+          outlet: tenantName,
+          count: tableQrs.length,
+          autoPrint: false,
+        });
+      }
     }
 
     RS.titles['floor-tab'] = ['Floor & Tables', 'Live table status & seating'];
@@ -1933,6 +1965,8 @@
     RS.clearAllOpenTables = clearAllOpenTables;
     RS.ensureSeatedPendingOrder = ensureSeatedPendingOrder;
     RS.ensureTableQrSession = ensureTableQrSession;
+    RS.closeTableQrSession = closeTableQrSession;
+    RS.bulkTableQrSessions = bulkTableQrSessions;
     RS.normTableKey = normTableKey;
     // Live refresh when QR/KDS sync lands new tickets
     if (!window.__rsFloorSyncBound) {

@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v121 (2026-07-13) — Print Table QRs redesigned (10/10)
+
+- No longer routes through thermal **RSPrint** (was broken / awful layout)
+- In-app preview modal → **Print N cards** opens a clean browser print sheet
+- Simple tent cards: Table # · QR · Scan to order · outlet name
+- Sticky Print toolbar; staff tip is screen-only (hidden on paper)
+
 ## v120 (2026-07-13) — Open / Close all QR (10/10 bulk)
 
 - **Open all QR**: progress “Opening 3/12…”, confirm, success/fail count + failed table names
