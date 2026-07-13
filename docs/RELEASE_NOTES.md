@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v110 (2026-07-13) — WhatsApp settings layout (clean hierarchy)
+
+- Removed duplicate Get QR / tip boxes that made the page feel chaotic
+- One status card, secondary actions (Send test · Refresh · New QR), one quiet number tip
+- Clear **Bill preferences** section + compact activity log
+
 ## v109 (2026-07-13) — WhatsApp QR connect CTA + calmer tips
 
 - Removed “keep the computer on” line from client tip (not useful on this screen)
