@@ -2750,10 +2750,14 @@
           const dc = document.getElementById('delivery-charge');
           const dr = document.getElementById('delivery-rider');
           
+          const tableLabel = cust.table || 'Held order';
           const dbRow = {
             id: id,
             draftId: draftId,
-            draftName: cust.table || 'Held order',
+            draftName: tableLabel,
+            name: tableLabel,
+            table: tableLabel,
+            tableNumber: tableLabel,
             customerName: cust.name || '',
             customerPhone: cust.phone || '',
             customerGst: cust.gst || '',
@@ -2764,9 +2768,39 @@
             orderType: orderTypeKey,
             deliveryAddress: da ? da.value : '',
             deliveryCharge: dc ? dc.value : '',
-            deliveryRider: dr ? dr.value : ''
+            deliveryRider: dr ? dr.value : '',
+            time: newHeld.time,
           };
           await RS_DB.put('drafts', id, dbRow);
+
+          // Floor must not keep empty "DineIn Active" seat tickets after Hold,
+          // or the card stays Dining and never shows Held.
+          try {
+            const pend = await RS_DB.list('pending_orders').catch(() => []);
+            const dig = (v) => parseInt(String(v == null ? '' : v).replace(/\D/g, ''), 10);
+            const tableDig = dig(tableLabel);
+            for (const r of pend || []) {
+              const tn = String(r.tableNumber || r.table || '');
+              const same =
+                tn === tableLabel ||
+                tn.toLowerCase() === String(tableLabel).toLowerCase() ||
+                (Number.isFinite(tableDig) && dig(tn) === tableDig);
+              if (!same) continue;
+              const items = Array.isArray(r.items) ? r.items : [];
+              const empty =
+                items.length === 0 && !(Number(r.total) > 0);
+              const seatLike =
+                r.source === 'floor_seat' ||
+                r.status === 'DineIn Active' ||
+                empty;
+              // Only remove empty seat placeholders — never kill kitchen tickets with items
+              if (empty && seatLike) {
+                await RS_DB.del('pending_orders', r.id).catch(() => {});
+              }
+            }
+          } catch (e2) {
+            console.warn('hold: clear empty seat tickets failed', e2);
+          }
         } catch (e) {
           console.warn("Failed to save draft to database", e);
         }
@@ -2795,6 +2829,9 @@
         typeLabel + ' held · ' + heldOrders[orderTypeKey].length + ' parked · tap Hold again to resume',
         'fa-pause'
       );
+      try {
+        document.dispatchEvent(new Event('rs:tables-updated'));
+      } catch (_) {}
       // Update table grid to reflect occupied status
       await renderPosTableGrid();
     }

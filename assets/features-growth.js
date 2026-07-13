@@ -729,6 +729,13 @@
 
           TABLES.forEach((t) => {
             const activeOrders = collectActiveOrders(rows, t);
+            // Tickets with real items/value vs empty seat placeholders
+            const meatyOrders = activeOrders.filter(
+              (o) => orderItemCount(o) > 0 || Number(o.total) > 0
+            );
+            const emptySeatOrders = activeOrders.filter(
+              (o) => orderItemCount(o) <= 0 && !(Number(o.total) > 0)
+            );
             const matchedDraft = (drafts || []).find((d) => matchDraftToTable(d, t));
             const labelCandidates = [`table ${t.n}`, String(t.n), tableNameLabel(t.n), t.name]
               .filter(Boolean)
@@ -741,9 +748,39 @@
             t.draft = null;
             t.draftId = null;
             t.ticketCount = 0;
+            t.emptySeat = false;
 
-            if (activeOrders.length) {
-              const agg = aggregateTableOrders(activeOrders);
+            // Prefer held draft when only empty seat ticket(s) remain (Hold after Seat)
+            if (matchedDraft || isHeldFlag) {
+              if (!meatyOrders.length) {
+                const d = matchedDraft || null;
+                const tot = draftTotals(d);
+                t.state = 'held';
+                t.amt = tot.total;
+                t.since = d && d.time ? String(d.time) : 'Held';
+                t.orderId = d && (d.draftId || d.id);
+                t.dbId = null;
+                t.draft = d;
+                t.draftId = d && d.id;
+                t.guest = (d && d.customerName) || '';
+                t.itemCount = tot.itemCount;
+                t.orderStatus = 'Held';
+              } else {
+                // Has real kitchen tickets AND a hold — show dining with meaty orders
+                const agg = aggregateTableOrders(meatyOrders);
+                t.state = agg.state;
+                t.amt = agg.total;
+                t.since = agg.since;
+                t.orderId = agg.orderId;
+                t.dbId = agg.primaryId;
+                t.dbIds = agg.ids;
+                t.guest = agg.guest;
+                t.itemCount = agg.itemCount;
+                t.orderStatus = agg.orderStatus;
+                t.ticketCount = meatyOrders.length;
+              }
+            } else if (meatyOrders.length) {
+              const agg = aggregateTableOrders(meatyOrders);
               t.state = agg.state;
               t.amt = agg.total;
               t.since = agg.since;
@@ -753,20 +790,21 @@
               t.guest = agg.guest;
               t.itemCount = agg.itemCount;
               t.orderStatus = agg.orderStatus;
-              t.ticketCount = activeOrders.length;
-            } else if (matchedDraft || isHeldFlag) {
-              const d = matchedDraft || null;
-              const tot = draftTotals(d);
-              t.state = 'held';
-              t.amt = tot.total;
-              t.since = d && d.time ? String(d.time) : '';
-              t.orderId = d && (d.draftId || d.id);
-              t.dbId = null;
-              t.draft = d;
-              t.draftId = d && d.id;
-              t.guest = (d && d.customerName) || '';
-              t.itemCount = tot.itemCount;
-              t.orderStatus = 'Held';
+              t.ticketCount = meatyOrders.length;
+            } else if (emptySeatOrders.length) {
+              // Seated, no items yet (honest occupancy)
+              const primary = emptySeatOrders[0];
+              t.state = 'occupied';
+              t.emptySeat = true;
+              t.amt = 0;
+              t.since = primary.dateTime ? getElapsedDesc(primary.dateTime) : 'just now';
+              t.orderId = primary.orderId || primary.id;
+              t.dbId = primary.id;
+              t.dbIds = emptySeatOrders.map((o) => o.id);
+              t.guest = primary.customerName || '';
+              t.itemCount = 0;
+              t.orderStatus = 'Seated';
+              t.ticketCount = emptySeatOrders.length;
             } else {
               t.state = 'free';
               t.amt = 0;
@@ -824,10 +862,22 @@
             ${t.state === 'held' ? '<span class="table-held-badge"><i class="fa-solid fa-pause"></i> Held</span>' : ''}
             ${t.state === 'pending' ? '<span class="table-held-badge table-qr-badge"><i class="fa-solid fa-qrcode"></i> New</span>' : ''}
             <div class="tnum2">Table ${esc(t.name || t.n)}</div><div class="tcap"><i class="fa-solid fa-user-group" style="font-size:10px"></i> ${esc(t.cap)} seats</div>
-            <div class="tstate">${stateTxt[t.state] || t.state}${(t.state === 'free' && t.reservedInfo) ? ` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time || '')}${t.reservedInfo.guestName ? ' · ' + esc(t.reservedInfo.guestName) : ''}</span>` : ''}${t.guest ? ` · ${esc(t.guest)}` : ''}</div>
-            ${t.amt || t.state === 'held' || t.itemCount
-            ? `<div class="tamt">${rs(t.amt || 0)}</div><div class="tcap">${esc(t.since || (t.state === 'held' ? 'Held' : ''))}${t.itemCount ? ' · ' + t.itemCount + ' items' : ''}${t.ticketCount > 1 ? ' · ' + t.ticketCount + ' tickets' : ''}</div>`
-            : '<div class="tcap" style="margin-top:auto">Tap to seat</div>'}
+            <div class="tstate">${
+              t.state === 'held'
+                ? 'Held'
+                : t.emptySeat
+                  ? 'Seated'
+                  : (stateTxt[t.state] || t.state)
+            }${(t.state === 'free' && t.reservedInfo) ? ` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time || '')}${t.reservedInfo.guestName ? ' · ' + esc(t.reservedInfo.guestName) : ''}</span>` : ''}${t.guest && String(t.guest).toLowerCase() !== 'guest' ? ` · ${esc(t.guest)}` : ''}</div>
+            ${
+              t.state === 'free'
+                ? '<div class="tcap" style="margin-top:auto">Tap to seat</div>'
+                : t.state === 'held'
+                  ? `<div class="tamt">${rs(t.amt || 0)}</div><div class="tcap">${t.itemCount ? t.itemCount + ' items · ' : ''}Resume hold</div>`
+                  : t.emptySeat
+                    ? `<div class="tcap" style="margin-top:auto">${esc(t.since || 'just now')} · add items</div>`
+                    : `<div class="tamt">${rs(t.amt || 0)}</div><div class="tcap">${esc(t.since || '')}${t.itemCount ? ' · ' + t.itemCount + ' items' : ''}${t.ticketCount > 1 ? ' · ' + t.ticketCount + ' tickets' : ''}</div>`
+            }
           </div>`
         ).join('') : `<div class="sr-empty" style="grid-column:1/-1;padding:40px 20px"><i class="fa-solid fa-chair" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i><div style="font-weight:700;margin-bottom:4px">No tables configured</div><div style="color:var(--text-soft);font-size:13px;margin-bottom:12px">Add tables with Edit Tables to start seating guests.</div><button type="button" class="btn btn-primary btn-sm" id="btn-manage-seating-empty"><i class="fa-solid fa-plus"></i> Add tables</button></div>`}</div>`;
       $$('.table-card', sec).forEach((c) => {

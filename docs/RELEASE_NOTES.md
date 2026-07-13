@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v116 (2026-07-13) — Floor hold shows Held (verified)
+
+- After **Hold**, empty seat tickets are cleared so floor shows **Held** (not stuck Dining)
+- Drafts store `table` / `tableNumber` for matching
+- Empty seated tables: **Seated · add items** (not “Tap to seat”)
+- Held cards: amount + **Resume hold**
+- `rs:tables-updated` fires on hold
+
 ## v115 (2026-07-13) — Floor & Tables 10/10 ops
 
 - **Honest occupancy**: Seat & order creates a live `DineIn Active` ticket immediately (card turns Dining)
