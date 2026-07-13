@@ -384,10 +384,51 @@ const tenantClients = new Map(); // tenantId -> TenantClientData
 // Orders already handled by the /send endpoint -- realtime listener skips these
 // to prevent double-sending when the POS frontend sends explicitly (e.g. PDF mode).
 const realtimeSkipOrders = new Set(); // "tenantId:orderId"
-const MAX_RECONNECT_ATTEMPTS = 5;
+//
+// Reconnect policy (NOT a security timeout):
+// WhatsApp Web / Baileys routinely drops the WebSocket after idle periods,
+// phone sleep, mobile data switches, or Meta stream errors. That is expected
+// network behaviour — NOT a deliberate "log out after N hours" security kill.
+// We keep reconnecting forever for recoverable closes, with exponential backoff.
+// Only terminal auth failures (logged out, bad session, multidevice mismatch)
+// stop auto-reconnect and require a fresh QR scan.
+const RECONNECT_BASE_MS = 5_000;
+const RECONNECT_MAX_MS = 5 * 60_000; // cap backoff at 5 minutes
+const RECONNECT_ALERT_EVERY = 5;     // alert admin every N consecutive failures
+const STABILITY_PROBE_MS = 3 * 60_000; // probe live sockets every 3 minutes
+const STUCK_RECONNECT_MS = 10 * 60_000; // force re-init if stuck connecting >10m
 let totalMessagesSent = 0;
 let recentHealthEvents = []; // last 10 events for dashboard
 const lastAlertSentByType = new Map();
+
+/** True when Baileys status code means the session is dead and needs a QR rescan */
+function isTerminalDisconnect(statusCode) {
+    if (statusCode == null) return false;
+    return (
+        statusCode === DisconnectReason.loggedOut ||
+        statusCode === DisconnectReason.badSession ||
+        statusCode === DisconnectReason.multideviceMismatch ||
+        statusCode === DisconnectReason.forbidden
+    );
+}
+
+/** Human-readable disconnect label for logs/alerts */
+function disconnectReasonLabel(statusCode, err) {
+    const names = Object.entries(DisconnectReason || {}).reduce((acc, [k, v]) => {
+        acc[v] = k;
+        return acc;
+    }, {});
+    const named = statusCode != null ? (names[statusCode] || String(statusCode)) : 'unknown';
+    const msg = err?.message || err?.output?.payload?.message || '';
+    return msg ? `${named}: ${msg}` : named;
+}
+
+/** Exponential backoff with jitter, capped */
+function reconnectDelayMs(attempt) {
+    const exp = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * Math.pow(2, Math.max(0, attempt - 1)));
+    const jitter = Math.floor(Math.random() * 1000);
+    return Math.min(RECONNECT_MAX_MS, exp + jitter);
+}
 
 // ============================================================
 // HEALTH LOGGING -- writes to gateway_health_log in Supabase
@@ -522,7 +563,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
           <table style="font-size: 13px; width: 100%; margin: 20px 0; border-collapse: collapse;">
             <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; width: 180px; padding: 8px 0; color: #475569;">Connection Status:</td><td style="color: #dc2626; font-weight: 600; padding: 8px 0;">OFFLINE</td></tr>
             <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Timestamp:</td><td style="padding: 8px 0; color: #334155;">${timeStr}</td></tr>
-            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Reconnect Attempts:</td><td style="padding: 8px 0; color: #334155;">${extraDetails.attempts || 0}/${MAX_RECONNECT_ATTEMPTS}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Reconnect Attempts:</td><td style="padding: 8px 0; color: #334155;">${extraDetails.attempts || 0} (auto-retry with backoff)</td></tr>
             <tr style="border-bottom: 1px solid #f1f5f9;"><td style="font-weight: 600; padding: 8px 0; color: #475569;">Reported Reason:</td><td style="padding: 8px 0; color: #334155; font-family: monospace;">${extraDetails.reason || 'Unknown'}</td></tr>
           </table>
 
@@ -621,7 +662,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
     // Short plain-text version for Telegram/desktop -- the HTML email above
     // stays the detailed version; these channels are for "notice it NOW".
     const plainTextByType = {
-        disconnected: `WhatsApp gateway went OFFLINE at ${timeStr}. Reason: ${extraDetails.reason || 'Unknown'}. Reconnect attempts: ${extraDetails.attempts || 0}/${MAX_RECONNECT_ATTEMPTS}.`,
+        disconnected: `WhatsApp gateway went OFFLINE at ${timeStr}. Reason: ${extraDetails.reason || 'Unknown'}. Reconnect attempts so far: ${extraDetails.attempts || 0} (gateway keeps auto-retrying recoverable drops).`,
         online: `WhatsApp gateway is back ONLINE at ${timeStr} (+${extraDetails.number || 'unknown number'}).`,
         qr_needed: `WhatsApp gateway needs a fresh QR scan to reconnect. ${extraDetails.reason || ''}`.trim(),
         startup: `WhatsApp gateway server started at ${timeStr}.`
@@ -977,32 +1018,56 @@ async function initializeBaileysClient(tid, tenantData) {
             version: waVersion,
             printQRInTerminal: false,
             logger: pino({ level: 'silent' }),
-            browser: ['Ubuntu', 'Chrome', '20.0.04'],
+            // Realistic desktop fingerprint — mobile-looking browsers are flagged more often
+            browser: ['Ubuntu', 'Chrome', '22.04.4'],
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
-            keepAliveIntervalMs: 30000
+            // Ping WhatsApp every 25s so idle links are less likely to be closed
+            keepAliveIntervalMs: 25000,
+            markOnlineOnConnect: true,
+            syncFullHistory: false,
+            generateHighQualityLinkPreview: false,
+            getMessage: async () => undefined
         });
 
         // Set the client reference on tenantData
+        // sockId guards against late events from a replaced socket firing reconnect storms
+        const sockId = (tenantData.sockId || 0) + 1;
+        tenantData.sockId = sockId;
         tenantData.client = sock;
+        tenantData.lastDisconnectAt = null;
+        tenantData.lastConnectedAt = tenantData.lastConnectedAt || null;
+        tenantData.reconnectTimer = tenantData.reconnectTimer || null;
+        tenantData.handlingClose = false;
+
+        const isCurrentSocket = () => tenantData.sockId === sockId && tenantClients.get(tid) === tenantData;
 
         // Custom destroy/logout mappings for compatibility with calling code
         sock.destroy = async () => {
             clearWatchdog();
-            try { sock.end(); } catch (_) {}
+            try { sock.end(undefined); } catch (_) {}
         };
+        // IMPORTANT: do not call sock.logout() from inside this override (infinite recursion).
+        // Callers that need a full unlink also purge local session files (see /logout).
         sock.logout = async () => {
             clearWatchdog();
             try {
-                await sock.logout();
+                if (typeof sock.ws?.close === 'function') {
+                    try { sock.ws.close(); } catch (_) {}
+                }
+                sock.end(undefined);
             } catch (_) {
-                try { sock.end(); } catch (__) {}
+                try { sock.end(undefined); } catch (__) {}
             }
         };
 
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', (creds) => {
+            if (!isCurrentSocket()) return;
+            return saveCreds(creds);
+        });
 
         sock.ev.on('connection.update', async (update) => {
+            if (!isCurrentSocket()) return;
             const { connection, lastDisconnect, qr } = update;
             
             if (qr) {
@@ -1027,71 +1092,122 @@ async function initializeBaileysClient(tid, tenantData) {
             }
 
             if (connection === 'close') {
+                if (tenantData.handlingClose) return;
+                tenantData.handlingClose = true;
                 clearWatchdog();
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                
+                if (tenantData.reconnectTimer) {
+                    clearTimeout(tenantData.reconnectTimer);
+                    tenantData.reconnectTimer = null;
+                }
+
+                const statusCode = lastDisconnect?.error?.output?.statusCode
+                    ?? lastDisconnect?.error?.status
+                    ?? lastDisconnect?.error?.data;
+                const reasonLabel = disconnectReasonLabel(statusCode, lastDisconnect?.error);
+                const terminal = isTerminalDisconnect(statusCode);
+                // restartRequired (515) and connectionLost/Closed/timedOut are routine —
+                // always reconnect. connectionReplaced means another linked session took over;
+                // still try once, then continue backoff (user may have opened WA Web elsewhere).
+                const shouldReconnect = !terminal;
+
                 const lostNumber = tenantData.number; // capture before it is cleared
-                console.log(`[Disconnected] Tenant ${tid} connection closed:`, lastDisconnect?.error);
+                const wasReady = tenantData.status === 'ready';
+                console.log(`[Disconnected] Tenant ${tid} connection closed — code=${statusCode} terminal=${terminal} reason=${reasonLabel}`);
                 tenantData.status = shouldReconnect ? 'connecting' : 'disconnected';
                 tenantData.qr = null;
                 tenantData.number = null;
-
-                // Terminal disconnect (logged out) -> alert the tenant on their
-                // WhatsApp via the central gateway (their own session is dead).
-                if (!shouldReconnect && tid !== 'system' && lostNumber) {
-                    notifyTenantDisconnected(tid, lostNumber, 'logged out').catch(() => {});
+                tenantData.lastDisconnectAt = Date.now();
+                if (tenantData.client === sock) {
+                    tenantData.client = null;
                 }
-                
-                await logHealthEvent('disconnected', shouldReconnect ? 'warning' : 'error', { 
-                    tenantId: tid, 
-                    reason: lastDisconnect?.error?.message,
-                    message: `Connection closed for tenant ${tid}: ${lastDisconnect?.error?.message || 'Connection Failure'}`
+
+                // Do NOT call sock.end() here — Baileys already closed; ending again
+                // can re-emit 'close' and race with the reconnect we schedule below.
+
+                // Terminal disconnect (logged out / bad session) -> alert the tenant
+                // on WhatsApp via the central gateway (their own session is dead).
+                if (terminal && tid !== 'system' && lostNumber) {
+                    notifyTenantDisconnected(tid, lostNumber, reasonLabel).catch(() => {});
+                }
+
+                await logHealthEvent('disconnected', shouldReconnect ? 'warning' : 'error', {
+                    tenantId: tid,
+                    statusCode,
+                    reason: reasonLabel,
+                    terminal,
+                    wasReady,
+                    message: `Connection closed for tenant ${tid}: ${reasonLabel}`
                 });
 
-                // Send email alert for central system disconnect
+                // Alert admin on system disconnect (throttled inside sendAdminAlert)
                 if (tid === 'system') {
                     sendAdminAlert(shouldReconnect ? 'disconnected' : 'qr_needed', {
                         attempts: tenantData.reconnectAttempts,
-                        reason: lastDisconnect?.error?.message || 'Connection closed by remote peer'
+                        reason: reasonLabel
                     });
                 }
 
                 if (shouldReconnect) {
-                    // Reconnect logic
-                    if (tenantData.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                        console.error(`[Reconnect] Tenant ${tid}: All attempts exhausted.`);
-                        await logHealthEvent('reconnect_failed', 'error', { tenantId: tid, attempts: tenantData.reconnectAttempts, message: `Reconnect failed for tenant ${tid} after ${tenantData.reconnectAttempts} attempts` });
-                        
+                    tenantData.reconnectAttempts = (tenantData.reconnectAttempts || 0) + 1;
+                    const attempt = tenantData.reconnectAttempts;
+                    const delayMs = reconnectDelayMs(attempt);
+
+                    // Periodic alert only (never give up on recoverable stream drops)
+                    if (attempt % RECONNECT_ALERT_EVERY === 0) {
+                        console.warn(`[Reconnect] Tenant ${tid}: still offline after ${attempt} attempts — will keep retrying.`);
+                        await logHealthEvent('reconnect_retrying', 'warning', {
+                            tenantId: tid,
+                            attempts: attempt,
+                            nextDelayMs: delayMs,
+                            message: `Still reconnecting tenant ${tid} (attempt ${attempt}); next try in ${Math.round(delayMs / 1000)}s`
+                        });
                         if (tid === 'system') {
-                            sendAdminAlert('qr_needed', {
-                                reason: 'All reconnect attempts exhausted. Manual QR scan required.'
+                            sendAdminAlert('disconnected', {
+                                attempts: attempt,
+                                reason: `Still offline after ${attempt} reconnects: ${reasonLabel}`
                             });
+                        } else if (lostNumber) {
+                            // Soft notify tenant occasionally (anti-spam inside helper)
+                            notifyTenantDisconnected(tid, lostNumber, 'connection unstable — auto-reconnecting').catch(() => {});
                         }
-                        return;
                     }
-                    if (tenantData.reconnectAttempts + 1 >= MAX_RECONNECT_ATTEMPTS && tid !== 'system' && lostNumber) {
-                        // Last attempt about to run -- warn the tenant proactively
-                        notifyTenantDisconnected(tid, lostNumber, 'connection lost').catch(() => {});
-                    }
-                    tenantData.reconnectAttempts++;
-                    const delayMs = 10000 * tenantData.reconnectAttempts;
-                    console.log(`[Reconnect] Tenant ${tid}: Attempt ${tenantData.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs / 1000}s...`);
-                    setTimeout(() => {
+
+                    console.log(`[Reconnect] Tenant ${tid}: Attempt ${attempt} in ${Math.round(delayMs / 1000)}s (recoverable: ${reasonLabel})...`);
+                    tenantData.reconnectTimer = setTimeout(() => {
+                        tenantData.reconnectTimer = null;
                         if (tenantClients.get(tid) === tenantData) {
                             initializeBaileysClient(tid, tenantData);
                         }
                     }, delayMs);
+                } else {
+                    console.error(`[Reconnect] Tenant ${tid}: Terminal disconnect (${reasonLabel}). QR scan required.`);
+                    await logHealthEvent('reconnect_terminal', 'error', {
+                        tenantId: tid,
+                        statusCode,
+                        reason: reasonLabel,
+                        message: `Terminal disconnect for tenant ${tid}: ${reasonLabel}. Manual QR scan required.`
+                    });
+                    if (tid === 'system') {
+                        sendAdminAlert('qr_needed', { reason: reasonLabel });
+                    }
                 }
             } else if (connection === 'open') {
                 clearWatchdog();
+                tenantData.handlingClose = false;
+                if (tenantData.reconnectTimer) {
+                    clearTimeout(tenantData.reconnectTimer);
+                    tenantData.reconnectTimer = null;
+                }
+                const previousAttempts = tenantData.reconnectAttempts || 0;
                 tenantData.status = 'ready';
                 tenantData.qr = null;
                 tenantData.number = sock.user.id.split(':')[0] || sock.user.id.split('@')[0];
                 tenantData.sessionSavedAt = new Date().toISOString();
+                tenantData.lastConnectedAt = Date.now();
                 tenantData.reconnectAttempts = 0;
-                console.log(`[Multi-Tenant Ready] Tenant ${tid} is connected as +${tenantData.number}`);
-                
+                console.log(`[Multi-Tenant Ready] Tenant ${tid} is connected as +${tenantData.number}` +
+                    (previousAttempts ? ` (recovered after ${previousAttempts} reconnect attempt(s))` : ''));
+
                 // Send email alert that system gateway is online
                 if (tid === 'system') {
                     sendAdminAlert('online', {
@@ -1112,7 +1228,12 @@ async function initializeBaileysClient(tid, tenantData) {
                 if (supabaseService) {
                     await saveSessionToSupabaseScoped(tid);
                 }
-                await logHealthEvent('connected', 'ok', { tenantId: tid, number: tenantData.number, message: `WhatsApp connected for tenant ${tid} as +${tenantData.number}` });
+                await logHealthEvent('connected', 'ok', {
+                    tenantId: tid,
+                    number: tenantData.number,
+                    recoveredAfterAttempts: previousAttempts,
+                    message: `WhatsApp connected for tenant ${tid} as +${tenantData.number}`
+                });
             }
         });
 
@@ -1120,6 +1241,17 @@ async function initializeBaileysClient(tid, tenantData) {
         clearWatchdog();
         console.error(`[Initialization Error] Tenant ${tid} failed:`, err.message);
         tenantData.status = 'error';
+        // Recoverable init failures (network, DNS, transient) — schedule retry
+        tenantData.reconnectAttempts = (tenantData.reconnectAttempts || 0) + 1;
+        const delayMs = reconnectDelayMs(tenantData.reconnectAttempts);
+        if (tenantData.reconnectTimer) clearTimeout(tenantData.reconnectTimer);
+        tenantData.reconnectTimer = setTimeout(() => {
+            tenantData.reconnectTimer = null;
+            if (tenantClients.get(tid) === tenantData) {
+                console.log(`[Reconnect] Tenant ${tid}: retrying after init error in ${Math.round(delayMs / 1000)}s...`);
+                initializeBaileysClient(tid, tenantData);
+            }
+        }, delayMs);
     }
 }
 
@@ -1186,7 +1318,11 @@ function getOrCreateClient(tenantId) {
         number: null,
         sessionSavedAt: null,
         reconnectAttempts: 0,
-        watchdogTimer: null
+        watchdogTimer: null,
+        reconnectTimer: null,
+        lastDisconnectAt: null,
+        lastConnectedAt: null,
+        awaitingLink: false
     };
 
     tenantClients.set(tid, tenantData);
@@ -1872,7 +2008,20 @@ app.post('/logout', async (req, res) => {
     try {
         if (tenantClients.has(tenantId)) {
             const tenantData = tenantClients.get(tenantId);
-            if (tenantData.status === 'ready') {
+            // Cancel any pending auto-reconnect so logout is intentional and final
+            if (tenantData.reconnectTimer) {
+                clearTimeout(tenantData.reconnectTimer);
+                tenantData.reconnectTimer = null;
+            }
+            if (tenantData.watchdogTimer) {
+                clearTimeout(tenantData.watchdogTimer);
+                tenantData.watchdogTimer = null;
+            }
+            // Bump sockId so late close events from the dying socket are ignored
+            tenantData.sockId = (tenantData.sockId || 0) + 1;
+            tenantData.handlingClose = true;
+
+            if (tenantData.client) {
                 try {
                     const logoutPromise = tenantData.client.logout();
                     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Logout timeout')), 5000));
@@ -1880,12 +2029,12 @@ app.post('/logout', async (req, res) => {
                 } catch (logoutErr) {
                     console.log(`[Logout Warning] Logout failed or timed out for tenant ${tenantId}:`, logoutErr.message);
                 }
+                try {
+                    const destroyPromise = tenantData.client.destroy();
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                    await Promise.race([destroyPromise, timeoutPromise]);
+                } catch (_) {}
             }
-            try {
-                const destroyPromise = tenantData.client.destroy();
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
-                await Promise.race([destroyPromise, timeoutPromise]);
-            } catch (_) {}
             
             // Delete auth folder locally
             const tenantFolder = path.join(authDataPath, `session-${tenantId}`);
@@ -1904,7 +2053,7 @@ app.post('/logout', async (req, res) => {
             tenantClients.delete(tenantId);
         }
         
-        // Re-create as a clean disconnected instance
+        // Re-create as a clean instance (will show QR for re-link)
         getOrCreateClient(tenantId);
         res.json({ status: 'success', message: 'Logged out successfully. Scan QR again.' });
     } catch (err) {
@@ -3326,7 +3475,8 @@ app.get('/test-relay-call', async (req, res) => {
 app.get('/health', async (req, res) => {
     const systemData = tenantClients.get('system') || { status: 'disconnected' };
     const status = String(systemData.status || 'disconnected');
-    const ready = status === 'connected' || status === 'online' || status === 'open';
+    // Baileys open handler sets status to 'ready' — include all known online labels
+    const ready = status === 'ready' || status === 'connected' || status === 'online' || status === 'open';
     const emailConfigured = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD && process.env.ADMIN_ALERT_EMAIL);
     const telegramConfigured = !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
     const desktopConfigured = String(process.env.DESKTOP_ALERTS_ENABLED || '').toLowerCase() === 'true';
@@ -3337,6 +3487,10 @@ app.get('/health', async (req, res) => {
         uptime: Math.floor(process.uptime()),
         time: new Date().toISOString(),
         tenants: typeof tenantClients !== 'undefined' ? tenantClients.size : 0,
+        reconnectAttempts: systemData.reconnectAttempts || 0,
+        lastDisconnectAt: systemData.lastDisconnectAt || null,
+        lastConnectedAt: systemData.lastConnectedAt || null,
+        number: ready ? (systemData.number || null) : null,
         alerts: {
             email: emailConfigured,
             telegram: telegramConfigured,
@@ -3423,27 +3577,37 @@ app.listen(PORT, async () => {
     }
 
     // ============================================================
-    // KEEP-ALIVE SELF-PING -- prevents HuggingFace Space from sleeping
-    // Pings own /health endpoint every 4 minutes so the space stays
-    // warm 24/7 even on the free tier.
+    // LOCAL HEALTH PULSE
+    // On a local PC this only hits localhost (harmless self-check).
+    // On cloud hosts (optional SPACE_HOST), it also counts as external
+    // traffic. This does NOT prevent Windows sleep — the launcher
+    // (scripts/start-gateway.js) handles stay-awake on Windows.
     // ============================================================
-    const selfUrl = process.env.SPACE_HOST
-        ? `https://${process.env.SPACE_HOST}/health`
-        : `http://localhost:${PORT}/health`;
+    const spaceHost = process.env.SPACE_HOST
+        || process.env.SPACE_URL
+        || (process.env.SPACE_ID ? `${process.env.SPACE_ID}.hf.space` : '')
+        || '';
+    const selfUrl = spaceHost
+        ? `https://${String(spaceHost).replace(/^https?:\/\//, '').replace(/\/$/, '')}/health`
+        : `http://127.0.0.1:${PORT}/health`;
 
     const https = require('https');
     const http  = require('http');
 
     function selfPing() {
         const lib = selfUrl.startsWith('https') ? https : http;
-        const req = lib.get(selfUrl, (res) => {
+        const req = lib.get(selfUrl, { timeout: 15000 }, (res) => {
             const systemData = tenantClients.get('system') || { status: 'disconnected' };
-            console.log(`[Keep-Alive] Self-ping OK — status ${res.statusCode} (gateway: ${systemData.status})`);
+            console.log(`[Health pulse] OK — HTTP ${res.statusCode} (gateway: ${systemData.status})`);
+            res.resume();
         });
         req.on('error', (err) => {
-            console.warn(`[Keep-Alive] Self-ping failed: ${err.message}`);
+            console.warn(`[Health pulse] Failed: ${err.message}`);
         });
-        req.end();
+        req.on('timeout', () => {
+            req.destroy();
+            console.warn('[Health pulse] Timed out');
+        });
     }
 
     // First ping after 30s, then every 4 minutes
@@ -3452,5 +3616,83 @@ app.listen(PORT, async () => {
         setInterval(selfPing, 4 * 60 * 1000);
     }, 30000);
 
-    console.log(`[Keep-Alive] Self-ping scheduler started → ${selfUrl} (every 4 min)`);
+    console.log(`[Health pulse] Scheduler started → ${selfUrl} (every 4 min)` +
+        (spaceHost ? ' [external host]' : ' [local PC]'));
+
+    // ============================================================
+    // STABILITY WATCHDOG
+    // WhatsApp may silently drop sockets without a clean 'close' event,
+    // or leave a tenant stuck in 'connecting' after network blips.
+    // Every few minutes:
+    //   1) presence ping on ready sockets — force reconnect if dead
+    //   2) re-init tenants stuck connecting/error longer than STUCK_RECONNECT_MS
+    // This is maintenance, not a security feature.
+    // ============================================================
+    async function runStabilityProbe() {
+        for (const [tid, data] of tenantClients.entries()) {
+            try {
+                if (!data) continue;
+
+                if (data.status === 'ready' && data.client) {
+                    try {
+                        // Lightweight presence update keeps the session warm and
+                        // detects half-open sockets that no longer accept writes.
+                        await data.client.sendPresenceUpdate('available');
+                        data.lastProbeOkAt = Date.now();
+                    } catch (probeErr) {
+                        console.warn(`[Stability] Tenant ${tid} presence probe failed (${probeErr.message}) — forcing reconnect`);
+                        await logHealthEvent('stability_probe_failed', 'warning', {
+                            tenantId: tid,
+                            error: probeErr.message,
+                            message: `Presence probe failed for ${tid}; forcing reconnect`
+                        });
+                        data.status = 'connecting';
+                        data.lastDisconnectAt = Date.now();
+                        try { data.client.end(undefined); } catch (_) {}
+                        data.client = null;
+                        data.reconnectAttempts = (data.reconnectAttempts || 0) + 1;
+                        if (data.reconnectTimer) clearTimeout(data.reconnectTimer);
+                        const delayMs = reconnectDelayMs(data.reconnectAttempts);
+                        data.reconnectTimer = setTimeout(() => {
+                            data.reconnectTimer = null;
+                            if (tenantClients.get(tid) === data) {
+                                initializeBaileysClient(tid, data);
+                            }
+                        }, delayMs);
+                    }
+                    continue;
+                }
+
+                // Stuck connecting / error with no pending timer → force re-init
+                const stuckStatuses = new Set(['connecting', 'error']);
+                if (stuckStatuses.has(data.status) && !data.reconnectTimer) {
+                    const lastActivity = data.lastDisconnectAt || data.lastConnectedAt || 0;
+                    const idleFor = Date.now() - (lastActivity || 0);
+                    // Only force if we have been stuck long enough (or never connected)
+                    if (!lastActivity || idleFor >= STUCK_RECONNECT_MS) {
+                        console.warn(`[Stability] Tenant ${tid} stuck in '${data.status}' — re-initialising`);
+                        await logHealthEvent('stability_stuck_reinit', 'warning', {
+                            tenantId: tid,
+                            status: data.status,
+                            idleForMs: idleFor,
+                            message: `Forced re-init for stuck tenant ${tid}`
+                        });
+                        data.reconnectAttempts = (data.reconnectAttempts || 0) + 1;
+                        initializeBaileysClient(tid, data);
+                    }
+                }
+            } catch (err) {
+                console.warn(`[Stability] Probe error for tenant ${tid}:`, err.message);
+            }
+        }
+    }
+
+    setTimeout(() => {
+        runStabilityProbe().catch(() => {});
+        setInterval(() => {
+            runStabilityProbe().catch(() => {});
+        }, STABILITY_PROBE_MS);
+    }, 60_000);
+
+    console.log(`[Stability] Watchdog started (probe every ${STABILITY_PROBE_MS / 1000}s)`);
 });

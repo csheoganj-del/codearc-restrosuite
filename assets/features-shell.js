@@ -386,7 +386,7 @@
           <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.45">Cards already say <b>Order food</b> + <b>Call waiter</b>. Optional extras below — turn on/off when you print.</p>
           <div class="form-grid-2">${field('Wifi name','','e.g. Cafe-Guest')}${field('Wifi password','','Guest network password')}</div>
           <div style="margin-top:10px">${field('Guest welcome','','Scan to order food or call your waiter')}</div>
-        </div>`
+        </div>`,
       tax:`<div class="set-section form-grid-2">
           ${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
           ${field('Invoice prefix','INV-')}

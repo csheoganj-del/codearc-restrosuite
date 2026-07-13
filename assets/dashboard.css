@@ -166,6 +166,20 @@
 }
 .tb-right {
   display: flex; align-items: center; gap: 6px; flex: none;
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+}
+/* Top-bar actions must always receive clicks (overlays/scripts must not swallow them) */
+.tb-right .tb-icon-btn,
+.tb-right #tb-wa-status-btn,
+.tb-right #tb-notif-btn,
+.tb-right #tb-call-support,
+.sb-foot #open-settings {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  position: relative;
+  z-index: 2;
 }
 /* Support popover (Call + WhatsApp support) */
 .tb-support-wrap {

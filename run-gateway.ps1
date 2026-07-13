@@ -1,5 +1,6 @@
 Write-Host "==========================================" -ForegroundColor Green
-Write-Host "    FREE LOCAL WHATSAPP GATEWAY STARTER" -ForegroundColor Green
+Write-Host "  RestroSuite LOCAL WhatsApp Gateway" -ForegroundColor Green
+Write-Host "  (runs on THIS PC — not Hugging Face)" -ForegroundColor Green
 Write-Host "==========================================" -ForegroundColor Green
 
 # Set NODE_PATH dynamically to load dependencies cleanly
@@ -30,9 +31,22 @@ if (-not (Test-Path $nodeExe)) {
     $nodeExe = "node"
 }
 
-Write-Host "`nLaunching gateway... A QR code will display shortly in this terminal." -ForegroundColor Green
-Write-Host "You can also view and scan the QR directly in the POS Settings!" -ForegroundColor Cyan
-Write-Host "Leave this terminal window open." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "IMPORTANT for all-day / overnight use on this computer:" -ForegroundColor Yellow
+Write-Host "  1. Leave this window OPEN (closing it stops WhatsApp)." -ForegroundColor Yellow
+Write-Host "  2. Do not put the PC to sleep/hibernate while the restaurant is open." -ForegroundColor Yellow
+Write-Host "     Settings → System → Power → Sleep = Never (when plugged in)." -ForegroundColor Yellow
+Write-Host "  3. Keep the phone online with WhatsApp open occasionally (Linked Devices)." -ForegroundColor Yellow
+Write-Host "  4. Session files live in: $env:USERPROFILE\.restrosuite\whatsapp-auth" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Launcher will keep Windows from sleeping and auto-restart if Node crashes." -ForegroundColor Green
+Write-Host ""
 
-& $nodeExe "$PSScriptRoot\whatsapp-gateway.js"
-
+# Prefer the robust launcher (env load + stay-awake + crash restart)
+$launcher = Join-Path $PSScriptRoot "scripts\start-gateway.js"
+if (Test-Path $launcher) {
+    & $nodeExe $launcher
+} else {
+    Write-Host "scripts\start-gateway.js missing — starting gateway directly." -ForegroundColor Yellow
+    & $nodeExe "$PSScriptRoot\whatsapp-gateway.js"
+}
