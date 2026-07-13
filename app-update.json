@@ -1,11 +1,12 @@
 {
-  "version": "v178-20260713-settled-restore",
+  "version": "v179-20260713-receipt-text-font",
   "date": "2026-07-13",
-  "title": "Restore original Bill settled UI",
-  "summary": "Bill settled modal restored to the original layout: title Bill settled, receipt paper preview, footer WhatsApp / Thermal / Print / New order. Experimental slim layout, icon bar, and payment-success animations removed.",
+  "title": "Fix Bill settled garbled text and font flash",
+  "summary": "Corrupted Unicode (arrow/dash) from file restore showed as fA etc. Receipt fonts now match system stack immediately so Inter/monospace no longer swaps after a second. Cleaner date/time on receipt.",
   "highlights": [
-    "Original Bill settled modal layout",
-    "Original print helper",
-    "WhatsApp phone prompt still gets .show so it remains visible"
+    "Fixed Open Gateway and bill synced text encoding",
+    "Receipt uses system-ui + Georgia (no late web-font swap)",
+    "Readable local date/time instead of raw ISO",
+    "Deferred PDF warm to avoid jank on open"
   ]
 }

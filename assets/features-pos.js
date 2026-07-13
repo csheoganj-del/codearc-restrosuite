@@ -1062,34 +1062,35 @@
       const syncBanner = st === 'pending' || st === 'local' || st === 'saving'
         ? `<div style="margin:0 0 10px;padding:8px 11px;border-radius:10px;border:1px solid rgba(234,179,8,.35);background:rgba(234,179,8,.1);font-size:12px;line-height:1.45;color:var(--text-soft);display:flex;gap:8px;align-items:center">
             <i class="fa-solid fa-cloud-arrow-up" style="color:#ca8a04"></i>
-            <span><b style="color:var(--text)">Saved on this device</b> ΓÇö cloud sync ${st === 'saving' ? 'in progress' : 'pending'}. Bill is safe; will upload when online.</span>
+            <span><b style="color:var(--text)">Saved on this device</b> - cloud sync ${st === 'saving' ? 'in progress' : 'pending'}. Bill is safe; will upload when online.</span>
           </div>`
         : `<div style="margin:0 0 10px;padding:6px 10px;border-radius:10px;border:1px solid rgba(34,197,94,.28);background:rgba(34,197,94,.08);font-size:11.5px;color:var(--text-soft);display:flex;gap:8px;align-items:center">
             <i class="fa-solid fa-circle-check" style="color:#16a34a"></i>
-            <span>Bill synced ┬╖ ${esc(bill.no || '')}</span>
+            <span>Bill synced · ${esc(bill.no || '')}</span>
           </div>`;
       const connectBanner = !gwReady
         ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
             <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
             <div style="flex:1;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
               <b style="color:var(--text)">Connect WhatsApp</b> to send this exact bill as a PDF in one tap.
-              <span style="color:var(--orange);font-weight:600"> Open Gateway ΓåÆ</span>
+              <span style="color:var(--orange);font-weight:600"> Open Gateway -></span>
             </div>
           </div>`
         : '';
-      const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> ${waLabel}</button>`;
+      const waBtn = `<button type="button" class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> ${waLabel}</button>`;
       RSModal.open({
         title: 'Bill settled',
-        sub: `${bill.no} \u00b7 ${rs(bill.grand)}`,
+        sub: `${esc(bill.no || '')} · ${rs(bill.grand)}`,
         icon: 'fa-circle-check',
         size: 'sm',
         body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
         foot: `${waBtn}
-              <button class="btn btn-ghost" id="rc-thermal" style="flex:1" title="ESC/POS thermal printer"><i class="fa-solid fa-receipt"></i> Thermal</button>
-              <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
-              <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
+              <button type="button" class="btn btn-ghost" id="rc-thermal" style="flex:1" title="ESC/POS thermal printer"><i class="fa-solid fa-receipt"></i> Thermal</button>
+              <button type="button" class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
+              <button type="button" class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
         onMount(modal, close) {
-          modal.querySelector('#rc-print').onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
+          const printBtn = modal.querySelector('#rc-print');
+          if (printBtn) printBtn.onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
           const thEl = modal.querySelector('#rc-thermal');
           if (thEl) {
             thEl.onclick = () => {
@@ -1103,17 +1104,18 @@
             };
           }
           const waEl = modal.querySelector('#rc-wa');
-          if (waEl && waEl.tagName === 'BUTTON') {
-            waEl.onclick = () => RSReceipt.share(bill);
-          }
+          if (waEl) waEl.onclick = () => RSReceipt.share(bill);
           const cta = modal.querySelector('#rc-wa-cta');
           if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
-          modal.querySelector('#rc-new').onclick = close;
-          // Warm PDF cache while cashier reads the bill (instant WhatsApp)
+          const newBtn = modal.querySelector('#rc-new');
+          if (newBtn) newBtn.onclick = close;
+          // Defer PDF warm so first paint keeps stable fonts (no style flash / jank)
           if (window.RSReceiptEngine && RSReceiptEngine.toPDF) {
             const warm = () => RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() }).catch(() => {});
-            if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 });
-            else setTimeout(warm, 400);
+            setTimeout(() => {
+              if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 4000 });
+              else warm();
+            }, 1200);
           }
         }
       });

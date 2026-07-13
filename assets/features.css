@@ -60,22 +60,34 @@
 .quick-tenders button:hover { border-color: var(--orange); color: var(--orange); }
 
 /* ---------------- RECEIPT / KOT ---------------- */
+/* Match receipt.js EXPORT_CSS so preview never FOUTs (no Inter/web-font swap) */
 .receipt-paper {
-  background: #fbfaf7; color: #16151c; border-radius: 10px; padding: 22px 22px 26px; font-family: 'Inter', monospace;
+  background: #fbfaf7; color: #16151c; border-radius: 10px; padding: 22px 22px 26px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   max-width: 320px; margin: 0 auto; box-shadow: 0 18px 50px rgba(0,0,0,.4); position: relative;
+  box-sizing: border-box;
 }
 .receipt-paper::after { content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 14px;
   background: radial-gradient(circle at 7px -2px, transparent 0 7px, #fbfaf7 7px) repeat-x; background-size: 14px 14px; }
 .rcp-center { text-align: center; }
-.rcp-logo { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -.02em; }
+.rcp-logo {
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  font-weight: 800; font-size: 20px; letter-spacing: -.02em; color: #16151c;
+}
 .rcp-sub { font-size: 11px; color: #6b6960; margin-top: 2px; }
 .rcp-hr { border: 0; border-top: 1px dashed #c9c6bd; margin: 13px 0; }
-.rcp-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #4a4842; }
-.rcp-line { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; }
+.rcp-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #4a4842; gap: 8px; }
+.rcp-line { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; color: #16151c; gap: 8px; }
 .rcp-line .q { color: #6b6960; }
-.rcp-tot { display: flex; justify-content: space-between; font-family: var(--font-display); font-weight: 800; font-size: 17px; margin-top: 6px; }
+.rcp-tot {
+  display: flex; justify-content: space-between;
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  font-weight: 800; font-size: 17px; margin-top: 6px; color: #16151c;
+}
 .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
 .rcp-foot b { color: #16151c; }
+.rcp-qr-wrap { margin-top:10px;padding-top:10px;border-top:1px dashed #c9c6bd;display:flex;flex-direction:column;align-items:center; }
+.rcp-qr-wrap img { width:100px;height:100px;display:block; }
 .kot-paper { background: #fbfaf7; color: #16151c; border-radius: 10px; padding: 20px; max-width: 300px; margin: 0 auto; box-shadow: var(--shadow-lg); }
 .kot-h { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #16151c; padding-bottom: 10px; margin-bottom: 12px; }
 .kot-h .kt { font-family: var(--font-display); font-weight: 800; font-size: 18px; }

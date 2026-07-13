@@ -147,6 +147,18 @@
       custSection = `<div class="rcp-meta"><span>Customer:</span><span>Walk-in</span></div>`;
     }
 
+    // Human-readable time (avoid raw ISO flash / ugly Z timestamps)
+    let timeDisp = m.time || '';
+    try {
+      const d = new Date(m.time);
+      if (!isNaN(d.getTime())) {
+        timeDisp = d.toLocaleString(undefined, {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+      }
+    } catch (_) {}
+
     const profileLines = [
       outlet.address,
       outlet.phone ? `Phone ${outlet.phone}` : '',
@@ -199,9 +211,9 @@
       ? m.tenders.map((t) => `<div class="rcp-line"><span class="q">${esc(t.method)}</span><span>${$(t.amount)}</span></div>`).join('')
       : `<div class="rcp-line"><span class="q">Cash</span><span>${$(m.grand)}</span></div>`;
 
-    return `<div class="rcp-center"><div class="rcp-logo">${esc(outlet.name || 'Outlet')}</div>${profileLines || '<div class="rcp-sub">CodeArc RestroSuite</div>'}</div>
+    return `<div class="rcp-center"><div class="rcp-logo">${esc(outlet.name || 'Outlet')}</div>${profileLines || ''}</div>
       <hr class="rcp-hr">
-      <div class="rcp-meta"><span>${esc(m.no)}</span><span>${esc(m.time)}</span></div>
+      <div class="rcp-meta"><span>${esc(m.no)}</span><span>${esc(timeDisp)}</span></div>
       <div class="rcp-meta"><span>Table:</span><span>${esc(m.table)}</span></div>
       ${m.covers ? `<div class="rcp-meta"><span>Covers:</span><span>${m.covers}</span></div>` : ''}
       ${custSection}

@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v178-20260713-settled-restore';
+    return 'v179-20260713-receipt-text-font';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
