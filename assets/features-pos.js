@@ -1171,36 +1171,36 @@
 
       RSModal.open({
         title: 'Bill settled',
-        sub: `${esc(bill.no || '')} · ${rs(bill.grand)} · ${itemN || '—'} item(s)`,
+        sub: `${esc(bill.no || '')} · ${rs(bill.grand)}`,
         icon: 'fa-circle-check',
-        // Class rc-settled-modal: full receipt visible, one scroll surface only
-        size: 'md rc-settled-modal',
+        // Slim ticket-width modal
+        size: 'sm rc-settled-modal',
         bodyClass: 'rc-settled-body',
         body: `
-          <div class="rc-settled-layout">
-            <div class="rc-settled-side">
-              ${syncBanner}
-              ${connectBanner}
-              <div class="rc-actions-stack">
-                <button type="button" class="btn btn-wa btn-block" id="rc-wa">
-                  <i class="fa-brands fa-whatsapp"></i> Send WhatsApp
-                </button>
-                <div class="rc-actions-row">
-                  <button type="button" class="btn btn-ghost" id="rc-print" title="Browser print">
-                    <i class="fa-solid fa-print"></i> Print
-                  </button>
-                  <button type="button" class="btn btn-ghost" id="rc-thermal" title="Thermal printer">
-                    <i class="fa-solid fa-receipt"></i> Thermal
-                  </button>
-                  <button type="button" class="btn btn-ghost" id="rc-copy" title="Copy text">
-                    <i class="fa-solid fa-copy"></i> Copy
-                  </button>
-                </div>
-                <button type="button" class="btn btn-primary btn-block" id="rc-new">
-                  <i class="fa-solid fa-plus"></i> New order
-                </button>
-              </div>
-              <p class="rc-hint">Full receipt on the right. WhatsApp asks for number if walk-in.</p>
+          <div class="rc-settled-slim">
+            ${syncBanner}
+            ${connectBanner}
+            <div class="rc-icon-bar" role="toolbar" aria-label="Bill actions">
+              <button type="button" class="rc-ico rc-ico-wa" id="rc-wa" title="WhatsApp">
+                <i class="fa-brands fa-whatsapp"></i>
+                <span class="rc-ico-lab">WhatsApp</span>
+              </button>
+              <button type="button" class="rc-ico" id="rc-print" title="Print">
+                <i class="fa-solid fa-print"></i>
+                <span class="rc-ico-lab">Print</span>
+              </button>
+              <button type="button" class="rc-ico" id="rc-thermal" title="Thermal">
+                <i class="fa-solid fa-receipt"></i>
+                <span class="rc-ico-lab">Thermal</span>
+              </button>
+              <button type="button" class="rc-ico" id="rc-copy" title="Copy text">
+                <i class="fa-solid fa-copy"></i>
+                <span class="rc-ico-lab">Copy</span>
+              </button>
+              <button type="button" class="rc-ico rc-ico-new" id="rc-new" title="New order">
+                <i class="fa-solid fa-plus"></i>
+                <span class="rc-ico-lab">New</span>
+              </button>
             </div>
             <div class="rc-settled-preview-wrap">
               <div class="receipt-paper rc-receipt-preview" id="rc-preview">${receiptInner}</div>
@@ -1208,7 +1208,6 @@
           </div>`,
         foot: '',
         onMount(modal, close) {
-          // Ensure body is the only scroll container (never nest scroll on receipt)
           try {
             modal.classList.add('rc-settled-modal');
             const body = modal.querySelector('.rs-mbody');
@@ -1283,8 +1282,6 @@
           });
 
           bind('#rc-new', () => close());
-
-          // Do NOT warm PDF on open — html2canvas freezes the modal / kills scroll
         },
       });
     }

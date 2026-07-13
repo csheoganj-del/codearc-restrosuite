@@ -1597,15 +1597,25 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .recipe-next-urgent > i { color: var(--amber); }
 .recipe-plain-tip { font-size: 12.5px; }
 
-/* Bill settled — full receipt visible, ONE scroll (modal body only), no hang */
-.rs-modal.rc-settled-modal {
-  max-width: min(920px, calc(100vw - 24px)) !important;
-  max-height: min(92dvh, 900px) !important;
-  width: 100%;
+/* Bill settled — slim ticket (≈ thermal width), icon toolbar, one scroll */
+.rs-modal.rc-settled-modal,
+.rs-modal.sm.rc-settled-modal {
+  max-width: min(380px, calc(100vw - 20px)) !important;
+  width: 100% !important;
+  max-height: min(92dvh, 860px) !important;
+}
+.rs-modal.rc-settled-modal .rs-mhead {
+  padding: 12px 14px !important;
+  gap: 10px !important;
+}
+.rs-modal.rc-settled-modal .rs-mhead h3 { font-size: 16px !important; }
+.rs-modal.rc-settled-modal .rs-mhead .sub { font-size: 12px !important; }
+.rs-modal.rc-settled-modal .mh-ic {
+  width: 34px !important; height: 34px !important; font-size: 14px !important;
 }
 .rs-modal.rc-settled-modal .rs-mbody.rc-settled-body,
 .rs-mbody.rc-settled-body {
-  padding: 14px 16px 18px !important;
+  padding: 10px 12px 14px !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
@@ -1614,111 +1624,143 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
   min-height: 0;
   flex: 1 1 auto;
 }
-.rs-modal.rc-settled-modal .rs-mfoot:empty { display: none !important; padding: 0 !important; border: 0 !important; }
+.rs-modal.rc-settled-modal .rs-mfoot:empty {
+  display: none !important; padding: 0 !important; border: 0 !important;
+}
 
-.rc-settled-layout {
-  display: grid;
-  grid-template-columns: minmax(200px, 1fr) minmax(260px, 320px);
-  gap: 16px 20px;
-  align-items: start;
-}
-.rc-settled-side {
-  display: flex; flex-direction: column; gap: 10px;
-  position: sticky; top: 0;
-  min-width: 0;
-}
-.rc-settled-preview-wrap {
-  min-width: 0;
-  /* NO overflow:auto here — whole receipt shows; parent .rs-mbody scrolls if needed */
-  overflow: visible;
-}
-.rc-receipt-preview,
-.receipt-paper.rc-receipt-preview {
-  max-height: none !important;
-  overflow: visible !important;
-  height: auto !important;
-  max-width: 300px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 14px 16px 18px !important;
-  border: 1px solid #e5e2da;
-  border-radius: 10px;
-  background: #fbfaf7 !important;
-  color: #16151c !important;
-  box-shadow: 0 12px 32px rgba(0,0,0,.18);
-  font-size: 12px;
-  line-height: 1.35;
-  pointer-events: none; /* drag/scroll hits the modal body, not trapped on paper */
-  -webkit-user-select: text;
-  user-select: text;
-}
-.rc-receipt-preview * {
+.rc-settled-slim {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
   max-width: 100%;
-  color: inherit;
-}
-.rc-receipt-preview img {
-  max-width: 140px !important;
-  height: auto !important;
-  margin: 8px auto !important;
-  display: block;
 }
 
+/* Compact status chips */
 .rc-banner {
-  display: flex; align-items: center; gap: 10px;
-  margin: 0; padding: 10px 12px; border-radius: 10px;
-  font-size: 12.5px; line-height: 1.45; color: var(--text-soft);
+  display: flex; align-items: center; gap: 8px;
+  margin: 0; padding: 8px 10px; border-radius: 10px;
+  font-size: 11.5px; line-height: 1.35; color: var(--text-soft);
   border: 1px solid var(--stroke); background: var(--glass);
   width: 100%; font: inherit; text-align: left; cursor: default;
   box-sizing: border-box;
 }
 .rc-banner b { color: var(--text); }
 .rc-banner-ok { border-color: rgba(34,197,94,.28); background: rgba(34,197,94,.08); }
-.rc-banner-ok > i { color: #16a34a; }
+.rc-banner-ok > i { color: #16a34a; font-size: 13px; }
 .rc-banner-warn { border-color: rgba(234,179,8,.35); background: rgba(234,179,8,.1); }
 .rc-banner-warn > i { color: #ca8a04; }
 .rc-banner-wa {
   border-color: rgba(37,211,102,.3); background: rgba(37,211,102,.08);
-  cursor: pointer;
+  cursor: pointer; padding: 8px 10px;
 }
 .rc-banner-wa:hover { border-color: #25d366; }
-.rc-banner-wa > i { color: #25d366; font-size: 18px; }
+.rc-banner-wa > i { color: #25d366; font-size: 16px; }
 .rc-banner-wa-ok {
   border-color: rgba(37,211,102,.28); background: rgba(37,211,102,.08);
 }
-.rc-banner-wa-ok > i { color: #25d366; font-size: 16px; }
+.rc-banner-wa-ok > i { color: #25d366; font-size: 14px; }
 
-.rc-actions-stack { display: flex; flex-direction: column; gap: 8px; }
-.rc-actions-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.rc-actions-row .btn { min-width: 0; padding: 10px 6px; font-size: 12px; }
-.btn-wa {
-  background: #25d366 !important; color: #fff !important; border: none !important;
-  font-weight: 700 !important; min-height: 44px;
+/* Icon-only action bar */
+.rc-icon-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  background: var(--glass-2);
 }
-.btn-wa:hover { filter: brightness(1.05); }
-.btn-wa i { color: #fff !important; }
-.rc-hint {
-  margin: 4px 0 0; font-size: 11.5px; color: var(--text-mute); line-height: 1.4;
+.rc-ico {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 12px;
+  padding: 8px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--text-soft);
+  font: inherit;
+  min-height: 52px;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
 }
+.rc-ico i { font-size: 18px; line-height: 1; }
+.rc-ico-lab {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  opacity: .85;
+  line-height: 1;
+}
+.rc-ico:hover {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--stroke-2);
+}
+.rc-ico:active { transform: scale(0.96); }
+.rc-ico-wa {
+  color: #128c7e;
+}
+.rc-ico-wa:hover {
+  background: rgba(37, 211, 102, 0.14);
+  color: #0f9d58;
+  border-color: rgba(37, 211, 102, 0.35);
+}
+.rc-ico-wa i { color: #25d366; font-size: 20px; }
+.rc-ico-new {
+  color: var(--orange);
+}
+.rc-ico-new:hover {
+  background: var(--orange-tint);
+  color: var(--orange);
+  border-color: color-mix(in srgb, var(--orange) 40%, var(--stroke));
+}
+.rc-ico-new i { color: var(--orange); }
 
-@media (max-width: 720px) {
-  .rc-settled-layout {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  .rc-settled-side {
-    position: static;
-    order: 1;
-  }
-  .rc-settled-preview-wrap {
-    order: 2;
-  }
-  /* On phone: still no nested scroll — shrink receipt so more fits, body scrolls once */
-  .rc-receipt-preview,
-  .receipt-paper.rc-receipt-preview {
-    max-width: min(300px, 100%);
-    font-size: 11.5px;
-    padding: 12px 14px 16px !important;
-  }
+.rc-settled-preview-wrap {
+  overflow: visible;
+  width: 100%;
+}
+.rc-receipt-preview,
+.receipt-paper.rc-receipt-preview {
+  max-height: none !important;
+  overflow: visible !important;
+  height: auto !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding: 14px 14px 18px !important;
+  border: 1px solid #e5e2da;
+  border-radius: 10px;
+  background: #fbfaf7 !important;
+  color: #16151c !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,.16);
+  font-size: 11.5px;
+  line-height: 1.35;
+  pointer-events: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.rc-receipt-preview * { max-width: 100%; color: inherit; }
+.rc-receipt-preview img {
+  max-width: 120px !important;
+  height: auto !important;
+  margin: 6px auto !important;
+  display: block;
+}
+.rc-receipt-preview .rcp-logo { font-size: 17px !important; }
+.rc-receipt-preview .rcp-tot { font-size: 15px !important; }
+
+/* Icon-only on very narrow (optional labels still help; hide labs if needed) */
+@media (max-width: 360px) {
+  .rc-ico-lab { display: none; }
+  .rc-ico { min-height: 44px; padding: 10px 4px; }
+  .rc-ico i { font-size: 17px; }
 }
 
 /* POS cart portion size (half / full / double) */

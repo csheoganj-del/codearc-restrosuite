@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v175-20260713-settled-scroll';
+    return 'v176-20260713-settled-slim';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

@@ -1,12 +1,12 @@
 {
-  "version": "v175-20260713-settled-scroll",
+  "version": "v176-20260713-settled-slim",
   "date": "2026-07-13",
-  "title": "Bill settled: fix scroll freeze + full receipt",
-  "summary": "Receipt no longer uses nested max-height scroll (which trapped/froze the modal). Side-by-side layout shows full receipt; only the modal body scrolls if needed. PDF warm on open removed (was freezing UI).",
+  "title": "Bill settled slim ticket UI",
+  "summary": "Bill settled modal is narrow (ticket width ~380px) with a compact icon toolbar (WhatsApp, Print, Thermal, Copy, New) and full receipt below — no wide two-column layout.",
   "highlights": [
-    "No nested scroll on receipt paper",
-    "Desktop: actions left · full receipt right",
-    "Mobile: actions then full receipt, one finger scroll",
-    "Removed PDF warm-up that hung the UI after pay"
+    "Slim modal max-width ~380px",
+    "Icon action bar with tiny labels",
+    "Receipt fills the ticket width",
+    "Single-column, clean post-pay UX"
   ]
 }
