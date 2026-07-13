@@ -1,13 +1,13 @@
 {
-  "version": "v156-20260713-inventory-10",
+  "version": "v158-20260713-fefo-expiry",
   "date": "2026-07-13",
-  "title": "Inventory stock UI 10/10",
-  "summary": "Inventory stock list shows readable names, dynamic category filters, search, reliable edit/restock actions, fixed CSV import/template, and removes the suppliers stub in favour of live synced panels.",
+  "title": "FEFO batch expiry — use first",
+  "summary": "Inventory now tracks expiry on batches. Near-expiry banner and per-item Use first labels show what to cook first. Receiving stock and restock capture expiry; POS sales and waste deduct soonest-expiring batches first (FEFO).",
   "highlights": [
-    "Names like hoagie_roll display as Hoagie Roll (key kept as subtitle).",
-    "Category filter is built from your real stock categories (e.g. food), not a fixed veg/dairy list.",
-    "Search stock, set cost affordance when ₹0, supplier field on add/edit.",
-    "Import CSV prefers IngredientName; template matches import columns; POs include line items for receive.",
-    "Live Suppliers / POs / Waste from features-manage; no bogus 'configure via Growth Hub' stub."
+    "Receive PO / Restock: enter batch expiry date.",
+    "Stock row: click name for batches; Use first / Expired labels.",
+    "Banner: N batches near expiry with View list.",
+    "FEFO: sales and waste consume oldest-expiring batch first.",
+    "Sidebar badge counts low stock + near-expiry batches."
   ]
 }

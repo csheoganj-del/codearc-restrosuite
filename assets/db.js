@@ -553,6 +553,34 @@
       clientId: true,
       localOnly: true,
     },
+    // Batches with expiry — prefer local; cloud table doppio_inventory_batches when available
+    inventory_batches: {
+      table: 'doppio_inventory_batches',
+      pk: 'id',
+      clientId: false,
+      // Composite PK on server is (tenant_id, id) with text id
+      from: (r) => ({
+        id: r.id,
+        invId: r.inv_id || r.invId || null,
+        ingredientKey: r.ingredient_key || r.ingredientKey || '',
+        ingredientName: r.ingredient_name || r.ingredientName || r.label || '',
+        qty: num(r.qty != null ? r.qty : r.quantity),
+        unit: r.unit || 'unit',
+        expiryDate: r.expiryDate || r.expiry_date || null,
+        receivedDate: r.receivedDate || r.received_date || null,
+        source: r.source || 'receive',
+        poId: r.po_id || r.poId || null,
+        cost: num(r.cost),
+        createdAt: r.created_at || r.createdAt || null,
+      }),
+      to: (o) => ({
+        id: o.id,
+        ingredient_key: o.ingredientKey || o.ingredient_key || '',
+        qty: num(o.qty),
+        expiryDate: o.expiryDate || o.expiry_date || null,
+        receivedDate: o.receivedDate || o.received_date || null,
+      }),
+    },
     support_tickets: {
       table:'doppio_support_tickets', pk:'id', clientId:false, uuidPK:true,
       from: r => ({ id:r.id, ticketNumber:r.ticket_number, subject:r.subject, customerName:r.customer_name, priority:r.priority, status:r.status }),
@@ -576,6 +604,7 @@
     // unit_cost / supplier may be missing on older doppio_inventory schemas
     inventory: ['unit_cost', 'supplier', 'cost'],
     vendors: ['terms', 'rating', 'items_count', 'email'],
+    inventory_batches: ['ingredient_name', 'unit', 'source', 'po_id', 'cost', 'inv_id', 'receivedDate', 'expiryDate'],
   });
   const known = {}; // collection -> Set of ids seen from server
   function newClientId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }

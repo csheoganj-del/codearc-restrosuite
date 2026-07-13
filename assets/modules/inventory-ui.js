@@ -131,8 +131,16 @@
     return getInventory().filter(isLowStock);
   }
   function paintInventoryBadge() {
-    const n = lowStockItems().length;
-    global.__rsLowStockCount = n;
+    const nLow = lowStockItems().length;
+    let nExp = 0;
+    try {
+      if (global.RSInventoryBatches && RSInventoryBatches.listExpiring) {
+        nExp = RSInventoryBatches.listExpiring(RSInventoryBatches.NEAR_DAYS || 3).length;
+      }
+    } catch (_) {}
+    const n = nLow + nExp;
+    global.__rsLowStockCount = nLow;
+    global.__rsNearExpiryCount = nExp;
     document
       .querySelectorAll('.sidebar-link[data-tab="inventory-tab"], .mnav-link[data-tab="inventory-tab"]')
       .forEach((link) => {
@@ -146,12 +154,165 @@
           badge.textContent = String(n);
           badge.style.display = n > 0 ? '' : 'none';
           badge.classList.toggle('badge-urgent', n > 0);
-          badge.title = n ? n + ' below min stock' : '';
+          const bits = [];
+          if (nLow) bits.push(nLow + ' low stock');
+          if (nExp) bits.push(nExp + ' near expiry');
+          badge.title = bits.join(' · ') || '';
         }
       });
     try {
       if (global.RS && typeof RS.updateTabAttentionBlinking === 'function') RS.updateTabAttentionBlinking();
     } catch (_) {}
+  }
+
+  function paintExpiryBanner() {
+    let bar = document.getElementById('inv-expiry-banner');
+    if (!bar) {
+      const stockPanel = document.getElementById('inv-panel-stock');
+      const host = stockPanel && stockPanel.parentElement;
+      if (!host) return;
+      bar = document.createElement('div');
+      bar.id = 'inv-expiry-banner';
+      bar.className = 'banner warn inv-expiry-banner';
+      bar.style.display = 'none';
+      host.insertBefore(bar, stockPanel);
+    }
+    const Batches = global.RSInventoryBatches;
+    if (!Batches || !Batches.listExpiring) {
+      bar.style.display = 'none';
+      return;
+    }
+    const list = Batches.listExpiring(Batches.NEAR_DAYS || 3);
+    if (!list.length) {
+      bar.style.display = 'none';
+      return;
+    }
+    const preview = list
+      .slice(0, 4)
+      .map((b) => {
+        const label =
+          b.daysLeft < 0
+            ? 'EXPIRED'
+            : b.daysLeft === 0
+              ? 'today'
+              : b.daysLeft === 1
+                ? 'tomorrow'
+                : b.daysLeft + 'd';
+        return `<b>${esc(b.prettyName || b.ingredientName)}</b> ${esc(String(b.qty))} ${esc(b.unit || '')} (${label})`;
+      })
+      .join(' · ');
+    bar.style.display = 'flex';
+    bar.innerHTML = `
+      <i class="fa-solid fa-clock"></i>
+      <div style="flex:1;min-width:0">
+        <b>${list.length} batch${list.length === 1 ? '' : 'es'} near expiry</b>
+        — use these first (FEFO). ${preview}${list.length > 4 ? '…' : ''}
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm banner-cta" id="btn-show-expiring">View</button>`;
+    const btn = bar.querySelector('#btn-show-expiring');
+    if (btn)
+      btn.onclick = () => {
+        openExpiringModal(list);
+      };
+  }
+
+  function openExpiringModal(list) {
+    if (!global.RSModal) {
+      toast(
+        list
+          .slice(0, 5)
+          .map((b) => (b.prettyName || '') + ' ' + (b.daysLeft < 0 ? 'expired' : b.daysLeft + 'd'))
+          .join(', '),
+        'fa-clock'
+      );
+      return;
+    }
+    const rows = (list || [])
+      .map((b) => {
+        const when =
+          b.daysLeft < 0
+            ? '<span style="color:var(--red);font-weight:700">Expired</span>'
+            : b.daysLeft === 0
+              ? '<span style="color:var(--amber);font-weight:700">Today</span>'
+              : b.daysLeft + ' day' + (b.daysLeft === 1 ? '' : 's');
+        const exp =
+          global.RSInventoryBatches && RSInventoryBatches.formatShort
+            ? RSInventoryBatches.formatShort(b.expiryDate)
+            : b.expiryDate || '—';
+        return `<tr>
+          <td><b>${esc(b.prettyName || b.ingredientName || b.ingredientKey)}</b></td>
+          <td>${esc(String(b.qty))} ${esc(b.unit || '')}</td>
+          <td>${esc(exp)}</td>
+          <td>${when}</td>
+          <td style="font-size:12px;color:var(--text-soft)">Use this batch first</td>
+        </tr>`;
+      })
+      .join('');
+    RSModal.open({
+      title: 'Use first — near expiry',
+      sub: 'FEFO: kitchen should consume these batches before fresher stock',
+      icon: 'fa-clock',
+      size: 'md',
+      body: `<div class="table-scroll"><table class="data-table">
+        <thead><tr><th>Ingredient</th><th>Qty</th><th>Expiry</th><th>In</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" style="text-align:center;padding:20px">None</td></tr>'}</tbody>
+      </table></div>`,
+      foot: '<button type="button" class="btn btn-primary" data-ok style="flex:1">Got it</button>',
+      onMount(m, close) {
+        const ok = m.querySelector('[data-ok]');
+        if (ok) ok.onclick = close;
+      },
+    });
+  }
+
+  function openBatchesModal(inv) {
+    if (!inv || !global.RSModal) return;
+    const Batches = global.RSInventoryBatches;
+    const list =
+      Batches && Batches.batchesForItem ? Batches.batchesForItem(inv) : [];
+    const rows = list
+      .map((b, i) => {
+        const d = Batches.daysUntil(b.expiryDate);
+        const exp = Batches.formatShort(b.expiryDate) || 'No date';
+        const tag =
+          d == null
+            ? '<span class="pill" style="padding:2px 8px">No expiry</span>'
+            : d < 0
+              ? '<span class="pill pill-red" style="padding:2px 8px">Expired · use/waste</span>'
+              : d <= (Batches.NEAR_DAYS || 3)
+                ? '<span class="pill pill-amber" style="padding:2px 8px">Use first</span>'
+                : '<span class="pill pill-green" style="padding:2px 8px">OK</span>';
+        return `<tr>
+          <td style="font-weight:700">${i === 0 && d != null ? '① ' : ''}${esc(String(b.qty))} ${esc(b.unit || inv.unit || '')}</td>
+          <td>${esc(exp)}</td>
+          <td>${tag}</td>
+          <td style="font-size:11.5px;color:var(--text-mute)">${esc(b.source || 'batch')}</td>
+        </tr>`;
+      })
+      .join('');
+    RSModal.open({
+      title: 'Batches · ' + (inv.name || ''),
+      sub: 'Soonest expiry is used first when stock is deducted (FEFO)',
+      icon: 'fa-boxes-stacked',
+      size: 'md',
+      body: list.length
+        ? `<div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Qty</th><th>Expiry</th><th>Priority</th><th>Source</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+          <p style="margin:12px 0 0;font-size:12.5px;color:var(--text-soft)">Total on batches: <b>${list.reduce((a, b) => a + (Number(b.qty) || 0), 0)}</b> · Book stock: <b>${Number(inv.stock) || 0}</b> ${esc(inv.unit || '')}</p>`
+        : `<div class="sr-empty" style="padding:28px 12px">
+            <div style="font-weight:700;margin-bottom:6px">No batches yet</div>
+            <div style="font-size:13px;color:var(--text-soft);max-width:340px;margin:0 auto">
+              Receive a purchase order with an <b>expiry date</b>, or restock with expiry, to create batches.
+            </div>
+          </div>`,
+      foot: '<button type="button" class="btn btn-primary" data-ok style="flex:1">Close</button>',
+      onMount(m, close) {
+        const ok = m.querySelector('[data-ok]');
+        if (ok) ok.onclick = close;
+      },
+    });
   }
   function buildPoRowsFromLow(items) {
     const bySup = {};
@@ -332,9 +493,23 @@
     const INVENTORY = getInventory();
     const MENU = getMenu();
     const cls = stockCls();
+    const Batches = global.RSInventoryBatches;
+
+    // Ensure batches loaded then re-paint once (near-expiry banner / FEFO labels)
+    if (Batches && typeof Batches.loadBatches === 'function' && !renderInventory._batchWarm) {
+      renderInventory._batchWarm = true;
+      Batches.loadBatches(true)
+        .then(() => {
+          try {
+            renderInventory();
+          } catch (_) {}
+        })
+        .catch(() => {});
+    }
 
     const low = INVENTORY.filter(isLowStock);
     paintInventoryBadge();
+    paintExpiryBanner();
     const banner = $('#inv-banner');
     if (banner) banner.style.display = low.length ? 'flex' : 'none';
     const lowCount = $('#inv-low-count');
@@ -455,21 +630,48 @@
               ? `${rs(costN)}<span class="inv-unit-suffix">/${_e(i.unit || 'unit')}</span>`
               : `<span class="inv-cost-zero" title="Set unit cost for plate costing &amp; POs">₹0 · set cost</span>`;
           const idAttr = esc(invMatchKey(i));
+          const sum =
+            Batches && typeof Batches.summarizeItem === 'function'
+              ? Batches.summarizeItem(i)
+              : null;
+          let statusLabel = st === 'out' ? 'Reorder' : st === 'low' ? 'Low' : 'Healthy';
+          let statusCls = cls[st] || '';
+          if (sum && sum.status === 'expired') {
+            statusLabel = 'Expired batch';
+            statusCls = cls.out || 'stock-out';
+          } else if (sum && sum.status === 'near') {
+            statusLabel = 'Use first';
+            statusCls = cls.low || 'stock-low';
+          }
+          const fefoLine = sum && sum.useFirstLabel
+            ? `<div class="inv-fefo-line inv-fefo-${esc(sum.status || 'ok')}" title="First expiry first out">${_e(sum.useFirstLabel)}</div>`
+            : '';
           return `<tr data-inv-id="${idAttr}">
           <td>
-            <b class="inv-name">${_e(pretty)}</b>
+            <button type="button" class="inv-name-btn" data-batches="${idAttr}" title="View batches / expiry">
+              <b class="inv-name">${_e(pretty)}</b>
+            </button>
             ${pretty !== String(i.name) ? `<div class="inv-key-sub" title="Stored key">${_e(i.name)}</div>` : ''}
+            ${fefoLine}
           </td>
           <td><span class="inv-cat-pill">${_e(i.cat || '—')}</span></td>
-          <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${_e(i.unit)}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st === 'out' ? 'var(--red)' : st === 'low' ? 'var(--amber)' : 'var(--green)'}"></span></div></div></td>
+          <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${_e(i.unit)}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${sum && sum.status === 'expired' ? 'var(--red)' : sum && sum.status === 'near' ? 'var(--amber)' : st === 'out' ? 'var(--red)' : st === 'low' ? 'var(--amber)' : 'var(--green)'}"></span></div></div></td>
           <td>${i.min} ${_e(i.unit)}</td>
           <td>${costHtml}</td>
-          <td><span class="stock-dot ${cls[st] || ''}">${st === 'out' ? 'Reorder' : st === 'low' ? 'Low' : 'Healthy'}</span></td>
-          <td><div class="row-actions"><button type="button" class="icon-act go" title="Raise purchase order" aria-label="Restock ${_e(pretty)}"><i class="fa-solid fa-truck"></i></button><button type="button" class="icon-act inv-edit" title="Edit ingredient" aria-label="Edit ${_e(pretty)}"><i class="fa-solid fa-pen"></i></button></div></td>
+          <td><span class="stock-dot ${statusCls}">${_e(statusLabel)}</span></td>
+          <td><div class="row-actions"><button type="button" class="icon-act go" title="Raise purchase order / restock with expiry" aria-label="Restock ${_e(pretty)}"><i class="fa-solid fa-truck"></i></button><button type="button" class="icon-act inv-edit" title="Edit ingredient" aria-label="Edit ${_e(pretty)}"><i class="fa-solid fa-pen"></i></button></div></td>
         </tr>`;
         })
         .join('');
       }
+
+      $$('#inv-table-body .inv-name-btn').forEach((btn) => {
+        btn.onclick = () => {
+          const row = btn.closest('tr');
+          const inv = findInvByRow(row);
+          if (inv) openBatchesModal(inv);
+        };
+      });
 
       $$('#inv-table-body .icon-act.go').forEach((b) => {
         b.addEventListener('click', () => {
@@ -484,34 +686,46 @@
             return;
           }
 
+          const defExp = (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 7);
+            return d.toISOString().slice(0, 10);
+          })();
           const body = `
             <div style="display:flex;flex-direction:column;gap:12px">
               <div style="font-size:13px;color:var(--text-soft)">
-                Create a purchase order to restock <b>${_e(inv.name)}</b> (current: ${inv.stock} ${_e(inv.unit)}, min: ${inv.min} ${_e(inv.unit)}).
+                Restock <b>${_e(displayInvName(inv.name))}</b> (current: ${inv.stock} ${_e(inv.unit)}, min: ${inv.min} ${_e(inv.unit)}).
               </div>
-              <div class="form-grid-2" style="margin-top:8px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-grid-2" style="margin-top:4px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                 <div>
-                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Order Qty (${_e(inv.unit)})</label>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Qty (${_e(inv.unit)})</label>
                   <input type="number" id="po-qty" class="form-control" value="${qtyToOrder}" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                 </div>
                 <div>
-                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Supplier</label>
-                  <input type="text" id="po-supplier" class="form-control" value="${_e(inv.cat)} Supplier Ltd." style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Batch expiry</label>
+                  <input type="date" id="po-expiry" class="form-control" value="${defExp}" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                 </div>
               </div>
-              <div style="font-size:12px;color:var(--text-mute);margin-top:4px">
-                Estimated Value: <strong style="color:var(--orange)" id="po-cost-preview">${rs(estimatedCost)}</strong>
+              <div>
+                <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Supplier</label>
+                <input type="text" id="po-supplier" class="form-control" value="${_e(inv.supplier || inv.cat || '')} Supplier" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+              </div>
+              <div style="font-size:12px;color:var(--text-mute)">
+                Est. value: <strong style="color:var(--orange)" id="po-cost-preview">${rs(estimatedCost)}</strong>
+                · Expiry drives <b>use first</b> (FEFO)
               </div>
             </div>
           `;
 
           RSModal.open({
-            title: 'Raise Purchase Order',
-            sub: 'Restock ' + inv.name,
+            title: 'Restock · ' + displayInvName(inv.name),
+            sub: 'Receive now with expiry, or draft a PO',
             icon: 'fa-truck',
             size: 'sm',
             body,
-            foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-file-invoice"></i> Create PO</button>`,
+            foot: `<button class="btn btn-ghost" data-cancel>Cancel</button>
+              <button class="btn btn-ghost" data-po title="Create PO only"><i class="fa-solid fa-file-invoice"></i> PO</button>
+              <button class="btn btn-primary" data-recv><i class="fa-solid fa-box-open"></i> Receive now</button>`,
             onMount(modal, close) {
               const qtyInput = modal.querySelector('#po-qty');
               qtyInput.oninput = () => {
@@ -519,9 +733,14 @@
                 modal.querySelector('#po-cost-preview').textContent = rs(Math.round(q * inv.cost));
               };
               modal.querySelector('[data-cancel]').onclick = close;
-              modal.querySelector('[data-confirm]').onclick = async () => {
+              const makeLine = () => {
                 const qty = Math.max(1, Number(qtyInput.value) || 1);
                 const supplier = modal.querySelector('#po-supplier').value || 'Default Supplier';
+                const expiryDate = (modal.querySelector('#po-expiry') && modal.querySelector('#po-expiry').value) || null;
+                return { qty, supplier, expiryDate };
+              };
+              modal.querySelector('[data-po]').onclick = async () => {
+                const { qty, supplier, expiryDate } = makeLine();
                 const poNum = nextLogicalNo('PO');
                 const line = {
                   name: inv.name,
@@ -530,6 +749,7 @@
                   cost: Number(inv.cost) || 0,
                   value: Math.round(qty * (Number(inv.cost) || 0)),
                   invId: inv.id,
+                  expiryDate,
                 };
                 const poRow = {
                   id: poNum,
@@ -543,19 +763,44 @@
                   channel: 'manual_restock',
                 };
                 close();
-                setOperationStatus('Creating PO...');
                 try {
                   if (global.RS && RS.saveOne) await RS.saveOne('purchase_orders', poRow);
                   else if (global.RS_DB) await RS_DB.put('purchase_orders', poRow.id, poRow);
-                  finishOperationStatus('PO created');
-                  toast('Purchase order raised · open Purchase orders tab', 'fa-circle-check');
-                  renderInventory();
+                  toast('PO raised · receive later with expiry', 'fa-circle-check');
                   document.dispatchEvent(new CustomEvent('rs:render-inventory'));
-                  if (global.RS && RS.render) RS.render('inventory-tab');
+                  renderInventory();
                 } catch (e) {
-                  console.warn('Failed to save PO', e);
-                  finishOperationStatus('Failed to create PO', 'error');
-                  toast('Could not save PO — try again', 'fa-circle-exclamation');
+                  toast('Could not save PO', 'fa-circle-exclamation');
+                }
+              };
+              modal.querySelector('[data-recv]').onclick = async () => {
+                const { qty, expiryDate } = makeLine();
+                close();
+                setOperationStatus('Receiving stock...');
+                try {
+                  inv.stock = Math.max(0, Number(inv.stock) || 0) + qty;
+                  if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
+                  if (global.RSInventoryBatches && RSInventoryBatches.receiveBatch) {
+                    await RSInventoryBatches.receiveBatch({
+                      item: inv,
+                      qty,
+                      unit: inv.unit,
+                      expiryDate,
+                      source: 'quick_receive',
+                      cost: inv.cost,
+                    });
+                  }
+                  finishOperationStatus('Stock received');
+                  toast(
+                    `+${qty} ${inv.unit || ''} ${displayInvName(inv.name)}` +
+                      (expiryDate ? ' · use by ' + expiryDate : ''),
+                    'fa-box-open'
+                  );
+                  renderInventory();
+                } catch (e) {
+                  console.warn(e);
+                  finishOperationStatus('Receive failed', 'error');
+                  toast('Could not receive stock', 'fa-circle-exclamation');
                 }
               };
             },

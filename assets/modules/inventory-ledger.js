@@ -172,29 +172,47 @@
       console.warn('[Inventory] server deduct failed, using local fallback:', e && e.message);
     }
 
-    // Local fallback
+    // Local fallback (+ FEFO batch consumption when available)
     let changed = false;
     let deductedCount = 0;
     const lowStock = [];
     const missingIngredients = [];
-    lines.forEach((line) => {
-      const invItem = INVENTORY.find(
-        (x) =>
-          (x.name && line.name && String(x.name).toLowerCase() === String(line.name).toLowerCase()) ||
-          (x.key && line.key && String(x.key).toLowerCase() === String(line.key).toLowerCase())
-      );
-      if (!invItem) {
-        if (line.name && missingIngredients.indexOf(line.name) === -1) missingIngredients.push(line.name);
-        return;
+    const nearAfter = [];
+    const Batches = global.RSInventoryBatches;
+    const runLines = async () => {
+      for (const line of lines) {
+        const invItem = INVENTORY.find(
+          (x) =>
+            (x.name && line.name && String(x.name).toLowerCase() === String(line.name).toLowerCase()) ||
+            (x.key && line.key && String(x.key).toLowerCase() === String(line.key).toLowerCase())
+        );
+        if (!invItem) {
+          if (line.name && missingIngredients.indexOf(line.name) === -1) missingIngredients.push(line.name);
+          continue;
+        }
+        const q = Number(line.qty) || 0;
+        invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - q);
+        if (Batches && typeof Batches.deductFefo === 'function') {
+          try {
+            await Batches.deductFefo(invItem, q);
+            const sum = Batches.summarizeItem(invItem);
+            if (sum.status === 'near' || sum.status === 'expired') {
+              if (nearAfter.indexOf(invItem.name) === -1) nearAfter.push(invItem.name);
+            }
+          } catch (e) {
+            console.warn('[Inventory] FEFO deduct failed', e);
+          }
+        }
+        changed = true;
+        deductedCount++;
+        const minLevel = Number(invItem.min != null ? invItem.min : invItem.minStock || 0);
+        if (minLevel && invItem.stock <= minLevel && lowStock.indexOf(invItem.name) === -1) {
+          lowStock.push(invItem.name);
+        }
       }
-      invItem.stock = Math.max(0, (Number(invItem.stock) || 0) - (Number(line.qty) || 0));
-      changed = true;
-      deductedCount++;
-      const minLevel = Number(invItem.min != null ? invItem.min : invItem.minStock || 0);
-      if (minLevel && invItem.stock <= minLevel && lowStock.indexOf(invItem.name) === -1) {
-        lowStock.push(invItem.name);
-      }
-    });
+    };
+    // deductInventoryForBill is async — await FEFO loop
+    await runLines();
     if (changed) {
       markDeducted(deductKey);
       if (global.RS_DB && RS_DB.writeLocal) {
@@ -255,6 +273,18 @@
               'fa-triangle-exclamation'
             ),
           missingIngredients.length || noRecipeCount ? 3800 : 2600
+        );
+      }
+      if (nearAfter.length) {
+        setTimeout(
+          () =>
+            toast(
+              'Use first (near expiry): ' +
+                nearAfter.slice(0, 3).join(', ') +
+                (nearAfter.length > 3 ? '…' : ''),
+              'fa-clock'
+            ),
+          3200
         );
       }
     } else if (noRecipeCount === items.length) {

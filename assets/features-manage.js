@@ -96,6 +96,7 @@
       const inv = RS.INVENTORY || [];
       let updated = 0;
       let created = 0;
+      const Batches = window.RSInventoryBatches;
       for (const line of lines) {
         if (!line.name || !(Number(line.qty) > 0)) continue;
         let item =
@@ -105,6 +106,22 @@
           item.stock = Math.max(0, Number(item.stock) || 0) + Number(line.qty);
           if (line.cost > 0 && !(Number(item.cost) > 0)) item.cost = line.cost;
           await saveInventoryItem(item);
+          if (Batches && typeof Batches.receiveBatch === 'function') {
+            try {
+              await Batches.receiveBatch({
+                item,
+                qty: Number(line.qty),
+                unit: line.unit || item.unit,
+                expiryDate: line.expiryDate || options.defaultExpiry || null,
+                receivedDate: options.receivedDate || new Date(),
+                source: options.source || 'po_receive',
+                poId: options.poId || null,
+                cost: line.cost != null ? line.cost : item.cost,
+              });
+            } catch (e) {
+              console.warn('[FEFO] receiveBatch failed', e);
+            }
+          }
           updated++;
         } else if (options.createMissing !== false) {
           const id =
@@ -126,6 +143,22 @@
           };
           inv.push(neo);
           await saveInventoryItem(neo);
+          if (Batches && typeof Batches.receiveBatch === 'function') {
+            try {
+              await Batches.receiveBatch({
+                item: neo,
+                qty: Number(line.qty),
+                unit: neo.unit,
+                expiryDate: line.expiryDate || options.defaultExpiry || null,
+                receivedDate: options.receivedDate || new Date(),
+                source: options.source || 'po_receive',
+                poId: options.poId || null,
+                cost: neo.cost,
+              });
+            } catch (e) {
+              console.warn('[FEFO] receiveBatch failed', e);
+            }
+          }
           created++;
         }
       }
@@ -151,7 +184,11 @@
         RS.toast('Nothing left to receive on this PO', 'fa-circle-exclamation');
         return false;
       }
-      const { updated, created } = await applyStockForLines(lines, options);
+      const { updated, created } = await applyStockForLines(lines, {
+        ...options,
+        poId: p.poNumber || p.po || p.id,
+        source: 'po_receive',
+      });
 
       // Track cumulative received quantities
       if (!Array.isArray(p.receivedLines)) p.receivedLines = [];
@@ -222,6 +259,11 @@
         RS.toast('Nothing left to receive', 'fa-circle-check');
         return Promise.resolve(false);
       }
+      const defaultExp = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        return d.toISOString().slice(0, 10);
+      })();
       const rows = remaining
         .map(
           (l, i) => `
@@ -229,17 +271,22 @@
           <td style="font-weight:600">${esc(l.name)}</td>
           <td style="color:var(--text-soft);font-size:12px">${esc(l.orderedQty)} ${esc(l.unit)}${l.receivedQty ? ' · got ' + l.receivedQty : ''}</td>
           <td><input type="number" class="form-input" data-recv-i="${i}" min="0" step="any" max="${l.qty}" value="${l.qty}" style="width:90px;padding:6px 8px;font-size:13px"></td>
+          <td><input type="date" class="form-input" data-exp-i="${i}" value="${defaultExp}" style="width:140px;padding:6px 8px;font-size:12px" title="Batch expiry — FEFO uses soonest first"></td>
         </tr>`
         )
         .join('');
       return new Promise((resolve) => {
         RSModal.open({
           title: 'Receive stock · ' + (p.poNumber || p.po || p.id),
-          sub: 'Edit qty for partial delivery · leave 0 to skip a line',
+          sub: 'Qty + expiry per line · soonest expiry is used first (FEFO)',
           icon: 'fa-box-open',
           size: 'md',
-          body: `<table class="data-table"><thead><tr><th>Item</th><th>Ordered / prior</th><th>Receive now</th></tr></thead>
+          body: `<table class="data-table"><thead><tr><th>Item</th><th>Ordered / prior</th><th>Receive now</th><th>Expiry date</th></tr></thead>
             <tbody>${rows}</tbody></table>
+            <p style="margin:10px 0 0;font-size:12px;color:var(--text-soft);line-height:1.45">
+              <i class="fa-solid fa-circle-info" style="color:var(--orange)"></i>
+              Each receive creates a <b>batch</b>. Kitchen should use the batch that expires soonest first.
+            </p>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
               <button type="button" class="btn btn-ghost btn-sm" data-all>All remaining</button>
               <button type="button" class="btn btn-ghost btn-sm" data-zero>Clear all</button>
@@ -266,9 +313,10 @@
               const toRecv = remaining
                 .map((l, i) => {
                   const inp = modal.querySelector(`[data-recv-i="${i}"]`);
+                  const exp = modal.querySelector(`[data-exp-i="${i}"]`);
                   let q = Math.max(0, Number(inp && inp.value) || 0);
                   if (q > l.qty) q = l.qty;
-                  return { ...l, qty: q };
+                  return { ...l, qty: q, expiryDate: (exp && exp.value) || null };
                 })
                 .filter((l) => l.qty > 0);
               if (!toRecv.length) {
@@ -1014,6 +1062,14 @@
           item.stock = Math.max(0, have - q);
           const cost = Math.round(deducted * (Number(item.cost) || 0) * 100) / 100;
           await saveInventoryItem(item);
+          // FEFO: waste also consumes soonest-expiring batch first
+          try {
+            if (window.RSInventoryBatches && RSInventoryBatches.deductFefo) {
+              await RSInventoryBatches.deductFefo(item, deducted);
+            }
+          } catch (e) {
+            console.warn('[FEFO] waste batch deduct', e);
+          }
 
           const now = new Date();
           const entry = {
