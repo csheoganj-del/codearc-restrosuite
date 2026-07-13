@@ -543,6 +543,137 @@
       }
     }
 
+    /** Close guest QR ordering for one table (does not free bills / POS tickets). */
+    async function closeTableQrSession(tableN, opts) {
+      const options = opts || {};
+      if (!window.RS_DB) return false;
+      const key = normTableKey(tableN);
+      if (!key) return false;
+      try {
+        const sessions = await RS_DB.list('table_sessions').catch(() => []);
+        const openOnes = (sessions || []).filter(
+          (s) =>
+            normTableKey(s.tableNumber) === key &&
+            s.status !== 'closed'
+        );
+        if (!openOnes.length) {
+          if (options.toast) RS.toast('QR already closed for Table ' + tableN, 'fa-qrcode');
+          return true; // already closed counts as success
+        }
+        for (const sess of openOnes) {
+          await RS_DB.put('table_sessions', sess.id, {
+            ...sess,
+            status: 'closed',
+            closedAt: new Date().toISOString(),
+          });
+        }
+        if (options.toast !== false && !options.silent) {
+          RS.toast('QR closed for Table ' + tableN, 'fa-power-off');
+        }
+        if (!options.silent) {
+          try {
+            document.dispatchEvent(new Event('rs:tables-updated'));
+          } catch (_) {}
+        }
+        return true;
+      } catch (e) {
+        console.warn('closeTableQrSession failed', e);
+        return false;
+      }
+    }
+
+    /**
+     * Bulk open/close QR for every floor table with progress + fail detail.
+     * @param {'open'|'close'} mode
+     */
+    async function bulkTableQrSessions(mode, btn) {
+      if (!TABLES.length) {
+        RS.toast('Add tables first', 'fa-chair');
+        return;
+      }
+      if (!window.RS_DB) {
+        RS.toast('Database not ready — try again', 'fa-circle-exclamation');
+        return;
+      }
+      const isOpen = mode === 'open';
+      const total = TABLES.length;
+      const verb = isOpen ? 'Open' : 'Close';
+      const confirmMsg = isOpen
+        ? 'Open QR ordering on all ' +
+          total +
+          ' tables?\n\nGuests can scan and order at every table until you close QR or free the table.'
+        : 'Close QR ordering on all ' +
+          total +
+          ' tables?\n\nGuests will not be able to place new QR orders until you open QR again.\n\nBills and seated tables stay as they are.';
+      if (!window.confirm(confirmMsg)) return;
+
+      const labelHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML =
+          '<i class="fa-solid fa-spinner fa-spin"></i> ' + (isOpen ? 'Opening' : 'Closing') + ' 0/' + total;
+      }
+
+      let okN = 0;
+      let failN = 0;
+      const failedNames = [];
+      for (let i = 0; i < TABLES.length; i++) {
+        const t = TABLES[i];
+        const name = t.n || t.name || String(i + 1);
+        if (btn) {
+          btn.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> ' +
+            (isOpen ? 'Opening' : 'Closing') +
+            ' ' +
+            (i + 1) +
+            '/' +
+            total;
+        }
+        let ok = false;
+        try {
+          ok = isOpen
+            ? await ensureTableQrSession(name, { toast: false })
+            : await closeTableQrSession(name, { toast: false, silent: true });
+        } catch (_) {
+          ok = false;
+        }
+        if (ok) okN++;
+        else {
+          failN++;
+          if (failedNames.length < 6) failedNames.push(String(name));
+        }
+      }
+
+      try {
+        document.dispatchEvent(new Event('rs:tables-updated'));
+      } catch (_) {}
+      renderFloor();
+
+      if (failN === 0) {
+        RS.toast(
+          isOpen
+            ? 'QR open on all ' + okN + ' tables — guests can scan'
+            : 'QR closed on all ' + okN + ' tables',
+          isOpen ? 'fa-qrcode' : 'fa-power-off'
+        );
+      } else {
+        RS.toast(
+          (isOpen ? 'Opened ' : 'Closed ') +
+            okN +
+            '/' +
+            total +
+            (failedNames.length ? ' · failed: ' + failedNames.join(', ') : '') +
+            (failN > failedNames.length ? '…' : ''),
+          'fa-circle-exclamation'
+        );
+      }
+      // Button HTML restored by renderFloor rebuild
+      if (btn && document.body.contains(btn)) {
+        btn.disabled = false;
+        btn.innerHTML = labelHtml;
+      }
+    }
+
     async function openTableInPos(t, opts) {
       const options = opts || {};
       const tableLabel = tableNameLabel(t.n || t.name);
@@ -955,7 +1086,7 @@
           <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
           <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open QR ordering on every table for this service"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
+        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open guest QR ordering on every table"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-close-all-qr" style="margin-right:8px;" title="Close guest QR ordering on every table"><i class="fa-solid fa-power-off"></i> Close all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-print"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
         <div class="floor-grid">${TABLES.length ? TABLES.map(
           (t) => `
           <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}">

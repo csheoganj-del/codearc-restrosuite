@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v120 (2026-07-13) — Open / Close all QR (10/10 bulk)
+
+- **Open all QR**: progress “Opening 3/12…”, confirm, success/fail count + failed table names
+- **Close all QR**: same pattern — closes guest QR sessions on every table (bills stay)
+- Print Table QRs keeps print icon (distinct from Open all)
+
 ## v119 (2026-07-13) — Edit Tables works without visiting POS first
 
 - Floor loads its own **RSModal** if POS has not been opened yet (was silent no-op on Edit Tables)
