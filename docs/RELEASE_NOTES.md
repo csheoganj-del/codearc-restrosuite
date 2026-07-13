@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v132 (2026-07-13) — QR print size actually applied on print sheet
+
+- Selected size is tracked in state and **rebuilt into every card** when Print is clicked
+- Print grid uses **inline** columns/gap/QR px for that size (not only CSS class)
+- Live preview uses the **same size id** as print (scaled to fit the left column)
+- Toolbar shows size + “N per row · QR Npx”; tip: print scale 100% not Fit-to-page
+
 ## v131 (2026-07-13) — QR print: left preview · right options
 
 - **Split layout** (large modal): live card on the **left**, size + toggles on the **right**
