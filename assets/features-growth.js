@@ -1691,8 +1691,9 @@
     }
 
     /**
-     * Print sizes — proportions match live preview (card not stretched full A4 width).
-     * perPage: hard page-break after N cards. cardMaxW: caps width so Full looks like preview.
+     * Print sizes — same portrait proportions as live preview.
+     * Cards never stretch to fill the page; width is capped (cardMaxW) and height = content.
+     * perPage enforces page-breaks only (not “fill the sheet”).
      */
     const QR_PRINT_SIZES = {
       mini: {
@@ -1701,17 +1702,18 @@
         hint: '16 per A4 (4×4)',
         cols: 4,
         perPage: 16,
-        qrCss: 78,
-        titlePx: 14,
-        scanPx: 9,
-        outletPx: 10,
-        metaPx: 8,
-        logoPx: 14,
-        brandPx: 9,
+        qrCss: 72,
+        titlePx: 13,
+        scanPx: 8,
+        outletPx: 9,
+        metaPx: 7,
+        logoPx: 12,
+        brandPx: 8,
         poweredPx: 6,
-        gap: '4mm',
+        gap: '3mm',
         margin: '8mm',
-        cardMaxW: '',
+        // Fixed tent width — not 1fr stretch
+        cardMaxW: '44mm',
         showSteps: false,
         showMeta: false,
       },
@@ -1721,17 +1723,17 @@
         hint: '9 per A4 (3×3)',
         cols: 3,
         perPage: 9,
-        qrCss: 108,
-        titlePx: 18,
-        scanPx: 11,
-        outletPx: 12,
+        qrCss: 100,
+        titlePx: 17,
+        scanPx: 10,
+        outletPx: 11,
         metaPx: 9,
-        logoPx: 18,
-        brandPx: 11,
+        logoPx: 16,
+        brandPx: 10,
         poweredPx: 7,
-        gap: '5mm',
+        gap: '4mm',
         margin: '10mm',
-        cardMaxW: '',
+        cardMaxW: '58mm',
         showSteps: true,
         showMeta: true,
       },
@@ -1741,17 +1743,17 @@
         hint: '4 per A4 (2×2)',
         cols: 2,
         perPage: 4,
-        qrCss: 148,
-        titlePx: 24,
+        qrCss: 132,
+        titlePx: 22,
         scanPx: 12,
-        outletPx: 13,
+        outletPx: 12,
         metaPx: 10,
-        logoPx: 20,
-        brandPx: 12,
+        logoPx: 18,
+        brandPx: 11,
         poweredPx: 8,
         gap: '6mm',
         margin: '12mm',
-        cardMaxW: '',
+        cardMaxW: '82mm',
         showSteps: true,
         showMeta: true,
       },
@@ -1761,38 +1763,38 @@
         hint: '2 per A4 only',
         cols: 2,
         perPage: 2,
-        qrCss: 168,
-        titlePx: 28,
-        scanPx: 13,
-        outletPx: 14,
-        metaPx: 11,
-        logoPx: 22,
-        brandPx: 13,
+        qrCss: 150,
+        titlePx: 24,
+        scanPx: 12,
+        outletPx: 13,
+        metaPx: 10,
+        logoPx: 20,
+        brandPx: 12,
         poweredPx: 8,
-        gap: '7mm',
+        gap: '8mm',
         margin: '12mm',
-        cardMaxW: '',
+        cardMaxW: '88mm',
         showSteps: true,
         showMeta: true,
       },
       full: {
         id: 'full',
         label: 'Full page',
-        hint: '1 centered card per A4',
+        hint: '1 card per A4 (preview size, not fill page)',
         cols: 1,
         perPage: 1,
-        // Match preview proportions — tent card centered, not full-bleed wide strip
-        qrCss: 200,
-        titlePx: 32,
-        scanPx: 14,
-        outletPx: 15,
-        metaPx: 12,
-        logoPx: 24,
-        brandPx: 14,
-        poweredPx: 9,
+        // Same proportions as modal preview — just printed larger, not stretched
+        qrCss: 168,
+        titlePx: 26,
+        scanPx: 13,
+        outletPx: 13,
+        metaPx: 11,
+        logoPx: 20,
+        brandPx: 12,
+        poweredPx: 8,
         gap: '0',
-        margin: '12mm',
-        cardMaxW: '108mm',
+        margin: '14mm',
+        cardMaxW: '95mm',
         pageCenter: true,
         showSteps: true,
         showMeta: true,
@@ -2052,17 +2054,22 @@
         poweredHtml = restroSuitePoweredByFooterHtml(sz.id);
       }
 
+      // Fixed width + content height = same look as live preview (never fill A4)
+      const maxW = sz.cardMaxW || '90mm';
       const cardStyle = [
         'box-sizing:border-box',
         'background:linear-gradient(165deg,' + B.cream + ' 0%,#fff 45%,' + B.creamDeep + ' 100%)',
         'border:2px solid ' + B.ink,
-        'border-radius:16px',
+        'border-radius:14px',
         'overflow:hidden',
         'page-break-inside:avoid',
         'break-inside:avoid',
-        'display:flex',
-        'flex-direction:column',
-        'min-height:100%',
+        'display:block',
+        'width:' + maxW,
+        'max-width:100%',
+        'height:auto',
+        'min-height:0',
+        'margin:0 auto',
         'font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif',
         'color:' + B.ink,
         '-webkit-print-color-adjust:exact',
@@ -2078,7 +2085,7 @@
             <div style="font-size:${outletPx}px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.96">${outletName}</div>
             <div style="flex-shrink:0;font-size:${badgePx}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.ink};background:linear-gradient(135deg,${B.goldSoft},${B.gold});padding:3px 9px;border-radius:999px;white-space:nowrap">Scan me</div>
           </div>
-          <div style="flex:1;padding:${padY}px ${padX}px ${padY}px;text-align:center;box-sizing:border-box">
+          <div style="padding:${padY}px ${padX}px ${padY}px;text-align:center;box-sizing:border-box">
             <div style="font-weight:900;font-size:${titlePx}px;letter-spacing:-.03em;color:${B.ink};line-height:1.05;margin:0 0 2px">Table ${tbl}</div>
             ${
               showTagline
@@ -2108,7 +2115,9 @@
     function qrPrintDocumentStyles(sizeId) {
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
       const B = QR_BRAND;
-      // Cards are self-styled (inline). Sheet only needs page chrome + grid.
+      const perPage = Math.max(1, Number(sz.perPage) || 4);
+      const maxW = sz.cardMaxW || '';
+      const pageCenter = !!sz.pageCenter;
       return `
         <style>
           @page { margin: ${sz.margin}; size: A4; }
@@ -2146,21 +2155,43 @@
             display: grid;
             grid-template-columns: repeat(${sz.cols}, 1fr);
             gap: ${sz.gap};
-            max-width: 980px;
+            max-width: ${pageCenter ? maxW || '120mm' : '980px'};
             margin: 0 auto;
-            padding: 0 8px 24px;
-            align-items: stretch;
+            padding: ${pageCenter ? '12mm 0' : '0 4mm 12mm'};
+            align-items: start;
+            justify-items: ${pageCenter ? 'center' : 'stretch'};
           }
-          .qr-print-card { width: 100%; }
+          .qr-print-card {
+            width: 100%;
+            ${maxW ? 'max-width:' + maxW + ';' : ''}
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .qr-print-card:nth-child(${perPage}n) {
+            page-break-after: always;
+            break-after: page;
+          }
+          .qr-print-card:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
           .qr-print-single {
-            max-width: 440px;
+            max-width: ${maxW || '120mm'};
             margin: 24px auto;
           }
-          .qr-print-single .qr-print-grid { grid-template-columns: 1fr; }
+          .qr-print-single .qr-print-grid {
+            grid-template-columns: 1fr;
+            max-width: ${maxW || '120mm'};
+            padding: 0;
+          }
           @media print {
             .qr-print-toolbar, .qr-print-note, .no-print { display: none !important; }
             body { background: #fff; }
-            .qr-print-grid { max-width: none; padding: 0; }
+            .qr-print-grid {
+              max-width: ${pageCenter ? maxW || '108mm' : 'none'};
+              padding: ${pageCenter ? '0' : '0'};
+              width: ${pageCenter ? maxW || '108mm' : '100%'};
+            }
           }
           @media screen {
             body { background: #e8ebe9; padding-bottom: 32px; }
@@ -2306,12 +2337,20 @@
       const sz = QR_PRINT_SIZES[sid] || QR_PRINT_SIZES.medium;
       // Inline grid styles so print sheet always matches selected size
       // (even if stylesheet sizeId is wrong / cached)
-      const gridStyle =
-        'display:grid;grid-template-columns:repeat(' +
-        sz.cols +
-        ',1fr);gap:' +
-        sz.gap +
-        ';max-width:980px;margin:0 auto;padding:0 8px 24px;align-items:stretch;box-sizing:border-box';
+      const maxW = sz.cardMaxW || '';
+      const pageCenter = !!sz.pageCenter;
+      const gridStyle = [
+        'display:grid',
+        'grid-template-columns:repeat(' + sz.cols + ',1fr)',
+        'gap:' + sz.gap,
+        'max-width:' + (pageCenter && maxW ? maxW : '980px'),
+        'margin:0 auto',
+        'padding:' + (pageCenter ? '12mm 0' : '0 4mm 12mm'),
+        'align-items:start',
+        'justify-items:' + (pageCenter ? 'center' : 'stretch'),
+        'box-sizing:border-box',
+        'width:100%',
+      ].join(';');
       return (
         '<div class="qr-print-grid" data-print-size="' +
         esc(sid) +

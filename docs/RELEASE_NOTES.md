@@ -1,11 +1,13 @@
 # RestroSuite release notes
 
-## v141 (2026-07-13) — Print sheet matches live preview proportions
+## v142 (2026-07-13) — Print cards keep preview height×width proportions
 
-- **Full page** no longer stretches edge-to-edge (max ~108mm centered tent card)
-- Removed forced min-height stretch (was leaving huge empty space)
-- Page-breaks restored (Large = 2/page, Full = 1/page, etc.)
-- Card height follows content like the modal preview
+- Every size uses a **fixed tent width** (mini 44mm → full 95mm); height = content only
+- Grid columns are fixed card widths (not `1fr` stretch across A4)
+- White margin on the page is OK — cards do **not** fill the whole sheet
+- Looks like the live preview, only scaled for paper
+
+## v141 (2026-07-13) — Print sheet matches live preview proportions
 
 ## v140 (2026-07-13) — Powered by CODEARC RestroSuite
 
