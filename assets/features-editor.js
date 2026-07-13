@@ -38,7 +38,13 @@
       return [];
     }
     function invCost(name){ const i=(RS.INVENTORY||[]).find(x=>x.name===name); return i?i.cost:0; }
-    function plateCost(m){ return recipeOf(m).reduce((a,g)=>a+g.qty*invCost(g.name),0); }
+    function plateCost(m){
+      if (window.RSRecipeUnits && typeof RSRecipeUnits.plateCost === 'function') {
+        return RSRecipeUnits.plateCost(m, RS.INVENTORY || []);
+      }
+      const base = Math.max(1, Number(m.recipeServings) || 1);
+      return recipeOf(m).reduce((a,g)=>a+(Number(g.qty)||0)*invCost(g.name),0) / base;
+    }
     function escEd(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
     /* ---------------- left form ---------------- */
@@ -67,7 +73,25 @@
               <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
               <div><label class="fl">${taxLabel} slab</label><select class="form-input" id="ed-gst">${slabs.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
             </div>
-            <div><label class="fl">Uses from store room (recipe) <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">optional · links stock</span></label><div class="ing-chips" id="ed-ings"></div></div>
+            <div class="form-grid-2">
+              <div>
+                <label class="fl">Sold as</label>
+                <select class="form-input" id="ed-serve-unit">
+                  <option value="plate">Plate</option>
+                  <option value="bowl">Bowl</option>
+                  <option value="glass">Glass / cup</option>
+                  <option value="piece">Piece</option>
+                  <option value="portion">Portion</option>
+                  <option value="pack">Pack / box</option>
+                  <option value="serve">Serve</option>
+                </select>
+              </div>
+              <div>
+                <label class="fl">Recipe for (servings)</label>
+                <input class="form-input" id="ed-recipe-servings" type="number" min="1" step="1" value="1" title="Ingredient quantities below are for this many servings">
+              </div>
+            </div>
+            <div><label class="fl">Uses from store room (recipe) <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">qty + unit · optional</span></label><div class="ing-chips" id="ed-ings"></div></div>
             <div id="ed-costline" style="font-size:12.5px;color:var(--text-mute)"></div>
             <button class="btn btn-primary btn-block" id="ed-save"><i class="fa-solid fa-circle-check"></i> Save item</button>
             <button type="button" class="btn btn-ghost btn-block" id="ed-help-link" style="margin-top:2px"><i class="fa-solid fa-wand-magic-sparkles"></i> Need help linking stock?</button>
@@ -90,15 +114,30 @@
       let draftIngs = [];
       const ingsEl = $('#ed-ings'), costEl = $('#ed-costline');
       function renderIngs(){
-        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${esc(g.name)} ${esc(g.qty)}${esc(g.unit)} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
+        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${esc(g.name)} ${esc(g.qty)} ${esc(g.unit || '')} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
           + `<span class="ing-chip add" id="ed-add-ing"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span>`;
         ingsEl.querySelectorAll('[data-i]').forEach(b=> b.onclick=()=>{ draftIngs.splice(+b.dataset.i,1); renderIngs(); });
         $('#ed-add-ing').onclick = openIngPicker;
-        const cost = draftIngs.reduce((a,g)=>a+g.qty*invCost(g.name),0);
+        const serv = Math.max(1, Number($('#ed-recipe-servings') && $('#ed-recipe-servings').value) || 1);
+        const costBatch = draftIngs.reduce((a,g)=>a+(Number(g.qty)||0)*invCost(g.name),0);
+        const cost = costBatch / serv;
         const price = +$('#ed-price').value||0;
-        costEl.innerHTML = cost? `Plate cost <b style="color:var(--text)">${rs(cost)}</b>${price?` · margin <b style="color:var(--green)">${Math.round((1-cost/price)*100)}%</b>`:''}` : '';
+        const su = ($('#ed-serve-unit') && $('#ed-serve-unit').value) || 'plate';
+        costEl.innerHTML = cost
+          ? `Cost per ${esc(su)} <b style="color:var(--text)">${rs(cost)}</b> (recipe for ${serv} ${esc(su)}${serv===1?'':'s'})${price?` · margin <b style="color:var(--green)">${Math.round((1-cost/price)*100)}%</b>`:''}`
+          : '';
       }
       $('#ed-price').addEventListener('input', renderIngs);
+      const edServ = $('#ed-recipe-servings');
+      if (edServ && !edServ._rsCostWire) {
+        edServ._rsCostWire = true;
+        edServ.addEventListener('input', renderIngs);
+      }
+      const edSu = $('#ed-serve-unit');
+      if (edSu && !edSu._rsCostWire) {
+        edSu._rsCostWire = true;
+        edSu.addEventListener('change', renderIngs);
+      }
       const helpLinkBtn = $('#ed-help-link');
       if (helpLinkBtn && !helpLinkBtn._rsWired) {
         helpLinkBtn._rsWired = true;
@@ -207,7 +246,9 @@
           veg: $('#ed-type').value==='veg', 
           gst: selectedGst, 
           taxCategory: rateCode, 
-          ingredients: draftIngs.slice() 
+          ingredients: draftIngs.slice(),
+          serveUnit: ($('#ed-serve-unit') && $('#ed-serve-unit').value) || 'plate',
+          recipeServings: Math.max(1, Number($('#ed-recipe-servings') && $('#ed-recipe-servings').value) || 1),
         };
         
         try {
@@ -239,6 +280,8 @@
       // expose for edit
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
         $('#ed-name').value=m.name; $('#ed-price').value=m.price; $('#ed-cat').value=m.cat; $('#ed-type').value=m.veg?'veg':'nonveg';
+        if ($('#ed-serve-unit')) $('#ed-serve-unit').value = m.serveUnit || 'plate';
+        if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = Math.max(1, Number(m.recipeServings) || 1);
         const edGst = $('#ed-gst');
         
         // Resolve slab percentage from m.taxCategory if missing or stale
@@ -272,7 +315,10 @@
         }
         draftIngs = recipeOf(m).map(g=>({...g})); renderIngs(); $('#ed-name').focus(); };
       function resetForm(){ editingId=null; $('#ed-form-title').textContent='Add new item'; $('#ed-reset').style.display='none';
-        $('#ed-name').value=''; $('#ed-price').value=''; $('#ed-cat').selectedIndex=0; $('#ed-type').selectedIndex=0; $('#ed-gst').selectedIndex=0; draftIngs=[]; renderIngs(); }
+        $('#ed-name').value=''; $('#ed-price').value=''; $('#ed-cat').selectedIndex=0; $('#ed-type').selectedIndex=0; $('#ed-gst').selectedIndex=0;
+        if ($('#ed-serve-unit')) $('#ed-serve-unit').value = 'plate';
+        if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = 1;
+        draftIngs=[]; renderIngs(); }
       renderIngs();
     }
 

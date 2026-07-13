@@ -405,8 +405,15 @@ function addToCart(id){
   try {
     if (Array.isArray(m.ingredients) && m.ingredients.length && INVENTORY.length) {
       const short = m.ingredients.filter(ing => {
+        let need = Number(ing.qty) || 0;
+        if (global.RSRecipeUnits && RSRecipeUnits.deductQtyForIngredient) {
+          need = RSRecipeUnits.deductQtyForIngredient(ing, m, 1, 1, INVENTORY);
+        } else {
+          const base = Math.max(1, Number(m.recipeServings) || 1);
+          need = need / base;
+        }
         const inv = INVENTORY.find(i => i.name === ing.name);
-        return inv && (Number(inv.stock) || 0) < (Number(ing.qty) || 0);
+        return inv && (Number(inv.stock) || 0) < need;
       });
       if (short.length) {
         toast(`Low stock for ${short.map(s => s.name).slice(0,2).join(', ')}`, 'fa-triangle-exclamation');

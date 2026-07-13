@@ -81,7 +81,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v168-20260713-inv-cost-link';
+    var builtin = 'v169-20260713-recipe-servings';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -1691,6 +1691,7 @@
 <script src="assets/print-bridge.js"></script>
 <script src="assets/escpos-encoder.js"></script>
 <script src="assets/modules/bill-identity.js"></script>
+<script src="assets/modules/recipe-units.js"></script>
 <script src="assets/modules/inventory-ledger.js"></script>
 <script src="assets/modules/inventory-batches.js"></script>
 <script src="assets/modules/kitchen-link-coach.js"></script>

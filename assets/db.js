@@ -147,15 +147,41 @@
   const MAP = {
     menu: {
       table:'doppio_menu', pk:'id', clientId:true,
-      from: r => ({ id:r.id, name:r.name, cat:r.category, price:num(r.price),
-                    veg: !(r.recipe_specs && r.recipe_specs.veg===false),
-                    stock: r.available===false ? 'out' : 'ok',
-                    ingredients: (r.recipe_specs && r.recipe_specs.ingredients) || [],
-                    taxCategory: r.tax_category || 'IN_REST_5' }),
-      to: o => ({ id:o.id, name:o.name, category:o.cat, price:num(o.price),
-                  available: o.stock!=='out',
-                  recipe_specs: { veg: !!o.veg, ingredients: o.ingredients || [] },
-                  tax_category: o.taxCategory || 'IN_REST_5' })
+      from: r => {
+        const specs = r.recipe_specs && typeof r.recipe_specs === 'object' ? r.recipe_specs : {};
+        return {
+          id: r.id,
+          name: r.name,
+          cat: r.category,
+          price: num(r.price),
+          veg: !(specs && specs.veg === false),
+          stock: r.available === false ? 'out' : 'ok',
+          ingredients: (specs && specs.ingredients) || [],
+          // Recipe quantities are written for this many servings (default 1 plate)
+          recipeServings: num(specs.recipeServings != null ? specs.recipeServings : specs.servings) || 1,
+          serveUnit: specs.serveUnit || specs.serve_unit || 'plate',
+          taxCategory: r.tax_category || 'IN_REST_5',
+        };
+      },
+      to: o => ({
+        id: o.id,
+        name: o.name,
+        category: o.cat,
+        price: num(o.price),
+        available: o.stock !== 'out',
+        recipe_specs: {
+          veg: !!o.veg,
+          ingredients: (o.ingredients || []).map((g) => ({
+            name: g.name,
+            qty: num(g.qty),
+            unit: g.unit || 'unit',
+            key: g.key || undefined,
+          })),
+          recipeServings: Math.max(1, num(o.recipeServings != null ? o.recipeServings : o.servings) || 1),
+          serveUnit: o.serveUnit || o.serve_unit || 'plate',
+        },
+        tax_category: o.taxCategory || 'IN_REST_5',
+      })
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},

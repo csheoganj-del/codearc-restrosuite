@@ -663,7 +663,7 @@
         return `
           <div class="klc-wiz">
             <div class="klc-wiz-step">Step 2 of 3 · What goes into <b>${esc(chosen.name)}</b></div>
-            <p class="klc-p">Add from store room: <b>food</b> and also <b>boxes, bags, napkins</b> if this dish uses them. Adjust qty for <b>1 plate / 1 order</b>.</p>
+            <p class="klc-p">Add from store room: <b>food</b> and packaging. Quantities use the stock <b>unit</b> (kg, ml, pcs). Default is for <b>1 serving</b> — change servings under Recipes if needed.</p>
             ${suggestionsHtml()}
             ${copyBarHtml()}
             <div id="klc-draft">${draftHtml()}</div>
@@ -818,10 +818,21 @@
               qty: Number(g.qty) || 0,
               unit: g.unit || 'unit',
             }));
+            if (!chosen.recipeServings) chosen.recipeServings = 1;
+            if (!chosen.serveUnit) chosen.serveUnit = 'plate';
             try {
               if (global.RS && RS.saveOne) await RS.saveOne('menu', chosen);
               else if (global.RS && RS.save) await RS.save('menu');
-              toast('Saved! “' + chosen.name + '” will now reduce stock when sold', 'fa-circle-check');
+              toast(
+                'Saved! “' +
+                  chosen.name +
+                  '” · 1 ' +
+                  (chosen.serveUnit || 'plate') +
+                  ' deducts stock by recipe ÷ ' +
+                  (chosen.recipeServings || 1) +
+                  ' serving(s)',
+                'fa-circle-check'
+              );
               close();
               document.dispatchEvent(new CustomEvent('rs:render-inventory'));
               if (global.RS && RS.render) RS.render('inventory-tab');

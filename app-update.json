@@ -1,13 +1,14 @@
 {
-  "version": "v168-20260713-inv-cost-link",
+  "version": "v169-20260713-recipe-servings",
   "date": "2026-07-13",
-  "title": "Every inventory item links to unit cost",
-  "summary": "Unit cost is first-class on stock: click any cost cell to set it, banner for ₹0 items, restock updates cost, plate cost/margin use the linked value, stock value shown per row.",
+  "title": "Recipe servings + units across Menu · Recipe · Stock",
+  "summary": "Recipes now have serving size (e.g. 1 plate / 4 servings). Stock deduction = (ingredient qty ÷ recipe servings) × sold qty. Units (kg, ml, pcs) stay on stock and recipe lines; plate cost is per serving.",
   "highlights": [
-    "Click Unit cost on any stock row to set/edit",
-    "Banner: N items missing cost + Set costs wizard",
-    "Add/Edit stock requires unit cost",
-    "Restock: enter paid unit cost — saved on the item",
-    "Shows stock value (qty × unit cost) under each cost"
+    "Recipe: Sold as (plate/bowl/glass…) + Recipe written for N servings",
+    "Each stock line keeps unit (kg/ml/pcs) on the recipe",
+    "POS sale deducts by servings (family pack recipes supported)",
+    "g↔kg and ml↔L auto-convert when units differ",
+    "Menu Editor: serve unit + servings; plate cost per order",
+    "Export recipes includes servings and units"
   ]
 }

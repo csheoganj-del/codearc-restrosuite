@@ -43,23 +43,31 @@
   }
 
   function buildLines(items, MENU) {
+    // Serving-aware + unit-aware path (recipe servings, g/kg, ml/L)
+    if (global.RSRecipeUnits && typeof RSRecipeUnits.buildDeductLines === 'function') {
+      return RSRecipeUnits.buildDeductLines(items, MENU, getInventory());
+    }
     let noRecipeCount = 0;
     const lines = [];
     (items || []).forEach((it) => {
-      const menuItem = MENU.find((m) => m.name === it.name);
+      const menuItem =
+        MENU.find((m) => String(m.id) === String(it.id)) ||
+        MENU.find((m) => m.name === it.name);
       if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) {
         noRecipeCount++;
         return;
       }
       const orderedQty = Number(it.qty) || 1;
+      const base = Math.max(1, Number(menuItem.recipeServings) || 1);
+      const factor = orderedQty / base;
       menuItem.ingredients.forEach((ing) => {
-        const qty = (Number(ing.qty) || 0) * orderedQty;
+        const qty = (Number(ing.qty) || 0) * factor;
         if (qty <= 0) return;
         const key = String(ing.key || ing.name || '')
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '_')
           .replace(/^_|_$/g, '');
-        lines.push({ key, name: ing.name || key, qty });
+        lines.push({ key, name: ing.name || key, qty, unit: ing.unit || 'unit' });
       });
     });
     return { lines, noRecipeCount };

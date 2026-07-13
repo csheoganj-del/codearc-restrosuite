@@ -452,27 +452,83 @@
       document.addEventListener('rs:render-inventory', drawPanes);
 
       function openRecipeEditModal(m) {
-        let draft = (m.ingredients || []).map(g => ({ ...g }));
-        
+        let draft = (m.ingredients || []).map((g) => ({
+          name: g.name,
+          qty: Number(g.qty) || 0,
+          unit: g.unit || 'unit',
+          key: g.key,
+        }));
+        let recipeServings = Math.max(1, Number(m.recipeServings) || 1);
+        let serveUnit = m.serveUnit || 'plate';
+        const RU = window.RSRecipeUnits;
+
+        function serveLabel() {
+          if (RU && RU.serveUnitLabel) return RU.serveUnitLabel(serveUnit);
+          return serveUnit || 'plate';
+        }
+
         function drawDraft(modalBody) {
           const listEl = modalBody.querySelector('#rec-modal-list');
-          listEl.innerHTML = draft.map((g, i) => `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-              <span style="flex:1;font-weight:600;font-size:14px">${g.name}</span>
-              <input class="form-input" type="number" step="any" min="0" value="${g.qty}" data-qty-i="${i}" style="width:80px;padding:5px 8px;font-size:13px;text-align:right">
-              <span style="width:40px;color:var(--text-mute);font-size:12.5px">${g.unit}</span>
+          const hint = modalBody.querySelector('#rec-serve-hint');
+          if (hint) {
+            hint.innerHTML = `Enter how much stock is used for <b>${recipeServings}</b> ${esc(serveLabel().toLowerCase())}${
+              recipeServings === 1 ? '' : 's'
+            }. When the guest orders <b>1</b> ${esc(serveLabel().toLowerCase())}, stock goes down by (qty ÷ ${recipeServings}).`;
+          }
+          listEl.innerHTML =
+            draft
+              .map((g, i) => {
+                const inv =
+                  (RU && RU.findInventory && RU.findInventory(g, RS.INVENTORY)) ||
+                  (RS.INVENTORY || []).find((x) => x.name === g.name);
+                const invUnit = (inv && inv.unit) || g.unit || 'unit';
+                const unitMismatch =
+                  inv &&
+                  g.unit &&
+                  RU &&
+                  RU.normUnit &&
+                  RU.normUnit(g.unit) !== RU.normUnit(invUnit) &&
+                  RU.convertQty(1, g.unit, invUnit) == null;
+                return `
+            <div class="rec-ing-row" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
+              <span style="flex:1;min-width:120px;font-weight:600;font-size:14px">${esc(g.name)}</span>
+              <label style="font-size:11px;color:var(--text-mute)">Qty</label>
+              <input class="form-input" type="number" step="any" min="0" value="${g.qty}" data-qty-i="${i}" style="width:88px;padding:5px 8px;font-size:13px;text-align:right">
+              <select class="form-input" data-unit-i="${i}" style="width:88px;padding:5px 6px;font-size:12.5px" title="Unit (should match stock)">
+                ${['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'box', 'unit']
+                  .concat(g.unit && !['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'box', 'unit'].includes(g.unit) ? [g.unit] : [])
+                  .map(
+                    (u) =>
+                      `<option value="${esc(u)}" ${String(g.unit || invUnit) === u ? 'selected' : ''}>${esc(u)}</option>`
+                  )
+                  .join('')}
+              </select>
+              <span style="font-size:11px;color:var(--text-mute);min-width:70px">stock: ${esc(invUnit)}</span>
+              ${
+                unitMismatch
+                  ? '<span style="font-size:11px;color:var(--amber);font-weight:700">unit ≠ stock</span>'
+                  : ''
+              }
               <button class="icon-act danger" data-del-i="${i}" style="width:30px;height:30px"><i class="fa-solid fa-trash"></i></button>
-            </div>
-          `).join('') || `<div style="text-align:center;padding:20px 0;color:var(--text-mute);font-style:italic">No ingredients in recipe. Click Add to link.</div>`;
-          
-          listEl.querySelectorAll('[data-qty-i]').forEach(inp => {
+            </div>`;
+              })
+              .join('') ||
+            `<div style="text-align:center;padding:20px 0;color:var(--text-mute);font-style:italic">No stock items yet. Click Add from store room.</div>`;
+
+          listEl.querySelectorAll('[data-qty-i]').forEach((inp) => {
             inp.oninput = () => {
               const idx = +inp.dataset.qtyI;
               draft[idx].qty = Number(inp.value) || 0;
             };
           });
-          
-          listEl.querySelectorAll('[data-del-i]').forEach(btn => {
+          listEl.querySelectorAll('[data-unit-i]').forEach((sel) => {
+            sel.onchange = () => {
+              const idx = +sel.dataset.unitI;
+              draft[idx].unit = sel.value || 'unit';
+              drawDraft(modalBody);
+            };
+          });
+          listEl.querySelectorAll('[data-del-i]').forEach((btn) => {
             btn.onclick = () => {
               const idx = +btn.dataset.delI;
               draft.splice(idx, 1);
@@ -481,32 +537,73 @@
           });
         }
 
+        const servingsHtml =
+          RU && RU.servingsSelectHtml
+            ? RU.servingsSelectHtml(recipeServings, 'rec-servings')
+            : `<input class="form-input" id="rec-servings" type="number" min="1" value="${recipeServings}">`;
+        const serveUnitHtml =
+          RU && RU.serveUnitSelectHtml
+            ? RU.serveUnitSelectHtml(serveUnit, 'rec-serve-unit')
+            : `<input class="form-input" id="rec-serve-unit" value="${esc(serveUnit)}">`;
+
         RSModal.open({
-          title: `What does “${m.name}” use?`,
-          sub: 'Add store-room items + how much for ONE plate',
+          title: `Recipe · ${m.name}`,
+          sub: 'Servings + units · stock deducts when this dish is sold',
           icon: 'fa-clipboard-list',
           size: 'md',
           body: `
             <div style="display:flex;flex-direction:column;gap:12px">
-              <p style="margin:0;font-size:13px;color:var(--text-soft);line-height:1.45">When this dish is sold, these amounts leave stock automatically.</p>
-              <div id="rec-modal-list" style="max-height:260px;overflow:auto"></div>
+              <div class="rec-serve-bar" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border:1px solid var(--stroke);border-radius:10px;background:var(--glass)">
+                <div>
+                  <label class="fl">Sold as (menu unit)</label>
+                  ${serveUnitHtml}
+                </div>
+                <div>
+                  <label class="fl">Recipe is written for</label>
+                  ${servingsHtml}
+                  <input class="form-input" id="rec-servings-custom" type="number" min="1" step="1" placeholder="Custom servings" style="display:none;margin-top:6px">
+                </div>
+              </div>
+              <p id="rec-serve-hint" style="margin:0;font-size:13px;color:var(--text-soft);line-height:1.45"></p>
+              <div id="rec-modal-list" style="max-height:280px;overflow:auto"></div>
               <button class="btn btn-ghost btn-block" id="rec-modal-add" style="border-style:dashed"><i class="fa-solid fa-plus"></i> Add from store room</button>
             </div>
           `,
-          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Save</button>`,
+          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Save recipe</button>`,
           onMount(modal, close) {
             modal.querySelector('[data-x]').onclick = close;
+            const servSel = modal.querySelector('#rec-servings');
+            const servCustom = modal.querySelector('#rec-servings-custom');
+            const unitSel = modal.querySelector('#rec-serve-unit');
+            const syncServe = () => {
+              if (unitSel) serveUnit = unitSel.value || 'plate';
+              if (servSel) {
+                if (servSel.value === '__custom__') {
+                  servCustom.style.display = '';
+                  recipeServings = Math.max(1, Number(servCustom.value) || 1);
+                } else {
+                  servCustom.style.display = 'none';
+                  recipeServings = Math.max(1, Number(servSel.value) || 1);
+                }
+              }
+              drawDraft(modal);
+            };
+            if (servSel) servSel.onchange = syncServe;
+            if (servCustom) servCustom.oninput = syncServe;
+            if (unitSel) unitSel.onchange = syncServe;
+
             modal.querySelector('#rec-modal-add').onclick = () => {
               const list = RS.INVENTORY || [];
               RSModal.open({
-                title: 'Add ingredient',
-                sub: 'Link a raw material to this recipe',
-                icon: 'fa-flask',
+                title: 'Add from store room',
+                sub: 'Food or packaging — unit comes from stock',
+                icon: 'fa-boxes-stacked',
                 size: 'sm',
-                body: `<input class="form-input" id="ing-q" placeholder="Search ingredient..." style="margin-bottom:12px">
+                body: `<input class="form-input" id="ing-q" placeholder="Search stock…" style="margin-bottom:12px">
                       <div id="ing-pick" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto"></div>`,
                 onMount(subModal, subClose) {
-                  const q = subModal.querySelector('#ing-q'), box = subModal.querySelector('#ing-pick');
+                  const q = subModal.querySelector('#ing-q'),
+                    box = subModal.querySelector('#ing-pick');
                   function pretty(n) {
                     const s = String(n || '');
                     return /[_-]/.test(s)
@@ -529,16 +626,21 @@
                       filtered
                         .map((i) => {
                           const cost = Number(i.cost) || 0;
-                          const costLabel = cost > 0 ? rs(cost) + '/' + esc(i.unit || '') : '₹0 · set cost';
-                          return `<div class="sr-item" data-n="${esc(i.name)}" data-u="${esc(i.unit || 'unit')}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${esc(pretty(i.name))}</div><div class="si-s">${esc(i.cat || '—')} · ${costLabel} · stock ${Number(i.stock) || 0}</div></div><span class="si-meta">+ add</span></div>`;
+                          const u = i.unit || 'unit';
+                          const costLabel = cost > 0 ? rs(cost) + '/' + esc(u) : '₹0 · set cost';
+                          return `<div class="sr-item" data-n="${esc(i.name)}" data-u="${esc(u)}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${esc(pretty(i.name))}</div><div class="si-s">${esc(i.cat || '—')} · unit <b>${esc(u)}</b> · ${costLabel} · stock ${Number(i.stock) || 0}</div></div><span class="si-meta">+ add</span></div>`;
                         })
                         .join('') ||
-                      '<div class="sr-empty">No match — add the ingredient under Stock levels first</div>';
+                      '<div class="sr-empty">No match — add under Stock levels first</div>';
                     box.querySelectorAll('[data-n]').forEach((el) => {
                       el.onclick = () => {
                         const exists = draft.find((g) => g.name === el.dataset.n);
                         if (!exists) {
-                          draft.push({ name: el.dataset.n, qty: 1, unit: el.dataset.u || 'unit' });
+                          draft.push({
+                            name: el.dataset.n,
+                            qty: 1,
+                            unit: el.dataset.u || 'unit',
+                          });
                         }
                         subClose();
                         drawDraft(modal);
@@ -548,20 +650,30 @@
                   q.addEventListener('input', draw);
                   draw();
                   q.focus();
-                }
+                },
               });
             };
-            
+
             modal.querySelector('[data-ok]').onclick = async () => {
-              m.ingredients = draft;
+              syncServe();
+              m.ingredients = draft.map((g) => ({
+                name: g.name,
+                qty: Number(g.qty) || 0,
+                unit: g.unit || 'unit',
+              }));
+              m.recipeServings = recipeServings;
+              m.serveUnit = serveUnit;
               if (RS.saveOne) await RS.saveOne('menu', m);
               close();
               drawPanes();
-              RS.toast(`Recipe for "${m.name}" updated`, 'fa-circle-check');
+              RS.toast(
+                `Recipe saved · per ${recipeServings} ${serveLabel().toLowerCase()}${recipeServings === 1 ? '' : 's'}`,
+                'fa-circle-check'
+              );
             };
-            
+
             drawDraft(modal);
-          }
+          },
         });
       }
 
@@ -595,10 +707,10 @@
             </div>
             <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
               <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-top:2px"></i>
-              <div><strong style="color:var(--text)">In plain words:</strong> when a bill is paid, stock goes down by the recipe amounts (× how many sold) — food <b>and</b> packaging (boxes, bags, napkins). Near-expiry packs are used first. Dishes with no recipe do not change stock.</div>
+              <div><strong style="color:var(--text)">In plain words:</strong> each recipe is for a number of <b>servings</b> (e.g. 1 plate). When a bill is paid, stock goes down by (recipe qty ÷ servings) × quantity sold — food <b>and</b> packaging. Units (kg, ml, pcs) come from stock and stay on the recipe. Near-expiry packs are used first.</div>
             </div>
             <div class="table-scroll"><table class="data-table recipe-table">
-              <thead><tr><th>Menu Item</th><th>Category</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Uses from stock</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Menu Item</th><th>Category</th><th>Serve</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Uses from stock</th><th>Actions</th></tr></thead>
               <tbody id="recipe-list-body"></tbody>
             </table></div>
           </div>
@@ -824,12 +936,17 @@
         }
 
         function plateCost(m) {
+          if (window.RSRecipeUnits && typeof RSRecipeUnits.plateCost === 'function') {
+            return RSRecipeUnits.plateCost(m, RS.INVENTORY || []);
+          }
           const ings = (m && m.ingredients) || [];
-          return ings.reduce((sum, g) => {
+          const base = Math.max(1, Number(m.recipeServings) || 1);
+          const sum = ings.reduce((s, g) => {
             const inv = findInvForRecipeLine(g);
             const unitCost = inv ? Number(inv.cost) || 0 : 0;
-            return sum + (Number(g.qty) || 0) * unitCost;
+            return s + (Number(g.qty) || 0) * unitCost;
           }, 0);
+          return sum / base;
         }
 
         function prettyInvName(raw) {
@@ -912,7 +1029,7 @@
           if (searchEl && searchEl.value !== sec._recipeSearch) searchEl.value = sec._recipeSearch || '';
 
           if (!rows.length) {
-            recipeListBody.innerHTML = `<tr><td colspan="7" style="padding:0;border:none">
+            recipeListBody.innerHTML = `<tr><td colspan="8" style="padding:0;border:none">
               <div class="sr-empty" style="padding:36px 16px">
                 <div style="font-weight:700;margin-bottom:6px">${
                   q || sec._recipeFilter !== 'all' ? 'No menu items match' : 'No menu items yet'
@@ -964,21 +1081,27 @@
                           ? 'Not in stock list'
                           : zeroCost
                             ? 'In stock but unit cost is ₹0'
-                            : 'Linked';
+                            : 'Linked · unit ' + (g.unit || inv.unit || '');
                         return `<span class="pill" title="${esc(tip)}" style="font-size:11.5px;padding:2px 7px;${
                           missing
                             ? 'border-color:var(--red);color:var(--red)'
                             : zeroCost
                               ? 'border-color:var(--amber);color:var(--amber)'
                               : 'background:var(--hover);border-color:var(--border)'
-                        }">${esc(prettyInvName(g.name))} (${esc(g.qty)} ${esc(g.unit || '')})</span>`;
+                        }">${esc(prettyInvName(g.name))} (${esc(g.qty)} ${esc(g.unit || inv && inv.unit || '')})</span>`;
                       })
                       .join('')}</div>`
                   : `<span class="recipe-missing-label">Not linked to stock yet</span>`;
+                const servesN = Math.max(1, Number(m.recipeServings) || 1);
+                const serveU =
+                  (window.RSRecipeUnits && RSRecipeUnits.serveUnitLabel
+                    ? RSRecipeUnits.serveUnitLabel(m.serveUnit || 'plate')
+                    : m.serveUnit || 'plate') || 'plate';
                 return `
               <tr data-id="${esc(m.id)}" class="${ings.length ? 'recipe-row-linked' : 'recipe-row-missing'}">
                 <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg ? '' : 'nonveg'}"></span><b>${esc(m.name)}</b></div></td>
                 <td style="font-size:12px;color:var(--text-soft)">${esc(m.cat || '—')}</td>
+                <td style="font-size:12px;font-weight:700;color:var(--text-soft)" title="Recipe written for this many servings">${servesN}× ${esc(String(serveU).toLowerCase())}</td>
                 <td class="td-strong">${sell ? rs(sell) : '—'}</td>
                 <td class="td-strong">${
                   ings.length
@@ -1121,22 +1244,54 @@
               return;
             }
             const escCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-            const headers = ['Menu Item', 'Ingredient', 'Qty', 'Unit', 'Category', 'Sell Price'];
+            const headers = [
+              'Menu Item',
+              'Ingredient',
+              'Qty',
+              'Unit',
+              'Recipe Servings',
+              'Serve Unit',
+              'Category',
+              'Sell Price',
+            ];
+            // Rebuild with servings columns
+            const fullRows = [];
+            menu.forEach((m) => {
+              const ings = Array.isArray(m.ingredients) ? m.ingredients : [];
+              const rsN = Math.max(1, Number(m.recipeServings) || 1);
+              const su = m.serveUnit || 'plate';
+              if (!ings.length) {
+                fullRows.push([m.name || '', '', '', '', rsN, su, m.cat || '', m.price != null ? m.price : '']);
+                return;
+              }
+              ings.forEach((g) => {
+                fullRows.push([
+                  m.name || '',
+                  g.name || '',
+                  g.qty != null ? g.qty : '',
+                  g.unit || '',
+                  rsN,
+                  su,
+                  m.cat || '',
+                  m.price != null ? m.price : '',
+                ]);
+              });
+            });
             const csv =
               '\uFEFF' +
-              [headers.map(escCell).join(','), ...rows.map((r) => r.map(escCell).join(','))].join('\r\n');
+              [headers.map(escCell).join(','), ...fullRows.map((r) => r.map(escCell).join(','))].join('\r\n');
             const stamp = new Date().toISOString().slice(0, 10);
-            const name = 'recipes-export-' + stamp + '.csv';
-            if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
+            const fname = 'recipes-export-' + stamp + '.csv';
+            if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', fname);
             else {
               const a = document.createElement('a');
               a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-              a.download = name;
+              a.download = fname;
               a.click();
             }
             const linked = menu.filter((m) => Array.isArray(m.ingredients) && m.ingredients.length).length;
             RS.toast(
-              'Recipes CSV · ' + linked + ' linked dish' + (linked === 1 ? '' : 'es') + ' · ' + rows.length + ' rows',
+              'Recipes CSV · ' + linked + ' linked dish' + (linked === 1 ? '' : 'es') + ' · servings + units',
               'fa-file-export'
             );
           };
