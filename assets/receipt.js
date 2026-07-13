@@ -612,6 +612,7 @@
     sendWhatsApp,
     preload,
     getCachedPdf,
+    qrDataUriFor,
     clearPdfCache: () => PDF_CACHE.clear(),
     EXPORT_CSS,
   };

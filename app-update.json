@@ -1,9 +1,11 @@
 {
-  "version": "v184-20260713-icons-one-row",
+  "version": "v185-20260713-qr-thermal",
   "date": "2026-07-13",
-  "title": "Bill settled icons stay in one row",
-  "summary": "Force icon toolbar to a single horizontal row (no 2x2 wrap).",
+  "title": "Thermal includes digital bill QR",
+  "summary": "QR on receipt opens the public digital bill page when the bill is synced. Thermal and Print now include the same QR as the on-screen preview.",
   "highlights": [
-    "WhatsApp, Thermal, Print, New order icons in one line"
+    "QR links to /bill/{outlet}/{bill-no}",
+    "Works when bill is cloud-synced",
+    "Thermal print includes QR (formatted HTML path)"
   ]
 }

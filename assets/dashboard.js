@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v184-20260713-icons-one-row';
+    return 'v185-20260713-qr-thermal';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

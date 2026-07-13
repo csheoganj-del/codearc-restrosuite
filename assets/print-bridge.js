@@ -181,13 +181,13 @@
   }
 
   /** Same HTML body as Bill settled preview (formatted), sized for roll paper. */
-  function formattedBillHtml(bill, outlet) {
+  function formattedBillHtml(bill, outlet, qrDataUri) {
     const out = outlet || {};
     let body = '';
     if (global.RSReceiptEngine && typeof RSReceiptEngine.toHTML === 'function') {
-      body = RSReceiptEngine.toHTML(bill, null, out);
+      body = RSReceiptEngine.toHTML(bill, qrDataUri || null, out);
     } else if (global.RSReceipt && typeof RSReceipt.html === 'function') {
-      body = RSReceipt.html(bill, null);
+      body = RSReceipt.html(bill, qrDataUri || null);
     } else {
       const items = (bill && (bill.items || bill._items)) || [];
       const name = out.name || 'Outlet';
@@ -202,13 +202,37 @@
     return `<div class="receipt-paper" style="max-width:${maxW};margin:0 auto;box-shadow:none">${body}</div>`;
   }
 
+  async function qrDataUriForBill(bill) {
+    try {
+      if (global.RSReceiptEngine && typeof RSReceiptEngine.qrDataUriFor === 'function') {
+        return await RSReceiptEngine.qrDataUriFor(bill);
+      }
+    } catch (_) {}
+    return new Promise((resolve) => {
+      try {
+        if (!global.QRCode || !bill) return resolve(null);
+        const no = bill.no || bill.orderId || bill.id;
+        if (!no) return resolve(null);
+        const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+        global.QRCode.toDataURL(
+          `https://restrosuite.codearc.co.in/bill/${slug}/${no}`,
+          { width: 200, margin: 1 },
+          (err, url) => resolve(err ? null : url)
+        );
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
   async function printBillEscPos(bill, outlet, opts) {
     const options = opts || {};
-    // Default: print the SAME formatted receipt as the on-screen preview.
+    // Default: print the SAME formatted receipt as the on-screen preview (with QR).
     // Plain ESC/POS text only when settings/opts force raw mode.
     if (!forceRawThermal(options)) {
       try {
-        const html = formattedBillHtml(bill, outlet);
+        const qr = await qrDataUriForBill(bill);
+        const html = formattedBillHtml(bill, outlet, qr);
         const title = 'Receipt ' + ((bill && (bill.no || bill.orderId)) || '');
         const res = await printHtml(html, title, options);
         if (res && res.ok) return { ...res, mode: res.mode || 'html-thermal' };

@@ -1657,15 +1657,13 @@
     }
   }
 
-  function billReceiptPreviewHtml(bill, outlet) {
-    let qr = null;
-    // Sync path only — QR is optional on thermal paper
+  function billReceiptPreviewHtml(bill, outlet, qrDataUri) {
     const engine = global.RSReceiptEngine;
     let body = '';
     if (engine && typeof engine.toHTML === 'function') {
-      body = engine.toHTML(bill, qr, outlet || outletForPrint());
+      body = engine.toHTML(bill, qrDataUri || null, outlet || outletForPrint());
     } else if (global.RSReceipt && typeof RSReceipt.html === 'function') {
-      body = RSReceipt.html(bill, qr);
+      body = RSReceipt.html(bill, qrDataUri || null);
     } else {
       body = `<div class="rcp-center"><div class="rcp-logo">${esc((outlet && outlet.name) || 'Outlet')}</div></div>
         <hr class="rcp-hr"><div class="rcp-tot"><span>TOTAL</span><span>${esc(String((bill && (bill.grand != null ? bill.grand : bill.amount)) || 0))}</span></div>`;
@@ -1673,6 +1671,26 @@
     const paperSize = (global.RS_SETTINGS && global.RS_SETTINGS.set_paper_size) || '80 mm';
     const maxW = paperSize === '58 mm' ? '220px' : '300px';
     return `<div class="receipt-paper" style="max-width:${maxW};margin:0 auto;box-shadow:none">${body}</div>`;
+  }
+
+  async function qrForThermalBill(bill) {
+    try {
+      if (global.RSReceiptEngine && typeof RSReceiptEngine.qrDataUriFor === 'function') {
+        return await RSReceiptEngine.qrDataUriFor(bill);
+      }
+    } catch (_) {}
+    return new Promise((resolve) => {
+      try {
+        if (!global.QRCode || !bill || !bill.no) return resolve(null);
+        const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+        const digitalUrl = `https://restrosuite.codearc.co.in/bill/${slug}/${bill.no}`;
+        global.QRCode.toDataURL(digitalUrl, { width: 200, margin: 1 }, (err, url) => {
+          resolve(err ? null : url);
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
   }
 
   async function printBillThermal(bill) {
@@ -1686,7 +1704,7 @@
     if (preferRawEscPosThermal()) {
       try {
         if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
-          const res = await RSPrintBridge.printBillEscPos(bill, outlet, {});
+          const res = await RSPrintBridge.printBillEscPos(bill, outlet, { raw: true });
           if (res && res.ok) {
             toast('Thermal receipt sent (raw)', 'fa-print');
             return res;
@@ -1697,9 +1715,10 @@
       }
     }
 
-    // Default: same formatted preview as Bill settled (HTML at roll width)
+    // Default: same formatted preview as Bill settled (includes QR when available)
     try {
-      const html = billReceiptPreviewHtml(bill, outlet);
+      const qr = await qrForThermalBill(bill);
+      const html = billReceiptPreviewHtml(bill, outlet, qr);
       const title = 'Receipt ' + (bill.no || bill.orderId || '');
       if (global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
         const res = await RSPrintBridge.printHtml(html, title, { silent: true });
