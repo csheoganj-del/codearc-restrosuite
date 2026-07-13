@@ -1231,11 +1231,19 @@
 
     /* ============== EMPLOYEES ============== */
     const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const shiftFor = (i,d)=>{ const pat=[['M','M','M','O','M','M','M'],['M','E','M','E','M','E','O'],['E','E','O','E','E','E','E'],['D','D','D','D','D','O','D'],['E','M','E','M','E','E','O'],['M','M','E','E','M','O','M']][i%6][d]; return pat; };
+    // Map directory shift label → week pattern (honest, not random fake roster)
+    const shiftPatternFromLabel = (shift) => {
+      const s = String(shift || 'Day').toLowerCase();
+      if (s.includes('off')) return ['O','O','O','O','O','O','O'];
+      if (s.includes('night') || s.includes('eve')) return ['E','E','E','E','E','E','O'];
+      if (s.includes('morn')) return ['M','M','M','M','M','M','O'];
+      // Day / Full day default: work Mon–Sat, off Sun
+      return ['D','D','D','D','D','D','O'];
+    };
     const shiftName = {M:'Morning',E:'Evening',D:'Full day',O:'Off'};
     const shiftCls = {M:'pill-amber',E:'pill-violet',D:'pill-green',O:''};
     let ATT = [];
-    let PAY = [];
+    let ATT_FROM_DB = false;
     const attPill = {present:'pill-green',late:'pill-amber',absent:'pill-red'};
 
     function enhanceEmployees(){
@@ -1246,62 +1254,259 @@
       sec.appendChild(panes);
 
       document.addEventListener('rs:render-employees', () => {
-        // Redraw on employees update
-        if (RS.EMPLOYEES) {
-          ATT.length = 0;
-          RS.EMPLOYEES.forEach((e,i)=>{
-            ATT.push({
-              name:e.name,role:e.role,rc:e.rc,
-              inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['--','18:05','22:10','17:30','--','18:00'][i%6],
-              status:['present','present','present','present','late','present'][i%6]
-            });
-          });
-        }
         drawPanes();
       });
 
+      function parsePayroll(emp) {
+        const n = parseFloat(String(emp.payroll || emp.salary || '').replace(/[^0-9.]/g, ''));
+        return Number.isFinite(n) && n > 0 ? n : 0;
+      }
+
+      function fmtClock(v) {
+        if (!v) return '—';
+        const s = String(v);
+        // ISO → local time
+        const d = new Date(s);
+        if (!Number.isNaN(d.getTime()) && /T|\d{4}-\d{2}/.test(s)) {
+          try {
+            return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+          } catch (_) {}
+        }
+        return s;
+      }
+
       function drawPanes() {
         const currentEmployees = RS.EMPLOYEES || [];
+        const monthLabel = new Date().toLocaleString(undefined, { month: 'long', year: 'numeric' });
 
-        if (ATT.length === 0 && currentEmployees.length > 0) {
-          currentEmployees.forEach((e,i)=>{
-            ATT.push({
-              name:e.name,role:e.role,rc:e.rc,
-              inT:['9:02','9:00','12:58','8:45','13:10','9:30'][i%6],
-              outT:['--','18:05','22:10','17:30','--','18:00'][i%6],
-              status:['present','present','present','present','late','present'][i%6]
-            });
-          });
+        // Attendance: DB only — never invent clock times
+        let attRows = ATT_FROM_DB ? ATT.slice() : [];
+        if (!ATT_FROM_DB || !attRows.length) {
+          // Show directory as not clocked (honest empty day)
+          attRows = currentEmployees.map((e) => ({
+            name: e.name,
+            role: e.role || 'Staff',
+            rc: e.rc || '',
+            inT: '—',
+            outT: '—',
+            status: 'absent',
+            placeholder: true,
+          }));
         }
+        const presentCount = attRows.filter((a) => a.status !== 'absent' && !a.placeholder).length;
 
-        const currentPay = currentEmployees.map((e,i)=>{
-          const base=[28000,18000,15000,16000,18000,15000][i%6];
-          const inc=[6000,2200,1800,1200,2400,1500][i%6];
-          const ded=[1200,600,500,540,600,500][i%6];
-          return {name:e.name,role:e.role,rc:e.rc,base,inc,ded,net:base+inc-ded};
+        // Payroll from directory salary only (no fake incentives)
+        const currentPay = currentEmployees.map((e) => {
+          const base = parsePayroll(e);
+          return {
+            name: e.name,
+            role: e.role || 'Staff',
+            rc: e.rc || '',
+            base,
+            inc: 0,
+            ded: 0,
+            net: base,
+            hasPay: base > 0,
+          };
         });
+        const payTotal = currentPay.reduce((a, p) => a + p.net, 0);
 
         panes.innerHTML = `
           <div class="panel panel-pad subtab-pane" data-pane="roster">
-            <div class="panel-head"><h3>Weekly shift roster</h3><button class="btn btn-primary btn-sm"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-schedule</button></div>
-            <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>
-            ${currentEmployees.map((e,i)=>`<tr><td><b>${e.name}</b><div style="font-size:11px;color:var(--text-mute)">${e.role}</div></td>${DAYS.map((d,di)=>{const s=shiftFor(i,di);return `<td>${s==='O'?'<span style="color:var(--text-faint);font-size:12px">Off</span>':`<span class="pill ${shiftCls[s]}" style="padding:3px 8px;font-size:11px">${shiftName[s]}</span>`}</td>`;}).join('')}</tr>`).join('')}
-            </tbody></table></div>
+            <div class="panel-head">
+              <div>
+                <h3>Weekly shift roster</h3>
+                <div style="font-size:12px;color:var(--text-soft);margin-top:2px">From each member’s directory shift · not auto-generated fiction</div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" id="emp-roster-hint" title="How roster works"><i class="fa-solid fa-circle-info"></i> How it works</button>
+            </div>
+            ${
+              currentEmployees.length
+                ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th>${DAYS.map((d) => `<th>${d}</th>`).join('')}</tr></thead><tbody>
+            ${currentEmployees
+              .map((e) => {
+                const pat = shiftPatternFromLabel(e.shift);
+                return `<tr><td><b>${esc(e.name)}</b><div style="font-size:11px;color:var(--text-mute)">${esc(e.role || '')} · ${esc(e.shift || 'Day')}</div></td>${DAYS.map((d, di) => {
+                  const s = pat[di] || 'O';
+                  return `<td>${
+                    s === 'O'
+                      ? '<span style="color:var(--text-faint);font-size:12px">Off</span>'
+                      : `<span class="pill ${shiftCls[s]}" style="padding:3px 8px;font-size:11px">${shiftName[s]}</span>`
+                  }</td>`;
+                }).join('')}</tr>`;
+              })
+              .join('')}
+            </tbody></table></div>`
+                : `<div class="sr-empty" style="padding:28px">Add team members in Directory to build a roster.</div>`
+            }
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="attendance">
-            <div class="panel-head"><h3>Today’s attendance</h3><span class="pill pill-green" style="padding:4px 11px">${ATT.filter(a=>a.status!=='absent').length}/${ATT.length} present</span></div>
-            <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Clock in</th><th>Clock out</th><th>Status</th></tr></thead><tbody>
-            ${ATT.map(a=>`<tr><td><b>${a.name}</b></td><td><span class="role-tag ${a.rc}">${a.role}</span></td><td class="td-strong">${a.inT}</td><td>${a.outT}</td><td><span class="pill ${attPill[a.status]}" style="padding:3px 9px;text-transform:capitalize">${a.status}</span></td></tr>`).join('')}
-            </tbody></table></div>
+            <div class="panel-head">
+              <div>
+                <h3>Today’s attendance</h3>
+                <div style="font-size:12px;color:var(--text-soft);margin-top:2px">${
+                  ATT_FROM_DB
+                    ? 'Live from attendance records'
+                    : 'No punches recorded today — mark present when staff clock in'
+                }</div>
+              </div>
+              <span class="pill ${presentCount ? 'pill-green' : ''}" style="padding:4px 11px">${presentCount}/${currentEmployees.length || 0} present</span>
+            </div>
+            ${
+              currentEmployees.length
+                ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Clock in</th><th>Clock out</th><th>Status</th><th></th></tr></thead><tbody>
+            ${attRows
+              .map((a, i) => {
+                const emp = currentEmployees.find((e) => e.name === a.name) || currentEmployees[i];
+                return `<tr data-att-i="${i}">
+                  <td><b>${esc(a.name)}</b></td>
+                  <td><span class="role-tag ${esc(a.rc || '')}">${esc(a.role || '')}</span></td>
+                  <td class="td-strong">${esc(fmtClock(a.inT))}</td>
+                  <td>${esc(fmtClock(a.outT))}</td>
+                  <td><span class="pill ${attPill[a.status] || ''}" style="padding:3px 9px;text-transform:capitalize">${esc(a.status || '—')}</span></td>
+                  <td>${
+                    a.placeholder || a.status === 'absent'
+                      ? `<button type="button" class="btn btn-ghost btn-sm emp-mark-present" data-emp-id="${esc(emp && emp.id)}" data-name="${esc(a.name)}">Mark present</button>`
+                      : a.outT === '—' || a.outT === '--'
+                        ? `<button type="button" class="btn btn-ghost btn-sm emp-mark-out" data-emp-id="${esc(emp && emp.id)}" data-name="${esc(a.name)}">Clock out</button>`
+                        : ''
+                  }</td>
+                </tr>`;
+              })
+              .join('')}
+            </tbody></table></div>`
+                : `<div class="sr-empty" style="padding:28px">No employees yet — add people in Directory first.</div>`
+            }
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="payroll">
-            <div class="panel-head"><h3>Payroll · June 2026</h3><button class="btn btn-primary btn-sm"><i class="fa-solid fa-money-check-dollar"></i> Run payroll</button></div>
-            <div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Base</th><th>Incentive</th><th>Deductions</th><th>Net pay</th></tr></thead><tbody>
-            ${currentPay.map(p=>`<tr><td><b>${p.name}</b></td><td><span class="role-tag ${p.rc}">${p.role}</span></td><td>${rs(p.base)}</td><td style="color:var(--green)">+${rs(p.inc)}</td><td style="color:var(--red)">- ${rs(p.ded)}</td><td class="td-strong">${rs(p.net)}</td></tr>`).join('')}
-            <tr><td colspan="5" style="text-align:right"><b style="color:var(--text)">Total payout</b></td><td><b style="color:var(--orange);font-size:15px">${rs(currentPay.reduce((a,p)=>a+p.net,0))}</b></td></tr>
+            <div class="panel-head">
+              <div>
+                <h3>Payroll · ${esc(monthLabel)}</h3>
+                <div style="font-size:12px;color:var(--text-soft);margin-top:2px">Base pay from directory · set salary when adding/editing staff</div>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" id="emp-export-payroll"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+            </div>
+            ${
+              currentEmployees.length
+                ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>Team member</th><th>Role</th><th>Base</th><th>Net pay</th></tr></thead><tbody>
+            ${currentPay
+              .map(
+                (p) =>
+                  `<tr><td><b>${esc(p.name)}</b></td><td><span class="role-tag ${esc(p.rc)}">${esc(p.role)}</span></td><td>${
+                    p.hasPay ? rs(p.base) : '<span style="color:var(--text-mute)">Not set</span>'
+                  }</td><td class="td-strong">${p.hasPay ? rs(p.net) : '—'}</td></tr>`
+              )
+              .join('')}
+            <tr><td colspan="3" style="text-align:right"><b style="color:var(--text)">Total (with salary set)</b></td><td><b style="color:var(--orange);font-size:15px">${rs(payTotal)}</b></td></tr>
             </tbody></table></div>
+            <p style="font-size:12px;color:var(--text-soft);margin:12px 0 0;line-height:1.45">Incentives &amp; deductions can be added later — we only show real directory salary so payroll never invents numbers.</p>`
+                : `<div class="sr-empty" style="padding:28px">Add employees with a monthly payroll amount to estimate payout.</div>`
+            }
           </div>`;
+
+        const rosterHint = panes.querySelector('#emp-roster-hint');
+        if (rosterHint)
+          rosterHint.onclick = () => {
+            RS.toast('Roster follows each member’s Day / Evening / Night / Off shift from Directory', 'fa-circle-info');
+          };
+
+        const exportPay = panes.querySelector('#emp-export-payroll');
+        if (exportPay)
+          exportPay.onclick = () => {
+            if (!currentPay.length) {
+              RS.toast('No employees to export', 'fa-circle-exclamation');
+              return;
+            }
+            const csv =
+              '\uFEFF' +
+              [
+                'Name,Role,Shift,Base,Net',
+                ...currentEmployees.map((e, i) => {
+                  const p = currentPay[i];
+                  return [e.name, e.role || '', e.shift || '', p.base, p.net]
+                    .map((v) => '"' + String(v).replace(/"/g, '""') + '"')
+                    .join(',');
+                }),
+              ].join('\r\n');
+            if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'payroll-' + monthLabel.replace(/\s+/g, '-') + '.csv');
+            RS.toast('Payroll CSV exported', 'fa-file-csv');
+          };
+
+        // Mark present / clock out → write attendance store
+        panes.querySelectorAll('.emp-mark-present').forEach((btn) => {
+          btn.onclick = async () => {
+            const empId = btn.dataset.empId;
+            const name = btn.dataset.name;
+            const emp = (RS.EMPLOYEES || []).find((e) => String(e.id) === String(empId) || e.name === name);
+            const now = new Date();
+            const row = {
+              id: 'att-' + (emp && emp.id ? emp.id : name) + '-' + now.toISOString().slice(0, 10),
+              employeeId: emp && emp.id,
+              employeeName: name,
+              date: now.toISOString().slice(0, 10),
+              clockInTime: now.toISOString(),
+              clockOutTime: null,
+              status: 'present',
+            };
+            try {
+              if (window.RS_DB) await RS_DB.put('attendance', row.id, row);
+              ATT_FROM_DB = true;
+              const existing = ATT.findIndex((a) => a.name === name);
+              const view = {
+                name,
+                role: (emp && emp.role) || 'Staff',
+                rc: (emp && emp.rc) || '',
+                inT: row.clockInTime,
+                outT: '—',
+                status: 'present',
+              };
+              if (existing >= 0) ATT[existing] = view;
+              else ATT.push(view);
+              RS.toast(name + ' marked present', 'fa-user-check');
+              drawPanes();
+            } catch (e) {
+              console.warn(e);
+              RS.toast('Could not save attendance', 'fa-circle-exclamation');
+            }
+          };
+        });
+        panes.querySelectorAll('.emp-mark-out').forEach((btn) => {
+          btn.onclick = async () => {
+            const name = btn.dataset.name;
+            const empId = btn.dataset.empId;
+            const now = new Date();
+            const day = now.toISOString().slice(0, 10);
+            const id = 'att-' + (empId || name) + '-' + day;
+            try {
+              let row = null;
+              if (window.RS_DB && RS_DB.get) row = await RS_DB.get('attendance', id).catch(() => null);
+              if (!row) {
+                row = {
+                  id,
+                  employeeId: empId,
+                  employeeName: name,
+                  date: day,
+                  clockInTime: now.toISOString(),
+                  status: 'present',
+                };
+              }
+              row.clockOutTime = now.toISOString();
+              if (window.RS_DB) await RS_DB.put('attendance', id, row);
+              ATT_FROM_DB = true;
+              const existing = ATT.findIndex((a) => a.name === name);
+              if (existing >= 0) {
+                ATT[existing].outT = row.clockOutTime;
+                ATT[existing].status = 'present';
+              }
+              RS.toast(name + ' clocked out', 'fa-clock');
+              drawPanes();
+            } catch (e) {
+              console.warn(e);
+              RS.toast('Could not clock out', 'fa-circle-exclamation');
+            }
+          };
+        });
+
         const activeBtn = sec.querySelector('.seg button.active');
         if (activeBtn) {
           const tabName = activeBtn.textContent.trim().toLowerCase();
@@ -1311,26 +1516,36 @@
         }
       }
 
-      // Load from DB
+      // Load from DB — real rows only
       if (window.RS_DB) {
         RS_DB.list('attendance').then(rows => {
-          if (rows && rows.length) {
+          const today = new Date().toISOString().slice(0, 10);
+          const todayRows = (rows || []).filter((r) => {
+            const d = String(r.date || r.clockInTime || '').slice(0, 10);
+            return d === today || (r.clockInTime && String(r.clockInTime).slice(0, 10) === today);
+          });
+          if (todayRows.length) {
+            ATT_FROM_DB = true;
             ATT.length = 0;
-            rows.forEach(r => {
+            todayRows.forEach(r => {
               const emp = (RS.EMPLOYEES||[]).find(e => e.id === r.employeeId) || {};
               ATT.push({
                 name: r.employeeName || emp.name || 'Unknown',
                 role: emp.role || 'Staff',
                 rc: emp.rc || 'r-waiter',
                 inT: r.clockInTime || '--',
-                outT: r.clockOutTime || '--',
+                outT: r.clockOutTime || '—',
                 status: r.status || 'present'
               });
             });
+          } else {
+            ATT_FROM_DB = false;
+            ATT.length = 0;
           }
           drawPanes();
         }).catch(e => {
           console.warn("Failed to load attendance", e);
+          ATT_FROM_DB = false;
           drawPanes();
         });
       } else {

@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v104 (2026-07-13) — Employees honesty + CRM edit/delete
+
+- **Roster**: built from each member’s real Day/Evening/Night/Off shift (no random fake week)
+- **Attendance**: only real DB punches; **Mark present / Clock out** writes `attendance` store; no invented times
+- **Payroll**: base from directory salary only; **Export CSV**; no fake incentives
+- **CRM**: edit profile (name/phone/email/tier/notes), delete customer, VIP/Gold/Silver broadcast filters
+- **CRM bills**: sorted by date, human times on cards + history
+- Empty CRM state with Add CTA
+
 ## v103 (2026-07-13) — Full product pass (remaining surfaces)
 
 - **Employees**: real Add team member modal, Reset PIN, Remove, honest attendance %, empty CTA wired
