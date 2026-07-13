@@ -1847,13 +1847,24 @@
         </style>`;
     }
 
-    /** Dedicated browser print window — NEVER thermal RSPrint. */
+    /**
+     * Open QR print sheet reliably.
+     * NOTE: window.open('', '_blank', 'noopener') often yields an EMPTY tab —
+     * document.write cannot populate a noopener window in modern Chrome.
+     * Use a Blob URL instead (always has content).
+     */
     function openQrPrintWindow(title, cardsHtml, meta) {
       const outlet = (meta && meta.outlet) || 'Restaurant';
       const count = (meta && meta.count) || 0;
       const sizeId = (meta && meta.sizeId) || getSavedQrPrintSizeId();
       const sizeLabel = (QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium).label;
       const autoPrint = !!(meta && meta.autoPrint);
+
+      if (!cardsHtml || !String(cardsHtml).trim()) {
+        if (window.RS && RS.toast) RS.toast('Nothing to print — try again', 'fa-circle-exclamation');
+        return null;
+      }
+
       const toolbar = autoPrint
         ? ''
         : `<div class="qr-print-toolbar no-print">
@@ -1880,22 +1891,74 @@
         toolbar +
         cardsHtml +
         (autoPrint
-          ? '<script>(function(){function go(){setTimeout(function(){window.print();},400);}var imgs=[].slice.call(document.images||[]);if(!imgs.length){go();return;}var n=0;function d(){n++;if(n>=imgs.length)go();}imgs.forEach(function(i){if(i.complete)d();else{i.onload=d;i.onerror=d;}});})();<\/script>'
+          ? '<script>(function(){function go(){setTimeout(function(){try{window.print()}catch(e){}},500);}var imgs=[].slice.call(document.images||[]);if(!imgs.length){go();return;}var n=0;function d(){n++;if(n>=imgs.length)go();}imgs.forEach(function(i){if(i.complete)d();else{i.onload=d;i.onerror=d;}});setTimeout(go,8000);})();<\/script>'
           : '') +
         '</body></html>';
 
-      const win = window.open('', '_blank', 'noopener,noreferrer,width=920,height=720');
-      if (!win) {
-        if (window.RS && RS.toast) RS.toast('Allow pop-ups to print QR cards', 'fa-print');
+      try {
+        const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        // Do NOT use noopener here — we need a usable window; Blob URL is same-origin-ish
+        const win = window.open(url, '_blank');
+        if (!win) {
+          URL.revokeObjectURL(url);
+          // Fallback: hidden iframe print
+          return printQrViaIframe(doc, title);
+        }
+        // Revoke after load so tab keeps content in memory
+        setTimeout(() => {
+          try {
+            URL.revokeObjectURL(url);
+          } catch (_) {}
+        }, 60000);
+        try {
+          win.focus();
+        } catch (_) {}
+        if (window.RS && RS.toast) {
+          RS.toast('Print sheet ready — click Print in the new tab', 'fa-print');
+        }
+        return win;
+      } catch (e) {
+        console.warn('[QR print] blob open failed', e);
+        return printQrViaIframe(doc, title);
+      }
+    }
+
+    function printQrViaIframe(docHtml, title) {
+      try {
+        const prev = document.getElementById('rs-qr-print-frame');
+        if (prev) prev.remove();
+        const f = document.createElement('iframe');
+        f.id = 'rs-qr-print-frame';
+        f.setAttribute('title', title || 'QR print');
+        f.style.cssText =
+          'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none';
+        document.body.appendChild(f);
+        const idoc = f.contentWindow.document;
+        idoc.open();
+        idoc.write(docHtml);
+        idoc.close();
+        const go = () => {
+          try {
+            f.contentWindow.focus();
+            f.contentWindow.print();
+          } catch (err) {
+            console.warn(err);
+            if (window.RS && RS.toast) RS.toast('Could not open print — allow pop-ups', 'fa-print');
+          }
+          setTimeout(() => {
+            try {
+              f.remove();
+            } catch (_) {}
+          }, 2000);
+        };
+        setTimeout(go, 600);
+        return f;
+      } catch (e) {
+        console.warn('[QR print] iframe failed', e);
+        if (window.RS && RS.toast) RS.toast('Print failed — allow pop-ups and try again', 'fa-circle-exclamation');
         return null;
       }
-      win.document.open();
-      win.document.write(doc);
-      win.document.close();
-      try {
-        win.focus();
-      } catch (_) {}
-      return win;
     }
 
     function buildCardsHtml(tableQrs, tenantName, sizeId) {

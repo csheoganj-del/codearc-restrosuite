@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v123 (2026-07-13) — Fix empty QR print tab
+
+- Print sheet uses **Blob URL** (not `document.write` into a noopener blank tab)
+- Fallback: silent iframe print if pop-ups blocked
+- Toast when sheet is ready
+
 ## v122 (2026-07-13) — QR print sizes (mini → full page)
 
 - Print Table QRs / single table QR: choose **Mini sticker · Small · Medium · Large · Full page**
