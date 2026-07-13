@@ -1401,6 +1401,7 @@
               'btn-export-low-stock-toolbar',
               'btn-inv-variance',
               'btn-inv-prep',
+              'btn-inv-takeaway-pack',
               'inv-stock-search',
             ];
             stockOnly.forEach((id) => {
@@ -1430,6 +1431,7 @@
           'btn-export-low-stock-toolbar',
           'btn-inv-variance',
           'btn-inv-prep',
+          'btn-inv-takeaway-pack',
           'inv-stock-search',
         ];
         stockOnly.forEach((id) => {
@@ -2011,6 +2013,201 @@
     if (prepBtn && !prepBtn.dataset.wired) {
       prepBtn.dataset.wired = '1';
       prepBtn.onclick = () => openPrepBatchModal();
+    }
+
+    function loadTakeawayPackCfg() {
+      try {
+        if (global.RSInventoryLedger && RSInventoryLedger.loadTakeawayPackConfig) {
+          return RSInventoryLedger.loadTakeawayPackConfig();
+        }
+        const raw = localStorage.getItem('rs_takeaway_pack');
+        if (raw) return JSON.parse(raw);
+      } catch (_) {}
+      return { enabled: false, items: [], applyDelivery: true };
+    }
+    async function saveTakeawayPackCfg(cfg) {
+      try {
+        localStorage.setItem('rs_takeaway_pack', JSON.stringify(cfg));
+      } catch (_) {}
+      try {
+        if (!global.RS_SETTINGS) global.RS_SETTINGS = {};
+        global.RS_SETTINGS.set_takeaway_pack = cfg;
+        if (global.RS && RS.saveSettings) await RS.saveSettings(global.RS_SETTINGS);
+      } catch (_) {}
+    }
+    function openTakeawayPackModal() {
+      if (!global.RSModal) return;
+      const cfg = loadTakeawayPackCfg();
+      let items = (cfg.items || []).map((x) => ({
+        name: x.name,
+        qty: Number(x.qty) || 1,
+        unit: x.unit || 'gm',
+      }));
+      let enabled = cfg.enabled !== false;
+      let applyDelivery = cfg.applyDelivery !== false;
+      if (!items.length && INVENTORY.length) {
+        // Suggest common packaging already in stock
+        const sug = INVENTORY.filter((i) => {
+          const hay = String(i.name || '').toLowerCase() + ' ' + String(i.cat || '').toLowerCase();
+          return /pack|bag|box|napkin|foil|container|carry|parcel/.test(hay);
+        }).slice(0, 4);
+        items = sug.map((i) => ({
+          name: i.name,
+          qty: 1,
+          unit: i.unit || 'gm',
+        }));
+      }
+      RSModal.open({
+        title: 'Takeaway packaging pack',
+        sub: 'Auto-used on Takeaway / Delivery — not added to the customer cart',
+        icon: 'fa-bag-shopping',
+        size: 'md',
+        body: `
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <p class="klc-p" style="margin:0">
+              <b>Do not put bags in the POS cart</b> (unless you charge a bag fee as a menu item).
+              Industry practice: when order type is <b>Takeaway</b> or <b>Delivery</b>, stock of bag/box/napkin is deducted <b>once per bill</b> automatically.
+              Per-dish packaging (e.g. pizza box) still belongs on that dish’s <b>recipe</b>.
+            </p>
+            <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer">
+              <input type="checkbox" id="tk-en" ${enabled ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--orange)">
+              Enable takeaway pack deduction
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="tk-del" ${applyDelivery ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--orange)">
+              Also apply on <b>Delivery</b> orders
+            </label>
+            <div>
+              <label class="fl">Pack contents (from stock)</label>
+              <div id="tk-list"></div>
+              <button type="button" class="btn btn-ghost btn-block" id="tk-add" style="border-style:dashed;margin-top:8px">
+                <i class="fa-solid fa-plus"></i> Add packaging item
+              </button>
+            </div>
+            <div style="font-size:12px;color:var(--text-mute);line-height:1.45">
+              Example: 1× Paper bag + 2× Napkin per takeaway bill. Units stay kg/gm/ltr/ml as on stock cards.
+            </div>
+          </div>`,
+        foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+          <button type="button" class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-circle-check"></i> Save pack</button>`,
+        onMount(modal, close) {
+          const listEl = modal.querySelector('#tk-list');
+          function draw() {
+            listEl.innerHTML =
+              items
+                .map(
+                  (g, i) =>
+                    `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+                  <span style="flex:1;min-width:100px;font-weight:700">${esc(displayInvName(g.name))}</span>
+                  <label style="font-size:11px;color:var(--text-mute)">Qty / order</label>
+                  <input type="number" class="form-input" data-tq="${i}" min="0" step="any" value="${esc(g.qty)}" style="width:80px">
+                  <span style="font-size:12px;color:var(--text-mute);min-width:36px">${esc(
+                    global.RSRecipeUnits && RSRecipeUnits.displayUnit
+                      ? RSRecipeUnits.displayUnit(g.unit)
+                      : g.unit || ''
+                  )}</span>
+                  <button type="button" class="icon-act danger" data-td="${i}"><i class="fa-solid fa-trash"></i></button>
+                </div>`
+                )
+                .join('') ||
+              '<div class="sr-empty" style="padding:14px;font-size:13px">No items yet — add bag, box, napkin from stock.</div>';
+            listEl.querySelectorAll('[data-tq]').forEach((inp) => {
+              inp.oninput = () => {
+                items[+inp.getAttribute('data-tq')].qty = Number(inp.value) || 0;
+              };
+            });
+            listEl.querySelectorAll('[data-td]').forEach((btn) => {
+              btn.onclick = () => {
+                items.splice(+btn.getAttribute('data-td'), 1);
+                draw();
+              };
+            });
+          }
+          draw();
+          modal.querySelector('#tk-en').onchange = (e) => {
+            enabled = !!e.target.checked;
+          };
+          modal.querySelector('#tk-del').onchange = (e) => {
+            applyDelivery = !!e.target.checked;
+          };
+          modal.querySelector('[data-x]').onclick = close;
+          modal.querySelector('#tk-add').onclick = () => {
+            if (!INVENTORY.length) {
+              toast('Add packaging to stock first (e.g. Paper bag)', 'fa-box');
+              return;
+            }
+            global.RSModal.open({
+              title: 'Add to takeaway pack',
+              sub: 'Pick from store room',
+              icon: 'fa-box',
+              size: 'sm',
+              body: `<input class="form-input" id="tk-q" placeholder="Search packaging…" style="margin-bottom:10px"><div id="tk-pick" class="klc-pick-list"></div>`,
+              foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>`,
+              onMount(sm, sc) {
+                sm.querySelector('[data-x]').onclick = sc;
+                const q = sm.querySelector('#tk-q');
+                const pick = sm.querySelector('#tk-pick');
+                function drawP() {
+                  const t = (q.value || '').toLowerCase();
+                  pick.innerHTML = INVENTORY.filter((i) =>
+                    displayInvName(i.name).toLowerCase().includes(t)
+                  )
+                    .map(
+                      (i) =>
+                        `<button type="button" class="klc-pick" data-n="${esc(i.name)}" data-u="${esc(i.unit || 'gm')}">
+                      <span class="klc-pick-t">${esc(displayInvName(i.name))}</span>
+                      <span class="klc-pick-s">${esc(i.cat || '')} · ${Number(i.stock) || 0} ${esc(
+                          global.RSRecipeUnits && RSRecipeUnits.displayUnit
+                            ? RSRecipeUnits.displayUnit(i.unit)
+                            : i.unit || ''
+                        )}</span>
+                    </button>`
+                    )
+                    .join('');
+                  pick.querySelectorAll('[data-n]').forEach((el) => {
+                    el.onclick = () => {
+                      const n = el.getAttribute('data-n');
+                      if (!items.find((x) => x.name === n)) {
+                        items.push({
+                          name: n,
+                          qty: 1,
+                          unit: el.getAttribute('data-u') || 'gm',
+                        });
+                      }
+                      sc();
+                      draw();
+                    };
+                  });
+                }
+                q.oninput = drawP;
+                drawP();
+              },
+            });
+          };
+          modal.querySelector('[data-ok]').onclick = async () => {
+            const clean = items.filter((x) => x.name && Number(x.qty) > 0);
+            const next = {
+              enabled: enabled && clean.length > 0,
+              applyDelivery,
+              items: clean,
+            };
+            await saveTakeawayPackCfg(next);
+            close();
+            toast(
+              next.enabled
+                ? 'Takeaway pack on · ' + clean.length + ' item(s) per Takeaway/Delivery bill'
+                : 'Takeaway pack saved (disabled or empty)',
+              'fa-bag-shopping'
+            );
+          };
+        },
+      });
+    }
+
+    const packBtn = $('#btn-inv-takeaway-pack');
+    if (packBtn && !packBtn.dataset.wired) {
+      packBtn.dataset.wired = '1';
+      packBtn.onclick = () => openTakeawayPackModal();
     }
     if (global.RSInventoryUI) global.RSInventoryUI._openAddStockModal = openAddStockModal;
     document.dispatchEvent(new CustomEvent('rs:render-inventory'));

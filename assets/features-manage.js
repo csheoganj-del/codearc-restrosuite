@@ -975,6 +975,7 @@
           const missingN = menu.length - linkedN;
           const coverage = menu.length ? Math.round((linkedN / menu.length) * 100) : 0;
 
+          const invN = (RS.INVENTORY || []).length;
           const cov = $('#recipe-coverage-bar', panes);
           if (cov) {
             cov.innerHTML = `
@@ -982,11 +983,65 @@
               <span class="pill pill-amber" style="padding:4px 10px">${missingN} need recipe</span>
               <span class="pill" style="padding:4px 10px">${coverage}% coverage</span>
               <span class="pill" style="padding:4px 10px">${menu.length} menu items</span>
+              <span class="pill" style="padding:4px 10px">${invN} stock items</span>
               ${
                 missingN
                   ? `<span style="font-size:12.5px;color:var(--text-soft);align-self:center">Link recipes so selling a dish reduces store-room stock.</span>`
                   : `<span style="font-size:12.5px;color:var(--green);align-self:center;font-weight:600">All dishes are linked to stock.</span>`
               }`;
+          }
+
+          // 10/10 next-step strip when setup incomplete
+          const nextEl = $('#recipe-next-step', panes);
+          if (nextEl) {
+            if (!invN) {
+              nextEl.style.display = 'flex';
+              nextEl.className = 'recipe-next-step recipe-next-urgent';
+              nextEl.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i>
+                <div style="flex:1"><b>Step 1 of 2 — Add store-room stock first</b><br>
+                <span style="font-size:12.5px;color:var(--text-soft)">You have ${menu.length} menu dishes but <b>0 stock items</b>. Add milk, coffee, flour… (units: kg, gm, ltr, ml), then come back to link recipes.</span></div>
+                <button type="button" class="btn btn-primary btn-sm" id="recipe-go-stock"><i class="fa-solid fa-plus"></i> Add stock</button>`;
+              const go = nextEl.querySelector('#recipe-go-stock');
+              if (go)
+                go.onclick = () => {
+                  if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.goInventoryTab) {
+                    RSKitchenLinkCoach.goInventoryTab('stock');
+                  } else {
+                    const b = document.querySelector('#inv-seg [data-inv-tab="stock"], #inv-seg button');
+                    if (b) b.click();
+                  }
+                  setTimeout(() => {
+                    if (window.RSInventoryUI && RSInventoryUI.openAddStockModal) {
+                      RSInventoryUI.openAddStockModal({ typeId: 'food' });
+                    } else {
+                      const add = document.getElementById('btn-add-ingredient');
+                      if (add) add.click();
+                    }
+                  }, 200);
+                };
+            } else if (missingN > 0) {
+              nextEl.style.display = 'flex';
+              nextEl.className = 'recipe-next-step';
+              nextEl.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i>
+                <div style="flex:1"><b>Step 2 — Link dishes to stock</b><br>
+                <span style="font-size:12.5px;color:var(--text-soft)"><b>${missingN}</b> of ${menu.length} still need a recipe. Tap <b>Help me</b> on a row (or below) — set servings + qty in kg/gm/ltr/ml.</span></div>
+                <button type="button" class="btn btn-primary btn-sm" id="recipe-go-help"><i class="fa-solid fa-wand-magic-sparkles"></i> Help me link next</button>`;
+              const gh = nextEl.querySelector('#recipe-go-help');
+              if (gh)
+                gh.onclick = () => {
+                  if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.openLinkWizard) {
+                    RSKitchenLinkCoach.openLinkWizard();
+                  }
+                };
+            } else {
+              nextEl.style.display = 'none';
+              nextEl.innerHTML = '';
+            }
+          }
+
+          // Default filter: show "needs recipe" first when nothing linked yet
+          if (!sec._recipeFilterUserSet && missingN === menu.length && menu.length) {
+            sec._recipeFilter = 'missing';
           }
 
           const q = String(sec._recipeSearch || '').toLowerCase().trim();
@@ -1198,6 +1253,7 @@
             if (!el || el._rsWired) return;
             el._rsWired = true;
             el.onclick = () => {
+              sec._recipeFilterUserSet = true;
               sec._recipeFilter = key;
               drawPanes();
             };
@@ -1850,6 +1906,7 @@
           'btn-export-low-stock-toolbar',
           'btn-inv-variance',
           'btn-inv-prep',
+          'btn-inv-takeaway-pack',
           'inv-stock-search',
         ];
         const segBtns = $$('.seg button', sec);

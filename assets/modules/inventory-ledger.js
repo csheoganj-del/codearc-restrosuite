@@ -73,6 +73,93 @@
     return { lines, noRecipeCount };
   }
 
+  /**
+   * Takeaway / Delivery order-level packaging — NOT cart lines.
+   * One pack per order when channel is takeaway or delivery.
+   * Config: RS_SETTINGS.set_takeaway_pack or localStorage rs_takeaway_pack
+   *   { enabled: true, items: [{ name, qty, unit }], applyDelivery: true }
+   */
+  function loadTakeawayPackConfig() {
+    try {
+      const s = (global.RS_SETTINGS || global.RS && RS.getSettings && null) || global.RS_SETTINGS || {};
+      let cfg = s.set_takeaway_pack;
+      if (typeof cfg === 'string') {
+        try {
+          cfg = JSON.parse(cfg);
+        } catch (_) {
+          cfg = null;
+        }
+      }
+      if (!cfg || typeof cfg !== 'object') {
+        const raw = global.localStorage && localStorage.getItem('rs_takeaway_pack');
+        if (raw) cfg = JSON.parse(raw);
+      }
+      if (!cfg || typeof cfg !== 'object') return { enabled: false, items: [], applyDelivery: true };
+      return {
+        enabled: cfg.enabled !== false && Array.isArray(cfg.items) && cfg.items.length > 0,
+        items: Array.isArray(cfg.items) ? cfg.items : [],
+        applyDelivery: cfg.applyDelivery !== false,
+      };
+    } catch (_) {
+      return { enabled: false, items: [], applyDelivery: true };
+    }
+  }
+
+  function isParcelChannel(billRow) {
+    const ch = String(
+      (billRow && (billRow.channel || billRow.orderType || billRow.order_type || billRow.table)) || ''
+    ).toLowerCase();
+    if (ch.includes('dine')) return false;
+    if (ch.includes('take') || ch.includes('parcel') || ch.includes('carry')) return true;
+    if (ch.includes('deliv')) return true;
+    // walk-in takeaway tables often labeled this way
+    if (ch.includes('walk') && ch.includes('take')) return true;
+    return false;
+  }
+
+  function isDeliveryChannel(billRow) {
+    const ch = String((billRow && (billRow.channel || billRow.orderType || '')) || '').toLowerCase();
+    return ch.includes('deliv');
+  }
+
+  /** Merge order-level packaging lines into food recipe lines (once per bill). */
+  function appendTakeawayPackLines(lines, billRow) {
+    const cfg = loadTakeawayPackConfig();
+    if (!cfg.enabled || !cfg.items.length) return { lines: lines || [], packCount: 0 };
+    const parcel = isParcelChannel(billRow);
+    if (!parcel) return { lines: lines || [], packCount: 0 };
+    if (isDeliveryChannel(billRow) && cfg.applyDelivery === false) {
+      return { lines: lines || [], packCount: 0 };
+    }
+    const inv = getInventory();
+    const out = (lines || []).slice();
+    let packCount = 0;
+    cfg.items.forEach((it) => {
+      const name = String(it.name || '').trim();
+      const qty = Number(it.qty) || 0;
+      if (!name || qty <= 0) return;
+      const stock = inv.find((x) => String(x.name).toLowerCase() === name.toLowerCase());
+      const unit = (stock && stock.unit) || it.unit || 'gm';
+      const key = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
+      // merge with existing line if recipe already uses same pack item
+      const existing = out.find(
+        (l) =>
+          (l.name && String(l.name).toLowerCase() === name.toLowerCase()) ||
+          (l.key && l.key === key)
+      );
+      if (existing) {
+        existing.qty = (Number(existing.qty) || 0) + qty;
+      } else {
+        out.push({ key, name, qty, unit, pack: true });
+      }
+      packCount++;
+    });
+    return { lines: out, packCount };
+  }
+
   async function deductInventoryForBill(billRow) {
     const MENU = getMenu();
     const INVENTORY = getInventory();
@@ -86,7 +173,11 @@
       return;
     }
 
-    const { lines, noRecipeCount } = buildLines(items, MENU);
+    let { lines, noRecipeCount } = buildLines(items, MENU);
+    const packMerge = appendTakeawayPackLines(lines, billRow);
+    lines = packMerge.lines;
+    const packCount = packMerge.packCount || 0;
+
     if (!lines.length) {
       if (noRecipeCount === items.length) {
         toast('No stock deducted: link recipes under Inventory > Recipes', 'fa-triangle-exclamation');
@@ -133,7 +224,12 @@
             console.info('[Inventory] Server reported duplicate deduction for', deductKey);
           } else if (deductedCount > 0) {
             toast(
-              'Stock updated: ' + deductedCount + ' ingredient' + (deductedCount === 1 ? '' : 's') + ' deducted',
+              'Stock updated: ' +
+                deductedCount +
+                ' item' +
+                (deductedCount === 1 ? '' : 's') +
+                ' deducted' +
+                (packCount ? ' · incl. takeaway pack' : ''),
               'fa-boxes-stacked'
             );
           }
@@ -246,9 +342,10 @@
       toast(
         'Stock updated: ' +
           deductedCount +
-          ' ingredient' +
+          ' item' +
           (deductedCount === 1 ? '' : 's') +
-          ' deducted from inventory',
+          ' deducted' +
+          (packCount ? ' · incl. takeaway pack' : ''),
         'fa-boxes-stacked'
       );
       if (noRecipeCount) {
@@ -340,6 +437,9 @@
     deductInventoryForBill,
     restoreInventoryForBill,
     buildLines,
+    loadTakeawayPackConfig,
+    appendTakeawayPackLines,
+    isParcelChannel,
   };
 
   function attach() {

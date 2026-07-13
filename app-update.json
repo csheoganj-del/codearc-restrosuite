@@ -1,12 +1,12 @@
 {
-  "version": "v172-20260713-recipes-10",
+  "version": "v173-20260713-takeaway-pack",
   "date": "2026-07-13",
-  "title": "Recipes pane 10/10 — clear next step",
-  "summary": "Recipes tab hides stock-only toolbar (Variance/Prep/Export). Clear Step 1 add stock / Step 2 link dishes strip when 0% linked. Formula text uses plain English. Defaults to Needs recipe when nothing linked.",
+  "title": "Takeaway packaging pack (not cart)",
+  "summary": "Takeaway/Delivery packaging is deducted automatically once per bill — not added as POS cart lines. Configure under Inventory → Takeaway pack (bag, napkin, etc.). Per-dish boxes still go on the dish recipe.",
   "highlights": [
-    "Stock toolbar only on Stock levels — not on Recipes",
-    "Next-step banner: Add stock first OR Help me link next",
-    "Default filter: Needs recipe when coverage is 0%",
-    "Clearer stock calculation copy (divided by servings)"
+    "Industry rule: pack is order-level, not a menu line (unless bag fee)",
+    "Inventory → Takeaway pack: enable + pick stock items + qty per order",
+    "Applies on Takeaway and optional Delivery",
+    "Food recipes still deduct food; pack adds bag/napkin once per bill"
   ]
 }

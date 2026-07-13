@@ -81,7 +81,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v172-20260713-recipes-10';
+    var builtin = 'v173-20260713-takeaway-pack';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -912,6 +912,7 @@
           </div>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-variance" title="Theoretical usage from sales vs stock"><i class="fa-solid fa-chart-column"></i> Variance</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-prep" title="Run prep batch: use stock to make stock"><i class="fa-solid fa-blender"></i> Prep</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-takeaway-pack" title="Packaging auto-used on Takeaway / Delivery orders"><i class="fa-solid fa-bag-shopping"></i> Takeaway pack</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-export-inventory" title="Export all stock items to CSV"><i class="fa-solid fa-file-export"></i> Export</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-download-inventory-template" title="CSV template for bulk import"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
