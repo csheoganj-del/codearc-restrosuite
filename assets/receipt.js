@@ -28,8 +28,17 @@
     [data-rs-receipt-export] .rcp-tot { display: flex; justify-content: space-between; font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 17px; margin-top: 6px; color: #16151c; }
     [data-rs-receipt-export] .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
     [data-rs-receipt-export] .rcp-foot b { color: #16151c; }
-    [data-rs-receipt-export] .rcp-qr-wrap { margin-top:10px;padding-top:10px;border-top:1px dashed #c9c6bd;display:flex;flex-direction:column;align-items:center; }
-    [data-rs-receipt-export] .rcp-qr-wrap img { width:100px;height:100px;display:block; }
+    [data-rs-receipt-export] .rcp-qr-wrap {
+      margin-top:12px;padding-top:12px;border-top:1px dashed #c9c6bd;
+      display:flex !important;flex-direction:column !important;align-items:center !important;
+      justify-content:center !important;text-align:center !important;width:100%;
+    }
+    [data-rs-receipt-export] .rcp-qr-wrap img {
+      width:100px;height:100px;display:block;margin:0 auto;
+    }
+    [data-rs-receipt-export] .rcp-qr-label {
+      font-size:10px;color:#6b6960;margin-top:6px;text-align:center;width:100%;
+    }
   `;
 
   function esc(v) {
@@ -236,9 +245,9 @@
       ${tenders}
       ${m.change ? `<div class="rcp-line"><span class="q">Change</span><span>${$(m.change)}</span></div>` : ''}
       ${qrDataUri ? `
-        <div class="rcp-center rcp-qr-wrap">
-          <div style="font-size:10px;color:#6b6960;margin-bottom:6px;text-align:center;">Scan to view digital bill</div>
-          <img src="${qrDataUri}" width="100" height="100" alt="Digital bill QR" style="width:100px;height:100px;display:block;" crossorigin="anonymous" />
+        <div class="rcp-qr-wrap">
+          <img src="${qrDataUri}" width="100" height="100" alt="Digital bill QR" crossorigin="anonymous" />
+          <div class="rcp-qr-label">Scan to view digital bill</div>
         </div>` : ''}
       <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
   }

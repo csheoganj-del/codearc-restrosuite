@@ -166,10 +166,11 @@
         const root = RS.getModalRoot();
         const ov = document.createElement('div');
         ov.className = 'rs-overlay';
-        const head = opts.title!=null ? `<div class="rs-mhead">${opts.icon?`<div class="mh-ic"><i class="fa-solid ${opts.icon}"></i></div>`:''}<div><h3>${opts.title}</h3>${opts.sub?`<div class="sub">${opts.sub}</div>`:''}</div><button class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>` : '';
+        const icCls = ['mh-ic', opts.iconClass || ''].filter(Boolean).join(' ');
+        const head = opts.title!=null ? `<div class="rs-mhead">${opts.icon?`<div class="${icCls}"${opts.iconId?` id="${opts.iconId}"`:''}><i class="fa-solid ${opts.icon}"></i></div>`:''}<div class="rs-mhead-text"><h3>${opts.title}</h3>${opts.sub?`<div class="sub">${opts.sub}</div>`:''}</div><button class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>` : '';
         const body = opts.bare ? (opts.body||'') : `<div class="rs-mbody ${opts.bodyClass||''}">${opts.body||''}</div>`;
         const foot = opts.foot ? `<div class="rs-mfoot">${opts.foot}</div>` : '';
-        ov.innerHTML = `<div class="rs-modal ${opts.size||'md'}">${head}${body}${foot}</div>`;
+        ov.innerHTML = `<div class="rs-modal ${opts.size||'md'} ${opts.modalClass||''}">${head}${body}${foot}</div>`;
         root.appendChild(ov);
         const close = ()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),300); document.removeEventListener('keydown', esc); };
         const esc = e=>{ if(e.key==='Escape') close(); };
@@ -210,7 +211,9 @@
           .rcp-tot{display:flex;justify-content:space-between;font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:15px;margin-top:6px}
           .rcp-foot{text-align:center;font-size:10.5px;color:#6b6960;margin-top:12px}
           .rcp-foot b{color:#16151c}
-          .rcp-qr-wrap{margin-top:8px;padding-top:8px;border-top:1px dashed #8a877c;display:flex;flex-direction:column;align-items:center}
+          .rcp-qr-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed #8a877c;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
+          .rcp-qr-wrap img{width:90px;height:90px;display:block;margin:0 auto}
+          .rcp-qr-label{font-size:10px;color:#6b6960;margin-top:6px;text-align:center;width:100%}
           .kot-h{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
           .kot-h .kt{font-weight:700;font-size:18px}
           .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}
@@ -1127,35 +1130,66 @@
       }
     }
 
+    function isBillSyncPending(st) {
+      return st === 'pending' || st === 'local' || st === 'saving';
+    }
+
+    function billSyncChipHtml(st) {
+      if (isBillSyncPending(st)) {
+        return `<span class="rc-sync-chip pending" id="rc-sync-chip" title="Uploading to cloud">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Saving…
+        </span>`;
+      }
+      return `<span class="rc-sync-chip ok" id="rc-sync-chip" title="Saved to cloud">
+        <i class="fa-solid fa-circle-check"></i> Bill synced
+      </span>`;
+    }
+
+    function paintBillSettledSync(modal, st) {
+      if (!modal) return;
+      const pending = isBillSyncPending(st);
+      const chip = modal.querySelector('#rc-sync-chip');
+      if (chip) {
+        chip.className = 'rc-sync-chip ' + (pending ? 'pending' : 'ok');
+        chip.innerHTML = pending
+          ? '<i class="fa-solid fa-cloud-arrow-up"></i> Saving…'
+          : '<i class="fa-solid fa-circle-check"></i> Bill synced';
+        chip.title = pending ? 'Uploading to cloud' : 'Saved to cloud';
+      }
+      const ic = modal.querySelector('#rc-settle-ic');
+      if (ic) {
+        ic.classList.toggle('mh-ic-sync', pending);
+        ic.classList.toggle('mh-ic-ok', !pending);
+      }
+    }
+
     async function showReceipt(bill) {
-      const qrDataUri = await generateReceiptQrDataUri(bill);
-      const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
+      // Open modal immediately — do NOT await QR (that blocked scroll for seconds)
       const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
-      const st = bill.syncStatus || 'synced';
-      const syncBanner = st === 'pending' || st === 'local' || st === 'saving'
-        ? `<div style="margin:0 0 10px;padding:8px 11px;border-radius:10px;border:1px solid rgba(234,179,8,.35);background:rgba(234,179,8,.1);font-size:12px;line-height:1.45;color:var(--text-soft);display:flex;gap:8px;align-items:center">
-            <i class="fa-solid fa-cloud-arrow-up" style="color:#ca8a04"></i>
-            <span><b style="color:var(--text)">Saved on this device</b> - cloud sync ${st === 'saving' ? 'in progress' : 'pending'}. Bill is safe; will upload when online.</span>
-          </div>`
-        : `<div style="margin:0 0 10px;padding:6px 10px;border-radius:10px;border:1px solid rgba(34,197,94,.28);background:rgba(34,197,94,.08);font-size:11.5px;color:var(--text-soft);display:flex;gap:8px;align-items:center">
-            <i class="fa-solid fa-circle-check" style="color:#16a34a"></i>
-            <span>Bill synced | ${esc(bill.no || '')}</span>
-          </div>`;
+      const st0 = bill.syncStatus || 'synced';
+      const pending0 = isBillSyncPending(st0);
+      let liveQr = null;
+      let printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, null)}</div>`;
+
       const connectBanner = !gwReady
-        ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
-            <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
-            <div style="flex:1;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
-              <b style="color:var(--text)">Connect WhatsApp</b> for automatic PDF send. Green icon below opens manual chat backup.
-              <span style="color:var(--orange);font-weight:600"> Open Gateway -&gt;</span>
+        ? `<div id="rc-wa-cta" class="rc-wa-banner">
+            <i class="fa-brands fa-whatsapp"></i>
+            <div class="rc-wa-banner-text">
+              <b>Connect WhatsApp</b> for automatic PDF send. Green icon below opens manual chat backup.
+              <span class="rc-wa-banner-link"> Open Gateway -&gt;</span>
             </div>
           </div>`
         : '';
+
       RSModal.open({
         title: 'Bill settled',
-        sub: `${esc(bill.no || '')} | ${rs(bill.grand)}`,
+        sub: `<span class="rc-bill-meta">${esc(bill.no || '')} | ${rs(bill.grand)}</span>${billSyncChipHtml(st0)}`,
         icon: 'fa-circle-check',
+        iconClass: pending0 ? 'mh-ic-sync' : 'mh-ic-ok',
+        iconId: 'rc-settle-ic',
         size: 'sm',
-        body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
+        modalClass: 'rc-settle-modal',
+        body: `${connectBanner}<div class="receipt-paper" id="rc-paper">${receiptHTML(bill, null)}</div>`,
         foot: `<div class="rc-foot-actions" role="toolbar" aria-label="Bill actions">
               <button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">
                 <i class="fa-brands fa-whatsapp"></i>
@@ -1172,11 +1206,14 @@
             </div>`,
         onMount(modal, close) {
           const printBtn = modal.querySelector('#rc-print');
-          if (printBtn) printBtn.onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
+          if (printBtn) {
+            printBtn.onclick = () => {
+              RSPrint(printHtml, 'Receipt ' + bill.no);
+            };
+          }
           const thEl = modal.querySelector('#rc-thermal');
           if (thEl) {
             thEl.onclick = () => {
-              // Always same formatted preview as on screen (not plain ESC/POS text)
               if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
                 RSOps.printBillThermal(bill);
               } else {
@@ -1185,19 +1222,55 @@
             };
           }
           const waEl = modal.querySelector('#rc-wa');
-          // Manual backup: always open WhatsApp chat (does not depend on Gateway auto-send)
           if (waEl) waEl.onclick = () => openManualWhatsAppBill(bill);
           const cta = modal.querySelector('#rc-wa-cta');
           if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
           const newBtn = modal.querySelector('#rc-new');
           if (newBtn) newBtn.onclick = close;
-          // Warm PDF only after idle — export CSS is scoped so it cannot restyle this preview
+
+          // QR inject after first paint (keeps scroll free)
+          const injectQr = (qr) => {
+            liveQr = qr;
+            printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qr)}</div>`;
+            const paper = modal.querySelector('#rc-paper');
+            if (paper && qr) paper.innerHTML = receiptHTML(bill, qr);
+          };
+          setTimeout(() => {
+            generateReceiptQrDataUri(bill).then(injectQr).catch(() => {});
+          }, 80);
+
+          // Live orange -> green when cloud save completes
+          paintBillSettledSync(modal, st0);
+          let ticks = 0;
+          const syncTimer = setInterval(() => {
+            ticks += 1;
+            if (ticks > 40 || !modal.isConnected) {
+              clearInterval(syncTimer);
+              return;
+            }
+            let st = bill.syncStatus || 'synced';
+            try {
+              if (window.RS && Array.isArray(RS.BILLS)) {
+                const hit = RS.BILLS.find((b) => b && (b.no === bill.no || b.id === bill.id || b.orderId === bill.no));
+                if (hit && hit.syncStatus) st = hit.syncStatus;
+              }
+            } catch (_) {}
+            if (!isBillSyncPending(st)) {
+              bill.syncStatus = 'synced';
+              paintBillSettledSync(modal, 'synced');
+              clearInterval(syncTimer);
+            } else {
+              paintBillSettledSync(modal, st);
+            }
+          }, 500);
+
+          // PDF warm long after open so first scroll never freezes
           if (window.RSReceiptEngine && RSReceiptEngine.toPDF) {
             const warm = () => RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() }).catch(() => {});
             setTimeout(() => {
-              if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 5000 });
+              if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 8000 });
               else warm();
-            }, 1800);
+            }, 3500);
           }
         }
       });

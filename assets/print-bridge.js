@@ -23,6 +23,9 @@
           font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         body > div, .receipt-paper {
           max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important;
@@ -54,8 +57,13 @@
         }
         .rcp-foot { text-align: center; font-size: 10.5px; color: #6b6960; margin-top: 12px; }
         .rcp-foot b { color: #16151c; }
-        .rcp-qr-wrap { margin-top:8px;padding-top:8px;border-top:1px dashed #8a877c;display:flex;flex-direction:column;align-items:center; }
-        .rcp-qr-wrap img { width:90px;height:90px;display:block; }
+        .rcp-qr-wrap {
+          margin-top:10px;padding-top:10px;border-top:1px dashed #8a877c;
+          display:flex !important;flex-direction:column !important;align-items:center !important;
+          justify-content:center !important;text-align:center !important;width:100%;
+        }
+        .rcp-qr-wrap img { width:90px;height:90px;display:block;margin:0 auto; }
+        .rcp-qr-label { font-size:10px;color:#6b6960;margin-top:6px;text-align:center;width:100%; }
         .kot-h{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
         .kot-h .kt{font-weight:700;font-size:18px}
         .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}

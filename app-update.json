@@ -1,11 +1,12 @@
 {
-  "version": "v185-20260713-qr-thermal",
+  "version": "v186-20260713-settle-polish",
   "date": "2026-07-13",
-  "title": "Thermal includes digital bill QR",
-  "summary": "QR on receipt opens the public digital bill page when the bill is synced. Thermal and Print now include the same QR as the on-screen preview.",
+  "title": "Bill settled polish: centered QR, free scroll, header sync",
+  "summary": "QR centered under receipt. Modal opens instantly (no scroll freeze). Bill synced moves to header chip; check icon goes orange then green when cloud save completes. WhatsApp connect line kept.",
   "highlights": [
-    "QR links to /bill/{outlet}/{bill-no}",
-    "Works when bill is cloud-synced",
-    "Thermal print includes QR (formatted HTML path)"
+    "QR stacked and centered (not sideways)",
+    "No QR wait before open — scroll works immediately",
+    "Bill synced chip in upper bar",
+    "Header icon orange → green live when cloud done"
   ]
 }
