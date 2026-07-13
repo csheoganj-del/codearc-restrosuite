@@ -29,17 +29,40 @@
     [data-rs-receipt-export] .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
     [data-rs-receipt-export] .rcp-foot b { color: #16151c; }
     [data-rs-receipt-export] .rcp-qr-wrap {
-      margin-top:12px;padding-top:12px;border-top:1px dashed #c9c6bd;
-      display:flex !important;flex-direction:column !important;align-items:center !important;
-      justify-content:center !important;text-align:center !important;width:100%;
+      width: 100% !important; margin: 14px 0 0 !important; border-collapse: collapse !important;
+      border-top: 1px dashed #c9c6bd !important;
+    }
+    [data-rs-receipt-export] .rcp-qr-wrap td {
+      text-align: center !important; padding-top: 12px !important; vertical-align: middle !important;
     }
     [data-rs-receipt-export] .rcp-qr-wrap img {
-      width:100px;height:100px;display:block;margin:0 auto;
+      width: 110px !important; height: 110px !important; display: block !important;
+      margin: 0 auto !important; float: none !important;
     }
     [data-rs-receipt-export] .rcp-qr-label {
-      font-size:10px;color:#6b6960;margin-top:6px;text-align:center;width:100%;
+      font-size: 10px !important; color: #6b6960 !important; margin-top: 6px !important;
+      text-align: center !important; display: block !important; width: 100% !important;
     }
   `;
+
+  /** Print-safe centered QR (table + inline styles — flex is flaky in browser print). */
+  function qrBlockHtml(qrDataUri) {
+    if (!qrDataUri) return '';
+    const src = String(qrDataUri).replace(/"/g, '&quot;');
+    return `
+      <table class="rcp-qr-wrap" role="presentation" cellpadding="0" cellspacing="0" border="0"
+        style="width:100%;max-width:100%;margin:14px 0 0;border-collapse:collapse;border-top:1px dashed #8a877c;table-layout:fixed;">
+        <tr>
+          <td align="center" valign="middle" style="width:100%;text-align:center;padding:12px 0 0;margin:0;">
+            <img src="${src}" width="110" height="110" alt="Digital bill QR" crossorigin="anonymous"
+              style="display:block;margin:0 auto;width:110px;height:110px;max-width:110px;border:0;float:none;" />
+            <div class="rcp-qr-label" style="display:block;width:100%;text-align:center;font-size:10px;color:#6b6960;margin:6px 0 0;line-height:1.3;">
+              Scan to view digital bill
+            </div>
+          </td>
+        </tr>
+      </table>`;
+  }
 
   function esc(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, (ch) =>
@@ -244,12 +267,8 @@
       <hr class="rcp-hr">
       ${tenders}
       ${m.change ? `<div class="rcp-line"><span class="q">Change</span><span>${$(m.change)}</span></div>` : ''}
-      ${qrDataUri ? `
-        <div class="rcp-qr-wrap">
-          <img src="${qrDataUri}" width="100" height="100" alt="Digital bill QR" crossorigin="anonymous" />
-          <div class="rcp-qr-label">Scan to view digital bill</div>
-        </div>` : ''}
-      <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
+      ${qrBlockHtml(qrDataUri)}
+      <div class="rcp-foot" style="text-align:center;width:100%;display:block;margin-top:12px;">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
   }
 
   function toText(bill, outletProfile) {
@@ -629,6 +648,7 @@
     preload,
     getCachedPdf,
     qrDataUriFor,
+    qrBlockHtml,
     clearPdfCache: () => PDF_CACHE.clear(),
     EXPORT_CSS,
   };

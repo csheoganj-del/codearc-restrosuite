@@ -269,34 +269,45 @@
 .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
 .receipt-paper .rcp-foot b,
 .rcp-foot b { color: #16151c; }
-/* QR always stacked + centered (never beside label / sideways) */
+/* QR: table layout so print + screen both center it on the receipt */
 .rcp-qr-wrap,
-.receipt-paper .rcp-qr-wrap {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px dashed #c9c6bd;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
+.receipt-paper .rcp-qr-wrap,
+table.rcp-qr-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 14px 0 0 !important;
+  border-collapse: collapse !important;
+  border-top: 1px dashed #c9c6bd !important;
+  table-layout: fixed !important;
+}
+.rcp-qr-wrap td,
+.receipt-paper .rcp-qr-wrap td {
+  width: 100% !important;
   text-align: center !important;
-  width: 100%;
-  box-sizing: border-box;
+  padding: 12px 0 0 !important;
+  vertical-align: middle !important;
 }
 .rcp-qr-wrap img,
 .receipt-paper .rcp-qr-wrap img {
-  width: 100px;
-  height: 100px;
-  display: block;
-  margin: 0 auto;
-  flex: none;
+  width: 110px !important;
+  height: 110px !important;
+  display: block !important;
+  margin: 0 auto !important;
+  float: none !important;
+  border: 0 !important;
 }
 .rcp-qr-label {
-  font-size: 10px;
-  color: #6b6960;
-  margin-top: 6px;
-  text-align: center;
-  width: 100%;
+  display: block !important;
+  font-size: 10px !important;
+  color: #6b6960 !important;
+  margin-top: 6px !important;
+  text-align: center !important;
+  width: 100% !important;
+}
+.receipt-paper .rcp-foot {
+  text-align: center !important;
+  width: 100% !important;
+  display: block !important;
 }
 .kot-paper { background: #fbfaf7; color: #16151c; border-radius: 10px; padding: 20px; max-width: 300px; margin: 0 auto; box-shadow: var(--shadow-lg); }
 .kot-h { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #16151c; padding-bottom: 10px; margin-bottom: 12px; }

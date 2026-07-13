@@ -211,9 +211,11 @@
           .rcp-tot{display:flex;justify-content:space-between;font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:15px;margin-top:6px}
           .rcp-foot{text-align:center;font-size:10.5px;color:#6b6960;margin-top:12px}
           .rcp-foot b{color:#16151c}
-          .rcp-qr-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed #8a877c;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%}
-          .rcp-qr-wrap img{width:90px;height:90px;display:block;margin:0 auto}
-          .rcp-qr-label{font-size:10px;color:#6b6960;margin-top:6px;text-align:center;width:100%}
+          .rcp-qr-wrap{width:100%!important;margin:14px 0 0!important;border-collapse:collapse!important;border-top:1px dashed #8a877c!important;table-layout:fixed!important}
+          .rcp-qr-wrap td{width:100%!important;text-align:center!important;padding:12px 0 0!important}
+          .rcp-qr-wrap img{width:110px!important;height:110px!important;display:block!important;margin:0 auto!important;float:none!important}
+          .rcp-qr-label{display:block!important;width:100%!important;text-align:center!important;font-size:10px!important;color:#6b6960!important;margin-top:6px!important}
+          .rcp-foot{text-align:center!important;width:100%!important;display:block!important}
           .kot-h{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
           .kot-h .kt{font-weight:700;font-size:18px}
           .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}
@@ -1292,7 +1294,7 @@
             }, { once: true });
           }
 
-          // Soft QR inject: append only QR block — never rewrite whole paper
+          // Soft QR inject: print-safe centered table block (never left/sideways)
           const injectQr = (qr) => {
             if (!qr || !modal.isConnected || closed) return;
             liveQr = qr;
@@ -1300,14 +1302,24 @@
             const paper = modal.querySelector('#rc-paper');
             if (!paper || paper.querySelector('.rcp-qr-wrap')) return;
             const y = mbody ? mbody.scrollTop : 0;
-            const wrap = document.createElement('div');
-            wrap.className = 'rcp-qr-wrap';
-            wrap.innerHTML =
-              '<img src="' + qr + '" width="100" height="100" alt="Digital bill QR" crossorigin="anonymous" />' +
-              '<div class="rcp-qr-label">Scan to view digital bill</div>';
+            const block =
+              (window.RSReceiptEngine && typeof RSReceiptEngine.qrBlockHtml === 'function')
+                ? RSReceiptEngine.qrBlockHtml(qr)
+                : (
+                  '<table class="rcp-qr-wrap" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:14px 0 0;border-collapse:collapse;border-top:1px dashed #8a877c;table-layout:fixed;">' +
+                  '<tr><td align="center" style="width:100%;text-align:center;padding-top:12px;">' +
+                  '<img src="' + qr + '" width="110" height="110" alt="Digital bill QR" crossorigin="anonymous" style="display:block;margin:0 auto;width:110px;height:110px;float:none;" />' +
+                  '<div class="rcp-qr-label" style="display:block;width:100%;text-align:center;font-size:10px;color:#6b6960;margin-top:6px;">Scan to view digital bill</div>' +
+                  '</td></tr></table>'
+                );
             const footEl = paper.querySelector('.rcp-foot');
-            if (footEl) paper.insertBefore(wrap, footEl);
-            else paper.appendChild(wrap);
+            const holder = document.createElement('div');
+            holder.innerHTML = block.trim();
+            const node = holder.firstElementChild;
+            if (node) {
+              if (footEl) paper.insertBefore(node, footEl);
+              else paper.appendChild(node);
+            }
             if (mbody) mbody.scrollTop = y;
           };
           setTimeout(() => {
