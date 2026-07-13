@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v111 (2026-07-13) — Top bar ⋯ Status menu (readable)
+
+- WhatsApp row in More menu no longer icon-only (label was CSS-hidden by compact-pill rules)
+- Status rows match Support layout: icon + title + detail (WhatsApp · Connected / +number, Cloud · Connected)
+- Version line stays quiet at the bottom
+
 ## v110 (2026-07-13) — WhatsApp settings layout (clean hierarchy)
 
 - Removed duplicate Get QR / tip boxes that made the page feel chaotic

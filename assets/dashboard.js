@@ -381,13 +381,14 @@
   window.withToast = withToast;
 
   const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708';
-  // Show version in topbar
+  // Show version in topbar ⋯ menu
   (function(){
     const el = document.getElementById('app-version-pill');
     if(el) {
-      el.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>' + appVersion.split('-')[0] + '</span>';
-      el.setAttribute('data-tooltip', 'App Version: ' + appVersion);
-      el.title = '';
+      const short = appVersion.split('-')[0];
+      el.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>' + short + '</span>';
+      el.setAttribute('data-tooltip', 'App version: ' + appVersion);
+      el.title = 'App version: ' + appVersion;
     }
   })();
   const updateSignatureKey = 'rs_update_signature';
@@ -1111,26 +1112,44 @@
     const bar = document.getElementById('rs-gateway-offline-banner');
     if (bar) bar.style.display = 'none';
 
-    const textEl = document.getElementById('topbar-whatsapp-status-text');
+    // Prefer shell badge updater (keeps More menu + compact pill consistent)
+    if (typeof window.updateTopbarWhatsAppStatus === 'function') {
+      // fall through — shell polling will set offline; also set immediate UI
+    }
+    if (window.setTopbarWhatsAppBadge) {
+      // not exported — use DOM detail
+    }
     const pillEl = document.getElementById('topbar-whatsapp-status-pill');
-    if (textEl && pillEl) {
-      textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-      const friendly = (function (raw) {
-        const s = String(raw || '').toLowerCase();
-        if (!s) return 'WhatsApp is not connected. Open Settings → Gateway to link.';
-        if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings → Gateway.';
-        if (s.includes('timeout')) return 'Gateway took too long to respond. Check the PC running WhatsApp.';
-        if (s.includes('auth')) return 'WhatsApp session expired. Scan the QR code again.';
-        if (s.length > 90 || /[{}\[\]<>]|error code|ECONN/i.test(String(raw))) {
-          return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → Gateway.';
-        }
-        return 'WhatsApp is offline: ' + raw;
-      })(reason);
+    const moreTitle = document.getElementById('topbar-wa-title');
+    const moreDetail = document.getElementById('topbar-wa-detail');
+    const compact = document.getElementById('tb-wa-status-text');
+    const friendly = (function (raw) {
+      const s = String(raw || '').toLowerCase();
+      if (!s) return 'WhatsApp is not connected. Open Settings → WhatsApp to link.';
+      if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings → WhatsApp.';
+      if (s.includes('timeout')) return 'WhatsApp took too long to respond. Try again in a moment.';
+      if (s.includes('auth')) return 'Link expired. Scan the QR code again in Settings → WhatsApp.';
+      if (s.length > 90 || /[{}\[\]<>]|error code|ECONN/i.test(String(raw))) {
+        return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → WhatsApp.';
+      }
+      return 'WhatsApp is offline.';
+    })(reason);
+    if (moreTitle) moreTitle.textContent = 'WhatsApp · Off';
+    if (moreDetail) moreDetail.textContent = 'Not connected';
+    if (compact) {
+      compact.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span class="tb-badge-label">Off</span>';
+    }
+    if (pillEl) {
+      pillEl.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
+      pillEl.classList.add('wa-offline');
       pillEl.setAttribute('data-tooltip', friendly);
-      pillEl.title = '';
-      pillEl.style.background = 'var(--red-tint)';
-      pillEl.style.color = 'var(--red)';
-      pillEl.style.border = '1px solid color-mix(in srgb, var(--red) 28%, transparent)';
+      pillEl.title = friendly;
+    }
+    const tbBtn = document.getElementById('tb-wa-status-btn');
+    if (tbBtn) {
+      tbBtn.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
+      tbBtn.classList.add('wa-offline');
+      tbBtn.title = friendly;
     }
   }
   function hideGatewayOfflineBanner() {

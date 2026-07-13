@@ -1376,15 +1376,22 @@
       let syncDoneTimer   = null;
       let errorClearTimer = null;
 
-      function setState(state, title, html) {
+      function setState(state, title, detail) {
         if (!pill) return;
-        pill.style.cssText = '';              // wipe any legacy inline styles
+        pill.style.cssText = '';
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
         document.body.classList.toggle('rs-offline-lock', ['local-only', 'offline', 'sync-error'].includes(state));
         pill.setAttribute('data-tooltip', title);
-        pill.title = '';
-        pill.innerHTML = html;
+        pill.title = title || '';
+        const icon =
+          state === 'superadmin-cloud' ? 'fa-cloud-bolt'
+          : state === 'syncing' ? 'fa-cloud fa-pulse'
+          : state === 'offline' || state === 'local-only' || state === 'sync-error' ? 'fa-cloud'
+          : 'fa-cloud';
+        pill.innerHTML =
+          `<i class="fa-solid ${icon}" aria-hidden="true"></i>` +
+          `<div class="tb-more-status-copy"><strong>Cloud</strong><span id="db-mode-detail">${detail || '—'}</span></div>`;
       }
 
       function updatePill() {
@@ -1397,61 +1404,49 @@
 
         if (!isSuperAdmin && (!isOnline || cloudFallbackActive)) {
           const title = !isOnline
-            ? 'Offline mode - bills and changes are saved locally and will sync to the cloud automatically when you reconnect.'
-            : 'Cloud is currently unavailable. Data is saved locally on this device and will retry sync automatically.';
-          setState('local-only',
-            title,
-            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
-          );
+            ? 'Offline — changes save on this device and sync when you reconnect.'
+            : 'Cloud temporarily unavailable — saved on this device, will retry.';
+          setState('local-only', title, 'Local only');
           return;
         }
 
         if (!isOnline) {
           setState('offline',
-            'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
-            `<i class="fa-solid fa-cloud"></i><span>Offline</span>`
+            'You are offline — changes save on this device and sync when you reconnect.',
+            'Offline'
           );
           return;
         }
         if (isSuperAdmin) {
           setState('superadmin-cloud',
-            'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
-            `<i class="fa-solid fa-cloud-bolt"></i><span>Cloud admin</span>`
+            'Platform admin connected to cloud controls.',
+            'Admin'
           );
           return;
         }
         if (!isCloud) {
           setState('local-only',
-            'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
-            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
+            'Local mode — data stays in this browser until you use cloud login.',
+            'Local only'
           );
           return;
         }
-        // Signed in + online — check for recent error (within 30 s)
         const err = window.RS_LAST_CLOUD_ERROR;
         if (err && (Date.now() - err.time < 30000)) {
           setState('sync-error',
-            `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
-            `<i class="fa-solid fa-cloud"></i><span>Sync error</span>`
+            `Last sync failed: ${err.message}. Saved locally; will retry.`,
+            'Sync error'
           );
           clearTimeout(errorClearTimer);
           errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
           return;
         }
-        setState('cloud',
-          'Connected to Supabase — all data syncs to the cloud instantly.',
-          `<i class="fa-solid fa-cloud"></i><span>Cloud</span>`
-        );
+        setState('cloud', 'Data is syncing to the cloud.', 'Connected');
       }
 
       function showSyncing() {
         if (!pill || !navigator.onLine || !(window.RS_DB && window.RS_DB.isCloud)) return;
-        ALL_STATES.forEach(s => pill.classList.remove(s));
-        pill.classList.add('syncing');
-        pill.style.cssText = '';
-        pill.setAttribute('data-tooltip', 'Syncing to cloud…');
-        pill.title = '';
-        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i><span>Syncing</span>`;
+        setState('syncing', 'Syncing to cloud…', 'Syncing…');
       }
 
       // ── Sync-event listeners (fired by db.js guard()) ─────────────────
@@ -1575,12 +1570,47 @@
     const WA_BADGE_STATES = ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
     function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
       const pills = document.querySelectorAll('.js-wa-status-pill, #topbar-whatsapp-status-pill, #tb-wa-status-btn');
-      const texts = document.querySelectorAll('.js-wa-status-text, #topbar-whatsapp-status-text, #tb-wa-status-text');
-      if (!pills.length && !texts.length) return;
-      const html = `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i><span class="tb-badge-label">${safe(label)}</span>`;
-      texts.forEach((textEl) => {
-        textEl.innerHTML = html;
-      });
+      if (!pills.length) return;
+
+      // Compact always-visible pill: icon + short label (label expands on hover via CSS)
+      const compact = document.getElementById('tb-wa-status-text');
+      if (compact) {
+        compact.innerHTML =
+          `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i>` +
+          `<span class="tb-badge-label">${safe(label)}</span>`;
+      }
+
+      // ⋯ More menu: always show full title + detail (never icon-only)
+      const moreTitle = document.getElementById('topbar-wa-title');
+      const moreDetail = document.getElementById('topbar-wa-detail');
+      const moreIcon = document.querySelector('#topbar-whatsapp-status-pill > i.fa-whatsapp, #topbar-whatsapp-status-pill > i.fa-brands');
+      if (moreIcon) {
+        moreIcon.className = `fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}`;
+      }
+      const detailMap = {
+        'wa-linked': (window.__rsGatewayNumber ? ('+' + window.__rsGatewayNumber) : 'Ready to send bills'),
+        'wa-syncing': 'Finishing setup…',
+        'wa-qr': 'Tap to open WhatsApp settings',
+        'wa-offline': 'Not connected',
+        'wa-auth-failure': 'Tap to reconnect',
+        'wa-starting': 'Starting…',
+      };
+      const titleMap = {
+        'wa-linked': 'WhatsApp · Connected',
+        'wa-syncing': 'WhatsApp · Almost ready',
+        'wa-qr': 'WhatsApp · Scan QR',
+        'wa-offline': 'WhatsApp · Off',
+        'wa-auth-failure': 'WhatsApp · Retry',
+        'wa-starting': 'WhatsApp · Starting',
+      };
+      if (moreTitle) moreTitle.textContent = titleMap[state] || 'WhatsApp';
+      if (moreDetail) {
+        moreDetail.textContent =
+          state === 'wa-linked' && window.__rsGatewayNumber
+            ? '+' + window.__rsGatewayNumber
+            : detailMap[state] || String(label || tooltip || '—');
+      }
+
       pills.forEach((pillEl) => {
         WA_BADGE_STATES.forEach((cls) => pillEl.classList.remove(cls));
         pillEl.classList.add(state);

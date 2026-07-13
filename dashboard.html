@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v110-20260713-wa-layout';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v111-20260713-topbar-status';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -454,13 +454,21 @@
               </div>
             </a>
             <div class="tb-more-section">Status</div>
-            <button type="button" class="dropdown-item tb-more-status js-wa-status-pill" id="topbar-whatsapp-status-pill" role="status">
-              <span class="js-wa-status-text" id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin"></i><span class="tb-badge-label">WhatsApp</span></span>
+            <button type="button" class="dropdown-item tb-more-status js-wa-status-pill" id="topbar-whatsapp-status-pill" role="status" title="Bill WhatsApp status">
+              <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+              <div class="tb-more-status-copy">
+                <strong id="topbar-wa-title">WhatsApp</strong>
+                <span id="topbar-wa-detail" class="js-wa-status-text" data-wa-detail="1">Checking…</span>
+              </div>
             </button>
             <div class="dropdown-item tb-more-status" id="db-mode-pill" role="status" title="Cloud sync">
-              <i class="fa-solid fa-spinner fa-spin"></i><span>Loading</span>
+              <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+              <div class="tb-more-status-copy">
+                <strong>Cloud</strong>
+                <span id="db-mode-detail">Checking…</span>
+              </div>
             </div>
-            <div class="dropdown-item tb-more-status" id="app-version-pill" role="status"></div>
+            <div class="dropdown-item tb-more-status tb-more-version" id="app-version-pill" role="status"></div>
           </div>
         </div>
         <!-- Always-visible WhatsApp outlet status (also mirrored under ⋯ More) -->
