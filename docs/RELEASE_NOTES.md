@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v117 (2026-07-13) — Floor “Clear all open” tables
+
+- Toolbar: **Clear all open** (broom) frees every dining / seated / held / billed / QR-pending table
+- Double confirm; removes open tickets, holds, and closes QR sessions
+- Disabled when the floor is already all free
+
 ## v116 (2026-07-13) — Floor hold shows Held (verified)
 
 - After **Hold**, empty seat tickets are cleared so floor shows **Held** (not stuck Dining)

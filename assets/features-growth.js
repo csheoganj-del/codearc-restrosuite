@@ -262,7 +262,7 @@
     async function clearTable(t, opts) {
       const options = opts || {};
       if (!t || !window.RS_DB) {
-        RS.toast('Cannot clear table right now', 'fa-circle-exclamation');
+        if (!options.silent) RS.toast('Cannot clear table right now', 'fa-circle-exclamation');
         return false;
       }
       const label = tableNameLabel(t.n || t.name);
@@ -289,22 +289,78 @@
           }
         }
         await closeTableQrSessionOnSettle(t.n || t.name);
-        if (window.RS_SYNC && RS_SYNC.syncPendingOrders) {
+        if (!options.skipSync && window.RS_SYNC && RS_SYNC.syncPendingOrders) {
           try {
             await RS_SYNC.syncPendingOrders({ forceCloud: true });
           } catch (_) {}
         }
-        RS.toast(label + ' is free', 'fa-chair');
-        try {
-          document.dispatchEvent(new Event('rs:tables-updated'));
-        } catch (_) {}
-        renderFloor();
+        if (!options.silent) {
+          RS.toast(label + ' is free', 'fa-chair');
+          try {
+            document.dispatchEvent(new Event('rs:tables-updated'));
+          } catch (_) {}
+          renderFloor();
+        }
         return true;
       } catch (e) {
         console.warn('clearTable failed', e);
-        RS.toast('Could not free table', 'fa-circle-exclamation');
+        if (!options.silent) RS.toast('Could not free table', 'fa-circle-exclamation');
         return false;
       }
+    }
+
+    /** Free every non-available table (dining / seated / held / billed / QR pending). */
+    async function clearAllOpenTables() {
+      if (!window.RS_DB) {
+        RS.toast('Cannot clear tables right now', 'fa-circle-exclamation');
+        return false;
+      }
+      const open = (TABLES || []).filter((t) => t && t.state && t.state !== 'free');
+      if (!open.length) {
+        RS.toast('All tables are already free', 'fa-chair');
+        return true;
+      }
+      const names = open
+        .map((t) => t.n || t.name)
+        .slice(0, 8)
+        .join(', ');
+      const more = open.length > 8 ? '…' : '';
+      const msg1 =
+        'Clear ALL open tables?\n\n' +
+        open.length +
+        ' table(s): ' +
+        names +
+        more +
+        '\n\nThis removes open orders, held carts, and closes QR sessions on those tables.\n\nThis cannot be undone.';
+      if (!confirm(msg1)) return false;
+      const msg2 =
+        'Final confirm: free ' +
+        open.length +
+        ' open table(s)?\n\nType-level check: only click OK if service is ending or you meant to wipe the floor.';
+      if (!confirm(msg2)) return false;
+
+      let okN = 0;
+      let failN = 0;
+      for (const t of open) {
+        const ok = await clearTable(t, { force: true, silent: true, skipSync: true });
+        if (ok) okN++;
+        else failN++;
+      }
+      if (window.RS_SYNC && RS_SYNC.syncPendingOrders) {
+        try {
+          await RS_SYNC.syncPendingOrders({ forceCloud: true });
+        } catch (_) {}
+      }
+      try {
+        document.dispatchEvent(new Event('rs:tables-updated'));
+      } catch (_) {}
+      renderFloor();
+      if (failN) {
+        RS.toast(okN + ' freed, ' + failN + ' failed', 'fa-circle-exclamation');
+      } else {
+        RS.toast(okN + ' table' + (okN === 1 ? '' : 's') + ' freed', 'fa-broom');
+      }
+      return failN === 0;
     }
 
     async function printTableBill(t) {
@@ -854,7 +910,7 @@
           <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
           <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open QR ordering on every table for this service"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
+        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open QR ordering on every table for this service"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-qrcode"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
         <div class="floor-grid">${TABLES.length ? TABLES.map(
           (t) => `
           <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}">
