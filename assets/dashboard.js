@@ -2083,8 +2083,8 @@
     }
     const versionPill = document.getElementById('app-version-pill');
     if (versionPill) versionPill.style.display = 'none';
-    const callBtn = document.getElementById('tb-call-support');
-    if (callBtn) callBtn.style.display = 'none';
+    const supportWrap = document.getElementById('tb-support-wrap');
+    if (supportWrap) supportWrap.style.display = 'none';
     const stationChip = document.getElementById('rs-station-chip');
     if (stationChip) stationChip.style.display = 'none';
     const tbSearch = document.querySelector('.tb-search');
