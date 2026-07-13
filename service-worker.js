@@ -52,6 +52,7 @@ const APP_SHELL = [
   "/assets/print-bridge.js",
   "/assets/escpos-encoder.js",
   "/assets/modules/bill-identity.js",
+  "/assets/modules/recipe-units.js",
   "/assets/modules/inventory-ledger.js",
   "/assets/modules/inventory-batches.js",
   "/assets/modules/kitchen-link-coach.js",
