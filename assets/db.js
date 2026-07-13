@@ -288,11 +288,32 @@
     },
     inventory: {
       table:'doppio_inventory', pk:'id', clientId:true,
-      from: r => ({ id:r.id, key:r.key, name:r.label||r.name, cat:r.category, stock:num(r.current),
-                    unit:r.unit, min:num(r.threshold), max:num(r.max_stock), cost:0 }),
-      to: o => ({ id:o.id, key:o.key||String(o.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_'),
-                  name:o.name, label:o.name, category:o.cat||'General', current:num(o.stock),
-                  threshold:num(o.min), max_stock:num(o.max||o.stock), unit:o.unit||'unit' })
+      from: r => ({
+        id: r.id,
+        key: r.key,
+        name: r.label || r.name,
+        cat: r.category,
+        stock: num(r.current),
+        unit: r.unit,
+        min: num(r.threshold),
+        max: num(r.max_stock),
+        // unit_cost is optional (added via align migrations / client optional columns)
+        cost: num(r.unit_cost != null ? r.unit_cost : r.cost),
+        supplier: r.supplier || r.vendor || '',
+      }),
+      to: o => ({
+        id: o.id,
+        key: o.key || String(o.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        name: o.name,
+        label: o.name,
+        category: o.cat || 'General',
+        current: num(o.stock),
+        threshold: num(o.min),
+        max_stock: num(o.max || o.stock),
+        unit: o.unit || 'unit',
+        unit_cost: num(o.cost),
+        supplier: o.supplier || '',
+      }),
     },
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
@@ -462,14 +483,75 @@
       }
     },
     vendors: {
-      table:'doppio_vendors', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, name:r.name, category:r.category, contact:r.phone, terms:r.terms, rating:num(r.rating), itemsCount:num(r.items_count) }),
-      to: o => ({ name:o.name, category:o.category||'', phone:o.contact||'', terms:o.terms||'', rating:num(o.rating), items_count:num(o.itemsCount) })
+      table: 'doppio_vendors',
+      pk: 'id',
+      clientId: false,
+      uuidPK: true,
+      from: (r) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category || 'General',
+        cat: r.category || 'General',
+        contact: r.phone || r.email || '',
+        email: r.email || '',
+        terms: r.terms || 'Net 30',
+        rating: num(r.rating) || 4,
+        itemsCount: num(r.items_count),
+        items: num(r.items_count),
+      }),
+      // Core schema: name, phone, email, category, status (extra cols dropped gracefully if absent)
+      to: (o) => ({
+        name: o.name,
+        category: o.category || o.cat || 'General',
+        phone: o.contact || o.phone || '',
+        email: o.email || '',
+        status: o.status || 'active',
+        terms: o.terms || 'Net 30',
+        rating: num(o.rating) || 4,
+        items_count: num(o.itemsCount != null ? o.itemsCount : o.items),
+      }),
     },
     purchase_orders: {
-      table:'doppio_purchase_orders', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, poNumber:r.po_number, supplier:r.vendor_name, items:r.item_name, value:num(r.expected_cost), date:r.due_date, status:r.status }),
-      to: o => ({ po_number:o.poNumber||'', vendor_name:o.supplier||'Supplier', item_name:o.items||'Supply items', expected_cost:num(o.value), due_date:(o.date||new Date().toISOString()).slice(0,10), status:o.status||'pending' })
+      table: 'doppio_purchase_orders',
+      pk: 'id',
+      clientId: false,
+      uuidPK: true,
+      from: (r) => ({
+        id: r.id,
+        poNumber: r.po_number,
+        supplier: r.vendor_name,
+        items: r.item_name,
+        value: num(r.expected_cost),
+        date: r.due_date || r.created_at,
+        status: r.status,
+        lines: r.lines || null,
+        quantity: num(r.quantity),
+        unit: r.unit || 'unit',
+      }),
+      to: (o) => ({
+        po_number: o.poNumber || o.po || '',
+        vendor_name: o.supplier || 'Supplier',
+        item_name: o.items || 'Supply items',
+        quantity: num(
+          o.quantity != null
+            ? o.quantity
+            : Array.isArray(o.lines)
+              ? o.lines.reduce((a, l) => a + (Number(l.qty) || 0), 0)
+              : 0
+        ),
+        unit:
+          (Array.isArray(o.lines) && o.lines[0] && o.lines[0].unit) || o.unit || 'unit',
+        expected_cost: num(o.value),
+        due_date: (o.date || new Date().toISOString()).slice(0, 10),
+        status: o.status || 'pending',
+      }),
+    },
+    // Waste is local-first (no dedicated cloud table in all deploys). HYBRID falls back to LS.
+    waste_log: {
+      table: null,
+      pk: 'id',
+      clientId: true,
+      localOnly: true,
     },
     support_tickets: {
       table:'doppio_support_tickets', pk:'id', clientId:false, uuidPK:true,
@@ -490,7 +572,10 @@
     // These persist once migration 20260709160000_crm_customer_fields is
     // applied; until then a DB without the columns will drop them gracefully
     // instead of rejecting the whole customer upsert.
-    customers: ['email', 'dues', 'marketing_opt_in']
+    customers: ['email', 'dues', 'marketing_opt_in'],
+    // unit_cost / supplier may be missing on older doppio_inventory schemas
+    inventory: ['unit_cost', 'supplier', 'cost'],
+    vendors: ['terms', 'rating', 'items_count', 'email'],
   });
   const known = {}; // collection -> Set of ids seen from server
   function newClientId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
@@ -613,6 +698,8 @@
   const CLOUD = {
     async list(c, opts){
       const m=MAP[c]; if(!m) return [];
+      // Collections without a cloud table (e.g. waste_log) stay localStorage-backed
+      if (m.localOnly || !m.table) return LS.list(c, opts);
       const options = opts && typeof opts === 'object' ? opts : {};
       // Higher default for money/CRM collections (Wave 2 pagination)
       const defaultLimit = (c === 'bills' || c === 'customers') ? 1000 : 500;
@@ -628,10 +715,28 @@
         offset: offset || null,
       });
       known[c] = new Set((rows||[]).map(r=>String(r[m.pk])));
-      return (rows||[]).map(m.from);
+      // Preserve client-only fields (e.g. unit cost) that older cloud schemas omit
+      const mapped = (rows || []).map(m.from);
+      if (c === 'inventory') {
+        const local = LS.read(c) || [];
+        mapped.forEach((row) => {
+          const loc = local.find(
+            (x) =>
+              String(x.id) === String(row.id) ||
+              String(x.key || '') === String(row.key || '') ||
+              String(x.name || '').toLowerCase() === String(row.name || '').toLowerCase()
+          );
+          if (loc) {
+            if (!(Number(row.cost) > 0) && Number(loc.cost) > 0) row.cost = Number(loc.cost);
+            if (!row.supplier && loc.supplier) row.supplier = loc.supplier;
+          }
+        });
+      }
+      return mapped;
     },
     async put(c,id,obj){
       const m=MAP[c]; if(!m) return obj;
+      if (m.localOnly || !m.table) return LS.put(c, id, obj);
       const cleanId = cleanIdForCollection(c, id);
       const cleanObj = { ...obj, id: cleanId };
       const body = m.to(cleanObj);
@@ -728,6 +833,7 @@
     async bulkPut(c,arr){ for(const o of arr){ await CLOUD.put(c, o.id, o); } return arr; },
     async del(c,id){
       const m=MAP[c]; if(!m) return true;
+      if (m.localOnly || !m.table) return LS.del(c, id);
       const cleanId = cleanIdForCollection(c, id);
       await API.remove(m.table, [{operator:'eq',column:m.pk,value:cleanId}]);
       if(known[c]) known[c].delete(String(cleanId));

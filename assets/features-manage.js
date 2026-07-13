@@ -512,8 +512,38 @@
             </table></div>
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="suppliers">
-            <div class="panel-head"><h3>Suppliers</h3><button class="btn btn-primary btn-sm" id="add-sup"><i class="fa-solid fa-plus"></i> Add supplier</button></div>
-            <div class="crm-grid">${SUPPLIERS.map(s=>`<div class="crm-card"><div class="crm-top"><div class="crm-av" style="background:${RS.avatarColors[s.name.length%RS.avatarColors.length]}"><i class="fa-solid fa-truck-field" style="font-size:15px"></i></div><div><div class="crm-name">${s.name}</div><div class="crm-phone">${s.cat}</div></div></div><div style="font-size:12.5px;color:var(--text-soft);line-height:1.9"><div><i class="fa-solid fa-phone" style="width:16px;color:var(--text-mute)"></i> ${s.contact}</div><div><i class="fa-solid fa-file-contract" style="width:16px;color:var(--text-mute)"></i> ${s.terms} · ${s.items} items</div><div><i class="fa-solid fa-star" style="width:16px;color:var(--amber)"></i> ${s.rating} rating</div></div></div>`).join('')}</div>
+            <div class="panel-head" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <h3 style="margin:0">Suppliers</h3>
+              <span class="pill" style="padding:3px 9px">${SUPPLIERS.length} vendor${SUPPLIERS.length===1?'':'s'}</span>
+              <div class="grow"></div>
+              <button type="button" class="btn btn-primary btn-sm" id="add-sup"><i class="fa-solid fa-plus"></i> Add supplier</button>
+            </div>
+            ${
+              SUPPLIERS.length
+                ? `<div class="crm-grid">${SUPPLIERS.map((s) => {
+                    const colors = (RS && RS.avatarColors) || ['#FF4F00', '#7c3aed', '#0ea5e9', '#16a34a', '#ca8a04'];
+                    const bg = colors[(String(s.name || '').length || 0) % colors.length];
+                    return `<div class="crm-card" data-sup-id="${esc(s.id || s.name)}">
+                <div class="crm-top">
+                  <div class="crm-av" style="background:${bg}"><i class="fa-solid fa-truck-field" style="font-size:15px"></i></div>
+                  <div><div class="crm-name">${esc(s.name)}</div><div class="crm-phone">${esc(s.cat || s.category || 'General')}</div></div>
+                </div>
+                <div style="font-size:12.5px;color:var(--text-soft);line-height:1.9">
+                  <div><i class="fa-solid fa-phone" style="width:16px;color:var(--text-mute)"></i> ${esc(s.contact || '—')}</div>
+                  <div><i class="fa-solid fa-file-contract" style="width:16px;color:var(--text-mute)"></i> ${esc(s.terms || 'Net 30')} · ${esc(String(s.items != null ? s.items : s.itemsCount || 0))} items</div>
+                  <div><i class="fa-solid fa-star" style="width:16px;color:var(--amber)"></i> ${esc(String(s.rating != null ? s.rating : 4))} rating</div>
+                </div>
+              </div>`;
+                  }).join('')}</div>`
+                : `<div class="sr-empty" style="padding:36px 16px">
+              <i class="fa-solid fa-truck-field" style="font-size:28px;opacity:.35;display:block;margin-bottom:10px"></i>
+              <div style="font-weight:700;margin-bottom:6px">No suppliers yet</div>
+              <div style="font-size:13px;color:var(--text-soft);max-width:360px;margin:0 auto 14px;line-height:1.45">
+                Add wholesale vendors here. They appear when you raise a purchase order.
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" id="add-sup-empty"><i class="fa-solid fa-plus"></i> Add first supplier</button>
+            </div>`
+            }
           </div>
           <div class="panel panel-pad subtab-pane" data-pane="pos">
             <div class="panel-head" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
@@ -780,11 +810,9 @@
           };
         }
 
-        const btnAddSup = $('#add-sup');
-        if (btnAddSup) {
-          btnAddSup.onclick = () => {
-            if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
-            const body = `
+        function openAddSupplierModal() {
+          if (!window.RSModal) return RS.toast('Modal utility not available', 'fa-circle-exclamation');
+          const body = `
               <div style="display:flex;flex-direction:column;gap:12px">
                 <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                   <div>
@@ -809,45 +837,82 @@
                 <div>
                   <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Rating (1-5)</label>
                   <select id="sup-rating" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
-                    <option value="5">⭐⭐⭐⭐⭐ (5)</option>
-                    <option value="4" selected>⭐⭐⭐⭐ (4)</option>
-                    <option value="3">⭐⭐⭐ (3)</option>
-                    <option value="2">⭐⭐ (2)</option>
-                    <option value="1">⭐ (1)</option>
+                    <option value="5">5</option>
+                    <option value="4" selected>4</option>
+                    <option value="3">3</option>
+                    <option value="2">2</option>
+                    <option value="1">1</option>
                   </select>
                 </div>
               </div>
             `;
-            RSModal.open({
-              title: 'Add New Supplier',
-              sub: 'Register a wholesale vendor',
-              icon: 'fa-truck',
-              size: 'sm',
-              body,
-              foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Add Supplier</button>`,
-              onMount(modal, close) {
-                modal.querySelector('[data-cancel]').onclick = close;
-                modal.querySelector('[data-confirm]').onclick = async () => {
-                  const name = modal.querySelector('#sup-name').value || '';
-                  if (!name) return RS.toast('Supplier name is required', 'fa-circle-exclamation');
-                  const category = modal.querySelector('#sup-cat').value || 'General';
-                  const contact = modal.querySelector('#sup-contact').value || '';
-                  const terms = modal.querySelector('#sup-terms').value || 'Net 30';
-                  const rating = Number(modal.querySelector('#sup-rating').value) || 4;
+          RSModal.open({
+            title: 'Add New Supplier',
+            sub: 'Register a wholesale vendor',
+            icon: 'fa-truck',
+            size: 'sm',
+            body,
+            foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Add Supplier</button>`,
+            onMount(modal, close) {
+              modal.querySelector('[data-cancel]').onclick = close;
+              modal.querySelector('[data-confirm]').onclick = async () => {
+                const name = (modal.querySelector('#sup-name').value || '').trim();
+                if (!name) return RS.toast('Supplier name is required', 'fa-circle-exclamation');
+                const category = (modal.querySelector('#sup-cat').value || 'General').trim() || 'General';
+                const contact = (modal.querySelector('#sup-contact').value || '').trim();
+                const terms = (modal.querySelector('#sup-terms').value || 'Net 30').trim() || 'Net 30';
+                const rating = Number(modal.querySelector('#sup-rating').value) || 4;
 
-                  const supId = RS.nextLogicalNo('SUP');
-                  const newSup = { id: supId, name, category, contact, terms, rating, itemsCount: 0 };
-                  close();
-                  if (RS.saveOne) {
-                    await RS.saveOne('vendors', newSup);
-                    RS.toast('Supplier added successfully', 'fa-circle-check');
-                    if (RS.render) RS.render('inventory-tab');
-                  }
+                const supId =
+                  (RS.nextLogicalNo && RS.nextLogicalNo('SUP')) ||
+                  'sup_' + Date.now();
+                const newSup = {
+                  id: supId,
+                  name,
+                  category,
+                  cat: category,
+                  contact,
+                  terms,
+                  rating,
+                  itemsCount: 0,
+                  items: 0,
                 };
-              }
-            });
-          };
+                close();
+                try {
+                  let saved = newSup;
+                  if (window.RS_DB && RS_DB.put) saved = (await RS_DB.put('vendors', newSup.id, newSup)) || newSup;
+                  else if (RS.saveOne) saved = (await RS.saveOne('vendors', newSup)) || newSup;
+                  const row = {
+                    id: saved.id || newSup.id,
+                    name: saved.name || name,
+                    cat: saved.category || saved.cat || category,
+                    category: saved.category || category,
+                    contact: saved.contact || contact,
+                    terms: saved.terms || terms,
+                    rating: saved.rating != null ? saved.rating : rating,
+                    items: saved.itemsCount != null ? saved.itemsCount : 0,
+                    itemsCount: saved.itemsCount != null ? saved.itemsCount : 0,
+                  };
+                  const idx = SUPPLIERS.findIndex(
+                    (s) => String(s.id) === String(row.id) || String(s.name).toLowerCase() === String(row.name).toLowerCase()
+                  );
+                  if (idx >= 0) SUPPLIERS[idx] = row;
+                  else SUPPLIERS.unshift(row);
+                  RS.toast('Supplier added · ' + name, 'fa-circle-check');
+                  drawPanes();
+                } catch (e) {
+                  console.warn('add supplier failed', e);
+                  RS.toast('Could not save supplier — try again', 'fa-circle-exclamation');
+                }
+              };
+            },
+          });
         }
+
+        const btnAddSup = $('#add-sup', panes) || $('#add-sup');
+        if (btnAddSup) btnAddSup.onclick = () => openAddSupplierModal();
+        const btnAddSupEmpty = $('#add-sup-empty', panes);
+        if (btnAddSupEmpty) btnAddSupEmpty.onclick = () => openAddSupplierModal();
 
         const btnAddPo = $('#add-po');
         if (btnAddPo) {
@@ -1205,7 +1270,49 @@
         drawPanes();
       }
 
-      wireSeg('#inventory-tab', ['stock','recipes','suppliers','pos','waste']);
+      // Segmented tabs: stock + recipes/suppliers/POs/waste (single handler, not stub)
+      (function wireInventoryTabs() {
+        const names = ['stock', 'recipes', 'suppliers', 'pos', 'waste'];
+        const stockOnlyIds = [
+          'btn-add-ingredient',
+          'btn-import-inventory',
+          'btn-download-inventory-template',
+          'btn-export-low-stock-toolbar',
+          'inv-stock-search',
+        ];
+        const segBtns = $$('.seg button', sec);
+        segBtns.forEach((b, i) => {
+          b.onclick = () => {
+            const pane = names[i] || 'stock';
+            segBtns.forEach((x) => x.classList.toggle('active', x === b));
+            $$('.subtab-pane', sec).forEach((p) => {
+              const match = p.dataset.pane === pane;
+              p.classList.toggle('active', match);
+              // Clear inline display left by inventory-ui fallback
+              if (match) p.style.display = '';
+              else if (p.id && p.id.startsWith('inv-panel-')) p.style.display = 'none';
+            });
+            // Stock panel id
+            const stock = $('#inv-panel-stock', sec);
+            if (stock) {
+              stock.classList.toggle('active', pane === 'stock');
+              stock.style.display = pane === 'stock' ? '' : 'none';
+            }
+            stockOnlyIds.forEach((id) => {
+              const el = document.getElementById(id);
+              if (!el) return;
+              if (id === 'inv-stock-search') {
+                const wrap = el.closest('.inv-search-wrap') || el;
+                wrap.style.display = pane === 'stock' ? '' : 'none';
+              } else {
+                el.style.display = pane === 'stock' ? '' : 'none';
+              }
+            });
+            sec.dispatchEvent(new CustomEvent('rs:subtab-change', { detail: { pane, index: i } }));
+          };
+        });
+        sec.dataset.segWired = '1';
+      })();
 
       // Reload POs when inventory re-renders (after auto-draft)
       if (!sec._poReloadBound) {

@@ -402,7 +402,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v156-20260713-inventory-10';
+    return 'v157-20260713-inv-tabs';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
