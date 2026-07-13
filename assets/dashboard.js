@@ -399,7 +399,11 @@
   }
   window.withToast = withToast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708';
+  const appVersion = (function resolveDisplayedAppVersion() {
+    const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
+    if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
+    return 'v150-20260713-version-label';
+  })();
   // Quiet version chip on the top bar
   (function(){
     const el = document.getElementById('app-version-pill');
@@ -684,15 +688,34 @@
     return parts.join('|');
   }
 
+  function isRealAppVersionTag(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    if (/system\s*patch/i.test(raw)) return false;
+    return /^v\d+/i.test(raw);
+  }
+
+  function resolveAppvForReload(preferred) {
+    // Never write marketing labels (e.g. "System patch" → "Systempatch") into ?appv=
+    if (isRealAppVersionTag(preferred)) {
+      return String(preferred).trim().replace(/[^a-zA-Z0-9._-]/g, '');
+    }
+    if (isRealAppVersionTag(appVersion)) {
+      return String(appVersion).trim().replace(/[^a-zA-Z0-9._-]/g, '');
+    }
+    return 'v' + Date.now();
+  }
+
   function showUpdateDialog(releaseInfo, signature) {
     if (document.getElementById('app-update-dialog')) return;
     let info = releaseInfo || {};
     let highlights = Array.isArray(info.highlights) ? info.highlights : [];
 
-    // Fallback to generic system patch details ONLY if releaseInfo is missing title or version
-    if (!info.title || !info.version) {
+    // Patch-only updates pass null releaseInfo. Keep the real build tag for display
+    // and for ?appv= so the version pill never becomes "Systempatch".
+    if (!info.title || !info.version || !isRealAppVersionTag(info.version)) {
       info = {
-        version: 'System patch',
+        version: isRealAppVersionTag(appVersion) ? appVersion : ('v' + Date.now()),
         date: new Date().toLocaleDateString('en-CA'),
         title: 'System stability hotfix',
         summary: 'This update applies under-the-hood code improvements to enhance security, responsiveness, and dashboard stability.'
@@ -778,7 +801,7 @@
         }
 
         const url = new URL(window.location.href);
-        url.searchParams.set('appv', (info.version || Date.now()).toString().replace(/[^a-zA-Z0-9._-]/g, ''));
+        url.searchParams.set('appv', resolveAppvForReload(info && info.version));
         
         // Fail-safe reload fallback (triggers after 1.5 seconds if location.replace hangs)
         setTimeout(() => {

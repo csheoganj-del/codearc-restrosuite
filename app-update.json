@@ -1,12 +1,12 @@
 {
-  "version": "v36-20260708",
-  "date": "2026-07-08",
-  "title": "Logical Numbering & Update Reliability Fix",
-  "summary": "This update replaces timestamp-style visible numbers with short daily sequence numbers, refreshes update-release text so old notes are not reused, and widens the POS guest name and phone fields.",
+  "version": "v150-20260713-version-label",
+  "date": "2026-07-13",
+  "title": "WhatsApp resilience, notifications & version label",
+  "summary": "Local WhatsApp gateway reconnects more reliably, the notification panel is fully clickable, and the top-bar version chip always shows the real build tag instead of Systempatch.",
   "highlights": [
-    "Short daily numbers: Bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable sequences such as RS-260708-001 or KOT-260708-001.",
-    "Update dialog fix: Patch-only updates no longer show stale release notes from an older release.",
-    "Current release history: Update history now starts with the latest release instead of falling back to June release text.",
-    "POS cart cleanup: Guest name and phone inputs now use the full cart width and remain readable on desktop, tablet, and mobile."
+    "WhatsApp gateway: infinite recoverable reconnect, stability probes, and a Windows stay-awake launcher for long-running local servers.",
+    "Top bar: bell, settings, and WhatsApp icons wire reliably again after shell syntax fixes.",
+    "Notifications: Mark all read always works; viewing an item dismisses and removes it from the list.",
+    "Version pill: rejects bogus ?appv=Systempatch values and never writes marketing labels into the cache-bust query."
   ]
 }

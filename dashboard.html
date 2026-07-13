@@ -77,7 +77,17 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v149-20260713-notif-dismiss';
+  // Cache-bust query (?appv=) must look like a real build tag (vNNN-...). Reject
+  // marketing labels such as "Systempatch" left over from the old update dialog.
+  window.__RESTROSUITE_ASSET_VERSION__ = (function () {
+    var builtin = 'v150-20260713-version-label';
+    var q = '';
+    try { q = String(new URLSearchParams(location.search).get('appv') || '').trim(); } catch (_) {}
+    if (!q) return builtin;
+    if (/system\s*patch/i.test(q)) return builtin;
+    if (!/^v\d+/i.test(q)) return builtin;
+    return q;
+  })();
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
