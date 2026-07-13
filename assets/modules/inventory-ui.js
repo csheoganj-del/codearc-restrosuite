@@ -930,24 +930,28 @@
                   <input type="number" id="po-qty" class="form-control" value="${qtyToOrder}" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                 </div>
                 <div>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Unit cost (₹ / ${_e(inv.unit || 'unit')})</label>
+                  <input type="number" id="po-unit-cost" class="form-control" min="0" step="any" value="${unitCostOf(inv) || ''}" placeholder="What you paid per unit" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                </div>
+                <div>
                   <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Batch expiry</label>
                   <input type="date" id="po-expiry" class="form-control" value="${defExp}" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
                 </div>
-              </div>
-              <div>
-                <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Supplier</label>
-                <input type="text" id="po-supplier" class="form-control" value="${_e(inv.supplier || inv.cat || '')} Supplier" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                <div>
+                  <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Supplier</label>
+                  <input type="text" id="po-supplier" class="form-control" value="${_e(inv.supplier || inv.cat || '')} Supplier" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                </div>
               </div>
               <div style="font-size:12px;color:var(--text-mute)">
                 Est. value: <strong style="color:var(--orange)" id="po-cost-preview">${rs(estimatedCost)}</strong>
-                · Expiry drives <b>use first</b> (FEFO)
+                · Unit cost is saved on the item (links recipes / plate cost)
               </div>
             </div>
           `;
 
           RSModal.open({
             title: 'Restock · ' + displayInvName(inv.name),
-            sub: 'Receive now with expiry, or draft a PO',
+            sub: 'Receive now with cost + expiry, or draft a PO',
             icon: 'fa-truck',
             size: 'sm',
             body,
@@ -956,26 +960,36 @@
               <button class="btn btn-primary" data-recv><i class="fa-solid fa-box-open"></i> Receive now</button>`,
             onMount(modal, close) {
               const qtyInput = modal.querySelector('#po-qty');
-              qtyInput.oninput = () => {
+              const costInput = modal.querySelector('#po-unit-cost');
+              const refreshEst = () => {
                 const q = Math.max(0, Number(qtyInput.value) || 0);
-                modal.querySelector('#po-cost-preview').textContent = rs(Math.round(q * inv.cost));
+                const c = Math.max(0, Number(costInput.value) || 0);
+                modal.querySelector('#po-cost-preview').textContent = rs(Math.round(q * c));
               };
+              qtyInput.oninput = refreshEst;
+              costInput.oninput = refreshEst;
               modal.querySelector('[data-cancel]').onclick = close;
               const makeLine = () => {
                 const qty = Math.max(1, Number(qtyInput.value) || 1);
+                const unitCost = Math.max(0, Number(costInput.value) || 0);
                 const supplier = modal.querySelector('#po-supplier').value || 'Default Supplier';
                 const expiryDate = (modal.querySelector('#po-expiry') && modal.querySelector('#po-expiry').value) || null;
-                return { qty, supplier, expiryDate };
+                return { qty, supplier, expiryDate, unitCost };
               };
               modal.querySelector('[data-po]').onclick = async () => {
-                const { qty, supplier, expiryDate } = makeLine();
+                const { qty, supplier, expiryDate, unitCost } = makeLine();
+                if (unitCost > 0) {
+                  try {
+                    await persistInvCost(inv, unitCost);
+                  } catch (_) {}
+                }
                 const poNum = nextLogicalNo('PO');
                 const line = {
                   name: inv.name,
                   unit: inv.unit || 'unit',
                   qty,
-                  cost: Number(inv.cost) || 0,
-                  value: Math.round(qty * (Number(inv.cost) || 0)),
+                  cost: unitCost || unitCostOf(inv),
+                  value: Math.round(qty * (unitCost || unitCostOf(inv))),
                   invId: inv.id,
                   expiryDate,
                 };
@@ -1002,11 +1016,15 @@
                 }
               };
               modal.querySelector('[data-recv]').onclick = async () => {
-                const { qty, expiryDate } = makeLine();
+                const { qty, expiryDate, unitCost } = makeLine();
                 close();
                 setOperationStatus('Receiving stock...');
                 try {
                   inv.stock = Math.max(0, Number(inv.stock) || 0) + qty;
+                  if (unitCost > 0) {
+                    inv.cost = unitCost;
+                    inv.unit_cost = unitCost;
+                  }
                   if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
                   if (global.RSInventoryBatches && RSInventoryBatches.receiveBatch) {
                     await RSInventoryBatches.receiveBatch({
@@ -1015,12 +1033,13 @@
                       unit: inv.unit,
                       expiryDate,
                       source: 'quick_receive',
-                      cost: inv.cost,
+                      cost: unitCost || inv.cost,
                     });
                   }
                   finishOperationStatus('Stock received');
                   toast(
                     `+${qty} ${inv.unit || ''} ${displayInvName(inv.name)}` +
+                      (unitCost > 0 ? ' · cost ' + rs(unitCost) + '/' + (inv.unit || '') : '') +
                       (expiryDate ? ' · use by ' + expiryDate : ''),
                     'fa-box-open'
                   );
@@ -1087,10 +1106,14 @@
                 <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="edit-ing-min" type="number" min="0" value="${inv.min}"></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Unit cost (${rs(1).replace(/[\d.,]/g, '').trim() || '₹'})</label><input class="form-input" id="edit-ing-cost" type="number" min="0" step="any" value="${inv.cost}"></div>
+                <div>
+                  <label class="fl">Unit cost (${rs(1).replace(/[\d.,]/g, '').trim() || '₹'} / ${_e(inv.unit || 'unit')}) <span style="color:var(--amber)">· linked</span></label>
+                  <input class="form-input" id="edit-ing-cost" type="number" min="0" step="any" value="${unitCostOf(inv) || ''}" placeholder="What you pay per unit">
+                  <div style="font-size:11.5px;color:var(--text-mute);margin-top:4px">Stock value: <b id="edit-ing-val">${rs(stockValueOf(inv))}</b></div>
+                </div>
                 <div><label class="fl">Supplier</label><input class="form-input" id="edit-ing-supplier" value="${_e(inv.supplier || inv.vendor || '')}" placeholder="Optional"></div>
               </div>
-              <p style="margin:0;font-size:12px;color:var(--text-soft);line-height:1.45">Tip: packaging &amp; disposables work like food — link them on a dish recipe so each sale reduces box/bag/napkin stock.</p>
+              <p style="margin:0;font-size:12px;color:var(--text-soft);line-height:1.45">Unit cost feeds recipe plate cost &amp; margin. Packaging works the same as food when linked on a recipe.</p>
             </div>`;
 
           RSModal.open({
@@ -1103,6 +1126,17 @@
             onMount(modal, close) {
               const catSel = modal.querySelector('#edit-ing-cat');
               const catCustom = modal.querySelector('#edit-ing-cat-custom');
+              const costEl = modal.querySelector('#edit-ing-cost');
+              const valEl = modal.querySelector('#edit-ing-val');
+              const stockEl = modal.querySelector('#edit-ing-stock');
+              const refreshVal = () => {
+                if (!valEl) return;
+                const c = Math.max(0, Number(costEl.value) || 0);
+                const s = Math.max(0, Number(stockEl.value) || 0);
+                valEl.textContent = rs(Math.round(c * s * 100) / 100);
+              };
+              if (costEl) costEl.addEventListener('input', refreshVal);
+              if (stockEl) stockEl.addEventListener('input', refreshVal);
               if (catSel)
                 catSel.onchange = () => {
                   if (catSel.value === '__custom__') {
@@ -1138,13 +1172,19 @@
                 inv.stock = +modal.querySelector('#edit-ing-stock').value || 0;
                 inv.min = +modal.querySelector('#edit-ing-min').value || 0;
                 inv.cost = +modal.querySelector('#edit-ing-cost').value || 0;
+                inv.unit_cost = inv.cost;
                 inv.supplier = (modal.querySelector('#edit-ing-supplier').value || '').trim();
+                if (!(inv.cost > 0)) {
+                  toast('Set unit cost so this item is linked for plate costing', 'fa-indian-rupee-sign');
+                  modal.querySelector('#edit-ing-cost').focus();
+                  return;
+                }
                 close();
                 setOperationStatus('Saving changes...');
                 try {
                   if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
                   finishOperationStatus('Stock item updated');
-                  toast(`${displayInvName(inv.name)} updated · synced`, 'fa-circle-check');
+                  toast(`${displayInvName(inv.name)} updated · cost ${rs(inv.cost)}/${inv.unit || 'unit'}`, 'fa-link');
                   renderInventory();
                 } catch (e) {
                   console.warn('Failed to save ingredient edit', e);
@@ -1450,7 +1490,11 @@
                 <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="add-ing-min" type="number" min="0" placeholder="10" value="10"></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Unit cost (₹)</label><input class="form-input" id="add-ing-cost" type="number" min="0" step="any" placeholder="0"></div>
+                <div>
+                  <label class="fl">Unit cost (₹) <span style="color:var(--amber);font-weight:700">· links recipes</span></label>
+                  <input class="form-input" id="add-ing-cost" type="number" min="0" step="any" placeholder="What you pay per unit">
+                  <div style="font-size:11.5px;color:var(--text-mute);margin-top:4px">Per 1 unit — used for plate cost &amp; stock value</div>
+                </div>
                 <div><label class="fl">Supplier (optional)</label><input class="form-input" id="add-ing-supplier" placeholder="e.g. Metro Cash"></div>
               </div>
             </div>
@@ -1524,6 +1568,12 @@
             let cat = catEl.value;
             if (cat === '__custom__') cat = (catCustom.value || '').trim() || 'Other';
             if (!cat) cat = 'General';
+            const costVal = +modal.querySelector('#add-ing-cost').value || 0;
+            if (!(costVal > 0)) {
+              toast('Add unit cost (₹ per unit) so this item links to plate cost', 'fa-indian-rupee-sign');
+              modal.querySelector('#add-ing-cost').focus();
+              return;
+            }
             const item = {
               id: 'inv_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now(),
               name,
@@ -1531,7 +1581,8 @@
               unit: (unitEl.value || 'unit').trim(),
               stock: +modal.querySelector('#add-ing-stock').value || 0,
               min: +modal.querySelector('#add-ing-min').value || 10,
-              cost: +modal.querySelector('#add-ing-cost').value || 0,
+              cost: costVal,
+              unit_cost: costVal,
               supplier: (modal.querySelector('#add-ing-supplier').value || '').trim(),
             };
             await saveStockItem(item);
@@ -1574,6 +1625,10 @@
     reorderQty,
     paintInventoryBadge,
     openAddStockModal: openAddStockModalPublic,
+    openSetCostModal,
+    openMissingCostsWizard,
+    unitCostOf,
+    stockValueOf,
   };
 
   function attachToRS() {
