@@ -1,12 +1,12 @@
 {
-  "version": "v180-20260713-receipt-stable",
+  "version": "v181-20260713-bill-actions",
   "date": "2026-07-13",
-  "title": "Bill settled text + font flash fixed for good",
-  "summary": "Garbled Open Gateway / Bill synced text came from Unicode symbols misread as Latin-1. Font swap after ~1s was PDF warm injecting global CSS over the live receipt. Export styles are now scoped; banners use plain ASCII only.",
+  "title": "Bill settled: green WhatsApp + colored actions",
+  "summary": "WhatsApp is green and opens a manual chat backup. Thermal/Print/Done each have their own color in a 2x2 grid so Done is never cut off. Stale receipt bundle no longer overrides latest receipt.js.",
   "highlights": [
-    "Bill synced / Open Gateway use plain ASCII (no mojibake)",
-    "PDF export CSS scoped so live preview fonts never jump",
-    "Receipt body uses stable system-ui + Georgia from first paint",
-    "Hard refresh once so service worker picks up v180"
+    "Green WhatsApp button opens wa.me to send the bill manually",
+    "Thermal (slate), Print (blue), Done (orange) — clear colors",
+    "2x2 footer so buttons never clip",
+    "receipt.js always loads after critical.bundle (fixes CodeArc subtitle / ISO time)"
   ]
 }

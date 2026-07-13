@@ -1053,11 +1053,71 @@
       });
     }
 
+    /** Manual WhatsApp backup: always opens WhatsApp chat with bill text (no gateway required). */
+    async function openManualWhatsAppBill(bill) {
+      let phone = bill.customerPhone;
+      if (!phone || String(phone).trim() === '' || phone === 'null') {
+        phone = await new Promise((resolve) => {
+          const ov = document.createElement('div');
+          ov.className = 'rs-overlay show';
+          ov.innerHTML = `<div class="rs-modal sm">
+            <div class="rs-mhead"><div class="mh-ic" style="background:rgba(37,211,102,.15);color:#128C7E"><i class="fa-brands fa-whatsapp"></i></div><div><h3>Send on WhatsApp</h3><div class="sub">Manual backup - opens chat so you can send</div></div><button type="button" class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="rs-mbody" style="padding:16px 20px 8px">
+              <label class="field-label">Customer WhatsApp (with country code)</label>
+              <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric" placeholder="e.g. 919876543210" style="margin-top:6px" autocomplete="tel">
+              <p style="font-size:12px;color:var(--text-mute);margin-top:8px">Include country code without +. Example: 91 for India. Use this when automatic send is offline.</p>
+            </div>
+            <div class="rs-mfoot">
+              <button type="button" class="btn btn-ghost rs-mcancel">Cancel</button>
+              <button type="button" class="btn rc-btn-wa rs-mok"><i class="fa-brands fa-whatsapp"></i> Open WhatsApp</button>
+            </div>
+          </div>`;
+          document.body.appendChild(ov);
+          requestAnimationFrame(() => ov.classList.add('show'));
+          const inp = ov.querySelector('#wa-phone-input');
+          const ok = ov.querySelector('.rs-mok');
+          const cancel = ov.querySelector('.rs-mcancel');
+          const closeBtn = ov.querySelector('.rs-mclose');
+          if (inp) inp.focus();
+          const finish = (val) => {
+            try { ov.remove(); } catch (_) {}
+            resolve(val);
+          };
+          if (ok) ok.onclick = () => finish((inp && inp.value.trim()) || null);
+          if (cancel) cancel.onclick = () => finish(null);
+          if (closeBtn) closeBtn.onclick = () => finish(null);
+          if (inp) {
+            inp.onkeydown = (e) => {
+              if (e.key === 'Enter' && ok) ok.click();
+              if (e.key === 'Escape') finish(null);
+            };
+          }
+        });
+        if (phone === null) return;
+      }
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 10) {
+        RS.toast('Enter a valid WhatsApp number with country code', 'fa-circle-exclamation');
+        return;
+      }
+      bill.customerPhone = cleanPhone;
+      const text = typeof receiptText === 'function' ? receiptText(bill) : (`Bill ${bill.no || ''}\nTotal ${rs(bill.grand)}`);
+      try {
+        window.open(
+          `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
+        RS.toast('WhatsApp opened - review the bill and tap Send', 'fa-whatsapp');
+      } catch (e) {
+        RS.toast('Could not open WhatsApp', 'fa-circle-exclamation');
+      }
+    }
+
     async function showReceipt(bill) {
       const qrDataUri = await generateReceiptQrDataUri(bill);
       const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
       const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
-      const waLabel = gwReady ? 'WhatsApp' : 'WhatsApp';
       const st = bill.syncStatus || 'synced';
       const syncBanner = st === 'pending' || st === 'local' || st === 'saving'
         ? `<div style="margin:0 0 10px;padding:8px 11px;border-radius:10px;border:1px solid rgba(234,179,8,.35);background:rgba(234,179,8,.1);font-size:12px;line-height:1.45;color:var(--text-soft);display:flex;gap:8px;align-items:center">
@@ -1072,22 +1132,31 @@
         ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
             <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
             <div style="flex:1;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
-              <b style="color:var(--text)">Connect WhatsApp</b> to send this exact bill as a PDF in one tap.
+              <b style="color:var(--text)">Connect WhatsApp</b> for automatic PDF send. Green button below is the manual backup.
               <span style="color:var(--orange);font-weight:600"> Open Gateway -&gt;</span>
             </div>
           </div>`
         : '';
-      const waBtn = `<button type="button" class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> ${waLabel}</button>`;
       RSModal.open({
         title: 'Bill settled',
         sub: `${esc(bill.no || '')} | ${rs(bill.grand)}`,
         icon: 'fa-circle-check',
         size: 'sm',
         body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
-        foot: `${waBtn}
-              <button type="button" class="btn btn-ghost" id="rc-thermal" style="flex:1" title="ESC/POS thermal printer"><i class="fa-solid fa-receipt"></i> Thermal</button>
-              <button type="button" class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
-              <button type="button" class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
+        foot: `<div class="rc-foot-actions">
+              <button type="button" class="btn rc-btn-wa" id="rc-wa" title="Open WhatsApp to send this bill manually (backup if auto-send fails)">
+                <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span>
+              </button>
+              <button type="button" class="btn rc-btn-thermal" id="rc-thermal" title="Thermal = kitchen/counter roll printer (58mm or 80mm ESC/POS). Prints a fast text receipt for the guest or kitchen.">
+                <i class="fa-solid fa-receipt"></i><span>Thermal</span>
+              </button>
+              <button type="button" class="btn rc-btn-print" id="rc-print" title="Print A4 / browser print preview of this bill">
+                <i class="fa-solid fa-print"></i><span>Print</span>
+              </button>
+              <button type="button" class="btn rc-btn-done" id="rc-new" title="Close and start a new order">
+                <i class="fa-solid fa-check"></i><span>Done</span>
+              </button>
+            </div>`,
         onMount(modal, close) {
           const printBtn = modal.querySelector('#rc-print');
           if (printBtn) printBtn.onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
@@ -1100,11 +1169,13 @@
                 RSPrintBridge.printBillEscPos(bill, engineOutlet(), {}).catch(() => RSPrint(printHtml, 'Receipt ' + bill.no));
               } else {
                 RSPrint(printHtml, 'Receipt ' + bill.no);
+                RS.toast('No thermal printer linked - opened browser print', 'fa-receipt');
               }
             };
           }
           const waEl = modal.querySelector('#rc-wa');
-          if (waEl) waEl.onclick = () => RSReceipt.share(bill);
+          // Manual backup: always open WhatsApp chat (does not depend on Gateway auto-send)
+          if (waEl) waEl.onclick = () => openManualWhatsAppBill(bill);
           const cta = modal.querySelector('#rc-wa-cta');
           if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
           const newBtn = modal.querySelector('#rc-new');

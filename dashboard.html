@@ -81,7 +81,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v180-20260713-receipt-stable';
+    var builtin = 'v181-20260713-bill-actions';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -1897,6 +1897,11 @@
         return loadScript('assets/dist/critical.bundle.js').catch(function() {
           return loadSeq(unbundledMid);
         });
+      })
+      .then(function() {
+        // Always overlay latest receipt.js so stale critical.bundle never keeps old
+        // "CodeArc RestroSuite" fallback / unscoped PDF CSS / broken time formatting.
+        return loadScript('assets/receipt.js').catch(function() {});
       })
       .then(function() { return loadSeq(post); })
       .then(function() {
