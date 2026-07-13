@@ -260,12 +260,19 @@
       gateway:`
         <div class="set-section" style="margin-bottom:14px;padding:14px 16px;border-radius:12px;border:1px solid color-mix(in srgb, #25d366 35%, var(--stroke));background:color-mix(in srgb, #25d366 8%, var(--panel))">
           <div style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:6px"><i class="fa-brands fa-whatsapp" style="color:#25d366"></i> Bill WhatsApp for this outlet</div>
-          <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--text-soft)">Link <b>your restaurant’s</b> WhatsApp number so customers get bills and order updates from you. Keep the computer that runs RestroSuite WhatsApp <b>on during service hours</b>. Best used for bills and “order ready” messages — not bulk promos.</p>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--text-soft)">Link your restaurant number so customers receive bills and “order ready” messages from <b>you</b>. Best for bills and service updates — not bulk offers.</p>
         </div>
-        <div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Scan the QR code to link your phone (WhatsApp → Linked devices)</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking…</span></div></div>
+        <div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Checking connection…</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking…</span></div></div>
         <div class="set-section" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-wa-get-qr" title="Show a fresh QR code to link WhatsApp"><i class="fa-solid fa-qrcode"></i> Get QR code</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-test-send" title="Send a short test to your own number"><i class="fa-solid fa-paper-plane"></i> Send test</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-refresh-status"><i class="fa-solid fa-rotate"></i> Check again</button>
+        </div>
+        <div class="set-section" style="margin:4px 0 14px;padding:12px 14px;border-radius:10px;border:1px solid color-mix(in srgb, #eab308 40%, var(--stroke));background:color-mix(in srgb, #eab308 8%, var(--panel));font-size:12.5px;line-height:1.5;color:var(--text-soft)">
+          <strong style="color:var(--text)"><i class="fa-solid fa-lightbulb" style="color:#eab308;margin-right:4px"></i> Recommended:</strong>
+          Use a <b>dedicated restaurant / business SIM</b> for bill WhatsApp when you can.
+          Personal numbers work, but WhatsApp may limit accounts that send many automated messages.
+          Stick to bills and order updates and you will usually be fine.
         </div>
         ${toggle('Send bill after payment','Automatically WhatsApp the bill when a bill is paid',true)}
         ${sel('Bill message style',['Simple text','PDF receipt (recommended)'],'PDF receipt (recommended)')}
@@ -284,11 +291,11 @@
         <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
           <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:12px;">
             <div>
-              <div style="font-weight:700; font-size:13px; color:var(--text)">Still not connecting?</div>
-              <div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">Disconnect and get a fresh QR code. You will need to scan again from your phone.</div>
+              <div style="font-weight:700; font-size:13px; color:var(--text)">QR not showing or stuck?</div>
+              <div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">Generate a fresh QR code. You will scan it again from your phone (Linked devices).</div>
             </div>
             <button type="button" class="btn btn-sm btn-danger" id="btn-gateway-troubleshoot-reset" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); font-size:11px; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; white-space:nowrap; transition:all 0.2s">
-              <i class="fa-solid fa-rotate-right"></i> Start over
+              <i class="fa-solid fa-qrcode"></i> New QR code
             </button>
           </div>
         </div>`,
@@ -885,6 +892,53 @@
       const body = $('#set-body');
       let SET_STORE = {};
       let outletGatewayInterval = null;
+      async function requestFreshQr(tenantId, btn) {
+        if (window.__rsGatewayReady) {
+          if (!confirm('WhatsApp is already connected.\n\nGet a new QR code? This unlinks the current number until you scan again.')) {
+            return;
+          }
+        }
+        if (btn) {
+          btn.disabled = true;
+          const prev = btn.innerHTML;
+          btn.dataset.prevHtml = prev;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Getting QR…';
+        }
+        try {
+          await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
+          if (window.RS && RS.toast) RS.toast('Preparing a new QR code…', 'fa-qrcode');
+        } catch (e) {
+          if (window.RS && RS.toast) RS.toast('Could not start QR. Please try again.', 'fa-circle-exclamation');
+        }
+        if (outletGatewayInterval) {
+          clearInterval(outletGatewayInterval);
+          outletGatewayInterval = setInterval(pollOutletGateway, 2500);
+        }
+        setTimeout(() => {
+          pollOutletGateway();
+          if (btn) {
+            btn.disabled = false;
+            if (btn.dataset.prevHtml) btn.innerHTML = btn.dataset.prevHtml;
+          }
+        }, 2800);
+      }
+
+      function wireFreshQrButtons(container, tenantId) {
+        if (!container) return;
+        container.querySelectorAll('[data-wa-fresh-qr]').forEach((btn) => {
+          if (btn.dataset.bound === '1') return;
+          btn.dataset.bound = '1';
+          btn.onclick = () => requestFreshQr(tenantId, btn);
+        });
+      }
+
+      const WA_NUM_TIP =
+        '<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid color-mix(in srgb,#eab308 35%,var(--stroke));border-radius:10px;background:color-mix(in srgb,#eab308 7%,var(--panel));text-align:left">' +
+        '<div style="font-size:15px;color:#eab308;margin-top:1px"><i class="fa-solid fa-circle-info"></i></div>' +
+        '<div style="flex:1;font-size:12px;color:var(--text-soft);line-height:1.55">' +
+        '<strong style="color:var(--text)">Best practice:</strong> Prefer a dedicated restaurant number for sending bills. ' +
+        'Your personal WhatsApp can work too — just avoid bulk promos so the number stays healthy.</div></div>';
+
       async function pollOutletGateway() {
         const container = body.querySelector('#outlet-gateway-status-container');
         if (!container) {
@@ -892,13 +946,20 @@
           return;
         }
         const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
-        const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+        const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || 'local-demo';
         
         // 1. Poll Gateway Status
         try {
           const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
           if (!res || res.error) {
-            container.innerHTML = `<div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd" style="color:#ef4444">We could not check the connection. Please try again in a moment.</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>`;
+            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">
+              <div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd" style="color:#ef4444">We could not check the connection right now.</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>
+              <div style="padding:16px;border:1.5px dashed var(--stroke);border-radius:12px;text-align:center;background:var(--panel)">
+                <p style="margin:0 0 12px;font-size:13px;color:var(--text-soft)">Tap below to prepare a fresh QR code, then scan it from your phone.</p>
+                <button type="button" class="btn btn-primary btn-sm" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Get QR code</button>
+              </div>
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
           } else if (res.status === 'ready') {
             container.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Connected — bills can be sent to customers.</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Connected</span></div><div style="display:flex;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--stroke);padding:12px;border-radius:8px"><div style="font-size:13px">Linked number: <strong>+${res.number || ''}</strong></div><button type="button" class="btn btn-sm btn-danger" id="btn-outlet-gateway-logout" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);font-size:11px;padding:6px 12px;border-radius:6px;cursor:pointer"><i class="fa-solid fa-power-off"></i> Unlink</button></div></div>`;
             const logoutBtn = container.querySelector('#btn-outlet-gateway-logout');
@@ -923,9 +984,30 @@
             if (res.qr) {
               // Speed up polling while waiting for scan
               if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
-              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Scan this QR code with your phone to connect.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Scan QR</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings -> Linked Devices -> Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Waiting for you to scan…</div></div><div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid rgba(234,179,8,0.35);border-radius:var(--r-md);background:rgba(234,179,8,0.06);text-align:left"><div style="font-size:16px;color:#eab308;margin-top:1px"><i class="fa-solid fa-triangle-exclamation"></i></div><div style="flex:1;font-size:12px;color:var(--text-soft);line-height:1.55"><strong style="color:var(--text)">Tip: use a dedicated business number.</strong> Prefer a separate SIM for the restaurant when you can. Send bills and order updates only — avoid bulk promotional messages.</div></div></div>`;
+              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+                <div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Scan this QR code with your phone to connect.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Scan QR</span></div>
+                <div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center">
+                  <img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:180px;height:180px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px"/>
+                  <div style="font-size:12.5px;color:var(--text);font-weight:700;margin-bottom:6px">How to connect</div>
+                  <div style="font-size:12px;color:var(--text-soft);line-height:1.65;text-align:left;max-width:320px">
+                    1. Open <strong>WhatsApp</strong> on your phone<br>
+                    2. Tap <strong>Settings → Linked devices → Link a device</strong><br>
+                    3. Point the camera at this QR code
+                  </div>
+                  <div style="margin-top:12px;font-size:11px;color:var(--text-mute)"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Waiting for you to scan…</div>
+                  <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr style="margin-top:12px"><i class="fa-solid fa-rotate-right"></i> QR expired? Get a new one</button>
+                </div>
+                ${WA_NUM_TIP}
+              </div>`;
+              wireFreshQrButtons(container, tenantId);
             } else {
-              container.innerHTML = `<div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Preparing your QR code… this usually takes a few seconds.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Preparing…</span></div>`;
+              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">
+                <div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Preparing your QR code… this usually takes a few seconds.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Preparing…</span></div>
+                <div style="text-align:center;padding:8px 0">
+                  <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr><i class="fa-solid fa-rotate-right"></i> Taking long? Start over</button>
+                </div>
+              </div>`;
+              wireFreshQrButtons(container, tenantId);
             }
           } else if (res.status === 'syncing' || res.status === 'authenticated') {
             // QR just scanned -- show animated syncing UI, speed up polling to catch 'ready'
@@ -960,30 +1042,18 @@
               </div>
             </div>
             <style>@keyframes wa-spin-progress{0%{stroke-dashoffset:188}100%{stroke-dashoffset:0}}</style>`;
-            // Wire the Force New QR button
             const forceQrBtn = container.querySelector('#btn-gateway-force-newqr');
-            if (forceQrBtn) {
-              forceQrBtn.onclick = async () => {
-                forceQrBtn.disabled = true;
-                forceQrBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-                try {
-                  await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-                } catch(e) { /* ignore -- gateway restarts itself */ }
-                // Wait a moment for gateway to restart then resume normal polling
-                setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
-              };
-            }
+            if (forceQrBtn) forceQrBtn.onclick = () => requestFreshQr(tenantId, forceQrBtn);
           } else if (res.status === 'auth_failure') {
             container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
               <div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Could not finish linking. Please scan a new QR code.</div></div><span class="pill" style="padding:5px 12px;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2)"><i class="fa-solid fa-triangle-exclamation"></i> Link failed</span></div>
               <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--r-md);background:rgba(239,68,68,0.03)">
                 <div style="font-size:22px;color:#ef4444"><i class="fa-solid fa-circle-xmark"></i></div>
-                <div style="flex:1;font-size:12.5px;color:var(--text-soft)">This often happens if the QR code expired or the phone was busy. Tap <strong>Try again</strong> for a fresh code.</div>
-                <button type="button" class="btn btn-sm" id="btn-gateway-retry" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);font-size:11px;padding:6px 12px;border-radius:6px;white-space:nowrap"><i class="fa-solid fa-rotate-right"></i> Try again</button>
+                <div style="flex:1;font-size:12.5px;color:var(--text-soft)">This often happens if the QR code expired or the phone was busy. Tap <strong>Get QR code</strong> for a fresh one.</div>
+                <button type="button" class="btn btn-sm" data-wa-fresh-qr style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);font-size:11px;padding:6px 12px;border-radius:6px;white-space:nowrap"><i class="fa-solid fa-qrcode"></i> Get QR code</button>
               </div>
             </div>`;
-            const retryBtn = container.querySelector('#btn-gateway-retry');
-            if (retryBtn) retryBtn.onclick = () => pollOutletGateway();
+            wireFreshQrButtons(container, tenantId);
           } else if (res.status === 'connecting' || res.status === 'starting') {
             // Speed up polling while gateway is starting
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
@@ -1011,25 +1081,31 @@
             </div>
             <style>@keyframes gw-conn-spin{0%{stroke-dashoffset:138}100%{stroke-dashoffset:0}}</style>`;
             const connResetBtn = container.querySelector('#btn-gateway-conn-reset');
-            if (connResetBtn) {
-              connResetBtn.onclick = async () => {
-                connResetBtn.disabled = true;
-                connResetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Restarting…';
-                try {
-                  await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-                } catch(e) { /* ignore */ }
-                setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
-              };
-            }
+            if (connResetBtn) connResetBtn.onclick = () => requestFreshQr(tenantId, connResetBtn);
           } else {
-            // disconnected / offline / unknown — never dump raw machine status to the client
+            // disconnected / offline / unknown — show connect CTA + get QR (never dump raw machine status)
             const st = String(res.status || '').toLowerCase();
-            const offlineLike = !st || st === 'disconnected' || st === 'offline' || st === 'close' || st === 'closed' || st === 'logout' || st === 'logged_out' || st === 'n/a';
-            container.innerHTML = `<div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">${offlineLike ? 'Not connected yet. Scan a QR code to link your restaurant number.' : 'Connection needs attention. Tap Check again, or Start over below if it stays stuck.'}</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-link-slash"></i> Not connected</span></div>`;
+            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+              <div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd">Not connected yet. Get a QR code and scan it with your phone.</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-link-slash"></i> Not connected</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 18px;border:1.5px dashed var(--stroke);border-radius:12px;background:var(--panel);text-align:center">
+                <div style="width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,#25d366 14%,var(--panel));color:#25d366;font-size:26px"><i class="fa-brands fa-whatsapp"></i></div>
+                <div style="font-weight:800;font-size:15px;color:var(--text)">Connect WhatsApp</div>
+                <div style="font-size:12.5px;color:var(--text-soft);line-height:1.55;max-width:340px">A QR code will appear on this page. On your phone open WhatsApp → <b>Linked devices</b> → <b>Link a device</b>, then scan it.</div>
+                <button type="button" class="btn btn-primary" data-wa-fresh-qr style="margin-top:4px"><i class="fa-solid fa-qrcode"></i> Get QR code</button>
+              </div>
+              ${WA_NUM_TIP}
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
           }
         } catch (e) {
           console.warn('Failed to poll outlet gateway status:', e);
-          container.innerHTML = `<div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd" style="color:#ef4444">We could not reach WhatsApp right now. Check that RestroSuite WhatsApp is running, then try again.</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>`;
+          container.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">
+            <div class="set-row"><div class="si"><div class="st">WhatsApp connection</div><div class="sd" style="color:#ef4444">Could not reach WhatsApp right now. Please try again in a moment.</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>
+            <div style="text-align:center;padding:12px;border:1.5px dashed var(--stroke);border-radius:12px">
+              <button type="button" class="btn btn-primary btn-sm" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Get QR code</button>
+            </div>
+          </div>`;
+          wireFreshQrButtons(container, tenantId);
         }
 
         // 2. Poll Gateway Activity Logs securely (for this tenant only)
@@ -1072,6 +1148,13 @@
               }
             });
           };
+        }
+
+        // 3a. Get QR — always available (not connected / stuck loop)
+        const waGetQr = body.querySelector('#btn-wa-get-qr');
+        if (waGetQr && !waGetQr.dataset.listenerBound) {
+          waGetQr.dataset.listenerBound = 'true';
+          waGetQr.onclick = () => requestFreshQr(tenantId, waGetQr);
         }
 
         // 3b. Test send + status refresh (cockpit)
@@ -1137,28 +1220,13 @@
           };
         }
 
-        // 4. Wire Troubleshoot Force Reset Button Click
+        // 4. New QR / force refresh
         const troubleshootBtn = body.querySelector('#btn-gateway-troubleshoot-reset');
         if (troubleshootBtn && !troubleshootBtn.dataset.listenerBound) {
           troubleshootBtn.dataset.listenerBound = 'true';
-          troubleshootBtn.onclick = async () => {
-            if (!confirm('Start over and get a new QR code?\n\nYou will need to scan again from your phone. Any bills waiting to send may need to be resent.')) return;
-            troubleshootBtn.disabled = true;
-            const originalHtml = troubleshootBtn.innerHTML;
-            troubleshootBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Restarting…';
-            try {
-              await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-              RS.toast('Ready for a new QR code', 'fa-circle-check');
-            } catch (err) {
-              console.error(err);
-              RS.toast('Could not restart. Please try again in a moment.', 'fa-circle-exclamation');
-            } finally {
-              setTimeout(() => {
-                troubleshootBtn.disabled = false;
-                troubleshootBtn.innerHTML = originalHtml;
-                pollOutletGateway();
-              }, 3000);
-            }
+          troubleshootBtn.onclick = () => {
+            if (!confirm('Get a new QR code?\n\nYou will scan it again from your phone (WhatsApp → Linked devices).')) return;
+            requestFreshQr(tenantId, troubleshootBtn);
           };
         }
       }
@@ -1630,7 +1698,7 @@
             <div style="color:var(--text);font-size:15px">${statusLine}</div>
             ${tip ? `<div style="margin-top:6px;font-size:12.5px">${safe(tip)}</div>` : ''}
           </div>
-          <p style="margin:0;font-size:12.5px">Bills are sent from <b>your</b> linked number to <b>your</b> customers. Keep the RestroSuite WhatsApp computer on during service.</p>
+          <p style="margin:0;font-size:12.5px">Bills are sent from <b>your</b> linked number to <b>your</b> customers.</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft)">
             <li>Best for bills and “order ready” messages</li>
             <li>Phone online · WhatsApp → Linked devices</li>

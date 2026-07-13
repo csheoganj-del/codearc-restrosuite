@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v109 (2026-07-13) — WhatsApp QR connect CTA + calmer tips
+
+- Removed “keep the computer on” line from client tip (not useful on this screen)
+- When **Not connected**: clear **Connect WhatsApp** card + **Get QR code** (force new QR)
+- Top **Get QR code** / bottom **New QR code** / stuck-loop **Start over** all request a fresh QR
+- Calm recommendation: prefer a dedicated restaurant SIM (personal works; avoid bulk promos)
+
 ## v108 (2026-07-13) — Client-friendly WhatsApp copy
 
 - Settings → **WhatsApp** (not “gateway”): plain language for restaurant owners
