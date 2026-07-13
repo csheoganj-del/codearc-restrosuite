@@ -697,26 +697,27 @@
             <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
               <div>
                 <h3 style="margin:0">Menu Recipes</h3>
-                <div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Which store-room items each dish uses when sold</div>
+                <div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Link each dish to store-room stock (qty + unit). Sales then reduce stock automatically.</div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-all">All</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-linked">Linked</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-missing">Needs recipe</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="btn-export-recipes" title="Export recipes to CSV (re-importable)"><i class="fa-solid fa-file-export"></i> Export</button>
-                <button type="button" class="btn btn-primary btn-sm" id="bulk-recipe-import" title="For advanced users"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="bulk-recipe-import" title="For advanced users"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
               </div>
             </div>
             <div id="recipe-coverage-bar" class="recipe-coverage-bar" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
+            <div id="recipe-next-step" class="recipe-next-step" style="display:none;margin-bottom:12px"></div>
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
               <div class="pos-search" style="max-width:280px;padding:8px 12px;flex:1">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input id="recipe-search" placeholder="Search menu item or category…" autocomplete="off" aria-label="Search recipes">
               </div>
             </div>
-            <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
+            <div class="recipe-plain-tip" style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
               <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-top:2px"></i>
-              <div><strong style="color:var(--text)">In plain words:</strong> each recipe is for a number of <b>servings</b> (e.g. 1 plate). When a bill is paid, stock goes down by (recipe qty ÷ servings) × quantity sold. Units are only <b>kg, gm, ltr, ml</b> (auto: kg↔gm, ltr↔ml). Near-expiry packs are used first.</div>
+              <div><strong style="color:var(--text)">How stock is calculated:</strong> write the recipe for e.g. <b>1 plate</b> (or 4 servings). When a guest buys that dish, stock falls by <b>recipe amount ÷ servings × sold qty</b>. Units: <b>kg, gm, ltr, ml</b> only (kg↔gm and ltr↔ml convert automatically).</div>
             </div>
             <div class="table-scroll"><table class="data-table recipe-table">
               <thead><tr><th>Menu Item</th><th>Category</th><th>Serve</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Uses from stock</th><th>Actions</th></tr></thead>
@@ -1869,19 +1870,30 @@
               stock.classList.toggle('active', pane === 'stock');
               stock.style.display = pane === 'stock' ? '' : 'none';
             }
-            stockOnlyIds.forEach((id) => {
-              const el = document.getElementById(id);
-              if (!el) return;
-              if (id === 'inv-stock-search') {
-                const wrap = el.closest('.inv-search-wrap') || el;
-                wrap.style.display = pane === 'stock' ? '' : 'none';
-              } else {
-                el.style.display = pane === 'stock' ? '' : 'none';
-              }
-            });
+            if (window.RSInventoryToolbar && RSInventoryToolbar.sync) {
+              RSInventoryToolbar.sync(pane);
+            } else {
+              stockOnlyIds.forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (id === 'inv-stock-search') {
+                  const wrap = el.closest('.inv-search-wrap') || el;
+                  wrap.style.display = pane === 'stock' ? '' : 'none';
+                } else {
+                  el.style.display = pane === 'stock' ? '' : 'none';
+                }
+              });
+            }
             sec.dispatchEvent(new CustomEvent('rs:subtab-change', { detail: { pane, index: i } }));
           };
         });
+        // Apply immediately (e.g. user lands on Recipes — hide Variance/Prep/Export)
+        try {
+          const active = sec.querySelector('.seg button.active');
+          const pane0 =
+            (active && (active.getAttribute('data-inv-tab') || active.dataset.invTab)) || 'stock';
+          if (window.RSInventoryToolbar && RSInventoryToolbar.sync) RSInventoryToolbar.sync(pane0);
+        } catch (_) {}
         sec.dataset.segWired = '1';
       })();
 

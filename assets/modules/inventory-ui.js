@@ -1389,30 +1389,68 @@
               p.style.display = match ? '' : 'none';
             }
           });
-          // Hide toolbar actions that only apply to stock list when on other tabs
-          const stockOnly = [
-            'btn-add-ingredient',
-            'btn-import-inventory',
-            'btn-download-inventory-template',
-            'btn-export-inventory',
-            'btn-export-low-stock-toolbar',
-            'btn-inv-variance',
-            'btn-inv-prep',
-            'inv-stock-search',
-          ];
-          stockOnly.forEach((id) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            if (id === 'inv-stock-search') {
-              const wrap = el.closest('.inv-search-wrap') || el;
-              wrap.style.display = tab === 'stock' ? '' : 'none';
-            } else {
-              el.style.display = tab === 'stock' ? '' : 'none';
-            }
-          });
+          if (global.RSInventoryToolbar && RSInventoryToolbar.sync) {
+            RSInventoryToolbar.sync(tab);
+          } else {
+            // Hide toolbar actions that only apply to stock list when on other tabs
+            const stockOnly = [
+              'btn-add-ingredient',
+              'btn-import-inventory',
+              'btn-download-inventory-template',
+              'btn-export-inventory',
+              'btn-export-low-stock-toolbar',
+              'btn-inv-variance',
+              'btn-inv-prep',
+              'inv-stock-search',
+            ];
+            stockOnly.forEach((id) => {
+              const el = document.getElementById(id);
+              if (!el) return;
+              if (id === 'inv-stock-search') {
+                const wrap = el.closest('.inv-search-wrap') || el;
+                wrap.style.display = tab === 'stock' ? '' : 'none';
+              } else {
+                el.style.display = tab === 'stock' ? '' : 'none';
+              }
+            });
+          }
         };
       });
     }
+
+    // Shared: stock-only chrome (Variance / Prep / Export / search) only on Stock levels
+    global.RSInventoryToolbar = {
+      sync(pane) {
+        const isStock = !pane || pane === 'stock';
+        const stockOnly = [
+          'btn-add-ingredient',
+          'btn-import-inventory',
+          'btn-download-inventory-template',
+          'btn-export-inventory',
+          'btn-export-low-stock-toolbar',
+          'btn-inv-variance',
+          'btn-inv-prep',
+          'inv-stock-search',
+        ];
+        stockOnly.forEach((id) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (id === 'inv-stock-search') {
+            const wrap = el.closest('.inv-search-wrap') || el;
+            wrap.style.display = isStock ? '' : 'none';
+          } else {
+            el.style.display = isStock ? '' : 'none';
+          }
+        });
+      },
+      activePane() {
+        const a = document.querySelector('#inv-seg button.active');
+        return (a && (a.getAttribute('data-inv-tab') || a.dataset.invTab)) || 'stock';
+      },
+    };
+    try {
+      global.RSInventoryToolbar.sync(global.RSInventoryToolbar.activePane());
+    } catch (_) {}
 
     // Stock types: food + packaging + disposables + cleaning + other (all reduce on recipe link)
     const STOCK_TYPE_PRESETS = [

@@ -1580,6 +1580,23 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 }
 .inv-cost-banner { margin-bottom: 12px; }
 
+/* Recipes next-step strip (10/10 empty / incomplete setup) */
+.recipe-next-step {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: var(--r-md);
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--stroke));
+  background:
+    radial-gradient(ellipse 80% 80% at 0% 0%, color-mix(in srgb, var(--orange) 12%, transparent), transparent 55%),
+    var(--panel);
+}
+.recipe-next-step > i { color: var(--orange); font-size: 18px; }
+.recipe-next-urgent {
+  border-color: color-mix(in srgb, var(--amber) 50%, var(--stroke));
+  background: color-mix(in srgb, var(--amber) 10%, var(--panel));
+}
+.recipe-next-urgent > i { color: var(--amber); }
+.recipe-plain-tip { font-size: 12.5px; }
+
 /* POS cart portion size (half / full / double) */
 .cart-portion {
   display: inline-flex; gap: 4px; margin-top: 4px;
