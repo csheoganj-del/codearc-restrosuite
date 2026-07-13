@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v134 (2026-07-13) — QR cards match RestroSuite brand colors
+
+- Replaced forest/gold print palette with **system brand**: charcoal + **orange `#FF4F00`** + white
+- Scan me badge, QR frame, steps, Call waiter chip, Powered by accent → orange
+- QR modules stay dark charcoal on white (scan reliability)
+- Modal size selection highlight uses orange (same as primary buttons)
+
 ## v133 (2026-07-13) — Large = 2 cards per A4 page (not 4)
 
 - Size presets now have a hard **`perPage`** limit with CSS page-break

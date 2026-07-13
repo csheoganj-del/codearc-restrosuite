@@ -1623,16 +1623,20 @@
       if (/^\d+$/.test(s)) return s.padStart(2, '0');
       return s || '—';
     }
-    // Premium brand palette (dark modules stay scannable; accent on card chrome only)
+    // Match RestroSuite console brand (orange #FF4F00 + charcoal) — not forest/gold
     const QR_BRAND = {
-      ink: '#0c1f1a',
-      inkSoft: '#1a3d34',
-      gold: '#c4a35a',
-      goldSoft: '#e8d5a3',
-      cream: '#fffcf7',
-      creamDeep: '#f7f0e6',
+      ink: '#16151c', // charcoal — QR modules + headers (high scan contrast)
+      inkSoft: '#2a2830',
+      orange: '#FF4F00',
+      orangeSoft: '#FF6A2A',
+      orangeDeep: '#D94300',
+      orangeTint: '#FFF0E8',
+      gold: '#FF4F00', // alias: older card code used B.gold as accent
+      goldSoft: '#FFB08A',
+      cream: '#ffffff',
+      creamDeep: '#f4f3f1',
       white: '#ffffff',
-      mute: '#5c6b66',
+      mute: '#6b6960',
     };
 
     async function makeTableQrDataUrl(orderUrl, size) {
@@ -1655,7 +1659,7 @@
         px +
         'x' +
         px +
-        '&ecc=H&margin=8&color=0c1f1a&bgcolor=ffffff&data=' +
+        '&ecc=H&margin=8&color=16151c&bgcolor=ffffff&data=' +
         encodeURIComponent(orderUrl)
       );
     }
@@ -1806,44 +1810,20 @@
       },
     };
 
-    /** Inline mark so Blob print tabs always show logo (no broken external img). */
+    /** Inline mark — orange ring (system brand), works on dark Powered-by footer */
     function restroSuiteMarkSvg(sizePx) {
       const s = Math.max(12, Number(sizePx) || 22);
-      // Gold ring + cream plate so mark pops on dark "Powered by" footer and light cards
+      const B = QR_BRAND;
       return (
-        `<svg class="rs-mark" xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 192 192" fill="none" aria-hidden="true" focusable="false" style="display:block;flex-shrink:0;width:${s}px;height:${s}px;border-radius:22%;box-shadow:0 0 0 1px rgba(232,213,163,.45)">` +
-        `<circle cx="96" cy="96" r="96" fill="#c4a35a"/>` +
-        `<circle cx="96" cy="96" r="82" fill="#0c1f1a"/>` +
-        `<circle cx="96" cy="96" r="68" fill="#fffcf7"/>` +
-        `<circle cx="96" cy="96" r="54" fill="#0c1f1a"/>` +
-        `<path d="M66 82 L80 96 L66 110" stroke="#e8d5a3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-        `<path d="M126 82 L112 96 L126 110" stroke="#e8d5a3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-        `<line x1="106" y1="78" x2="86" y2="114" stroke="#c4a35a" stroke-width="8" stroke-linecap="round"/>` +
+        `<svg class="rs-mark" xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 192 192" fill="none" aria-hidden="true" focusable="false" style="display:block;flex-shrink:0;width:${s}px;height:${s}px;border-radius:22%;box-shadow:0 0 0 1px rgba(255,79,0,.35)">` +
+        `<circle cx="96" cy="96" r="96" fill="${B.orange}"/>` +
+        `<circle cx="96" cy="96" r="82" fill="${B.ink}"/>` +
+        `<circle cx="96" cy="96" r="68" fill="${B.white}"/>` +
+        `<circle cx="96" cy="96" r="54" fill="${B.ink}"/>` +
+        `<path d="M66 82 L80 96 L66 110" stroke="${B.orangeSoft}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+        `<path d="M126 82 L112 96 L126 110" stroke="${B.orangeSoft}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+        `<line x1="106" y1="78" x2="86" y2="114" stroke="${B.orange}" stroke-width="8" stroke-linecap="round"/>` +
         `</svg>`
-      );
-    }
-
-    function buildPoweredByAdHtml(sizeId) {
-      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
-      const logoPx = sz.logoPx || 22;
-      const brandPx = sz.brandPx || 13;
-      const poweredPx = sz.poweredPx || 8;
-      const gap = Math.max(5, Math.round(logoPx * 0.28));
-      const padTop = Math.max(6, Math.round(logoPx * 0.32));
-      const mt = Math.max(6, Math.round(logoPx * 0.35));
-      const logo = restroSuiteMarkSvg(logoPx);
-      // Inline styles so live modal preview matches print sheet
-      return (
-        `<div class="qr-powered" aria-label="Powered by RestroSuite" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.max(
-          2,
-          Math.round(logoPx * 0.12)
-        )}px;margin-top:${mt}px;padding-top:${padTop}px;border-top:1px dashed #e8d5a3">` +
-        `<span class="qr-powered-label" style="font-size:${poweredPx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5c6b66;line-height:1;opacity:.92">Powered by</span>` +
-        `<span class="qr-powered-brand" style="display:inline-flex;align-items:center;justify-content:center;gap:${gap}px;line-height:1">` +
-        logo +
-        `<span class="qr-powered-name" style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.02em;color:#0c1f1a;line-height:1">Restro<span style="color:#1a3d34;font-weight:700">Suite</span></span>` +
-        `</span>` +
-        `</div>`
       );
     }
 
@@ -2003,19 +1983,18 @@
       // —— Dual purpose strip (hero message) ——
       let usesHtml = '';
       if (showUses) {
-        const cell = (num, label, gold) =>
+        // accent=true → orange (brand) chip for Call waiter
+        const cell = (num, label, accent) =>
           `<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:${
             isMini ? '5px 4px' : '8px 6px'
-          };background:${gold ? 'linear-gradient(180deg,#fff9ec 0%,#fff 100%)' : '#fff'};border:1.5px solid ${
-            gold ? B.gold : B.ink
+          };background:${accent ? B.orangeTint : '#fff'};border:1.5px solid ${
+            accent ? B.orange : B.ink
           };border-radius:10px">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:${
               isMini ? 14 : 18
             }px;height:${isMini ? 14 : 18}px;border-radius:50%;font-size:${
               isMini ? 8 : 10
-            }px;font-weight:900;background:${gold ? 'linear-gradient(135deg,' + B.gold + ',' + B.goldSoft + ')' : B.ink};color:${
-              gold ? B.ink : B.goldSoft
-            }">${num}</span>
+            }px;font-weight:900;background:${accent ? B.orange : B.ink};color:#fff">${num}</span>
             <span style="font-size:${usePx}px;font-weight:800;color:${B.ink};line-height:1.15;letter-spacing:-.01em">${label}</span>
           </div>`;
         usesHtml = `<div style="display:flex;align-items:stretch;gap:6px;margin:0 0 ${
@@ -2034,7 +2013,7 @@
             8,
             metaPx
           )}px;font-weight:700;color:${B.mute}">
-            <i style="font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:${B.ink};color:${B.goldSoft};font-size:9px;font-weight:800">${n}</i>${t}
+            <i style="font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:${B.orange};color:#fff;font-size:9px;font-weight:800">${n}</i>${t}
           </span>`;
         stepsHtml = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 10px;margin:0 0 2px">
           ${step(1, 'Camera')}
@@ -2052,7 +2031,7 @@
             `<span style="font-size:${metaPx}px;font-weight:600;color:${B.inkSoft}"><span style="font-size:${Math.max(
               7,
               metaPx - 1
-            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.gold};margin-right:3px">Wi‑Fi</span>${wifi}${
+            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.orange};margin-right:3px">Wi‑Fi</span>${wifi}${
               wantPass ? ' · ' + wifiPass : ''
             }</span>`
           );
@@ -2062,7 +2041,7 @@
             `<span style="font-size:${metaPx}px;font-weight:600;color:${B.inkSoft}"><span style="font-size:${Math.max(
               7,
               metaPx - 1
-            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.gold};margin-right:3px">Phone</span>${phone}</span>`
+            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.orange};margin-right:3px">Phone</span>${phone}</span>`
           );
         }
         if (bits.length) {
@@ -2072,7 +2051,7 @@
         }
       }
 
-      // —— Powered by (full-width dark footer ad) ——
+      // —— Powered by (charcoal footer + orange Suite — system brand) ——
       let poweredHtml = '';
       if (showPoweredBy) {
         const logo = restroSuiteMarkSvg(logoPx);
@@ -2081,21 +2060,21 @@
           Math.round(logoPx * 0.3)
         )}px ${Math.max(8, Math.round(logoPx * 0.4))}px;padding:${
           isMini ? '7px 8px' : '10px 12px'
-        };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);box-sizing:border-box;border-top:1px solid rgba(196,163,90,.35)" aria-label="Powered by RestroSuite">
+        };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);box-sizing:border-box;border-top:2px solid ${B.orange}" aria-label="Powered by RestroSuite">
           <span style="font-size:${poweredPx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7);line-height:1;white-space:nowrap">Powered by</span>
           <span style="display:inline-flex;align-items:center;gap:${Math.max(
             5,
             Math.round(logoPx * 0.28)
           )}px;line-height:1">
             ${logo}
-            <span style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1">Restro<span style="color:${B.goldSoft};font-weight:700">Suite</span></span>
+            <span style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1">Restro<span style="color:${B.orange};font-weight:700">Suite</span></span>
           </span>
         </div>`;
       }
 
       const cardStyle = [
         'box-sizing:border-box',
-        'background:linear-gradient(165deg,' + B.cream + ' 0%,#fff 45%,' + B.creamDeep + ' 100%)',
+        'background:linear-gradient(180deg,' + B.white + ' 0%,' + B.creamDeep + ' 100%)',
         'border:2px solid ' + B.ink,
         'border-radius:16px',
         'overflow:hidden',
@@ -2108,7 +2087,7 @@
         'color:' + B.ink,
         '-webkit-print-color-adjust:exact',
         'print-color-adjust:exact',
-        'box-shadow:0 2px 0 rgba(12,31,26,.06)',
+        'box-shadow:0 2px 0 rgba(22,21,28,.06)',
       ].join(';');
 
       return `
@@ -2117,7 +2096,7 @@
             isMini ? '7px 8px' : '10px 12px'
           };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);color:#fff">
             <div style="font-size:${outletPx}px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.96">${outletName}</div>
-            <div style="flex-shrink:0;font-size:${badgePx}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.ink};background:linear-gradient(135deg,${B.goldSoft},${B.gold});padding:3px 9px;border-radius:999px;white-space:nowrap">Scan me</div>
+            <div style="flex-shrink:0;font-size:${badgePx}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#fff;background:${B.orange};padding:3px 9px;border-radius:999px;white-space:nowrap">Scan me</div>
           </div>
           <div style="flex:1;padding:${padY}px ${padX}px ${padY}px;text-align:center;box-sizing:border-box">
             <div style="font-weight:900;font-size:${titlePx}px;letter-spacing:-.03em;color:${B.ink};line-height:1.05;margin:0 0 2px">Table ${tbl}</div>
@@ -2129,9 +2108,9 @@
                 : ''
             }
             ${usesHtml}
-            <div style="display:inline-block;padding:3px;border-radius:14px;background:linear-gradient(145deg,${B.gold},${B.inkSoft} 55%,${B.goldSoft});margin:0 0 ${
+            <div style="display:inline-block;padding:3px;border-radius:14px;background:linear-gradient(145deg,${B.orange},${B.orangeDeep} 55%,${B.ink});margin:0 0 ${
               isMini ? 6 : 8
-            }px;box-shadow:0 4px 14px rgba(12,31,26,.12)">
+            }px;box-shadow:0 4px 14px rgba(255,79,0,.18)">
               <div style="padding:${isMini ? 5 : 8}px;background:#fff;border-radius:11px">
                 <img src="${qrCodeUrl}" alt="Table ${tbl} — order or call waiter" width="${qr}" height="${qr}" style="display:block;width:${qr}px;height:${qr}px;max-width:100%" />
               </div>
@@ -2149,7 +2128,9 @@
     function qrPrintDocumentStyles(sizeId) {
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
       const B = QR_BRAND;
-      // Cards are self-styled (inline). Sheet only needs page chrome + grid.
+      const perPage = Math.max(1, Number(sz.perPage) || sz.cols || 4);
+      const minH = sz.cardMinH || '';
+      // Cards are self-styled (inline). Sheet enforces per-page count via page-break.
       return `
         <style>
           @page { margin: ${sz.margin}; size: A4; }
@@ -2192,16 +2173,31 @@
             padding: 0 8px 24px;
             align-items: stretch;
           }
-          .qr-print-card { width: 100%; }
+          .qr-print-card {
+            width: 100%;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            ${minH ? 'min-height: ' + minH + ';' : ''}
+          }
+          /* Hard page break after every N cards so Large=2/page, Full=1/page, etc. */
+          .qr-print-card:nth-child(${perPage}n) {
+            page-break-after: always;
+            break-after: page;
+          }
+          .qr-print-card:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
           .qr-print-single {
-            max-width: 440px;
+            max-width: 520px;
             margin: 24px auto;
           }
           .qr-print-single .qr-print-grid { grid-template-columns: 1fr; }
+          .qr-print-single .qr-print-card { min-height: 0; page-break-after: auto !important; }
           @media print {
             .qr-print-toolbar, .qr-print-note, .no-print { display: none !important; }
             body { background: #fff; }
-            .qr-print-grid { max-width: none; padding: 0; }
+            .qr-print-grid { max-width: none; padding: 0; width: 100%; }
           }
           @media screen {
             body { background: #e8ebe9; padding-bottom: 32px; }
@@ -2221,6 +2217,8 @@
       const sizeId = resolveQrPrintSizeId((meta && meta.sizeId) || getSavedQrPrintSizeId());
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
       const sizeLabel = sz.label;
+      const perPage = Math.max(1, Number(sz.perPage) || 4);
+      const pagesEst = count ? Math.ceil(count / perPage) : 0;
       const autoPrint = !!(meta && meta.autoPrint);
 
       if (!cardsHtml || !String(cardsHtml).trim()) {
@@ -2239,7 +2237,9 @@
         : `<div class="qr-print-toolbar no-print">
             <div>
               <h1>${esc(title)}</h1>
-              <p>${esc(formatOutletTitle(outlet))}${count ? ' · ' + count + ' cards' : ''} · <b>${esc(sizeLabel)}</b> (${sz.cols} per row · QR ${sz.qrCss}px)</p>
+              <p>${esc(formatOutletTitle(outlet))}${count ? ' · ' + count + ' cards' : ''} · <b>${esc(sizeLabel)}</b> · <b>${perPage} per A4 page</b>${
+                pagesEst ? ' · ~' + pagesEst + ' pages' : ''
+              }</p>
             </div>
             <div style="display:flex;gap:8px">
               <button type="button" class="secondary" onclick="window.close()">Close</button>
@@ -2247,9 +2247,9 @@
             </div>
           </div>
           <div class="qr-print-note no-print">
-            Selected size: <b>${esc(sizeLabel)}</b> — ${esc(sz.hint || '')}.
-            In the print dialog use <b>A4</b> and scale <b>100%</b> (not “Fit to page”) so card sizes stay correct.
-            Before service: <b>Open all QR</b> so guest scans work.
+            Size <b>${esc(sizeLabel)}</b> = <b>${perPage} card${perPage === 1 ? '' : 's'} per A4 page</b> (${esc(sz.hint || '')}).
+            Print dialog: paper <b>A4</b>, scale <b>100%</b> (avoid “Fit to page”).
+            Before service: <b>Open all QR</b>.
           </div>`;
 
       const doc =
@@ -2546,9 +2546,7 @@
             <input type="radio" name="qr-print-size" value="${esc(id)}" ${checked} style="margin:0;flex-shrink:0;accent-color:#c4a35a">
             <span style="min-width:0">
               <b style="font-size:12px;color:var(--text);display:block;line-height:1.2">${esc(s.label)}</b>
-              <span style="font-size:10px;color:var(--text-soft);line-height:1.2">${esc(
-                (s.hint || '').split('·')[0].trim()
-              )}</span>
+              <span style="font-size:10px;color:var(--text-soft);line-height:1.2">${esc(s.hint || '')}</span>
             </span>
           </label>`;
         })
