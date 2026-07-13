@@ -218,10 +218,18 @@
 .toggle input:checked + span::before { transform: translateX(19px); background: #fff; }
 
 /* ---------------- NOTIFICATIONS PANEL ---------------- */
-.notif-panel { position: fixed; top: 70px; right: 18px; width: 360px; max-width: calc(100vw - 36px); z-index: 3500;
-  background: var(--panel-solid); border: 1px solid var(--stroke-2); border-radius: var(--r-md); box-shadow: var(--shadow-lg);
-  opacity: 0; transform: translateY(-10px); pointer-events: none; transition: var(--t); overflow: hidden; }
-.notif-panel.show { opacity: 1; transform: none; pointer-events: auto; }
+.notif-panel {
+  position: fixed; top: 64px; right: 12px; width: 360px; max-width: calc(100vw - 24px); z-index: 9000;
+  background: var(--panel-solid); border: 1px solid var(--stroke-2); border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  opacity: 0; visibility: hidden; transform: translateY(-8px);
+  pointer-events: none; transition: opacity .18s ease, transform .18s ease, visibility .18s;
+  overflow: hidden;
+}
+.notif-panel.show {
+  opacity: 1; visibility: visible; transform: none; pointer-events: auto;
+}
+#tb-notif-btn { cursor: pointer; position: relative; z-index: 2; pointer-events: auto !important; }
 .notif-h { padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--stroke); }
 .notif-h h4 { font-size: 15px; }
 .notif-list { max-height: 380px; overflow-y: auto; }

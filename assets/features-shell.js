@@ -35,74 +35,150 @@
     }
 
     /* ===================== NOTIFICATIONS ===================== */
-    const bell = $('.tb-icon-btn[aria-label="Notifications"]');
-    if(bell){
+    const bell =
+      document.getElementById('tb-notif-btn') ||
+      $('.tb-icon-btn[aria-label="Notifications"]');
+    if (bell) {
       let NOTIFS = [];
       const readKey = 'rs:notif-read';
       let notifLoading = false;
       let notifReloadQueued = false;
       let notifCloudUnavailable = false;
-      const panel = document.createElement('div'); panel.className='notif-panel';
-      function readSet(){ try { return new Set(JSON.parse(localStorage.getItem(readKey) || '[]')); } catch(e){ return new Set(); } }
-      function saveRead(set){ try { localStorage.setItem(readKey, JSON.stringify([...set])); } catch(e){} }
-      function relTime(v){
+      const panel = document.createElement('div');
+      panel.className = 'notif-panel';
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', 'Notifications');
+      function readSet() {
+        try {
+          return new Set(JSON.parse(localStorage.getItem(readKey) || '[]'));
+        } catch (e) {
+          return new Set();
+        }
+      }
+      function saveRead(set) {
+        try {
+          localStorage.setItem(readKey, JSON.stringify([...set]));
+        } catch (e) {}
+      }
+      function relTime(v) {
         const t = v ? new Date(v).getTime() : 0;
-        if(!t || Number.isNaN(t)) return '';
+        if (!t || Number.isNaN(t)) return '';
         const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
-        if(mins < 1) return 'just now';
-        if(mins < 60) return mins + ' min ago';
+        if (mins < 1) return 'just now';
+        if (mins < 60) return mins + ' min ago';
         const hrs = Math.round(mins / 60);
-        if(hrs < 24) return hrs + ' hr ago';
-        return new Date(t).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+        if (hrs < 24) return hrs + ' hr ago';
+        return new Date(t).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
       }
-      function iconFor(type){
-        if(type === 'warning') return ['fa-triangle-exclamation','var(--red-tint)','var(--red)'];
-        if(type === 'success') return ['fa-circle-check','var(--green-tint)','var(--green)'];
-        if(type === 'billing') return ['fa-receipt','var(--amber-tint)','var(--amber)'];
-        if(type === 'order') return ['fa-bowl-rice','var(--orange-tint)','var(--orange)'];
-        if(type === 'system') return ['fa-cloud-arrow-down','var(--violet-tint)','var(--violet-soft)'];
-        return ['fa-bell','var(--orange-tint)','var(--orange)'];
+      function iconFor(type) {
+        if (type === 'warning') return ['fa-triangle-exclamation', 'var(--red-tint)', 'var(--red)'];
+        if (type === 'success') return ['fa-circle-check', 'var(--green-tint)', 'var(--green)'];
+        if (type === 'billing') return ['fa-receipt', 'var(--amber-tint)', 'var(--amber)'];
+        if (type === 'order') return ['fa-bowl-rice', 'var(--orange-tint)', 'var(--orange)'];
+        if (type === 'system') return ['fa-cloud-arrow-down', 'var(--violet-tint)', 'var(--violet-soft)'];
+        if (type === 'waiter' || type === 'waiter_call') return ['fa-bell-concierge', 'var(--orange-tint)', 'var(--orange)'];
+        return ['fa-bell', 'var(--orange-tint)', 'var(--orange)'];
       }
-      async function loadNotifications(){
-        if(notifLoading){ notifReloadQueued = true; return; }
+      function positionPanel() {
+        try {
+          const r = bell.getBoundingClientRect();
+          const top = Math.max(8, r.bottom + 8);
+          const right = Math.max(8, window.innerWidth - r.right);
+          panel.style.top = top + 'px';
+          panel.style.right = right + 'px';
+          panel.style.left = 'auto';
+        } catch (_) {}
+      }
+      async function loadNotifications() {
+        if (notifLoading) {
+          notifReloadQueued = true;
+          return;
+        }
         notifLoading = true;
         try {
           const live = [];
-          if(Array.isArray(RS.INVENTORY)){
-            RS.INVENTORY.filter(i=>Number(i.stock) < Number(i.min)).slice(0,4).forEach(i=>{
-              live.push({ id:'low-stock-'+(i.id||i.name), type:'warning', title:`${i.name} is low on stock`, message:`${i.stock || 0} ${i.unit || 'unit'} left, minimum ${i.min || 0}`, timestamp:'' });
+          if (Array.isArray(RS.INVENTORY)) {
+            RS.INVENTORY.filter((i) => Number(i.stock) < Number(i.min))
+              .slice(0, 4)
+              .forEach((i) => {
+                live.push({
+                  id: 'low-stock-' + (i.id || i.name),
+                  type: 'warning',
+                  title: `${i.name} is low on stock`,
+                  message: `${i.stock || 0} ${i.unit || 'unit'} left, minimum ${i.min || 0}`,
+                  timestamp: '',
+                });
+              });
+          }
+          if (Array.isArray(RS.QR_ORDERS)) {
+            RS.QR_ORDERS.filter((o) => String(o.status || '').toLowerCase() === 'pending')
+              .slice(0, 4)
+              .forEach((o) => {
+                const id = 'pending-order-' + (o.id || o.orderId || o.table);
+                live.push({
+                  id,
+                  type: 'order',
+                  title: `New order${
+                    o.table
+                      ? ' · ' + (String(o.table).match(/^\d+$/) ? 'Table ' + o.table : o.table)
+                      : ''
+                  }`.trim(),
+                  message: `${o.table || 'Table'} - ${rs(o.total || 0)}`,
+                  timestamp: o.time || o.dateTime || '',
+                });
+              });
+          }
+          if (Array.isArray(RS.BILLS)) {
+            RS.BILLS.filter((b) => String(b.status || '').toLowerCase() === 'refunded')
+              .slice(0, 2)
+              .forEach((b) => {
+                const id = 'refund-' + (b.id || b.no);
+                live.push({
+                  id,
+                  type: 'billing',
+                  title: `Refund completed ${b.no || ''}`.trim(),
+                  message: `${rs(b.amount || 0)} refunded`,
+                  timestamp: b.time || '',
+                });
+              });
+          }
+          if (window.RS_LAST_CLOUD_ERROR) {
+            live.push({
+              id: 'cloud-sync-warning',
+              type: 'warning',
+              title: 'Cloud sync needs attention',
+              message:
+                window.RS_LAST_CLOUD_ERROR.message ||
+                'Latest change is saved locally until sync recovers.',
+              timestamp: window.RS_LAST_CLOUD_ERROR.time,
             });
           }
-          if(Array.isArray(RS.QR_ORDERS)){
-            RS.QR_ORDERS.filter(o=>String(o.status||'').toLowerCase()==='pending').slice(0,4).forEach(o=>{
-              const id = 'pending-order-'+(o.id||o.orderId||o.table);
-              live.push({ id, type:'order', title:`New order${o.table ? (' · ' + (String(o.table).match(/^\d+$/) ? ('Table ' + o.table) : o.table)) : ''}`.trim(), message:`${o.table || 'Table'} - ${rs(o.total || 0)}`, timestamp:o.time || o.dateTime || '' });
-            });
-          }
-          if(Array.isArray(RS.BILLS)){
-            RS.BILLS.filter(b=>String(b.status||'').toLowerCase()==='refunded').slice(0,2).forEach(b=>{
-              const id = 'refund-'+(b.id||b.no);
-              live.push({ id, type:'billing', title:`Refund completed ${b.no || ''}`.trim(), message:`${rs(b.amount || 0)} refunded`, timestamp:b.time || '' });
-            });
-          }
-          if(window.RS_LAST_CLOUD_ERROR){
-            live.push({ id:'cloud-sync-warning', type:'warning', title:'Cloud sync needs attention', message:window.RS_LAST_CLOUD_ERROR.message || 'Latest change is saved locally until sync recovers.', timestamp:window.RS_LAST_CLOUD_ERROR.time });
-          }
-          if(window.RS_APP_UPDATE){
-            const notifId = 'system-update-' + (window.RS_APP_UPDATE.signature ? window.RS_APP_UPDATE.signature.substring(0, 8) : 'latest');
-            const timestamp = window.RS_APP_UPDATE.detectedAt || window.RS_APP_UPDATE.releaseInfo?.date || '';
-            const msg = window.RS_APP_UPDATE.isPatchOnly 
+          if (window.RS_APP_UPDATE) {
+            const notifId =
+              'system-update-' +
+              (window.RS_APP_UPDATE.signature
+                ? window.RS_APP_UPDATE.signature.substring(0, 8)
+                : 'latest');
+            const timestamp =
+              window.RS_APP_UPDATE.detectedAt || window.RS_APP_UPDATE.releaseInfo?.date || '';
+            const msg = window.RS_APP_UPDATE.isPatchOnly
               ? 'System stability hotfix - Click to apply.'
               : `Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} - Click to apply.`;
-            live.push({ id:notifId, type:'system', title:'System update is ready', message:msg, timestamp });
+            live.push({
+              id: notifId,
+              type: 'system',
+              title: 'System update is ready',
+              message: msg,
+              timestamp,
+            });
           }
           let saved = [];
-          if(window.RS_DB){
-            if(RS_DB.isCloud && RS_DB.listCloud && !notifCloudUnavailable) {
+          if (window.RS_DB) {
+            if (RS_DB.isCloud && RS_DB.listCloud && !notifCloudUnavailable) {
               try {
                 saved = await RS_DB.listCloud('notifications');
-                if(RS_DB.writeLocal) await RS_DB.writeLocal('notifications', saved || []);
-              } catch(e) {
+                if (RS_DB.writeLocal) await RS_DB.writeLocal('notifications', saved || []);
+              } catch (e) {
                 notifCloudUnavailable = true;
                 saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
               }
@@ -110,52 +186,158 @@
               saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
             }
           }
-          // Re-read localStorage AFTER all awaits so any mark-as-read
-          // that happened during the cloud fetch is not missed.
           const read = readSet();
-          NOTIFS = [...saved, ...live].map(n=>{
-            const [ic,bg,c] = iconFor(n.type);
-            return { ...n, ic, bg, c, unread: !n.isRead && !read.has(String(n.id)), time:relTime(n.timestamp || n.createdAt) };
-          }).filter(n=>n.unread);
-          draw(); updateDot();
+          const mapped = [...(saved || []), ...live].map((n) => {
+            const [ic, bg, c] = iconFor(n.type);
+            return {
+              ...n,
+              ic,
+              bg,
+              c,
+              unread: !n.isRead && !read.has(String(n.id)),
+              time: relTime(n.timestamp || n.createdAt),
+            };
+          });
+          // Keep unread first, then recent read (max 30) so panel is never "dead"
+          const unread = mapped.filter((n) => n.unread);
+          const readOnes = mapped.filter((n) => !n.unread).slice(0, 12);
+          NOTIFS = [...unread, ...readOnes].slice(0, 30);
+          draw();
+          updateDot();
+        } catch (err) {
+          console.warn('[notifications]', err);
+          draw();
         } finally {
           notifLoading = false;
-          if(notifReloadQueued){ notifReloadQueued = false; setTimeout(loadNotifications, 0); }
+          if (notifReloadQueued) {
+            notifReloadQueued = false;
+            setTimeout(loadNotifications, 0);
+          }
         }
       }
-      function draw(){
-        const list = NOTIFS.filter(n=>n.unread);
-        const unread = list.length;
-        panel.innerHTML = `<div class="notif-h"><h4>Notifications ${unread?`<span class="pill pill-orange" style="padding:2px 8px;font-size:11px">${unread} new</span>`:''}</h4><button class="btn btn-ghost btn-sm" id="notif-read">Mark all read</button></div>
-          <div class="notif-list">${list.length ? list.map(n=>`<div class="notif-item unread" data-id="${n.id}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${n.ic}"></i></div><div style="flex:1"><div class="nt">${safe(n.title)}</div><div class="nd">${safe(n.message)}</div><div class="ntime">${safe(n.time)}</div></div></div>`).join('') : '<div class="sr-empty">No live notifications right now.</div>'}</div>`;
-        const markRead = n => {
-          if(!n || !n.id) return;
-          n.unread = false; n.isRead = true;
-          const read = readSet(); read.add(String(n.id)); saveRead(read);
-          if(window.RS_DB && !String(n.id).startsWith('low-stock-') && !String(n.id).startsWith('pending-order-') && !String(n.id).startsWith('refund-') && n.id !== 'cloud-sync-warning' && !String(n.id).startsWith('system-update')) {
-            RS_DB.put('notifications', n.id, n).catch(()=>{});
+      function draw() {
+        const unread = NOTIFS.filter((n) => n.unread).length;
+        const list = NOTIFS;
+        panel.innerHTML = `<div class="notif-h"><h4>Notifications ${
+          unread
+            ? `<span class="pill pill-orange" style="padding:2px 8px;font-size:11px">${unread} new</span>`
+            : ''
+        }</h4><button type="button" class="btn btn-ghost btn-sm" id="notif-read">Mark all read</button></div>
+          <div class="notif-list">${
+            list.length
+              ? list
+                  .map(
+                    (n) =>
+                      `<div class="notif-item ${n.unread ? 'unread' : ''}" data-id="${safe(
+                        n.id
+                      )}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${
+                        n.ic
+                      }"></i></div><div style="flex:1"><div class="nt">${safe(
+                        n.title
+                      )}</div><div class="nd">${safe(n.message)}</div><div class="ntime">${safe(
+                        n.time
+                      )}</div></div></div>`
+                  )
+                  .join('')
+              : '<div class="sr-empty" style="padding:20px 16px;text-align:center;color:var(--text-soft);font-size:13px">No notifications yet.<br><span style="font-size:12px;color:var(--text-mute)">New QR orders, low stock, and waiter calls show here.</span></div>'
+          }</div>`;
+        const markRead = (n) => {
+          if (!n || !n.id) return;
+          n.unread = false;
+          n.isRead = true;
+          const read = readSet();
+          read.add(String(n.id));
+          saveRead(read);
+          if (
+            window.RS_DB &&
+            !String(n.id).startsWith('low-stock-') &&
+            !String(n.id).startsWith('pending-order-') &&
+            !String(n.id).startsWith('refund-') &&
+            n.id !== 'cloud-sync-warning' &&
+            !String(n.id).startsWith('system-update')
+          ) {
+            RS_DB.put('notifications', n.id, n).catch(() => {});
           }
-          if(String(n.id).startsWith('system-update') && typeof window.RS_SHOW_UPDATE_DIALOG === 'function') {
+          if (
+            String(n.id).startsWith('system-update') &&
+            typeof window.RS_SHOW_UPDATE_DIALOG === 'function'
+          ) {
             window.RS_SHOW_UPDATE_DIALOG();
           }
         };
-        panel.querySelector('#notif-read').onclick = ()=>{ NOTIFS.forEach(markRead); draw(); updateDot(); };
-        $$('.notif-item',panel).forEach(el=> el.onclick=()=>{
-          const id = el.dataset.id;
-          const target = NOTIFS.find(x => String(x.id) === String(id));
-          if(target) { markRead(target); draw(); updateDot(); }
+        const btnRead = panel.querySelector('#notif-read');
+        if (btnRead)
+          btnRead.onclick = (e) => {
+            e.stopPropagation();
+            NOTIFS.forEach(markRead);
+            draw();
+            updateDot();
+          };
+        $$('.notif-item', panel).forEach((el) => {
+          el.onclick = (e) => {
+            e.stopPropagation();
+            const id = el.dataset.id;
+            const target = NOTIFS.find((x) => String(x.id) === String(id));
+            if (target) {
+              markRead(target);
+              draw();
+              updateDot();
+            }
+          };
         });
       }
-      function updateDot(){ const d=bell.querySelector('.dot-notif'); if(d) d.style.display = NOTIFS.some(n=>n.unread)?'':'none'; }
-      document.body.appendChild(panel); loadNotifications();
-      bell.addEventListener('click', e=>{ e.stopPropagation(); panel.classList.toggle('show'); });
-      document.addEventListener('click', e=>{ if(!panel.contains(e.target) && !bell.contains(e.target)) panel.classList.remove('show'); });
+      function updateDot() {
+        const d = bell.querySelector('.dot-notif');
+        if (d) d.style.display = NOTIFS.some((n) => n.unread) ? '' : 'none';
+      }
+      function openPanel() {
+        positionPanel();
+        panel.classList.add('show');
+        draw();
+        loadNotifications();
+      }
+      function closePanel() {
+        panel.classList.remove('show');
+      }
+      function togglePanel(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        if (panel.classList.contains('show')) closePanel();
+        else openPanel();
+      }
+      if (!document.body.contains(panel)) document.body.appendChild(panel);
+      draw();
+      loadNotifications();
+      // Capture phase so nothing on the page steals the click
+      bell.addEventListener('click', togglePanel, true);
+      bell.addEventListener(
+        'keydown',
+        (e) => {
+          if (e.key === 'Enter' || e.key === ' ') togglePanel(e);
+        },
+        true
+      );
+      document.addEventListener(
+        'click',
+        (e) => {
+          if (!panel.classList.contains('show')) return;
+          if (panel.contains(e.target) || bell.contains(e.target)) return;
+          closePanel();
+        },
+        true
+      );
+      window.addEventListener('resize', () => {
+        if (panel.classList.contains('show')) positionPanel();
+      });
       document.addEventListener('rs:hydrated', loadNotifications);
       document.addEventListener('rs:pending_orders_synced', loadNotifications);
       document.addEventListener('rs:collection_synced', loadNotifications);
       window.addEventListener('rs:cloud-fallback', loadNotifications);
       document.addEventListener('rs:app_update_available', loadNotifications);
       document.addEventListener('rs:render-inventory', loadNotifications);
+      window.RS_openNotifications = openPanel;
     }
 
     /* ===================== SETTINGS ===================== */
@@ -1858,9 +2040,16 @@
     } catch(e){}
 
     document.addEventListener('rs:hydrated', window.startTopbarWhatsAppPolling);
-    if (window.RS_DB && window.RS_DB.session) {
+    // Start polling as soon as shell boots (don't wait only for RS_DB.session)
+    try {
       window.startTopbarWhatsAppPolling();
+    } catch (e) {
+      console.warn('[WA topbar] poll start failed', e);
     }
+    // Re-bind WA click after late DOM injects
+    setTimeout(wireWhatsAppStatusClicks, 500);
+    setTimeout(wireWhatsAppStatusClicks, 2000);
   }
-  if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
+  if (window.RS) boot();
+  else document.addEventListener('rs:ready', boot, { once: true });
 })();

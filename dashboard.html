@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v145-20260713-qr-custom-size';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v146-20260713-bell-wa';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -461,7 +461,7 @@
           <span class="tb-badge-label" id="tb-wa-label">…</span>
         </button>
         <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
-        <button type="button" class="tb-icon-btn" aria-label="Notifications" title="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
+        <button type="button" class="tb-icon-btn" id="tb-notif-btn" aria-label="Notifications" title="Notifications" data-tooltip="Notifications"><i class="fa-regular fa-bell" aria-hidden="true"></i><span class="dot-notif" style="display:none"></span></button>
         <button type="button" class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme" title="Light / dark"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
         <span class="tb-version" id="app-version-pill" role="status" title="App version" aria-label="App version"></span>
         <!-- Hidden cloud state for JS / offline lock (not shown in UI chrome) -->
