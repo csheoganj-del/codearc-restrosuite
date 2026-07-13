@@ -48,6 +48,10 @@
       panel.className = 'notif-panel';
       panel.setAttribute('role', 'dialog');
       panel.setAttribute('aria-label', 'Notifications');
+      panel.setAttribute('aria-modal', 'false');
+      // Always clickable once shown — avoid re-binding per-item handlers on every redraw
+      panel.style.pointerEvents = 'auto';
+
       function readSet() {
         try {
           return new Set(JSON.parse(localStorage.getItem(readKey) || '[]'));
@@ -79,6 +83,16 @@
         if (type === 'waiter' || type === 'waiter_call') return ['fa-bell-concierge', 'var(--orange-tint)', 'var(--orange)'];
         return ['fa-bell', 'var(--orange-tint)', 'var(--orange)'];
       }
+      function actionLabel(n) {
+        const t = String(n.type || '').toLowerCase();
+        if (t === 'waiter' || t === 'waiter_call') return 'Open floor';
+        if (t === 'order') return 'Open orders';
+        if (t === 'billing') return 'Open bills';
+        if (t === 'warning' && String(n.id || '').startsWith('low-stock')) return 'Open inventory';
+        if (t === 'system' || String(n.id || '').startsWith('system-update')) return 'Apply update';
+        if (t === 'warning') return 'View';
+        return 'Open';
+      }
       function positionPanel() {
         try {
           const r = bell.getBoundingClientRect();
@@ -87,7 +101,91 @@
           panel.style.top = top + 'px';
           panel.style.right = right + 'px';
           panel.style.left = 'auto';
+          panel.style.zIndex = '120000';
         } catch (_) {}
+      }
+      function findNotif(id) {
+        const key = String(id == null ? '' : id);
+        return NOTIFS.find((x) => String(x.id) === key) || null;
+      }
+      function markRead(n, { silent } = {}) {
+        if (!n || n.id == null) return false;
+        const wasUnread = !!n.unread;
+        n.unread = false;
+        n.isRead = true;
+        const read = readSet();
+        read.add(String(n.id));
+        saveRead(read);
+        if (
+          window.RS_DB &&
+          !String(n.id).startsWith('low-stock-') &&
+          !String(n.id).startsWith('pending-order-') &&
+          !String(n.id).startsWith('refund-') &&
+          n.id !== 'cloud-sync-warning' &&
+          !String(n.id).startsWith('system-update')
+        ) {
+          try {
+            RS_DB.put('notifications', n.id, { ...n, isRead: true, unread: false }).catch(() => {});
+          } catch (_) {}
+        }
+        if (!silent && wasUnread) {
+          // light feedback only when something actually changed
+        }
+        return wasUnread;
+      }
+      function markAllRead() {
+        const count = NOTIFS.filter((n) => n.unread).length;
+        NOTIFS.forEach((n) => markRead(n, { silent: true }));
+        draw();
+        updateDot();
+        if (count > 0) {
+          RS.toast(count === 1 ? '1 notification marked read' : count + ' notifications marked read', 'fa-check');
+        } else {
+          RS.toast('All caught up — nothing new', 'fa-circle-check');
+        }
+      }
+      function openFromNotif(n) {
+        if (!n) return;
+        const id = String(n.id || '');
+        const type = String(n.type || '').toLowerCase();
+        markRead(n, { silent: true });
+        updateDot();
+        closePanel();
+
+        if (id.startsWith('system-update') || type === 'system') {
+          if (typeof window.RS_SHOW_UPDATE_DIALOG === 'function') {
+            window.RS_SHOW_UPDATE_DIALOG();
+          } else {
+            RS.toast(n.message || 'System update available', 'fa-cloud-arrow-down');
+          }
+          return;
+        }
+        if (type === 'waiter' || type === 'waiter_call' || /waiter|table/i.test(n.title || '')) {
+          if (RS.activateTab) RS.activateTab('floor-tab');
+          RS.toast(n.title || 'Opening floor', 'fa-bell-concierge');
+          return;
+        }
+        if (type === 'order' || id.startsWith('pending-order-')) {
+          if (RS.activateTab) RS.activateTab('aggregator-tab');
+          RS.toast(n.title || 'Opening online orders', 'fa-bowl-rice');
+          return;
+        }
+        if (type === 'billing' || id.startsWith('refund-')) {
+          if (RS.activateTab) RS.activateTab('bills-tab');
+          RS.toast(n.title || 'Opening bills', 'fa-receipt');
+          return;
+        }
+        if (id.startsWith('low-stock-') || (type === 'warning' && /stock/i.test(n.title || ''))) {
+          if (RS.activateTab) RS.activateTab('inventory-tab');
+          RS.toast(n.title || 'Opening inventory', 'fa-boxes-stacked');
+          return;
+        }
+        if (id === 'cloud-sync-warning') {
+          RS.toast(n.message || 'Cloud sync issue — data is safe locally', 'fa-cloud');
+          return;
+        }
+        // Generic: mark read + toast so the click always feels alive
+        RS.toast(n.title || 'Notification opened', 'fa-bell');
       }
       async function loadNotifications() {
         if (notifLoading) {
@@ -162,8 +260,8 @@
             const timestamp =
               window.RS_APP_UPDATE.detectedAt || window.RS_APP_UPDATE.releaseInfo?.date || '';
             const msg = window.RS_APP_UPDATE.isPatchOnly
-              ? 'System stability hotfix - Click to apply.'
-              : `Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} - Click to apply.`;
+              ? 'System stability hotfix — tap to apply.'
+              : `Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} — tap to apply.`;
             live.push({
               id: notifId,
               type: 'system',
@@ -187,20 +285,28 @@
             }
           }
           const read = readSet();
-          const mapped = [...(saved || []), ...live].map((n) => {
+          const seen = new Set();
+          const mapped = [];
+          [...(saved || []), ...live].forEach((n) => {
+            if (!n || n.id == null) return;
+            const key = String(n.id);
+            if (seen.has(key)) return;
+            seen.add(key);
             const [ic, bg, c] = iconFor(n.type);
-            return {
+            mapped.push({
               ...n,
+              id: key,
               ic,
               bg,
               c,
-              unread: !n.isRead && !read.has(String(n.id)),
-              time: relTime(n.timestamp || n.createdAt),
-            };
+              unread: !n.isRead && !read.has(key),
+              time: relTime(n.timestamp || n.createdAt || n.created_at),
+              cta: actionLabel(n),
+            });
           });
-          // Keep unread first, then recent read (max 30) so panel is never "dead"
+          // Unread first, then recent read (max 30)
           const unread = mapped.filter((n) => n.unread);
-          const readOnes = mapped.filter((n) => !n.unread).slice(0, 12);
+          const readOnes = mapped.filter((n) => !n.unread).slice(0, 16);
           NOTIFS = [...unread, ...readOnes].slice(0, 30);
           draw();
           updateDot();
@@ -218,86 +324,79 @@
       function draw() {
         const unread = NOTIFS.filter((n) => n.unread).length;
         const list = NOTIFS;
-        panel.innerHTML = `<div class="notif-h"><h4>Notifications ${
-          unread
-            ? `<span class="pill pill-orange" style="padding:2px 8px;font-size:11px">${unread} new</span>`
-            : ''
-        }</h4><button type="button" class="btn btn-ghost btn-sm" id="notif-read">Mark all read</button></div>
-          <div class="notif-list">${
-            list.length
-              ? list
-                  .map(
-                    (n) =>
-                      `<div class="notif-item ${n.unread ? 'unread' : ''}" data-id="${safe(
-                        n.id
-                      )}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${
-                        n.ic
-                      }"></i></div><div style="flex:1"><div class="nt">${safe(
-                        n.title
-                      )}</div><div class="nd">${safe(n.message)}</div><div class="ntime">${safe(
-                        n.time
-                      )}</div></div></div>`
-                  )
-                  .join('')
-              : '<div class="sr-empty" style="padding:20px 16px;text-align:center;color:var(--text-soft);font-size:13px">No notifications yet.<br><span style="font-size:12px;color:var(--text-mute)">New QR orders, low stock, and waiter calls show here.</span></div>'
-          }</div>`;
-        const markRead = (n) => {
-          if (!n || !n.id) return;
-          n.unread = false;
-          n.isRead = true;
-          const read = readSet();
-          read.add(String(n.id));
-          saveRead(read);
-          if (
-            window.RS_DB &&
-            !String(n.id).startsWith('low-stock-') &&
-            !String(n.id).startsWith('pending-order-') &&
-            !String(n.id).startsWith('refund-') &&
-            n.id !== 'cloud-sync-warning' &&
-            !String(n.id).startsWith('system-update')
-          ) {
-            RS_DB.put('notifications', n.id, n).catch(() => {});
-          }
-          if (
-            String(n.id).startsWith('system-update') &&
-            typeof window.RS_SHOW_UPDATE_DIALOG === 'function'
-          ) {
-            window.RS_SHOW_UPDATE_DIALOG();
-          }
-        };
-        const btnRead = panel.querySelector('#notif-read');
-        if (btnRead)
-          btnRead.onclick = (e) => {
-            e.stopPropagation();
-            NOTIFS.forEach(markRead);
-            draw();
-            updateDot();
-          };
-        $$('.notif-item', panel).forEach((el) => {
-          el.onclick = (e) => {
-            e.stopPropagation();
-            const id = el.dataset.id;
-            const target = NOTIFS.find((x) => String(x.id) === String(id));
-            if (target) {
-              markRead(target);
-              draw();
-              updateDot();
+        panel.innerHTML = `
+          <div class="notif-h">
+            <div class="notif-h-title">
+              <h4>Notifications</h4>
+              ${
+                unread
+                  ? `<span class="pill pill-orange notif-count">${unread} new</span>`
+                  : `<span class="notif-count-muted">All read</span>`
+              }
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm notif-mark-all" data-action="mark-all" ${
+              unread ? '' : 'disabled'
+            } title="${unread ? 'Mark all as read' : 'Nothing new'}">
+              <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+              <span>Mark all read</span>
+            </button>
+          </div>
+          <div class="notif-list" role="list">
+            ${
+              list.length
+                ? list
+                    .map((n) => {
+                      const idAttr = encodeURIComponent(String(n.id));
+                      return `<button type="button" class="notif-item ${
+                        n.unread ? 'unread' : ''
+                      }" role="listitem" data-action="open-item" data-id="${idAttr}" title="${safe(
+                        n.cta || 'Open'
+                      )}">
+                        <div class="notif-ic" style="background:${n.bg};color:${n.c}" aria-hidden="true"><i class="fa-solid ${
+                          n.ic
+                        }"></i></div>
+                        <div class="notif-body">
+                          <div class="nt">${safe(n.title)}</div>
+                          <div class="nd">${safe(n.message)}</div>
+                          <div class="notif-meta">
+                            <span class="ntime">${safe(n.time || '')}</span>
+                            <span class="notif-cta">${safe(n.cta || 'Open')} <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+                          </div>
+                        </div>
+                        ${n.unread ? '<span class="notif-unread-dot" aria-label="Unread"></span>' : ''}
+                      </button>`;
+                    })
+                    .join('')
+                : `<div class="notif-empty">
+                    <i class="fa-regular fa-bell" aria-hidden="true"></i>
+                    <strong>No notifications yet</strong>
+                    <span>Waiter calls, new QR orders, low stock, and updates show up here.</span>
+                  </div>`
             }
-          };
-        });
+          </div>`;
       }
       function updateDot() {
         const d = bell.querySelector('.dot-notif');
         if (d) d.style.display = NOTIFS.some((n) => n.unread) ? '' : 'none';
+        bell.setAttribute(
+          'aria-label',
+          NOTIFS.some((n) => n.unread)
+            ? `Notifications (${NOTIFS.filter((n) => n.unread).length} new)`
+            : 'Notifications'
+        );
       }
       function openPanel() {
         positionPanel();
         panel.classList.add('show');
+        panel.setAttribute('aria-hidden', 'false');
+        bell.setAttribute('aria-expanded', 'true');
         draw();
         loadNotifications();
       }
       function closePanel() {
         panel.classList.remove('show');
+        panel.setAttribute('aria-hidden', 'true');
+        bell.setAttribute('aria-expanded', 'false');
       }
       function togglePanel(e) {
         if (e) {
@@ -307,27 +406,64 @@
         if (panel.classList.contains('show')) closePanel();
         else openPanel();
       }
-      if (!document.body.contains(panel)) document.body.appendChild(panel);
-      draw();
-      loadNotifications();
-      // Capture phase so nothing on the page steals the click
-      bell.addEventListener('click', togglePanel, true);
-      bell.addEventListener(
-        'keydown',
-        (e) => {
-          if (e.key === 'Enter' || e.key === ' ') togglePanel(e);
-        },
-        true
-      );
-      document.addEventListener(
+
+      // One durable click handler — never wiped by draw()
+      panel.addEventListener(
         'click',
         (e) => {
-          if (!panel.classList.contains('show')) return;
-          if (panel.contains(e.target) || bell.contains(e.target)) return;
-          closePanel();
+          e.stopPropagation();
+          const markAllBtn = e.target.closest('[data-action="mark-all"]');
+          if (markAllBtn) {
+            e.preventDefault();
+            if (markAllBtn.disabled) {
+              RS.toast('All caught up — nothing new', 'fa-circle-check');
+              return;
+            }
+            markAllRead();
+            return;
+          }
+          const item = e.target.closest('[data-action="open-item"]');
+          if (item) {
+            e.preventDefault();
+            let id = item.getAttribute('data-id') || '';
+            try {
+              id = decodeURIComponent(id);
+            } catch (_) {}
+            const target = findNotif(id);
+            if (target) openFromNotif(target);
+            else RS.toast('Notification not found — refresh and try again', 'fa-circle-exclamation');
+          }
         },
         true
       );
+      // Keyboard: Enter/Space on focused item buttons work natively (real <button>)
+
+      if (!document.body.contains(panel)) document.body.appendChild(panel);
+      panel.setAttribute('aria-hidden', 'true');
+      bell.setAttribute('aria-expanded', 'false');
+      bell.setAttribute('aria-haspopup', 'dialog');
+      draw();
+      loadNotifications();
+
+      // Bell open/close (bubble + stopPropagation so outside handler does not fight)
+      bell.addEventListener('click', togglePanel);
+      bell.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') togglePanel(e);
+      });
+      // Outside click closes (bubble phase — does not block panel internals)
+      document.addEventListener('click', (e) => {
+        if (!panel.classList.contains('show')) return;
+        if (panel.contains(e.target) || bell.contains(e.target)) return;
+        closePanel();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && panel.classList.contains('show')) {
+          closePanel();
+          try {
+            bell.focus();
+          } catch (_) {}
+        }
+      });
       window.addEventListener('resize', () => {
         if (panel.classList.contains('show')) positionPanel();
       });
