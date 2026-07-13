@@ -1,11 +1,11 @@
 {
-  "version": "v165-20260713-sa-no-klc",
+  "version": "v166-20260713-menu-layout",
   "date": "2026-07-13",
-  "title": "Hide kitchen-stock tip for Super-Admin",
-  "summary": "The “Quick tip: connect kitchen stock” modal and Kitchen Setup nav no longer appear on Super-Admin or Brand Admin consoles — only restaurant staff see them.",
+  "title": "Fix Menu Editor list layout",
+  "summary": "Kitchen coach banner was inserted inside the Menu Editor two-column grid, which pushed the menu list off-screen. Banner now sits above the grid so the full menu shows on the right again.",
   "highlights": [
-    "No kitchen coach popup for superadmin / brand_admin",
-    "Kitchen Setup sidebar hidden on platform roles",
-    "Restaurant tenants still get the tip once when needed"
+    "Menu items list restored to the right column",
+    "Coach banner above the form+list grid",
+    "Auto-repair if an old banner was stuck inside the grid"
   ]
 }

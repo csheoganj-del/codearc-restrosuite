@@ -63,7 +63,6 @@
               <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category...</option></select></div>
             </div>
             <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups..."></div>
-            </div>
             <div class="form-grid-2">
               <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
               <div><label class="fl">${taxLabel} slab</label><select class="form-input" id="ed-gst">${slabs.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
@@ -281,23 +280,27 @@
     function renderList(){
       const body = $('#editor-list'); if(!body) return;
 
-      // Naive-user banner above menu list (Menu · Recipe · Stock)
+      // Coach banner ABOVE the 2-column grid — never inside report-grid
+      // (inserting into the grid stole the right column and hid the menu list)
       try {
         const edTab = $('#editor-tab');
         if (edTab && window.RSKitchenLinkCoach && RSKitchenLinkCoach.miniBannerHtml) {
           let host = document.getElementById('klc-editor-banner');
+          const grid = edTab.querySelector('.report-grid');
           if (!host) {
             host = document.createElement('div');
             host.id = 'klc-editor-banner';
-            host.style.margin = '0 0 12px';
-            const listPanel = body.closest('.panel') || body.parentElement;
-            if (listPanel && listPanel.parentElement) {
-              listPanel.parentElement.insertBefore(host, listPanel);
-            } else if (edTab.querySelector('.page-head')) {
-              edTab.querySelector('.page-head').after(host);
+            host.style.cssText = 'margin:0 0 12px;grid-column:1/-1;width:100%';
+            if (grid && grid.parentElement === edTab) {
+              edTab.insertBefore(host, grid);
+            } else if (grid) {
+              grid.parentElement.insertBefore(host, grid);
             } else {
               edTab.prepend(host);
             }
+          } else if (grid && host.parentElement === grid) {
+            // Repair older broken placement: move banner out of the grid
+            edTab.insertBefore(host, grid);
           }
           host.innerHTML = RSKitchenLinkCoach.miniBannerHtml({ id: 'klc-ed-mini', place: 'menu' });
           RSKitchenLinkCoach.wireMiniBanner(host);
@@ -318,7 +321,7 @@
       const catFilter = ($('#editor-cat-filter')?.value || 'All').toLowerCase();
       const stockFilter = ($('#editor-stock-filter')?.value || 'All').toLowerCase();
 
-      let filtered = RS.MENU;
+      let filtered = Array.isArray(RS.MENU) ? RS.MENU.slice() : [];
       if (catFilter !== 'all') {
         filtered = filtered.filter(m => m.cat && m.cat.toLowerCase() === catFilter);
       }
