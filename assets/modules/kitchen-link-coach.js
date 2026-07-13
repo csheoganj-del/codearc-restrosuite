@@ -8,6 +8,41 @@
   var LS_FIRST = 'rs_klc_first_visit_v1';
   var LS_HINT = 'rs_klc_pos_hint_v1';
 
+  /**
+   * Platform consoles (Super-Admin / Brand Admin) are not restaurant staff —
+   * never show kitchen-stock onboarding or Kitchen Setup nav there.
+   */
+  function isPlatformConsole() {
+    try {
+      if (document.body && document.body.classList) {
+        if (document.body.classList.contains('rs-role-superadmin')) return true;
+        if (document.body.classList.contains('rs-role-brandadmin')) return true;
+      }
+      if (document.documentElement && document.documentElement.classList) {
+        if (document.documentElement.classList.contains('rs-role-superadmin')) return true;
+        if (document.documentElement.classList.contains('rs-role-brandadmin')) return true;
+      }
+      var role = '';
+      if (global.RS_API && typeof RS_API.session === 'function') {
+        var sess = RS_API.session();
+        if (sess) {
+          role = String(sess.role || '').toLowerCase();
+          var slug = String(sess.tenant_slug || sess.slug || '').toLowerCase();
+          if (slug === 'superadmin') return true;
+        }
+      }
+      if (!role && global.sessionStorage) {
+        role = String(sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+      }
+      if (role === 'superadmin' || role === 'brand_admin' || role === 'brandadmin') return true;
+      if (global.sessionStorage) {
+        var ts = String(sessionStorage.getItem('tenant_slug') || '').toLowerCase();
+        if (ts === 'superadmin') return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   function toast(msg, icon) {
     if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
     else if (typeof global.__toast === 'function') global.__toast(msg, icon);
@@ -1126,9 +1161,11 @@
 
   /**
    * Soft first-visit offer — once per browser when setup incomplete.
+   * Never for Super-Admin / Brand Admin platform consoles.
    */
   function maybeOfferFirstVisit() {
     try {
+      if (isPlatformConsole()) return;
       if (global.localStorage && localStorage.getItem(LS_FIRST) === '1') return;
       const s = setupStatus();
       if (s.allLinked) return;
@@ -1138,29 +1175,34 @@
         return;
       }
       if (!global.RSModal) return;
-      if (global.localStorage) localStorage.setItem(LS_FIRST, '1');
+      // Re-check after delay (role classes may apply after first paint)
       setTimeout(() => {
-        if (!global.RSModal) return;
-        global.RSModal.open({
-          title: 'Quick tip: connect kitchen stock',
-          sub: 'Takes a few minutes · works for any staff',
-          icon: 'fa-lightbulb',
-          size: 'sm',
-          body: `<p style="margin:0;font-size:14px;line-height:1.55;color:var(--text-soft)">
-            When a customer buys a dish, stock can go down <b>automatically</b> — but only if each dish has a simple <b>recipe</b> (what it uses from the store room).
-            <br><br>
-            We will walk you through it in plain language. You can skip and come back anytime.
-          </p>`,
-          foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Not now</button>
-            <button type="button" class="btn btn-primary" style="flex:1.3" data-go><i class="fa-solid fa-list-check"></i> Show me the 3 steps</button>`,
-          onMount(m, close) {
-            m.querySelector('[data-x]').onclick = close;
-            m.querySelector('[data-go]').onclick = () => {
-              close();
-              openSetupChecklist();
-            };
-          },
-        });
+        try {
+          if (isPlatformConsole()) return;
+          if (global.localStorage && localStorage.getItem(LS_FIRST) === '1') return;
+          if (!global.RSModal) return;
+          if (global.localStorage) localStorage.setItem(LS_FIRST, '1');
+          global.RSModal.open({
+            title: 'Quick tip: connect kitchen stock',
+            sub: 'Takes a few minutes · works for any staff',
+            icon: 'fa-lightbulb',
+            size: 'sm',
+            body: `<p style="margin:0;font-size:14px;line-height:1.55;color:var(--text-soft)">
+              When a customer buys a dish, stock can go down <b>automatically</b> — but only if each dish has a simple <b>recipe</b> (what it uses from the store room).
+              <br><br>
+              We will walk you through it in plain language. You can skip and come back anytime.
+            </p>`,
+            foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Not now</button>
+              <button type="button" class="btn btn-primary" style="flex:1.3" data-go><i class="fa-solid fa-list-check"></i> Show me the 3 steps</button>`,
+            onMount(m, close) {
+              m.querySelector('[data-x]').onclick = close;
+              m.querySelector('[data-go]').onclick = () => {
+                close();
+                openSetupChecklist();
+              };
+            },
+          });
+        } catch (_) {}
       }, 900);
     } catch (_) {}
   }
@@ -1170,6 +1212,7 @@
    */
   function posUnlinkedHint(dishName) {
     try {
+      if (isPlatformConsole()) return;
       const key = LS_HINT;
       let n = 0;
       if (global.sessionStorage) {
@@ -1189,11 +1232,19 @@
    */
   function refreshSetupNav() {
     try {
-      const s = setupStatus();
       const badge = document.getElementById('klc-setup-badge');
       const link = document.getElementById('klc-sidebar-setup');
       const mobile = document.getElementById('klc-mobile-setup');
-      const show = !s.allLinked;
+      // Super-Admin / Brand Admin: hide kitchen setup entry entirely
+      if (isPlatformConsole()) {
+        if (link) link.style.display = 'none';
+        if (mobile) mobile.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        return;
+      }
+      if (link) link.style.display = '';
+      if (mobile) mobile.style.display = '';
+      const s = setupStatus();
       if (badge) {
         if (s.missing > 0) {
           badge.style.display = '';
@@ -1214,7 +1265,6 @@
           : 'Kitchen Setup · connect Menu, Recipe & Stock';
       }
       if (mobile) mobile.style.opacity = s.allLinked ? '0.75' : '1';
-      // Hide emphasis when fully done but keep link for "how it works"
     } catch (_) {}
   }
 
@@ -1265,14 +1315,19 @@
 
   // Soft first visit + nav wiring after app shell is ready
   if (typeof document !== 'undefined') {
+    function bootCoachUi() {
+      try {
+        wireSetupNav();
+        // Wait for role classes (rs-role-superadmin) before offering tip
+        setTimeout(() => {
+          try {
+            maybeOfferFirstVisit();
+          } catch (_) {}
+        }, 600);
+      } catch (_) {}
+    }
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        try {
-          wireSetupNav();
-          maybeOfferFirstVisit();
-        } catch (_) {}
-      }, 1800);
-      // Re-badge when inventory/menu re-renders
+      setTimeout(bootCoachUi, 2000);
       document.addEventListener('rs:render-inventory', () => {
         try {
           refreshSetupNav();
@@ -1281,11 +1336,7 @@
     });
     // If script loads after DOMContentLoaded
     if (document.readyState !== 'loading') {
-      setTimeout(() => {
-        try {
-          wireSetupNav();
-        } catch (_) {}
-      }, 400);
+      setTimeout(bootCoachUi, 500);
     }
   }
 })(typeof window !== 'undefined' ? window : globalThis);

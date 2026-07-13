@@ -1757,6 +1757,15 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .sidebar-link.klc-setup-link .badge-count {
   background: var(--orange); color: #fff;
 }
+/* Kitchen setup is for restaurant staff only — never Super-Admin / Brand Admin */
+body.rs-role-superadmin #klc-sidebar-setup,
+body.rs-role-brandadmin #klc-sidebar-setup,
+html.rs-role-superadmin #klc-sidebar-setup,
+html.rs-role-brandadmin #klc-sidebar-setup,
+body.rs-role-superadmin #klc-mobile-setup,
+body.rs-role-brandadmin #klc-mobile-setup {
+  display: none !important;
+}
 /* Add stock: food + packaging types */
 .inv-add-stock .klc-p { margin-bottom: 8px; }
 .inv-type-chips {

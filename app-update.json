@@ -1,13 +1,11 @@
 {
-  "version": "v164-20260713-stock-packaging",
+  "version": "v165-20260713-sa-no-klc",
   "date": "2026-07-13",
-  "title": "Stock = food + packaging + disposables",
-  "summary": "Inventory is not food-only. Add packaging (boxes, bags, foil), disposables (napkins, spoons), cleaning and other supplies. Link them on recipes so sales reduce packing stock too.",
+  "title": "Hide kitchen-stock tip for Super-Admin",
+  "summary": "The “Quick tip: connect kitchen stock” modal and Kitchen Setup nav no longer appear on Super-Admin or Brand Admin consoles — only restaurant staff see them.",
   "highlights": [
-    "Add stock item: Food / Packaging / Disposables / Cleaning / Other",
-    "Quick-add common packaging (takeaway box, bag, napkin…)",
-    "Recipe wizard: packaging suggestions + Food/Packaging picker filter",
-    "Categories include Packaging, Disposables, Cleaning",
-    "Plain language: stock items not only ingredients"
+    "No kitchen coach popup for superadmin / brand_admin",
+    "Kitchen Setup sidebar hidden on platform roles",
+    "Restaurant tenants still get the tip once when needed"
   ]
 }
