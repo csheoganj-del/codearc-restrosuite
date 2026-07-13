@@ -59,6 +59,66 @@
   function isLowStock(i) {
     return Number(i.stock) < Number(i.min);
   }
+
+  /** Pretty label for keys like hoagie_roll → Hoagie roll */
+  function displayInvName(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) return '—';
+    if (!/[_-]/.test(s) && !/^[a-z0-9]+$/i.test(s)) return s;
+    // Only auto-prettify snake/kebab or all-lowercase keys
+    if (/[A-Z]/.test(s) && !/[_-]/.test(s) && s.includes(' ')) return s;
+    return s
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function invMatchKey(i) {
+    return String((i && (i.id || i.name || i.key)) || '');
+  }
+
+  function findInvByRow(row) {
+    if (!row) return null;
+    const id = row.getAttribute('data-inv-id');
+    const list = getInventory();
+    if (id) {
+      const byId = list.find((x) => String(x.id) === id || String(x.name) === id || String(x.key) === id);
+      if (byId) return byId;
+    }
+    const name = row.querySelector('b') && row.querySelector('b').textContent;
+    if (!name) return null;
+    return list.find(
+      (x) =>
+        x.name === name ||
+        displayInvName(x.name) === name ||
+        String(x.key || '').replace(/[_-]+/g, ' ') === name.toLowerCase()
+    );
+  }
+
+  function rebuildCatFilterOptions(inventory) {
+    const sel = $('#inv-cat-filter');
+    if (!sel) return;
+    const prev = sel.value || 'All';
+    const cats = Array.from(
+      new Set(
+        (inventory || [])
+          .map((i) => String(i.cat || i.category || '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    const opts = ['All'].concat(cats);
+    sel.innerHTML = opts
+      .map((c) => `<option value="${esc(c)}">${esc(c === 'All' ? 'All' : c)}</option>`)
+      .join('');
+    if (opts.some((c) => String(c).toLowerCase() === String(prev).toLowerCase())) {
+      // restore previous selection (case-insensitive)
+      const match = opts.find((c) => String(c).toLowerCase() === String(prev).toLowerCase());
+      sel.value = match || 'All';
+    } else {
+      sel.value = 'All';
+    }
+  }
   function reorderQty(i) {
     const min = Math.max(0, Number(i.min) || 0);
     const stock = Math.max(0, Number(i.stock) || 0);
@@ -295,6 +355,7 @@
 
     const invBody = $('#inv-table-body');
     if (invBody) {
+      rebuildCatFilterOptions(INVENTORY);
       const catFil = $('#inv-cat-filter');
       if (catFil && !catFil._rsListenerBound) {
         catFil._rsListenerBound = true;
@@ -305,13 +366,26 @@
         statusFil._rsListenerBound = true;
         statusFil.addEventListener('change', renderInventory);
       }
+      const searchEl = $('#inv-stock-search');
+      if (searchEl && !searchEl._rsListenerBound) {
+        searchEl._rsListenerBound = true;
+        let t;
+        searchEl.addEventListener('input', () => {
+          clearTimeout(t);
+          t = setTimeout(renderInventory, 120);
+        });
+      }
 
       const catFilter = ($('#inv-cat-filter')?.value || 'All').toLowerCase();
       const statusFilter = ($('#inv-status-filter')?.value || 'All').toLowerCase();
+      const q = (($('#inv-stock-search') && $('#inv-stock-search').value) || '').toLowerCase().trim();
 
       let filtered = INVENTORY;
       if (catFilter !== 'all') {
-        filtered = filtered.filter((i) => i.cat && i.cat.toLowerCase() === catFilter);
+        filtered = filtered.filter((i) => {
+          const c = String(i.cat || i.category || '').toLowerCase();
+          return c === catFilter;
+        });
       }
       if (statusFilter !== 'all') {
         filtered = filtered.filter((i) => {
@@ -319,9 +393,17 @@
           return st === statusFilter;
         });
       }
+      if (q) {
+        filtered = filtered.filter((i) => {
+          const hay = [i.name, i.key, i.cat, i.unit, i.supplier, displayInvName(i.name)]
+            .map((x) => String(x || '').toLowerCase())
+            .join(' ');
+          return hay.includes(q);
+        });
+      }
 
       if (!filtered.length) {
-        const hasFilters = catFilter !== 'all' || statusFilter !== 'all';
+        const hasFilters = catFilter !== 'all' || statusFilter !== 'all' || !!q;
         invBody.innerHTML = `<tr class="inv-empty-row"><td colspan="7" style="padding:0;border:none">
           <div class="sr-empty" style="padding:40px 20px">
             <i class="fa-solid fa-boxes-stacked" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i>
@@ -330,8 +412,8 @@
             }</div>
             <div style="color:var(--text-soft);font-size:13px;max-width:360px;margin:0 auto 14px;line-height:1.45">${
               hasFilters
-                ? 'Clear category / status filters to see full stock.'
-                : 'Add ingredients to track min levels, reorders, and plate costing.'
+                ? 'Clear search / category / status filters to see full stock.'
+                : 'Add ingredients to track min levels, reorders, and plate costing. Import CSV or cloud sync fills this list.'
             }</div>
             <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
               ${
@@ -348,8 +430,10 @@
           clear.onclick = () => {
             const c = document.getElementById('inv-cat-filter');
             const s = document.getElementById('inv-status-filter');
+            const se = document.getElementById('inv-stock-search');
             if (c) c.value = 'All';
             if (s) s.value = 'All';
+            if (se) se.value = '';
             renderInventory();
           };
         const add = document.getElementById('inv-empty-add');
@@ -364,12 +448,24 @@
         .map((i) => {
           const st = i.stock < i.min ? 'out' : i.stock < i.min * 1.4 ? 'low' : 'ok';
           const pct = Math.min(100, Math.round((i.stock / (i.min * 2 || 1)) * 100));
-          return `<tr>
-          <td><b>${_e(i.name)}</b></td><td>${_e(i.cat)}</td>
+          const pretty = displayInvName(i.name);
+          const costN = Number(i.cost) || 0;
+          const costHtml =
+            costN > 0
+              ? `${rs(costN)}<span class="inv-unit-suffix">/${_e(i.unit || 'unit')}</span>`
+              : `<span class="inv-cost-zero" title="Set unit cost for plate costing &amp; POs">₹0 · set cost</span>`;
+          const idAttr = esc(invMatchKey(i));
+          return `<tr data-inv-id="${idAttr}">
+          <td>
+            <b class="inv-name">${_e(pretty)}</b>
+            ${pretty !== String(i.name) ? `<div class="inv-key-sub" title="Stored key">${_e(i.name)}</div>` : ''}
+          </td>
+          <td><span class="inv-cat-pill">${_e(i.cat || '—')}</span></td>
           <td><div style="display:flex;align-items:center;gap:10px"><span class="td-strong" style="min-width:58px">${i.stock} ${_e(i.unit)}</span><div style="flex:1;height:6px;background:var(--glass-2);border-radius:99px;overflow:hidden;min-width:60px"><span style="display:block;height:100%;width:${pct}%;background:${st === 'out' ? 'var(--red)' : st === 'low' ? 'var(--amber)' : 'var(--green)'}"></span></div></div></td>
-          <td>${i.min} ${_e(i.unit)}</td><td>${rs(i.cost)}/${_e(i.unit)}</td>
+          <td>${i.min} ${_e(i.unit)}</td>
+          <td>${costHtml}</td>
           <td><span class="stock-dot ${cls[st] || ''}">${st === 'out' ? 'Reorder' : st === 'low' ? 'Low' : 'Healthy'}</span></td>
-          <td><div class="row-actions"><button class="icon-act go" title="Restock" aria-label="Restock ${_e(i.name)}"><i class="fa-solid fa-truck"></i></button><button class="icon-act" title="Edit" aria-label="Edit ${_e(i.name)}"><i class="fa-solid fa-pen"></i></button></div></td>
+          <td><div class="row-actions"><button type="button" class="icon-act go" title="Raise purchase order" aria-label="Restock ${_e(pretty)}"><i class="fa-solid fa-truck"></i></button><button type="button" class="icon-act inv-edit" title="Edit ingredient" aria-label="Edit ${_e(pretty)}"><i class="fa-solid fa-pen"></i></button></div></td>
         </tr>`;
         })
         .join('');
@@ -378,8 +474,7 @@
       $$('#inv-table-body .icon-act.go').forEach((b) => {
         b.addEventListener('click', () => {
           const row = b.closest('tr');
-          const name = row.querySelector('b').textContent;
-          const inv = INVENTORY.find((x) => x.name === name);
+          const inv = findInvByRow(row);
           if (!inv) return;
           const qtyToOrder = Math.max(1, Math.round(inv.min * 2 - inv.stock));
           const estimatedCost = Math.round(qtyToOrder * inv.cost);
@@ -428,27 +523,39 @@
                 const qty = Math.max(1, Number(qtyInput.value) || 1);
                 const supplier = modal.querySelector('#po-supplier').value || 'Default Supplier';
                 const poNum = nextLogicalNo('PO');
+                const line = {
+                  name: inv.name,
+                  unit: inv.unit || 'unit',
+                  qty,
+                  cost: Number(inv.cost) || 0,
+                  value: Math.round(qty * (Number(inv.cost) || 0)),
+                  invId: inv.id,
+                };
                 const poRow = {
                   id: poNum,
                   poNumber: poNum,
                   supplier,
-                  items: `${qty} ${inv.unit} ${inv.name}`,
-                  value: Math.round(qty * inv.cost),
+                  lines: [line],
+                  items: `${qty} ${inv.unit || 'unit'} ${inv.name}`,
+                  value: line.value,
                   date: new Date().toISOString(),
                   status: 'pending',
+                  channel: 'manual_restock',
                 };
                 close();
                 setOperationStatus('Creating PO...');
                 try {
                   if (global.RS && RS.saveOne) await RS.saveOne('purchase_orders', poRow);
+                  else if (global.RS_DB) await RS_DB.put('purchase_orders', poRow.id, poRow);
                   finishOperationStatus('PO created');
-                  toast('Purchase order raised successfully', 'fa-circle-check');
+                  toast('Purchase order raised · open Purchase orders tab', 'fa-circle-check');
                   renderInventory();
+                  document.dispatchEvent(new CustomEvent('rs:render-inventory'));
                   if (global.RS && RS.render) RS.render('inventory-tab');
                 } catch (e) {
                   console.warn('Failed to save PO', e);
                   finishOperationStatus('Failed to create PO', 'error');
-                  toast('Failed to save purchase order -- saved locally', 'fa-circle-exclamation');
+                  toast('Could not save PO — try again', 'fa-circle-exclamation');
                 }
               };
             },
@@ -456,11 +563,10 @@
         });
       });
 
-      $$('#inv-table-body .icon-act:not(.go)').forEach((b) => {
+      $$('#inv-table-body .icon-act.inv-edit').forEach((b) => {
         b.addEventListener('click', () => {
           const row = b.closest('tr');
-          const name = row.querySelector('b').textContent;
-          const inv = INVENTORY.find((x) => x.name === name);
+          const inv = findInvByRow(row);
           if (!inv) return;
 
           if (!global.RSModal) {
@@ -479,7 +585,10 @@
                 <div><label class="fl">Current stock</label><input class="form-input" id="edit-ing-stock" type="number" min="0" value="${inv.stock}"></div>
                 <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="edit-ing-min" type="number" min="0" value="${inv.min}"></div>
               </div>
-              <div><label class="fl">Unit cost (${rs(1).replace(/[\d.,]/g, '').trim() || '₹'})</label><input class="form-input" id="edit-ing-cost" type="number" min="0" value="${inv.cost}"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div><label class="fl">Unit cost (${rs(1).replace(/[\d.,]/g, '').trim() || '₹'})</label><input class="form-input" id="edit-ing-cost" type="number" min="0" step="any" value="${inv.cost}"></div>
+                <div><label class="fl">Supplier</label><input class="form-input" id="edit-ing-supplier" value="${_e(inv.supplier || inv.vendor || '')}" placeholder="Optional"></div>
+              </div>
             </div>`;
 
           RSModal.open({
@@ -516,12 +625,13 @@
                 inv.stock = +modal.querySelector('#edit-ing-stock').value || 0;
                 inv.min = +modal.querySelector('#edit-ing-min').value || 0;
                 inv.cost = +modal.querySelector('#edit-ing-cost').value || 0;
+                inv.supplier = (modal.querySelector('#edit-ing-supplier').value || '').trim();
                 close();
                 setOperationStatus('Saving changes...');
                 try {
                   if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
                   finishOperationStatus('Ingredient updated');
-                  toast(`${inv.name} updated`, 'fa-circle-check');
+                  toast(`${displayInvName(inv.name)} updated · synced`, 'fa-circle-check');
                   renderInventory();
                 } catch (e) {
                   console.warn('Failed to save ingredient edit', e);
@@ -696,10 +806,22 @@
             }
           });
           // Hide toolbar actions that only apply to stock list when on other tabs
-          const stockOnly = ['btn-add-ingredient', 'btn-import-inventory', 'btn-download-inventory-template', 'btn-export-low-stock-toolbar'];
+          const stockOnly = [
+            'btn-add-ingredient',
+            'btn-import-inventory',
+            'btn-download-inventory-template',
+            'btn-export-low-stock-toolbar',
+            'inv-stock-search',
+          ];
           stockOnly.forEach((id) => {
             const el = document.getElementById(id);
-            if (el) el.style.display = tab === 'stock' ? '' : 'none';
+            if (!el) return;
+            if (id === 'inv-stock-search') {
+              const wrap = el.closest('.inv-search-wrap') || el;
+              wrap.style.display = tab === 'stock' ? '' : 'none';
+            } else {
+              el.style.display = tab === 'stock' ? '' : 'none';
+            }
           });
         };
       });
@@ -726,7 +848,10 @@
                 <div><label class="fl">Current stock</label><input class="form-input" id="add-ing-stock" type="number" min="0" placeholder="0"></div>
                 <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="add-ing-min" type="number" min="0" placeholder="10"></div>
               </div>
-              <div><label class="fl">Unit cost (₹)</label><input class="form-input" id="add-ing-cost" type="number" min="0" placeholder="0"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div><label class="fl">Unit cost (₹)</label><input class="form-input" id="add-ing-cost" type="number" min="0" step="any" placeholder="0"></div>
+                <div><label class="fl">Supplier (optional)</label><input class="form-input" id="add-ing-supplier" placeholder="e.g. Metro Cash"></div>
+              </div>
             </div>`,
           foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Add ingredient</button>`,
           onMount(modal, close) {
@@ -742,12 +867,18 @@
                 stock: +modal.querySelector('#add-ing-stock').value || 0,
                 min: +modal.querySelector('#add-ing-min').value || 10,
                 cost: +modal.querySelector('#add-ing-cost').value || 0,
+                supplier: (modal.querySelector('#add-ing-supplier').value || '').trim(),
               };
               INVENTORY.push(item);
-              if (global.RS_DB) await RS_DB.put('inventory', item.id, item);
+              try {
+                if (global.RS_DB) await RS_DB.put('inventory', item.id, item);
+                toast(`${name} added · synced`, 'fa-circle-check');
+              } catch (e) {
+                console.warn('add ingredient save', e);
+                toast(`${name} added locally · cloud pending`, 'fa-circle-exclamation');
+              }
               close();
               renderInventory();
-              toast(`${name} added to inventory`, 'fa-circle-check');
             };
           },
         });

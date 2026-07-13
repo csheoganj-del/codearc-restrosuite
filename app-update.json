@@ -1,12 +1,13 @@
 {
-  "version": "v155-20260713-print-10",
+  "version": "v156-20260713-inventory-10",
   "date": "2026-07-13",
-  "title": "Bills print report & exports 10/10",
-  "summary": "Print report is now a proper A4/PDF sales summary for the selected date range (not a tiny thermal slip). Excel remains the full data export; CSV is grouped as a secondary option.",
+  "title": "Inventory stock UI 10/10",
+  "summary": "Inventory stock list shows readable names, dynamic category filters, search, reliable edit/restock actions, fixed CSV import/template, and removes the suppliers stub in favour of live synced panels.",
   "highlights": [
-    "Print report: A4 layout, period + filter label, KPIs, payment breakdown, tax, refunds, bill list.",
-    "Title matches range (Today / Yesterday / 7 days / All / Custom) — no more always-Daily.",
-    "Export group: Excel (recommended) + CSV side by side; Print report for paper/PDF close.",
-    "Report uses active Bills filters and tax label from settings when available."
+    "Names like hoagie_roll display as Hoagie Roll (key kept as subtitle).",
+    "Category filter is built from your real stock categories (e.g. food), not a fixed veg/dairy list.",
+    "Search stock, set cost affordance when ₹0, supplier field on add/edit.",
+    "Import CSV prefers IngredientName; template matches import columns; POs include line items for receive.",
+    "Live Suppliers / POs / Waste from features-manage; no bogus 'configure via Growth Hub' stub."
   ]
 }

@@ -402,7 +402,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v155-20260713-print-10';
+    return 'v156-20260713-inventory-10';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -2466,21 +2466,32 @@
       };
     }
 
-    // 3. Inventory Download Template
+    // 3. Inventory Download Template (matches import field names)
     const btnDownloadInventory = document.getElementById('btn-download-inventory-template');
     if (btnDownloadInventory) {
       btnDownloadInventory.onclick = () => {
         setOperationStatus('Preparing inventory CSV template...');
-        const headers = ['IngredientKey', 'IngredientName', 'Category', 'CurrentStock', 'MaxStock', 'Unit', 'ReorderLevelPercent', 'ExpiryDate'];
-        const sampleRows = [
-          ['espresso_shot', 'Espresso Shot', 'drinks', '3000', '6000', 'ml', '20', ''],
-          ['milk', 'Milk', 'drinks', '6000', '10000', 'ml', '25', '2026-06-16'],
-          ['bread', 'Bread', 'food', '60', '100', 'slices', '20', '2026-06-13']
+        const headers = [
+          'IngredientName',
+          'Category',
+          'CurrentStock',
+          'MinLevel',
+          'Unit',
+          'UnitCost',
+          'Supplier',
+          'IngredientKey',
         ];
-        const csv = [
-          headers.join(','),
-          ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        ].join('\n');
+        const sampleRows = [
+          ['Espresso Shot', 'drinks', '3000', '600', 'ml', '0.8', 'Bean Bros', 'espresso_shot'],
+          ['Milk', 'dairy', '6000', '1000', 'ml', '0.06', 'Local Dairy', 'milk'],
+          ['Hoagie Roll', 'food', '50', '25', 'pcs', '8', 'Bakery Co', 'hoagie_roll'],
+        ];
+        const csv =
+          '\uFEFF' +
+          [
+            headers.join(','),
+            ...sampleRows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+          ].join('\r\n');
         RS.downloadFile(csv, 'text/csv;charset=utf-8;', `inventory-template-${fileDate()}.csv`);
         finishOperationStatus('Inventory template downloaded');
         toast('Inventory CSV template downloaded', 'fa-circle-check');
@@ -2552,23 +2563,52 @@
               const records = [];
               const skipped = [];
               rows.forEach((row, index) => {
-                const name = getValue(row, ['ingredientname', 'ingredient', 'name', 'item', 'ingredientkey']);
-                if(!name) { skipped.push(`Row ${index + 2}: missing ingredient name`); return; }
+                const prettyName = getValue(row, [
+                  'ingredientname',
+                  'ingredient_name',
+                  'name',
+                  'item',
+                  'ingredient',
+                ]);
+                const keyVal = getValue(row, ['ingredientkey', 'ingredient_key', 'key', 'sku']);
+                const name = prettyName || keyVal;
+                if (!name) {
+                  skipped.push(`Row ${index + 2}: missing ingredient name`);
+                  return;
+                }
                 const cat = getValue(row, ['category', 'cat', 'itemcategory']) || 'General';
-                const parsedStock = cleanNumber(getValue(row, ['instock', 'stock', 'currentstock', 'current', 'quantity']));
-                const parsedMin = cleanNumber(getValue(row, ['minlevel', 'min', 'threshold', 'reorderlevelpercent']));
-                const parsedCost = cleanNumber(getValue(row, ['unitcost', 'cost', 'price', 'sellingprice']));
+                const parsedStock = cleanNumber(
+                  getValue(row, ['instock', 'stock', 'currentstock', 'current', 'quantity'])
+                );
+                // Prefer absolute min level — do not treat "reorder %" as min units
+                const parsedMin = cleanNumber(
+                  getValue(row, ['minlevel', 'min', 'threshold', 'reorderlevel', 'minstock'])
+                );
+                const parsedCost = cleanNumber(
+                  getValue(row, ['unitcost', 'cost', 'price', 'unit_cost'])
+                );
                 const unit = getValue(row, ['unit', 'unitofmeasure']) || 'unit';
-                
-                const existing = INVENTORY.find(x => String(x.name).toLowerCase() === String(name).toLowerCase() || String(x.key).toLowerCase() === String(name).toLowerCase());
+                const supplier = getValue(row, ['supplier', 'vendor']) || '';
+                const keyNorm = String(keyVal || name)
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '_');
+
+                const existing = INVENTORY.find(
+                  (x) =>
+                    String(x.name).toLowerCase() === String(name).toLowerCase() ||
+                    String(x.key || '').toLowerCase() === keyNorm ||
+                    String(x.id || '').toLowerCase() === 'inv_' + keyNorm
+                );
                 const item = {
-                  id: existing ? existing.id : 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
-                  name: String(name),
+                  id: existing ? existing.id : 'inv_' + keyNorm,
+                  name: String(prettyName || name),
+                  key: keyNorm,
                   cat: String(cat),
-                  stock: Number.isFinite(parsedStock) ? parsedStock : 0,
-                  min: Number.isFinite(parsedMin) ? parsedMin : 10,
-                  cost: Number.isFinite(parsedCost) ? parsedCost : 0,
-                  unit: String(unit)
+                  stock: Number.isFinite(parsedStock) ? parsedStock : existing ? Number(existing.stock) || 0 : 0,
+                  min: Number.isFinite(parsedMin) ? parsedMin : existing ? Number(existing.min) || 10 : 10,
+                  cost: Number.isFinite(parsedCost) ? parsedCost : existing ? Number(existing.cost) || 0 : 0,
+                  unit: String(unit),
+                  supplier: String(supplier || (existing && existing.supplier) || ''),
                 };
                 records.push(item);
               });

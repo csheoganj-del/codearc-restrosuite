@@ -379,7 +379,24 @@
 
     function enhanceInventory(){
       const sec = $('#inventory-tab'); if(!sec || sec.dataset.enhanced) return; sec.dataset.enhanced='1';
-      const stock = sec.querySelector('.panel'); if(stock){ stock.classList.add('subtab-pane','active'); stock.dataset.pane='stock'; }
+      // Prefer stock panel by id (not first .panel which can be wrong)
+      const stock = sec.querySelector('#inv-panel-stock') || sec.querySelector('.panel');
+      if (stock) {
+        stock.classList.add('subtab-pane', 'active');
+        stock.dataset.pane = 'stock';
+      }
+      // Remove static stub shells so live panes below are the single source of truth
+      ['inv-panel-suppliers', 'inv-panel-pos', 'inv-panel-waste'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      });
+      // Hide static recipes shell so live panes below are the single UI (avoids double tables)
+      const staticRec = document.getElementById('inv-panel-recipes');
+      if (staticRec) {
+        staticRec.style.display = 'none';
+        staticRec.hidden = true;
+        staticRec.dataset.pane = 'recipes-fallback';
+      }
       const panes = document.createElement('div');
       panes.id = 'inv-panes-wrapper';
       sec.appendChild(panes);

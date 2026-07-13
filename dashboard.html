@@ -81,7 +81,7 @@
   // (never marketing labels like "Systempatch"). Dirty URLs are rewritten so
   // the address bar always matches the version chip.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v155-20260713-print-10';
+    var builtin = 'v156-20260713-inventory-10';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -891,22 +891,26 @@
           <button class="btn btn-ghost btn-sm banner-cta" id="btn-export-low-stock" style="margin-right:6px"><i class="fa-solid fa-file-csv"></i> Low-stock CSV</button>
           <button class="btn btn-primary btn-sm banner-cta" id="btn-auto-draft-pos"><i class="fa-solid fa-truck"></i> Auto-draft POs</button>
         </div>
-        <div class="toolbar-row">
+        <div class="toolbar-row inv-toolbar">
           <div class="seg" id="inv-seg">
-            <button class="active" data-inv-tab="stock">Stock levels</button>
-            <button data-inv-tab="recipes">Recipes</button>
-            <button data-inv-tab="suppliers">Suppliers</button>
-            <button data-inv-tab="pos">Purchase orders</button>
-            <button data-inv-tab="waste">Waste log</button>
+            <button type="button" class="active" data-inv-tab="stock">Stock levels</button>
+            <button type="button" data-inv-tab="recipes">Recipes</button>
+            <button type="button" data-inv-tab="suppliers">Suppliers</button>
+            <button type="button" data-inv-tab="pos">Purchase orders</button>
+            <button type="button" data-inv-tab="waste">Waste log</button>
           </div>
           <div class="grow"></div>
-          <button class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
-          <button class="btn btn-ghost btn-sm" id="btn-download-inventory-template"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
-          <button class="btn btn-ghost btn-sm" id="btn-import-inventory"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
-          <button class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>
+          <div class="pos-search inv-search-wrap" style="max-width:220px;padding:8px 12px">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="inv-stock-search" placeholder="Search stock…" autocomplete="off" aria-label="Search inventory">
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-download-inventory-template" title="CSV template for bulk import"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-import-inventory" title="Import ingredients from CSV"><i class="fa-solid fa-file-import"></i> Import</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>
         </div>
         <!-- Stock panel -->
-        <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table">
+        <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table inv-stock-table">
           <thead>
             <tr>
               <th>Ingredient</th>
@@ -914,11 +918,6 @@
                 Category
                 <select id="inv-cat-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
                   <option value="All">All</option>
-                  <option value="veg">veg</option>
-                  <option value="dairy">dairy</option>
-                  <option value="grocery">grocery</option>
-                  <option value="meat">meat</option>
-                  <option value="dry-goods">dry-goods</option>
                 </select>
               </th>
               <th>In stock</th>
@@ -938,19 +937,18 @@
           </thead>
           <tbody id="inv-table-body"></tbody>
         </table></div></div>
-        <!-- Recipes panel -->
-        <div id="inv-panel-recipes" class="inv-panel-section panel panel-pad" style="display:none;">
-          <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div><h3>Menu Recipes</h3><span class="ph-sub">Ingredients linked to each menu item — used for automatic inventory deduction</span></div><button class="btn btn-primary btn-sm" id="btn-bulk-recipe-import" style="white-space:nowrap;"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import Recipes</button></div>
+        <!-- Recipes / suppliers / POs / waste are injected by features-manage.js (live, synced panels).
+             Keep lightweight fallback shells for when that module is delayed. -->
+        <div id="inv-panel-recipes" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="recipes">
+          <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div><h3>Menu Recipes</h3><span class="ph-sub">Link ingredients to menu items for stock deduction</span></div><button type="button" class="btn btn-primary btn-sm" id="btn-bulk-recipe-import" style="white-space:nowrap;"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import Recipes</button></div>
           <div class="table-scroll"><table class="data-table">
             <thead><tr><th>Menu Item</th><th>Category</th><th>Ingredients</th><th>Plate Cost</th><th>Selling Price</th><th>Margin</th><th>Actions</th></tr></thead>
             <tbody id="recipe-table-body"></tbody>
           </table></div>
         </div>
-        <!-- Suppliers panel -->
-        <div id="inv-panel-suppliers" class="inv-panel-section panel panel-pad" style="display:none;">
-          <div class="panel-head"><h3>Suppliers</h3><span class="ph-sub">Manage your raw material vendors and purchase orders</span></div>
-          <div style="color:var(--text-mute);font-size:13px;padding:20px 0;text-align:center;"><i class="fa-solid fa-truck" style="font-size:32px;opacity:.3;margin-bottom:12px;"></i><br>No suppliers configured yet. Add suppliers via Growth Hub → Procurement.</div>
-        </div>
+        <div id="inv-panel-suppliers" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="suppliers" hidden aria-hidden="true"></div>
+        <div id="inv-panel-pos" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="pos" hidden aria-hidden="true"></div>
+        <div id="inv-panel-waste" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="waste" hidden aria-hidden="true"></div>
       </section>
 
       <!-- ============ MENU EDITOR ============ -->

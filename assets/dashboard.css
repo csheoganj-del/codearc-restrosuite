@@ -1533,6 +1533,25 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .kds-item.done .kn { text-decoration: line-through; color: var(--text-faint); }
 .kds-foot { padding: 12px 15px; border-top: 1px solid var(--stroke); }
 
+/* Inventory stock list polish */
+.inv-toolbar { flex-wrap: wrap; gap: 10px; align-items: center; }
+.inv-search-wrap { flex: 0 1 220px; }
+.inv-name { font-weight: 700; font-size: 13.5px; }
+.inv-key-sub {
+  font-size: 10.5px; color: var(--text-faint); margin-top: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.inv-cat-pill {
+  display: inline-block; font-size: 11.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--glass); border: 1px solid var(--stroke);
+  color: var(--text-soft); text-transform: capitalize;
+}
+.inv-unit-suffix { color: var(--text-mute); font-weight: 500; font-size: 12px; }
+.inv-cost-zero {
+  color: var(--amber); font-weight: 700; font-size: 12px; cursor: default;
+}
+
 /* Bills filters + 10/10 history chrome */
 .bills-toolbar { flex-wrap: wrap; gap: 10px; align-items: center; }
 .bills-export-group {
