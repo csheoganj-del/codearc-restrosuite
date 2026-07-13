@@ -220,22 +220,27 @@
 /* ---------------- NOTIFICATIONS PANEL ---------------- */
 .notif-panel {
   position: fixed; top: 64px; right: 12px; width: min(400px, calc(100vw - 20px));
-  max-width: calc(100vw - 20px); z-index: 120000;
+  max-width: calc(100vw - 20px); z-index: 2147483000;
   background: var(--panel-solid, var(--panel)); border: 1px solid var(--stroke-2);
   border-radius: 16px; box-shadow: 0 18px 48px rgba(0,0,0,.18), 0 4px 14px rgba(0,0,0,.08);
   opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.98);
-  pointer-events: none !important;
+  pointer-events: none;
   transition: opacity .16s ease, transform .16s ease, visibility .16s;
   overflow: hidden; display: flex; flex-direction: column;
 }
 .notif-panel.show {
   opacity: 1; visibility: visible; transform: none;
-  pointer-events: auto !important;
+  pointer-events: auto;
 }
-/* Only interactive while open — children with auto must not pierce a closed panel */
-.notif-panel.show,
-.notif-panel.show * {
+.notif-panel.show .notif-h,
+.notif-panel.show .notif-list,
+.notif-panel.show .notif-mark-all,
+.notif-panel.show .notif-item {
   pointer-events: auto !important;
+  cursor: pointer;
+}
+.notif-panel.show .notif-mark-all:disabled {
+  cursor: default;
 }
 #tb-notif-btn {
   cursor: pointer; position: relative; z-index: 2;

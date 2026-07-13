@@ -40,29 +40,48 @@
       $('.tb-icon-btn[aria-label="Notifications"]');
     if (bell) {
       let NOTIFS = [];
-      const readKey = 'rs:notif-read';
+      // Dismissed = permanently removed from the panel list (not just "read" styling)
+      const dismissedKey = 'rs:notif-dismissed';
+      const readKey = 'rs:notif-read'; // legacy; still written for older clients
       let notifLoading = false;
       let notifReloadQueued = false;
       let notifCloudUnavailable = false;
       const panel = document.createElement('div');
       panel.className = 'notif-panel';
+      panel.id = 'rs-notif-panel';
       panel.setAttribute('role', 'dialog');
       panel.setAttribute('aria-label', 'Notifications');
       panel.setAttribute('aria-modal', 'false');
-      // Always clickable once shown — avoid re-binding per-item handlers on every redraw
-      panel.style.pointerEvents = 'auto';
 
-      function readSet() {
+      function loadIdSet(key) {
         try {
-          return new Set(JSON.parse(localStorage.getItem(readKey) || '[]'));
+          const raw = JSON.parse(localStorage.getItem(key) || '[]');
+          return new Set(Array.isArray(raw) ? raw.map(String) : []);
         } catch (e) {
           return new Set();
         }
       }
-      function saveRead(set) {
+      function saveIdSet(key, set) {
         try {
-          localStorage.setItem(readKey, JSON.stringify([...set]));
+          // Cap so localStorage never grows forever
+          const arr = [...set].slice(-400);
+          localStorage.setItem(key, JSON.stringify(arr));
         } catch (e) {}
+      }
+      function dismissedSet() {
+        return loadIdSet(dismissedKey);
+      }
+      function markDismissed(ids) {
+        const set = dismissedSet();
+        const read = loadIdSet(readKey);
+        (Array.isArray(ids) ? ids : [ids]).forEach((id) => {
+          if (id == null || id === '') return;
+          const k = String(id);
+          set.add(k);
+          read.add(k);
+        });
+        saveIdSet(dismissedKey, set);
+        saveIdSet(readKey, read);
       }
       function relTime(v) {
         const t = v ? new Date(v).getTime() : 0;
@@ -101,54 +120,56 @@
           panel.style.top = top + 'px';
           panel.style.right = right + 'px';
           panel.style.left = 'auto';
-          panel.style.zIndex = '120000';
+          panel.style.zIndex = '2147483000';
         } catch (_) {}
       }
       function findNotif(id) {
         const key = String(id == null ? '' : id);
         return NOTIFS.find((x) => String(x.id) === key) || null;
       }
-      function markRead(n, { silent } = {}) {
+      /** Remove one item from the in-memory list + persist dismiss */
+      function dismissNotif(n) {
         if (!n || n.id == null) return false;
-        const wasUnread = !!n.unread;
-        n.unread = false;
-        n.isRead = true;
-        const read = readSet();
-        read.add(String(n.id));
-        saveRead(read);
+        const key = String(n.id);
+        markDismissed(key);
+        const before = NOTIFS.length;
+        NOTIFS = NOTIFS.filter((x) => String(x.id) !== key);
+        // Best-effort cloud flag
         if (
           window.RS_DB &&
-          !String(n.id).startsWith('low-stock-') &&
-          !String(n.id).startsWith('pending-order-') &&
-          !String(n.id).startsWith('refund-') &&
-          n.id !== 'cloud-sync-warning' &&
-          !String(n.id).startsWith('system-update')
+          !key.startsWith('low-stock-') &&
+          !key.startsWith('pending-order-') &&
+          !key.startsWith('refund-') &&
+          key !== 'cloud-sync-warning' &&
+          !key.startsWith('system-update')
         ) {
           try {
-            RS_DB.put('notifications', n.id, { ...n, isRead: true, unread: false }).catch(() => {});
+            RS_DB.put('notifications', key, { ...n, isRead: true, dismissed: true }).catch(() => {});
           } catch (_) {}
         }
-        if (!silent && wasUnread) {
-          // light feedback only when something actually changed
-        }
-        return wasUnread;
+        return before !== NOTIFS.length;
       }
       function markAllRead() {
-        const count = NOTIFS.filter((n) => n.unread).length;
-        NOTIFS.forEach((n) => markRead(n, { silent: true }));
+        const count = NOTIFS.length;
+        if (!count) {
+          RS.toast('Inbox is empty', 'fa-circle-check');
+          draw();
+          updateDot();
+          return;
+        }
+        markDismissed(NOTIFS.map((n) => n.id));
+        NOTIFS = [];
         draw();
         updateDot();
-        if (count > 0) {
-          RS.toast(count === 1 ? '1 notification marked read' : count + ' notifications marked read', 'fa-check');
-        } else {
-          RS.toast('All caught up — nothing new', 'fa-circle-check');
-        }
+        RS.toast(count === 1 ? '1 notification cleared' : count + ' notifications cleared', 'fa-check-double');
       }
       function openFromNotif(n) {
         if (!n) return;
         const id = String(n.id || '');
         const type = String(n.type || '').toLowerCase();
-        markRead(n, { silent: true });
+        // Remove from list immediately so "view" never leaves a ghost row
+        dismissNotif(n);
+        draw();
         updateDot();
         closePanel();
 
@@ -184,7 +205,6 @@
           RS.toast(n.message || 'Cloud sync issue — data is safe locally', 'fa-cloud');
           return;
         }
-        // Generic: mark read + toast so the click always feels alive
         RS.toast(n.title || 'Notification opened', 'fa-bell');
       }
       async function loadNotifications() {
@@ -284,7 +304,7 @@
               saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
             }
           }
-          const read = readSet();
+          const gone = dismissedSet();
           const seen = new Set();
           const mapped = [];
           [...(saved || []), ...live].forEach((n) => {
@@ -292,6 +312,8 @@
             const key = String(n.id);
             if (seen.has(key)) return;
             seen.add(key);
+            // Dismissed items never reappear (until storage cleared)
+            if (gone.has(key) || n.dismissed || n.isDismissed) return;
             const [ic, bg, c] = iconFor(n.type);
             mapped.push({
               ...n,
@@ -299,15 +321,18 @@
               ic,
               bg,
               c,
-              unread: !n.isRead && !read.has(key),
+              unread: true, // anything still in the inbox is actionable
               time: relTime(n.timestamp || n.createdAt || n.created_at),
               cta: actionLabel(n),
             });
           });
-          // Unread first, then recent read (max 30)
-          const unread = mapped.filter((n) => n.unread);
-          const readOnes = mapped.filter((n) => !n.unread).slice(0, 16);
-          NOTIFS = [...unread, ...readOnes].slice(0, 30);
+          // Newest first when we have timestamps
+          mapped.sort((a, b) => {
+            const ta = new Date(a.timestamp || a.createdAt || a.created_at || 0).getTime() || 0;
+            const tb = new Date(b.timestamp || b.createdAt || b.created_at || 0).getTime() || 0;
+            return tb - ta;
+          });
+          NOTIFS = mapped.slice(0, 40);
           draw();
           updateDot();
         } catch (err) {
@@ -322,21 +347,21 @@
         }
       }
       function draw() {
-        const unread = NOTIFS.filter((n) => n.unread).length;
+        const count = NOTIFS.length;
         const list = NOTIFS;
         panel.innerHTML = `
           <div class="notif-h">
             <div class="notif-h-title">
               <h4>Notifications</h4>
               ${
-                unread
-                  ? `<span class="pill pill-orange notif-count">${unread} new</span>`
-                  : `<span class="notif-count-muted">All read</span>`
+                count
+                  ? `<span class="pill pill-orange notif-count">${count}</span>`
+                  : `<span class="notif-count-muted">Inbox clear</span>`
               }
             </div>
-            <button type="button" class="btn btn-ghost btn-sm notif-mark-all" data-action="mark-all" ${
-              unread ? '' : 'disabled'
-            } title="${unread ? 'Mark all as read' : 'Nothing new'}">
+            <button type="button" class="btn btn-ghost btn-sm notif-mark-all" id="notif-mark-all-btn" data-action="mark-all" ${
+              count ? '' : 'disabled'
+            } title="${count ? 'Clear all notifications' : 'Nothing to clear'}">
               <i class="fa-solid fa-check-double" aria-hidden="true"></i>
               <span>Mark all read</span>
             </button>
@@ -347,9 +372,7 @@
                 ? list
                     .map((n) => {
                       const idAttr = encodeURIComponent(String(n.id));
-                      return `<button type="button" class="notif-item ${
-                        n.unread ? 'unread' : ''
-                      }" role="listitem" data-action="open-item" data-id="${idAttr}" title="${safe(
+                      return `<button type="button" class="notif-item unread" role="listitem" data-action="open-item" data-id="${idAttr}" title="${safe(
                         n.cta || 'Open'
                       )}">
                         <div class="notif-ic" style="background:${n.bg};color:${n.c}" aria-hidden="true"><i class="fa-solid ${
@@ -363,13 +386,13 @@
                             <span class="notif-cta">${safe(n.cta || 'Open')} <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
                           </div>
                         </div>
-                        ${n.unread ? '<span class="notif-unread-dot" aria-label="Unread"></span>' : ''}
+                        <span class="notif-unread-dot" aria-hidden="true"></span>
                       </button>`;
                     })
                     .join('')
                 : `<div class="notif-empty">
                     <i class="fa-regular fa-bell" aria-hidden="true"></i>
-                    <strong>No notifications yet</strong>
+                    <strong>All clear</strong>
                     <span>Waiter calls, new QR orders, low stock, and updates show up here.</span>
                   </div>`
             }
@@ -377,13 +400,9 @@
       }
       function updateDot() {
         const d = bell.querySelector('.dot-notif');
-        if (d) d.style.display = NOTIFS.some((n) => n.unread) ? '' : 'none';
-        bell.setAttribute(
-          'aria-label',
-          NOTIFS.some((n) => n.unread)
-            ? `Notifications (${NOTIFS.filter((n) => n.unread).length} new)`
-            : 'Notifications'
-        );
+        const n = NOTIFS.length;
+        if (d) d.style.display = n ? '' : 'none';
+        bell.setAttribute('aria-label', n ? `Notifications (${n})` : 'Notifications');
       }
       function openPanel() {
         positionPanel();
@@ -407,36 +426,62 @@
         else openPanel();
       }
 
-      // One durable click handler — never wiped by draw()
-      panel.addEventListener(
-        'click',
-        (e) => {
+      let lastActionAt = 0;
+      let lastActionKey = '';
+      function handlePanelAction(e) {
+        if (!panel.classList.contains('show')) return;
+        const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+        const target = e.target;
+        const inPanel =
+          panel.contains(target) ||
+          path.includes(panel) ||
+          (target && target.closest && target.closest('#rs-notif-panel'));
+        if (!inPanel) return;
+
+        const markAllBtn =
+          (target && target.closest && target.closest('[data-action="mark-all"]')) ||
+          path.find((el) => el && el.getAttribute && el.getAttribute('data-action') === 'mark-all');
+        if (markAllBtn) {
+          e.preventDefault();
           e.stopPropagation();
-          const markAllBtn = e.target.closest('[data-action="mark-all"]');
-          if (markAllBtn) {
-            e.preventDefault();
-            if (markAllBtn.disabled) {
-              RS.toast('All caught up — nothing new', 'fa-circle-check');
-              return;
-            }
-            markAllRead();
-            return;
+          // Debounce double-firing from capture + bubble / click + pointer
+          const now = Date.now();
+          if (lastActionKey === 'mark-all' && now - lastActionAt < 400) return;
+          lastActionKey = 'mark-all';
+          lastActionAt = now;
+          markAllRead();
+          return;
+        }
+
+        const itemEl =
+          (target && target.closest && target.closest('[data-action="open-item"]')) ||
+          path.find((el) => el && el.getAttribute && el.getAttribute('data-action') === 'open-item');
+        if (itemEl) {
+          e.preventDefault();
+          e.stopPropagation();
+          let id = itemEl.getAttribute('data-id') || '';
+          try {
+            id = decodeURIComponent(id);
+          } catch (_) {}
+          const now = Date.now();
+          const actionKey = 'open:' + id;
+          if (lastActionKey === actionKey && now - lastActionAt < 400) return;
+          lastActionKey = actionKey;
+          lastActionAt = now;
+          const targetNotif = findNotif(id);
+          if (targetNotif) openFromNotif(targetNotif);
+          else {
+            markDismissed(id);
+            NOTIFS = NOTIFS.filter((x) => String(x.id) !== String(id));
+            draw();
+            updateDot();
+            RS.toast('Notification cleared', 'fa-check');
           }
-          const item = e.target.closest('[data-action="open-item"]');
-          if (item) {
-            e.preventDefault();
-            let id = item.getAttribute('data-id') || '';
-            try {
-              id = decodeURIComponent(id);
-            } catch (_) {}
-            const target = findNotif(id);
-            if (target) openFromNotif(target);
-            else RS.toast('Notification not found — refresh and try again', 'fa-circle-exclamation');
-          }
-        },
-        true
-      );
-      // Keyboard: Enter/Space on focused item buttons work natively (real <button>)
+        }
+      }
+
+      // Capture-phase on panel so parent page handlers cannot steal the click
+      panel.addEventListener('click', handlePanelAction, true);
 
       if (!document.body.contains(panel)) document.body.appendChild(panel);
       panel.setAttribute('aria-hidden', 'true');
@@ -445,15 +490,14 @@
       draw();
       loadNotifications();
 
-      // Bell open/close (bubble + stopPropagation so outside handler does not fight)
       bell.addEventListener('click', togglePanel);
       bell.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') togglePanel(e);
       });
-      // Outside click closes (bubble phase — does not block panel internals)
       document.addEventListener('click', (e) => {
         if (!panel.classList.contains('show')) return;
         if (panel.contains(e.target) || bell.contains(e.target)) return;
+        // Don't close if click was on mark-all / item (already handled)
         closePanel();
       });
       document.addEventListener('keydown', (e) => {
