@@ -77,7 +77,7 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v112-20260713-wa-icon';
+  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v113-20260713-topbar-clean';
   // Role shell BEFORE first paint: super-admin and client share dashboard.html,
   // so we stamp html/body classes from sessionStorage immediately. Without this,
   // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
@@ -427,58 +427,26 @@
       </div>
       <div class="tb-spacer"></div>
       <!-- Center: shift host injected by competitive-ops (#rs-topbar-shift) -->
-      <!-- Right: search + more tray + clock + bell + theme -->
+      <!-- Right: search · call · bill WhatsApp · clock · bell · theme · version (no ⋯ dump) -->
       <div class="tb-right" id="tb-right">
         <div class="tb-search tb-search-compact" title="Global search">
           <i class="fa-solid fa-magnifying-glass"></i>
           <input type="search" placeholder="Search…" aria-label="Search anything" autocomplete="off">
         </div>
-        <div class="tb-more support-dropdown" id="tb-more">
-          <button type="button" class="tb-icon-btn dropdown-trigger" id="support-trigger" aria-label="More tools" aria-expanded="false" data-tooltip="More" title="Support, sync, version">
-            <i class="fa-solid fa-ellipsis"></i>
-          </button>
-          <div class="dropdown-menu support-menu tb-more-menu" id="support-menu">
-            <div class="tb-more-section">Support</div>
-            <a href="tel:+919983721179" class="dropdown-item call">
-              <i class="fa-solid fa-phone"></i>
-              <div>
-                <strong>Call support</strong>
-                <span>+91 99837 21179</span>
-              </div>
-            </a>
-            <a href="https://wa.me/919983721179" target="_blank" rel="noopener" class="dropdown-item whatsapp">
-              <i class="fa-brands fa-whatsapp"></i>
-              <div>
-                <strong>WhatsApp support</strong>
-                <span>Chat with us</span>
-              </div>
-            </a>
-            <div class="tb-more-section">Status</div>
-            <button type="button" class="dropdown-item tb-more-status js-wa-status-pill" id="topbar-whatsapp-status-pill" role="status" title="Bill WhatsApp status">
-              <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
-              <div class="tb-more-status-copy">
-                <strong id="topbar-wa-title">WhatsApp</strong>
-                <span id="topbar-wa-detail" class="js-wa-status-text" data-wa-detail="1">Checking…</span>
-              </div>
-            </button>
-            <div class="dropdown-item tb-more-status" id="db-mode-pill" role="status" title="Cloud sync">
-              <i class="fa-solid fa-cloud" aria-hidden="true"></i>
-              <div class="tb-more-status-copy">
-                <strong>Cloud</strong>
-                <span id="db-mode-detail">Checking…</span>
-              </div>
-            </div>
-            <div class="dropdown-item tb-more-status tb-more-version" id="app-version-pill" role="status"></div>
-          </div>
-        </div>
-        <!-- Always-visible WhatsApp status: green icon = connected, red = off, spin = connecting -->
-        <button type="button" class="tb-pill tb-wa-pill js-wa-status-pill wa-starting" id="tb-wa-status-btn" role="status" aria-label="WhatsApp status" title="WhatsApp status" data-tooltip="WhatsApp status">
+        <a href="tel:+919983721179" class="tb-icon-btn tb-call-btn" id="tb-call-support" aria-label="Call support" title="Call support · +91 99837 21179" data-tooltip="Call support">
+          <i class="fa-solid fa-phone" aria-hidden="true"></i>
+        </a>
+        <!-- Bill WhatsApp only (not support chat) — green / red / spin -->
+        <button type="button" class="tb-pill tb-wa-pill js-wa-status-pill wa-starting" id="tb-wa-status-btn" role="status" aria-label="Bill WhatsApp status" title="Bill WhatsApp" data-tooltip="Bill WhatsApp">
           <i class="fa-brands fa-whatsapp tb-wa-icon" id="tb-wa-icon" aria-hidden="true"></i>
           <span class="tb-badge-label" id="tb-wa-label">…</span>
         </button>
         <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
         <button type="button" class="tb-icon-btn" aria-label="Notifications" title="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
         <button type="button" class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme" title="Light / dark"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
+        <span class="tb-version" id="app-version-pill" role="status" title="App version" aria-label="App version"></span>
+        <!-- Hidden cloud state for JS / offline lock (not shown in UI chrome) -->
+        <span id="db-mode-pill" class="tb-cloud-sr" role="status" aria-hidden="true"></span>
       </div>
     </header>
 

@@ -316,24 +316,7 @@
   $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
   document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
 
-  /* ---------- SUPPORT DROPDOWN ---------- */
-  const supportTrigger = $('#support-trigger');
-  const supportDropdown = supportTrigger ? supportTrigger.closest('.support-dropdown') : null;
-  if (supportTrigger && supportDropdown) {
-    supportTrigger.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const open = !supportDropdown.classList.contains('active');
-      supportDropdown.classList.toggle('active', open);
-      supportTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-    document.addEventListener('click', (e) => {
-      if (!supportDropdown.contains(e.target)) {
-        supportDropdown.classList.remove('active');
-        supportTrigger.setAttribute('aria-expanded', 'false');
-      }
-    });
-  }
+  /* Support is a direct top-bar call button (no ⋯ menu) */
 
   /* ---------- TOAST ---------- */
   let toastT;
@@ -381,12 +364,13 @@
   window.withToast = withToast;
 
   const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708';
-  // Show version in topbar ⋯ menu
+  // Quiet version chip on the top bar
   (function(){
     const el = document.getElementById('app-version-pill');
     if(el) {
       const short = appVersion.split('-')[0];
-      el.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>' + short + '</span>';
+      el.textContent = short;
+      el.classList.add('tb-version');
       el.setAttribute('data-tooltip', 'App version: ' + appVersion);
       el.title = 'App version: ' + appVersion;
     }
@@ -1119,9 +1103,6 @@
     if (window.setTopbarWhatsAppBadge) {
       // not exported — use DOM detail
     }
-    const pillEl = document.getElementById('topbar-whatsapp-status-pill');
-    const moreTitle = document.getElementById('topbar-wa-title');
-    const moreDetail = document.getElementById('topbar-wa-detail');
     const tbIcon = document.getElementById('tb-wa-icon');
     const tbLabel = document.getElementById('tb-wa-label');
     const friendly = (function (raw) {
@@ -1135,24 +1116,17 @@
       }
       return 'WhatsApp is offline.';
     })(reason);
-    if (moreTitle) moreTitle.textContent = 'WhatsApp · Off';
-    if (moreDetail) moreDetail.textContent = 'Not connected';
     if (tbIcon) {
       tbIcon.className = 'fa-brands fa-whatsapp tb-wa-icon';
       tbIcon.style.display = 'inline-block';
     }
     if (tbLabel) tbLabel.textContent = 'Off';
-    if (pillEl) {
-      pillEl.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
-      pillEl.classList.add('wa-offline');
-      pillEl.setAttribute('data-tooltip', friendly);
-      pillEl.title = friendly;
-    }
     const tbBtn = document.getElementById('tb-wa-status-btn');
     if (tbBtn) {
       tbBtn.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
       tbBtn.classList.add('wa-offline');
       tbBtn.title = friendly;
+      tbBtn.setAttribute('data-tooltip', friendly);
     }
   }
   function hideGatewayOfflineBanner() {
@@ -2073,8 +2047,8 @@
     }
     const versionPill = document.getElementById('app-version-pill');
     if (versionPill) versionPill.style.display = 'none';
-    const supportDrop = document.querySelector('.support-dropdown');
-    if (supportDrop) supportDrop.style.display = 'none';
+    const callBtn = document.getElementById('tb-call-support');
+    if (callBtn) callBtn.style.display = 'none';
     const stationChip = document.getElementById('rs-station-chip');
     if (stationChip) stationChip.style.display = 'none';
     const tbSearch = document.querySelector('.tb-search');

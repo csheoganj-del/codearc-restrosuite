@@ -1378,20 +1378,14 @@
 
       function setState(state, title, detail) {
         if (!pill) return;
-        pill.style.cssText = '';
+        // Pill is screen-reader / offline-lock only — no chrome
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
         document.body.classList.toggle('rs-offline-lock', ['local-only', 'offline', 'sync-error'].includes(state));
-        pill.setAttribute('data-tooltip', title);
-        pill.title = title || '';
-        const icon =
-          state === 'superadmin-cloud' ? 'fa-cloud-bolt'
-          : state === 'syncing' ? 'fa-cloud fa-pulse'
-          : state === 'offline' || state === 'local-only' || state === 'sync-error' ? 'fa-cloud'
-          : 'fa-cloud';
-        pill.innerHTML =
-          `<i class="fa-solid ${icon}" aria-hidden="true"></i>` +
-          `<div class="tb-more-status-copy"><strong>Cloud</strong><span id="db-mode-detail">${detail || '—'}</span></div>`;
+        pill.setAttribute('data-cloud-state', state || '');
+        pill.setAttribute('data-cloud-detail', detail || '');
+        pill.setAttribute('title', title || '');
+        pill.textContent = detail || state || '';
       }
 
       function updatePill() {
@@ -1569,12 +1563,12 @@
     
     const WA_BADGE_STATES = ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
     function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
-      const pills = document.querySelectorAll('.js-wa-status-pill, #topbar-whatsapp-status-pill, #tb-wa-status-btn');
+      const pills = document.querySelectorAll('.js-wa-status-pill, #tb-wa-status-btn');
       if (!pills.length) return;
 
       const spinning = !!(pulse || state === 'wa-starting' || state === 'wa-syncing' || state === 'wa-qr');
 
-      // Always-visible top-bar icon (never remove the icon node)
+      // Always-visible top-bar icon only (no ⋯ menu duplicate)
       const icon = document.getElementById('tb-wa-icon');
       const lab = document.getElementById('tb-wa-label');
       if (icon) {
@@ -1584,7 +1578,6 @@
         icon.setAttribute('aria-hidden', 'true');
       }
       if (lab) {
-        // Short hover label: On / Off / … / Scan
         const short =
           state === 'wa-linked' ? (label && String(label).indexOf('+') === 0 ? label : 'On')
           : state === 'wa-offline' || state === 'wa-auth-failure' ? 'Off'
@@ -1593,44 +1586,13 @@
         lab.textContent = short;
       }
 
-      // ⋯ More menu: title + detail + matching icon spin
-      const moreTitle = document.getElementById('topbar-wa-title');
-      const moreDetail = document.getElementById('topbar-wa-detail');
-      const moreIcon = document.querySelector('#topbar-whatsapp-status-pill > i.fa-brands, #topbar-whatsapp-status-pill > i.fa-whatsapp');
-      if (moreIcon) {
-        moreIcon.className = 'fa-brands fa-whatsapp' + (spinning ? ' fa-spin' : '');
-      }
-      const detailMap = {
-        'wa-linked': window.__rsGatewayNumber ? ('+' + window.__rsGatewayNumber) : 'Ready to send bills',
-        'wa-syncing': 'Finishing setup…',
-        'wa-qr': 'Tap to open WhatsApp settings',
-        'wa-offline': 'Not connected',
-        'wa-auth-failure': 'Tap to reconnect',
-        'wa-starting': 'Starting…',
-      };
-      const titleMap = {
-        'wa-linked': 'WhatsApp · Connected',
-        'wa-syncing': 'WhatsApp · Almost ready',
-        'wa-qr': 'WhatsApp · Scan QR',
-        'wa-offline': 'WhatsApp · Off',
-        'wa-auth-failure': 'WhatsApp · Retry',
-        'wa-starting': 'WhatsApp · Starting',
-      };
-      if (moreTitle) moreTitle.textContent = titleMap[state] || 'WhatsApp';
-      if (moreDetail) {
-        moreDetail.textContent =
-          state === 'wa-linked' && window.__rsGatewayNumber
-            ? '+' + window.__rsGatewayNumber
-            : detailMap[state] || String(label || tooltip || '—');
-      }
-
       pills.forEach((pillEl) => {
         WA_BADGE_STATES.forEach((cls) => pillEl.classList.remove(cls));
         pillEl.classList.add(state);
         pillEl.style.cssText = '';
         pillEl.setAttribute('data-tooltip', tooltip || '');
-        pillEl.title = tooltip || label || 'WhatsApp';
-        pillEl.setAttribute('aria-label', 'WhatsApp: ' + (label || state));
+        pillEl.title = tooltip || label || 'Bill WhatsApp';
+        pillEl.setAttribute('aria-label', 'Bill WhatsApp: ' + (label || state));
       });
       window.__rsWaBadge = { state, label, tooltip };
     }
@@ -1725,7 +1687,7 @@
     }
 
     function wireWhatsAppStatusClicks() {
-      document.querySelectorAll('.js-wa-status-pill, #tb-wa-status-btn, #topbar-whatsapp-status-pill').forEach((el) => {
+      document.querySelectorAll('.js-wa-status-pill, #tb-wa-status-btn').forEach((el) => {
         if (el.dataset.waClickBound === '1') return;
         el.dataset.waClickBound = '1';
         el.style.cursor = 'pointer';
@@ -1848,19 +1810,7 @@
       window.stopTopbarWhatsAppPolling();
       topbarWhatsAppDelay = 15000;
       pollTopbarWhatsApp();
-
-      const pill = document.getElementById('topbar-whatsapp-status-pill');
-      if (pill) {
-        pill.onclick = () => {
-          if (window.RS && typeof RS.activateTab === 'function') {
-            RS.activateTab('settings-tab');
-          }
-          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
-          if (gatewayBtn) {
-            gatewayBtn.click();
-          }
-        };
-      }
+      wireWhatsAppStatusClicks();
     };
     
     RS.syncPhoneCombosToSettings = function(customSettings) {

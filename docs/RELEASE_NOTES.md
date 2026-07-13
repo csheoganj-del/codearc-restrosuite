@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v113 (2026-07-13) — Clean top bar (no ⋯ dump)
+
+- Removed ⋯ menu that duplicated WhatsApp + Cloud status
+- **Call support** and **version** sit on the top bar directly
+- Bill WhatsApp stays one green/red/spin icon only (no second copy in a dropdown)
+
 ## v112 (2026-07-13) — Always-visible WhatsApp top-bar icon
 
 - Top bar always shows WhatsApp brand icon (never blank circle)
